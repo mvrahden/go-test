@@ -26,7 +26,7 @@ func checkFixtureHookCall(pass *analysis.Pass, insp *inspector.Inspector) {
 		if fd.Recv == nil || len(fd.Recv.List) != 1 || len(fd.Recv.List[0].Names) != 1 || fd.Body == nil {
 			return
 		}
-		if !harnessType(receiverTypeName(fd.Recv)) {
+		if name := receiverTypeName(fd.Recv); !harnessType(name) || isTestifySuite(pass, name) {
 			return
 		}
 		recv := pass.TypesInfo.Defs[fd.Recv.List[0].Names[0]]

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -289,18 +290,24 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		res = fixed
 	}
 
+	findings := slices.Concat(res.Findings, res.Unapplied)
+	slices.SortStableFunc(findings, func(x, y lint.Finding) int {
+		return cmp.Or(cmp.Compare(x.File, y.File), cmp.Compare(x.Line, y.Line), cmp.Compare(x.Col, y.Col))
+	})
 	switch {
 	case a.json:
-		// As with the driver, -json exits 0 with findings.
+		// As with the driver, -json exits 0 with findings. A dropped fix
+		// has no place in its format; stderr names it.
 		if err := res.PrintJSON(stdout); err != nil {
 			fmt.Fprintf(stderr, "FAIL: %v\n", err)
 			return 1, true
 		}
+		reportLintPlain(stderr, res.Unapplied, -1, source)
 		return 0, true
 	case github && !a.diff:
-		return reportLintGitHub(stdout, dir, res.Findings), true
+		return reportLintGitHub(stdout, dir, findings), true
 	default:
-		return reportLintPlain(stderr, res.Findings, a.context, source), true
+		return reportLintPlain(stderr, findings, a.context, source), true
 	}
 }
 

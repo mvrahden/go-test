@@ -92,4 +92,22 @@ func (s *RunTestSuite) TestLoad(t *gotest.T) {
 		gotest.ErrorContains(it, err, "lintprobe/one\n")
 		gotest.ErrorContains(it, err, "lintprobe/two\n")
 	})
+
+	t.It("names a dependency that does not compile once, relative to the module", func(it *gotest.T) {
+		broken := t.TempDir()
+		gotest.NoError(it, os.WriteFile(filepath.Join(broken, "go.mod"), []byte("module lintprobe\n\ngo 1.25\n"), 0o600))
+		for pkg, source := range map[string]string{
+			"dep":  "package dep\n\nfunc Value() int { return \"nope\" }\n",
+			"root": "package root\n\nimport \"lintprobe/dep\"\n\nvar X = dep.Value()\n",
+		} {
+			gotest.NoError(it, os.Mkdir(filepath.Join(broken, pkg), 0o700))
+			gotest.NoError(it, os.WriteFile(filepath.Join(broken, pkg, pkg+".go"), []byte(source), 0o600))
+		}
+		_, err := lint.Run(broken, []string{"./root"})
+		gotest.Error(it, err)
+		const msg = "dep/dep.go:3:27: cannot use \"nope\" (untyped string constant) as int value in return statement"
+		gotest.Equal(it, 1, strings.Count(err.Error(), msg), err.Error())
+		gotest.ErrorContains(it, err, "lintprobe/dep\n\t"+msg)
+		gotest.NotContains(it, err.Error(), broken)
+	})
 }

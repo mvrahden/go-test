@@ -27,7 +27,7 @@ func checkSuiteDeclaration(pass *analysis.Pass, insp *inspector.Inspector, reach
 			if !ok {
 				continue
 			}
-			kind := declaredKind(ts.Name.Name, reached)
+			kind := declaredKind(pass, ts.Name.Name, reached)
 			if kind == "" {
 				continue
 			}
@@ -38,10 +38,14 @@ func checkSuiteDeclaration(pass *analysis.Pass, insp *inspector.Inspector, reach
 }
 
 // declaredKind is "suite" or "fixture" for a type the generator reads as
-// one, or "". A package fixture counts only when a suite reaches it.
-func declaredKind(name string, reached map[string]bool) string {
+// one, or "". A package fixture counts only when a suite reaches it; a
+// testify suite is no suite.
+func declaredKind(pass *analysis.Pass, name string, reached map[string]bool) string {
 	switch {
 	case gotestast.IS_TEST_SUITE.MatchString(name):
+		if isTestifySuite(pass, name) {
+			return ""
+		}
 		return "suite"
 	case strings.HasSuffix(name, protocol.SuffixSharedFixture) || reached[name]:
 		return "fixture"
@@ -56,7 +60,7 @@ func reachedFixtures(pass *analysis.Pass) map[string]bool {
 	scope := pass.Pkg.Scope()
 	for _, name := range scope.Names() {
 		tn, ok := scope.Lookup(name).(*types.TypeName)
-		if !ok || tn.IsAlias() || !gotestast.IS_TEST_SUITE.MatchString(name) {
+		if !ok || tn.IsAlias() || !gotestast.IS_TEST_SUITE.MatchString(name) || isTestifySuite(pass, name) {
 			continue
 		}
 		if st, ok := tn.Type().Underlying().(*types.Struct); ok {

@@ -30,7 +30,10 @@ type Result struct {
 	Findings []Finding // deduplicated, sorted by position
 	// FixFiles are the files the fixable findings edit.
 	FixFiles []string
-	graph    *checker.Graph
+	// Unapplied names the fixes Fix dropped because their result does not
+	// compile; their findings stay in Findings.
+	Unapplied []Finding
+	graph     *checker.Graph
 }
 
 // PrintJSON writes the findings in the go/analysis driver's -json format.

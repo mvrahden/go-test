@@ -305,7 +305,7 @@ func mapLenEqNeq(left, right ast.Expr, negated, isNeq bool) (conditionMapping, b
 		if negated {
 			positive = !positive
 		}
-		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: "len == 0 check"}, true
+		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: pick(isNeq, "len != 0 check", "len == 0 check")}, true
 	}
 
 	// len(x) == n where n is not 0 — Len fits whenever the asserted reading
@@ -678,18 +678,40 @@ func guardErrorContains(pass *analysis.Pass, call *ast.CallExpr) {
 
 func emitSimplify(pass *analysis.Pass, call *ast.CallExpr, from, to string, newArgs, msgArgs []ast.Expr, desc string) {
 	qual := assertionQualifier(call.Fun)
-	newText := renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)
+	msg := fmt.Sprintf("use %s instead of %s for %s", to, from, desc)
+	src, ok := sourceAt(pass, call.Pos())
+	if !ok {
+		reportWithFix(pass, AssertionSimplify, call.Pos(), simplifyFix(qual, to, call, renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)), "%s", msg)
+		return
+	}
+	kept := append(append([]ast.Expr{}, newArgs...), msgArgs...)
+	parts := make([]string, len(kept))
+	for i, arg := range kept {
+		parts[i] = src.text(pass.Fset, arg)
+	}
+	newText := qual + to + "(" + strings.Join(parts, ", ") + ")"
+	stray := src.strayComments(call.Pos(), call.End(), kept)
+	if len(stray) > 0 {
+		indent, ok := src.lineIndent(call.Pos())
+		if !ok {
+			// Nowhere to keep them: no fix rather than lose them.
+			report(pass, AssertionSimplify, call.Pos(), "%s", msg)
+			return
+		}
+		newText = strings.Join(stray, "\n"+indent) + "\n" + indent + newText
+	}
+	reportWithFix(pass, AssertionSimplify, call.Pos(), simplifyFix(qual, to, call, newText), "%s", msg)
+}
 
-	reportWithFix(pass, AssertionSimplify, call.Pos(),
-		[]analysis.SuggestedFix{{
-			Message: fmt.Sprintf("use %s%s", qual, to),
-			TextEdits: []analysis.TextEdit{{
-				Pos:     call.Pos(),
-				End:     call.End(),
-				NewText: []byte(newText),
-			}},
+func simplifyFix(qual, to string, call *ast.CallExpr, newText string) []analysis.SuggestedFix {
+	return []analysis.SuggestedFix{{
+		Message: fmt.Sprintf("use %s%s", qual, to),
+		TextEdits: []analysis.TextEdit{{
+			Pos:     call.Pos(),
+			End:     call.End(),
+			NewText: []byte(newText),
 		}},
-		"use %s instead of %s for %s", to, from, desc)
+	}}
 }
 
 func renderAssertion(fset *token.FileSet, qual, target string, args, msgArgs []ast.Expr) string {
@@ -701,6 +723,80 @@ func renderAssertion(fset *token.FileSet, qual, target string, args, msgArgs []a
 		parts = append(parts, renderExpr(fset, arg))
 	}
 	return qual + target + "(" + strings.Join(parts, ", ") + ")"
+}
+
+// fileSource is the text of the file a fix edits, so rewritten code can be
+// copied with the comments inside it.
+type fileSource struct {
+	tf   *token.File
+	src  []byte
+	file *ast.File
+}
+
+func sourceAt(pass *analysis.Pass, pos token.Pos) (*fileSource, bool) {
+	tf := pass.Fset.File(pos)
+	file := fileContaining(pass, pos)
+	if tf == nil || file == nil {
+		return nil, false
+	}
+	src, err := passSource(pass, tf.Name())
+	if err != nil || tf.Size() != len(src) {
+		return nil, false
+	}
+	return &fileSource{tf: tf, src: src, file: file}, true
+}
+
+// text is e as written, or rendered when the fix built it.
+func (fs *fileSource) text(fset *token.FileSet, e ast.Expr) string {
+	if e.Pos().IsValid() && fset.File(e.Pos()) == fs.tf {
+		return string(fs.src[fs.tf.Offset(e.Pos()):fs.tf.Offset(e.End())])
+	}
+	if c, ok := e.(*ast.CallExpr); ok {
+		args := make([]string, len(c.Args))
+		for i, a := range c.Args {
+			args[i] = fs.text(fset, a)
+		}
+		return renderExpr(fset, c.Fun) + "(" + strings.Join(args, ", ") + ")"
+	}
+	return renderExpr(fset, e)
+}
+
+// strayComments are the comments within [start, end) that no kept
+// expression carries.
+func (fs *fileSource) strayComments(start, end token.Pos, kept []ast.Expr) []string {
+	var out []string
+	for _, cg := range fs.file.Comments {
+		for _, c := range cg.List {
+			if c.Pos() < start || c.End() > end || insideAny(c, kept) {
+				continue
+			}
+			out = append(out, c.Text)
+		}
+	}
+	return out
+}
+
+func insideAny(c *ast.Comment, kept []ast.Expr) bool {
+	for _, e := range kept {
+		if e.Pos().IsValid() && c.Pos() >= e.Pos() && c.End() <= e.End() {
+			return true
+		}
+	}
+	return false
+}
+
+// lineIndent is the whitespace before pos on its line; ok is false when
+// code precedes pos there.
+func (fs *fileSource) lineIndent(pos token.Pos) (string, bool) {
+	off := fs.tf.Offset(pos)
+	start := off
+	for start > 0 && (fs.src[start-1] == ' ' || fs.src[start-1] == '\t') {
+		start--
+	}
+	if start > 0 && fs.src[start-1] != '\n' {
+		return "", false
+	}
+	return string(fs.src[start:off]), true
 }
 
 // --- expression helpers ---

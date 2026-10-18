@@ -211,7 +211,7 @@ func skipped(rule Rule) bool {
 func run(pass *analysis.Pass) (any, error) {
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
-	suites := discoverSuites(insp)
+	suites := discoverSuites(pass, insp)
 	if len(suites) > 0 {
 		checkMethods(pass, insp, suites)
 		checkFocusPrefixes(pass, suites)
@@ -438,7 +438,7 @@ type suiteInfo struct {
 	fixtureFields     map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
 }
 
-func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
+func discoverSuites(pass *analysis.Pass, insp *inspector.Inspector) map[string]*suiteInfo {
 	suites := make(map[string]*suiteInfo)
 
 	insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
@@ -453,7 +453,7 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 			}
 			name := ts.Name.Name
 			stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
-			if strings.HasSuffix(stripped, protocol.SuffixTestSuite) {
+			if strings.HasSuffix(stripped, protocol.SuffixTestSuite) && !isTestifySuite(pass, name) {
 				suites[name] = &suiteInfo{
 					name:          name,
 					pos:           ts.Pos(),
@@ -465,6 +465,12 @@ func discoverSuites(insp *inspector.Inspector) map[string]*suiteInfo {
 	})
 
 	return suites
+}
+
+// isTestifySuite reports whether the package type name is a testify suite.
+func isTestifySuite(pass *analysis.Pass, name string) bool {
+	tn, ok := pass.Pkg.Scope().Lookup(name).(*types.TypeName)
+	return ok && gotestast.IsTestifySuite(tn.Type())
 }
 
 // X_ (skip) prefixes are intentionally not flagged: a skipped test is visibly
@@ -629,7 +635,7 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		ast.Inspect(body, func(n ast.Node) bool {
 			switch node := n.(type) {
 			case *ast.AssignStmt:
-				trackTVarAssign(node, tVars, gotestTVars)
+				trackTVarAssign(pass.TypesInfo, node, tVars, gotestTVars)
 			case *ast.CallExpr:
 				reportDirectEscape(pass, cl, node, isSuiteMethod, tVars, reported)
 				if isSuiteMethod {
@@ -697,7 +703,7 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 	}
 }
 
-func trackTVarAssign(assign *ast.AssignStmt, tVars, gotestTVars map[string]bool) {
+func trackTVarAssign(info *types.Info, assign *ast.AssignStmt, tVars, gotestTVars map[string]bool) {
 	for i, rhs := range assign.Rhs {
 		if i >= len(assign.Lhs) {
 			break
@@ -706,7 +712,7 @@ func trackTVarAssign(assign *ast.AssignStmt, tVars, gotestTVars map[string]bool)
 		if !ok {
 			continue
 		}
-		if isTMethodCall(rhs) {
+		if isTMethodCall(info, rhs) {
 			tVars[lhsId.Name] = true
 			continue
 		}
@@ -729,7 +735,7 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 
 	if esc, ok := escapeConfigs[sel.Sel.Name]; ok {
 		if !esc.suiteOnly || isSuiteMethod {
-			isDirect := isTMethodCall(sel.X)
+			isDirect := isTMethodCall(pass.TypesInfo, sel.X)
 			isAlias := false
 			if !isDirect {
 				if id, ok := sel.X.(*ast.Ident); ok && tVars[id.Name] {
@@ -766,7 +772,7 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 
 	if assertionFuncName(pass, call.Fun) != "" && len(call.Args) > 0 {
 		arg := call.Args[0]
-		if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(inner) {
+		if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(pass.TypesInfo, inner) {
 			reported[inner.Pos()] = true
 			innerSel := inner.Fun.(*ast.SelectorExpr)
 			reportWithFix(pass, TEscape, inner.Pos(),
@@ -948,7 +954,7 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 	ast.Inspect(fd.Body, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.AssignStmt:
-			trackParamFlow(node, aliases)
+			trackParamFlow(mr.pass.TypesInfo, node, aliases)
 		case *ast.CallExpr:
 			sel, ok := node.Fun.(*ast.SelectorExpr)
 			if ok {
@@ -962,7 +968,7 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 							mr.mark(fd, idx, method, node.Pos())
 						}
 					}
-					if isTMethodCall(sel.X) {
+					if isTMethodCall(mr.pass.TypesInfo, sel.X) {
 						innerSel := sel.X.(*ast.CallExpr).Fun.(*ast.SelectorExpr)
 						if id, ok := innerSel.X.(*ast.Ident); ok {
 							if idx, ok := aliases[id.Name]; ok {
@@ -975,7 +981,7 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 			if callee := mr.resolveCallee(node); callee != nil {
 				edge := callEdge{callee: callee, args: map[int]int{}}
 				for argIdx, arg := range node.Args {
-					if idx := exprToParamIdx(arg, aliases); idx >= 0 {
+					if idx := exprToParamIdx(mr.pass.TypesInfo, arg, aliases); idx >= 0 {
 						edge.args[argIdx] = idx
 					}
 				}
@@ -1025,7 +1031,7 @@ func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map
 		if len(argMethods) == 0 {
 			continue
 		}
-		tainted := isTMethodCall(arg)
+		tainted := isTMethodCall(mr.pass.TypesInfo, arg)
 		if !tainted {
 			if id, ok := arg.(*ast.Ident); ok {
 				tainted = tVars[id.Name] || gotestTVars[id.Name]
@@ -1070,7 +1076,7 @@ func flattenParams(params *ast.FieldList) map[string]int {
 
 // trackParamFlow extends the alias map for direct assignments (x := param)
 // and .T() calls (x := param.T()).
-func trackParamFlow(assign *ast.AssignStmt, aliases map[string]int) {
+func trackParamFlow(info *types.Info, assign *ast.AssignStmt, aliases map[string]int) {
 	for i, rhs := range assign.Rhs {
 		if i >= len(assign.Lhs) {
 			break
@@ -1085,7 +1091,7 @@ func trackParamFlow(assign *ast.AssignStmt, aliases map[string]int) {
 			}
 			continue
 		}
-		if call, ok := rhs.(*ast.CallExpr); ok && isTMethodCall(call) {
+		if call, ok := rhs.(*ast.CallExpr); ok && isTMethodCall(info, call) {
 			if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
 				if id, ok := sel.X.(*ast.Ident); ok {
 					if idx, ok := aliases[id.Name]; ok {
@@ -1099,13 +1105,13 @@ func trackParamFlow(assign *ast.AssignStmt, aliases map[string]int) {
 
 // exprToParamIdx returns the parameter index if the expression is a
 // parameter/alias ident or a .T() call on one. Returns -1 otherwise.
-func exprToParamIdx(expr ast.Expr, aliases map[string]int) int {
+func exprToParamIdx(info *types.Info, expr ast.Expr, aliases map[string]int) int {
 	if id, ok := expr.(*ast.Ident); ok {
 		if idx, ok := aliases[id.Name]; ok {
 			return idx
 		}
 	}
-	if call, ok := expr.(*ast.CallExpr); ok && isTMethodCall(call) {
+	if call, ok := expr.(*ast.CallExpr); ok && isTMethodCall(info, call) {
 		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
 			if id, ok := sel.X.(*ast.Ident); ok {
 				if idx, ok := aliases[id.Name]; ok {
@@ -1117,13 +1123,15 @@ func exprToParamIdx(expr ast.Expr, aliases map[string]int) int {
 	return -1
 }
 
-func isTMethodCall(expr ast.Expr) bool {
+// isTMethodCall reports whether expr is a T() call on a *gotest.T; a T
+// method of any other type is not the escape.
+func isTMethodCall(info *types.Info, expr ast.Expr) bool {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok || len(call.Args) != 0 {
 		return false
 	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	return ok && sel.Sel.Name == "T"
+	return ok && sel.Sel.Name == "T" && namedPtrType(info.TypeOf(sel.X), gotestImportPath, "T")
 }
 
 func checkOrphanedFiles(pass *analysis.Pass) {
@@ -1328,7 +1336,17 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 				return true
 			}
 
-			// Case 2: direct method call — t.Errorf(...), t.Fatal(...)
+			// Case 2: the outer t handed to a helper — check(t)
+			for _, arg := range innerCall.Args {
+				if ident, ok := arg.(*ast.Ident); ok && isTestT(pass, ident) && ident.Name != pollParam {
+					cl.add(PollScope, innerCall.Pos())
+					report(pass, PollScope, ident.Pos(),
+						"%s passed to %s in poll callback bypasses assertion recording — use %s",
+						ident.Name, pick(calleeName(innerCall.Fun) == "", "a function", calleeName(innerCall.Fun)), pollParam)
+				}
+			}
+
+			// Case 3: direct method call — t.Errorf(...), t.Fatal(...)
 			sel, ok := innerCall.Fun.(*ast.SelectorExpr)
 			if !ok {
 				return true
@@ -1337,9 +1355,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			if !ok {
 				return true
 			}
-			onTestT := namedPtrType(pass.TypesInfo.TypeOf(ident), "testing", "T") ||
-				namedPtrType(pass.TypesInfo.TypeOf(ident), gotestImportPath, "T")
-			if pollScopeMethodNames[sel.Sel.Name] && onTestT && ident.Name != pollParam {
+			if pollScopeMethodNames[sel.Sel.Name] && isTestT(pass, ident) && ident.Name != pollParam {
 				cl.add(PollScope, innerCall.Pos())
 				report(pass, PollScope, ident.Pos(),
 					"%s.%s in poll callback bypasses assertion recording — use %s",
@@ -1348,6 +1364,12 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			return true
 		})
 	})
+}
+
+// isTestT reports whether ident is a *testing.T or a *gotest.T.
+func isTestT(pass *analysis.Pass, ident *ast.Ident) bool {
+	t := pass.TypesInfo.TypeOf(ident)
+	return namedPtrType(t, "testing", "T") || namedPtrType(t, gotestImportPath, "T")
 }
 
 func hasTypedRParam(pass *analysis.Pass, lit *ast.FuncLit) bool {

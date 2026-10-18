@@ -180,3 +180,20 @@ func helperGotestOwnErrorf(t *gotest.T) {
 	t.Errorf("msg")
 	t.FailNow()
 }
+
+// A type of its own with a T method is no gotest.T.
+type harness struct{ t *testing.T }
+
+func (h *harness) T() *testing.T { return h.t }
+
+func ownHelper(tt *testing.T) { tt.Errorf("msg") }
+
+func (s *EscapeTestSuite) TestOwnTMethod(t *gotest.T) {
+	h := &harness{}
+	h.T().Errorf("msg")
+	h.T().Helper()
+	tt := h.T()
+	tt.Errorf("msg")
+	gotest.True(h.T(), true)
+	ownHelper(h.T())
+}

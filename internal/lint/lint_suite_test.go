@@ -33,6 +33,7 @@ func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {
 var diagnosticFixtures = []string{
 	"sample",
 	"withtestify",
+	"withtestifysuite",
 	"withnolint",
 	"withforeign",
 	"withpollscope",

@@ -72,12 +72,12 @@ func TestTrueNilNonComparable(t *testing.T) {
 func TestTrueLen(t *testing.T) {
 	s := []int{1, 2, 3}
 	gotest.True(t, len(s) == 0) // want `use Empty instead of True for len == 0 check`
-	gotest.True(t, len(s) != 0) // want `use NotEmpty instead of True for len == 0 check`
+	gotest.True(t, len(s) != 0) // want `use NotEmpty instead of True for len != 0 check`
 	gotest.True(t, len(s) > 0)  // want `use NotEmpty instead of True for len > 0 check`
 	gotest.True(t, len(s) >= 1) // want `use NotEmpty instead of True for len >= 1 check`
 	gotest.True(t, len(s) == 3) // want `use Len instead of True for len comparison`
 	gotest.True(t, 0 == len(s)) // want `use Empty instead of True for len == 0 check`
-	gotest.True(t, 0 != len(s)) // want `use NotEmpty instead of True for len == 0 check`
+	gotest.True(t, 0 != len(s)) // want `use NotEmpty instead of True for len != 0 check`
 	gotest.True(t, 3 == len(s)) // want `use Len instead of True for len comparison`
 }
 
@@ -162,7 +162,7 @@ func TestFalseNilNonComparable(t *testing.T) {
 func TestFalseLen(t *testing.T) {
 	s := []int{1, 2, 3}
 	gotest.False(t, len(s) == 0) // want `use NotEmpty instead of False for len == 0 check`
-	gotest.False(t, len(s) != 0) // want `use Empty instead of False for len == 0 check`
+	gotest.False(t, len(s) != 0) // want `use Empty instead of False for len != 0 check`
 	gotest.False(t, len(s) > 0)  // want `use Empty instead of False for len > 0 check`
 	gotest.False(t, len(s) >= 1) // want `use Empty instead of False for len >= 1 check`
 	gotest.False(t, 0 == len(s)) // want `use NotEmpty instead of False for len == 0 check`
@@ -553,4 +553,22 @@ func TestErrorIdentity(t *testing.T) {
 	target := &mixedErr{msg: "boom"}
 	gotest.True(t, err == target) // want `use ErrorIs instead of True for error == comparison — errors.Is also matches wrapped errors`
 	gotest.False(t, err == target)
+}
+
+// === Comments inside a rewritten assertion survive the fix ===
+
+func double(n int) int { return 2 * n }
+
+func TestSimplifyKeepsComments(t *testing.T) {
+	a, b := 1, 2
+	var s []int
+	gotest.True(t, a == /* expected */ b)             // want `use Equal instead of True for == comparison`
+	gotest.True(t, a != b /* why */, "differ")        // want `use NotEqual instead of True for != comparison`
+	gotest.True(t, double(1 /* one */) == 2)          // want `use Equal instead of True for == comparison`
+	gotest.Len(t, s /* none yet */, 0, "empty %d", 1) // want `use Empty instead of Len for zero length check`
+	gotest.True(t, len(s) == 0,                       // want `use Empty instead of True for len == 0 check`
+		// the reason
+		"no items")
+	check := func() { gotest.True(t, a == /* inline */ b) } // want `use Equal instead of True for == comparison`
+	check()
 }

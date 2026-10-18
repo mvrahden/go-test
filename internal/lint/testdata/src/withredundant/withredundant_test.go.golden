@@ -12,39 +12,46 @@ import (
 func TestErrorBeforeErrorIs(t *testing.T) {
 	err := errors.New("x")
 	target := errors.New("target")
+	// want `Error is redundant before ErrorIs`
 	gotest.ErrorIs(t, err, target)
 }
 
 func TestErrorBeforeErrorContains(t *testing.T) {
 	err := errors.New("x")
+	// want `Error is redundant before ErrorContains`
 	gotest.ErrorContains(t, err, "msg")
 }
 
 func TestErrorBeforeErrorAs(t *testing.T) {
 	err := errors.New("x")
+	// want `Error is redundant before ErrorAs`
 	gotest.ErrorAs(t, err)
 }
 
 func TestErrorBeforeErrorIsWithMsg(t *testing.T) {
 	err := errors.New("x")
 	target := errors.New("target")
-	gotest.ErrorIs(t, err, target)
+	// want `Error is redundant before ErrorIs`
+	gotest.ErrorIs(t, err, target, "guard")
 }
 
 // === Tier 2: NotNil before NotEmpty/Len/Contains ===
 
 func TestNotNilBeforeNotEmpty(t *testing.T) {
 	var s []int
+	// want `NotNil is redundant before NotEmpty`
 	gotest.NotEmpty(t, s)
 }
 
 func TestNotNilBeforeLenPositive(t *testing.T) {
 	var s []int
+	// want `NotNil is redundant before Len`
 	gotest.Len(t, s, 3)
 }
 
 func TestNotNilBeforeContains(t *testing.T) {
 	s := []int{1, 2, 3}
+	// want `NotNil is redundant before Contains`
 	gotest.Contains(t, s, 1)
 }
 
@@ -52,11 +59,13 @@ func TestNotNilBeforeContains(t *testing.T) {
 
 func TestNotEmptyBeforeLenPositive(t *testing.T) {
 	var s []int
+	// want `NotEmpty is redundant before Len`
 	gotest.Len(t, s, 3)
 }
 
 func TestNotEmptyBeforeContains(t *testing.T) {
 	s := []int{1, 2, 3}
+	// want `NotEmpty is redundant before Contains`
 	gotest.Contains(t, s, 1)
 }
 
@@ -89,4 +98,27 @@ func TestStandaloneAssertions(t *testing.T) {
 
 	s := []int{1, 2, 3}
 	gotest.NotEmpty(t, s)
+}
+
+// === The fix keeps the removed assertion's message and comments ===
+
+func TestRedundantKeepsMessage(t *testing.T) {
+	err := errors.New("x")
+	// want `Error is redundant before ErrorContains`
+	gotest.ErrorContains(t, err,
+		"msg", "loading %s", "config",
+	)
+}
+
+func TestRedundantKeepsComments(t *testing.T) {
+	var s []int
+	/* built above */
+	// want `NotNil is redundant before NotEmpty`
+	gotest.NotEmpty(t, s)
+}
+
+func TestRedundantBothMessages(t *testing.T) {
+	err := errors.New("x")
+	gotest.Error(t, err, "guard") // want `Error is redundant before ErrorContains`
+	gotest.ErrorContains(t, err, "msg", "contains")
 }

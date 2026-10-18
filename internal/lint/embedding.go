@@ -27,7 +27,7 @@ func checkNoEmbedding(pass *analysis.Pass, insp *inspector.Inspector, reached ma
 			if _, ok := ts.Type.(*ast.StructType); !ok {
 				continue
 			}
-			kind := declaredKind(ts.Name.Name, reached)
+			kind := declaredKind(pass, ts.Name.Name, reached)
 			if kind == "" {
 				continue
 			}
