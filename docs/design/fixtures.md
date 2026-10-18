@@ -397,7 +397,9 @@ Window scheduling is always on; there is no configuration.
 
 Fixture setup does not run at package init.
 Each generated top-level function that binds fixtures — a suite's `Test` function, each of its `Fuzz` seed-replay wrappers, its `Benchmark` wrapper — holds them for itself (`gotestruntime.HoldFixtures`): `OpenSuite` sets the DAG up right after the suite's `SuiteGuard`, before its config and `BeforeAll`, and the hold tears it down in its own cleanup, after the suite's `AfterAll`.
-A suite its guard skips sets up none of its package fixtures and hydrates none of its shared ones; the runner still starts those shared fixtures, since it cannot evaluate the guard.
+A suite its guard skips sets up none of its package fixtures and hydrates none of its shared ones; the runner still starts those shared fixtures, since it cannot evaluate the guard:
+
+> when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
 A run whose `-run`/`-skip` selects no fixture-bound function never pays setup, and `-count`, `-shuffle` or any other selection flag cannot tear a fixture down under a test that still uses it: nothing counts tests.
 
 A hold covers the suite's part of the DAG only: the package fixtures the suite binds, their parents, and the shared fixtures any of those or the suite name.
@@ -414,7 +416,20 @@ A shared fixture's state is written by the runner alone, so a suite that binds o
 
 **A panic.** The testing package runs the cleanups of the panicking test and of every test above it before it ends the process, so a panic anywhere below a holding function — a method, `It`/`When`/`Each`, `BeforeAll`/`AfterAll`, a fuzz body, a parallel or raw subtest, a cleanup — releases the fixtures. A benchmark is the exception: a panicking sub-benchmark runs only its own cleanups, and the testing package can lose a benchmark's panic altogether, printing PASS and exiting 0. So gotest recovers a panic anywhere on the benchmark path — a benchmark method, its `BeforeEach`/`AfterEach`, the suite's `BeforeAll` or `AfterAll` — prints it with its stack, and fails the benchmark (exit 1); every generated `b.Run` defers `gotestruntime.ReleaseOnPanic` for this. The remaining benchmarks, the suite's `AfterAll` and the fixture teardown then run as after any failure. Under `GODEBUG=panicnil=1` nothing is recovered, since recovering would swallow `panic(nil)`.
 
+> when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
+
+> when a benchmark panics → runs AfterAll before the fixture is released
+
 **A stop.** Ctrl-C, gotest's `--timeout`, a cancelled run: while a hold lasts, a watcher takes the stop. The contexts of test methods and of fixture setup end first, so a test blocked on a resource returns it; then setup in flight is waited for (a cancelled setup tears down what it brought up), then the held fixtures are released and the process ends by the signal. A setup that would start after the stop is refused. Releasing is bounded by the teardown budget the process gave the runner; past it the process says what it could not release and ends anyway. A hold already tearing down when the signal arrives finishes first.
+
+> when the run is interrupted while a method holds → exits 130
+
+> when the run is interrupted while a method holds → ends the holding method's context
+
+> when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
+
+> when the run is interrupted while a method holds → runs AfterAll before the fixture is released
+
 Under the runner a signal counts only once the runner has announced the stop, so a signal the code under test sends its own process is left to that code — unless the process's parent is gone (the CLI crashed), when nobody is left to announce it. Under plain `go test` only Ctrl-C (SIGINT) counts, so a test that sends SIGINT to its own process while it holds fixtures ends the run; use SIGTERM there, or run under gotest. A signal ignored when the process started stays ignored. Between holds no watcher runs and a signal has Go's default action: nothing is held.
 Fuzzing is left to Go once its engine has the selected target: it stops on Ctrl-C by itself — stopping the workers, saving what it found — and the target returns, so its fixtures tear down after it. `gotest fuzz` stops its fuzzing processes with the same Ctrl-C. A fuzz worker gets about a second from Go's coordinator to exit before it is killed, so a package fixture whose teardown takes longer is cut in the workers; fuzzing against external resources belongs in a shared fixture, which workers only hydrate.
 
@@ -446,6 +461,10 @@ A `bench` run waits for its first window of shared fixtures instead, and for eve
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
 - Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the function that held it (`fixture teardown failed`).
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
+
+A per-method hook's error is the method's failure, located where the hook produced it:
+
+> when a fixture BeforeEach returns an error → is reported in the hook's own file, not the runtime's
 
 ### Config markers
 

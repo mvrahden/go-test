@@ -276,6 +276,14 @@ gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
 A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
 so it waits for a goroutine nothing has stopped yet.
 
+> when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops → the suite passes: the wait comes after AfterAll
+
+> when a goroutine started by gotest.Go fails a fatal assertion → the wait on it fails the method there, and nothing after the wait runs
+
+A process the test starts and never waits for is not the test's to release, but it does not outlive the run:
+
+> when a test starts sleep 4242 and never waits for it → the test passes and no such process outlives the run
+
 ## Suite Conventions
 
 ### Suite types
@@ -313,6 +321,20 @@ func (s *MyTestSuite) AfterEach(t *gotest.T)  {}  // after each test
 All are optional.
 Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
+
+`FailFast` is judged per method; a failure `BeforeAll` records without stopping skips nothing:
+
+> when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
+
+> when BeforeAll of a FailFast suite records a failure without stopping and no method fails → runs every method
+
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`:
+
+> when the run is interrupted while a method holds → ends the holding method's context
+
+> when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
+
+> when the run is interrupted while a method holds → runs AfterAll before the fixture is released
 
 **On failure and panic.**
 `AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
@@ -467,6 +489,8 @@ type UserTestSuite struct {
 When both fixture and suite define `BeforeEach`/`AfterEach`, the fixture's hooks wrap the suite's:
 fixture.BeforeEach -> suite.BeforeEach -> test -> suite.AfterEach -> fixture.AfterEach.
 
+> when a fixture BeforeEach returns an error → is reported in the hook's own file, not the runtime's
+
 Fixtures compose via pointer fields (DAG — dependencies set up first):
 
 ```go
@@ -485,6 +509,9 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 ```
 
 Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 1 retry, 5s delay).
+The declared `Timeout` is also how long the runner waits for a shared fixture's setup:
+
+> when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
 
 **Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
 panics fails the run — for package and shared fixtures alike. A panic in one fixture's
@@ -521,6 +548,13 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 ```
 
 Fields assigned in `Hydrate` are automatically classified as local and excluded from serialization.
+The state travels on a pipe of its own, so the fixture may print what it likes to stdout, and only the runner can provide it:
+
+> when a shared fixture's setup prints to stdout without a newline → its suite receives the state
+
+> when a shared fixture's setup logs a JSON-shaped line → the line is not an event of the run
+
+> when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
 
 Shared fixture configuration uses a method named `SharedFixtureConfig()` (not `FixtureConfig()`) but returns the same `gotest.FixtureConfig` type:
 
@@ -533,6 +567,10 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 Suites reference shared fixtures via pointer fields (same as package fixtures).
 Shared fixtures must not live in `internal/` packages.
 Shared fixtures are window-scheduled: each is resident exactly while a scheduled suite needs it — never started when no dispatched suite requires it, and released or started at the bulk→exclusive-tail barrier as the phases' needs differ.
+
+> when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
+
+> when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
 
 ### Generic test suites (contract testing)
 

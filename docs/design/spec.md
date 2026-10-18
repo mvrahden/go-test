@@ -283,6 +283,34 @@ Each test method receives its own context instance, enabling safe method-level p
 
 Hooks accept either `*gotest.T` or `*testing.T`.
 
+A per-method fixture hook that fails is the method's failure, located where the hook produced it:
+
+> when a fixture BeforeEach returns an error → is reported in the hook's own file, not the runtime's
+
+`FailFast` is judged per method: the first failed method ends the suite, and a failure `BeforeAll` records without stopping skips nothing:
+
+> when the first method of a FailFast suite fails → fails the method
+
+> when the first method of a FailFast suite fails → fails the run
+
+> when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
+
+> when BeforeAll of a FailFast suite records a failure without stopping and no method fails → runs every method
+
+A method that panics ends the suite as it would under `go test`, after the suite's and the fixtures' teardown:
+
+> when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
+
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through its context and the suite through its teardown:
+
+> when the run is interrupted while a method holds → exits 130
+
+> when the run is interrupted while a method holds → ends the holding method's context
+
+> when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
+
+> when the run is interrupted while a method holds → runs AfterAll before the fixture is released
+
 #### Context Consistency Rules
 
 When `BeforeEach` returns a value, the following rules are enforced at generation time:
@@ -326,6 +354,10 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 
 The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`, the full path under `-fullpath`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest. It is the only verdict: once the method's body returns it is waiting for `done()`, not running, so a declared `Timeout` never also reports it as still running.
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
+
+The wait for `done` ends with the goroutine that owns it:
+
+> when the goroutine that owns done fails a fatal assertion → fails the method at once, not at the end of its budget
 With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.
 
@@ -423,7 +455,7 @@ method loop must never wait on the parallel subtests itself (a `sync.WaitGroup`,
 channel): on panic, `testing` runs ancestor cleanups from the panicking goroutine while
 the subtest that would release such a wait is still parked inside `t.Run`, so any
 wait deadlocks against the panic unwind.
-With `FailFast`, the parallel subtests of a suite additionally share a failure flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
+With `FailFast`, the parallel subtests of a suite additionally share a failure flag: a failed subtest sets it, and subtests that start afterwards skip themselves (the clauses under Lifecycle Hooks hold for both forms).
 
 On Windows, suite subprocesses run on a hidden console of their own and under a job object, so that a shutdown request and a force-kill reach the whole process tree and nothing outside it.
 
@@ -492,6 +524,9 @@ type BatchTestSuite struct {
 ```
 
 Both paths produce the same lifecycle: deserialize from state file, call `Hydrate`, run tests, call `Dehydrate`.
+The state file is the runner's to write, so a suite binding a shared fixture is not plain `go test`'s to run:
+
+> when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
 
 Fixtures may be defined in a different package from the suite.
 Binding walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
@@ -511,6 +546,14 @@ InfraFixture.BeforeAll
   APIFixture.AfterAll
 InfraFixture.AfterAll
 ```
+
+A shared fixture starts for the suites the run dispatches — `-skip` counts in that plan as `-run` does — and a guard the runner cannot evaluate does not take a suite out of it:
+
+> when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
+
+> when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
+
+> when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
 
 #### Fixture Runtime
 
@@ -592,11 +635,11 @@ Read transferred fields but do not reassign them — use local variables for any
 Subprocess (compiled binary):
   sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
   serialize transferable fields  → JSON (local fields excluded)
-  write to stdout, wait for SIGTERM
+  write to the protocol stream, wait for the runner's teardown verb
   sf.AfterAll(ctx)               → tears down infrastructure
 
 CLI (gotest):
-  read JSON from subprocess stdout
+  read JSON from the subprocess's protocol stream
   write state files in the work dir — per-suite shared/<Suite>.json in the
   test run; one global shared/state.json in a bench run
   set GOTEST_SHARED_STATE_FILE env var for test process
@@ -617,6 +660,20 @@ The serialization boundary only exists between the subprocess and test processes
 
 `BeforeAll` always sets transfer fields. Local fields only need to be set in `BeforeAll` when a dependent shared fixture accesses them — otherwise they may add an idle resource to the subprocess.
 `Hydrate` is not called within the subprocess — it runs only in test processes after JSON deserialization.
+
+The protocol stream is a pipe of its own, so the subprocess's stdout and stderr stay the fixture's to print to, and the state has no size the fixture must stay under:
+
+> when a shared fixture's setup prints to stdout without a newline → its suite receives the state
+
+> when a shared fixture's setup logs a JSON-shaped line → its suite receives the state
+
+> when a shared fixture's setup logs a JSON-shaped line → the line is not an event of the run
+
+> when a shared fixture carries 2 MiB of state → its suite receives the state
+
+The runner waits for setup as long as the fixture's declared config allows, not for a number of its own:
+
+> when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
 
 **Validation at generation time:**
 
@@ -735,7 +792,7 @@ A fixture with no marker gets the default bounds and no verdict; it is never fai
 A setup overrun on a *successful* return is terminal (`gotestruntime.ErrSetupOverran`): it is not retried — the work completed and the overrun is deterministic — and the fixture still gets its `AfterAll`, because the resources it built exist.
 
 **Shared fixtures:** The generated subprocess uses `SharedFixtureConfig()` when present (otherwise `DefaultFixtureConfig()`), wrapping each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`, under the same declared-budget verdicts as package fixtures.
-After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON.
+After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized as JSON on the protocol stream.
 `AfterAll(ctx)` runs through `gotestruntime.RunFixtureTeardown` in the teardown handler: context-bounded always, and held to a declared `Timeout` by verdict, with a failed teardown reaching the runner through the process exit status.
 The subprocess is shutdown-capable from birth and never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed.
 In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
@@ -844,6 +901,8 @@ Failure messages always include the user call site, resolved by an internal stac
 The failure is located (`file.go:line:` before the message, as `go test` prints it) at the line that failed, whichever testing type the assertion got — `*gotest.T`, `*testing.T`, `*gotest.B`, `*gotest.F`, or a fuzz body's `t` — inside a helper too, and never at a file of gotest's, reflect's or the runtime's. When that line is in a helper, the message names the test's own call site after it. Both honour `-fullpath`.
 Never call `t.T().Helper()` — it degrades location reporting; the `t-escape` lint rule flags it.
 
+> when a helper fails in a module whose path has no dot, built with -trimpath → the failure names the helper's line and the caller's
+
 <!-- fence:pseudo -->
 ```go
 // Equality — [V any] catches cross-type comparison at compile time
@@ -940,6 +999,10 @@ Equal failed:
 When only unexported fields differ (expansion cannot read them), the output falls back to `%#v`, which can.
 The same diff renderer serves snapshot mismatches.
 
+> when Equal fails on values whose rendering spans lines → the message carries a unified diff: hunks of changes with three lines of context
+
+> when an assertion's first extra argument is not a string → every extra argument is in the message
+
 Runtime argument guards — each fails with a type error instead of guessing:
 
 - `Contains`/`NotContains` accept a string (substring), slice/array (element, `DeepEqual`), or map (**key** presence)
@@ -947,6 +1010,24 @@ Runtime argument guards — each fails with a type error instead of guessing:
 - `Empty`/`NotEmpty` accept slice, map, array, chan, string, or pointer (recursively); other types are rejected — use `Nil`/`Zero`
 - `ErrorIs` with a nil target and `ErrorContains` with an empty string are rejected — use `NoError`/`Error`
 - `Must`'s second argument may be `nil`, `bool`, or `error`; anything else panics
+
+A guard refuses a kind, never a named type of an accepted kind, and a comparison reads the value, not its spelling:
+
+> when Regexp is given a pattern of a named string type → compiles and matches it like a string
+
+> when Contains compares named string kinds → checks the substring as it does for strings
+
+> when Contains is given a needle no element of the haystack could be → fails naming the haystack's type and the needle's
+
+> when InDelta is given a NaN delta → fails: no distance is within NaN
+
+> when InDelta compares two equal infinities → they are within any delta
+
+> when ErrorAs is given an error of another type → names the type it expected
+
+> when JSONEq compares integers beyond float64's exact range → tells 9007199254740993 from 9007199254740992
+
+> when JSONEq compares an integer with its decimal spelling → 1 equals 1.0
 
 The assertion engine has zero external dependencies — `reflect.DeepEqual`, `cmp.Compare`, `fmt.Sprintf("%#v")`, and a minimal inline diff renderer.
 
@@ -999,7 +1080,14 @@ for it, tc := range gotest.Each(t, []struct {
 ```
 
 Uses `Desc` or `Name` field for the subtest name, falls back to `#0`, `#1`, etc.
-A `FailNow` inside an entry aborts the remaining entries (the loop propagates it to the parent); `break` is supported and stops cleanly.
+
+A row is a subtest, and the loop carries its verdict to the method:
+
+> when one row of an Each table fails → fails that row and the method, and the rows after it never run
+
+> when one row of an Each table skips → skips that row and the method from there, and the rows after it never run
+
+> when the loop over an Each table breaks → stops at the break and the method goes on
 
 ---
 
@@ -1042,6 +1130,16 @@ The `poll *gotest.R` captures assertion failures without propagating them to the
 On timeout, `Eventually` reports the last poll's assertion failures.
 `Consistently` fails on first assertion failure and reports which poll failed.
 
+A poll is held to the deadline it was given, and the arguments are checked before the first poll:
+
+> when an Eventually poll runs past waitFor → fails at the deadline and says the poll is still running
+
+> when a Consistently poll runs past waitFor → fails at the deadline and says the poll is still running
+
+> when tick is longer than waitFor and the first poll fails → a final poll runs at the deadline and can still pass
+
+> when waitFor or tick is not positive → fails with a type-guard message and polls nothing
+
 ---
 
 ## Snapshot Testing
@@ -1057,6 +1155,16 @@ gotest.MatchSnapshot(t, result, "variant")    // custom snapshot name
 - Update: `gotest --update-snapshots ./...` (sets `GOTEST_UPDATE_SNAPSHOTS=1`; use the env var directly under plain `go test`)
 - CI mode (`--ci` / `GOTEST_CI=1`): read-only — a missing baseline fails instead of being created
 - Safe under parallel tests: snapshot files are guarded by per-file mutexes
+
+Each subtest reads a section of its own, the baseline is found from the test file whatever the build flags, and a name that could not be a section header is refused:
+
+> when Each rows and same-named subtests match snapshots → #0, #1, x and x#01 each read their own section
+
+> when the package is built with -trimpath → the baselines are still found beside the test, _ext suffix included
+
+> when GOTEST_UPDATE_SNAPSHOTS is 0 → a stale baseline still fails and is left as it was
+
+> when a snapshot name spans lines or spells a section header → is refused before anything is written
 
 ---
 
