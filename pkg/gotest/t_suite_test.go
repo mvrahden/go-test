@@ -38,6 +38,14 @@ func (s *TTestSuite) TestNewTWithDeadline(t *gotest.T) {
 			tt := gotest.NewTWithDeadline(it, 1*time.Second)
 			gotest.Equal(it, it.T(), tt.T())
 		})
+
+		w.It("accepts a *testing.T as well, deriving from its context", func(it *gotest.T) {
+			tt := gotest.NewTWithDeadline(it.T(), time.Hour)
+			deadline, ok := tt.Context().Deadline()
+			gotest.True(it, ok)
+			gotest.Greater(it, time.Until(deadline), 59*time.Minute)
+			gotest.Equal(it, it.T(), tt.T())
+		})
 	})
 }
 
