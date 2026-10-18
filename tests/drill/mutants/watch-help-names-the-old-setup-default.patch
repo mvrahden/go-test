@@ -1,5 +1,5 @@
-Expect: ^FAIL .*conformance/cli .* / gives its default as the fixtures' declared budgets, 2m until the first reports / help watch \(
-Clause: when a help text lists --setup-timeout → gives its default as the fixtures' declared budgets, 2m until the first reports
+Expect: ^FAIL .*conformance/cli .* / gives its default as the fixtures' declared budgets, 30s until the first reports / help watch \(
+Clause: when a help text lists --setup-timeout → gives its default as the fixtures' declared budgets, 30s until the first reports
 --- a/cmd/gotest/help.go
 +++ b/cmd/gotest/help.go
 @@ -346,8 +346,7 @@
@@ -7,7 +7,7 @@ Clause: when a help text lists --setup-timeout → gives its default as the fixt
    --update-snapshots      Regenerate snapshot files
    --no-cache              Disable the overlay and test binary caches
 -  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
--                          budgets, 2m until the first reports; 0 to disable)
+-                          budgets, 30s until the first reports; 0 to disable)
 +  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
    --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
    --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,

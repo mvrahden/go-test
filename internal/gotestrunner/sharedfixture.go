@@ -41,9 +41,9 @@ func (e *SetupTimeoutError) Error() string {
 }
 
 // setupReportFloor is how long the wait for shared fixtures lasts before the
-// process has reported a single fixture's budget: the first config
-// derivation, generously. Variable for the runner's own tests.
-var setupReportFloor = DefaultSetupTimeout
+// process has reported a single fixture's budget: the process starting and
+// deriving its first SharedFixtureConfig. Variable for the runner's own tests.
+var setupReportFloor = 30 * time.Second
 
 // SharedFixtureProcess manages a running shared fixture setup subprocess.
 // The subprocess starts shared fixtures, writes JSON state to stdout,

@@ -9,7 +9,7 @@ Clause: when a shared fixture started for a bench slot hangs past its declared 2
  // at zero, the budgets the started fixtures declare.
  func (p *SharedFixtureProcess) StartKeys(ctx context.Context, keys []string, flat time.Duration) error {
 +	if flat == 0 {
-+		flat = DefaultSetupTimeout
++		flat = 2 * time.Minute
 +	}
  	return p.command(ctx, "start", keys, flat)
  }

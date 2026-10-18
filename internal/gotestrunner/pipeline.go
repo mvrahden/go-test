@@ -19,11 +19,6 @@ import (
 	"github.com/mvrahden/go-test/internal/schedinfo"
 )
 
-// DefaultSetupTimeout bounds the wait for shared fixtures only until the
-// first fixture reports the budget its setup is held to; from then on the
-// wait is the fixtures' own (see SharedFixtureProcess.WaitSetup).
-const DefaultSetupTimeout = 2 * time.Minute
-
 // resolveSetupTimeout turns the --setup-timeout flag into WaitSetup's flat
 // budget: a positive duration as given, zero (the flag absent) for the
 // fixtures' declared budgets, negative (the flag at 0) for no deadline.

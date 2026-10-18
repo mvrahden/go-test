@@ -9,8 +9,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// ContainerSharedFixture declares ContainerFixtureConfig and takes 130s to
-// come up, as a container pull might.
+// ContainerSharedFixture declares ContainerFixtureConfig and takes 35s to
+// come up, past the runner's 30s wait for a first reported budget.
 type ContainerSharedFixture struct {
 	State string
 }
@@ -21,7 +21,7 @@ func (f *ContainerSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 
 func (f *ContainerSharedFixture) BeforeAll(ctx context.Context) error {
 	select {
-	case <-time.After(130 * time.Second):
+	case <-time.After(35 * time.Second):
 	case <-ctx.Done():
 		return ctx.Err()
 	}

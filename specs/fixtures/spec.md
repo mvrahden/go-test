@@ -80,7 +80,7 @@ A suite binding a shared fixture SHALL fail under plain go test before any metho
 When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them, for a setup at the start of the run and for one started later for the exclusive tail or a bench slot; a fixture that hangs past that budget SHALL fail the run and the suites that read it SHALL never run.
 
 #### Scenario: A container fixture slower than the default budget
-- **WHEN** a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given
+- **WHEN** a shared fixture declaring ContainerFixtureConfig takes 35s to come up and no --setup-timeout is given
 - **THEN** the run passes: the wait is the fixture's declared budget
 
 #### Scenario: A fixture that hangs past its budget

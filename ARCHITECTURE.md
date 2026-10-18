@@ -770,7 +770,7 @@ still run — never speculatively.
 │                                                                        │
 │  --setup-timeout (CLI flag)                                            │
 │  └─ Total budget for shared fixture subprocess to emit JSON state      │
-│     Default: the fixtures' declared budgets, 2m until the first        │
+│     Default: the fixtures' declared budgets, 30s until the first       │
 │     reports (0 to disable)                                             │
 │                                                                        │
 │  SharedFixtureConfig.Timeout (per shared fixture)                      │

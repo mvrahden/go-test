@@ -3,6 +3,8 @@ package gotestrunner_test
 import (
 	"context"
 	"encoding/json"
+	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -81,6 +83,25 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheBudgetOutlivesTheFloor(t *got
 			var got struct{ Marker string }
 			gotest.NoError(it, json.Unmarshal(proc.State([]string{key})[key], &got))
 			gotest.Equal(it, "up", got.Marker)
+		})
+	})
+}
+
+func (s *SharedFixtureSetupBudgetTestSuite) TestTheFloorIsThirtySeconds(t *gotest.T) {
+	// The bubble's clock: the floor's real value, waited out at once.
+	var err error
+	var took time.Duration
+	synctest.Test(t.T(), func(*testing.T) {
+		proc := gotestrunner.ExportNewSilentProcess()
+		began := time.Now()
+		err = proc.WaitSetup(context.Background(), 0)
+		took = time.Since(began)
+	})
+	t.When("no --setup-timeout is given and the setup process never reports a budget", func(w *gotest.T) {
+		w.It("the wait ends after 30s as a setup timeout", func(it *gotest.T) {
+			timeout := gotest.ErrorAs[*gotestrunner.SetupTimeoutError](it, err)
+			gotest.Equal(it, 30*time.Second, timeout.After)
+			gotest.Equal(it, 30*time.Second, took)
 		})
 	})
 }

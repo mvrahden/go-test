@@ -214,6 +214,16 @@ func ExportSetSetupReportFloor(d time.Duration) (restore func()) {
 	return func() { setupReportFloor = was }
 }
 
+// ExportNewSilentProcess is a process that never reports: no budget, no
+// state, no end of setup.
+func ExportNewSilentProcess() *SharedFixtureProcess {
+	return &SharedFixtureProcess{
+		state:      map[string]json.RawMessage{},
+		allDone:    make(chan struct{}),
+		budgetSeen: make(chan struct{}, 1),
+	}
+}
+
 var ExportAssignBudgetFiles = assignBudgetFiles
 
 // ExportExited is closed once the shared fixture process has exited.

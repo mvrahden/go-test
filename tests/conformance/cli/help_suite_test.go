@@ -23,7 +23,7 @@ type helpRow struct {
 
 func (s *CLIHelpTestSuite) TestTheSetupTimeoutDefault(t *gotest.T) {
 	t.When("a help text lists --setup-timeout", func(w *gotest.T) {
-		w.It("gives its default as the fixtures' declared budgets, 2m until the first reports", func(it *gotest.T) {
+		w.It("gives its default as the fixtures' declared budgets, 30s until the first reports", func(it *gotest.T) {
 			for sub, row := range gotest.Each(it, []helpRow{
 				{Desc: "help", args: []string{"help"}},
 				{Desc: "help watch", args: []string{"help", "watch"}},
@@ -37,7 +37,7 @@ func (s *CLIHelpTestSuite) TestTheSetupTimeoutDefault(t *gotest.T) {
 				gotest.Equal(sub, 0, run.Exit, "stderr: %s", run.Stderr)
 				text := strings.Join(strings.Fields(run.Stdout), " ")
 				gotest.Contains(sub, text, "setup-timeout")
-				gotest.Contains(sub, text, "default: the fixtures' declared budgets, 2m until the first reports")
+				gotest.Contains(sub, text, "default: the fixtures' declared budgets, 30s until the first reports")
 			}
 		})
 	})
