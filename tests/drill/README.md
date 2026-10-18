@@ -142,6 +142,8 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `indelta-infinities-differ` | two equal infinities are not within any delta | canary: the passing fixture's infinity comparison fails |
 | `message-drops-trailing-args` | a non-string first argument silences the arguments after it | canary: no failure carries the trailing argument |
 | `erroras-type-unnamed` | ErrorAs reports a mismatch without the type it wanted | canary: no failure names the expected type |
+| `jsoneq-numbers-as-float64` | JSONEq decodes numbers into float64 | canary: two integers a float64 cannot tell apart compare equal |
+| `jsoneq-numbers-by-spelling` | JSONEq tells numbers apart by how they are written | canary: the passing fixture's 1 and 1.0 differ |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |

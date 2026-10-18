@@ -193,6 +193,10 @@ Assertions take the types they are given at face value and say what they cannot 
 
 > when ErrorAs is given an error of another type → names the type it expected
 
+> when JSONEq compares integers beyond float64's exact range → tells 9007199254740993 from 9007199254740992
+
+> when JSONEq compares an integer with its decimal spelling → 1 equals 1.0
+
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.

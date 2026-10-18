@@ -1,0 +1,12 @@
+Expect: failing: verdicts differ from the golden list
+Clause: when JSONEq compares integers beyond float64's exact range → tells 9007199254740993 from 9007199254740992
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -163,7 +163,6 @@
+ 	// Numbers stay as written: decoding them into float64 would make
+ 	// 9007199254740993 and 9007199254740992 the same JSON.
+ 	dec := json.NewDecoder(bytes.NewReader(raw))
+-	dec.UseNumber()
+ 	var out any
+ 	if err := dec.Decode(&out); err != nil {
+ 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)

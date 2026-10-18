@@ -160,7 +160,7 @@ func (s *PredicatesTestSuite) TestDidPanic(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
-	want := map[string]any{"a": float64(1)}
+	want := map[string]any{"a": json.Number("1")} // numbers stay as written
 	for _, c := range []struct {
 		what string
 		in   any

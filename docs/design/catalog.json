@@ -245,6 +245,73 @@
               "name": "TestMessages",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "tells 9007199254740993 from 9007199254740992",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "tells_9007199254740993_from_9007199254740992",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when JSONEq compares integers beyond float64's exact range",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "JSONEq_compares_integers_beyond_float64's_exact_range",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "1 equals 1.0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "1_equals_1.0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when JSONEq compares an integer with its decimal spelling",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "JSONEq_compares_an_integer_with_its_decimal_spelling",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "JSONEq",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestJSONEq",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "AssertionTyping",
@@ -3722,7 +3789,7 @@
     }
   ],
   "stats": {
-    "behaviors": 135,
+    "behaviors": 137,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

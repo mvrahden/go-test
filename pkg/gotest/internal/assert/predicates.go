@@ -1,9 +1,11 @@
 package assert
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"reflect"
 	"strings"
 )
@@ -158,9 +160,16 @@ func NormalizeJSON(v any) (any, error) {
 			return nil, fmt.Errorf("failed to marshal value: %w", err)
 		}
 	}
+	// Numbers stay as written: decoding them into float64 would make
+	// 9007199254740993 and 9007199254740992 the same JSON.
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
 	var out any
-	if err := json.Unmarshal(raw, &out); err != nil {
+	if err := dec.Decode(&out); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+	if dec.More() {
+		return nil, fmt.Errorf("failed to unmarshal JSON: trailing data after the value")
 	}
 	return out, nil
 }
@@ -180,6 +189,44 @@ func Length(object any) (n int, ok bool) {
 }
 
 // JSONEqual reports whether two values from NormalizeJSON are the same JSON.
+// Numbers are compared as the exact values they spell, so 1 equals 1.0 and
+// 1e2 equals 100, while integers beyond float64's exact range stay apart.
 func JSONEqual(expected, actual any) bool {
+	switch e := expected.(type) {
+	case map[string]any:
+		a, ok := actual.(map[string]any)
+		if !ok || len(a) != len(e) {
+			return false
+		}
+		for k, ev := range e {
+			av, ok := a[k]
+			if !ok || !JSONEqual(ev, av) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		a, ok := actual.([]any)
+		if !ok || len(a) != len(e) {
+			return false
+		}
+		for i := range e {
+			if !JSONEqual(e[i], a[i]) {
+				return false
+			}
+		}
+		return true
+	case json.Number:
+		a, ok := actual.(json.Number)
+		if !ok {
+			return false
+		}
+		er, eok := new(big.Rat).SetString(string(e))
+		ar, aok := new(big.Rat).SetString(string(a))
+		if !eok || !aok {
+			return e == a
+		}
+		return er.Cmp(ar) == 0
+	}
 	return reflect.DeepEqual(expected, actual)
 }

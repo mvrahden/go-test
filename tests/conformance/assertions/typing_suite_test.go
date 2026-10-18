@@ -88,3 +88,22 @@ func (s *AssertionTypingTestSuite) TestMessages(t *gotest.T) {
 		})
 	})
 }
+
+func (s *AssertionTypingTestSuite) TestJSONEq(t *gotest.T) {
+	t.When("JSONEq compares integers beyond float64's exact range", func(w *gotest.T) {
+		w.It("tells 9007199254740993 from 9007199254740992", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"n":9007199254740993}`, `{"n":9007199254740992}`) })
+			gotest.True(it, m.Failed())
+			same := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"n":9007199254740993}`, `{"n":9007199254740993}`) })
+			gotest.False(it, same.Failed(), same.Message())
+		})
+	})
+	t.When("JSONEq compares an integer with its decimal spelling", func(w *gotest.T) {
+		w.It("1 equals 1.0", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"n":1}`, `{"n":1.0}`) })
+			gotest.False(it, m.Failed(), m.Message())
+			e := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `[1e2]`, `[100]`) })
+			gotest.False(it, e.Failed(), e.Message())
+		})
+	})
+}

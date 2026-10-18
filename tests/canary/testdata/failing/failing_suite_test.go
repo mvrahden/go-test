@@ -96,3 +96,7 @@ type route string
 func (s *FailingTestSuite) TestRegexpNamed(t *gotest.T) {
 	gotest.Regexp(t, route(`^/api/`), "/web/users")
 }
+
+func (s *FailingTestSuite) TestJSONEqBigInts(t *gotest.T) {
+	gotest.JSONEq(t, `{"n":9007199254740993}`, `{"n":9007199254740992}`)
+}
