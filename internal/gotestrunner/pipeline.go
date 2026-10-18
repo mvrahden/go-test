@@ -240,12 +240,12 @@ func fixtureBarrier(ctx context.Context, proc *SharedFixtureProcess, bulkAlive, 
 	}
 	var errs []error
 	if release := diffKeys(bulkAlive, tailAlive); len(release) > 0 {
-		if err := proc.TeardownKeys(release, proc.teardownBudget()); err != nil {
+		if err := proc.TeardownKeys(ctx, release, proc.teardownBudget()); err != nil {
 			errs = append(errs, fmt.Errorf("early shared fixture teardown: %w", err))
 		}
 	}
 	if acquire := diffKeys(tailAlive, bulkAlive); len(acquire) > 0 {
-		if err := proc.StartKeys(acquire, setupTimeout); err != nil {
+		if err := proc.StartKeys(ctx, acquire, setupTimeout); err != nil {
 			errs = append(errs, fmt.Errorf("shared fixture start for exclusive tail: %w", err))
 		}
 	}
@@ -570,7 +570,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		for _, k := range start {
 			alive[k] = true
 		}
-		if err := setupProc.StartKeys(start, resolvedSetupTimeout); err != nil {
+		if err := setupProc.StartKeys(ctx, start, resolvedSetupTimeout); err != nil {
 			openErrs = append(openErrs, fmt.Errorf("bench fixture window open (%s): %w", targets[i].SuiteName, err))
 		}
 	}
@@ -585,7 +585,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		for _, k := range release {
 			delete(alive, k)
 		}
-		if err := setupProc.TeardownKeys(release, setupProc.teardownBudget()); err != nil {
+		if err := setupProc.TeardownKeys(ctx, release, setupProc.teardownBudget()); err != nil {
 			closeErrs = append(closeErrs, fmt.Errorf("bench fixture window close (%s): %w", targets[i].SuiteName, err))
 		}
 	}

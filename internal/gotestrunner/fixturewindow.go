@@ -98,7 +98,7 @@ func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]
 	for pkg, suites := range suitesByPkg {
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) || skipsSuite(userSkipFilter, testFuncName) {
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) || skipsSuite(userSkipFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) {
 				continue
 			}
 			phase := bulk

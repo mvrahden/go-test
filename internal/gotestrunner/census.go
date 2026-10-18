@@ -91,6 +91,9 @@ type verdictIndex struct {
 	// short, and is named as such.
 	resulted map[CensusCase]bool
 	cut      map[CensusCase]bool
+	// ranNow and cutNow hold the units started and cut in the suite output
+	// being indexed.
+	ranNow, cutNow []CensusCase
 }
 
 func (x *verdictIndex) Write(p []byte) (int, error) {
@@ -167,9 +170,10 @@ func (x *verdictIndex) observe(line []byte) {
 				x.started = append(x.started, key)
 			}
 			x.running[key] = true
+			x.ranNow = append(x.ranNow, key)
 		}
 	case "output":
-		if ev.Test != "" && strings.HasPrefix(strings.TrimLeft(ev.Output, " "), "--- ") {
+		if ev.Test != "" && isResultLine(ev.Output) {
 			if x.resulted == nil {
 				x.resulted = map[CensusCase]bool{}
 			}
@@ -188,6 +192,7 @@ func (x *verdictIndex) observe(line []byte) {
 				x.cut = map[CensusCase]bool{}
 			}
 			x.cut[key] = true
+			x.cutNow = append(x.cutNow, key)
 		}
 		ev.Output = ""
 		x.last[key] = ev
@@ -196,6 +201,27 @@ func (x *verdictIndex) observe(line []byte) {
 	if depth == 1 && strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) && benchVerdict(ev) {
 		x.creditBenchmark(key)
 	}
+}
+
+// isResultLine reports whether output is a test's own result line.
+func isResultLine(output string) bool {
+	output = strings.TrimLeft(output, " ")
+	return strings.HasPrefix(output, "--- PASS: ") || strings.HasPrefix(output, "--- FAIL: ") || strings.HasPrefix(output, "--- SKIP: ")
+}
+
+// endSuite closes the output of one suite process. What its binary ended
+// under counts as running or cut only when the run's context stopped it; a
+// binary that ended on its own was cut short by no deadline.
+func (x *verdictIndex) endSuite(cutShort bool) {
+	if !cutShort {
+		for _, k := range x.ranNow {
+			x.settle(k)
+		}
+		for _, k := range x.cutNow {
+			delete(x.cut, k)
+		}
+	}
+	x.ranNow, x.cutNow = nil, nil
 }
 
 // creditBenchmark books a benchmark's verdict, once.

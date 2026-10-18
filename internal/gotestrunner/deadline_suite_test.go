@@ -113,6 +113,41 @@ func (s *DeadlineAttributionTestSuite) TestAMethodTheConverterFailedIsStillNamed
 	})
 }
 
+func (s *DeadlineAttributionTestSuite) TestACrashBeforeTheDeadlineIsNotBlamedOnIt(t *gotest.T) {
+	target := func(name string) gotestrunner.SuiteTarget {
+		return gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: censusPkg, SuiteName: name}}
+	}
+	hang := `{"Action":"run","Package":"example.com/pkg","Test":"TestHangTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestHangTestSuite/TestWait"}
+`
+	t.When("one suite crashed on its own and another was still running at the deadline", func(w *gotest.T) {
+		var stdout, stderr bytes.Buffer
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+		c.Register(censusPkg, 2)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{Target: target("TestCartTestSuite"), Stdout: []byte(cutShortStream), ExitCode: 2})
+		c.RecordResult(censusPkg, 1, gotestrunner.SuiteResult{Target: target("TestHangTestSuite"), Stdout: []byte(hang), ExitCode: 1, CutShort: true})
+		before := stdout.Len()
+		running := gotestrunner.ExportBookDeadlineOn(c, context.DeadlineExceeded)
+		booked := stdout.String()[before:]
+
+		w.It("names only what the deadline cut short", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestHangTestSuite/TestWait"}}, running)
+			gotest.NotContains(it, booked, `"Test":"TestCartTestSuite/TestAdd","Output":"    gotest: --timeout expired`)
+		})
+	})
+
+	t.When("a method's output starts with dashes that are not a result line", func(w *gotest.T) {
+		stream := `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- 5 allocs/op\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}
+`
+		w.It("still names the method the binary ended under", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite/TestAdd"}}, gotestrunner.ExportRunning(stream))
+		})
+	})
+}
+
 func (s *DeadlineAttributionTestSuite) TestRunningUnitsAreBookedIntoTheStream(t *gotest.T) {
 	t.When("the deadline cut the run short", func(w *gotest.T) {
 		for sub, mode := range gotest.Each(w, []gotestrunner.RunMode{gotestrunner.RunCaptureJSON, gotestrunner.RunStreamJSON}) {

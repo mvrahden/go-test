@@ -451,6 +451,29 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 			gotest.Empty(it, targets[0].FuzzFuncs)
 		})
 	})
+
+	t.When("-skip names the suite's Test function", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+		fuzzFuncsByPkg := map[string]map[string][]string{
+			"example.com/pkg": {"FooSuite": {"FuzzFooSuite_A", "FuzzFooSuite_B"}},
+		}
+
+		w.It("keeps the suite while a seed replay is not skipped, as go test runs it", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "", "^TestFooSuite$")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, []string{"FuzzFooSuite_A", "FuzzFooSuite_B"}, targets[0].FuzzFuncs)
+		})
+
+		w.It("drops the suite when every Test and Fuzz function is skipped", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "", "^TestFooSuite$|^FuzzFooSuite_")
+			gotest.Empty(it, targets)
+		})
+
+		w.It("drops a suite without fuzz methods", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, "", "^TestFooSuite$")
+			gotest.Empty(it, targets)
+		})
+	})
 }
 
 func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {

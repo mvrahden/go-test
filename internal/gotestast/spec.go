@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -808,10 +809,8 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	// A hook runs under benchmark and fuzz wrappers with a T whose T() is nil:
 	// a call to it there is a nil dereference at run time.
 	if kind := ts.th.wrapperKind(); kind != "" {
-		for name, hook := range map[string]*TestSuiteMethod{"BeforeAll": ts.th.BeforeAll, "AfterAll": ts.th.AfterAll, "BeforeEach": be, "AfterEach": ae} {
-			if pos := hook.callsT(ts.pkg); pos.IsValid() {
-				return At(pos, fmt.Errorf("suite %s has %s methods but %s calls t.T(), which is nil under them — use the hook's own t", suiteName, kind, name))
-			}
+		if err := hooksCallingT(ts, kind); err != nil {
+			return err
 		}
 	}
 
@@ -901,6 +900,37 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	}
 
 	return nil
+}
+
+// hooksCallingT names every hook that calls t.T(), in source order, located
+// at the first call.
+func hooksCallingT(ts *TestSuiteSpec, kind string) error {
+	type offender struct {
+		name string
+		pos  token.Pos
+	}
+	var found []offender
+	for _, h := range []struct {
+		name string
+		m    *TestSuiteMethod
+	}{{"BeforeAll", ts.th.BeforeAll}, {"AfterAll", ts.th.AfterAll}, {"BeforeEach", ts.th.BeforeEach}, {"AfterEach", ts.th.AfterEach}} {
+		if pos := h.m.callsT(ts.pkg); pos.IsValid() {
+			found = append(found, offender{h.name, pos})
+		}
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	sort.Slice(found, func(i, j int) bool { return found[i].pos < found[j].pos })
+	names := make([]string, len(found))
+	for i, o := range found {
+		names[i] = o.name
+	}
+	verb, list := "calls", names[0]
+	if len(names) > 1 {
+		verb, list = "call", strings.Join(names[:len(names)-1], ", ")+" and "+names[len(names)-1]
+	}
+	return At(found[0].pos, fmt.Errorf("suite %s has %s methods but %s %s t.T(), which is nil under them — use the hook's own t", ts.ts.Name.Name, kind, list, verb))
 }
 
 // wrapperKind names the wrappers besides Test that the suite's hooks run

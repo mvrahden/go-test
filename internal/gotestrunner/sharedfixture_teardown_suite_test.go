@@ -175,7 +175,7 @@ func (s *SharedFixtureTeardownTestSuite) TestWindowVerbs(t *gotest.T) {
 		})
 
 		w.It("starts it on StartKeys and streams its state", func(it *gotest.T) {
-			gotest.NoError(it, proc.StartKeys([]string{betaKey}, 30*time.Second))
+			gotest.NoError(it, proc.StartKeys(it.Context(), []string{betaKey}, 30*time.Second))
 
 			var betaState struct {
 				Label string
@@ -189,7 +189,7 @@ func (s *SharedFixtureTeardownTestSuite) TestWindowVerbs(t *gotest.T) {
 		})
 
 		w.It("releases early keys on TeardownKeys", func(it *gotest.T) {
-			gotest.NoError(it, proc.TeardownKeys([]string{alphaKey}, 30*time.Second))
+			gotest.NoError(it, proc.TeardownKeys(it.Context(), []string{alphaKey}, 30*time.Second))
 			_, statErr := os.Stat(alphaState.DataPath)
 			gotest.Error(it, statErr, "Alpha's AfterAll must have removed its data file")
 		})

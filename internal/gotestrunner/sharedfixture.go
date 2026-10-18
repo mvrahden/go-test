@@ -60,12 +60,14 @@ type SharedFixtureProcess struct {
 	state    map[string]json.RawMessage
 	mu       sync.Mutex
 	allDone  chan struct{}
-	setupErr error
+	setupErr error // under mu
+	protoErr error // under mu: a stream the process got wrong after its setup was read
 	waitErr  error // exit status of the subprocess; valid once done is closed
 
 	// Setup budgets the process reported, for the wait that has no flat
 	// timeout: the deadline moves to the latest one, and an unbounded
-	// fixture lifts it. budgetSeen wakes the waiter.
+	// fixture lifts it. budgetSeen wakes the waiter. A command starting
+	// fixtures resets them: its wait follows only the setups it started.
 	setupDeadline  time.Time // the latest reported budget's end; zero until one was reported
 	setupUnbounded bool
 	budgetSeen     chan struct{}
@@ -73,6 +75,9 @@ type SharedFixtureProcess struct {
 	stdin   io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
 	cmdMu   sync.Mutex     // serializes commands: one in flight, one _cmd ack each
 	cmdResp chan string    // _cmd ack payloads (error text, "" on success)
+	// cmdPending: a command was given up before its ack, so the process is
+	// still busy with it. Under cmdMu.
+	cmdPending bool
 
 	// failures keeps what the process reported on stderr about fixtures
 	// that failed.
@@ -95,7 +100,15 @@ func (p *SharedFixtureProcess) AllDone() <-chan struct{} {
 
 // SetupErr returns the setup error, if any. Only valid after AllDone() closes.
 func (p *SharedFixtureProcess) SetupErr() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return p.setupErr
+}
+
+func (p *SharedFixtureProcess) setSetupErr(err error) {
+	p.mu.Lock()
+	p.setupErr = err
+	p.mu.Unlock()
 }
 
 // TakeFailures returns the failures fixtures reported since the last call.
@@ -142,66 +155,92 @@ func (p *SharedFixtureProcess) State(keys []string) map[string]json.RawMessage {
 // flat waits without one. A setup that failed is returned as its error, a
 // wait given up as a [*SetupTimeoutError].
 func (p *SharedFixtureProcess) WaitSetup(ctx context.Context, flat time.Duration) error {
-	began := time.Now()
-	timer := time.NewTimer(time.Hour)
-	timer.Stop()
-	defer timer.Stop()
-	var deadline <-chan time.Time
-	arm := func(at time.Time) {
-		timer.Stop()
-		timer.Reset(time.Until(at))
-		deadline = timer.C
-	}
-	// follow arms the timer at the latest reported budget, the floor while
-	// none was reported, or lifts it for an unbounded fixture.
-	follow := func() {
-		p.mu.Lock()
-		unbounded, at := p.setupUnbounded, p.setupDeadline
-		p.mu.Unlock()
-		switch {
-		case unbounded:
-			timer.Stop()
-			deadline = nil
-		case at.IsZero():
-			arm(began.Add(setupReportFloor))
-		default:
-			arm(at)
-		}
-	}
-	switch {
-	case flat > 0:
-		arm(began.Add(flat))
-	case flat == 0:
-		follow()
-	}
+	clock := p.startSetupClock(flat)
+	defer clock.stop()
 	for {
 		select {
 		case <-p.allDone:
-			if p.setupErr != nil {
-				return fmt.Errorf("shared fixture setup failed: %w", p.setupErr)
+			if err := p.SetupErr(); err != nil {
+				return fmt.Errorf("shared fixture setup failed: %w", err)
 			}
 			return nil
 		case <-ctx.Done():
 			return fmt.Errorf("cancelled: %w", ctx.Err())
-		case <-deadline:
-			if flat > 0 {
-				return &SetupTimeoutError{After: flat}
+		case <-clock.C:
+			err := clock.expired()
+			if flat <= 0 {
+				// The process has not reported its teardown budget yet; a
+				// setup that overran what it declared gets as long again to
+				// stop, until _done reports the budget (see awaitExit).
+				p.mu.Lock()
+				if p.teardownTimeout <= 0 {
+					p.teardownTimeout = max(err.After, 5*time.Second)
+				}
+				p.mu.Unlock()
 			}
-			waited := time.Since(began).Round(time.Millisecond)
-			// The process has not reported its teardown budget yet; a setup
-			// that overran what it declared gets as long again to stop.
-			p.mu.Lock()
-			if p.teardownTimeout <= 0 {
-				p.teardownTimeout = max(waited, 5*time.Second)
-			}
-			p.mu.Unlock()
-			return &SetupTimeoutError{After: waited}
+			return err
 		case <-p.budgetSeen:
-			if flat == 0 {
-				follow()
-			}
+			clock.follow()
 		}
 	}
+}
+
+// setupClock is the deadline of a wait for setups the process runs: flat when
+// positive, none when negative, and at zero the budgets the process reports
+// as each setup starts, with [setupReportFloor] before the first.
+type setupClock struct {
+	p     *SharedFixtureProcess
+	flat  time.Duration
+	began time.Time
+	timer *time.Timer
+	C     <-chan time.Time // nil while the wait has no deadline
+}
+
+func (p *SharedFixtureProcess) startSetupClock(flat time.Duration) *setupClock {
+	c := &setupClock{p: p, flat: flat, began: time.Now(), timer: time.NewTimer(time.Hour)}
+	c.timer.Stop()
+	switch {
+	case flat > 0:
+		c.arm(c.began.Add(flat))
+	case flat == 0:
+		c.follow()
+	}
+	return c
+}
+
+func (c *setupClock) arm(at time.Time) {
+	c.timer.Stop()
+	c.timer.Reset(time.Until(at))
+	c.C = c.timer.C
+}
+
+// follow re-arms at the latest reported budget, or lifts the deadline for an
+// unbounded fixture. A flat wait ignores the reports.
+func (c *setupClock) follow() {
+	if c.flat != 0 {
+		return
+	}
+	c.p.mu.Lock()
+	unbounded, at := c.p.setupUnbounded, c.p.setupDeadline
+	c.p.mu.Unlock()
+	switch {
+	case unbounded:
+		c.timer.Stop()
+		c.C = nil
+	case at.IsZero():
+		c.arm(c.began.Add(setupReportFloor))
+	default:
+		c.arm(at)
+	}
+}
+
+func (c *setupClock) stop() { c.timer.Stop() }
+
+func (c *setupClock) expired() *SetupTimeoutError {
+	if c.flat > 0 {
+		return &SetupTimeoutError{After: c.flat}
+	}
+	return &SetupTimeoutError{After: time.Since(c.began).Round(time.Millisecond)}
 }
 
 // noteSetupBudget moves the budget-driven setup deadline for a fixture whose
@@ -268,16 +307,37 @@ func (p *SharedFixtureProcess) shutdown() {
 
 // awaitExit waits up to budget for the subprocess to exit on its own,
 // force-killing the group when it does not, and reports whether force was
-// needed.
-func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool) {
+// needed and how long the process was given. A process still setting up
+// reports its teardown budget on _done, as its teardown begins: from then on
+// it is given that budget.
+func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool, allowed time.Duration) {
+	began := time.Now()
+	deadline := began.Add(budget)
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
+	reported := p.allDone
 	select {
-	case <-p.done:
-		return false
-	case <-time.After(budget):
-		fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", budget)
-		_ = p.tree.Kill()
-		<-p.done
-		return true
+	case <-reported:
+		reported = nil
+	default:
+	}
+	for {
+		select {
+		case <-p.done:
+			return false, deadline.Sub(began)
+		case <-reported:
+			reported = nil
+			if at := time.Now().Add(p.teardownBudget()); at.After(deadline) {
+				deadline = at
+				timer.Reset(time.Until(at))
+			}
+		case <-timer.C:
+			allowed = deadline.Sub(began).Round(time.Millisecond)
+			fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", allowed)
+			_ = p.tree.Kill()
+			<-p.done
+			return true, allowed
+		}
 	}
 }
 
@@ -331,20 +391,29 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 // opening half of a window boundary. The subprocess runs them in dependency
 // order under the same per-fixture retry and budget policy as the up-front
 // phase, and streams their state lines before acknowledging. Blocks until the
-// acknowledgement; timeout 0 means no deadline.
-func (p *SharedFixtureProcess) StartKeys(keys []string, timeout time.Duration) error {
-	return p.command("start", keys, timeout)
+// acknowledgement, ctx ending, or the deadline flat sets as for [WaitSetup]:
+// at zero, the budgets the started fixtures declare.
+func (p *SharedFixtureProcess) StartKeys(ctx context.Context, keys []string, flat time.Duration) error {
+	return p.command(ctx, "start", keys, flat)
 }
 
 // TeardownKeys asks the setup subprocess to tear down the given fixtures now,
 // in reverse dependency order — the releasing half of a window boundary.
 // Teardown (the terminal owner) later skips keys already released here.
-// Blocks until the acknowledgement; timeout 0 means no deadline.
-func (p *SharedFixtureProcess) TeardownKeys(keys []string, timeout time.Duration) error {
-	return p.command("teardown", keys, timeout)
+// Blocks until the acknowledgement, ctx ending, or timeout; timeout 0 or less
+// means no deadline.
+func (p *SharedFixtureProcess) TeardownKeys(ctx context.Context, keys []string, timeout time.Duration) error {
+	if timeout <= 0 {
+		timeout = -1
+	}
+	return p.command(ctx, "teardown", keys, timeout)
 }
 
-func (p *SharedFixtureProcess) command(verb string, keys []string, timeout time.Duration) error {
+// command sends one window verb and waits for its ack. A command given up
+// leaves the process busy with it, so later ones are refused until its ack
+// arrives: the process serves one at a time, and an ack read by the wrong
+// command would answer for it.
+func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []string, flat time.Duration) error {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -354,11 +423,13 @@ func (p *SharedFixtureProcess) command(verb string, keys []string, timeout time.
 	p.cmdMu.Lock()
 	defer p.cmdMu.Unlock()
 
-	// Drain a stale ack a timed-out predecessor left behind: every command
-	// gets exactly one ack, and it must be its own.
-	select {
-	case <-p.cmdResp:
-	default:
+	if p.cmdPending {
+		select {
+		case <-p.cmdResp:
+			p.cmdPending = false
+		default:
+			return fmt.Errorf("shared fixture %s: the process is still busy with an earlier command", verb)
+		}
 	}
 
 	line, err := json.Marshal(struct {
@@ -368,26 +439,35 @@ func (p *SharedFixtureProcess) command(verb string, keys []string, timeout time.
 	if err != nil {
 		return err
 	}
+	if verb == "start" {
+		p.mu.Lock()
+		p.setupDeadline, p.setupUnbounded = time.Time{}, false
+		p.mu.Unlock()
+	}
 	if _, err := p.stdin.Write(append(line, '\n')); err != nil {
 		return fmt.Errorf("send %s to shared fixture process: %w", verb, err)
 	}
 
-	var deadline <-chan time.Time
-	if timeout > 0 {
-		timer := time.NewTimer(timeout)
-		defer timer.Stop()
-		deadline = timer.C
-	}
-	select {
-	case msg := <-p.cmdResp:
-		if msg != "" {
-			return fmt.Errorf("shared fixture %s: %s", verb, msg)
+	clock := p.startSetupClock(flat)
+	defer clock.stop()
+	for {
+		select {
+		case msg := <-p.cmdResp:
+			if msg != "" {
+				return fmt.Errorf("shared fixture %s: %s", verb, msg)
+			}
+			return nil
+		case <-p.done:
+			return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
+		case <-ctx.Done():
+			p.cmdPending = true
+			return fmt.Errorf("shared fixture %s cancelled: %w", verb, ctx.Err())
+		case <-clock.C:
+			p.cmdPending = true
+			return fmt.Errorf("shared fixture %s timed out after %v", verb, clock.expired().After)
+		case <-p.budgetSeen:
+			clock.follow()
 		}
-		return nil
-	case <-p.done:
-		return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
-	case <-deadline:
-		return fmt.Errorf("shared fixture %s timed out after %v", verb, timeout)
 	}
 }
 
@@ -439,7 +519,7 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if !diedEarly {
 		_ = p.tree.Interrupt()
 	}
-	forceKilled := p.awaitExit(budget)
+	forceKilled, allowed := p.awaitExit(budget)
 	if p.sharedDir != "" {
 		os.RemoveAll(p.sharedDir)
 	}
@@ -450,15 +530,23 @@ func (p *SharedFixtureProcess) Teardown() error {
 	// the fixture was still stopping stay up. A setup failure earlier in the
 	// run changes nothing about that.
 	if forceKilled {
-		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", budget)
+		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", allowed)
 	}
+	p.mu.Lock()
+	setupErr, protoErr := p.setupErr, p.protoErr
+	p.mu.Unlock()
+	return errors.Join(exitVerdict(setupErr, p.waitErr, diedEarly), protoErr)
+}
+
+// exitVerdict judges the process's exit status once it exited unforced.
+func exitVerdict(setupErr, waitErr error, diedEarly bool) error {
 
 	// A setup failure already surfaced through SetupErr; the subprocess ran its
 	// sibling teardowns under the runner's shutdown request and exited 1 for
 	// the setup failure. Reporting that status here again would blame teardown
 	// for it. Sibling AfterAll failures still reach the run through the
 	// fixtures' own reports, which the pipeline reads separately.
-	if p.setupErr != nil {
+	if setupErr != nil {
 		return nil
 	}
 
@@ -468,17 +556,17 @@ func (p *SharedFixtureProcess) Teardown() error {
 	// status supports. exec maps a success status under a canceled command
 	// context to ctx.Err() — and only a success status, so a context error here
 	// IS the clean exit, just relabeled.
-	if p.waitErr == nil || errors.Is(p.waitErr, context.Canceled) || errors.Is(p.waitErr, context.DeadlineExceeded) {
+	if waitErr == nil || errors.Is(waitErr, context.Canceled) || errors.Is(waitErr, context.DeadlineExceeded) {
 		return nil
 	}
 	var exitErr *exec.ExitError
-	if errors.As(p.waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
+	if errors.As(waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
 		return fmt.Errorf("shared fixture teardown failed")
 	}
 	if diedEarly {
-		return fmt.Errorf("shared fixture process exited before teardown was requested (%v); its AfterAll may not have run and its resources may be leaked", p.waitErr)
+		return fmt.Errorf("shared fixture process exited before teardown was requested (%v); its AfterAll may not have run and its resources may be leaked", waitErr)
 	}
-	return fmt.Errorf("shared fixture process died during teardown (%v); its AfterAll may not have finished and its resources may be leaked", p.waitErr)
+	return fmt.Errorf("shared fixture process died during teardown (%v); its AfterAll may not have finished and its resources may be leaked", waitErr)
 }
 
 // StartSharedFixtures generates a shared setup binary in the overlay temp dir,
@@ -518,8 +606,16 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		return nil, fmt.Errorf("build shared fixture setup: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, setupBin)
+	keys := make([]string, len(fixtures))
+	for i := range fixtures {
+		keys[i] = fixtures[i].PkgPath + "." + fixtures[i].Identifier
+	}
+	return launchSharedFixtures(exec.CommandContext(ctx, setupBin), sharedDir, keys, setupTimeout)
+}
 
+// launchSharedFixtures starts cmd as the shared fixture process serving the
+// fixtures with the given state keys.
+func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
 	// The teardown budget the process reports is the only kill timer: exec's
 	// WaitDelay stays unset, since any bound set here would have to be chosen
 	// before the budget is known, and one below it becomes the budget — a
@@ -581,9 +677,8 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	_ = stderrW.Close()
 
 	// Build per-fixture readiness channels.
-	ready := make(map[string]chan struct{}, len(fixtures))
-	for i := range fixtures {
-		key := fixtures[i].PkgPath + "." + fixtures[i].Identifier
+	ready := make(map[string]chan struct{}, len(keys))
+	for _, key := range keys {
 		ready[key] = make(chan struct{})
 	}
 
@@ -657,7 +752,7 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 				continue
 			}
 			if entry.Error != "" {
-				p.setupErr = fmt.Errorf("%s", entry.Error)
+				p.setSetupErr(fmt.Errorf("%s", entry.Error))
 			}
 			if entry.TeardownBudget != "" {
 				if d, err := time.ParseDuration(entry.TeardownBudget); err == nil && d > 0 {
@@ -700,20 +795,20 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 	}
 	// A read end closed by the drain, like EOF, is the end of the stream too.
 	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, os.ErrClosed) {
-		p.setupErr = fmt.Errorf("reading the protocol stream: %w", readErr)
-	} else if p.setupErr == nil {
-		p.setupErr = fmt.Errorf("subprocess exited without _done sentinel")
+		p.setSetupErr(fmt.Errorf("reading the protocol stream: %w", readErr))
+	} else if p.SetupErr() == nil {
+		p.setSetupErr(fmt.Errorf("subprocess exited without _done sentinel"))
 	}
 	close(p.allDone)
 }
 
-// protocolError records a stream the process got wrong: as the setup error
-// when none is set yet, and on the failure log either way, since the setup
-// may already have been read as done.
+// protocolError records a stream the process got wrong after its setup was
+// read as done: the setup's verdict stands, the teardown's adds this, and the
+// failure log carries it.
 func (p *SharedFixtureProcess) protocolError(err error) {
 	p.mu.Lock()
-	if p.setupErr == nil {
-		p.setupErr = err
+	if p.protoErr == nil {
+		p.protoErr = err
 	}
 	p.mu.Unlock()
 	fmt.Fprintf(p.failures, "shared fixture protocol: %v\n", err)

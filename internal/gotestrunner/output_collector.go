@@ -160,6 +160,7 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	case RunStreamJSON, RunCaptureJSON:
 		w := c.jsonWriter()
 		filterPackageLevelEvents(w, r.Stdout)
+		c.verdicts.endSuite(r.CutShort)
 		if len(r.Stderr) > 0 {
 			_, _ = c.stderr.Write(r.Stderr)
 		}

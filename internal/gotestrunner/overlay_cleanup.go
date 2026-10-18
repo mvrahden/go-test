@@ -21,8 +21,12 @@ func CleanStaleOverlays() {
 // earlier gotest, which wrote none, may still be running in it.
 const workDirGrace = 24 * time.Hour
 
+// overlayDirGrace is how long an overlay dir with no pid file is left alone:
+// its writer creates it first and writes the pid right after.
+const overlayDirGrace = time.Minute
+
 func cleanStaleTmpOverlays() {
-	for _, glob := range []string{"gotest-overlay-*", "gotest-work-*"} {
+	for glob, grace := range map[string]time.Duration{"gotest-overlay-*": overlayDirGrace, "gotest-work-*": workDirGrace} {
 		dirs, err := filepath.Glob(filepath.Join(os.TempDir(), glob))
 		if err != nil {
 			continue
@@ -35,7 +39,7 @@ func cleanStaleTmpOverlays() {
 			if isOverlayAlive(dir) {
 				continue
 			}
-			if glob == "gotest-work-*" && !hasPID(dir) && time.Since(info.ModTime()) < workDirGrace {
+			if !hasPID(dir) && time.Since(info.ModTime()) < grace {
 				continue
 			}
 			os.RemoveAll(dir)

@@ -96,7 +96,8 @@ Flags (gotest — use --double-dash):
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct%% (0-100)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+                          budgets, 2m until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
                           halved under -race/-msan/-asan)
@@ -157,7 +158,8 @@ Flags:
   --no-cache              Disable the overlay and test binary caches
   --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+                          budgets, 2m until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
                           halved under -race/-msan/-asan)
@@ -240,7 +242,8 @@ Flags:
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+                          budgets, 2m until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
                           halved under -race/-msan/-asan)
@@ -301,7 +304,8 @@ Flags:
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+                          budgets, 2m until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
                           halved under -race/-msan/-asan)
@@ -342,7 +346,8 @@ Flags:
                           ns/op delta against the previous run
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+                          budgets, 2m until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
                           halved under -race/-msan/-asan)
@@ -378,7 +383,8 @@ Flags:
   --no-color              Disable ANSI color codes (with --spec)
   --debug                 Keep generated overlay for inspection
   --no-cache              Disable the overlay and test binary caches
-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+                          budgets, 2m until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
   --save=<path>           Save this run's results as a JSON baseline (forces
                            capture mode; the spec view is still rendered so
@@ -969,7 +975,7 @@ at a go.mod boundary. CLI flags override config values.
 
 Fields:
   tags: <string>            Build tags, comma-separated (e.g., "integration,e2e")
-  setup-timeout: <duration> Total budget for all shared fixture setup (default: 2m, 0 to disable)
+  setup-timeout: <duration> Total budget for all shared fixture setup (default: the fixtures' declared budgets, 2m until the first reports; 0 to disable)
   timeout: <duration>       Global pipeline deadline (default: 15m, 0 to disable)
   min-coverage: <int>       Minimum coverage percentage, 0-100
   parallel: <int>           Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan)

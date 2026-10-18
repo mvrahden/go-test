@@ -60,8 +60,9 @@ func (s *SharedFixtureProtocolTestSuite) TestASecondDoneIsAProtocolError(t *gote
 	lines := `{"key":"_done","teardownBudget":"1m"}` + "\n" + `{"key":"_done","teardownBudget":"1m"}` + "\n"
 	proc := gotestrunner.ExportReadProtocol(strings.NewReader(lines))
 	t.When("the protocol stream carries _done twice", func(w *gotest.T) {
-		w.It("the second is a protocol error of the setup, not a crash of the runner", func(it *gotest.T) {
-			gotest.ErrorContains(it, proc.SetupErr(), "_done")
+		w.It("the second is a protocol error, not a crash of the runner, and the setup stays good", func(it *gotest.T) {
+			gotest.ErrorContains(it, gotestrunner.ExportProtocolErr(proc), "_done twice")
+			gotest.NoError(it, proc.SetupErr())
 		})
 	})
 }

@@ -4,11 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -232,22 +234,54 @@ func writeToCacheDir(root string, results gotestgen.GenerateResults) (string, er
 		os.RemoveAll(staging)
 		return "", err
 	}
-	// Whatever a crashed run left under the hash goes whole.
-	os.RemoveAll(dir)
-	if err := os.Rename(staging, dir); err != nil {
-		os.RemoveAll(staging)
-		if _, statErr := os.Stat(filepath.Join(dir, "overlay.json")); statErr == nil {
-			return dir, nil // another run completed the same entry meanwhile
-		}
-		return "", fmt.Errorf("install cache entry: %w", err)
+	err := installEntry(staging, dir)
+	os.RemoveAll(staging) // gone once renamed; else the copy another run beat
+	if err != nil {
+		return "", err
 	}
 	return dir, nil
 }
 
-// stagingDir names where entry is written before it is renamed into place:
-// a sibling carrying the writer's pid, which the sweep reads.
+// installEntry renames staging to dir. A complete entry already there, which
+// another run may be using, is kept; only an incomplete leftover is replaced,
+// moved aside first and removed only once it is known not to be complete.
+func installEntry(staging, dir string) error {
+	if os.Rename(staging, dir) == nil || entryComplete(dir) {
+		return nil
+	}
+	aside := stagingDir(dir)
+	if err := os.Rename(dir, aside); err != nil {
+		if entryComplete(dir) {
+			return nil
+		}
+		return fmt.Errorf("install cache entry: %w", err)
+	}
+	if entryComplete(aside) {
+		// Another run installed it meanwhile: put it back.
+		if os.Rename(aside, dir) == nil || entryComplete(dir) {
+			return nil
+		}
+		return errors.New("install cache entry: a complete entry was moved and could not be restored")
+	}
+	os.RemoveAll(aside)
+	if err := os.Rename(staging, dir); err != nil && !entryComplete(dir) {
+		return fmt.Errorf("install cache entry: %w", err)
+	}
+	return nil
+}
+
+// entryComplete reports whether dir holds overlay.json, written last.
+func entryComplete(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, "overlay.json"))
+	return err == nil
+}
+
+var stagingSeq atomic.Int64
+
+// stagingDir names a fresh sibling of entry to write or move it through. Its
+// name ends in the writer's pid, which the sweep reads.
 func stagingDir(entry string) string {
-	return entry + ".staging-" + strconv.Itoa(os.Getpid())
+	return entry + ".staging-" + strconv.FormatInt(stagingSeq.Add(1), 10) + "-" + strconv.Itoa(os.Getpid())
 }
 
 func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {

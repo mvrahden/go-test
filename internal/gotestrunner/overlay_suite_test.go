@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -141,10 +142,23 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 			gotest.False(it, os.IsNotExist(err), "expected live overlay to be kept")
 		})
 
-		w.It("removes overlay with no PID file", func(it *gotest.T) {
+		w.It("keeps a fresh overlay with no PID file: its writer has not written the pid yet", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
 			gotest.NoError(it, err)
 			ctx.dirs = append(ctx.dirs, dir)
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the fresh overlay to be kept")
+		})
+
+		w.It("removes an overlay with no PID file once it is older than a minute", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			old := time.Now().Add(-2 * time.Minute)
+			gotest.NoError(it, os.Chtimes(dir, old, old))
 
 			gotestrunner.CleanStaleOverlays()
 
@@ -416,5 +430,53 @@ func (s *OverlayTestSuite) TestCacheEntryIsWrittenWhole(t *gotest.T, ctx *overla
 				gotest.NoError(it, statErr, "overlay.json names a file that is not there")
 			}
 		})
+	})
+}
+
+// Runs that build the same entry at once each get it complete, and keep it:
+// no run removes an entry another one was already handed.
+func (s *OverlayTestSuite) TestConcurrentRunsShareAnEntry(t *gotest.T, ctx *overlayDirsCtx) {
+	const rounds, runs = 100, 8
+	vanished, failed := 0, 0
+	for round := range rounds {
+		root := filepath.Join(t.TempDir(), strconv.Itoa(round))
+		t.Setenv(protocol.EnvCacheDir, root)
+		results := gotestgen.GenerateResults{{AbsPath: filepath.Join(root, "pkg"), PTest: []byte("package pkg\n")}}
+		entry := filepath.Join(root, "overlays", gotestrunner.ExportOverlayContentHash(results))
+
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		for range runs {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				dir, err := gotestrunner.ExportWriteOverlayCached(results, false)
+				ok := err == nil && dir == entry
+				// The run now builds against the entry: it must stay whole.
+				for range 50 {
+					if !ok {
+						break
+					}
+					_, statErr := os.Stat(filepath.Join(entry, "0", about.PSuite))
+					ok = statErr == nil
+				}
+				mu.Lock()
+				defer mu.Unlock()
+				if dir != "" && dir != entry {
+					ctx.dirs = append(ctx.dirs, dir)
+				}
+				switch {
+				case err != nil || dir != entry:
+					failed++
+				case !ok:
+					vanished++
+				}
+			}()
+		}
+		wg.Wait()
+	}
+	t.It("hands every run the cached entry and never removes it under another", func(it *gotest.T) {
+		gotest.Zero(it, failed, "runs that did not get the cached entry")
+		gotest.Zero(it, vanished, "runs whose entry vanished while they used it")
 	})
 }

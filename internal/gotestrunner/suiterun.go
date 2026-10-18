@@ -242,7 +242,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		if target.StopFile != "" {
 			_ = os.WriteFile(target.StopFile, nil, 0o600)
 			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
-				if err := signalSuite(pid); err == nil {
+				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
 					return nil
 				}
 			}
@@ -362,7 +362,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
 			fuzzFuncs := fuzzFuncsByPkg[pkg][suiteName]
-			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) || skipsSuite(userSkipFilter, testFuncName) {
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) || skipsSuite(userSkipFilter, testFuncName, fuzzFuncs) {
 				continue
 			}
 			target := SuiteTarget{
@@ -404,16 +404,27 @@ func selectsSuite(userRunFilter, testFuncName string, fuzzFuncs []string) bool {
 	return false
 }
 
-// skipsSuite reports whether the user's -skip filter drops a suite whole: one
-// of its alternatives names the Test function with no subtest segment. An
-// alternative with a subtest segment skips methods inside a suite that still
-// runs, and the binary applies it.
-func skipsSuite(userSkipFilter, testFuncName string) bool {
+// skipsSuite reports whether the user's -skip filter drops a suite whole: it
+// skips the Test function and every fuzz wrapper, so go test would run none
+// of them. Otherwise the suite runs and the binary applies the filter.
+func skipsSuite(userSkipFilter, testFuncName string, fuzzFuncs []string) bool {
 	if userSkipFilter == "" {
 		return false
 	}
+	for _, f := range append([]string{testFuncName}, fuzzFuncs...) {
+		if !skipsFunc(userSkipFilter, f) {
+			return false
+		}
+	}
+	return true
+}
+
+// skipsFunc reports whether one alternative of the filter names the top-level
+// function with no subtest segment. An alternative with a subtest segment
+// skips subtests inside a function that still runs.
+func skipsFunc(userSkipFilter, funcName string) bool {
 	for _, alt := range splitTopLevelOr(userSkipFilter) {
-		if !strings.Contains(alt, "/") && matchesSuiteFunc(alt, testFuncName) {
+		if !strings.Contains(alt, "/") && matchesSuiteFunc(alt, funcName) {
 			return true
 		}
 	}
