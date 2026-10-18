@@ -62,11 +62,12 @@ func (t *T) Context() context.Context {
 
 // NewTWithDeadline wraps t with a context that expires after timeout, so a test
 // can hold work to a tighter budget than the suite's own. The context is derived
-// from t.Context() and is released when the test ends.
-func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
+// from t.Context() — the suite's, deadline and stop included — and is released
+// when the test ends.
+func NewTWithDeadline(t *T, timeout time.Duration) *T {
 	ctx, cancel := context.WithTimeout(t.Context(), timeout)
-	t.Cleanup(cancel)
-	return &T{t: t, tb: t, ctx: ctx}
+	t.testingTB().Cleanup(cancel)
+	return &T{t: t.t, tb: t.tb, ctx: ctx}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the

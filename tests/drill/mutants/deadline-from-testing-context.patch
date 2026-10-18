@@ -1,0 +1,12 @@
+Expect: passing: verdicts differ from the golden list
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -65,7 +65,7 @@
+ // from t.Context() — the suite's, deadline and stop included — and is released
+ // when the test ends.
+ func NewTWithDeadline(t *T, timeout time.Duration) *T {
+-	ctx, cancel := context.WithTimeout(t.Context(), timeout)
++	ctx, cancel := context.WithTimeout(t.testingTB().Context(), timeout)
+ 	t.testingTB().Cleanup(cancel)
+ 	return &T{t: t.t, tb: t.tb, ctx: ctx}
+ }

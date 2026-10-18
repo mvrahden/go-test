@@ -1,6 +1,8 @@
 passing exit 0
 passing pass -
 passing pass TestPassingTestSuite
+passing pass TestPassingTestSuite/TestDeadlineFollowsTheSuite
+passing pass TestPassingTestSuite/TestEventuallyFinalPoll
 passing pass TestPassingTestSuite/TestJSONNumbers
 passing pass TestPassingTestSuite/TestOne
 passing pass TestPassingTestSuite/TestTwo
@@ -14,6 +16,7 @@ failing fail TestFailingTestSuite/TestBehavior
 failing fail TestFailingTestSuite/TestBehavior/a_behavior_fails
 failing fail TestFailingTestSuite/TestBehavior/a_behavior_fails/is_reported_at_the_leaf
 failing fail TestFailingTestSuite/TestConsistently
+failing fail TestFailingTestSuite/TestConsistentlyHangingPoll
 failing fail TestFailingTestSuite/TestContains
 failing fail TestFailingTestSuite/TestContainsAnInt
 failing fail TestFailingTestSuite/TestEachRow
@@ -26,6 +29,8 @@ failing fail TestFailingTestSuite/TestErrorAs
 failing fail TestFailingTestSuite/TestErrorContains
 failing fail TestFailingTestSuite/TestErrorIs
 failing fail TestFailingTestSuite/TestEventually
+failing fail TestFailingTestSuite/TestEventuallyHangingPoll
+failing fail TestFailingTestSuite/TestEventuallyZeroTick
 failing fail TestFailingTestSuite/TestFail
 failing fail TestFailingTestSuite/TestFalse
 failing fail TestFailingTestSuite/TestGreater

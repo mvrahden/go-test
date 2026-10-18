@@ -104,3 +104,15 @@ func (s *FailingTestSuite) TestJSONEqBigInts(t *gotest.T) {
 func (s *FailingTestSuite) TestSnapshotBadName(t *gotest.T) {
 	gotest.MatchSnapshot(t, "v", "two\nlines")
 }
+
+func (s *FailingTestSuite) TestEventuallyHangingPoll(t *gotest.T) {
+	gotest.Eventually(t, 100*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) { time.Sleep(10 * time.Second) })
+}
+
+func (s *FailingTestSuite) TestConsistentlyHangingPoll(t *gotest.T) {
+	gotest.Consistently(t, 100*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) { time.Sleep(10 * time.Second) })
+}
+
+func (s *FailingTestSuite) TestEventuallyZeroTick(t *gotest.T) {
+	gotest.Eventually(t, time.Second, 0, func(poll *gotest.R) {})
+}

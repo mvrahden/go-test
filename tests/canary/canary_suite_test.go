@@ -615,8 +615,13 @@ func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *got
 // A failed assertion says what it could not work with: the type ErrorAs
 // expected, the needle a haystack cannot hold, and every extra argument.
 func (s *CanaryTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gotest.T) {
+	began := time.Now()
 	s.check(t, "failing")
-	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN"} {
+	// Two polls sleep 10s each; a run held to its deadlines ends long before that.
+	if took := time.Since(began); took > 8*time.Second {
+		t.Errorf("failing: the run took %s; a hanging poll was waited out instead of failed at its deadline", took)
+	}
+	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive"} {
 		if !strings.Contains(s.lastStream, want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}

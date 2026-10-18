@@ -743,7 +743,7 @@ In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if 
 **Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and breaks the test case loop on first failure when `FailFast` is set.
 Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunTest` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses — located where the phase is running, and also written to stderr, unbuffered, unless test2json streams the verdict (`-json`), where a raw line would be attributed to whichever test printed last — but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
 
-**`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline.
+**`NewTWithDeadline(t *gotest.T, d)`:** Creates a `*gotest.T` with a context deadline, derived from the suite's own context.
 `t.Context()` returns the deadline-aware context.
 
 **`NewTWithContext`:** Creates a `*gotest.T` whose `t.Context()` is the context supplied by the caller, for the cases a deadline off `t.Context()` cannot express — injected values, or a lifetime that must outlive the test's own.

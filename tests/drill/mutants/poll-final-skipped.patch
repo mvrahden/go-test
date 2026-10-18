@@ -1,0 +1,15 @@
+Expect: passing: verdicts differ from the golden list
+Clause: when tick is longer than waitFor and the first poll fails → a final poll runs at the deadline and can still pass
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -246,6 +246,10 @@
+ 	for {
+ 		polls++
+ 		final := !time.Now().Before(deadline)
++		if final {
++			failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    the deadline passed", waitFor, polls)
++			return
++		}
+ 		rec, ok := pollUntil(fn, pollLimit(deadline, tick, final))
+ 		if !ok {
+ 			failf(t, "Eventually failed after %v (%d polls):\n  poll still running after %v", waitFor, polls, waitFor)

@@ -223,6 +223,16 @@ gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, func(poll *gotest.R)
 
 There are no method forms on `*T`. Only package-level `gotest.Eventually()` and `gotest.Consistently()` exist.
 
+A poll is held to the deadline it was given, and the arguments are checked before the first poll:
+
+> when an Eventually poll runs past waitFor → fails at the deadline and says the poll is still running
+
+> when a Consistently poll runs past waitFor → fails at the deadline and says the poll is still running
+
+> when tick is longer than waitFor and the first poll fails → a final poll runs at the deadline and can still pass
+
+> when waitFor or tick is not positive → fails with a type-guard message and polls nothing
+
 **Critical constraint:** Inside the callback, `poll` is a `*gotest.R`, not a `*gotest.T`.
 `poll` has no `T()` method. All code in the callback must use gotest assertions only.
 A helper that takes `*gotest.T` cannot be called with `poll`.
@@ -385,7 +395,7 @@ it (go test's `-timeout`, `--setup-timeout`, or a shared fixture's teardown forc
 
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that
-nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline`.
+nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline(t, d)`, which derives from the suite's context.
 
 ### SuiteGuard (optional)
 
