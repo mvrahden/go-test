@@ -69,9 +69,11 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
         Name: "{{ $fix.Identifier }}",
 {{- if $fix.BeforeEach }}
         Before: func(ctx context.Context) error { return ƒ_{{ $fix.Identifier }}.BeforeEach(ctx) },
+        BeforeAt: {{ printf "%q" $fix.BeforeEachAt }},
 {{- end }}
 {{- if $fix.AfterEach }}
         After: func(ctx context.Context) error { return ƒ_{{ $fix.Identifier }}.AfterEach(ctx) },
+        AfterAt: {{ printf "%q" $fix.AfterEachAt }},
 {{- end }}
       },
 {{- end }}{{ end }}

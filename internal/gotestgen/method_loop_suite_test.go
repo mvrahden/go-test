@@ -29,11 +29,11 @@ func (s *MethodLoopTestSuite) TestHookOrder(t *gotest.T) {
 func (s *MethodLoopTestSuite) TestFixtureBeforeEachFails(t *gotest.T) {
 	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestBrokenHookTestSuite$")
 
-	t.It("fails the method without running it and still runs the fixture's AfterEach", func(it *gotest.T) {
+	t.It("fails the method without running it, and the fixture's AfterEach, paired with nothing, does not run", func(it *gotest.T) {
 		gotest.False(it, run.passed, run.output)
 		gotest.Contains(it, run.output, "BrokenHookFixture.BeforeEach failed: boom")
 		gotest.NotContains(it, run.output, "MARK:never")
-		gotest.Contains(it, run.output, "MARK:broken after")
+		gotest.NotContains(it, run.output, "MARK:broken after")
 	})
 }
 

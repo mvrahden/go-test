@@ -3,7 +3,9 @@ package gotestgen
 import (
 	"fmt"
 	"go/types"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -32,6 +34,10 @@ type BoundFixture struct {
 	AfterEach    bool
 	HasHydrate   bool
 	HasDehydrate bool
+	// BeforeEachAt and AfterEachAt locate the hooks as base:line, where a
+	// failure of theirs is reported.
+	BeforeEachAt string
+	AfterEachAt  string
 
 	TransferFields []string // shared fixtures only
 	LocalFields    []string // shared fixtures only
@@ -409,6 +415,8 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		AfterAll:     mset.Lookup(typePkg, "AfterAll") != nil,
 		BeforeEach:   mset.Lookup(typePkg, "BeforeEach") != nil,
 		AfterEach:    mset.Lookup(typePkg, "AfterEach") != nil,
+		BeforeEachAt: hookAt(pkg, mset.Lookup(typePkg, "BeforeEach")),
+		AfterEachAt:  hookAt(pkg, mset.Lookup(typePkg, "AfterEach")),
 		HasHydrate:   mset.Lookup(typePkg, "Hydrate") != nil,
 		HasDehydrate: mset.Lookup(typePkg, "Dehydrate") != nil,
 		HasConfig:    detectConfigMethod(mset, typePkg, kind),
@@ -1068,4 +1076,17 @@ func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]Fix
 		visit(b.FixtureIdentifier)
 	}
 	return needed
+}
+
+// hookAt locates a fixture hook as testing prints a location, base:line, or
+// "" for a hook the fixture does not declare.
+func hookAt(pkg *packages.Package, sel *types.Selection) string {
+	if sel == nil || pkg == nil || pkg.Fset == nil {
+		return ""
+	}
+	p := pkg.Fset.Position(sel.Obj().Pos())
+	if !p.IsValid() {
+		return ""
+	}
+	return filepath.Base(p.Filename) + ":" + strconv.Itoa(p.Line)
 }

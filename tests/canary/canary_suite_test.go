@@ -360,6 +360,28 @@ func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
 	s.check(t, "guardskip")
 }
 
+// A fixture BeforeEach that fails registered no AfterEach for that method:
+// the hooks a method runs are the ones that paired with what ran. The
+// failure is reported at the hook's own file, not inside the runtime's.
+func (s *CanaryTestSuite) TestAFailedFixtureBeforeEachPairsWithNothing(t *gotest.T) {
+	dir := t.TempDir()
+	code, _ := s.run(t, "fixturehookfail", dir)
+	if code != 1 {
+		t.Errorf("fixturehookfail: exit code %d, want 1", code)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	want := []string{"fixture.BeforeAll", "fixture.BeforeEach", "fixture.BeforeEach", "second", "fixture.AfterEach", "fixture.AfterAll"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("fixturehookfail: hooks ran %v, want %v", got, want)
+	}
+	if !strings.Contains(s.lastStream, "fixture.go:") {
+		t.Errorf("fixturehookfail: the failure is not reported at the hook's file")
+	}
+	if strings.Contains(s.lastStream, "methods.go:") {
+		t.Errorf("fixturehookfail: the failure is reported inside the runtime's file")
+	}
+}
+
 // A run stopped while a method holds: the methods not yet started are skipped
 // with the reason run stopping, the holding method's context ends, and AfterAll
 // runs before the fixture is released. Ring 0: the conformance suite that
