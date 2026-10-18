@@ -6401,6 +6401,98 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a focused suite in one package skips every unfocused suite in the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_focused_suite_in_one_package_skips_every_unfocused_suite_in_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unfocused suite skipped by focus starts no fixture",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unfocused_suite_skipped_by_focus_starts_no_fixture",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a focused suite in the internal test package skips the external one's suites",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_focused_suite_in_the_internal_test_package_skips_the_external_one's_suites",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "--ci still refuses a run with a focused suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--ci_still_refuses_a_run_with_a_focused_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run holds a focused suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_holds_a_focused_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RunWide",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestRunWide",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DiscoveryFocus",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDiscoveryFocusTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a suite declared alone, binding a fixture through a named pointer field, runs",
                       "duration": 0,
                       "excluded": false,
@@ -13690,13 +13782,13 @@
     }
   ],
   "stats": {
-    "behaviors": 455,
+    "behaviors": 459,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 76,
+    "suites": 77,
     "tests": 0
   }
 }

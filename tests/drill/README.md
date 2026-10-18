@@ -595,6 +595,9 @@ shards of one run do not add up to every mutant exactly once.
 | `compile-overlay-keeps-stale-files` | a run's overlay stubs no generated file it does not regenerate | conformance: the discovery It for a legacy generated file name fails to build |
 | `legacy-generated-names-forgotten` | the `ƒƒ_` names are not among the generated file names | conformance: the discovery It for a legacy generated file name fails to build |
 | `tags-flag-unnormalized` | `--tags` is not spelled as go's `-tags` | conformance: the discovery It for `--tags=` sees `--tags` refused as an unknown flag with exit 2 |
+| `focus-decided-per-package` | the generator decides focus for each package on its own, not for the whole run | canary: the `shapes/focusacross` unfocused suite is not skipped and its fixtures start |
+| `focus-decided-per-variant` | the external test package decides its focus on its own | canary: the `shapes/focusvariants` external suite is not skipped |
+| `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
 
 ## Adding a mutant
 

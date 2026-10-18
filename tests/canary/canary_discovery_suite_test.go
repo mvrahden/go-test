@@ -188,3 +188,58 @@ func (s *CanaryDiscoveryTestSuite) TestGeneratedFilesStayValid(t *gotest.T) {
 		t.Errorf("shapes genrename: the run after the rename exits %d, TestNewNameTestSuite/TestRuns passed %v\n%s", code, passed, stderr)
 	}
 }
+
+// Focus is decided once for the whole run: a focused suite in one package or
+// test package variant skips the unfocused suites of every other, and a suite
+// skipped that way starts none of its fixtures.
+func (s *CanaryDiscoveryTestSuite) TestFocusIsRunWide(t *gotest.T) {
+	verdicts := func(stdout []byte) map[string]string {
+		out := map[string]string{}
+		for _, ev := range testkit.ParseEvents(stdout) {
+			if ev.Action == "pass" || ev.Action == "fail" || ev.Action == "skip" {
+				out[ev.Test] = ev.Action
+			}
+		}
+		return out
+	}
+
+	dir := t.TempDir()
+	code, stdout, stderr := s.invoke(t, dir, "-json", "./testdata/shapes/focusacross/...")
+	got := verdicts(stdout)
+	if code != 0 {
+		t.Errorf("shapes focusacross: exit code %d, want 0\n%s", code, stderr)
+	}
+	if got["TestF_OnlyTestSuite/TestRuns"] != "pass" {
+		t.Errorf("shapes focusacross: TestF_OnlyTestSuite/TestRuns did not pass: %v\n%s", got, stderr)
+	}
+	if got["TestOtherTestSuite"] != "skip" {
+		t.Errorf("shapes focusacross: TestOtherTestSuite is %q, want skip: %v", got["TestOtherTestSuite"], got)
+	}
+	if v, ok := got["TestOtherTestSuite/TestRuns"]; ok {
+		t.Errorf("shapes focusacross: TestOtherTestSuite/TestRuns has verdict %q, want none", v)
+	}
+	markers, err := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if err != nil {
+		fatalf(t, "shapes focusacross: %v", err)
+	}
+	if !slices.Contains(markers, "focused ran") {
+		t.Errorf("shapes focusacross: the focused suite left no marker: %v", markers)
+	}
+	for _, m := range []string{"fixture up", "shared up"} {
+		if slices.Contains(markers, m) {
+			t.Errorf("shapes focusacross: the focus-skipped suite started a fixture: %q in %v", m, markers)
+		}
+	}
+
+	code, stdout, stderr = s.invoke(t, t.TempDir(), "-json", "./testdata/shapes/focusvariants/")
+	got = verdicts(stdout)
+	if code != 0 {
+		t.Errorf("shapes focusvariants: exit code %d, want 0\n%s", code, stderr)
+	}
+	if got["TestF_InTestSuite/TestRuns"] != "pass" {
+		t.Errorf("shapes focusvariants: TestF_InTestSuite/TestRuns did not pass: %v\n%s", got, stderr)
+	}
+	if got["TestExtTestSuite"] != "skip" {
+		t.Errorf("shapes focusvariants: TestExtTestSuite is %q, want skip: %v", got["TestExtTestSuite"], got)
+	}
+}

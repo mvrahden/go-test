@@ -59,6 +59,16 @@ A suite SHALL run an alias of a generic suite another package declares, an alias
 - **THEN** an alias of a generic suite from another package runs that suite's methods
 - **AND** a package fixture from another package with a mis-signed hook is rejected with the signature it needs
 
+### Requirement: Focus across a run
+Focus SHALL be decided over the whole run: a focused suite or a focused method of any kind, Test, Benchmark or Fuzz, in any package or test package variant SHALL skip every unfocused suite, which then starts no fixture, and --ci SHALL still refuse a run with a focused suite or Test method.
+
+#### Scenario: A focused suite in the run
+- **WHEN** a run holds a focused suite
+- **THEN** a focused suite in one package skips every unfocused suite in the others
+- **AND** an unfocused suite skipped by focus starts no fixture
+- **AND** a focused suite in the internal test package skips the external one's suites
+- **AND** --ci still refuses a run with a focused suite
+
 ### Requirement: The generated harness
 The generated harness SHALL compile beside whatever names the package declares, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites and files of variants without suites, and SHALL NOT rewrite a file whose content is unchanged.
 

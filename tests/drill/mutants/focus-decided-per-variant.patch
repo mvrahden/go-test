@@ -1,0 +1,14 @@
+Expect: shapes focusvariants: TestExtTestSuite is "pass", want skip
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFocusIsRunWide
+Clause: when a run holds a focused suite → a focused suite in the internal test package skips the external one's suites
+--- a/internal/gotestgen/generator.go
++++ b/internal/gotestgen/generator.go
+@@ -542,7 +542,7 @@
+ 		if err != nil {
+ 			return nil, err
+ 		}
+-		pxtestSpec, err := c.applyInRun(pxtestCollected, focusRun)
++		pxtestSpec, err := c.applyInRun(pxtestCollected, pxtestCollected.Suites.Focuses())
+ 		if err != nil {
+ 			return nil, err
+ 		}
