@@ -1990,6 +1990,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails naming the shared fixture it binds and go tool gotest, before any method runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_naming_the_shared_fixture_it_binds_and_go_tool_gotest,_before_any_method_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite binding a shared fixture runs under plain go test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_binding_a_shared_fixture_runs_under_plain_go_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SharedFixtureSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSharedFixtureSuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "PlainGoTest",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestPlainGoTestTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "its suite receives the state",
                       "duration": 0,
                       "excluded": false,
@@ -2972,13 +3025,13 @@
     }
   ],
   "stats": {
-    "behaviors": 119,
+    "behaviors": 120,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 19,
+    "suites": 20,
     "tests": 0
   }
 }

@@ -51,6 +51,7 @@ func (s *MixedTestSuite) wired(t interface {
 	gotest.NotZero(t, s.Child, "package fixture field")
 	gotest.NotZero(t, s.Child.Root, "parent fixture field")
 	gotest.NotZero(t, s.Shared, "shared fixture field")
+	gotest.Equal(t, "hydrated", s.Shared.Addr, "shared fixture state")
 }
 
 func (s *MixedTestSuite) TestWired(t *gotest.T) { s.wired(t) }

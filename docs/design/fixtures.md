@@ -392,6 +392,9 @@ A package fixture is therefore set up once per function that binds it, not once 
 Under the runner this changes nothing for tests — each suite runs in a process of its own — but a fixture-bound suite with fuzz methods sets its fixtures up once more for each `Fuzz` wrapper, whose seeds replay in a function of their own; the suite's own `BeforeAll` already runs per wrapper the same way.
 Under plain `go test`, every suite of the package sets the fixtures up for itself.
 A resource too expensive for that belongs in a shared fixture, which comes up once per run.
+A shared fixture's state is written by the runner alone, so a suite that binds one is not plain `go test`'s to run:
+
+> when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
 
 **A panic.** The testing package runs the cleanups of the panicking test and of every test above it before it ends the process, so a panic anywhere below a holding function — a method, `It`/`When`/`Each`, `BeforeAll`/`AfterAll`, a fuzz body, a parallel or raw subtest, a cleanup — releases the fixtures. A benchmark is the exception: a panicking sub-benchmark runs only its own cleanups, and the testing package can lose a benchmark's panic altogether, printing PASS and exiting 0. So gotest recovers a panic anywhere on the benchmark path — a benchmark method, its `BeforeEach`/`AfterEach`, the suite's `BeforeAll` or `AfterAll` — prints it with its stack, and fails the benchmark (exit 1); every generated `b.Run` defers `gotestruntime.ReleaseOnPanic` for this. The remaining benchmarks, the suite's `AfterAll` and the fixture teardown then run as after any failure. Under `GODEBUG=panicnil=1` nothing is recovered, since recovering would swallow `panic(nil)`.
 

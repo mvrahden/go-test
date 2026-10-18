@@ -1424,6 +1424,8 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateChain(t *gotest.T) {
 	mustLess(t, indexOf(events, "schema.hydrate"), indexOf(events, "m.run"))
 }
 
+// A shared node with no state file is plain go test's doing: the setup refuses
+// it, naming the fixture, and sets nothing else up.
 func (s *RuntimeTestSuite) TestDAG_SharedStateNode_MissingStateFile(t *gotest.T) {
 	rec := &recorder{}
 
@@ -1439,10 +1441,6 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateNode_MissingStateFile(t *gotest.T)
 			Target:   pgTarget,
 			Hydrate: func(ctx context.Context) error {
 				rec.record("pg.hydrate")
-				return nil
-			},
-			Dehydrate: func(ctx context.Context) error {
-				rec.record("pg.dehydrate")
 				return nil
 			},
 		},
@@ -1462,20 +1460,14 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateNode_MissingStateFile(t *gotest.T)
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int {
-		rec.record("m.run")
-		return 0
-	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{pgNode, plainNode}})
+	_, err := gotestruntime.SetupFixtureDAG(t.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{pgNode, plainNode}})
 
-	mustEqual(t, 0, exitCode)
-
-	events := rec.names()
-	mustNotContain(t, events, "pg.hydrate")
-	mustNotContain(t, events, "pg.dehydrate")
-	mustContain(t, events, "plain.init")
-	mustContain(t, events, "plain.beforeAll")
-	mustContain(t, events, "m.run")
-	mustContain(t, events, "plain.afterAll")
+	if err == nil {
+		fatalf(t, "a shared node without a state file was set up")
+	}
+	mustContain(t, err.Error(), "binds shared fixture PostgresSharedFixture; run via go tool gotest")
+	mustNotContain(t, rec.names(), "pg.hydrate")
+	mustNotContain(t, rec.names(), "plain.beforeAll")
 }
 
 func (s *RuntimeTestSuite) TestBeforeAllError_IncludesFixtureName(t *gotest.T) {

@@ -108,9 +108,6 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
 	// Handle shared state nodes (unmarshal + hydrate)
 	if node.SharedState != nil {
-		if sharedState == nil {
-			return nil
-		}
 		// The file names exactly the fixtures this suite requires; the CLI
 		// refuses to write one with a required key missing. A node it does
 		// not name belongs to a sibling suite of the package and is left
@@ -317,12 +314,8 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 	return maxPath
 }
 
-func loadSharedState() (map[string]json.RawMessage, error) {
-	path := os.Getenv(protocol.EnvSharedStateFile)
-	if path == "" {
-		return nil, fmt.Errorf("%s not set — run via gotest CLI", protocol.EnvSharedStateFile)
-	}
-	data, err := os.ReadFile(path)
+func loadSharedState(path string) (map[string]json.RawMessage, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the runner names the file
 	if err != nil {
 		return nil, fmt.Errorf("read shared state file: %w", err)
 	}
@@ -333,13 +326,14 @@ func loadSharedState() (map[string]json.RawMessage, error) {
 	return state, nil
 }
 
-func anyNodeHasSharedState(fixtures []*FixtureNode) bool {
+// sharedNode returns the first shared fixture among fixtures, or nil.
+func sharedNode(fixtures []*FixtureNode) *FixtureNode {
 	for _, f := range fixtures {
 		if f.SharedState != nil {
-			return true
+			return f
 		}
 	}
-	return false
+	return nil
 }
 
 type nodeTracker struct {
@@ -397,14 +391,18 @@ func setupFixtureDAG(ctx context.Context, cfg MainConfig, up func(*FixtureDAG)) 
 	defer done()
 	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
 
+	// Only the runner writes a shared fixture's state; without the file the
+	// suite is running under plain go test and has nothing to hydrate from.
 	var sharedState map[string]json.RawMessage
-	if anyNodeHasSharedState(cfg.Fixtures) {
-		if os.Getenv(protocol.EnvSharedStateFile) != "" {
-			var err error
-			sharedState, err = loadSharedState()
-			if err != nil {
-				return nil, fmt.Errorf("load shared state: %w", err)
-			}
+	if shared := sharedNode(cfg.Fixtures); shared != nil {
+		path := os.Getenv(protocol.EnvSharedStateFile)
+		if path == "" {
+			return nil, fmt.Errorf("binds shared fixture %s; run via go tool gotest", shared.Name)
+		}
+		var err error
+		sharedState, err = loadSharedState(path)
+		if err != nil {
+			return nil, fmt.Errorf("load shared state: %w", err)
 		}
 	}
 

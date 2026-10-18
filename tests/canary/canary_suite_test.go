@@ -462,6 +462,47 @@ func (s *CanaryTestSuite) TestAFixtureThatFailedToStartIsReleased(t *gotest.T) {
 	}
 }
 
+// A suite binding a shared fixture has no state under plain go test: it fails
+// naming the fixture and the runner, before any method runs.
+func (s *CanaryTestSuite) TestASharedFixtureSuiteRefusesPlainGoTest(t *gotest.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	dir := t.TempDir()
+	if _, err := testkit.StagePackage(root, filepath.Join("testdata", "fixturechain"), dir, "example.com/plain"); err != nil {
+		fatalf(t, "stage fixturechain: %v", err)
+	}
+	generate := exec.Command(s.binary, "generate", "./fixturechain/") //nolint:gosec // G204: controlled binary with fixed args
+	generate.Dir = dir
+	generate.Env = childEnv(t.TempDir())
+	if out, err := generate.CombinedOutput(); err != nil {
+		fatalf(t, "generate fixturechain: %v\n%s", err, out)
+	}
+	run := exec.Command("go", "test", "-count=1", "-v", "./fixturechain/")
+	run.Dir = dir
+	run.Env = childEnv(t.TempDir())
+	raw, err := run.CombinedOutput()
+	out := string(raw)
+	code := 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			fatalf(t, "go test fixturechain: %v", err)
+		}
+		code = exitErr.ExitCode()
+	}
+	if code != 1 {
+		t.Errorf("plain go test on a shared-fixture suite: exit code %d, want 1\n%s", code, out)
+	}
+	if !strings.Contains(out, "binds shared fixture TokenSharedFixture; run via go tool gotest") {
+		t.Errorf("plain go test on a shared-fixture suite: the suite did not name the fixture it binds\n%s", out)
+	}
+	if strings.Contains(out, "=== RUN   TestChainTestSuite/") {
+		t.Errorf("plain go test on a shared-fixture suite: a method ran without the fixture's state\n%s", out)
+	}
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

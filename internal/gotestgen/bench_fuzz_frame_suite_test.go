@@ -1,9 +1,14 @@
 package gotestgen_test
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -121,8 +126,9 @@ func (s *BenchFuzzFrameTestSuite) TestFixtureClosure(t *gotest.T) {
 		{"benchmark", []string{"-test.run=^$", "-test.bench=^BenchmarkMixedTestSuite$", "-test.benchtime=1x"}},
 		{"fuzz", []string{"-test.run=^FuzzMixedTestSuite_FuzzWired$"}},
 	} {
-		t.It("wires every fixture field and sets up only the suite's own fixtures in a "+c.kind+" wrapper", func(it *gotest.T) {
-			run := runGeneratedSuiteArgs(it, "TestLifecycle_FixtureClosure", childTimeout, c.args...)
+		t.It("wires every fixture field, hydrates the shared one from the state file and sets up only the suite's own fixtures in a "+c.kind+" wrapper", func(it *gotest.T) {
+			state := sharedStateFile(it, "TestLifecycle_FixtureClosure", "MarkSharedFixture", `{"Addr":"hydrated"}`)
+			run := runGeneratedSuiteEnv(it, "TestLifecycle_FixtureClosure", childTimeout, []string{protocol.EnvSharedStateFile + "=" + state}, c.args...)
 			assertNoDeadlock(it, run)
 			gotest.True(it, run.passed, run.output)
 			gotest.Contains(it, run.output, "MARK:root setup", run.output)
@@ -149,4 +155,17 @@ func (s *BenchFuzzFrameTestSuite) TestGuardBeforeFixtures(t *gotest.T) {
 			gotest.NotContains(it, run.output, "MARK:guarded setup", run.output)
 		})
 	}
+}
+
+// sharedStateFile writes the state file a runner would hand the generated
+// harness of the testdata package name: the shared fixture identifier's state
+// under the key the harness declares for it.
+func sharedStateFile(t *gotest.T, name, identifier, state string) string {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), name)
+	source, _ := renderTestPkg(t.T(), pkg, false)
+	key := regexp.MustCompile(`StateKey:\s+"([^"]+\.` + identifier + `)"`).FindStringSubmatch(source)
+	gotest.Len(t, key, 2, "no shared state key for "+identifier)
+	path := filepath.Join(t.TempDir(), "shared.json")
+	gotest.NoError(t, os.WriteFile(path, []byte(`{"`+key[1]+`":`+state+`}`), 0o600))
+	return path
 }

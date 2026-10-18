@@ -1,0 +1,24 @@
+Expect: plain go test on a shared-fixture suite: the suite did not name the fixture it binds
+Clause: when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -396,13 +396,12 @@
+ 	var sharedState map[string]json.RawMessage
+ 	if shared := sharedNode(cfg.Fixtures); shared != nil {
+ 		path := os.Getenv(protocol.EnvSharedStateFile)
+-		if path == "" {
+-			return nil, fmt.Errorf("binds shared fixture %s; run via go tool gotest", shared.Name)
+-		}
+-		var err error
+-		sharedState, err = loadSharedState(path)
+-		if err != nil {
+-			return nil, fmt.Errorf("load shared state: %w", err)
++		if path != "" {
++			var err error
++			sharedState, err = loadSharedState(path)
++			if err != nil {
++				return nil, fmt.Errorf("load shared state: %w", err)
++			}
+ 		}
+ 	}
+ 
