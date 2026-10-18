@@ -46,8 +46,8 @@ func (s *EscapeTestSuite) TestNoEscape(t *gotest.T) {
 	gotest.True(t, true)
 }
 
-func (s *EscapeTestSuite) BeforeEach() {}
-func (s *EscapeTestSuite) AfterEach()  {}
+func (s *EscapeTestSuite) BeforeEach(t *gotest.T) {}
+func (s *EscapeTestSuite) AfterEach(t *gotest.T)  {}
 
 func (s *EscapeTestSuite) TestInterproceduralTestingT(t *gotest.T) {
 	helperErrorf(t.T())

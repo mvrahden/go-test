@@ -71,7 +71,8 @@ func countStdlibTests(pkgs ...*packages.Package) int {
 					n++
 					continue
 				}
-				if !strings.HasPrefix(name, "Test") && !strings.HasPrefix(name, "Benchmark") && !strings.HasPrefix(name, "Fuzz") {
+				isPrefixed := strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Fuzz")
+				if !isPrefixed || !gotestast.IsGoTestName(name) {
 					continue
 				}
 				if fd.Type.Params == nil || len(fd.Type.Params.List) != 1 || len(fd.Type.Params.List[0].Names) > 1 {

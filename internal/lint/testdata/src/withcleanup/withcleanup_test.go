@@ -56,8 +56,8 @@ func (s *ResourceTestSuite) TestNoCleanup(t *gotest.T) {
 	gotest.True(t, true)
 }
 
-func (s *ResourceTestSuite) BeforeEach() {}
-func (s *ResourceTestSuite) AfterEach()  {}
+func (s *ResourceTestSuite) BeforeEach(t *gotest.T) {}
+func (s *ResourceTestSuite) AfterEach(t *gotest.T)  {}
 
 // Helper with *gotest.T — not flagged directly; only call sites in suite
 // methods are flagged via interprocedural analysis.

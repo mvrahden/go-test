@@ -16,3 +16,8 @@ func ExportSetSkip(r Rule, v bool) { *cfg.skip[r] = v }
 func ExportLoad(dir string, patterns []string, tests bool) ([]*packages.Package, error) {
 	return load(context.Background(), &Targets{Dir: dir, Patterns: patterns, Tests: tests}, nil)
 }
+
+var (
+	ExportIsBenchmarkMethodName = isBenchmarkMethodName
+	ExportIsFuzzMethodName      = isFuzzMethodName
+)

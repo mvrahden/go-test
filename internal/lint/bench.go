@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -259,13 +260,13 @@ func findFixtureRead(region *ast.BlockStmt, recv string, fields map[string]bool)
 	return found
 }
 
-// isBenchmarkMethodName mirrors gotestast's IS_BENCHMARK classification
-// (^(?:X_|F_)?Benchmark.+$): an optional X_/F_ marker prefix, then
-// "Benchmark" followed by at least one more character.
+// isBenchmarkMethodName mirrors gotestast's IS_BENCHMARK classification: an
+// optional X_/F_ marker prefix, then "Benchmark" followed by at least one
+// more character that go test's rule accepts (not a lowercase letter).
 func isBenchmarkMethodName(name string) bool {
 	stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
 	rest, ok := strings.CutPrefix(stripped, protocol.PrefixBenchmark)
-	return ok && rest != ""
+	return ok && rest != "" && gotestast.IsGoTestName(stripped)
 }
 
 // benchParamName returns the name of a benchmark method's sole parameter

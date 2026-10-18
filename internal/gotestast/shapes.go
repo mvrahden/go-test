@@ -42,27 +42,36 @@ func validateFields(kind, owner string, st *types.Struct, in *types.Package) (to
 		return token.NoPos, nil
 	}
 	for i := range st.NumFields() {
-		field := st.Field(i)
-		named := namedBehind(field.Type())
-		if !field.Anonymous() {
-			if isSuiteType(named) {
-				return field.Pos(), fmt.Errorf("%s %s has a field of suite type %s; suites are never nested — share behavior through a generic contract suite", kind, owner, named.Obj().Name())
-			}
-			continue
-		}
-		if named != nil {
-			switch name := named.Obj().Name(); {
-			case isSuiteType(named):
-				return field.Pos(), fmt.Errorf("%s %s embeds suite %s; suites are never embedded — share behavior through a generic contract suite", kind, owner, name)
-			case strings.HasSuffix(name, suffixFixture):
-				return field.Pos(), fmt.Errorf("%s %s embeds fixture %s; fixtures compose through a named pointer field", kind, owner, name)
-			}
-		}
-		if m := promotedInterpreted(field.Type()); m != "" {
-			return field.Pos(), fmt.Errorf("%s %s embeds %s, whose method %s gotest would read; keep helpers in a named field or in functions", kind, owner, types.TypeString(field.Type(), types.RelativeTo(in)), m)
+		if err := FieldShapeError(kind, owner, st.Field(i), in); err != nil {
+			return st.Field(i).Pos(), err
 		}
 	}
 	return token.NoPos, nil
+}
+
+// FieldShapeError is the error a field of the suite or fixture owner is
+// rejected with, or nil when the field is accepted. kind is "suite" or
+// "fixture".
+func FieldShapeError(kind, owner string, field *types.Var, in *types.Package) error {
+	named := namedBehind(field.Type())
+	if !field.Anonymous() {
+		if isSuiteType(named) {
+			return fmt.Errorf("%s %s has a field of suite type %s; suites are never nested — share behavior through a generic contract suite", kind, owner, named.Obj().Name())
+		}
+		return nil
+	}
+	if named != nil {
+		switch name := named.Obj().Name(); {
+		case isSuiteType(named):
+			return fmt.Errorf("%s %s embeds suite %s; suites are never embedded — share behavior through a generic contract suite", kind, owner, name)
+		case strings.HasSuffix(name, suffixFixture):
+			return fmt.Errorf("%s %s embeds fixture %s; fixtures compose through a named pointer field", kind, owner, name)
+		}
+	}
+	if m := promotedInterpreted(field.Type()); m != "" {
+		return fmt.Errorf("%s %s embeds %s, whose method %s gotest would read; keep helpers in a named field or in functions", kind, owner, types.TypeString(field.Type(), types.RelativeTo(in)), m)
+	}
+	return nil
 }
 
 // isSuiteType reports whether named is a suite: named *TestSuite and

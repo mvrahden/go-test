@@ -100,3 +100,8 @@ through the fixture DAG) needs it. Two consequences:
   `shared-fixture-undeclared` lint rule (integrity tier) flags undeclared
   reads. Fixture self-tests that construct the fixture locally are
   exempt.
+- Never call a hook yourself (`s.Store.BeforeEach(ctx)`, `s.AfterAll(t)`):
+  the harness calls it too, so it runs twice (`fixture-hook-call`). Give
+  each suite and fixture its own `type` declaration, never one inside a
+  `type ( … )` block (`suite-declaration`, fixed by `lint -fix`), and
+  compose through named pointer fields, never embedding (`no-embedding`).

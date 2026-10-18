@@ -366,6 +366,16 @@ func validateContextErrorSig(sig *types.Signature, methodID string) error {
 // binds, directly or through other fixtures. Any other type named *Fixture is
 // an ordinary type to gotest.
 func ReachedFixtures(pkg *packages.Package, suites TestSuiteSpecSet) map[string]bool {
+	roots := make([]*types.Struct, 0, len(suites))
+	for _, s := range suites {
+		roots = append(roots, s.typ)
+	}
+	return ReachedFixturesFrom(pkg.PkgPath, roots)
+}
+
+// ReachedFixturesFrom is ReachedFixtures over the struct types of the suites
+// declared in the package at pkgPath.
+func ReachedFixturesFrom(pkgPath string, roots []*types.Struct) map[string]bool {
 	reached := map[string]bool{}
 	var walk func(st *types.Struct)
 	walk = func(st *types.Struct) {
@@ -374,7 +384,7 @@ func ReachedFixtures(pkg *packages.Package, suites TestSuiteSpecSet) map[string]
 		}
 		for i := range st.NumFields() {
 			named := namedBehind(st.Field(i).Type())
-			if named == nil || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != pkg.PkgPath {
+			if named == nil || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != pkgPath {
 				continue
 			}
 			name := named.Obj().Name()
@@ -386,8 +396,8 @@ func ReachedFixtures(pkg *packages.Package, suites TestSuiteSpecSet) map[string]
 			walk(next)
 		}
 	}
-	for _, s := range suites {
-		walk(s.typ)
+	for _, st := range roots {
+		walk(st)
 	}
 	return reached
 }

@@ -13,12 +13,16 @@ func (s *UserServiceTestSuite) TestCorrectSig(t *gotest.T)                   {}
 func (s *UserServiceTestSuite) TestContextualSig(t *gotest.T, ctx *struct{}) {}
 func (s *UserServiceTestSuite) TestStdlibSig(t *testing.T)                   {}
 func (s *UserServiceTestSuite) TestStdlibCtxSig(t *testing.T, ctx *struct{}) {}
-func (s *UserServiceTestSuite) BeforeAll()                                   {}
-func (s *UserServiceTestSuite) AfterAll()                                    {}
+func (s *UserServiceTestSuite) BeforeAll(t *gotest.T)                        {}
+func (s *UserServiceTestSuite) AfterAll(t *gotest.T)                         {}
 func (s *UserServiceTestSuite) X_AfterEach()                                 {} // want `X_ prefix on lifecycle hook UserServiceTestSuite.X_AfterEach has no effect`
 func (s *UserServiceTestSuite) BeforreAll()                                  {} // want `method BeforreAll on suite UserServiceTestSuite is similar to lifecycle hook BeforeAll`
 func (s UserServiceTestSuite) TestByValue()                                  {} // want `suite method UserServiceTestSuite.TestByValue should use a pointer receiver` `test method UserServiceTestSuite.TestByValue has wrong signature`
 func (s *UserServiceTestSuite) F_TestFocused()                               {} // want `focused method UserServiceTestSuite.F_TestFocused should not be committed` `test method UserServiceTestSuite.F_TestFocused has wrong signature`
+
+// go test's name rule: a lowercase rune after Test makes a helper, not a case.
+func (s *UserServiceTestSuite) Testify(x int)    {}
+func (s *UserServiceTestSuite) F_Testable(x int) {}
 
 type F_OrderTestSuite struct{} // want `focused suite F_OrderTestSuite should not be committed`
 
@@ -26,8 +30,8 @@ func (s *F_OrderTestSuite) TestList() {} // want `test method F_OrderTestSuite.T
 
 type PaymentTestSuite struct{} // want `suite PaymentTestSuite has BeforeAll but no AfterAll`
 
-func (s *PaymentTestSuite) TestCharge() {} // want `test method PaymentTestSuite.TestCharge has wrong signature`
-func (s *PaymentTestSuite) BeforeAll()  {}
+func (s *PaymentTestSuite) TestCharge()           {} // want `test method PaymentTestSuite.TestCharge has wrong signature`
+func (s *PaymentTestSuite) BeforeAll(t *gotest.T) {}
 
 // X_ prefix is allowed — skip markers don't hide other tests behind a green CI run.
 type X_InactiveTestSuite struct{}
@@ -48,3 +52,6 @@ func (s *PairTestSuite[K, V]) TestPair()       {} // want `test method PairTestS
 func (s PairTestSuite[K, V]) TestPairByValue() {} // want `suite method PairTestSuite.TestPairByValue should use a pointer receiver` `test method PairTestSuite.TestPairByValue has wrong signature`
 
 func TestStdlib(t *testing.T) {} // want `stdlib test TestStdlib — consider using a gotest suite`
+
+// Not a test under go test's rule: the rune after Test is lowercase.
+func Testé(t *testing.T) {}

@@ -753,6 +753,10 @@ percentage = covered / total</div>
           <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
           <tr><td><code>bench-loop</code></td><td><code>Benchmark*</code> methods that never touch <code>b.Loop()</code>/<code>b.N</code> — nothing iterates, so the numbers lie.</td></tr>
           <tr><td><code>fuzz-determinism</code></td><td>Fuzz targets reading <code>time.Now</code>, <code>math/rand</code> or <code>os.Getenv</code> — corpus replay and coverage guidance degrade.</td></tr>
+          <tr><td><code>generation-rejects</code></td><td>Every shape the generator rejects, at the place and with the message it gives — such a package does not run at all.</td></tr>
+          <tr><td><code>suite-declaration</code></td><td>A suite or fixture declared inside a <code>type ( … )</code> block — the fix gives it its own declaration, doc comment kept.</td></tr>
+          <tr><td><code>no-embedding</code></td><td>An embedded suite, fixture or type carrying a method gotest reads, or a suite-typed field — reported at the field with the alternative.</td></tr>
+          <tr><td><code>fixture-hook-call</code></td><td>A suite or fixture method calling a lifecycle hook of its own or of a fixture it holds — the harness calls it too, so it runs twice.</td></tr>
           <tr><td><code>fuzz-struct-corpus</code></td><td>On-disk corpus entries for a struct-typed fuzz target — bound to the field order; <code>gotest fuzz promote</code> turns them into typed seeds.</td></tr>
         </tbody>
       </table>

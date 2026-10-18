@@ -200,3 +200,5 @@ var (
 	ExportWithBuildTags      = withBuildTags
 	ExportTagsFromBuildFlags = tagsFromBuildFlags
 )
+
+var ExportCountStdlibTests = countStdlibTests

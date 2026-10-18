@@ -222,3 +222,45 @@ func (c collector) declaringPackage(pkg *packages.Package, s *gotestast.TestSuit
 	}
 	return nil, fmt.Errorf("suite %s aliases %s.%s, whose source cannot be loaded", s.Identifier(), named.Obj().Pkg().Name(), named.Obj().Name())
 }
+
+// Rejections lists the suites and fixtures generating pkg refuses, each at
+// its position: the collector's errors in result, else binding's. Focus is
+// decided within pkg. See FuzzRejections for the fuzz methods.
+func (c collector) Rejections(pkg *packages.Package, result CollectorResult) []CollectorError { //nolint:gocritic // hugeParam: stable API
+	if pkg == nil {
+		return nil
+	}
+	if len(result.Errs) > 0 {
+		return result.Errs
+	}
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	if err != nil {
+		return located(err)
+	}
+	spec = withoutCaseless(spec)
+	if len(spec.EffectiveTestSuites) == 0 {
+		return nil
+	}
+	if _, err := bind(pkg, c.sources, spec.EffectiveTestSuites, result.Fixtures); err != nil {
+		return located(err)
+	}
+	return nil
+}
+
+// located splits a joined error into one CollectorError per error.
+func located(err error) []CollectorError {
+	if j, ok := err.(interface{ Unwrap() []error }); ok {
+		var out []CollectorError
+		for _, e := range j.Unwrap() {
+			out = append(out, located(e)...)
+		}
+		return out
+	}
+	return []CollectorError{{Err: err, Pos: gotestast.PosOf(err)}}
+}
+
+// NewSourceCollector returns a collector that loads a dependency's source,
+// into fset, where binding needs it.
+func NewSourceCollector(fset *token.FileSet) collector {
+	return collector{sources: newSourceLoader(nil, fset)}
+}

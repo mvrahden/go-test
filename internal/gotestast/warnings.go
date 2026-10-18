@@ -111,7 +111,7 @@ func hookWarning(recv, name string) (Warning, bool) {
 		}
 		return Warning{Rule: RuleXLifecycle, Msg: ExcludedHookMessage(recv, name)}, true
 	}
-	if strings.HasPrefix(stripped, "Test") {
+	if strings.HasPrefix(stripped, "Test") && IsGoTestName(stripped) {
 		return Warning{}, false
 	}
 	if hook, ok := MisspelledHook(stripped); ok {

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -57,6 +56,15 @@ const (
 	// the fixtures scheduled suites declare, so an undeclared read may hit
 	// a fixture that never started or is already released.
 	SharedFixtureUndeclared Rule = "shared-fixture-undeclared"
+	// SuiteDeclaration, NoEmbedding and FixtureHookCall are integrity: the
+	// generator refuses the first two shapes, and a hook called by hand runs
+	// twice.
+	SuiteDeclaration Rule = "suite-declaration"
+	NoEmbedding      Rule = "no-embedding"
+	FixtureHookCall  Rule = "fixture-hook-call"
+	// GenerationRejects is integrity: a package the generator rejects does
+	// not run at all.
+	GenerationRejects Rule = "generation-rejects"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -117,6 +125,10 @@ var ruleMeta = map[Rule]struct {
 	BenchWait: {TierExpressiveness, ScopeSuites},
 
 	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
+	SuiteDeclaration:        {TierIntegrity, ScopeSuites},
+	NoEmbedding:             {TierIntegrity, ScopeSuites},
+	FixtureHookCall:         {TierIntegrity, ScopeSuites},
+	GenerationRejects:       {TierIntegrity, ScopeSuites},
 
 	// fuzz-determinism is integrity: a target reading the clock/RNG/env
 	// breaks the replayability the corpus depends on — its outcomes lie.
@@ -207,6 +219,11 @@ func run(pass *analysis.Pass) (any, error) {
 		checkSharedFixtureUndeclared(pass, insp, suites)
 	}
 
+	reached := reachedFixtures(pass)
+	checkSuiteDeclaration(pass, insp, reached)
+	checkNoEmbedding(pass, insp, reached)
+	checkFixtureHookCall(pass, insp)
+
 	checkOrphanedFiles(pass)
 	checkStdlibTests(pass, insp)
 	checkTestifyImports(pass)
@@ -231,6 +248,8 @@ func run(pass *analysis.Pass) (any, error) {
 	checkFuzzStructCorpus(pass, insp, suites)
 	checkFuzzHookIO(pass, insp, suites)
 	checkFuzzRawSeed(pass, insp, suites)
+	// Last: it stands down on the lines other rules reported.
+	checkGenerationRejects(pass)
 
 	return nil, nil
 }
@@ -259,6 +278,7 @@ func (c *claims) anyWithin(start, end token.Pos) bool {
 }
 
 func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args ...any) {
+	reportedLine(pass, rule, pos)
 	if skipped(rule) {
 		return
 	}
@@ -273,6 +293,7 @@ func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args .
 }
 
 func reportWithFix(pass *analysis.Pass, rule Rule, pos token.Pos, fixes []analysis.SuggestedFix, format string, args ...any) {
+	reportedLine(pass, rule, pos)
 	if skipped(rule) {
 		return
 	}
@@ -509,7 +530,7 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		}
 
 		stripped := strings.TrimPrefix(strings.TrimPrefix(methodName, protocol.PrefixFocused), protocol.PrefixExcluded)
-		if strings.HasPrefix(stripped, "Test") {
+		if strings.HasPrefix(stripped, "Test") && gotestast.IsGoTestName(stripped) {
 			if strings.HasPrefix(methodName, protocol.PrefixFocused) {
 				reportWithFix(pass, Focus, fd.Pos(),
 					[]analysis.SuggestedFix{{
@@ -1125,10 +1146,7 @@ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
 			return
 		}
 		name := fd.Name.Name
-		if !strings.HasPrefix(name, "Test") {
-			return
-		}
-		if len(name) > 4 && unicode.IsLower(rune(name[4])) {
+		if !strings.HasPrefix(name, "Test") || !gotestast.IsGoTestName(name) {
 			return
 		}
 		if isGeneratedFile(pass, fd.Pos()) {
