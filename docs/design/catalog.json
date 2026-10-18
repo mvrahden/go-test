@@ -2145,6 +2145,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails the method at once, not at the end of its budget",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_method_at_once,_not_at_the_end_of_its_budget",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the goroutine that owns done fails a fatal assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_goroutine_that_owns_done_fails_a_fatal_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFatalGoroutine",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFatalGoroutine",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AsyncMethods",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestAsyncMethodsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails the run",
                       "duration": 0,
                       "excluded": false,
@@ -2919,13 +2972,13 @@
     }
   ],
   "stats": {
-    "behaviors": 118,
+    "behaviors": 119,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 18,
+    "suites": 19,
     "tests": 0
   }
 }

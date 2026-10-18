@@ -108,21 +108,32 @@ func RunTest(t *gotest.T, budget time.Duration, run func()) {
 // method does (see [AwaitDoneAt]), so the watch is kept per method.
 func watchMethod(t *testing.T, budget time.Duration) (end func()) {
 	watch := watchPhase(t, budget, "", "Timeout")
-	bodies.Store(t, watch)
+	bodies.Store(t, methodWatch{end: watch, budget: budget})
 	return func() {
 		bodies.Delete(t)
 		watch()
 	}
 }
 
-// bodies holds, per running test method, the end of its budget watch.
-var bodies sync.Map // *testing.T -> func()
+// methodWatch is the budget watch of one running test method: what ends it,
+// and the budget the method's suite declared (zero for none).
+type methodWatch struct {
+	end    func()
+	budget time.Duration
+}
 
-// endBody ends the budget watch of t's method, whose body has returned.
-func endBody(t *testing.T) {
-	if end, ok := bodies.Load(t); ok {
-		end.(func())()
+// bodies holds, per running test method, its budget watch.
+var bodies sync.Map // *testing.T -> methodWatch
+
+// endBody ends the budget watch of t's method, whose body has returned, and
+// reports the budget the method was declared; zero when there is none.
+func endBody(t *testing.T) time.Duration {
+	w, ok := bodies.Load(t)
+	if !ok {
+		return 0
 	}
+	w.(methodWatch).end()
+	return w.(methodWatch).budget
 }
 
 // RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;

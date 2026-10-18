@@ -62,6 +62,17 @@ func (s *MethodLoopTestSuite) TestAsyncDeadline(t *gotest.T) {
 	})
 }
 
+func (s *MethodLoopTestSuite) TestAsyncFatalEndsTheWait(t *gotest.T) {
+	began := time.Now()
+	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestFatalAsyncTestSuite$")
+
+	t.It("fails the method the moment its goroutine failed, well before the budget", func(it *gotest.T) {
+		gotest.False(it, run.passed, run.output)
+		gotest.Contains(it, run.output, "the goroutine that owns done fails")
+		gotest.Less(it, time.Since(began), 10*time.Second)
+	})
+}
+
 func (s *MethodLoopTestSuite) TestCallSites(t *gotest.T) {
 	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestSiteTestSuite$")
 

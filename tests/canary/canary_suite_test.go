@@ -462,6 +462,22 @@ func (s *CanaryTestSuite) TestAFixtureThatFailedToStartIsReleased(t *gotest.T) {
 	}
 }
 
+// An async method whose done-owning goroutine fails fatally fails at once:
+// nothing is left to call done, so nothing waits for the budget.
+func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {
+	began := time.Now()
+	code, rows := s.run(t, "asyncfatal", t.TempDir())
+	if code != 1 {
+		t.Errorf("asyncfatal: exit code %d, want 1", code)
+	}
+	if !slices.Contains(rows, "asyncfatal fail TestAsyncTestSuite/TestFatalGoroutineAsync") {
+		t.Errorf("asyncfatal: the method did not fail: %v", rows)
+	}
+	if took := time.Since(began); took > 10*time.Second {
+		t.Errorf("asyncfatal: the run took %s; the wait outlived the failed goroutine", took)
+	}
+}
+
 // A run stopped while a method holds: the methods not yet started are skipped
 // with the reason run stopping, the holding method's context ends, and AfterAll
 // runs before the fixture is released. Ring 0: the conformance suite that

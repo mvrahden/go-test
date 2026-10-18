@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/callsite"
 	"github.com/mvrahden/go-test/internal/runstate"
@@ -126,16 +127,41 @@ func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 		default:
 		}
 	})
-	endBody(t.T())
+	budget := endBody(t.T())
 	select {
 	case <-done:
 		return // called in time, even if the deadline has passed since
 	default:
 	}
-	select {
-	case <-done:
-	case <-t.Context().Done():
-		reportAt(t.T(), callsite.Declared(at), name+": done() was not called before the test deadline")
-		t.T().FailNow() //nolint:t-escape // runtime verdict, located at the declaration
+	// Only a budget the suite declared is a verdict; without one the context's
+	// default deadline bounds the method's work, not the wait for done.
+	var deadline <-chan struct{}
+	if budget > 0 {
+		deadline = t.Context().Done()
+	}
+	// The failure of the goroutine that owns done leaves nothing to wait for.
+	failed := time.NewTicker(failedPoll)
+	defer failed.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-runstate.StopContext().Done():
+			t.T().Skip("run stopping") //nolint:t-escape // runtime verdict: the run was stopped
+		case <-deadline:
+			if runstate.StopContext().Err() != nil {
+				t.T().Skip("run stopping") //nolint:t-escape // the stop ended the context, not the deadline
+			}
+			reportAt(t.T(), callsite.Declared(at), name+": done() was not called before the test deadline")
+			t.T().FailNow() //nolint:t-escape // runtime verdict, located at the declaration
+		case <-failed.C:
+			if t.T().Failed() {
+				return
+			}
+		}
 	}
 }
+
+// failedPoll is how often an async wait looks for a failure recorded by
+// another goroutine; testing has no signal for one.
+const failedPoll = 10 * time.Millisecond
