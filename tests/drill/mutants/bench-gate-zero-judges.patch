@@ -1,0 +1,13 @@
+Expect: --gate=0 without -count: exit code 2, want 0
+Clause: when --gate=0 is given → compares without a gate, whatever -count says
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -66,7 +66,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 		gatePct = v
+ 	}
+ 	// 0 disables, on the flag as in the config.
+-	gateActive := gatePct > 0
++	gateActive := gatePct > 0 || gateGiven
+ 	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {
+ 		if againstGiven {
+ 			// Saving first and comparing after would judge the run against

@@ -131,7 +131,14 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	// ends mid-stream with no verdict of its own.
 	if code, how := ExitStatusVerdict(r.ExitCode); how != "" {
 		r.ExitCode = code
-		r.Stderr = append(r.Stderr, fmt.Appendf(nil, "gotest: suite binary terminated %s\n", how)...)
+		note := fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+		r.Stderr = append(r.Stderr, note...)
+		if c.mode != RunBatchText {
+			// The stream is what -json consumers see; a note only stderr
+			// carries would leave them a binary that stopped mid-stream
+			// with no word why.
+			_, _ = c.jsonTarget().Write(outputEvent(pkg, note))
+		}
 	}
 	if r.ExitCode > c.worst {
 		c.worst = r.ExitCode
@@ -390,12 +397,11 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 		return
 	}
 	failed := false
-	var dur time.Duration
+	dur := packageSpan(s.results)
 	for i := range s.results {
 		if s.results[i].ExitCode != 0 {
 			failed = true
 		}
-		dur += s.results[i].Duration
 	}
 	if c.verbose || failed {
 		for i := range s.results {
@@ -505,12 +511,11 @@ func (s *startWriter) writeLine(line []byte) {
 
 func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkgState) {
 	failed := false
-	var dur time.Duration
+	dur := packageSpan(s.results)
 	for i := range s.results {
 		if s.results[i].ExitCode != 0 {
 			failed = true
 		}
-		dur += s.results[i].Duration
 	}
 	now := time.Now()
 	var summaryLine string
@@ -578,4 +583,38 @@ func writeJSONLine(w io.Writer, fields map[string]any) {
 	data, _ := json.Marshal(fields)
 	_, _ = w.Write(data)
 	_, _ = w.Write([]byte{'\n'})
+}
+
+// outputEvent is one go test -json output line for pkg.
+func outputEvent(pkg, text string) []byte {
+	line, _ := json.Marshal(map[string]string{"Action": "output", "Package": pkg, "Output": text})
+	return append(line, '\n')
+}
+
+// packageSpan is the clock a package's suites occupied: from the first start
+// to the last end. Results without a start time, as tests and replays build
+// them, fall back to the sum of their durations.
+func packageSpan(results []SuiteResult) time.Duration {
+	var first, last time.Time
+	var sum time.Duration
+	timed := true
+	for i := range results {
+		r := &results[i]
+		sum += r.Duration
+		if r.Started.IsZero() {
+			timed = false
+			continue
+		}
+		end := r.Started.Add(r.Duration)
+		if first.IsZero() || r.Started.Before(first) {
+			first = r.Started
+		}
+		if end.After(last) {
+			last = end
+		}
+	}
+	if !timed || first.IsZero() {
+		return sum
+	}
+	return last.Sub(first)
 }

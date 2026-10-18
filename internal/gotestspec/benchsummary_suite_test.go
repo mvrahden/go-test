@@ -134,6 +134,17 @@ func (s *BenchSummaryTestSuite) TestComparison(t *gotest.T) {
 		})
 	})
 
+	t.When("a side has fewer than four samples", func(w *gotest.T) {
+		few := []gotestspec.BenchDelta{
+			{Key: "example.com/cache CacheTestSuite/BenchmarkGetHit", OldNs: 100, NewNs: 142.9, PercentChange: 42.9, Significant: true, InsufficientSample: true},
+		}
+		out := renderBench(benchPackages(), gotestspec.WithBenchDeltas(few))
+
+		w.It("marks the row as a heuristic, not a significance verdict", func(it *gotest.T) {
+			gotest.Contains(it, out, "| example.com/cache CacheTestSuite/BenchmarkGetHit | 100.0 | 142.9 | +42.9% ⚠ (n<4, ±20% heuristic) |")
+		})
+	})
+
 	t.When("the gate is breached", func(w *gotest.T) {
 		gate := &gotestspec.BenchGate{ThresholdPct: 5, Breached: true, WorstKey: "example.com/cache CacheTestSuite/BenchmarkGetHit", WorstPct: 42.9}
 		out := renderBench(benchPackages(), gotestspec.WithBenchDeltas(deltas), gotestspec.WithBenchGate(gate))

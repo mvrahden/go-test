@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -15,20 +14,28 @@ import (
 )
 
 func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), summaryAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), summaryAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	format := extractStringFlag(ownArgs, "--format", "terminal")
-	output := extractStringFlag(ownArgs, "--output", "")
-	input := extractStringFlag(ownArgs, "--input", "")
-	coverageProfile := extractStringFlag(ownArgs, "--coverage", "")
-	badgePath := extractStringFlag(ownArgs, "--badge", "")
-	noColor := hasFlag(ownArgs, "--no-color")
-	github := hasFlag(ownArgs, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
-	renderOnly := hasFlag(ownArgs, "--render-only")
+	format := own.ValueOr("--format", "terminal")
+	if err := checkFormat(format); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if jsonMode, _ := stripJSONFlag(goTestArgs); jsonMode {
+		fmt.Fprintln(os.Stderr, "FAIL: -json cannot be combined with summary; use --format=json for the summary as JSON")
+		return 2
+	}
+	output := own.Value("--output")
+	input := own.Value("--input")
+	coverageProfile := own.Value("--coverage")
+	badgePath := own.Value("--badge")
+	noColor := colorDisabled(own.Bool("--no-color"))
+	github := own.Bool("--github") || os.Getenv("GITHUB_ACTIONS") == "true"
+	renderOnly := own.Bool("--render-only")
 
 	if renderOnly && input == "" {
 		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
@@ -39,7 +46,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, badgePath)
 	}
 
-	minCoverage, err := parseMinFlag(ownArgs)
+	minCoverage, err := parseMinFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -55,7 +62,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer coverCleanup()
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -120,16 +127,13 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
+	noteStdlibTests(overlay.StdlibTestsByPkg)
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 
 	if coverageProfile == "" {
-		for _, arg := range goTestArgs {
-			if v, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
-				coverageProfile = v
-			}
-		}
+		coverageProfile = gotestrunner.ExtractCoverProfile(goTestArgs)
 	}
 
 	elapsed := time.Since(pipelineStart)
@@ -217,7 +221,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 		gotestspec.RenderSummary(w, tree, renderOpts...)
 	}
 
-	if github {
+	// Annotations are workflow commands for a human-readable log; a JSON or
+	// markdown document on stdout must stay the document alone.
+	if github && format == "terminal" {
 		modulePath := gotestspec.ReadModulePath(".")
 		annotations := gotestspec.CollectAnnotations(tree, modulePath)
 		gotestspec.WriteGitHubAnnotations(os.Stdout, annotations)

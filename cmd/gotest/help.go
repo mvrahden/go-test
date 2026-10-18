@@ -164,7 +164,9 @@ Flags:
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
 
-All standard go test flags (-single-dash) are forwarded automatically.
+All standard go test flags (-single-dash) are forwarded automatically; -run also
+takes a Fuzz<Suite>_<Method> wrapper name, -p caps the suite processes, -exec wraps
+every suite binary, and -o is refused (gotest builds the binaries itself).
 Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
@@ -194,7 +196,7 @@ Examples:
   gotest ./pkg/auth/... -v                  Verbose output for one package
   gotest --ci --min=80 ./... -race          CI pipeline with coverage gate
   gotest --debug ./pkg/auth/...             Keep overlay for inspection
-  gotest -- -customflag ./...               Escape hatch for custom flags
+  gotest -- -customflag=value ./...         Flags only the test binary knows
 `)
 }
 
@@ -381,15 +383,19 @@ Flags:
   --save=<path>           Save this run's results as a JSON baseline (forces
                            capture mode; the spec view is still rendered so
                            results remain visible). A bare --save= saves to
-                           bench.baseline from .gotest.yml
+                           bench.baseline from .gotest.yml; saving to the
+                           configured baseline promotes the run and compares
+                           it against nothing, while an explicit --against
+                           naming the --save file is refused (exit 2)
   --against=<path>        Compare this run against a saved baseline and print
                            a delta table (defaults to bench.baseline in
                            .gotest.yml when omitted)
   --gate=<pct>            Fail (exit 1) if the worst significant regression
                            against --against exceeds pct percent (e.g. 10 for
                            10%); requires --against or bench.baseline in
-                           .gotest.yml (defaults to bench.gate in
-                           .gotest.yml, 0 disables)
+                           .gotest.yml and -count=4 or more (exit 2 below
+                           that; defaults to bench.gate in .gotest.yml,
+                           0 disables)
   --json                  Emit one versioned JSON document to stdout instead
                            of human output: the run's results (baseline
                            shape), every delta when a comparison ran
@@ -433,7 +439,10 @@ books each missing benchmark into the captured stream as a failed one;
 comparing each benchmark's new mean ns/op against the saved baseline's.
 Only statistically significant deltas are shown by default; pass -v to
 show every row. Significant regressions are marked with a trailing "⚠".
-Deltas alone never change the exit code — only --gate does.
+Significance is a Welch t-test over -count samples; with fewer than 4 a
+side it is a ±20% rule of thumb and the row says "(n<4, ±20% heuristic)".
+Deltas alone never change the exit code — only --gate does, and a gate
+refuses to judge below -count=4.
 
 A baseline records the goos, goarch and Go version that produced it. When
 any of them differ from this run, --against prints "WARN: baseline was
@@ -762,8 +771,9 @@ Flags:
   -json                   Print the findings as JSON on stdout and exit 0,
                           as the go/analysis driver does (also with -fix;
                           not with -diff)
-  --github                Also emit GitHub ::error annotations and append a
-                          findings table to $GITHUB_STEP_SUMMARY. Implied when
+  --github                Print the findings as GitHub ::error annotations in
+                          place of the plain-text report, and append a findings
+                          table to $GITHUB_STEP_SUMMARY. Implied when
                           GITHUB_ACTIONS=true; ignored alongside -json, -diff
                           and flags only the go/analysis driver has.
 

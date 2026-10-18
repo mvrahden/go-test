@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -39,11 +38,11 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	if extractStringFlag(inv.DefaultArgs(), "--timeout", "") != "" {
+	if hasFlag(inv.DefaultArgs(), "--timeout") {
 		fmt.Fprintln(os.Stderr, "FAIL: --timeout is not a fuzz flag: --for is the session's clock and the deadline follows it (--for=0 fuzzes until interrupted)")
 		return 2
 	}
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -53,19 +52,19 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	forDuration, forExplicit, err := parseForFlag(ownArgs)
+	forDuration, forExplicit, err := parseForFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	jobs, err := parseJobsFlag(ownArgs)
+	jobs, err := parseJobsFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -93,7 +92,7 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	defer cleanup()
 
 	targets := collectFuzzTargets(overlay)
-	if name := extractStringFlag(ownArgs, "--target", ""); name != "" {
+	if name := own.Value("--target"); name != "" {
 		targets, err = selectFuzzTargets(targets, name)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -233,8 +232,8 @@ const defaultFuzzFor = time.Minute
 
 // parseForFlag reads --for. explicit reports whether the flag was given at
 // all; --for=0 is the explicit opt-out, like --timeout=0.
-func parseForFlag(args []string) (d time.Duration, explicit bool, err error) {
-	raw := extractStringFlag(args, "--for", "")
+func parseForFlag(own OwnFlags) (d time.Duration, explicit bool, err error) {
+	raw := own.Value("--for")
 	if raw == "" {
 		return 0, false, nil
 	}
@@ -274,19 +273,8 @@ func planFuzzSession(forExplicit bool, forDur time.Duration, targets, jobs int) 
 	return s
 }
 
-func parseJobsFlag(args []string) (int, error) {
-	raw := extractStringFlag(args, "--jobs", "")
-	if raw == "" {
-		return 0, nil
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid --jobs value %q: must be a positive integer", raw)
-	}
-	if v <= 0 {
-		return 0, fmt.Errorf("invalid --jobs value %d: must be positive", v)
-	}
-	return v, nil
+func parseJobsFlag(own OwnFlags) (int, error) {
+	return parsePositiveIntFlag(own, "--jobs")
 }
 
 // fuzzSelectionFlag names a go test flag in args that would pick tests or

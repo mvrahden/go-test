@@ -6,7 +6,7 @@ The generated code is not hand-edited.
 
 All assertions accept `*gotest.T`, `*testing.T`, `*gotest.B` and `*gotest.F` as first argument, and report a failure at the line that failed in each.
 
-Run the CLI as `go tool gotest <args>`, declared once with `go get -tool github.com/mvrahden/go-test/cmd/gotest@<the version go.mod already requires>` (unversioned `go get -tool` upgrades the pin). Never a global `go install` binary: it drifts from go.mod and the CLI refuses to run on drift.
+Run the CLI as `go tool gotest <args>`, declared once with `go get -tool github.com/mvrahden/go-test/cmd/gotest@<the version go.mod already requires>` (unversioned `go get -tool` upgrades the pin). Never a global `go install` binary: it drifts from go.mod; a CLI built with an older Go than the module's go line, or pinned below the oldest runtime it generates for, refuses to run and names the version the module selects.
 
 ## Rules
 
@@ -26,8 +26,9 @@ Calling `t.T().Cleanup()` inside suite methods breaks the predictable lifecycle.
 
 **Never call `t.T().Fatalf()` in reusable test helpers.**
 Use gotest assertions instead.
-Helpers that call `t.T()` panic inside `Eventually`/`Consistently` because the collecting T has no underlying `*testing.T`.
-This is the most common source of runtime panics in gotest code.
+Inside `Eventually`/`Consistently` the callback gets a `*gotest.R`, which has no `T()` method, so a helper that needs `t.T()` cannot be used there at all.
+In a benchmark's or fuzz target's `BeforeEach`/`AfterEach`, `t.T()` returns nil: the hook runs under a `*testing.B` or `*testing.F`, and the generator rejects a hook that would call it.
+Helpers built on gotest assertions work in every position.
 
 **Never use `t.T().Skip()` for environment gating.**
 Use `SuiteGuard() string` instead.
@@ -99,7 +100,7 @@ For nil checks on slices, maps, or functions: `gotest.NotNil(t, x)` / `gotest.Ni
 ### Collections
 
 ```go
-gotest.Empty(t, object any)                          // nil, or len == 0 (string, slice, map, chan, array)
+gotest.Empty(t, object any)                          // nil, or len == 0 (string, slice, map, chan, array; a pointer is followed); any other type fails the type guard
 gotest.NotEmpty(t, object any)
 gotest.Len(t, object any, length int)                // exact length check
 gotest.Contains(t, haystack, needle any)             // substring (string), element (slice/array), key (map)
@@ -191,7 +192,7 @@ There are no method forms on `*T`. Only package-level `gotest.Eventually()` and 
 
 **Critical constraint:** Inside the callback, `poll` is a `*gotest.R`, not a `*gotest.T`.
 `poll` has no `T()` method. All code in the callback must use gotest assertions only.
-Any helper that calls `t.T()` will panic.
+A helper that takes `*gotest.T` cannot be called with `poll`.
 This is by design — the recorder intercepts failures without aborting, enabling retry semantics.
 
 A panic in the callback fails the test and is reported with the stack from where it
@@ -308,7 +309,7 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite — for suites whose verdicts measure wall-clock behavior or contend for resources).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite; go test's `-p N` caps how many suite processes run at once — for suites whose verdicts measure wall-clock behavior or contend for resources).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 A duration the returned config leaves at zero (omitted or explicit) behaves as if the
@@ -516,7 +517,7 @@ Use a returning `BeforeEach` to give each method its own isolated state.
 ## Other T Methods
 
 ```go
-t.T() *testing.T                                    // access underlying testing.T (panics inside Eventually)
+t.T() *testing.T                                    // access underlying testing.T (nil in a benchmark's or fuzz target's BeforeEach/AfterEach)
 t.Context() context.Context                          // test context (respects deadline from SuiteConfig)
 t.Skipf(format, args...)                             // skip the test with a formatted reason
 t.Setenv(key, value)                                 // set env var, restored after test

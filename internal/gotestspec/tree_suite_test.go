@@ -336,6 +336,35 @@ func (s *TreeTestSuite) TestBuildTree_BenchmarkEvents(t *gotest.T, _ *treeCtx) {
 	mustEq(t, "behaviors", stats.Behaviors, 0)
 }
 
+// A benchmark method that opens sub-benchmarks reports no result line of its
+// own; each sub-benchmark is a benchmark leaf with its own result, and a
+// metric the method reports stays on its leaf.
+func (s *TreeTestSuite) TestBuildTree_SubBenchmarkLeaves(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkSplit"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkSplit/short"}
+{"Action":"output","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkSplit/short","Output":"BenchmarkFooTestSuite/BenchmarkSplit/short-8   \t 100 \t 10.0 ns/op \t 2.500 widgets/op \t 8 B/op \t 1 allocs/op\n"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkSplit/long"}
+{"Action":"output","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkSplit/long","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long-8   \t 50 \t 20.0 ns/op\n"}`)
+	mustLen(t, "root nodes", tree[0].Nodes, 1)
+	mustLen(t, "methods", tree[0].Nodes[0].Children, 1)
+	method := tree[0].Nodes[0].Children[0]
+	mustEq(t, "method kind", method.Kind, gotestspec.KindBenchmark)
+	mustLen(t, "sub-benchmarks", method.Children, 2)
+	short := method.Children[0]
+	mustEq(t, "leaf kind", short.Kind, gotestspec.KindBenchmark)
+	mustEq(t, "leaf display", short.Display, "short")
+	mustEq(t, "leaf status", short.Status, gotestspec.StatusPass)
+	mustEq(t, "iterations", short.Iterations, 100)
+	mustEq(t, "B/op", short.BytesPerOp, int64(8))
+	mustEq(t, "allocs/op", short.AllocsPerOp, int64(1))
+	mustInDelta(t, "widgets/op", 2.5, short.Metrics["widgets/op"], 0.001)
+	mustEq(t, "procs", short.Procs, 8)
+	stats := gotestspec.CollectStats(tree)
+	mustEq(t, "benchmarks", stats.Benchmarks, 2)
+	mustEq(t, "behaviors", stats.Behaviors, 0)
+}
+
 // test2json "output" events are not guaranteed line-aligned; under real
 // subprocess pipe timing a bench result line can arrive split mid-token
 // across two consecutive events for the same tagged Test. Metrics must still

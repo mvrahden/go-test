@@ -2,7 +2,9 @@ package main
 
 import (
 	"io"
+	"time"
 
+	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/lint"
 )
 
@@ -10,9 +12,8 @@ import (
 
 // args.go
 var (
-	ExportExtractStringFlag = extractStringFlag
-	ExportHasFlag           = hasFlag
-	ExportKnownSubcommands  = knownSubcommands
+	ExportHasFlag          = hasFlag
+	ExportKnownSubcommands = knownSubcommands
 )
 
 // bench.go
@@ -20,15 +21,81 @@ var ExportRunBench = runBench
 
 // cli.go
 var (
-	ExportParseMinFlag             = parseMinFlag
-	ExportParseParallelFlag        = parseParallelFlag
-	ExportParseCompileParallelFlag = parseCompileParallelFlag
-	ExportParseSetupTimeoutFlag    = parseSetupTimeoutFlag
-	ExportParseGlobalTimeoutFlag   = parseGlobalTimeoutFlag
-	ExportResolveGlobalTimeout     = resolveGlobalTimeout
-	ExportParseExecFlags           = parseExecFlags
-	ExportEnsureCoverProfile       = ensureCoverProfile
+	ExportResolveGlobalTimeout = resolveGlobalTimeout
+	ExportEnsureCoverProfile   = ensureCoverProfile
 )
+
+// ownOf parses raw own-flag tokens as every command's flags are parsed, with
+// every flag allowed, so the parse helpers can be exercised from tokens.
+func ownOf(args []string) (OwnFlags, error) {
+	allowed := make(map[string]bool, len(gotestFlags))
+	for name := range gotestFlags {
+		allowed[name] = true
+	}
+	own, _, err := SplitArgs(args, allowed)
+	return own, err
+}
+
+func ExportParseMinFlag(args []string) (int, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseMinFlag(own)
+}
+
+func ExportParseParallelFlag(args []string) (int, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseParallelFlag(own)
+}
+
+func ExportParseCompileParallelFlag(args []string) (int, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseCompileParallelFlag(own)
+}
+
+func ExportParseSetupTimeoutFlag(args []string) (time.Duration, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseSetupTimeoutFlag(own)
+}
+
+func ExportParseGlobalTimeoutFlag(args []string) (time.Duration, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseGlobalTimeoutFlag(own)
+}
+
+func ExportParseExecFlags(ownArgs, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {
+	own, err := ownOf(ownArgs)
+	if err != nil {
+		return ExecConfig{}, err
+	}
+	return parseExecFlags(own, goTestArgs, projCfg)
+}
+
+// color.go
+var (
+	ExportColorDisabled = colorDisabled
+	ExportCheckFormat   = checkFormat
+)
+
+// ExportSetStdoutIsTerminal swaps the terminal probe and returns its restorer.
+func ExportSetStdoutIsTerminal(f func() bool) func() {
+	prev := stdoutIsTerminal
+	stdoutIsTerminal = f
+	return func() { stdoutIsTerminal = prev }
+}
 
 // discover.go
 type (
@@ -62,11 +129,25 @@ var ExportDetectCIEnv = detectCIEnv
 type ExportFuzzSession = fuzzSession
 
 var (
-	ExportParseForFlag      = parseForFlag
-	ExportParseJobsFlag     = parseJobsFlag
 	ExportPlanFuzzSession   = planFuzzSession
 	ExportSelectFuzzTargets = selectFuzzTargets
 )
+
+func ExportParseForFlag(args []string) (time.Duration, bool, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, false, err
+	}
+	return parseForFlag(own)
+}
+
+func ExportParseJobsFlag(args []string) (int, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseJobsFlag(own)
+}
 
 // fuzzsummary.go
 var (
@@ -106,6 +187,9 @@ func ExportResetLintSkipFlag(name string) error {
 	return lint.Analyzer.Flags.Set(name, "false")
 }
 
+// prepare.go
+var ExportPrepareHarvestSeeds = prepareHarvestSeeds
+
 // scaffold.go
 var ExportRunScaffold = runScaffold
 
@@ -124,10 +208,23 @@ var (
 
 // watch.go
 var (
-	ExportParseDebounceFlag = parseDebounceFlag
-	ExportIsGoFile          = isGoFile
-	ExportDirsToPatterns    = dirsToPatterns
-	ExportReplacePatterns   = replacePatterns
-	ExportBenchDeltaLines   = benchDeltaLines
-	ExportRenderWatchRun    = renderWatchRun
+	ExportDirPattern = dirPattern
+	ExportRerunDirs  = rerunDirs
+	ExportWatchLoop  = watchLoop
+)
+
+func ExportParseDebounceFlag(args []string) (time.Duration, error) {
+	own, err := ownOf(args)
+	if err != nil {
+		return 0, err
+	}
+	return parseDebounceFlag(own)
+}
+
+var (
+	ExportIsGoFile        = isGoFile
+	ExportDirsToPatterns  = dirsToPatterns
+	ExportReplacePatterns = replacePatterns
+	ExportBenchDeltaLines = benchDeltaLines
+	ExportRenderWatchRun  = renderWatchRun
 )

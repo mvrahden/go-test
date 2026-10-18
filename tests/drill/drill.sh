@@ -8,6 +8,26 @@
 set -uo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/... ./tests/canary/...)
+
+# --list-unmutated prints the catalog clauses no patch names on a Clause: line,
+# by the reading the conventions suite holds the budget to.
+if [ "${1:-}" = "--list-unmutated" ]; then
+  (cd "$root" && go run ./internal/speccatalog/clauses --unmutated)
+  exit $?
+fi
+
+# Names on the command line select the mutants to run; none means all.
+patches=()
+if [ $# -gt 0 ]; then
+  for name in "$@"; do
+    if [ ! -f "$root/tests/drill/mutants/$name.patch" ]; then
+      echo "DRILL  no mutant named $name"; exit 1
+    fi
+    patches+=("$root/tests/drill/mutants/$name.patch")
+  done
+else
+  patches=("$root"/tests/drill/mutants/*.patch)
+fi
 failed=0
 work=$(mktemp -d)
 judgedir=$(mktemp -d)
@@ -22,7 +42,7 @@ judge="$judgedir/gotest"
 if ! (cd "$root" && go build -o "$judge" ./cmd/gotest); then
   echo "DRILL  could not build the judge"; exit 1
 fi
-for patch in "$root"/tests/drill/mutants/*.patch; do
+for patch in "${patches[@]}"; do
   name=$(basename "$patch" .patch)
   # Expect: lines precede the diff; each is an ERE the judge's log must match.
   mapfile -t expects < <(sed -n '/^--- /q; s/^Expect: //p' "$patch")

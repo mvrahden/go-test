@@ -30,6 +30,7 @@ Each directory under `testdata/` is one package with one suite:
 | `teardownfailing` | a shared fixture whose `AfterAll` fails turns a green run red, and the `-json` stream carries the failure as a failed package |
 | `fixturechain` | a shared fixture reached only through a parent package fixture is started and hydrated for the suite |
 | `setupfailing` | a shared fixture that fails to come up fails only the suites that read it, in the `-json` stream and in a bench run |
+| `teardownaftersetup` | a shared fixture whose `AfterAll` fails beside a sibling that never came up: the stream carries both failures |
 | `guardskip` | a suite its guard skips sets up none of its fixtures: one that would fail leaves the run green |
 | `snapshotting` | a value that differs from its committed baseline fails; one that matches passes |
 | `exclusive` | an Exclusive suite starts only after every non-exclusive suite in the run ended |

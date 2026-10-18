@@ -333,12 +333,8 @@ func renderMarkdownBenchDeltaTable(w io.Writer, deltas []BenchDelta) {
 		if d.PercentChange >= 0 {
 			sign = "+"
 		}
-		warn := ""
-		if d.Significant && d.PercentChange > 0 {
-			warn = " ⚠"
-		}
 		fmt.Fprintf(w, "| %s | %.1f | %.1f | %s%.1f%%%s |\n",
-			d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn)
+			d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, deltaMarks(d))
 	}
 	fmt.Fprintln(w)
 }

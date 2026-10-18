@@ -1,0 +1,13 @@
+Expect: --save and --against on one file: exit code [01], want 2
+Clause: when --save and --against name the same file → is refused before anything runs, since the run would be compared against itself
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -68,7 +68,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 	// 0 disables, on the flag as in the config.
+ 	gateActive := gatePct > 0
+ 	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {
+-		if againstGiven {
++		if false && againstGiven {
+ 			// Saving first and comparing after would judge the run against
+ 			// itself: every delta zero, every gate green, the old baseline gone.
+ 			fmt.Fprintf(os.Stderr, "FAIL: --save and --against name the same file (%s); the run would be compared against itself\n", saveTarget)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -102,10 +103,17 @@ func (x *verdictIndex) Write(p []byte) (int, error) {
 // verdictMarkers are the substrings a line needs before it is worth decoding.
 var verdictMarkers = [][]byte{
 	[]byte(`"Action":"pass"`), []byte(`"Action":"fail"`), []byte(`"Action":"skip"`),
-	[]byte(`"Action":"bench"`), []byte(" ns/op"), []byte(`"Action":"run"`),
+	[]byte(`"Action":"bench"`), []byte("/op"), []byte(`"Action":"run"`),
 }
 
-var testField = []byte(`"Test":"`)
+var (
+	testField      = []byte(`"Test":"`)
+	benchTestField = []byte(`"Test":"` + protocol.PrefixBenchmark)
+)
+
+// benchResultRe is the "<value> <unit>/op" pair every benchmark result line
+// carries, whatever unit go test or ReportMetric printed first.
+var benchResultRe = regexp.MustCompile(`\s\S+/op(\s|$)`)
 
 // rawTestDepth counts the slashes in a line's undecoded Test value. An escaped
 // quote ends the count early, so it never exceeds the decoded depth.
@@ -121,7 +129,11 @@ func rawTestDepth(line []byte) int {
 }
 
 func (x *verdictIndex) observe(line []byte) {
-	if !slices.ContainsFunc(verdictMarkers, func(m []byte) bool { return bytes.Contains(line, m) }) || rawTestDepth(line) > 1 {
+	if !slices.ContainsFunc(verdictMarkers, func(m []byte) bool { return bytes.Contains(line, m) }) {
+		return
+	}
+	// Deeper lines are a benchmark's sub-benchmarks, or nothing the census books.
+	if rawTestDepth(line) > 1 && !bytes.Contains(line, benchTestField) {
 		return
 	}
 	var ev streamEvent
@@ -131,6 +143,11 @@ func (x *verdictIndex) observe(line []byte) {
 	key := CensusCase{Pkg: ev.Package, Path: ev.Test}
 	depth := strings.Count(ev.Test, "/")
 	if depth > 1 {
+		// A method that opens sub-benchmarks prints no result line of its
+		// own: the leaves' results are its verdict.
+		if strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) && benchVerdict(ev) {
+			x.creditBenchmark(CensusCase{Pkg: ev.Package, Path: methodPath(ev.Test)})
+		}
 		return
 	}
 	switch ev.Action {
@@ -156,15 +173,26 @@ func (x *verdictIndex) observe(line []byte) {
 		x.settle(key)
 	}
 	if depth == 1 && strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) && benchVerdict(ev) {
-		x.settle(key)
-		if !x.benched[key] {
-			if x.benched == nil {
-				x.benched = map[CensusCase]bool{}
-			}
-			x.benched[key] = true
-			x.benchOrder = append(x.benchOrder, key)
-		}
+		x.creditBenchmark(key)
 	}
+}
+
+// creditBenchmark books a benchmark's verdict, once.
+func (x *verdictIndex) creditBenchmark(key CensusCase) {
+	x.settle(key)
+	if !x.benched[key] {
+		if x.benched == nil {
+			x.benched = map[CensusCase]bool{}
+		}
+		x.benched[key] = true
+		x.benchOrder = append(x.benchOrder, key)
+	}
+}
+
+// methodPath is the "Benchmark<Suite>/<Method>" prefix of a deeper path.
+func methodPath(path string) string {
+	parts := strings.SplitN(path, "/", 3)
+	return parts[0] + "/" + parts[1]
 }
 
 func (x *verdictIndex) settle(key CensusCase) {
@@ -202,13 +230,16 @@ func (x *verdictIndex) runningUnits() []CensusCase {
 }
 
 // benchVerdict reports whether ev settles a benchmark: go test emits no pass
-// for one, so its result line counts, as does a fail, skip or bench action.
+// for one, so its result line counts (any "<value> <unit>/op" pair), as does a
+// fail, skip or bench action.
 func benchVerdict(ev streamEvent) bool { //nolint:gocritic // hugeParam: a decoded line
 	switch ev.Action {
 	case "fail", "skip", "bench":
 		return true
 	case "output":
-		return strings.Contains(ev.Output, " ns/op")
+		// The line may arrive in pieces, its name on one chunk and its
+		// result on the next: the result is what counts.
+		return benchResultRe.MatchString(ev.Output)
 	}
 	return false
 }

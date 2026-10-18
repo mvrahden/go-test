@@ -71,6 +71,18 @@ func censusTree(t *gotest.T, stream string) *gotestspec.Package {
 	return nil
 }
 
+// A method that opens sub-benchmarks never prints a result line of its own;
+// a leaf's line may arrive in two pieces.
+const censusSubBenchStream = `{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkSplit"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkSplit/short"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkSplit/short","Output":"BenchmarkCacheTestSuite/BenchmarkSplit/short-6   \t 1\t 260.0 ns/op\n"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkSplit/long"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkSplit/long","Output":"BenchmarkCacheTestSuite/BenchmarkSplit/long-6\n"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite/BenchmarkSplit/long","Output":"       1\t 520.0 ns/op\t 2.500 widgets/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"BenchmarkCacheTestSuite","Elapsed":0.01}
+`
+
 func (s *CensusTestSuite) TestExecutedUnitsReadTheStream(t *gotest.T) {
 	t.It("lists every Suite/Method with a verdict, skip included, behaviors excluded", func(it *gotest.T) {
 		tests, _, _ := gotestrunner.ExportExecuted(censusGreenStream)
@@ -90,6 +102,11 @@ func (s *CensusTestSuite) TestExecutedUnitsReadTheStream(t *gotest.T) {
 		tests, fuzz, _ := gotestrunner.ExportExecuted(censusFuzzStream)
 		gotest.Empty(it, tests)
 		gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "FuzzCartTestSuite_FuzzTrim"}}, fuzz)
+	})
+
+	t.It("credits a benchmark method from the result lines of its sub-benchmarks", func(it *gotest.T) {
+		_, _, benchmarks := gotestrunner.ExportExecuted(censusSubBenchStream)
+		gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "BenchmarkCacheTestSuite/BenchmarkSplit"}}, benchmarks)
 	})
 
 	t.It("counts a benchmark with a result line or a failure, not one that merely started", func(it *gotest.T) {

@@ -13,19 +13,27 @@ import (
 )
 
 func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), specAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), specAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	format := extractStringFlag(ownArgs, "--format", "terminal")
-	output := extractStringFlag(ownArgs, "--output", "")
-	input := extractStringFlag(ownArgs, "--input", "")
-	noColor := hasFlag(ownArgs, "--no-color")
-	renderOnly := hasFlag(ownArgs, "--render-only")
+	format := own.ValueOr("--format", "terminal")
+	if err := checkFormat(format); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if jsonMode, _ := stripJSONFlag(goTestArgs); jsonMode {
+		fmt.Fprintln(os.Stderr, "FAIL: -json cannot be combined with spec; use --format=json for the specification as JSON")
+		return 2
+	}
+	output := own.Value("--output")
+	input := own.Value("--input")
+	noColor := colorDisabled(own.Bool("--no-color"))
+	renderOnly := own.Bool("--render-only")
 
-	if hasFlag(ownArgs, "--static") && input != "" {
+	if own.Bool("--static") && input != "" {
 		// One asks for the specification in the source, the other for the
 		// specification in a recorded run. Silently honouring --input would
 		// hand back a tree the caller did not ask for.
@@ -45,13 +53,13 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return runSpecFromInput(input, format, output, noColor, renderOnly)
 	}
 
-	if hasFlag(ownArgs, "--static") {
+	if own.Bool("--static") {
 		// The specification is written in the source; reading it should not
 		// require executing it.
-		return runStaticSpec(ownArgs, goTestArgs, &inv.Config, format, output, noColor)
+		return runStaticSpec(own, goTestArgs, &inv.Config, format, output, noColor)
 	}
 
-	minCoverage, err := parseMinFlag(ownArgs)
+	minCoverage, err := parseMinFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -67,7 +75,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer coverCleanup()
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -131,6 +139,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
+	noteStdlibTests(overlay.StdlibTestsByPkg)
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))

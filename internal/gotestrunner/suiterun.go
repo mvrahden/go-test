@@ -38,6 +38,7 @@ type SuiteTarget struct {
 	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
 	FuzzFuncs    []string // generated Fuzz<Suite>_<Method> wrapper names whose seed corpus replays alongside SuiteName in a plain run (ignored when Bench is true or RunFilter is set)
+	Exec         []string // go test's -exec: the command the binary runs under (empty = the binary itself)
 }
 
 // SuiteResult holds the output from running a single suite subprocess.
@@ -46,6 +47,9 @@ type SuiteResult struct {
 	Stdout   []byte
 	Stderr   []byte
 	ExitCode int
+	// Started is when the process was started; Duration how long it ran.
+	// Together they give a package the clock its suites occupied.
+	Started  time.Time
 	Duration time.Duration
 	// CutShort reports that the run's context ended while the process ran.
 	CutShort bool
@@ -176,7 +180,7 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 	}
 
 	if target.CoverProfile != "" {
-		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
+		testArgs = insertBeforeWords(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
 
 	if test2json {
@@ -187,7 +191,9 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		return cmd
 	}
 
-	cmd := exec.CommandContext(ctx, target.BinaryPath, testArgs...) //nolint:gosec // G204: binary built by this tool, not user-supplied
+	argv := append(slices.Clone(target.Exec), target.BinaryPath)
+	argv = append(argv, testArgs...)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: binary built by this tool, under the -exec command the user named
 	cmd.Env = slices.Concat(env, sidecarEnv(target))
 	cmd.Dir = target.Dir
 	return cmd
@@ -241,6 +247,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 			Target:   target,
 			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
 			ExitCode: 2,
+			Started:  start,
 			Duration: time.Since(start),
 		}
 	}
@@ -264,6 +271,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		Stdout:   stdout.Bytes(),
 		Stderr:   stderr.Bytes(),
 		ExitCode: exitCode,
+		Started:  start,
 		Duration: duration,
 		CutShort: cutShort.Load(),
 	}
@@ -346,7 +354,8 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+			fuzzFuncs := fuzzFuncsByPkg[pkg][suiteName]
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) {
 				continue
 			}
 			target := SuiteTarget{
@@ -362,11 +371,30 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
 				target.RunFilter = rf
+			} else if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+				// Selected through a fuzz wrapper's name alone: the user's
+				// filter is the whole -test.run, so only that wrapper runs.
+				target.RunFilter = userRunFilter
 			}
 			targets = append(targets, target)
 		}
 	}
 	return targets
+}
+
+// selectsSuite reports whether the user's -run filter selects a suite: by its
+// Test function, or by one of the generated fuzz wrappers it owns, which is
+// the name -v prints for a seed replay and the one go test -run would take.
+func selectsSuite(userRunFilter, testFuncName string, fuzzFuncs []string) bool {
+	if userRunFilter == "" || matchesSuiteFunc(userRunFilter, testFuncName) {
+		return true
+	}
+	for _, f := range fuzzFuncs {
+		if matchesSuiteFunc(userRunFilter, f) {
+			return true
+		}
+	}
+	return false
 }
 
 // BuildBenchTargets constructs SuiteTarget entries for benchmark suites from
@@ -547,4 +575,16 @@ func splitTopLevelOr(pattern string) []string {
 		}
 	}
 	return append(result, pattern[start:])
+}
+
+// insertBeforeWords adds a flag ahead of the binary's own words, which the
+// translated -args left in place: flag parsing stops at the first word that
+// is not a flag.
+func insertBeforeWords(args []string, flag string) []string {
+	for i, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			return slices.Insert(slices.Clone(args), i, flag)
+		}
+	}
+	return append(slices.Clone(args), flag)
 }

@@ -6,17 +6,18 @@ import (
 	"sort"
 )
 
-// minSamplesForTTest is the minimum sample count required on both sides of
+// MinSamplesForTTest is the minimum sample count required on both sides of
 // a comparison before Welch's t-test is trusted; below that, Compare falls
-// back to a plain percent-change heuristic (see Delta.InsufficientSample).
-const minSamplesForTTest = 4
+// back to a plain percent-change heuristic (see Delta.InsufficientSample),
+// and a gate refuses to judge.
+const MinSamplesForTTest = 4
 
 // significanceLevel is the two-tailed p-value threshold below which a
 // Welch's t-test result is considered significant.
 const significanceLevel = 0.05
 
 // insufficientSampleThresholdPct is the documented fallback heuristic used
-// when either side has fewer than minSamplesForTTest samples: a benchmark
+// when either side has fewer than MinSamplesForTTest samples: a benchmark
 // is flagged as significant if its mean changed by at least this many
 // percent, since a proper significance test isn't trustworthy with so few
 // samples.
@@ -81,7 +82,7 @@ func compareResult(key string, old, new Result) Delta {
 		PercentChange: pctChange,
 	}
 
-	if len(oldNs) < minSamplesForTTest || len(newNs) < minSamplesForTTest {
+	if len(oldNs) < MinSamplesForTTest || len(newNs) < MinSamplesForTTest {
 		d.InsufficientSample = true
 		d.Significant = math.Abs(pctChange) >= insufficientSampleThresholdPct
 		return d
@@ -251,4 +252,31 @@ func betaContinuedFraction(a, b, x float64) float64 {
 	}
 
 	return h
+}
+
+// Unmatched lists the benchmarks a comparison cannot judge: missing are the
+// baseline's keys the run did not produce, added the run's keys the baseline
+// does not have. Both are sorted.
+func Unmatched(old, new Baseline) (missing, added []string) { //nolint:gocritic // hugeParam: stable API
+	oldKeys := make(map[string]bool, len(old.Results))
+	for _, r := range old.Results {
+		oldKeys[resultKey(r)] = true
+	}
+	newKeys := make(map[string]bool, len(new.Results))
+	for _, r := range new.Results {
+		newKeys[resultKey(r)] = true
+	}
+	for k := range oldKeys {
+		if !newKeys[k] {
+			missing = append(missing, k)
+		}
+	}
+	for k := range newKeys {
+		if !oldKeys[k] {
+			added = append(added, k)
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(added)
+	return missing, added
 }

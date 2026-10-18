@@ -74,7 +74,7 @@ func (s *StaticSpecTestSuite) AfterEach(t *gotest.T, ctx *staticCtx) {
 // a specification, and returns what it wrote.
 func (s *StaticSpecTestSuite) render(t *gotest.T, dir, format, pattern string) string {
 	out := filepath.Join(dir, "spec."+format)
-	code := ExportRunStaticSpec(nil, []string{pattern}, &config.ProjectConfig{}, format, out, true)
+	code := ExportRunStaticSpec(OwnFlags{}, []string{pattern}, &config.ProjectConfig{}, format, out, true)
 	gotest.Equal(t, 0, code, "spec --static --format=%s", format)
 
 	data, err := os.ReadFile(out) //nolint:gosec // G304: path built in this test
@@ -249,11 +249,29 @@ func (s *StaticSpecTestSuite) TestDeclaresIncompletenessOnEverySurface(t *gotest
 	})
 }
 
+// A suite the X_ prefix disables is listed as excluded down to its last block,
+// so no reader of the JSON takes a parked behavior for a live one.
+func (s *StaticSpecTestSuite) TestAnExcludedSuiteIsExcludedThroughout(t *gotest.T, ctx *staticCtx) {
+	excluded, err := filepath.Abs(filepath.Join("testdata", "static", "excluded"))
+	gotest.NoError(t, err)
+	var doc specDocument
+	gotest.NoError(t, json.Unmarshal([]byte(s.render(t, ctx.dir, "json", excluded)), &doc))
+	t.When("the static spec renders an X_ suite", func(w *gotest.T) {
+		w.It("marks the suite, its methods and every block under them excluded", func(it *gotest.T) {
+			gotest.Len(it, doc.Packages, 1)
+			gotest.Len(it, doc.Packages[0].Nodes, 1)
+			gotest.True(it, doc.Packages[0].Nodes[0].Excluded)
+			gotest.NotEmpty(it, doc.Packages[0].Nodes[0].Children)
+			gotest.True(it, allExcluded(doc.Packages[0].Nodes[0].Children), "nodes: %+v", doc.Packages[0].Nodes[0].Children)
+		})
+	})
+}
+
 func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T, ctx *staticCtx) {
 	t.When("the source can be read", func(w *gotest.T) {
 		w.It("exits 0", func(it *gotest.T) {
 			out := filepath.Join(ctx.dir, "ok.txt")
-			gotest.Equal(it, 0, ExportRunStaticSpec(nil, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
+			gotest.Equal(it, 0, ExportRunStaticSpec(OwnFlags{}, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 
@@ -265,14 +283,14 @@ func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T, ctx *staticCtx) {
 
 		w.It("exits 2 rather than reporting an empty specification", func(it *gotest.T) {
 			out := filepath.Join(ctx.dir, "broken.txt")
-			gotest.Equal(it, 2, ExportRunStaticSpec(nil, []string{broken}, &config.ProjectConfig{}, "terminal", out, true))
+			gotest.Equal(it, 2, ExportRunStaticSpec(OwnFlags{}, []string{broken}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 
 	t.When("the output file cannot be created", func(w *gotest.T) {
 		w.It("exits 2", func(it *gotest.T) {
 			out := filepath.Join(ctx.dir, "no-such-dir", "spec.txt")
-			gotest.Equal(it, 2, ExportRunStaticSpec(nil, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
+			gotest.Equal(it, 2, ExportRunStaticSpec(OwnFlags{}, []string{s.corpus}, &config.ProjectConfig{}, "terminal", out, true))
 		})
 	})
 }
@@ -298,7 +316,18 @@ type specNode struct {
 	Name       string     `json:"name"`
 	Status     string     `json:"status"`
 	Incomplete bool       `json:"incomplete"`
+	Excluded   bool       `json:"excluded"`
 	Children   []specNode `json:"children"`
+}
+
+// allExcluded reports whether every node of the tree is marked excluded.
+func allExcluded(nodes []specNode) bool {
+	for _, n := range nodes {
+		if !n.Excluded || !allExcluded(n.Children) {
+			return false
+		}
+	}
+	return true
 }
 
 func nodePaths(nodes []specNode, prefix string) []string {

@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/scaffold"
 )
 
 func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, rest, err := SplitArgs(inv.Args, scaffoldAllowed)
+	own, rest, err := SplitArgs(inv.Args, scaffoldAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %v\n", err)
 		return 2
@@ -43,7 +42,7 @@ func runScaffold(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 		return 2
 	}
 
-	if slices.Contains(ownArgs, "--fuzz") {
+	if own.Bool("--fuzz") {
 		return runScaffoldFuzz(target)
 	}
 
@@ -110,11 +109,13 @@ func runScaffoldType(target string) int {
 }
 
 func runScaffoldFile(target string) int {
+	// The package is loaded from the file's directory as named, so a path
+	// through a symlink (macOS's temp directories) or a short name (Windows's)
+	// still lands in the module and workspace go finds from there.
 	dir := filepath.Dir(target)
 	filename := filepath.Base(target)
-	pkgPattern := "./" + filepath.ToSlash(dir)
 
-	info, err := scaffold.IntrospectFile(pkgPattern, filename)
+	info, err := scaffold.IntrospectFile(dir, filename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
 		return 1

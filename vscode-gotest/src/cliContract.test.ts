@@ -363,9 +363,11 @@ describe("recorded live runs", () => {
       "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
     ];
 
-    it("passes quietly", () => {
+    it("passes, saying on stderr only that the stdlib-only package was not run", () => {
       expect(recorded.exitCode).toBe(0);
-      expect(recorded.stderr).toBe("");
+      expect(recorded.stderr).toBe(
+        `note: 1 stdlib test(s) in ${unrunPkg}nosuites not run — gotest runs suites; use 'go test' for stdlib tests\n`,
+      );
     });
 
     it("opens every package with one start, before any other event of it", () => {

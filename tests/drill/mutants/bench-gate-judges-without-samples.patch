@@ -1,0 +1,13 @@
+Expect: gate without -count: exit code [01], want 2
+Clause: when --gate is given with -count below 4 → exits 2 naming -count=4 as the requirement
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -86,7 +86,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 		fmt.Fprintln(os.Stderr, "FAIL: --gate requires --against (or bench.baseline in .gotest.yml)")
+ 		return 2
+ 	}
+-	if count := gotestrunner.ExtractCountValue(goTestArgs); gateActive && count < gotestbench.MinSamplesForTTest {
++	if count := gotestrunner.ExtractCountValue(goTestArgs); false && gateActive && count < gotestbench.MinSamplesForTTest {
+ 		// Below four samples a side there is no significance test, only a
+ 		// rule of thumb; a verdict built on it would be a guess with an exit code.
+ 		fmt.Fprintf(os.Stderr, "FAIL: --gate needs -count=%d or more: a significance test needs %d samples a side, and this run would take %d\n", gotestbench.MinSamplesForTTest, gotestbench.MinSamplesForTTest, count)

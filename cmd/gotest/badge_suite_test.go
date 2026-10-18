@@ -34,7 +34,7 @@ func (s *SummaryBadgeTestSuite) TestFlagIsASummaryValueFlag(t *gotest.T, _ *badg
 	t.It("is accepted by summary and routed to gotest's own args", func(it *gotest.T) {
 		own, goTest, err := main.SplitArgs([]string{"--badge=coverage.svg", "-race", "./..."}, main.ExportSummaryAllowed)
 		gotest.NoError(it, err)
-		gotest.Equal(it, []string{"--badge=coverage.svg"}, own)
+		gotest.Equal(it, map[string]string{"--badge": "coverage.svg"}, own.Snapshot())
 		gotest.Equal(it, []string{"-race", "./..."}, goTest)
 	})
 
@@ -70,6 +70,14 @@ func (s *SummaryBadgeTestSuite) TestBadgeForcesACoverageProfile(t *gotest.T, _ *
 			gotest.NoError(it, err)
 			gotest.Equal(it, "c.out", profile)
 			gotest.Equal(it, []string{"-coverprofile=c.out"}, args)
+		})
+
+		w.It("reuses a profile given as a separate argument", func(it *gotest.T) {
+			args, profile, cleanup, err := main.ExportEnsureCoverProfile([]string{"-coverprofile", "c.out", "-v"}, true)
+			cleanup()
+			gotest.NoError(it, err)
+			gotest.Equal(it, "c.out", profile)
+			gotest.Equal(it, []string{"-coverprofile", "c.out", "-v"}, args)
 		})
 	})
 }

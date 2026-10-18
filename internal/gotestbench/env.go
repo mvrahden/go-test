@@ -2,20 +2,21 @@ package gotestbench
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 // EnvDiff is one recorded environment field in which a baseline and the run
 // compared against it disagree.
 type EnvDiff struct {
-	Field    string `json:"field"`    // "goos", "goarch" or "goVersion"
+	Field    string `json:"field"`    // "goos", "goarch", "goVersion", "cpu" or "gomaxprocs"
 	Baseline string `json:"baseline"` // what the baseline recorded
 	Run      string `json:"run"`      // what this run reports
 }
 
 // EnvMismatch names the environment fields in which two baselines disagree.
 //
-// Benchmark numbers describe one toolchain on one machine class. Compared
+// Benchmark numbers describe one toolchain on one machine, at one width. Compared
 // across either, a delta measures the difference between the machines, not
 // the change in the code — so a mismatch makes every row of the table
 // suspect. It is reported and never enforced: only the operator knows
@@ -28,6 +29,8 @@ func EnvMismatch(old, new Baseline) []EnvDiff { //nolint:gocritic // hugeParam: 
 		{"goos", old.GOOS, new.GOOS},
 		{"goarch", old.GOARCH, new.GOARCH},
 		{"goVersion", old.GoVersion, new.GoVersion},
+		{"cpu", old.CPU, new.CPU},
+		{"gomaxprocs", procsField(old.GOMAXPROCS), procsField(new.GOMAXPROCS)},
 	} {
 		if f.was == "" || f.now == "" || f.was == f.now {
 			continue
@@ -48,4 +51,13 @@ func FormatEnvMismatch(diffs []EnvDiff) string {
 		parts = append(parts, fmt.Sprintf("%s %s, now %s", d.Field, d.Baseline, d.Run))
 	}
 	return "baseline was recorded in a different environment (" + strings.Join(parts, "; ") + "); the deltas compare runs that are not alike"
+}
+
+// procsField renders a recorded GOMAXPROCS, empty when the baseline did not
+// record one.
+func procsField(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
 }

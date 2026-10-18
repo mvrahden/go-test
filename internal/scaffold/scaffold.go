@@ -154,13 +154,18 @@ func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 	return info, nil
 }
 
-// IntrospectFile loads a package and extracts exported package-level functions
-// from the specified file. It returns a FileInfo suitable for file-scoped scaffold generation.
-func IntrospectFile(pkgPattern, filename string) (*FileInfo, error) {
+// IntrospectFile loads the package in dir and extracts exported package-level
+// functions from the named file. It returns a FileInfo suitable for file-scoped
+// scaffold generation. The package is loaded from dir itself, so go resolves
+// the module and workspace the file belongs to by the directory as given — a
+// symlinked or short-named path included — and no path is compared outside go.
+func IntrospectFile(dir, filename string) (*FileInfo, error) {
 	cfg := &packages.Config{
 		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles | packages.NeedModule,
 		Tests: false,
+		Dir:   dir,
 	}
+	pkgPattern := "."
 
 	pkgs, err := packages.Load(cfg, pkgPattern)
 	if err != nil {

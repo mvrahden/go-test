@@ -926,3 +926,45 @@ func streamLines(t *gotest.T, stream string) []streamLine {
 	}
 	return lines
 }
+
+// A binary stopped from outside ends its own stream mid-way; the note that
+// says so must be in the stream for -json consumers, not only on stderr.
+func (s *OutputCollectorTestSuite) TestATerminatedBinaryIsNotedInTheStream(t *gotest.T) {
+	var stdout, stderr bytes.Buffer
+	c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+	c.Register("example.com/a", 1)
+	c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{ExitCode: -1, Duration: time.Millisecond})
+	t.When("a suite binary reports a signal status", func(w *gotest.T) {
+		w.It("writes the note as an output event of its package", func(it *gotest.T) {
+			gotest.Regexp(it, `"Action":"output".*"Output":"gotest: suite binary terminated by signal\\n".*"Package":"example.com/a"`, stdout.String())
+			gotest.Contains(it, stderr.String(), "gotest: suite binary terminated")
+		})
+	})
+}
+
+// Suites of one package run as concurrent processes; the package's time is
+// the clock they occupied together, never the sum of their durations.
+func (s *OutputCollectorTestSuite) TestPackageTimeIsTheSpanOfItsSuites(t *gotest.T) {
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	first := gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), Started: t0, Duration: 30 * time.Millisecond}
+	second := gotestrunner.SuiteResult{Stdout: []byte("PASS\n"), Started: t0.Add(10 * time.Millisecond), Duration: 10 * time.Millisecond}
+
+	t.When("two suites overlapped", func(w *gotest.T) {
+		w.It("prints the span in the text summary", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 2)
+			c.RecordResult("example.com/a", 0, first)
+			c.RecordResult("example.com/a", 1, second)
+			gotest.Equal(it, "ok  \texample.com/a\t0.030s\n", stdout.String())
+		})
+		w.It("reports the span as the package's Elapsed in the stream", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+			c.Register("example.com/a", 2)
+			c.RecordResult("example.com/a", 0, first)
+			c.RecordResult("example.com/a", 1, second)
+			gotest.Contains(it, stdout.String(), `"Action":"pass","Elapsed":0.03,`)
+		})
+	})
+}

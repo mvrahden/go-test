@@ -170,6 +170,11 @@ type Node struct {
 	NsPerOp     float64
 	BytesPerOp  int64
 	AllocsPerOp int64
+	// Metrics are the result line's other "<value> <unit>" pairs: MB/s and
+	// what ReportMetric added.
+	Metrics map[string]float64
+	// Procs is the GOMAXPROCS suffix of the result line.
+	Procs int
 }
 
 type Package struct {
@@ -317,8 +322,9 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		switch ev.Action {
 		case ActionOutput:
 			node.Output = append(node.Output, ev.Output)
-			lastSegment := resolvedSegments[len(resolvedSegments)-1]
-			if isBenchmarkName(lastSegment) {
+			// A sub-benchmark's segment is whatever b.Run was given; the
+			// benchmark above it is what makes its output a result line.
+			if slices.ContainsFunc(resolvedSegments, isBenchmarkName) {
 				scan := benchScans[node]
 				if scan == nil {
 					scan = &benchScan{}
@@ -463,33 +469,69 @@ func isBenchmarkName(name string) bool {
 	return !unicode.IsLower(r)
 }
 
-var benchLineRe = regexp.MustCompile(`^Benchmark\S+?(?:-\d+)?\s+(\d+)\s+([\d.]+) ns/op(?:\s+(\d+) B/op)?(?:\s+(\d+) allocs/op)?`)
+// BenchLine is a go test benchmark result line, read whole:
+//
+//	BenchmarkFoo/sub-8   	    1201	     985.2 ns/op	   4.500 widgets/op	      24 B/op	       3 allocs/op
+//
+// After the name and the iteration count come "<value> <unit>" pairs in
+// whatever order go test prints them: ns/op first, then MB/s and the metrics
+// the benchmark reported, then B/op and allocs/op when memory is reported.
+// The three the renderers know have fields of their own; the rest are Metrics.
+type BenchLine struct {
+	Name        string // the benchmark's full name without the GOMAXPROCS suffix
+	Procs       int    // the GOMAXPROCS suffix, 0 when the line carries none
+	Iterations  int
+	NsPerOp     float64
+	BytesPerOp  int64
+	AllocsPerOp int64
+	Metrics     map[string]float64
+}
 
-// parseBenchOutput parses a go test benchmark result line, e.g.:
-//
-//	BenchmarkFoo-8   	    1201	     985.2 ns/op	      24 B/op	       3 allocs/op
-//
-// B/op and allocs/op are optional (absent unless -benchmem is set).
-func parseBenchOutput(line string) (iters int, nsPerOp float64, bPerOp, allocsPerOp int64, ok bool) {
-	m := benchLineRe.FindStringSubmatch(strings.TrimSpace(line))
+var benchNameRe = regexp.MustCompile(`^(Benchmark\S*?)(?:-(\d+))?$`)
+
+// ParseBenchLine reads a benchmark result line. A line is one only when it
+// starts with a benchmark name, carries an iteration count and reports ns/op.
+func ParseBenchLine(line string) (BenchLine, bool) {
+	fields := strings.Fields(line)
+	if len(fields) < 4 || len(fields)%2 != 0 {
+		return BenchLine{}, false
+	}
+	m := benchNameRe.FindStringSubmatch(fields[0])
 	if m == nil {
-		return 0, 0, 0, 0, false
+		return BenchLine{}, false
 	}
-	iters, err := strconv.Atoi(m[1])
+	iters, err := strconv.Atoi(fields[1])
 	if err != nil {
-		return 0, 0, 0, 0, false
+		return BenchLine{}, false
 	}
-	nsPerOp, err = strconv.ParseFloat(m[2], 64)
-	if err != nil {
-		return 0, 0, 0, 0, false
+	out := BenchLine{Name: m[1], Iterations: iters}
+	if m[2] != "" {
+		out.Procs, _ = strconv.Atoi(m[2])
 	}
-	if m[3] != "" {
-		bPerOp, _ = strconv.ParseInt(m[3], 10, 64)
+	sawNs := false
+	for k := 2; k < len(fields); k += 2 {
+		value, err := strconv.ParseFloat(fields[k], 64)
+		if err != nil {
+			return BenchLine{}, false
+		}
+		switch unit := fields[k+1]; unit {
+		case "ns/op":
+			out.NsPerOp, sawNs = value, true
+		case "B/op":
+			out.BytesPerOp = int64(value)
+		case "allocs/op":
+			out.AllocsPerOp = int64(value)
+		default:
+			if out.Metrics == nil {
+				out.Metrics = map[string]float64{}
+			}
+			out.Metrics[unit] = value
+		}
 	}
-	if m[4] != "" {
-		allocsPerOp, _ = strconv.ParseInt(m[4], 10, 64)
+	if !sawNs {
+		return BenchLine{}, false
 	}
-	return iters, nsPerOp, bPerOp, allocsPerOp, true
+	return out, true
 }
 
 // benchScan finds a benchmark's result line in output that arrives in
@@ -526,15 +568,17 @@ func (b *benchScan) end(node *Node) {
 }
 
 func (b *benchScan) parse(node *Node, line string) {
-	iters, nsPerOp, bPerOp, allocsPerOp, ok := parseBenchOutput(line)
+	result, ok := ParseBenchLine(line)
 	if !ok {
 		return
 	}
 	b.found = true
-	node.Iterations = iters
-	node.NsPerOp = nsPerOp
-	node.BytesPerOp = bPerOp
-	node.AllocsPerOp = allocsPerOp
+	node.Iterations = result.Iterations
+	node.NsPerOp = result.NsPerOp
+	node.BytesPerOp = result.BytesPerOp
+	node.AllocsPerOp = result.AllocsPerOp
+	node.Metrics = result.Metrics
+	node.Procs = result.Procs
 	// go test's own -json encoder never emits a "pass" event for a
 	// benchmark (see ActionBench doc comment); reaching a parsed ns/op line
 	// is the only success signal a real benchmark run ever produces.
@@ -702,7 +746,21 @@ func classify(n *Node, topLevel bool) {
 	}
 
 	for _, c := range n.Children {
-		classify(c, false)
+		if n.Kind == KindBenchmark {
+			classifySubBenchmark(c)
+		} else {
+			classify(c, false)
+		}
+	}
+}
+
+// classifySubBenchmark shapes a node b.Run opened under a benchmark: a
+// benchmark itself, shown under the name it was given, whatever it looks like.
+func classifySubBenchmark(n *Node) {
+	n.Kind = KindBenchmark
+	n.Display = n.Name
+	for _, c := range n.Children {
+		classifySubBenchmark(c)
 	}
 }
 

@@ -1,0 +1,13 @@
+Expect: missing \[\], want \[example.com/elsewhere OtherTestSuite/BenchmarkGone\]
+Clause: when no benchmark is in both the baseline and the run → lists the baseline's benchmarks that did not run and the run's that the baseline lacks
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -203,7 +203,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 	if againstPath != "" {
+ 		deltas = gotestbench.Compare(oldBaseline, newBaseline)
+ 		specDeltas = toSpecDeltas(filterDeltas(deltas, verboseRequested))
+-		missing, added = gotestbench.Unmatched(oldBaseline, newBaseline)
++		missing, added = nil, nil
+ 		if len(missing) > 0 {
+ 			fmt.Fprintf(os.Stderr, "WARN: %d benchmark(s) in the baseline did not run: %s\n", len(missing), strings.Join(missing, ", "))
+ 		}

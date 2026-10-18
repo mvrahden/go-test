@@ -68,12 +68,26 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 				return pkgNode.Nodes[a].Name < pkgNode.Nodes[b].Name
 			})
 			gotestspec.ClassifyRoots(pkgNode.Nodes)
+			for _, n := range pkgNode.Nodes {
+				if n.Excluded {
+					markExcluded(n.Children)
+				}
+			}
 			out = append(out, pkgNode)
 		}
 	}
 
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Path < out[b].Path })
 	return out, notes
+}
+
+// markExcluded carries an excluded suite's flag down to every block under it:
+// a reader of one node must not take a parked behavior for a live one.
+func markExcluded(nodes []*gotestspec.Node) {
+	for _, n := range nodes {
+		n.Excluded = true
+		markExcluded(n.Children)
+	}
 }
 
 func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string) {
@@ -134,8 +148,8 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 // runStaticSpec renders the specification from source without running the
 // suites. Nothing carries a verdict, because nothing executed; the exit code
 // reports only whether the source could be read.
-func runStaticSpec(ownArgs, goTestArgs []string, projectConfig *config.ProjectConfig, format, output string, noColor bool) int {
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, projectConfig)
+func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.ProjectConfig, format, output string, noColor bool) int {
+	cfg, err := parseExecFlags(own, goTestArgs, projectConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

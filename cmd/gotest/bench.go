@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestbench"
@@ -19,23 +21,23 @@ import (
 // (SplitArgs -> ClassifyGoTestArgs -> LoadPackages -> GenerateOverlay ->
 // RunPipeline) with Bench: true.
 func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	ownArgs, goTestArgs, err := SplitArgs(inv.DefaultArgs(), benchAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), benchAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	specRequested := hasFlag(ownArgs, "--spec")
-	noColor := hasFlag(ownArgs, "--no-color")
-	jsonRequested := hasFlag(ownArgs, "--json")
+	specRequested := own.Bool("--spec")
+	noColor := colorDisabled(own.Bool("--no-color"))
+	jsonRequested := own.Bool("--json")
 
 	// -v is forced further down for benchmark result visibility; capture
 	// whether the caller actually asked for it first, since that's also our
 	// signal for showing every delta row (vs. only significant ones) below.
 	verboseRequested := gotestrunner.HasVerboseFlag(goTestArgs)
 
-	saveTarget := extractStringFlag(ownArgs, "--save", "")
-	if saveTarget == "" && hasFlag(ownArgs, "--save") {
+	saveTarget := own.Value("--save")
+	if saveTarget == "" && own.Given("--save") {
 		// `--save=` with no value asks for the configured baseline path —
 		// the same fallback --against already has. Config resolution stays
 		// in the CLI so tooling never parses .gotest.yml itself.
@@ -46,15 +48,16 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 	}
 
-	againstPath := extractStringFlag(ownArgs, "--against", "")
+	againstGiven := own.Given("--against")
+	againstPath := own.Value("--against")
 	if againstPath == "" {
 		againstPath = inv.Config.Bench.Baseline
 	}
 
-	gateGiven := hasFlag(ownArgs, "--gate")
+	gateGiven := own.Given("--gate")
 	gatePct := inv.Config.Bench.Gate
 	if gateGiven {
-		raw := extractStringFlag(ownArgs, "--gate", "")
+		raw := own.Value("--gate")
 		v, perr := strconv.ParseFloat(raw, 64)
 		if perr != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: invalid --gate value %q: %s\n", raw, perr)
@@ -62,9 +65,31 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		}
 		gatePct = v
 	}
-	gateActive := gateGiven || inv.Config.Bench.Gate > 0
+	// 0 disables, on the flag as in the config.
+	gateActive := gatePct > 0
+	if saveTarget != "" && againstPath != "" && sameFile(saveTarget, againstPath) {
+		if againstGiven {
+			// Saving first and comparing after would judge the run against
+			// itself: every delta zero, every gate green, the old baseline gone.
+			fmt.Fprintf(os.Stderr, "FAIL: --save and --against name the same file (%s); the run would be compared against itself\n", saveTarget)
+			return 2
+		}
+		// Saving to the configured baseline promotes this run to be the
+		// baseline; there is nothing older to compare it against, and a
+		// configured gate has nothing to judge.
+		againstPath = ""
+		if !gateGiven {
+			gateActive = false
+		}
+	}
 	if gateActive && againstPath == "" {
 		fmt.Fprintln(os.Stderr, "FAIL: --gate requires --against (or bench.baseline in .gotest.yml)")
+		return 2
+	}
+	if count := gotestrunner.ExtractCountValue(goTestArgs); gateActive && count < gotestbench.MinSamplesForTTest {
+		// Below four samples a side there is no significance test, only a
+		// rule of thumb; a verdict built on it would be a guess with an exit code.
+		fmt.Fprintf(os.Stderr, "FAIL: --gate needs -count=%d or more: a significance test needs %d samples a side, and this run would take %d\n", gotestbench.MinSamplesForTTest, gotestbench.MinSamplesForTTest, count)
 		return 2
 	}
 
@@ -79,10 +104,10 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	// suppression for ordinary tests). Force verbose so ns/op lines always
 	// show, matching go test's actual benchmark UX.
 	if !verboseRequested {
-		goTestArgs = append(goTestArgs, "-v")
+		goTestArgs = gotestrunner.InsertBeforeArgs(goTestArgs, "-v")
 	}
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -112,7 +137,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if len(overlay.BenchesByPkg) == 0 {
 		if jsonRequested {
 			// Machine consumers get a valid empty document, not prose.
-			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil, nil)
+			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil, nil, nil, nil)
 		}
 		fmt.Println("no benchmarks found")
 		return 0
@@ -168,6 +193,18 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		newBaseline = gotestbench.FromPackages(tree)
 	}
 
+	// The comparison reads the baseline as it was before this run; only then
+	// may the run overwrite it.
+	var oldBaseline gotestbench.Baseline
+	if againstPath != "" {
+		var err error
+		oldBaseline, err = gotestbench.Load(againstPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+			return 2
+		}
+	}
+
 	if saveTarget != "" {
 		if err := gotestbench.Save(saveTarget, newBaseline); err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -178,16 +215,18 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	var deltas []gotestbench.Delta
 	var specDeltas []gotestspec.BenchDelta
 	var envMismatch []gotestbench.EnvDiff
+	var missing, added []string
 
 	if againstPath != "" {
-		oldBaseline, err := gotestbench.Load(againstPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		}
-
 		deltas = gotestbench.Compare(oldBaseline, newBaseline)
 		specDeltas = toSpecDeltas(filterDeltas(deltas, verboseRequested))
+		missing, added = gotestbench.Unmatched(oldBaseline, newBaseline)
+		if len(missing) > 0 {
+			fmt.Fprintf(os.Stderr, "WARN: %d benchmark(s) in the baseline did not run: %s\n", len(missing), strings.Join(missing, ", "))
+		}
+		if len(added) > 0 {
+			fmt.Fprintf(os.Stderr, "WARN: %d benchmark(s) are new in this run and have no baseline: %s\n", len(added), strings.Join(added, ", "))
+		}
 
 		// A baseline from another toolchain or machine class measures the
 		// machines, not the change. Say so and carry on: refusing would
@@ -222,7 +261,15 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if againstPath != "" && gateActive {
 		verdict := gotestbench.GateVerdict(deltas, gatePct)
 		gateVerdict = &verdict
-		if verdict.Breached {
+		switch {
+		case len(deltas) == 0:
+			// A gate that judged nothing has not passed; a renamed module or
+			// package would otherwise turn every later regression green.
+			fmt.Fprintln(os.Stderr, "FAIL: bench gate: nothing to compare; no benchmark is in both the baseline and this run")
+			if code == 0 {
+				code = 1
+			}
+		case verdict.Breached:
 			fmt.Fprintf(os.Stderr, "bench gate: %s +%.1f%% exceeds %g%% gate\n", verdict.WorstKey, verdict.WorstPct, gatePct)
 			if code == 0 {
 				code = 1
@@ -231,7 +278,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if jsonRequested {
-		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), gateVerdict, envMismatch); jsonCode != 0 {
+		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, gateVerdict, envMismatch); jsonCode != 0 {
 			return jsonCode
 		}
 	}
@@ -295,11 +342,12 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 	out := make([]gotestspec.BenchDelta, len(deltas))
 	for i, d := range deltas {
 		out[i] = gotestspec.BenchDelta{
-			Key:           d.Key,
-			OldNs:         d.OldNs,
-			NewNs:         d.NewNs,
-			PercentChange: d.PercentChange,
-			Significant:   d.Significant,
+			Key:                d.Key,
+			OldNs:              d.OldNs,
+			NewNs:              d.NewNs,
+			PercentChange:      d.PercentChange,
+			Significant:        d.Significant,
+			InsufficientSample: d.InsufficientSample,
 		}
 	}
 	return out
@@ -307,8 +355,10 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 
 // emitBenchReport writes the versioned --json document to stdout. It returns
 // a non-zero exit code only when the document itself cannot be produced.
-func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, gate *gotestbench.Gate, envMismatch []gotestbench.EnvDiff) int { //nolint:gocritic // hugeParam: stable API
-	data, err := gotestbench.MarshalReport(gotestbench.NewReport(b, deltas, gate, envMismatch))
+func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, missing, added []string, gate *gotestbench.Gate, envMismatch []gotestbench.EnvDiff) int { //nolint:gocritic // hugeParam: stable API
+	report := gotestbench.NewReport(b, deltas, gate, envMismatch)
+	report.Missing, report.Added = missing, added
+	data, err := gotestbench.MarshalReport(report)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -329,4 +379,16 @@ func deltasForReport(deltas []gotestbench.Delta, againstPath string) []gotestben
 		deltas = []gotestbench.Delta{}
 	}
 	return deltas
+}
+
+// sameFile reports whether two paths name one file, by their clean absolute
+// forms; a path that cannot be resolved is compared as written.
+func sameFile(a, b string) bool {
+	abs := func(p string) string {
+		if r, err := filepath.Abs(p); err == nil {
+			return filepath.Clean(r)
+		}
+		return filepath.Clean(p)
+	}
+	return abs(a) == abs(b)
 }

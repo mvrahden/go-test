@@ -3,12 +3,16 @@ package main_test
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
+	. "github.com/mvrahden/go-test/cmd/gotest"
+
+	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -93,5 +97,72 @@ func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 
 	t.It("tears down and exits 0 on the shutdown signal", func(it *gotest.T) {
 		gotest.NoError(it, err)
+	})
+}
+
+// A fixture whose AfterAll fails leaves what it held behind; prepare must say
+// so with its exit code, as a run does.
+func (s *PrepareCLITestSuite) TestPrepareReportsATeardownFailure(t *gotest.T) {
+	cmd := exec.Command(s.cli.binary, "prepare", "./tests/canary/testdata/teardownfailing/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = s.cli.repoRoot
+	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	stdout, err := cmd.StdoutPipe()
+	gotest.NoError(t, err)
+	tree, err := testkit.StartCLI(cmd)
+	gotest.NoError(t, err)
+
+	lines := make(chan string, 1)
+	wait := gotest.Go(t, func() {
+		sc := bufio.NewScanner(stdout)
+		if sc.Scan() {
+			lines <- sc.Text()
+		}
+		close(lines)
+	})
+	select {
+	case <-lines:
+	case <-time.After(2 * time.Minute):
+		_ = tree.Kill()
+		gotest.Fail(t, "prepare printed nothing within two minutes")
+	}
+
+	gotest.NoError(t, testkit.Interrupt(cmd, tree))
+	err = cmd.Wait()
+	tree.Release()
+	wait()
+
+	t.When("the shared fixture's AfterAll fails on shutdown", func(w *gotest.T) {
+		w.It("exits 1 and names the teardown failure on stderr", func(it *gotest.T) {
+			var exitErr *exec.ExitError
+			gotest.True(it, errors.As(err, &exitErr), "prepare exited 0 although the teardown failed; stderr: %s", stderr.String())
+			gotest.Equal(it, 1, exitErr.ExitCode())
+			gotest.Contains(it, stderr.String(), "would not release")
+		})
+	})
+}
+
+// PrepareOptionsTestSuite: prepare builds the same overlay a run would, so
+// the project's fuzz.harvest setting decides seed harvesting here too.
+type PrepareOptionsTestSuite struct{}
+
+func (s *PrepareOptionsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+func (s *PrepareOptionsTestSuite) TestHarvestFollowsTheConfig(t *gotest.T) {
+	off := false
+	t.When("the config says nothing", func(w *gotest.T) {
+		w.It("harvests", func(it *gotest.T) {
+			gotest.True(it, ExportPrepareHarvestSeeds(config.ProjectConfig{}))
+		})
+	})
+	t.When("fuzz.harvest is false", func(w *gotest.T) {
+		w.It("does not harvest", func(it *gotest.T) {
+			gotest.False(it, ExportPrepareHarvestSeeds(config.ProjectConfig{Fuzz: config.FuzzConfig{Harvest: &off}}))
+		})
 	})
 }

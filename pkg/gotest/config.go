@@ -42,8 +42,11 @@ type SuiteConfig struct {
 	SetupTimeout time.Duration
 	// FailFast stops the suite after the first test failure. Default: false.
 	FailFast bool
-	// Parallel runs test methods concurrently. Requires a returning BeforeEach
-	// so each parallel test gets its own isolated state. Default: false.
+	// Parallel runs test methods concurrently. Per-test state then lives in
+	// the context a returning BeforeEach provides, never on the suite struct,
+	// which the methods share; the generator rejects a BeforeEach that returns
+	// nothing in a parallel suite, and a suite without per-test state needs
+	// none. Default: false.
 	Parallel bool
 	// Exclusive schedules the suite's process strictly alone: after every
 	// non-exclusive suite has finished, one exclusive suite at a time, in
@@ -74,7 +77,7 @@ func ContainerFixtureConfig() FixtureConfig {
 const NoDeadline time.Duration = -1
 
 // DefaultSuiteConfig returns a baseline suite configuration: 30s test timeout,
-// 30s setup timeout, no retries, sequential execution.
+// 30s setup timeout, sequential execution.
 func DefaultSuiteConfig() SuiteConfig {
 	return SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 30 * time.Second}
 }

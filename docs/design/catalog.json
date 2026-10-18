@@ -1,0 +1,1655 @@
+{
+  "packages": [
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is refused before anything runs, since the run would be compared against itself",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_refused_before_anything_runs,_since_the_run_would_be_compared_against_itself",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --save and --against name the same file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--save_and_--against_name_the_same_file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SaveAndAgainstNamingOneFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSaveAndAgainstNamingOneFile",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the gate and says there was nothing to compare",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_gate_and_says_there_was_nothing_to_compare",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lists the baseline's benchmarks that did not run and the run's that the baseline lacks",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lists_the_baseline's_benchmarks_that_did_not_run_and_the_run's_that_the_baseline_lacks",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when no benchmark is in both the baseline and the run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "no_benchmark_is_in_both_the_baseline_and_the_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGateWithNothingToCompare",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGateWithNothingToCompare",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming -count=4 as the requirement",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_-count=4_as_the_requirement",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "-count absent",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-count_absent",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming -count=4 as the requirement",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_-count=4_as_the_requirement",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "-count=2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-count=2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when --gate is given with -count below 4",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--gate_is_given_with_-count_below_4",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "judges the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "judges_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --gate is given with -count=4",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--gate_is_given_with_-count=4",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGateNeedsSamples",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGateNeedsSamples",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "still compares and marks each such row as a ±20% heuristic",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "still_compares_and_marks_each_such_row_as_a_±20%_heuristic",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when only --against is given and a side has fewer than 4 samples",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "only_--against_is_given_and_a_side_has_fewer_than_4_samples",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AComparisonWithFewSamples",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAComparisonWithFewSamples",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "compares without a gate, whatever -count says",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "compares_without_a_gate,_whatever_-count_says",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --gate=0 is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--gate=0_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGateOfZeroIsNoGate",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGateOfZeroIsNoGate",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "puts its own -v ahead of them and the run passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "puts_its_own_-v_ahead_of_them_and_the_run_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a bench run passes words after -args",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_bench_run_passes_words_after_-args",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABenchRunKeepsTheBinaryWordsLast",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABenchRunKeepsTheBinaryWordsLast",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "BenchGate",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestBenchGateTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/bench",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails to build with exit 2, as under go test",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_to_build_with_exit_2,_as_under_go_test",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package references a runtime symbol through a linkname the linker refuses",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_references_a_runtime_symbol_through_a_linkname_the_linker_refuses",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LinknameIsCheckedAsGoTestChecksIt",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLinknameIsCheckedAsGoTestChecksIt",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIBuildRules",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIBuildRulesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "-coverprofile=file passes the gate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-coverprofile=file_passes_the_gate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-coverprofile file passes the gate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-coverprofile_file_passes_the_gate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary -coverprofile=file prints the coverage",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_-coverprofile=file_prints_the_coverage",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary -coverprofile file prints the coverage",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_-coverprofile_file_prints_the_coverage",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "the gate still sees the profile when words follow -args",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_gate_still_sees_the_profile_when_words_follow_-args",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a fully covered package runs with a minimum and a profile",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fully_covered_package_runs_with_a_minimum_and_a_profile",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ProfileSpellings",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestProfileSpellings",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLICoverageProfile",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLICoverageProfileTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "--ci guards a focused run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--ci_guards_a_focused_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "--ci=true guards a focused run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--ci=true_guards_a_focused_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "--ci=false lets a focused run pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--ci=false_lets_a_focused_run_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "the last occurrence wins",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_last_occurrence_wins",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "a non-boolean value is a usage error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_non-boolean_value_is_a_usage_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary --no-color=true prints no color codes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_--no-color=true_prints_no_color_codes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a boolean flag is spelled in each accepted form",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_boolean_flag_is_spelled_in_each_accepted_form",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BooleanFlagSpellings",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBooleanFlagSpellings",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a value flag at the end without a value is a usage error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_value_flag_at_the_end_without_a_value_is_a_usage_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown flag is a usage error for a run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_flag_is_a_usage_error_for_a_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown flag is a usage error for clean",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_flag_is_a_usage_error_for_clean",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown flag is a usage error for generate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_flag_is_a_usage_error_for_generate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown flag is a usage error for discover",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_flag_is_a_usage_error_for_discover",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown flag is a usage error for prepare",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_flag_is_a_usage_error_for_prepare",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "a flag another command owns is refused",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_flag_another_command_owns_is_refused",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a value flag or an unknown flag is given to a command",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_value_flag_or_an_unknown_flag_is_given_to_a_command",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ValueFlagsAndUnknownFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestValueFlagsAndUnknownFlags",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "-run naming a fuzz wrapper selects its suite and replays the seeds",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-run_naming_a_fuzz_wrapper_selects_its_suite_and_replays_the_seeds",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-exec wraps every suite binary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-exec_wraps_every_suite_binary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-p caps the processes and the run still completes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-p_caps_the_processes_and_the_run_still_completes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-o is refused with a reason",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-o_is_refused_with_a_reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-buildvcs=false reaches the build",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-buildvcs=false_reaches_the_build",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "-pgo=off reaches the build",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "-pgo=off_reaches_the_build",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a go test flag gotest implements itself is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_go_test_flag_gotest_implements_itself_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "OwnedGoTestFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestOwnedGoTestFlags",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIGoTestFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIGoTestFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "version still prints",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "version_still_prints",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "help config still prints",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "help_config_still_prints",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run reports the config error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_run_reports_the_config_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when .gotest.yml does not parse",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": ".gotest.yml_does_not_parse",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABrokenConfigStillHelps",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABrokenConfigStillHelps",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "sumary suggests summary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "sumary_suggests_summary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "test suggests dropping the word",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "test_suggests_dropping_the_word",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "a package named like nothing runs as a pattern",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_package_named_like_nothing_runs_as_a_pattern",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when the first word is almost a subcommand or is a help topic",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_first_word_is_almost_a_subcommand_or_is_a_help_topic",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMistypedCommandIsSuggested",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAMistypedCommandIsSuggested",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names the go get -tool command to run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_the_go_get_-tool_command_to_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite imports gotest in a module that does not require it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_imports_gotest_in_a_module_that_does_not_require_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AModuleWithoutGotestIsToldHow",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAModuleWithoutGotestIsToldHow",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the plain run notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_plain_run_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "the -json run notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_-json_run_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec notes them on stderr",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "spec_notes_them_on_stderr",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a package has only stdlib tests",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_has_only_stdlib_tests",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "StdlibTestsAreNotedInEveryMode",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestStdlibTestsAreNotedInEveryMode",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLINewcomer",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLINewcomerTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "after -- it reaches the binary and the pattern stays a package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "after_--_it_reaches_the_binary_and_the_pattern_stays_a_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "after -args it reaches the binary verbatim",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "after_-args_it_reaches_the_binary_verbatim",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "without it the binary's check fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "without_it_the_binary's_check_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec puts its own -v ahead of the binary's words",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "spec_puts_its_own_-v_ahead_of_the_binary's_words",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a flag only the test binary declares is passed",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_flag_only_the_test_binary_declares_is_passed",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "UnknownFlagsReachTheBinary",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestUnknownFlagsReachTheBinary",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIPassthrough",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIPassthroughTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a relative path scaffolds beside the file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_relative_path_scaffolds_beside_the_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an absolute path scaffolds beside the file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_absolute_path_scaffolds_beside_the_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a source file is named by path",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_source_file_is_named_by_path",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FilePaths",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFilePaths",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "scaffolds beside the file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "scaffolds_beside_the_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a source file is named by an absolute path through a symlinked directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_source_file_is_named_by_an_absolute_path_through_a_symlinked_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASymlinkedPath",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASymlinkedPath",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIScaffoldPaths",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIScaffoldPathsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "summary --format json inside GitHub Actions carries no annotations",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_--format_json_inside_GitHub_Actions_carries_no_annotations",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary --format json carries no color codes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_--format_json_carries_no_color_codes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec --format json is one document",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "spec_--format_json_is_one_document",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when a JSON document is asked for",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_JSON_document_is_asked_for",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "holds JSON lines only, inside GitHub Actions too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "holds_JSON_lines_only,_inside_GitHub_Actions_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the go test -json stream is asked for",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_go_test_-json_stream_is_asked_for",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "JSONOutputsStayPure",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestJSONOutputsStayPure",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "summary prints no color codes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_prints_no_color_codes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary --no-color=false still prints none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_--no-color=false_still_prints_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "spec prints no color codes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "spec_prints_no_color_codes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "NO_COLOR is honoured as well",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "NO_COLOR_is_honoured_as_well",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when stdout is a pipe",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "stdout_is_a_pipe",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ColorFollowsTheTerminal",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestColorFollowsTheTerminal",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "--spec with -json",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--spec_with_-json",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary with -json",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "summary_with_-json",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown --format",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_--format",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    },
+                    {
+                      "children": [],
+                      "display": "an unknown --format for spec",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_unknown_--format_for_spec",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "each"
+                    }
+                  ],
+                  "display": "when two output modes are asked for at once",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "two_output_modes_are_asked_for_at_once",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TwoOutputModesAreRefused",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTwoOutputModesAreRefused",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIStreams",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIStreamsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 and prints the version on stdout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_0_and_prints_the_version_on_stdout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the version subcommand runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_version_subcommand_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Version",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestVersion",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIVersion",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIVersionTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/cli",
+      "status": "none"
+    }
+  ],
+  "stats": {
+    "behaviors": 65,
+    "benchmarks": 0,
+    "failed": 0,
+    "fuzzers": 0,
+    "passed": 0,
+    "skipped": 0,
+    "suites": 10,
+    "tests": 0
+  }
+}

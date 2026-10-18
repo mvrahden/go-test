@@ -13,7 +13,11 @@ import (
 // match, expanded as generate expands them: only in a main module, where
 // generate writes them.
 func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	args := inv.TagArgs()
+	_, args, err := SplitArgs(inv.TagArgs(), noOwnFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	patterns, err := ExtractPackagePatterns(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

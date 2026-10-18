@@ -29,7 +29,7 @@ go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
 go tool gotest ./...
 ```
 
-`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes, and gotest refuses to run on that drift, naming the version your module selects.
+`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes. A CLI built with an older Go than the module's go line, or pinned below the oldest runtime it generates for, refuses to run and names the version your module selects; one drifted the other way still runs.
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
 
@@ -58,10 +58,11 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
     })
 
     t.When("email already exists", func(w *gotest.T) {
+        err := s.svc.Create("bob@example.com")
+        gotest.NoError(w, err)
+
         w.It("returns ErrDuplicate", func(it *gotest.T) {
-            err := s.svc.Create("alice@example.com")
-            gotest.NoError(it, err)
-            err = s.svc.Create("alice@example.com")
+            err := s.svc.Create("bob@example.com")
             gotest.ErrorIs(it, err, ErrDuplicate)
         })
     })
@@ -80,9 +81,14 @@ Standard `go test` output:
 === RUN   TestUserServiceTestSuite
 === RUN   TestUserServiceTestSuite/TestCreate
 === RUN   TestUserServiceTestSuite/TestCreate/creates_a_user_with_valid_input
-=== RUN   TestUserServiceTestSuite/TestCreate/when_email_already_exists
-=== RUN   TestUserServiceTestSuite/TestCreate/when_email_already_exists/returns_ErrDuplicate
---- PASS: TestUserServiceTestSuite (0.01s)
+=== RUN   TestUserServiceTestSuite/TestCreate/email_already_exists
+=== RUN   TestUserServiceTestSuite/TestCreate/email_already_exists/returns_ErrDuplicate
+--- PASS: TestUserServiceTestSuite (0.00s)
+    --- PASS: TestUserServiceTestSuite/TestCreate (0.00s)
+        --- PASS: TestUserServiceTestSuite/TestCreate/creates_a_user_with_valid_input (0.00s)
+        --- PASS: TestUserServiceTestSuite/TestCreate/email_already_exists (0.00s)
+            --- PASS: TestUserServiceTestSuite/TestCreate/email_already_exists/returns_ErrDuplicate (0.00s)
+PASS
 ```
 
 The same suites render as a behavioral specification:
@@ -92,9 +98,9 @@ gotest spec ./pkg/user
 ```
 
 ```
-UserService (12ms)
-  Create (12ms)
-    ✓ creates a user with valid input (11ms)
+UserService (<1ms)
+  Create (<1ms)
+    ✓ creates a user with valid input (<1ms)
     when email already exists (<1ms)
       ✓ returns ErrDuplicate (<1ms)
 
@@ -449,10 +455,12 @@ gotest ./... -parallel 8            # explicit per-suite, no budget management
 |:------|:---------------:|:-----------------:|:-----:|
 | *(none)* | `min(S, GOMAXPROCS)` | `budget / inter` | `2 × GOMAXPROCS` |
 | `--parallel N` | `min(S, GOMAXPROCS, N)` | `N / inter` | `N` |
-| `-parallel M` | `2 × GOMAXPROCS` | `M` | `2 × GOMAXPROCS × M` *(compat)* |
+| `-parallel M` | `min(S, GOMAXPROCS, 2 × GOMAXPROCS / M)` | `M` | `≤ 2 × GOMAXPROCS` |
 | `--parallel N -parallel M` | `min(S, GOMAXPROCS, N/M)` | `M` | `~N` |
+| `-p P` | at most `P` | as above | as above |
 
 Where *S* is the number of suites and *inter* is the computed process count.
+`-p P` keeps the meaning it has for go test, the number of programs run at once: it caps the suite processes and the compile parallelism alike. `-exec <cmd>` runs every suite binary under the command, as go test does.
 Under `-race`/`-msan`/`-asan` the default budget halves (as does compile concurrency) — instrumentation at least doubles the CPU cost per instruction stream, and keeping the uninstrumented defaults would oversubscribe the machine. An explicit `--parallel`/`--compile-parallel` always wins over this heuristic.
 
 ## Testing Toolkit
@@ -486,7 +494,7 @@ gotest.ErrorAs[*MyError](t, err)             // returns the matched error
 gotest.ErrorContains(t, err, "not found")
 
 // Collections
-gotest.Empty(t, object)                      // nil, or len == 0
+gotest.Empty(t, object)                      // nil, or len == 0; a pointer is followed; any other type fails the type guard
 gotest.NotEmpty(t, object)
 gotest.Len(t, collection, 3)
 gotest.Contains(t, haystack, needle)         // substring, element, or map key
@@ -658,7 +666,7 @@ gotest bench ./pkg/parser -bench 'ParserTestSuite/Parse'  # one suite's methods 
 
 `gotest ./...` never runs benchmarks — use `gotest bench` explicitly.
 
-Benchmark suites always run serially, one suite process at a time, regardless of `--parallel`/`-test.parallel`.
+Benchmark suites run serially, one suite process at a time.
 Running benchmarks concurrently makes their timing numbers meaningless — the runner disables streaming and compiles everything up front so `go test -c` never competes with a running benchmark for CPU.
 A fresh process per suite is also a methodological win, not just an implementation detail: GC pressure from one benchmark can't pollute another's numbers.
 
@@ -1054,7 +1062,7 @@ Twenty-eight rules in three tiers:
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 Suppress per line with `//nolint:<rule>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
-There is no golangci-lint plugin — run `gotest lint` as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), findings additionally surface as inline PR annotations and a step-summary table. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags, and `pkg/lint` exports the analyzer for external `go/analysis` drivers.)
+There is no golangci-lint plugin — run `gotest lint` as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), the plain-text report is replaced: findings are printed as `::error` annotations, which GitHub shows inline on the PR, and appended as a table to the step summary. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags, and `pkg/lint` exports the analyzer for external `go/analysis` drivers.)
 
 ## GitHub Actions
 
@@ -1093,7 +1101,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `badge-branch` | Branch the coverage badge is published to; created on first use (default `ci/badges`) |
 | `bench` | Run benchmarks after tests via `gotest bench --spec --json` (default `false`) |
 | `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
-| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`) |
+| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`); needs `-count=4` or more in `flags`, or the step exits 2 |
 | `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
 | `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
 | `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
@@ -1153,7 +1161,7 @@ gotest summary ./...           # failure-focused summary for CI
 gotest watch ./... -v          # watch mode with auto-rerun
 gotest scaffold ./pkg/user.Svc # generate suite skeleton from type
 gotest lint ./...              # static analysis for test suites
-gotest refactor toggle-focus . # toggle F_/X_ prefixes programmatically
+gotest refactor toggle-focus user_test.go UserTestSuite  # toggle an F_ prefix on a suite (or Suite.Method)
 gotest skill install           # install the agent skill matching this version
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)

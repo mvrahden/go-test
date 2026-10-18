@@ -10,14 +10,21 @@ import (
 // buildOnlyFlags are flags consumed exclusively by `go test -c` (compilation).
 // Boolean flags have empty string value; value flags list their name only.
 var buildOnlyFlags = map[string]bool{
-	"-race":     true,
-	"-msan":     true,
-	"-asan":     true,
-	"-cover":    true,
-	"-a":        true,
-	"-c":        true,
-	"-trimpath": true,
-	"-work":     true,
+	"-race":       true,
+	"-msan":       true,
+	"-asan":       true,
+	"-cover":      true,
+	"-a":          true,
+	"-c":          true,
+	"-n":          true,
+	"-x":          true,
+	"-trimpath":   true,
+	"-work":       true,
+	"-linkshared": true,
+	"-modcacherw": true,
+	// -buildvcs takes an optional value (-buildvcs, -buildvcs=false), so a
+	// bare one must not swallow the next word.
+	"-buildvcs": true,
 }
 
 var buildSpecialValueFlags = map[string]bool{
@@ -26,18 +33,24 @@ var buildSpecialValueFlags = map[string]bool{
 }
 
 var buildValueFlags = map[string]bool{
-	"-covermode": true,
-	"-coverpkg":  true,
-	"-vet":       true,
-	"-tags":      true,
-	"-ldflags":   true,
-	"-gcflags":   true,
-	"-asmflags":  true,
-	"-mod":       true,
-	"-modfile":   true,
-	"-p":         true,
-	"-toolexec":  true,
-	"-pkgdir":    true,
+	"-covermode":     true,
+	"-coverpkg":      true,
+	"-vet":           true,
+	"-tags":          true,
+	"-ldflags":       true,
+	"-gcflags":       true,
+	"-gccgoflags":    true,
+	"-asmflags":      true,
+	"-mod":           true,
+	"-modfile":       true,
+	"-p":             true,
+	"-toolexec":      true,
+	"-pkgdir":        true,
+	"-pgo":           true,
+	"-overlay":       true,
+	"-buildmode":     true,
+	"-compiler":      true,
+	"-installsuffix": true,
 }
 
 // runOnlyFlags are flags consumed exclusively by the test binary at runtime.
@@ -83,18 +96,21 @@ type ClassifiedArgs struct {
 }
 
 // ClassifyGoTestArgs splits go test arguments into build flags, run flags,
-// and package patterns. Flags after -args are treated as pass-through and
-// appended to RunFlags.
+// and package patterns. Flags neither gotest nor go test knows belong to the
+// test binary, as under go test: they follow the known run flags behind an
+// "-args" marker, and whatever the caller wrote after its own "-args" comes
+// last, verbatim.
 func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 	var result ClassifiedArgs
 	needsCoverBuild := false
+	var binaryFlags, explicitArgs []string
 
 	i := 0
 	for i < len(args) {
 		arg := args[i]
 
 		if arg == "-args" {
-			result.RunFlags = append(result.RunFlags, args[i:]...)
+			explicitArgs = args[i+1:]
 			break
 		}
 
@@ -158,15 +174,20 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 			continue
 		}
 
-		// Unrecognized flag: pass to build (conservative — unknown flags
-		// are more likely build-related custom tooling than test binary flags).
-		// As go test does, a non-flag after it is taken as its value.
-		result.BuildFlags = append(result.BuildFlags, arg)
+		// A flag nobody here declares is the test binary's. As go test
+		// assumes, a non-flag after it is taken as its value.
+		binaryFlags = append(binaryFlags, arg)
 		i++
 		if !hasEquals && i < len(args) && !strings.HasPrefix(args[i], "-") {
-			result.BuildFlags = append(result.BuildFlags, args[i])
+			binaryFlags = append(binaryFlags, args[i])
 			i++
 		}
+	}
+
+	if len(binaryFlags) > 0 || explicitArgs != nil {
+		result.RunFlags = append(result.RunFlags, "-args")
+		result.RunFlags = append(result.RunFlags, binaryFlags...)
+		result.RunFlags = append(result.RunFlags, explicitArgs...)
 	}
 
 	if needsCoverBuild {
@@ -186,14 +207,14 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 }
 
 // TranslateToTestBinaryFlags converts go test run flags to test binary flags
-// by adding the -test. prefix. Flags after -args are left untouched.
+// by adding the -test. prefix. The "-args" marker is consumed, as go test
+// consumes it, and what follows it is passed verbatim.
 func TranslateToTestBinaryFlags(flags []string) []string {
 	out := make([]string, 0, len(flags))
 	passthrough := false
 	for _, f := range flags {
-		if f == "-args" {
+		if f == "-args" && !passthrough {
 			passthrough = true
-			out = append(out, f)
 			continue
 		}
 		if passthrough || !strings.HasPrefix(f, "-") {
@@ -268,8 +289,13 @@ func StripCoverProfile(runFlags []string) []string { return stripFlag(runFlags, 
 
 // StripNonLoadFlags removes the build flags only `go test -c` understands
 // (-cover, -covermode, -coverpkg, -vet), which packages.Load rejects when
-// passed as BuildFlags.
+// passed as BuildFlags, and -exec, which belongs to the suite command line.
 func StripNonLoadFlags(flags []string) []string {
+	_, flags = ExtractExecPrefix(flags)
+	return stripCompileOnlyFlags(flags)
+}
+
+func stripCompileOnlyFlags(flags []string) []string {
 	var out []string
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
@@ -286,25 +312,6 @@ func StripNonLoadFlags(flags []string) []string {
 		out = append(out, f)
 	}
 	return out
-}
-
-// InjectChecklinkname ensures -ldflags includes -checklinkname=0 so that
-// linkname references in generated overlay code can link correctly
-// (required for Go 1.23+ which restricts linkname to stdlib symbols).
-func InjectChecklinkname(buildFlags []string) []string {
-	const ldflag = "-checklinkname=0"
-	buildFlags = slices.Clone(buildFlags)
-	for i, f := range buildFlags {
-		if strings.HasPrefix(f, "-ldflags=") {
-			buildFlags[i] = f + " " + ldflag
-			return buildFlags
-		}
-		if f == "-ldflags" && i+1 < len(buildFlags) {
-			buildFlags[i+1] = buildFlags[i+1] + " " + ldflag
-			return buildFlags
-		}
-	}
-	return append(buildFlags, "-ldflags="+ldflag)
 }
 
 // IsGoTestFlag reports whether name (the flag name without any =value suffix)
@@ -329,8 +336,8 @@ func IsGoTestFlag(name string) (isValue bool, known bool) {
 	return false, false
 }
 
-// InjectDefaultTimeout adds -timeout=10m to runFlags if the user did not
-// supply one. This matches `go test` behavior — compiled test binaries have
+// InjectDefaultTimeout adds -timeout=10m to runFlags, ahead of -args, if the
+// user did not supply one. This matches `go test` behavior — compiled test binaries have
 // no timeout by default, which can cause indefinite hangs.
 func InjectDefaultTimeout(runFlags []string) []string {
 	for _, f := range runFlags {
@@ -341,8 +348,21 @@ func InjectDefaultTimeout(runFlags []string) []string {
 			return runFlags
 		}
 	}
-	return append(runFlags, "-timeout=10m")
+	return insertBeforeArgs(runFlags, "-timeout=10m")
 }
+
+// insertBeforeArgs adds flag to runFlags ahead of the -args marker, so it is
+// a run flag the binary's testing package reads and not a pass-through word.
+func insertBeforeArgs(runFlags []string, flag string) []string {
+	if i := slices.Index(runFlags, "-args"); i >= 0 {
+		return slices.Insert(slices.Clone(runFlags), i, flag)
+	}
+	return append(slices.Clone(runFlags), flag)
+}
+
+// InsertBeforeArgs adds a go test flag to args ahead of the -args marker, so
+// it is read as a flag and never as one of the test binary's own words.
+func InsertBeforeArgs(args []string, flag string) []string { return insertBeforeArgs(args, flag) }
 
 func HasVerboseFlag(flags []string) bool {
 	return slices.ContainsFunc(flags, func(f string) bool {
@@ -357,8 +377,20 @@ func ExtractParallelValue(runFlags []string) int {
 	return v
 }
 
-// InjectParallel appends -parallel=n to runFlags if not already present
-// before the -args boundary.
+// ExtractCountValue returns how many times -count asks each benchmark or
+// test to run: its value when given and parseable, otherwise 1. Stops
+// scanning at -args.
+func ExtractCountValue(flags []string) int {
+	for _, name := range []string{"-count", "-test.count"} {
+		if v, err := strconv.Atoi(extractFlag(flags, name)); err == nil && v > 0 {
+			return v
+		}
+	}
+	return 1
+}
+
+// InjectParallel adds -parallel=n to runFlags, ahead of -args, if not
+// already present before the -args boundary.
 func InjectParallel(runFlags []string, n int) []string {
 	for _, f := range runFlags {
 		if f == "-args" {
@@ -368,7 +400,7 @@ func InjectParallel(runFlags []string, n int) []string {
 			return runFlags
 		}
 	}
-	return append(runFlags, fmt.Sprintf("-parallel=%d", n))
+	return insertBeforeArgs(runFlags, fmt.Sprintf("-parallel=%d", n))
 }
 
 // PatternIndices returns the indices of the package patterns in args, read
@@ -408,4 +440,41 @@ func PatternIndices(args []string, own func(name string) (isValue, known bool)) 
 		}
 	}
 	return idx
+}
+
+// ExtractProcessCap reads go test's -p from the build flags: the number of
+// programs it would run at once, which caps gotest's suite processes and its
+// compile parallelism alike. 0 means the flag is absent or not a number.
+func ExtractProcessCap(buildFlags []string) int {
+	for i, f := range buildFlags {
+		if v, ok := strings.CutPrefix(f, "-p="); ok {
+			n, _ := strconv.Atoi(v)
+			return max(0, n)
+		}
+		if f == "-p" && i+1 < len(buildFlags) {
+			n, _ := strconv.Atoi(buildFlags[i+1])
+			return max(0, n)
+		}
+	}
+	return 0
+}
+
+// ExtractExecPrefix lifts go test's -exec out of the build flags: the command
+// line, split on whitespace as go test splits it, that every suite binary
+// runs under. rest is buildFlags without it.
+func ExtractExecPrefix(buildFlags []string) (prefix, rest []string) {
+	for i := 0; i < len(buildFlags); i++ {
+		f := buildFlags[i]
+		if v, ok := strings.CutPrefix(f, "-exec="); ok {
+			prefix = strings.Fields(v)
+			continue
+		}
+		if f == "-exec" && i+1 < len(buildFlags) {
+			prefix = strings.Fields(buildFlags[i+1])
+			i++
+			continue
+		}
+		rest = append(rest, f)
+	}
+	return prefix, rest
 }

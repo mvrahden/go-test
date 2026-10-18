@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,8 +25,9 @@ import (
 // CanaryTestSuite runs one fixture package per method.
 // Sequential: it builds the CLI once and each method spawns a full pipeline run.
 type CanaryTestSuite struct {
-	binary   string
-	expected map[string]expectation
+	binary     string
+	expected   map[string]expectation
+	lastStream string // the -json stdout of the last run, for checks on what it carried
 }
 
 type expectation struct {
@@ -109,6 +111,7 @@ func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string
 		}
 		code = exitErr.ExitCode()
 	}
+	s.lastStream = stdout.String()
 	seen := map[string]bool{}
 	for _, line := range bytes.Split(stdout.Bytes(), []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {
@@ -309,6 +312,19 @@ func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "teardownfailing")
 }
 
+// When one shared fixture fails to come up and another fails to release, the
+// run has two failures and the stream must carry both: a leak reported only on
+// stderr is a leak a -json consumer never sees.
+func (s *CanaryTestSuite) TestATeardownFailureBesideASetupFailureReachesTheStream(t *gotest.T) {
+	s.check(t, "teardownaftersetup")
+	if !strings.Contains(s.lastStream, "would not release what it holds") {
+		t.Errorf("teardownaftersetup: the stream carries no word of the teardown failure")
+	}
+	if !strings.Contains(s.lastStream, "would not come up") {
+		t.Errorf("teardownaftersetup: the stream carries no word of the setup failure")
+	}
+}
+
 // A shared fixture that fails to come up fails the suite that reads it and
 // the run; a suite that reads none runs and reports. The -json stream must
 // carry all three, not only the exit code.
@@ -345,31 +361,22 @@ func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {
-		Results []struct {
-			Name string `json:"name"`
+		GOMAXPROCS int `json:"gomaxprocs"`
+		Results    []struct {
+			Name    string `json:"name"`
+			Samples []struct {
+				Metrics map[string]float64 `json:"metrics"`
+			} `json:"samples"`
 		} `json:"results"`
 	} `json:"baseline"`
+	Missing []string `json:"missing"`
+	Added   []string `json:"added"`
 }
 
 // bench runs a capturing bench run over one fixture package and returns its
 // exit code and the benchmark names the report carries a sample for.
 func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
-	cmd := exec.Command(s.binary, "bench", "--json", "./testdata/"+pkg+"/", "-benchtime=1x") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = childEnv(canaryDir)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	code := 0
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			fatalf(t, "run bench %s: %v", pkg, err)
-		}
-		code = exitErr.ExitCode()
-	}
-	var report benchReport
-	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
-		fatalf(t, "bench %s: report is not the JSON document bench --json promises: %v\nstdout:\n%s\nstderr:\n%s", pkg, err, stdout.String(), stderr.String())
-	}
+	code, report := s.benchReport(t, pkg, canaryDir)
 	names := make([]string, 0, len(report.Baseline.Results))
 	for _, r := range report.Baseline.Results {
 		names = append(names, r.Name)
@@ -378,15 +385,157 @@ func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []stri
 	return code, names
 }
 
+// benchReport runs a capturing bench run over one fixture package with extra
+// gotest flags and returns its exit code, the parsed report and stderr.
+func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra ...string) (int, benchReport) {
+	code, stdout, stderr := s.benchRaw(t, pkg, canaryDir, extra...)
+	var report benchReport
+	if err := json.Unmarshal(stdout, &report); err != nil {
+		fatalf(t, "bench %s: report is not the JSON document bench --json promises: %v\nstdout:\n%s\nstderr:\n%s", pkg, err, stdout, stderr)
+	}
+	return code, report
+}
+
+// benchRaw runs bench --json over one fixture package and returns the exit
+// code and both streams as they were.
+func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
+	args := append([]string{"bench", "--json"}, extra...)
+	args = append(args, "./testdata/"+pkg+"/", "-benchtime=1x")
+	return s.invoke(t, canaryDir, args...)
+}
+
+// invoke runs the CLI with the arguments as given and returns the exit code
+// and both streams as they were.
+func (s *CanaryTestSuite) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = childEnv(canaryDir)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	code := 0
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			fatalf(t, "run %v: %v", args, err)
+		}
+		code = exitErr.ExitCode()
+	}
+	return code, stdout.Bytes(), stderr.Bytes()
+}
+
+// A gate of zero is no gate: the run compares and is not held to the sample
+// count a gate needs.
+func (s *CanaryTestSuite) TestAGateOfZeroIsNoGate(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := foreignBaseline(t, dir)
+	code, _, stderr := s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=0")
+	if code != 0 {
+		t.Errorf("--gate=0 without -count: exit code %d, want 0\n%s", code, stderr)
+	}
+}
+
+// What follows -args is the test binary's; the -v a bench run adds for itself
+// goes in front of it.
+func (s *CanaryTestSuite) TestABenchRunKeepsTheBinaryWordsLast(t *gotest.T) {
+	dir := t.TempDir()
+	code, _, stderr := s.invoke(t, dir, "bench", "./testdata/benching/", "-args", "-test.benchtime=1x")
+	if code != 0 {
+		t.Errorf("bench with -args: exit code %d, want 0\n%s", code, stderr)
+	}
+}
+
+// A gate judges the benchmarks the baseline and the run share. A baseline
+// from elsewhere shares none: the gate fails rather than passing on nothing,
+// and the report names what each side has that the other lacks.
+func (s *CanaryTestSuite) TestAGateWithNothingToCompareFails(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := foreignBaseline(t, dir)
+	code, report := s.benchReport(t, "benching", dir, "--against="+baseline, "--gate=10", "-count=4")
+	if code != 1 {
+		t.Errorf("gate against a foreign baseline: exit code %d, want 1", code)
+	}
+	if want := "example.com/elsewhere OtherTestSuite/BenchmarkGone"; strings.Join(report.Missing, ",") != want {
+		t.Errorf("missing %v, want [%s]", report.Missing, want)
+	}
+	if len(report.Added) != 6 {
+		t.Errorf("added %v, want the six benchmark leaves of the run", report.Added)
+	}
+}
+
+// foreignBaseline writes a baseline whose only benchmark lives in a package
+// this run does not have.
+func foreignBaseline(t *gotest.T, dir string) string {
+	baseline := filepath.Join(dir, "baseline.json")
+	foreign := `{"schemaVersion":1,"goVersion":"` + runtime.Version() + `","goos":"` + runtime.GOOS + `","goarch":"` + runtime.GOARCH + `",` +
+		`"results":[{"package":"example.com/elsewhere","suite":"OtherTestSuite","name":"BenchmarkGone","samples":[{"nsPerOp":1}]}]}`
+	if err := os.WriteFile(baseline, []byte(foreign), 0o600); err != nil {
+		fatalf(t, "write baseline: %v", err)
+	}
+	return baseline
+}
+
+// A gate judges by a significance test, which needs four samples a side;
+// below -count=4 it refuses instead of guessing.
+func (s *CanaryTestSuite) TestAGateNeedsSamples(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := foreignBaseline(t, dir)
+	code, _, stderr := s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=10")
+	if code != 2 {
+		t.Errorf("gate without -count: exit code %d, want 2", code)
+	}
+	if !strings.Contains(string(stderr), "-count=4 or more") {
+		t.Errorf("gate without -count: stderr does not name the requirement:\n%s", stderr)
+	}
+	// Four is enough: the gate then judges, and this baseline shares nothing.
+	code, _, _ = s.benchRaw(t, "benching", dir, "--against="+baseline, "--gate=10", "-count=4")
+	if code != 1 {
+		t.Errorf("gate with -count=4: exit code %d, want 1", code)
+	}
+}
+
+// Saving the run to the file it is compared against would compare the run
+// with itself; the command refuses before anything runs.
+func (s *CanaryTestSuite) TestSaveAndAgainstOnOneFileIsRefused(t *gotest.T) {
+	dir := t.TempDir()
+	baseline := filepath.Join(dir, "baseline.json")
+	if err := os.WriteFile(baseline, []byte(`{"schemaVersion":1}`), 0o600); err != nil {
+		fatalf(t, "write baseline: %v", err)
+	}
+	code, _, stderr := s.benchRaw(t, "benching", dir, "--save="+baseline, "--against="+baseline)
+	if code != 2 {
+		t.Errorf("--save and --against on one file: exit code %d, want 2", code)
+	}
+	if !strings.Contains(string(stderr), "same file") {
+		t.Errorf("--save and --against on one file: stderr does not say so:\n%s", stderr)
+	}
+	if data, err := os.ReadFile(baseline); err != nil || string(data) != `{"schemaVersion":1}` {
+		t.Errorf("the baseline was overwritten: %s", data)
+	}
+}
+
 // A green bench run reports a sample for every declared benchmark and exits
-// 0; a missing one is the bench census's job.
+// 0; a missing one is the bench census's job. A method that opens
+// sub-benchmarks is reported through its leaves, keyed by their path below
+// the suite; a metric a benchmark reports is kept on its sample; the run's
+// GOMAXPROCS is recorded.
 func (s *CanaryTestSuite) TestEveryBenchmarkReportsAResult(t *gotest.T) {
-	code, names := s.bench(t, "benching", t.TempDir())
+	code, report := s.benchReport(t, "benching", t.TempDir())
 	if code != 0 {
 		t.Errorf("benching: exit code %d, want 0", code)
 	}
-	if want := []string{"BenchmarkContext", "BenchmarkFirst", "BenchmarkSecond"}; strings.Join(names, ",") != strings.Join(want, ",") {
+	names := make([]string, 0, len(report.Baseline.Results))
+	for _, r := range report.Baseline.Results {
+		names = append(names, r.Name)
+		if r.Name == "BenchmarkMetric" && (len(r.Samples) == 0 || r.Samples[0].Metrics["widgets/op"] != 4.5) {
+			t.Errorf("BenchmarkMetric: samples %v, want widgets/op 4.5", r.Samples)
+		}
+	}
+	sort.Strings(names)
+	want := []string{"BenchmarkContext", "BenchmarkFirst", "BenchmarkMetric", "BenchmarkSecond", "BenchmarkSplit/long", "BenchmarkSplit/short"}
+	if strings.Join(names, ",") != strings.Join(want, ",") {
 		t.Errorf("benching: results %v, want %v", names, want)
+	}
+	if report.Baseline.GOMAXPROCS == 0 {
+		t.Errorf("benching: the baseline records no GOMAXPROCS")
 	}
 }
 

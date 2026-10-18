@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -68,6 +70,25 @@ type BenchDelta struct {
 	OldNs, NewNs  float64
 	PercentChange float64
 	Significant   bool
+	// InsufficientSample says a side had fewer samples than a significance
+	// test needs, so Significant is a ±20% rule of thumb.
+	InsufficientSample bool
+}
+
+// heuristicMark follows a delta row whose significance is a rule of thumb.
+const heuristicMark = "(n<4, ±20% heuristic)"
+
+// deltaMarks renders what follows a delta row's percentage: the regression
+// warning and the heuristic mark, in that order.
+func deltaMarks(d BenchDelta) string { //nolint:gocritic // hugeParam: stable API
+	marks := ""
+	if d.Significant && d.PercentChange > 0 {
+		marks += " ⚠"
+	}
+	if d.InsufficientSample {
+		marks += " " + heuristicMark
+	}
+	return marks
 }
 
 // WithBenchDeltas attaches a benchmark old-vs-new comparison table to be
@@ -176,9 +197,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 		icon, clr := statusIcon(n.Status, c)
 
 		if n.Kind == KindBenchmark && n.Iterations > 0 {
-			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s\n",
+			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s%s\n",
 				indent, clr, icon, c.reset,
-				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, c.reset)
+				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, formatMetrics(n.Metrics), c.reset)
 
 			if n.Status == StatusFail {
 				renderErrorOutput(w, n.Output, depth+2, c)
@@ -359,12 +380,12 @@ func renderBenchDeltaTable(w io.Writer, deltas []BenchDelta, c colors) { //nolin
 		if d.PercentChange >= 0 {
 			sign = "+"
 		}
-		warn, clr, reset := "", "", ""
+		clr, reset := "", ""
 		if d.Significant && d.PercentChange > 0 {
-			warn, clr, reset = " ⚠", c.red, c.reset
+			clr, reset = c.red, c.reset
 		}
 		fmt.Fprintf(w, "%s%s  %.1f  %.1f  %s%.1f%%%s%s\n",
-			clr, d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, warn, reset)
+			clr, d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, deltaMarks(d), reset)
 	}
 }
 
@@ -392,4 +413,19 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 		return
 	}
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(counts, ", "), strings.Join(parts, ", "))
+}
+
+// formatMetrics renders a benchmark's reported metrics after the known
+// units, in unit order so two runs read alike.
+func formatMetrics(metrics map[string]float64) string {
+	units := make([]string, 0, len(metrics))
+	for u := range metrics {
+		units = append(units, u)
+	}
+	sort.Strings(units)
+	var b strings.Builder
+	for _, u := range units {
+		fmt.Fprintf(&b, " · %s %s", strconv.FormatFloat(metrics[u], 'f', -1, 64), u)
+	}
+	return b.String()
 }

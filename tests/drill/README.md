@@ -30,6 +30,26 @@ caught: a mutated CLI cannot be trusted to report on itself.
 The drill exits 0 only when every mutant was caught. It runs in CI
 (`quality.yml`) on every push and pull request.
 
+`bash tests/drill/drill.sh <name> ...` runs only the named mutants, which is
+how a new patch is tried without waiting for the whole set.
+
+## Mutants and the behavior catalog
+
+A patch may carry `Clause: <when> → <it>` lines above its diff, naming the
+clauses of `docs/design/catalog.md` it falsifies. `bash tests/drill/drill.sh
+--list-unmutated` prints the clauses no patch names. Their number may not
+exceed `tests/drill/unmutated-allow.txt`: a new clause either gets a mutant or
+the budget is raised on purpose in the same change. A conventions suite
+enforces both, and that every `Clause:` line names a clause that exists; the
+listing and the suite share one reading (`internal/speccatalog`), so they
+cannot disagree about what is unmutated.
+
+A conformance suite cannot be the drill's oracle: it asserts with gotest, and
+a mutated assertion engine could pass its own test. A clause whose outcome is
+a verdict therefore ships with a ring-0 twin in `tests/canary`, the same check
+in plain Go. The mutant's `Expect:` lines match the twin's output; the
+`Clause:` line names the sentence the twin protects.
+
 ## Reading a failure
 
 - `DRILL  <name>: SURVIVED` — the bug went unnoticed. A check has a hole;
@@ -63,6 +83,15 @@ The drill exits 0 only when every mutant was caught. It runs in CI
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |
 | `snapshot-always-matches` | `MatchSnapshot` never reports a differing value | canary: the `snapshotting` fixture's `fail` row vanishes from the golden list |
 | `exclusive-runs-in-bulk` | the dispatcher never defers an Exclusive suite past the bulk | canary: the `exclusive` fixture's window stamps overlap |
+| `teardown-error-dropped-after-setup-failure` | a sibling fixture's `AfterAll` failure is not booked once another fixture's setup failed | canary: the `teardownaftersetup` stream carries no word of the teardown failure |
+| `bench-gate-passes-on-nothing` | a bench gate with no benchmark in both the baseline and the run passes | canary: the gate against a foreign baseline exits 0 instead of 1 |
+| `bench-unmatched-dropped` | a bench comparison reports no benchmark as missing or added | canary: the report against a foreign baseline lists no missing benchmark |
+| `bench-same-file-accepted` | `bench --save` and `--against` on one file compare the run against itself | canary: the same file for both is not refused with exit 2 |
+| `bench-gate-judges-without-samples` | a bench gate judges a run with fewer than 4 samples a side | canary: a gate without `-count` is not refused with exit 2 |
+| `bench-gate-refuses-enough-samples` | a bench gate refuses a run with exactly 4 samples a side | canary: the gate against a foreign baseline exits 2 instead of 1 |
+| `bench-heuristic-mark-dropped` | a delta row judged by the ±20% rule of thumb is not marked as one | ring-0 render suite: the heuristic row lacks its mark |
+| `bench-gate-zero-judges` | `--gate=0` arms a gate instead of disabling it | canary: a zero gate without `-count` is refused with exit 2 |
+| `bench-verbose-behind-args` | the `-v` a bench run adds lands behind the user's `-args` | canary: a bench run with words after `-args` fails on the binary's flag parsing |
 
 ## Adding a mutant
 

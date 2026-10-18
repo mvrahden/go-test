@@ -1,0 +1,13 @@
+Expect: bench with -args: exit code 1, want 0
+Clause: when a bench run passes words after -args → puts its own -v ahead of them and the run passes
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -104,7 +104,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 	// suppression for ordinary tests). Force verbose so ns/op lines always
+ 	// show, matching go test's actual benchmark UX.
+ 	if !verboseRequested {
+-		goTestArgs = gotestrunner.InsertBeforeArgs(goTestArgs, "-v")
++		goTestArgs = append(goTestArgs, "-v")
+ 	}
+ 
+ 	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)

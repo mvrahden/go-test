@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,22 +106,24 @@ func ParseSubcommand(args []string) (subcmd string, remaining []string) {
 
 // SplitArgs classifies args into gotest flags and go test flags.
 //
-// gotest flags use --double-dash; go test flags use -single-dash.
-// Both domains are validated against their respective registries.
-// A bare "--" acts as an escape hatch: everything after it goes to
-// goTestArgs without validation.
-func SplitArgs(args []string, allowed map[string]bool) (ownArgs, goTestArgs []string, err error) {
+// gotest flags use --double-dash and are returned parsed: a boolean takes
+// --name, --name=true or --name=false; a value flag takes --name=value or
+// --name value, and one without a value is a usage error; the last occurrence
+// wins. go test flags use -single-dash and are validated against their
+// registry. A bare "--" is an escape hatch: everything after it goes to
+// goTestArgs without validation, as does everything from "-args" on.
+func SplitArgs(args []string, allowed map[string]bool) (own OwnFlags, goTestArgs []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
 		if arg == "--" {
 			goTestArgs = append(goTestArgs, args[i+1:]...)
-			return
+			return own, goTestArgs, nil
 		}
 
 		if arg == "-args" {
 			goTestArgs = append(goTestArgs, args[i:]...)
-			return
+			return own, goTestArgs, nil
 		}
 
 		if !strings.HasPrefix(arg, "-") {
@@ -128,27 +131,44 @@ func SplitArgs(args []string, allowed map[string]bool) (ownArgs, goTestArgs []st
 			continue
 		}
 
-		name, _, hasEquals := strings.Cut(arg, "=")
+		name, value, hasEquals := strings.Cut(arg, "=")
 
 		if strings.HasPrefix(name, "--") {
 			kind := gotestFlags[name]
 			if kind == 0 {
-				return nil, nil, fmt.Errorf("unknown flag: %s", name)
+				return OwnFlags{}, nil, fmt.Errorf("unknown flag: %s", name)
 			}
 			if !allowed[name] {
-				return nil, nil, fmt.Errorf("flag %s is not valid for this subcommand", name)
+				return OwnFlags{}, nil, fmt.Errorf("flag %s is not valid for this subcommand", name)
 			}
-			ownArgs = append(ownArgs, arg)
-			if !hasEquals && kind == ValueFlag && i+1 < len(args) {
+			switch kind {
+			case BoolFlag:
+				if !hasEquals {
+					own.set(name, "true")
+					continue
+				}
+				b, perr := strconv.ParseBool(value)
+				if perr != nil {
+					return OwnFlags{}, nil, fmt.Errorf("invalid boolean value %q for %s", value, name)
+				}
+				own.set(name, strconv.FormatBool(b))
+			case ValueFlag:
+				if hasEquals {
+					own.set(name, value)
+					continue
+				}
+				if i+1 >= len(args) {
+					return OwnFlags{}, nil, fmt.Errorf("flag %s needs a value", name)
+				}
 				i++
-				ownArgs = append(ownArgs, args[i])
+				own.set(name, args[i])
 			}
 			continue
 		}
 
 		isValue, known := gotestrunner.IsGoTestFlag(name)
 		if !known {
-			return nil, nil, fmt.Errorf("unknown flag: %s", name)
+			return OwnFlags{}, nil, fmt.Errorf("unknown flag: %s", name)
 		}
 		goTestArgs = append(goTestArgs, arg)
 		if !hasEquals && isValue && i+1 < len(args) {
@@ -157,21 +177,9 @@ func SplitArgs(args []string, allowed map[string]bool) (ownArgs, goTestArgs []st
 		}
 	}
 	if err := gotestrunner.ValidateTestFlags(goTestArgs); err != nil {
-		return nil, nil, err
+		return OwnFlags{}, nil, err
 	}
-	return
-}
-
-func extractStringFlag(args []string, name, defaultVal string) string {
-	for i, arg := range args {
-		if v, ok := strings.CutPrefix(arg, name+"="); ok {
-			return v
-		}
-		if arg == name && i+1 < len(args) {
-			return args[i+1]
-		}
-	}
-	return defaultVal
+	return own, goTestArgs, nil
 }
 
 // ExtractPackagePatterns returns the package patterns in args as go test

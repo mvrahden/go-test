@@ -232,6 +232,10 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 					bp.Errors = append(bp.Errors, msg)
 				}
 			}
+			if hint := missingGotestHint(bp.Errors); hint != "" && !brokenMsgSeen[pkgPath][hint] {
+				brokenMsgSeen[pkgPath][hint] = true
+				bp.Errors = append(bp.Errors, hint)
+			}
 			continue
 		}
 		// Packages outside any module (std, GOPATH) hold no suites,
@@ -760,4 +764,15 @@ func fixtureHasSharedFixtures(rf *BoundFixture) bool {
 		}
 	}
 	return false
+}
+
+// missingGotestHint names the fix when a package fails because its module
+// does not require gotest: the import error alone reads like a typo.
+func missingGotestHint(errs []string) string {
+	for _, e := range errs {
+		if strings.Contains(e, "could not import github.com/mvrahden/go-test/") {
+			return "this module does not require github.com/mvrahden/go-test; run: go get -tool github.com/mvrahden/go-test/cmd/gotest@latest"
+		}
+	}
+	return ""
 }

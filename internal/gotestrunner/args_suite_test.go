@@ -86,10 +86,31 @@ func (s *ArgsTestSuite) TestPackagePatterns(t *gotest.T) {
 		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
 		gotest.Equal(it, []string{"-skip", "X"}, c.RunFlags)
 	})
-	t.It("gives an unknown flag the non-flag after it as its value", func(it *gotest.T) {
+	t.It("hands an unknown flag and the non-flag after it to the test binary", func(it *gotest.T) {
 		c := gotestrunner.ClassifyGoTestArgs([]string{"-custom", "value", "fmt"})
-		gotest.Equal(it, []string{"-custom", "value"}, c.BuildFlags)
+		gotest.Empty(it, c.BuildFlags)
+		gotest.Equal(it, []string{"-args", "-custom", "value"}, c.RunFlags)
 		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
+	})
+	t.It("places unknown flags after the run flags it knows, as go test does", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-custom=1", "-v", "fmt", "-count=2"})
+		gotest.Equal(it, []string{"-v", "-count=2", "-args", "-custom=1"}, c.RunFlags)
+		gotest.Equal(it, []string{"fmt"}, c.PkgPatterns)
+	})
+	t.It("keeps what follows -args verbatim behind the unknown flags", func(it *gotest.T) {
+		c := gotestrunner.ClassifyGoTestArgs([]string{"-custom=1", "fmt", "-args", "-count=nope"})
+		gotest.Equal(it, []string{"-args", "-custom=1", "-count=nope"}, c.RunFlags)
+	})
+}
+
+func (s *ArgsTestSuite) TestTranslateToTestBinaryFlags(t *gotest.T) {
+	t.When("run flags are turned into the binary's flags", func(w *gotest.T) {
+		w.It("prefixes the flags the binary's testing package owns", func(it *gotest.T) {
+			gotest.Equal(it, []string{"-test.v", "-test.count=2"}, gotestrunner.TranslateToTestBinaryFlags([]string{"-v", "-count=2"}))
+		})
+		w.It("consumes the -args word and passes what follows verbatim", func(it *gotest.T) {
+			gotest.Equal(it, []string{"-test.v", "-custom=1", "-count=nope"}, gotestrunner.TranslateToTestBinaryFlags([]string{"-v", "-args", "-custom=1", "-count=nope"}))
+		})
 	})
 }
 
@@ -321,6 +342,23 @@ func (s *ArgsTestSuite) TestSuiteRunFilter(t *gotest.T) {
 	}
 }
 
+func (s *ArgsTestSuite) TestExtractCountValue(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name  string
+		flags []string
+		want  int
+	}{
+		{"absent is one run", []string{"-benchtime=1x"}, 1},
+		{"joined", []string{"-count=6"}, 6},
+		{"separate", []string{"-count", "4", "-v"}, 4},
+		{"test prefix", []string{"-test.count=3"}, 3},
+		{"behind -args is the binary's", []string{"-args", "-count=9"}, 1},
+		{"unparseable is one run", []string{"-count=many"}, 1},
+	}) {
+		gotest.Equal(sub, tc.want, gotestrunner.ExtractCountValue(tc.flags))
+	}
+}
+
 func (s *ArgsTestSuite) TestExtractParallelValue(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Name   string
@@ -339,6 +377,20 @@ func (s *ArgsTestSuite) TestExtractParallelValue(t *gotest.T) {
 	}
 }
 
+func (s *ArgsTestSuite) TestInjectDefaultTimeout(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Name   string
+		flags  []string
+		expect []string
+	}{
+		{"adds the default", []string{"-v"}, []string{"-v", "-timeout=10m"}},
+		{"keeps a user timeout", []string{"-timeout=1m", "-v"}, []string{"-timeout=1m", "-v"}},
+		{"injects before -args, never behind it", []string{"-v", "-args", "-timeout=9s"}, []string{"-v", "-timeout=10m", "-args", "-timeout=9s"}},
+	}) {
+		gotest.Equal(sub, tc.expect, gotestrunner.InjectDefaultTimeout(tc.flags))
+	}
+}
+
 func (s *ArgsTestSuite) TestInjectParallel(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Name   string
@@ -350,7 +402,7 @@ func (s *ArgsTestSuite) TestInjectParallel(t *gotest.T) {
 		{"injects when absent", []string{"-v", "-timeout=10m"}, 2, []string{"-v", "-timeout=10m", "-parallel=2"}},
 		{"skips when equals present", []string{"-parallel=8", "-v"}, 2, []string{"-parallel=8", "-v"}},
 		{"skips when space present", []string{"-parallel", "8", "-v"}, 2, []string{"-parallel", "8", "-v"}},
-		{"does not inject after -args", []string{"-v", "-args", "-parallel=9"}, 2, []string{"-v", "-args", "-parallel=9", "-parallel=2"}},
+		{"injects before -args, never behind it", []string{"-v", "-args", "-parallel=9"}, 2, []string{"-v", "-parallel=2", "-args", "-parallel=9"}},
 	}) {
 		got := gotestrunner.InjectParallel(tc.flags, tc.n)
 		gotest.Equal(sub, tc.expect, got)

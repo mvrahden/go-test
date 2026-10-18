@@ -157,7 +157,7 @@ BENCHMARK  OLD ns/op  NEW ns/op  Δ
 ```
 
 ```
-$ go run ./cmd/gotest bench ./examples/benchmarking --against=/tmp/cache-baseline.json --gate=10
+$ go run ./cmd/gotest bench ./examples/benchmarking --against=/tmp/cache-baseline.json --gate=10 -count=4
 BenchmarkCache
   ✓ GetHit  9.0 ns/op · 0 B/op · 0 allocs/op
   ✓ GetMiss  7.0 ns/op · 0 B/op · 0 allocs/op

@@ -44,6 +44,8 @@ type jsonNode struct {
 	NsPerOp     float64    `json:"ns_per_op,omitempty"`
 	BytesPerOp  int64      `json:"bytes_per_op,omitempty"`
 	AllocsPerOp int64      `json:"allocs_per_op,omitempty"`
+	// Metrics are the result line's other units: MB/s and reported metrics.
+	Metrics map[string]float64 `json:"metrics,omitempty"`
 }
 
 type jsonStats struct {
@@ -111,6 +113,7 @@ func convertNodes(nodes []*Node) []jsonNode {
 			NsPerOp:     n.NsPerOp,
 			BytesPerOp:  n.BytesPerOp,
 			AllocsPerOp: n.AllocsPerOp,
+			Metrics:     n.Metrics,
 		}
 		if result[i].Output == nil {
 			result[i].Output = []string{}

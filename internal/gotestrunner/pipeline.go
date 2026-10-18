@@ -32,18 +32,13 @@ func resolveSetupTimeout(d time.Duration) time.Duration {
 	}
 }
 
-func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites int, sanitized bool) int {
+// computeDispatchConcurrency decides how many suite processes run at once.
+// The budget (total concurrent test methods, default 2×GOMAXPROCS) is split
+// between processes and each process's -parallel; a user -parallel keeps the
+// budget and divides it, so processes × methods never exceeds the budget;
+// procCap (go test's -p) bounds the process count outright.
+func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap int, sanitized bool) int {
 	userParallel := ExtractParallelValue(*runFlags)
-
-	if userParallel > 0 && budget == 0 {
-		// The user pinned intra-process parallelism; the process count is
-		// still ours to choose — halved under instrumentation like every
-		// other default (see SanitizerActive).
-		if sanitized {
-			return runtime.GOMAXPROCS(0)
-		}
-		return 2 * runtime.GOMAXPROCS(0)
-	}
 
 	procs := runtime.GOMAXPROCS(0)
 	if sanitized && budget == 0 {
@@ -54,10 +49,17 @@ func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites int, san
 		budget = procs
 		procs = max(1, procs/2)
 	}
-	inter, intra := ComputeConcurrency(budget, totalSuites, procs)
-	if userParallel == 0 {
-		*runFlags = InjectParallel(*runFlags, intra)
+	if procCap > 0 {
+		procs = min(procs, procCap)
 	}
+	if userParallel > 0 {
+		if budget <= 0 {
+			budget = 2 * runtime.GOMAXPROCS(0)
+		}
+		return max(1, min(totalSuites, procs, budget/userParallel))
+	}
+	inter, intra := ComputeConcurrency(budget, totalSuites, procs)
+	*runFlags = InjectParallel(*runFlags, intra)
 	return inter
 }
 
@@ -145,6 +147,22 @@ func withReports(err error, reports []string, teardown bool) error {
 		return err
 	}
 	return &fixtureFailure{err: err, reports: own}
+}
+
+// teardownVerdict is the teardown's error with the fixtures' AfterAll reports
+// attached. The reports are a failure on their own: a sibling's setup failure
+// has already claimed the process's exit status, and without this the AfterAll
+// that failed beside it would be known only to stderr.
+func teardownVerdict(teardownErr error, reports []string) error {
+	if err := withReports(teardownErr, reports, true); err != nil {
+		return err
+	}
+	for _, r := range reports {
+		if strings.Contains(r, ".AfterAll ") {
+			return withReports(errors.New("shared fixture teardown failed"), reports, true)
+		}
+	}
+	return nil
 }
 
 // applyTeardownFailure surfaces a shared fixture teardown failure and makes a
@@ -443,7 +461,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 			teardownErr = errors.Join(barrierErr, setupProc.Teardown())
 			reports := setupProc.TakeFailures()
 			setupErr = withReports(setupErr, reports, false)
-			teardownErr = withReports(teardownErr, reports, true)
+			teardownErr = teardownVerdict(teardownErr, reports)
 		}
 		if setupErr != nil && result.ExitCode == 0 {
 			result.ExitCode = 1
@@ -464,7 +482,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 
 	runFlags := pf.RunFlags
 	if cfg.OutputMode == RunCaptureJSON {
-		runFlags = append(append([]string(nil), runFlags...), "-v")
+		runFlags = insertBeforeArgs(runFlags, "-v")
 	}
 
 	// A user-supplied -bench value arrives in RunFlags via normal flag
@@ -480,6 +498,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	userBenchFilter := ExtractBenchFilter(runFlags)
 	runFlags = StripBenchFilter(runFlags)
 	targets := BuildBenchTargets(prep.compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter)
+	withExec(targets, pf.Exec)
 
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
 	order := flushOrder(cfg, overlay, noSuite)
@@ -727,7 +746,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	for _, suites := range overlay.SuitesByPkg {
 		totalSuites += len(suites)
 	}
-	maxParallel := computeDispatchConcurrency(&pf.RunFlags, cfg.Parallel, totalSuites, SanitizerActive(pf.BuildFlags))
+	maxParallel := computeDispatchConcurrency(&pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags))
 	sem := make(chan struct{}, maxParallel)
 	var wg sync.WaitGroup
 	anyTargets := false
@@ -775,6 +794,7 @@ loop:
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
 		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
+		withExec(targets, pf.Exec)
 
 		if len(targets) == 0 {
 			collector.RecordNothingToRun(cr.Package)
@@ -948,7 +968,7 @@ loop:
 		teardownErr = errors.Join(barrierErr, setupProc.Teardown())
 		reports := setupProc.TakeFailures()
 		setupErr = withReports(setupErr, reports, false)
-		teardownErr = withReports(teardownErr, reports, true)
+		teardownErr = teardownVerdict(teardownErr, reports)
 	}
 	streamCancel()
 
@@ -992,4 +1012,11 @@ loop:
 	applyTeardownFailure(collector, &result, teardownErr)
 	result.CapturedJSON = collector.CapturedJSON()
 	return result, nil
+}
+
+// withExec gives every target the command its binary runs under.
+func withExec(targets []SuiteTarget, exec []string) {
+	for i := range targets {
+		targets[i].Exec = exec
+	}
 }

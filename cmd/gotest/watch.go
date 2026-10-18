@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,26 +22,19 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestspec"
 )
 
-func parseDebounceFlag(args []string) (time.Duration, error) {
-	for i, arg := range args {
-		var raw string
-		if v, ok := strings.CutPrefix(arg, "--debounce="); ok {
-			raw = v
-		} else if arg == "--debounce" && i+1 < len(args) {
-			raw = args[i+1]
-		} else {
-			continue
-		}
-		d, err := time.ParseDuration(raw)
-		if err != nil {
-			return 0, fmt.Errorf("invalid --debounce value %q: %w", raw, err)
-		}
-		if d <= 0 {
-			return 0, fmt.Errorf("invalid --debounce value %q: must be positive", raw)
-		}
-		return d, nil
+func parseDebounceFlag(own OwnFlags) (time.Duration, error) {
+	if !own.Given("--debounce") {
+		return 200 * time.Millisecond, nil
 	}
-	return 200 * time.Millisecond, nil
+	raw := own.Value("--debounce")
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --debounce value %q: %w", raw, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("invalid --debounce value %q: must be positive", raw)
+	}
+	return d, nil
 }
 
 func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
@@ -44,43 +42,45 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if inv.Config.Debounce != nil && !hasFlag(args, "--debounce") {
 		args = append([]string{"--debounce=" + inv.Config.Debounce.Duration().String()}, args...)
 	}
-	ownArgs, goTestArgs, err := SplitArgs(args, watchAllowed)
+	own, goTestArgs, err := SplitArgs(args, watchAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	bench := hasFlag(ownArgs, "--bench")
+	bench := own.Bool("--bench")
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
-	specMode := hasFlag(ownArgs, "--spec")
+	specMode := own.Bool("--spec")
 	if specMode && jsonMode {
 		fmt.Fprintln(os.Stderr, "FAIL: --spec cannot be combined with -json")
 		return 2
 	}
-	debounceDuration, err := parseDebounceFlag(ownArgs)
+	debounceDuration, err := parseDebounceFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 
-	cfg, err := parseExecFlags(ownArgs, goTestArgs, &inv.Config)
+	cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 	// Watch is the interactive focus-iteration tool: never let a CI-ish
 	// environment auto-enable the F_ guard mid-iteration; --ci stays explicit.
-	cfg.CI = hasFlag(ownArgs, "--ci")
+	cfg.CI = own.Bool("--ci")
 
 	ctx, stop := shutdownContext()
 	defer stop()
 
 	if !jsonMode {
-		fmt.Printf("\033[2m  running tests...\033[0m\n")
+		fmt.Println(dim("  running tests..."))
 	}
 	var benchNs map[string]float64
-	_, benchNs = watchRunOnce(ctx, cfg, jsonMode, specMode, bench, benchNs)
+	var firstCode int
+	firstCode, benchNs = watchRunOnce(ctx, cfg, jsonMode, specMode, bench, benchNs)
+	emitWatchEnd(jsonMode, cfg.PackagePatterns, firstCode)
 	if !jsonMode {
-		fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
+		fmt.Println("\n" + dim("  watching for changes..."))
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -89,60 +89,272 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 	defer watcher.Close()
+	src := fsnotifySource{watcher}
 
-	for _, pattern := range cfg.PackagePatterns {
-		addWatchDirs(watcher, pattern)
+	loadFlags := gotestrunner.StripNonLoadFlags(gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs).BuildFlags)
+	watchDirsFor(src, cfg.PackagePatterns, loadFlags)
+	reverse := reverseDepDirs(cfg.PackagePatterns, loadFlags)
+
+	rerun := func(dirs []string) {
+		if !jsonMode {
+			clearTerminal()
+		}
+		pkgPatterns := dirsToPatterns(dirs)
+		changedCfg := cfg
+		changedCfg.GoTestArgs = replacePatterns(goTestArgs, pkgPatterns)
+		changedCfg.PackagePatterns = pkgPatterns
+		var code int
+		code, benchNs = watchRunOnce(ctx, changedCfg, jsonMode, specMode, bench, benchNs)
+		emitWatchEnd(jsonMode, pkgPatterns, code)
+		// The dependency graph may have changed with the code.
+		reverse = reverseDepDirs(cfg.PackagePatterns, loadFlags)
+		if !jsonMode {
+			fmt.Println("\n" + dim("  watching for changes..."))
+		}
 	}
+	return watchLoop(ctx, src, debounceDuration, func() map[string][]string { return reverse }, rerun)
+}
 
-	debounce := time.NewTimer(0)
-	if !debounce.Stop() {
-		<-debounce.C
+// watchSource is the file system as the loop sees it: fsnotify in the
+// command, a fake in tests.
+type watchSource interface {
+	Events() <-chan fsnotify.Event
+	Errors() <-chan error
+	Add(path string) error
+}
+
+type fsnotifySource struct{ w *fsnotify.Watcher }
+
+func (f fsnotifySource) Events() <-chan fsnotify.Event { return f.w.Events }
+func (f fsnotifySource) Errors() <-chan error          { return f.w.Errors }
+func (f fsnotifySource) Add(path string) error         { return f.w.Add(path) }
+
+// watchLoop reruns what changes until ctx ends. A Go file written, created,
+// renamed or removed marks its directory; after the debounce the marked
+// directories and, through deps, every package depending on them are handed
+// to run. A directory created under a watched one is watched too. The
+// interrupt that ends the loop is its exit code, 130.
+func watchLoop(ctx context.Context, src watchSource, debounce time.Duration, deps func() map[string][]string, run func(dirs []string)) int {
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
 	}
-	var changedDirs map[string]bool
-
+	var changed map[string]bool
 	for {
 		select {
 		case <-ctx.Done():
-			return 0
+			return 130
 
-		case event, ok := <-watcher.Events:
+		case event, ok := <-src.Events():
 			if !ok {
-				return 0
+				return 130
 			}
-			if !isGoFile(event.Name) {
+			if event.Op&fsnotify.Create != 0 {
+				if fi, err := os.Stat(event.Name); err == nil && fi.IsDir() {
+					watchTree(src, event.Name)
+					continue
+				}
+			}
+			if !isGoFile(event.Name) || event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove) == 0 {
 				continue
 			}
-			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
-				continue
+			if changed == nil {
+				changed = map[string]bool{}
 			}
-			if changedDirs == nil {
-				changedDirs = map[string]bool{}
-			}
-			changedDirs[filepath.Dir(event.Name)] = true
-			debounce.Reset(debounceDuration)
+			changed[filepath.Dir(event.Name)] = true
+			timer.Reset(debounce)
 
-		case <-debounce.C:
-			if !jsonMode {
-				clearTerminal()
-			}
-			pkgPatterns := dirsToPatterns(changedDirs)
-			pkgArgs := replacePatterns(goTestArgs, pkgPatterns)
-			changedCfg := cfg
-			changedCfg.GoTestArgs = pkgArgs
-			changedCfg.PackagePatterns = pkgPatterns
-			_, benchNs = watchRunOnce(ctx, changedCfg, jsonMode, specMode, bench, benchNs)
-			changedDirs = nil
-			if !jsonMode {
-				fmt.Printf("\n\033[2m  watching for changes...\033[0m\n")
-			}
+		case <-timer.C:
+			dirs := rerunDirs(changed, deps())
+			changed = nil
+			run(dirs)
 
-		case err, ok := <-watcher.Errors:
+		case err, ok := <-src.Errors():
 			if !ok {
-				return 0
+				return 130
 			}
 			fmt.Fprintf(os.Stderr, "watch error: %s\n", err)
 		}
 	}
+}
+
+// emitWatchEnd closes a cycle in the JSON stream, so a consumer knows the
+// verdict is complete without waiting for the next cycle to start.
+func emitWatchEnd(jsonMode bool, patterns []string, code int) {
+	if jsonMode {
+		fmt.Printf("{\"Action\":\"watch-end\",\"Package\":%q,\"Exit\":%d}\n", strings.Join(patterns, ","), code)
+	}
+}
+
+// rerunDirs is the sorted set of directories to rerun: the changed ones and
+// every package that depends on them.
+func rerunDirs(changed map[string]bool, reverse map[string][]string) []string {
+	set := map[string]bool{}
+	for dir := range changed {
+		set[dir] = true
+		for _, dependent := range reverse[dir] {
+			set[dependent] = true
+		}
+	}
+	dirs := make([]string, 0, len(set))
+	for dir := range set {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
+// watchDirsFor watches the directories the patterns name: the packages they
+// resolve to, every directory under a /... pattern so a package written
+// there later is seen too, and, for a pattern matching nothing yet, the
+// nearest existing directory on its path.
+func watchDirsFor(src watchSource, patterns, loadFlags []string) {
+	pkgs, unmatched, err := gotestgen.ListPackageDirs("", patterns, loadFlags)
+	if err == nil {
+		for _, p := range pkgs {
+			_ = src.Add(p.Dir)
+		}
+	}
+	for _, pattern := range patterns {
+		if dir, ok := strings.CutSuffix(pattern, "/..."); ok {
+			watchTree(src, dirOrDot(dir))
+		}
+	}
+	for _, pattern := range unmatched {
+		if dir := nearestDir(dirOrDot(strings.TrimSuffix(pattern, "/..."))); dir != "" {
+			watchTree(src, dir)
+		}
+	}
+}
+
+func dirOrDot(dir string) string {
+	if dir == "" {
+		return "."
+	}
+	return dir
+}
+
+// nearestDir is dir or its closest existing ancestor; "" for an import path.
+func nearestDir(dir string) string {
+	if !strings.ContainsAny(dir, `/\`) && dir != "." {
+		return ""
+	}
+	for {
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+// watchTree watches dir and every directory below it, skipping the ones no
+// package lives in.
+func watchTree(src watchSource, dir string) {
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if path != dir && (strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules") {
+				return filepath.SkipDir
+			}
+			_ = src.Add(path)
+		}
+		return nil
+	})
+}
+
+// reverseDepDirs maps a directory to the directories of the test packages
+// among the patterns that depend on it, within the main module(s), so a
+// change to a dependency reruns what it can break. Best effort: on any go
+// list error the map is empty and only the changed directory reruns.
+func reverseDepDirs(patterns, loadFlags []string) map[string][]string {
+	mods, err := goListLines("list", "-m", "-f", "{{.Path}}")
+	if err != nil || len(mods) == 0 {
+		return nil
+	}
+	inModule := func(path string) bool {
+		for _, m := range mods {
+			if path == m || strings.HasPrefix(path, m+"/") {
+				return true
+			}
+		}
+		return false
+	}
+	args := append([]string{"list", "-e", "-test", "-f", "{{.Dir}}|{{join .Deps \" \"}}"}, loadFlags...)
+	lines, err := goListLines(append(args, pkgpattern.Clean(patterns)...)...)
+	if err != nil {
+		return nil
+	}
+	depsOf := map[string]map[string]bool{}
+	allDeps := map[string]bool{}
+	for _, line := range lines {
+		dir, deps, ok := strings.Cut(line, "|")
+		if !ok || dir == "" {
+			continue
+		}
+		for _, dep := range strings.Fields(deps) {
+			if inModule(dep) {
+				if depsOf[dir] == nil {
+					depsOf[dir] = map[string]bool{}
+				}
+				depsOf[dir][dep] = true
+				allDeps[dep] = true
+			}
+		}
+	}
+	if len(allDeps) == 0 {
+		return nil
+	}
+	depList := make([]string, 0, len(allDeps))
+	for dep := range allDeps {
+		depList = append(depList, dep)
+	}
+	sort.Strings(depList)
+	dirLines, err := goListLines(append([]string{"list", "-e", "-f", "{{.ImportPath}}|{{.Dir}}"}, depList...)...)
+	if err != nil {
+		return nil
+	}
+	dirOf := map[string]string{}
+	for _, line := range dirLines {
+		if path, dir, ok := strings.Cut(line, "|"); ok && dir != "" {
+			dirOf[path] = dir
+		}
+	}
+	reverse := map[string][]string{}
+	for pkgDir, deps := range depsOf {
+		for dep := range deps {
+			depDir := dirOf[dep]
+			if depDir == "" || depDir == pkgDir || slices.Contains(reverse[depDir], pkgDir) {
+				continue
+			}
+			reverse[depDir] = append(reverse[depDir], pkgDir)
+		}
+	}
+	for dir := range reverse {
+		sort.Strings(reverse[dir])
+	}
+	return reverse
+}
+
+// goListLines runs the go command and returns its non-empty stdout lines.
+func goListLines(args ...string) ([]string, error) {
+	out, err := exec.Command("go", args...).Output() //nolint:gosec // G204: the go tool with the command's own patterns
+	if err != nil {
+		return nil, err
+	}
+	var lines []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines, nil
 }
 
 // watchRunOnce runs one watch iteration. benchNs carries the previous
@@ -205,7 +417,7 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 	// passing suite's stdout, hiding the ns/op lines go test would
 	// normally always print for -bench.
 	if bench && !gotestrunner.HasVerboseFlag(cfg.GoTestArgs) {
-		cfg.GoTestArgs = append(cfg.GoTestArgs, "-v")
+		cfg.GoTestArgs = gotestrunner.InsertBeforeArgs(cfg.GoTestArgs, "-v")
 	}
 
 	mode := gotestrunner.RunBatchText
@@ -342,40 +554,35 @@ func benchDeltaLines(results []gotestbench.Result, prevNs map[string]float64) (l
 	return lines, nextNs
 }
 
-func addWatchDirs(w *fsnotify.Watcher, pattern string) {
-	dir := strings.TrimSuffix(pattern, "/...")
-	if dir == "" || dir == "." {
-		dir = "."
-	}
-	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules" {
-				return filepath.SkipDir
-			}
-			_ = w.Add(path)
-		}
-		return nil
-	})
-}
-
 func isGoFile(name string) bool {
 	return strings.HasSuffix(name, ".go")
 }
 
 func clearTerminal() {
-	fmt.Print("\033[2J\033[H")
+	if !colorDisabled(false) {
+		fmt.Print("\033[2J\033[H")
+	}
 }
 
-func dirsToPatterns(dirs map[string]bool) []string {
+func dirsToPatterns(dirs []string) []string {
 	patterns := make([]string, 0, len(dirs))
-	for dir := range dirs {
-		patterns = append(patterns, "./"+filepath.ToSlash(dir))
+	for _, dir := range dirs {
+		patterns = append(patterns, dirPattern(dir))
 	}
 	return patterns
+}
+
+// dirPattern is the package pattern for a directory: an absolute or an
+// explicitly relative path is one already; a bare relative one needs ./ so
+// go does not read it as an import path. A slash-rooted path counts as
+// absolute on every platform: Windows would call it relative for lacking a
+// volume, and "./" in front of it names nothing.
+func dirPattern(dir string) string {
+	dir = filepath.ToSlash(dir)
+	if dir == "." || filepath.IsAbs(dir) || strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, "./") || strings.HasPrefix(dir, "../") {
+		return dir
+	}
+	return "./" + dir
 }
 
 func replacePatterns(originalArgs []string, newPatterns []string) []string {
@@ -391,4 +598,12 @@ func replacePatterns(originalArgs []string, newPatterns []string) []string {
 	}
 	args = append(args, newPatterns...)
 	return args
+}
+
+// dim renders s faintly on a terminal and plainly everywhere else.
+func dim(s string) string {
+	if colorDisabled(false) {
+		return s
+	}
+	return "\033[2m" + s + "\033[0m"
 }

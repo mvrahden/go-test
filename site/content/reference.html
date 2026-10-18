@@ -43,7 +43,7 @@ aliases: ["/reference.html"]
         <tbody>
           <tr><td><code>struct</code></td><td>Subject</td><td><code>UserServiceTestSuite</code></td></tr>
           <tr><td><code>method</code></td><td>Capability</td><td><code>TestCreate</code></td></tr>
-          <tr><td><code>When()</code></td><td>Context</td><td><code>"when email is valid"</code></td></tr>
+          <tr><td><code>When()</code></td><td>Context</td><td><code>"email is new"</code></td></tr>
           <tr><td><code>It()</code></td><td>Behavior</td><td><code>"creates the user"</code></td></tr>
           <tr><td><code>Each()</code></td><td>Variants</td><td><code>"standard format"</code>, <code>"missing @"</code></td></tr>
         </tbody>
@@ -53,7 +53,7 @@ aliases: ["/reference.html"]
 
       <div class="diagram">UserService
   Create
-    when email is valid
+    when email is new
       <span class="g">&#10003;</span> creates the user
       <span class="g">&#10003;</span> sends a welcome email
     when email already exists
@@ -157,7 +157,7 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
 
       <h3>Parallel execution</h3>
       <p><strong>Suite-level:</strong> Each suite runs as a separate subprocess — full process isolation with zero shared state between suites. This is automatic.</p>
-      <p><strong>Method-level:</strong> Opt-in via <code>SuiteConfig{Parallel: true}</code>. Requires a returning <code>BeforeEach</code> so each parallel test gets its own state.</p>
+      <p><strong>Method-level:</strong> Opt-in via <code>SuiteConfig{Parallel: true}</code>. Per-test state lives in the context a returning <code>BeforeEach</code> provides, never on the shared suite struct; the generator rejects a <code>BeforeEach</code> that returns nothing in a parallel suite, and a suite without per-test state needs none.</p>
     </section>
 
     <!-- 4. Test DSL -->
@@ -169,14 +169,14 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
       <p><code>When</code> groups context. <code>It</code> specifies behavior. Nest them freely to build a specification tree:</p>
       <div class="code-block">
         <pre><span class="kw">func</span> (s *<span class="tp">MySuite</span>) <span class="fn">TestCreate</span>(t *gotest.T) {
-    t.When(<span class="st">"when email is valid"</span>, <span class="kw">func</span>(w *gotest.T) {
+    t.When(<span class="st">"email is new"</span>, <span class="kw">func</span>(w *gotest.T) {
         w.It(<span class="st">"creates the user"</span>, <span class="kw">func</span>(it *gotest.T) {
             err := s.svc.Create(ctx, validUser)
             gotest.NoError(it, err)
         })
     })
 
-    t.When(<span class="st">"when email already exists"</span>, <span class="kw">func</span>(w *gotest.T) {
+    t.When(<span class="st">"email already exists"</span>, <span class="kw">func</span>(w *gotest.T) {
         w.It(<span class="st">"returns ErrDuplicate"</span>, <span class="kw">func</span>(it *gotest.T) {
             s.svc.Create(ctx, validUser)
             err := s.svc.Create(ctx, validUser)
@@ -211,7 +211,7 @@ AfterAll <span class="d">(via t.Cleanup — always runs)</span></div>
 gotest.MatchSnapshot(t, render(other), <span class="st">"variant"</span>)  <span class="cm">// explicit snapshot name</span></pre>
       </div>
       <p>Snapshots are stored in <code>testdata/__snapshots__/</code> next to the test file. On first run, the snapshot is created. On subsequent runs, the output is compared and failures include a diff. Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use <code>MatchSnapshot</code> without coordination.</p>
-      <p>Update all snapshots with <code>gotest --update-snapshots ./...</code> or <code>GOTEST_UPDATE_SNAPSHOTS=1 go test ./...</code> when running <code>go test</code> directly.</p>
+      <p>Update all snapshots with <code>gotest --update-snapshots ./...</code>.</p>
 
       <h3>Async polling</h3>
       <p>Package-level functions for polling conditions. Callbacks receive <code>*gotest.R</code> — an assertion recorder that captures failures without propagating them:</p>
@@ -589,7 +589,7 @@ percentage = covered / total</div>
         </tbody>
       </table>
       <div class="callout">
-        Benchmark suites always dispatch serially, one at a time, whatever <code>--parallel</code> says: concurrent benchmarks measure each other. <code>-test.benchmem</code> is on by default, so every line carries <code>B/op</code> and <code>allocs/op</code>.
+        Benchmark suites dispatch serially, one at a time: concurrent benchmarks measure each other. <code>-test.benchmem</code> is on by default, so every line carries <code>B/op</code> and <code>allocs/op</code>.
       </div>
 
       <h3>Baselines, deltas, and the gate</h3>
@@ -689,7 +689,7 @@ percentage = covered / total</div>
         <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
         <tbody>
           <tr><td><code>--ci</code></td><td>CI mode: fail on focus prefixes, snapshot read-only. Auto-detected from <code>CI</code> env var; opt out with <code>GOTEST_CI=0</code>.</td></tr>
-          <tr><td><code>--spec</code></td><td>Append spec summary after normal test output.</td></tr>
+          <tr><td><code>--spec</code></td><td>Render the spec view in place of the default output.</td></tr>
           <tr><td><code>--update-snapshots</code></td><td>Regenerate all snapshot files.</td></tr>
           <tr><td><code>--no-cache</code></td><td>Disable overlay cache, force fresh generation.</td></tr>
           <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage falls below threshold.</td></tr>
