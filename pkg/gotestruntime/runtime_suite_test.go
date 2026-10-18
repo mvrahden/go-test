@@ -462,14 +462,15 @@ func (s *RuntimeTestSuite) TestChildren_ConcurrentSetup(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 	rec := &recorder{}
-	childAStarted := make(chan struct{})
+	childBStarted := make(chan struct{})
 
 	childA := &gotestruntime.FixtureNode{
 		Name:   "ChildA",
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			close(childAStarted)
+			// Fail only once B is inside its BeforeAll, so B is cancelled mid-setup.
+			<-childBStarted
 			return errors.New("childA fails")
 		},
 		AfterAll: func(ctx context.Context) error {
@@ -482,13 +483,12 @@ func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			// Wait for A to have started (and likely failed)
-			<-childAStarted
-			// Give time for cancellation to propagate
+			close(childBStarted)
+			// Bounded, so a missing cancel fails the test instead of hanging it.
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(10 * time.Second):
 				rec.record("childB.beforeAll.completed")
 				return nil
 			}
@@ -731,13 +731,16 @@ func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentSetup(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 	rec := &recorder{}
+	rootBStarted := make(chan struct{})
 
 	rootA := &gotestruntime.FixtureNode{
 		Name:   "RootA",
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			return errors.New("rootA fails immediately")
+			// Fail only once B is inside its BeforeAll, so B is cancelled mid-setup.
+			<-rootBStarted
+			return errors.New("rootA fails")
 		},
 		AfterAll: func(ctx context.Context) error {
 			rec.record("rootA.afterAll")
@@ -749,9 +752,15 @@ func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			// Block until cancelled
-			<-ctx.Done()
-			return ctx.Err()
+			close(rootBStarted)
+			// Bounded, so a missing cancel fails the test instead of hanging it.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(10 * time.Second):
+				rec.record("rootB.beforeAll.completed")
+				return nil
+			}
 		},
 		AfterAll: func(ctx context.Context) error {
 			rec.record("rootB.afterAll")
@@ -766,6 +775,7 @@ func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 	// A failed and B was cancelled mid-setup: both ran BeforeAll, both are released.
 	mustContain(t, events, "rootA.afterAll")
 	mustContain(t, events, "rootB.afterAll")
+	mustNotContain(t, events, "rootB.beforeAll.completed")
 }
 
 func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentTeardown(t *gotest.T) {
