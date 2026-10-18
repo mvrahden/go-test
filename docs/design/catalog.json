@@ -13992,6 +13992,259 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a bare nolint comment suppresses every rule on its line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_bare_nolint_comment_suppresses_every_rule_on_its_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment names no rule",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_nolint_comment_names_no_rule",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "nolint:all suppresses every rule on its line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "nolint:all_suppresses_every_rule_on_its_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment names all",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_nolint_comment_names_all",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a nolint comment naming an unknown rule is a finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_nolint_comment_naming_an_unknown_rule_is_a_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the comment naming the unknown rule cannot suppress that finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_comment_naming_the_unknown_rule_cannot_suppress_that_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment names a rule lint does not have",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_nolint_comment_names_a_rule_lint_does_not_have",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint leaves the rule to that linter and suppresses none of its own",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_leaves_the_rule_to_that_linter_and_suppresses_none_of_its_own",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment names another linter's rule",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_nolint_comment_names_another_linter's_rule",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Nolint",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestNolint",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "an untracked generated file is not a finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_untracked_generated_file_is_not_a_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a generated file git tracks is a finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_generated_file_git_tracks_is_a_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "outside a git repository a generated file is a finding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "outside_a_git_repository_a_generated_file_is_a_finding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a generated file is on disk",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_generated_file_is_on_disk",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GeneratedFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGeneratedFile",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "skipping an integrity rule on the command line says why it cannot be skipped and exits 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "skipping_an_integrity_rule_on_the_command_line_says_why_it_cannot_be_skipped_and_exits_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the command line skips an integrity rule",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_command_line_skips_an_integrity_rule",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SkipFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSkipFlags",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterErgonomics",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestLinterErgonomicsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a fix that does not compile is dropped and named",
                       "duration": 0,
                       "excluded": false,
@@ -14153,6 +14406,72 @@
           "focused": false,
           "kind": "suite",
           "name": "TestLinterGenerationTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint --github escapes the annotation's message and properties",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_--github_escapes_the_annotation's_message_and_properties",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a long annotation is cut on a rune boundary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_long_annotation_is_cut_on_a_rune_boundary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a finding's message and file carry characters a workflow command escapes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_finding's_message_and_file_carry_characters_a_workflow_command_escapes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnnotationEscaping",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnnotationEscaping",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterGitHub",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestLinterGitHubTestSuite",
           "output": [],
           "status": "none"
         },
@@ -14875,13 +15194,13 @@
     }
   ],
   "stats": {
-    "behaviors": 497,
+    "behaviors": 508,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 84,
+    "suites": 86,
     "tests": 0
   }
 }

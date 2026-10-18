@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / lint leaves the rule to that linter and suppresses none of its own \(
+Clause: when a nolint comment names another linter's rule → lint leaves the rule to that linter and suppresses none of its own
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -21,7 +21,7 @@
+ 			for _, c := range cg.List {
+ 				ids, _ := nolintIDs(c.Text)
+ 				for _, id := range ids {
+-					if id == "all" || Known(Rule(id)) || foreignLinters[id] {
++					if id == "all" || Known(Rule(id)) {
+ 						continue
+ 					}
+ 					pass.Report(analysis.Diagnostic{

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / skipping an integrity rule on the command line says why it cannot be skipped and exits 2 \(
+Clause: when the command line skips an integrity rule → skipping an integrity rule on the command line says why it cannot be skipped and exits 2
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -114,8 +114,6 @@
+ 		switch {
+ 		case lintAnalyzerFlag(name):
+ 			a.analyzer = append(a.analyzer, "-"+name+"="+value)
+-		case strings.HasPrefix(name, "skip-") && lint.Known(lint.Rule(strings.TrimPrefix(name, "skip-"))):
+-			return a, integrityRuleError("-"+name, strings.TrimPrefix(name, "skip-"))
+ 		case name == "fix":
+ 			a.fix, err = strconv.ParseBool(value)
+ 		case name == "diff":

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / a nolint comment naming an unknown rule is a finding \(
+Clause: when a nolint comment names a rule lint does not have → a nolint comment naming an unknown rule is a finding
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -10,7 +10,7 @@
+ // gotest rule, "all", nor a golangci-lint linter. It reports past nolint
+ // comments: the comment at fault must not silence its own finding.
+ func checkNolintIDs(pass *analysis.Pass) {
+-	if cfg.disableNolint {
++	if !cfg.disableNolint {
+ 		return
+ 	}
+ 	for _, file := range pass.Files {

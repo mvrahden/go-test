@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / a generated file git tracks is a finding \(
+Clause: when a generated file is on disk → a generated file git tracks is a finding
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1190,7 +1190,7 @@
+ 	cmd := exec.Command("git", "ls-files", "-z", "--", filepath.Base(path)) //nolint:gosec // G204: git with a file the load read
+ 	cmd.Dir = filepath.Dir(path)
+ 	out, err := cmd.Output()
+-	return err == nil && len(out) == 0
++	return err == nil && len(out) >= 0
+ }
+ 
+ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {

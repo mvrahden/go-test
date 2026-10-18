@@ -630,6 +630,17 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
 | `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |
 | `lint-rule-simplify-fix-drops-comments` | the `assertion-simplify` fix drops comments between the arguments | conformance: the lint `-fix` It finds the comment gone |
+| `lint-erg-bare-nolint-reason-ignored` | a bare `//nolint` followed by a reason is not read as a nolint comment | conformance: the lint It for a bare nolint comment finds the line's finding reported |
+| `lint-erg-nolint-all-is-a-rule` | `//nolint:all` names a rule called `all` instead of every rule | conformance: the lint It for `nolint:all` finds the line's finding reported |
+| `lint-erg-unknown-nolint-silent` | a nolint comment naming an unknown rule is never reported | conformance: the lint It for an unknown rule finds no `nolint-unknown` finding |
+| `lint-erg-unknown-nolint-suppressible` | the unknown-rule finding goes through nolint suppression | conformance: the lint It for `nolint:all,not-a-rule` finds the comment silencing its own finding |
+| `lint-erg-foreign-nolint-unknown` | a golangci-lint linter's id counts as an unknown rule | conformance: the lint It for another linter's rule finds a `nolint-unknown` finding |
+| `lint-erg-generated-untracked-reported` | `generated-file` reports a generated file git does not track | conformance: the lint It for an untracked generated file finds it reported |
+| `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
+| `lint-erg-generated-no-git-dropped` | `generated-file` reads a failed `git ls-files` as untracked | conformance: the lint It outside a git repository finds no finding |
+| `lint-erg-integrity-skip-usage` | `-skip-<integrity rule>` falls through to the driver's usage text | conformance: the lint It for `-skip-focus` finds the usage text instead of the refusal |
+| `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
+| `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |
 
 ## Adding a mutant
 
