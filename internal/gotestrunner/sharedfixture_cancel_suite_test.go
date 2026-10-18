@@ -15,14 +15,6 @@ import (
 // Sequential: the fixture is configured through the environment.
 type SharedFixtureCancelTestSuite struct{}
 
-// SuiteConfig: Exclusive, as every suite that runs a real shared fixture
-// subprocess against the wall clock is.
-func (s *SharedFixtureCancelTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
-}
-
 func (s *SharedFixtureCancelTestSuite) TestCancellationLeavesTheProcessToTeardown(t *gotest.T) {
 	t.Setenv(fixtures.EnvSlowSetupTimeout, "30s")
 	t.Setenv(fixtures.EnvSlowSetupDelay, "0s")

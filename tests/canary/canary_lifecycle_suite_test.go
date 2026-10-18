@@ -44,10 +44,10 @@ func (s *CanaryTestSuite) TestEveryGoroutineBeforeAllStartedIsWaitedFor(t *gotes
 	}
 }
 
-// outputOf is what the last run's stream printed for the test at path.
-func (s *CanaryTestSuite) outputOf(path string) string {
+// outputOf is what t's last run's stream printed for the test at path.
+func (s *canary) outputOf(t *gotest.T, path string) string {
 	var out strings.Builder
-	for _, ev := range testkit.ParseEvents([]byte(s.lastStream)) {
+	for _, ev := range testkit.ParseEvents([]byte(s.lastStream(t))) {
 		if ev.Test == path && ev.Action == "output" {
 			out.WriteString(ev.Output)
 		}
@@ -71,7 +71,7 @@ func (s *CanaryTestSuite) TestAnotherGoroutinesFailureLeavesTheWaitToTheOwner(t 
 		if !slices.Contains(rows, "asynchelper fail "+path) {
 			t.Errorf("asynchelper: %s did not fail: %v", path, rows)
 		}
-		out := s.outputOf(path)
+		out := s.outputOf(t, path)
 		if !strings.Contains(out, "a helper goroutine fails") || !strings.Contains(out, c.says) {
 			t.Errorf("asynchelper: %s's output lacks the helper's failure or %q:\n%s", path, c.says, out)
 		}
@@ -89,8 +89,8 @@ func (s *CanaryTestSuite) TestAnotherGoroutinesFailureLeavesTheWaitToTheOwner(t 
 func (s *CanaryTestSuite) TestAnAsyncAfterEachIsHeldToTheTimeout(t *gotest.T) {
 	_, rows := s.run(t, "asynchelper", t.TempDir(), "-run=TestHookOverrunTestSuite")
 	path := "TestHookOverrunTestSuite/TestCallsDoneAsync"
-	if !slices.Contains(rows, "asynchelper fail "+path) || !strings.Contains(s.outputOf(path), "exceeded its configured Timeout of 1s") {
-		t.Errorf("asynchelper: %s did not fail for its AfterEach's overrun: %v\n%s", path, rows, s.outputOf(path))
+	if !slices.Contains(rows, "asynchelper fail "+path) || !strings.Contains(s.outputOf(t, path), "exceeded its configured Timeout of 1s") {
+		t.Errorf("asynchelper: %s did not fail for its AfterEach's overrun: %v\n%s", path, rows, s.outputOf(t, path))
 	}
 }
 
@@ -105,7 +105,7 @@ type liveRun struct {
 
 // startRun starts the CLI over args with the marker dir and extra env, as the
 // root of its own process tree.
-func (s *CanaryTestSuite) startRun(t *gotest.T, dir string, env []string, args ...string) *liveRun {
+func (s *canary) startRun(t *gotest.T, dir string, env []string, args ...string) *liveRun {
 	r := &liveRun{markers: filepath.Join(dir, testkit.MarkersFile), exited: make(chan struct{})}
 	r.cmd = exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	r.cmd.Env = append(childEnv(dir), env...)
@@ -174,21 +174,24 @@ func (r *liveRun) mark(event string) {
 // interrupted runs the stopgrace fixture with env and args, interrupts it once
 // a method marked running, and returns how long it took to end after the
 // signal, the stream and the markers. The marker "interrupted" is written
-// just before the signal; a run that outlives the stop by 40s is killed.
-func (s *CanaryTestSuite) interrupted(t *gotest.T, env []string, args ...string) (time.Duration, string, []string) {
+// just before the signal; a run that outlives the stop by 40s is killed. The
+// time is taken before the signal is sent: on Windows the interrupt returns
+// only once its helper process has exited, well after the run saw the stop.
+func (s *canary) interrupted(t *gotest.T, env []string, args ...string) (time.Duration, string, []string) {
 	r := s.startRun(t, t.TempDir(), env, append([]string{"-json"}, append(args, "./testdata/stopgrace/")...)...)
+	began := time.Now()
 	if r.await(90*time.Second, "running") {
 		r.mark("interrupted")
+		began = time.Now()
 		_ = testkit.Interrupt(r.cmd, r.tree)
 	}
-	began := time.Now()
 	_, markers := r.end(40 * time.Second)
 	return time.Since(began), r.stdout.String() + r.stderr.String(), markers
 }
 
 // A stopped run cuts a body that ignores its context short after 5s, saying
 // so, and releases the fixture without running AfterAll.
-func (s *CanaryTestSuite) TestABodyIgnoringItsContextIsCutShort(t *gotest.T) {
+func (s *CanaryTimingTestSuite) TestABodyIgnoringItsContextIsCutShort(t *gotest.T) {
 	took, out, markers := s.interrupted(t, []string{"STOPGRACE_IGNORE=1"}, "-run=TestGraceTestSuite")
 	if !strings.Contains(out, "a method did not return within 5s of its context ending; it is cut short") || took < 5*time.Second || took > 20*time.Second {
 		t.Errorf("stopgrace: the body was not cut short after 5s, saying so (the run ended %s after the stop):\n%s", took, out)

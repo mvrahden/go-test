@@ -13,5 +13,11 @@ Clause: when the parent of a suite process under the runner is killed while a me
 -func init() { askForParentDeath() }
 +func init() {}
  
- // askForParentDeath has the kernel send this process SIGTERM when its parent
- // is gone, under the runner only. The runner's own death signal reaches the
+ // deathSignal is what the kernel sends this process when its parent is gone.
+ // It is no stop signal, so nobody's stop request is ever taken for it: it
+@@ -37,4 +37,4 @@
+ 
+ // parentExited reports whether the process that started this one has ended:
+ // an orphan is handed to another parent.
+-func parentExited() bool { return os.Getppid() != parentPID }
++func parentExited() bool { return false }

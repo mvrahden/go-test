@@ -1,0 +1,13 @@
+Expect: the death signal abandoned the teardown
+Clause: when the parent of a suite process under the runner is killed while a method holds → runs AfterAll before the fixture is released
+--- a/pkg/gotestruntime/parentdeath_linux.go
++++ b/pkg/gotestruntime/parentdeath_linux.go
+@@ -27,7 +27,7 @@
+ 	if stopFile == "" {
+ 		return
+ 	}
+-	if _, _, errno := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_PDEATHSIG, uintptr(syscall.SIGHUP), 0); errno != 0 {
++	if _, _, errno := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_PDEATHSIG, uintptr(syscall.SIGTERM), 0); errno != 0 {
+ 		return
+ 	}
+ 	if os.Getppid() != parentPID {

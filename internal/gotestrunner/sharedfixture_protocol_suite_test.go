@@ -16,11 +16,10 @@ import (
 // protocol is judged, not trusted.
 type SharedFixtureProtocolTestSuite struct{}
 
-// SuiteConfig: Exclusive, as every suite that builds and runs a real shared
-// fixture subprocess is.
+// SuiteConfig: parallel; the methods share nothing and time nothing.
 func (s *SharedFixtureProtocolTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
+	cfg.Parallel = true
 	return cfg
 }
 

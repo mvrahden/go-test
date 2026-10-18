@@ -873,7 +873,12 @@ the tree when the runner itself is killed.
 
 On Linux a tree's root also gets SIGTERM from the kernel when the runner dies
 (`Pdeathsig`), so a suite or shared-fixture process tears down before it
-exits. On every OS the suite process watches for a dead runner itself (its
+exits. A suite process under the runner asks for SIGHUP instead, which only
+wakes its watcher to look at its parent: no SIGINT or SIGTERM it gets is the
+kernel's, so each is someone's request, and the second abandons the
+teardown, while the death signal never does. A second signal to the CLI
+kills every tree it still runs before it exits, so none outlives it where no
+death signal comes. On every OS the suite process watches for a dead runner itself (its
 parent gone, or nobody reading its stdout), and a shared-fixture process
 tears down when its stdin closes, exiting with status 1 once its setup and
 teardown budgets have passed if a hook never returns. A wrapper that

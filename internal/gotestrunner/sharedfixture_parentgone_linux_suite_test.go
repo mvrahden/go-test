@@ -46,14 +46,6 @@ func standInRunner(dir string) int {
 // Sequential: the fixture is configured through the environment.
 type SharedFixtureParentGoneTestSuite struct{}
 
-// SuiteConfig: Exclusive, as every suite that builds and runs a real shared
-// fixture subprocess is.
-func (s *SharedFixtureParentGoneTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
-}
-
 func (s *SharedFixtureParentGoneTestSuite) TestAKilledRunnerLeavesTheFixtureToTearDown(t *gotest.T) {
 	marker := filepath.Join(t.TempDir(), "released")
 	t.Setenv(fixtures.EnvSlowTeardownDelay, (500 * time.Millisecond).String())

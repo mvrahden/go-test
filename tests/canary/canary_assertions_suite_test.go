@@ -12,7 +12,7 @@ import (
 // judged by its result, for Eventually and Consistently alike.
 func (s *CanaryTestSuite) TestALatePollIsJudgedByItsResult(t *gotest.T) {
 	s.check(t, "latepolls")
-	if strings.Contains(s.lastStream, "poll still running") {
+	if strings.Contains(s.lastStream(t), "poll still running") {
 		t.Errorf("latepolls: a poll started before waitFor was failed as still running")
 	}
 }

@@ -21,6 +21,7 @@ import (
 const (
 	envGoneMode   = "GOTESTRUNTIME_GONE_MODE"
 	envGoneDir    = "GOTESTRUNTIME_GONE_DIR"
+	envGoneSlow   = "GOTESTRUNTIME_GONE_SLOW"
 	goneSuite     = "TestParentGoneTestSuite"
 	goneMethod    = "TestASuiteWhoseParentIsKilledTearsDown"
 	goneChildMode = "suite"
@@ -64,6 +65,9 @@ func goneSuiteRun(t *testing.T) {
 				_ = os.WriteFile(filepath.Join(dir, "suite.pid"), []byte(strconv.Itoa(os.Getpid())), 0o600)
 			},
 			AfterAll: func(*gotest.T) {
+				if os.Getenv(envGoneSlow) == "1" {
+					time.Sleep(2 * time.Second) // long enough for the parent to die meanwhile
+				}
 				_ = os.WriteFile(filepath.Join(dir, "torn-down"), nil, 0o600)
 			},
 		})

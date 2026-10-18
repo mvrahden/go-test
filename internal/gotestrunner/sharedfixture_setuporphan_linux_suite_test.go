@@ -53,11 +53,10 @@ const prSetChildSubreaper = 0x24
 // Sequential: the fixture is configured through the environment.
 type SharedFixtureSetupOrphanTestSuite struct{}
 
-// SuiteConfig: Exclusive, as every suite that builds and runs a real shared
-// fixture subprocess is; the Timeout covers the 30s budget headroom.
+// SuiteConfig: the Timeout covers the 30s budget headroom. Not Exclusive: the
+// verdict is a lower bound, which a busy machine only makes later.
 func (s *SharedFixtureSetupOrphanTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
 	cfg.Timeout = 2 * time.Minute
 	return cfg
 }

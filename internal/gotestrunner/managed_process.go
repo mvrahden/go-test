@@ -229,6 +229,7 @@ func (p *ManagedProcess) Start() error {
 		p.closePipes()
 		return err
 	}
+	track(p)
 	p.copyOutput()
 	go p.wait()
 	return nil
@@ -237,6 +238,7 @@ func (p *ManagedProcess) Start() error {
 // Adopt takes over a command the caller started after NewManagedProcess.
 func (p *ManagedProcess) Adopt() {
 	p.tree.Adopt()
+	track(p)
 	p.copyOutput()
 	go p.wait()
 }
@@ -248,6 +250,7 @@ func (p *ManagedProcess) wait() {
 	// An interrupted root can exit before the rest of its tree is done
 	// shutting down; the grace it was given covers them too.
 	p.tree.Linger(p.graceTimeout())
+	untrack(p)
 	p.tree.Release()
 	p.drain()
 	close(p.done)

@@ -18,18 +18,31 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// CanaryTestSuite runs one fixture package per method.
-// Sequential: it builds the CLI once and each method spawns a full pipeline run.
+// canary is what every canary suite shares: the CLI built once, the golden
+// list, and each test's last -json stream. Each run gets its own temp dir.
+type canary struct {
+	binary   string
+	expected map[string]expectation
+	streams  sync.Map // test name → the -json stdout of its last run
+}
+
+// CanaryTestSuite runs one fixture package per method, all at once: no
+// verdict here measures the wall clock.
 type CanaryTestSuite struct {
-	binary     string
-	expected   map[string]expectation
-	lastStream string // the -json stdout of the last run, for checks on what it carried
+	canary
+}
+
+func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 type expectation struct {
@@ -42,7 +55,12 @@ func fatalf(t *gotest.T, format string, args ...any) {
 	t.FailNow()
 }
 
-func (s *CanaryTestSuite) BeforeAll(t *gotest.T) {
+func (s *CanaryTestSuite) BeforeAll(t *gotest.T) { s.setUp(t) }
+
+func (s *CanaryTestSuite) AfterAll(t *gotest.T) {}
+
+// setUp builds the CLI and reads the golden list.
+func (s *canary) setUp(t *gotest.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		fatalf(t, "abs: %v", err)
@@ -56,7 +74,20 @@ func (s *CanaryTestSuite) BeforeAll(t *gotest.T) {
 	s.expected = readExpected(t, filepath.Join("testdata", "expected.txt"))
 }
 
-func (s *CanaryTestSuite) AfterAll(t *gotest.T) {}
+// lastStream is the -json stdout of the last run t, or the test t runs
+// under, made.
+func (s *canary) lastStream(t *gotest.T) string {
+	for name := t.T().Name(); ; {
+		if v, ok := s.streams.Load(name); ok {
+			return v.(string)
+		}
+		i := strings.LastIndexByte(name, '/')
+		if i < 0 {
+			return ""
+		}
+		name = name[:i]
+	}
+}
 
 // readExpected parses the golden list: a "<pkg> exit <code>" line opens a
 // package, and "<pkg> <action> <test>" lines follow it.
@@ -100,12 +131,12 @@ type event struct {
 
 // run executes the CLI in -json mode over one fixture package and returns
 // its exit code and the verdict rows it produced, in golden form.
-func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []string) {
+func (s *canary) run(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []string) {
 	return s.runEnv(t, pkg, canaryDir, nil, extra...)
 }
 
 // runEnv is run with extra variables in the child's environment.
-func (s *CanaryTestSuite) runEnv(t *gotest.T, pkg, canaryDir string, env []string, extra ...string) (int, []string) {
+func (s *canary) runEnv(t *gotest.T, pkg, canaryDir string, env []string, extra ...string) (int, []string) {
 	cmd := exec.Command(s.binary, append(append([]string{"-json"}, extra...), "./testdata/"+pkg+"/")...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = append(childEnv(canaryDir), env...)
 	var stdout, stderr bytes.Buffer
@@ -118,7 +149,7 @@ func (s *CanaryTestSuite) runEnv(t *gotest.T, pkg, canaryDir string, env []strin
 		}
 		code = exitErr.ExitCode()
 	}
-	s.lastStream = stdout.String()
+	s.streams.Store(t.T().Name(), stdout.String())
 	seen := map[string]bool{}
 	for _, line := range bytes.Split(stdout.Bytes(), []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {
@@ -160,7 +191,7 @@ func childEnv(canaryDir string) []string {
 }
 
 // check runs a fixture and compares exit code and rows with the golden.
-func (s *CanaryTestSuite) check(t *gotest.T, pkg string, extra ...string) string {
+func (s *canary) check(t *gotest.T, pkg string, extra ...string) string {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)
@@ -326,10 +357,10 @@ func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 // stderr is a leak a -json consumer never sees.
 func (s *CanaryTestSuite) TestATeardownFailureBesideASetupFailureReachesTheStream(t *gotest.T) {
 	s.check(t, "teardownaftersetup")
-	if !strings.Contains(s.lastStream, "would not release what it holds") {
+	if !strings.Contains(s.lastStream(t), "would not release what it holds") {
 		t.Errorf("teardownaftersetup: the stream carries no word of the teardown failure")
 	}
-	if !strings.Contains(s.lastStream, "would not come up") {
+	if !strings.Contains(s.lastStream(t), "would not come up") {
 		t.Errorf("teardownaftersetup: the stream carries no word of the setup failure")
 	}
 }
@@ -381,10 +412,10 @@ func (s *CanaryTestSuite) TestAFailedFixtureBeforeEachPairsWithNothing(t *gotest
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("fixturehookfail: hooks ran %v, want %v", got, want)
 	}
-	if !strings.Contains(s.lastStream, "fixture.go:") {
+	if !strings.Contains(s.lastStream(t), "fixture.go:") {
 		t.Errorf("fixturehookfail: the failure is not reported at the hook's file")
 	}
-	if strings.Contains(s.lastStream, "methods.go:") {
+	if strings.Contains(s.lastStream(t), "methods.go:") {
 		t.Errorf("fixturehookfail: the failure is reported inside the runtime's file")
 	}
 }
@@ -436,7 +467,7 @@ func (s *CanaryTestSuite) TestFailFastReportsWhatItSkipped(t *gotest.T) {
 			t.Errorf("failfast: missing %q in %v", want, rows)
 		}
 	}
-	if !strings.Contains(s.lastStream, "FailFast: TestFirst") {
+	if !strings.Contains(s.lastStream(t), "FailFast: TestFirst") {
 		t.Errorf("failfast: the skipped methods do not name TestFirst as the reason")
 	}
 }
@@ -528,7 +559,7 @@ func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T
 	if !slices.Contains(rows, "goroutines fail TestGoexitTestSuite/TestGoexit") {
 		t.Errorf("goroutines: the method whose goroutine failed did not fail: %v", rows)
 	}
-	if strings.Contains(s.lastStream, "the method went on after the wait") {
+	if strings.Contains(s.lastStream(t), "the method went on after the wait") {
 		t.Errorf("goroutines: the method went on after the wait on its failed goroutine")
 	}
 }
@@ -569,7 +600,7 @@ func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T)
 
 // Without --setup-timeout the wait for a shared fixture is the budget the
 // fixture declared: a 2s Timeout taking 15s fails the run in 2s, not 15.
-func (s *CanaryTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
+func (s *CanaryTimingTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
 	began := time.Now()
 	s.check(t, "setupbudget")
 	if took := time.Since(began); took > 10*time.Second {
@@ -642,7 +673,7 @@ func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *got
 
 // A failed assertion says what it could not work with: the type ErrorAs
 // expected, the needle a haystack cannot hold, and every extra argument.
-func (s *CanaryTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gotest.T) {
+func (s *CanaryTimingTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gotest.T) {
 	began := time.Now()
 	s.check(t, "failing")
 	// Two polls sleep 10s each; a run held to its deadlines ends long before that.
@@ -650,7 +681,7 @@ func (s *CanaryTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gote
 		t.Errorf("failing: the run took %s; a hanging poll was waited out instead of failed at its deadline", took)
 	}
 	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive", "@@ -1,5 +1,5 @@"} {
-		if !strings.Contains(s.lastStream, want) {
+		if !strings.Contains(s.lastStream(t), want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}
 	}
@@ -709,7 +740,7 @@ func (s *CanaryTestSuite) TestAHelperFailureNamesBothLinesUnderTrimpath(t *gotes
 
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
-func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {
+func (s *CanaryTimingTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {
 	began := time.Now()
 	code, rows := s.run(t, "asyncfatal", t.TempDir())
 	if code != 1 {
@@ -810,7 +841,7 @@ type benchReport struct {
 
 // bench runs a capturing bench run over one fixture package and returns its
 // exit code and the benchmark names the report carries a sample for.
-func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
+func (s *canary) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
 	code, report := s.benchReport(t, pkg, canaryDir)
 	names := make([]string, 0, len(report.Baseline.Results))
 	for _, r := range report.Baseline.Results {
@@ -822,7 +853,7 @@ func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []stri
 
 // benchReport runs a capturing bench run over one fixture package with extra
 // gotest flags and returns its exit code, the parsed report and stderr.
-func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra ...string) (int, benchReport) {
+func (s *canary) benchReport(t *gotest.T, pkg, canaryDir string, extra ...string) (int, benchReport) {
 	code, stdout, stderr := s.benchRaw(t, pkg, canaryDir, extra...)
 	var report benchReport
 	if err := json.Unmarshal(stdout, &report); err != nil {
@@ -833,7 +864,7 @@ func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra 
 
 // benchRaw runs bench --json over one fixture package and returns the exit
 // code and both streams as they were.
-func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
+func (s *canary) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
 	args := append([]string{"bench", "--json"}, extra...)
 	args = append(args, "./testdata/"+pkg+"/", "-benchtime=1x")
 	return s.invoke(t, canaryDir, args...)
@@ -841,7 +872,7 @@ func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...
 
 // invoke runs the CLI with the arguments as given and returns the exit code
 // and both streams as they were.
-func (s *CanaryTestSuite) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
+func (s *canary) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer

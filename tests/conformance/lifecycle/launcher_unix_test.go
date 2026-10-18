@@ -48,6 +48,9 @@ func (s *LauncherSignalTestSuite) BeforeAll(t *gotest.T) {
 	gotest.NoError(t, err)
 	gotest.NoError(t, os.WriteFile(goMod, append(data, []byte("\ntool github.com/mvrahden/go-test/cmd/gotest\n")...), 0o600))
 	gotest.NoError(t, os.MkdirAll(filepath.Join(s.staged, "stopping"), 0o750))
+	// An -exec wrapper that stays the suite's parent: the converter's death
+	// reaches neither, as where no death signal comes.
+	gotest.NoError(t, os.WriteFile(filepath.Join(s.staged, "wrap.sh"), []byte("#!/bin/sh\n\"$@\"\nexit $?\n"), 0o700)) //nolint:gosec // G306: the wrapper must be executable
 	for _, name := range []string{"fixture.go", "stopping_suite_test.go"} {
 		src, err := os.ReadFile(filepath.Join("..", "testdata", "stopping", name))
 		gotest.NoError(t, err)
@@ -60,7 +63,7 @@ func (s *LauncherSignalTestSuite) AfterAll(t *gotest.T) {}
 
 type launcherRow struct {
 	Desc     string
-	launcher string // direct, go run, go tool
+	launcher string // direct, exec wrapper, go run, go tool
 	signal   string // SIGINT, SIGTERM, second
 }
 
@@ -72,6 +75,8 @@ func (s *LauncherSignalTestSuite) command(launcher string) *exec.Cmd {
 		cmd = exec.Command("go", "run", "github.com/mvrahden/go-test/cmd/gotest", "-json", "./stopping/")
 	case "go tool":
 		cmd = exec.Command("go", "tool", "gotest", "-json", "./stopping/")
+	case "exec wrapper":
+		cmd = exec.Command(s.cli, "-json", "-exec", filepath.Join(s.staged, "wrap.sh"), "./stopping/") //nolint:gosec // G204: binary built by this suite
 	default:
 		cmd = exec.Command(s.cli, "-json", "./stopping/") //nolint:gosec // G204: binary built by this suite
 	}
@@ -133,6 +138,8 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				{Desc: "direct, SIGINT", launcher: "direct", signal: "SIGINT"},
 				{Desc: "direct, SIGTERM", launcher: "direct", signal: "SIGTERM"},
 				{Desc: "direct, a second SIGINT", launcher: "direct", signal: "second"},
+				{Desc: "under an -exec wrapper, SIGINT", launcher: "exec wrapper", signal: "SIGINT"},
+				{Desc: "under an -exec wrapper, a second SIGINT", launcher: "exec wrapper", signal: "second"},
 				{Desc: "go run, SIGINT", launcher: "go run", signal: "SIGINT"},
 				{Desc: "go run, SIGTERM", launcher: "go run", signal: "SIGTERM"},
 				{Desc: "go run, a second SIGINT", launcher: "go run", signal: "second"},

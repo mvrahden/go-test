@@ -76,7 +76,9 @@ package-level event.
 
 Fixtures that must prove something ran (a teardown, an order) write a
 marker file into the directory named by `GOTEST_CANARY_DIR`; the suite reads
-it back after the run.
+it back after the run. Each run gets a directory of its own, so the runs
+go at once; the few whose check bounds how long a run takes run one at a
+time in an Exclusive suite of their own, alone on the machine.
 
 ## Updating the golden list
 

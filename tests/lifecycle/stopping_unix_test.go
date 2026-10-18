@@ -3,6 +3,7 @@
 package lifecycle_test
 
 import (
+	"bufio"
 	"context"
 	"os"
 	"os/exec"
@@ -123,6 +124,45 @@ func (s *StoppingTestSuite) TestASignalAfterTheDeathSignalIsNotTheSecond(t *gote
 		if time.Now().After(deadline) {
 			_ = syscall.Kill(pid, syscall.SIGKILL)
 			gotest.Fail(t, "the orphaned binary did not end after its teardown") //nolint:fail-guard // it must kill the process before failing
+		}
+	}
+	gotest.Equal(t, []string{"db up", "running", "pool down", "db tearing", "db down"}, readEvents(log))
+}
+
+// A stop the runner asked for is still tearing down when the runner dies:
+// the death signal its exit sends is no request, so the teardown finishes.
+func (s *StoppingTestSuite) TestTheDeathSignalDuringAStopIsNotTheSecond(t *gotest.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("only Linux sends a death signal")
+	}
+	log := filepath.Join(t.TempDir(), "events")
+	stop := filepath.Join(t.TempDir(), "stop")
+	// The shell stands in for the runner: it outlives the stop request and
+	// exits once the teardown has begun.
+	sh := exec.Command("sh", "-c", `"$BIN" -test.run=TestHoldingTestSuite >/dev/null 2>&1 & echo $!; until grep -q "db tearing" "$STOPPING_LOG" 2>/dev/null; do sleep 0.05; done`)
+	sh.Env = append(ownEnv(), "BIN="+s.bin["hold"], "STOPPING_HOLD=1", "STOPPING_SLOW_TEARDOWN=1", "STOPPING_LOG="+log, protocol.EnvStopFile+"="+stop)
+	out, err := sh.StdoutPipe()
+	gotest.NoError(t, err)
+	gotest.NoError(t, sh.Start())
+	line, err := bufio.NewReader(out).ReadString('\n')
+	gotest.NoError(t, err)
+	pid, err := strconv.Atoi(strings.TrimSpace(line))
+	gotest.NoError(t, err)
+	for deadline := time.Now().Add(30 * time.Second); !slices.Contains(readEvents(log), "running"); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+			_ = sh.Process.Kill()
+			gotest.Fail(t, "the binary never held its connection") //nolint:fail-guard // it must kill the processes before failing
+		}
+	}
+
+	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
+	gotest.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
+	gotest.NoError(t, sh.Wait())
+	for deadline := time.Now().Add(15 * time.Second); syscall.Kill(pid, 0) == nil; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+			gotest.Fail(t, "the binary did not end after its teardown") //nolint:fail-guard // it must kill the process before failing
 		}
 	}
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db tearing", "db down"}, readEvents(log))

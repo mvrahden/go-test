@@ -85,6 +85,7 @@ type watcher struct {
 	file    string // the runner's stop file; empty under plain go test
 	sigs    []os.Signal
 	ch      chan os.Signal // the signals that arrived
+	death   chan os.Signal // the death signal, which only wakes the watcher
 	found   chan os.Signal // a stop the poll found
 	running bool
 	quit    chan struct{}
@@ -117,6 +118,10 @@ func watchFile(stderr io.Writer, file string) *watcher {
 	}
 	if len(w.sigs) > 0 {
 		signal.Notify(w.ch, w.sigs...)
+	}
+	if w.file != "" && deathSignal != nil && !signal.Ignored(deathSignal) {
+		w.death = make(chan os.Signal, 1)
+		signal.Notify(w.death, deathSignal)
 	}
 	w.running = true
 	go w.loop()
@@ -173,27 +178,21 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
-				w.stop(sig, !w.orphaned()) // returns once the run has stopped, or ends the process
+				w.stop(sig, true) // returns once the run has stopped, or ends the process
 			}
 		case sig := <-w.found:
 			if w.counts(sig) {
 				w.stop(sig, false)
 			}
+		case <-w.death:
+			// Only a parent that is gone makes it a stop, and the stop it
+			// starts is nobody's request. Landing while a stop runs, it is
+			// not read at all.
+			if parentExited() {
+				w.stop(stopSignals[0], false)
+			}
 		}
 	}
-}
-
-// orphaned reports whether a signal now comes with nobody to have asked for
-// it: no stop file, and the parent gone. On Linux the parent's exit sends a
-// death signal of its own, which is no one's request.
-func (w *watcher) orphaned() bool {
-	if w.file == "" {
-		return false
-	}
-	if _, err := os.Stat(w.file); err == nil {
-		return false
-	}
-	return os.Getppid() != parentPID || parentExited()
 }
 
 func (w *watcher) counts(sig os.Signal) bool {
@@ -223,11 +222,11 @@ const stopGrace = 5 * time.Second
 // stream carries every verdict. A method body that does not return within
 // stopGrace, or a run that does not finish within the release bound, is
 // forced: the fixtures are torn down, within that same bound, and the process
-// ends by sig. A stop someone asked for by a signal resets the handlers, so
-// the next signal ends the process. One nobody asked for by a signal, which
-// the poll found or the death signal brought, keeps them for the first signal
-// that follows, the runner's own after its stop file among them: that one is
-// the first request, and only the next ends the process.
+// ends by sig. A stop asked for by a signal resets the handlers, so the next
+// signal ends the process. One no signal asked for, which the poll found or
+// the death signal brought, keeps them for the first signal that follows, the
+// runner's own after its stop file among them: that one is the first request,
+// and only the next ends the process. The death signal is never a request.
 func (w *watcher) stop(sig os.Signal, requested bool) {
 	if len(w.sigs) > 0 {
 		if requested {
@@ -323,6 +322,9 @@ func waitHoldsEnd(deadline time.Time) bool {
 func (w *watcher) close() {
 	if len(w.sigs) > 0 {
 		signal.Stop(w.ch)
+	}
+	if w.death != nil {
+		signal.Stop(w.death)
 	}
 	if w.running {
 		close(w.quit)

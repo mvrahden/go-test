@@ -164,6 +164,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `bench-stderr-dropped` | a plain bench run never prints a benchmark suite's stderr | lifecycle conformance: the panic and its stack are missing from stderr |
 | `failfast-trips-before-a-failure` | a FailFast suite trips before any method failed, so its first method is skipped | canary: the FailFast fixture's run exits 0 and its first method has no fail verdict |
 | `second-signal-taken-for-the-first` | every signal after the first counts as the same event, so a second Ctrl-C never abandons the teardown | lifecycle conformance: the second-SIGINT rows find the teardown finished and no word of the abandon |
+| `second-signal-leaves-the-processes` | the CLI ends on a second signal without killing the process trees it runs | lifecycle conformance: the second-SIGINT rows find the suite process outliving the run |
 | `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' worst code instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
 | `stop-leaves-the-method-context` | a stop no longer ends a running method's context | canary: the stopping fixture's markers lack `context ended` |
 | `each-break-ignored` | `Each` goes on to the next row after the loop body broke, so Go panics on the next yield | canary: the each-break fixture's method fails and never reaches the marker after the loop |
@@ -182,7 +183,8 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `stop-file-ignored` | the watcher no longer counts the stop file by itself, only a signal | canary: with the signals ignored, the stopping fixture's later methods are not skipped, verdicts are missing and AfterAll never runs |
 | `plain-run-taken-for-the-runner` | a run without the runner's stop file falls back to a default one, so a plain run watches its stream | canary: the plainreader method's context ends when its reader goes |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
-| `parent-death-not-asked` | a suite process under the runner no longer asks for its parent's death signal | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
+| `parent-death-not-asked` | a suite process under the runner neither asks for its parent's death signal nor polls for its parent | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
+| `death-signal-is-a-stop-signal` | the death signal is SIGTERM, so landing during a requested stop it counts as the second signal | runtime: the parent's death abandons the teardown a stop it asked for runs |
 | `reader-loss-read-as-hangup` | a stream nobody reads is taken for one only on a hang-up, which a pipe's writer never gets | canary: after the runner and converter are killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
 | `stop-grace-past-5s` | a stopped body gets 15s, not 5s, before it is cut short | canary: the stopgrace run ends later and no message names 5s |
 | `cut-short-releases-nothing` | a stop that cuts a body short ends the process without releasing the fixtures | canary: stopgrace's fixture AfterAll never runs |

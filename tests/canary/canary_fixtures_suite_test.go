@@ -23,7 +23,7 @@ type fixtureRun struct {
 }
 
 // runFixture runs the CLI in -json mode over pkg with dir as its marker dir.
-func (s *CanaryTestSuite) runFixture(t *gotest.T, pkg, dir string) fixtureRun {
+func (s *canary) runFixture(t *gotest.T, pkg, dir string) fixtureRun {
 	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(dir)
 	var stdout, stderr bytes.Buffer
@@ -56,7 +56,7 @@ func (s *CanaryTestSuite) runFixture(t *gotest.T, pkg, dir string) fixtureRun {
 }
 
 // checkFixture runs pkg and compares its exit code and rows with the golden.
-func (s *CanaryTestSuite) checkFixture(t *gotest.T, pkg, dir string) fixtureRun {
+func (s *canary) checkFixture(t *gotest.T, pkg, dir string) fixtureRun {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)

@@ -7,13 +7,15 @@ import (
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 // shutdownContext is canceled by the first shutdown signal, which starts the
 // graceful shutdown: suites are stopped and fixtures torn down within their
-// budgets. A second signal ends the CLI at once with 130, abandoning what
-// is left of that teardown, the way a terminal's second Ctrl-C ends any
-// other program. The exit is explicit rather than left to the default
+// budgets. A second signal kills the process trees still running and ends
+// the CLI at once with 130, abandoning what is left of that teardown, the
+// way a terminal's second Ctrl-C ends any other program. The exit is explicit rather than left to the default
 // disposition: a CLI started by a parent that ignores SIGINT (go tool
 // test2json does) would inherit that and swallow the second signal. The
 // suite and fixture processes run in their own process groups, so the
@@ -26,6 +28,7 @@ import (
 func shutdownContext() (context.Context, context.CancelFunc) {
 	return shutdownContextThen(func() {
 		fmt.Fprintln(os.Stderr, "interrupted again: giving up on the teardown")
+		gotestrunner.KillAll()
 	})
 }
 

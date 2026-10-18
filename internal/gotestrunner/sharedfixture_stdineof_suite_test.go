@@ -16,14 +16,6 @@ import (
 // Sequential: the fixture is configured through the environment.
 type SharedFixtureStdinEOFTestSuite struct{}
 
-// SuiteConfig: Exclusive, as every suite that builds and runs a real shared
-// fixture subprocess is.
-func (s *SharedFixtureStdinEOFTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
-}
-
 func (s *SharedFixtureStdinEOFTestSuite) TestAClosedCommandPipeTearsTheFixturesDown(t *gotest.T) {
 	marker := filepath.Join(t.TempDir(), "released")
 	t.Setenv(fixtures.EnvSlowTeardownDelay, (200 * time.Millisecond).String())
