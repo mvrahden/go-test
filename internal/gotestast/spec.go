@@ -63,19 +63,39 @@ type TestSuiteSpecSet []*TestSuiteSpec
 type SkippedTestSuites []*TestSuiteSpec
 type SkippedTestCases map[*TestSuiteSpec][]*TestSuiteMethod
 
+// ReduceToEffectiveSet is ReduceInRun for a run made of ts alone.
 func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTestSuites, SkippedTestCases) {
+	return ts.ReduceInRun(ts.Focuses())
+}
+
+// Focuses reports whether ts holds a focused item: an F_ suite, or an F_
+// method of a suite that is not excluded.
+func (ts TestSuiteSpecSet) Focuses() bool {
+	return slices.Any(ts, func(v *TestSuiteSpec, _ int) bool { return v.IsFocused() || v.focusesMethod() })
+}
+
+// focusesMethod reports whether a suite that is not excluded has an F_ method.
+func (ts *TestSuiteSpec) focusesMethod() bool {
+	if ts.IsExcluded() {
+		return false
+	}
+	focused := func(m *TestSuiteMethod, _ int) bool { return m.IsFocused() }
+	return slices.Any(ts.th.TestCases, focused) || slices.Any(ts.th.Benchmarks, focused) || slices.Any(ts.th.Fuzzers, focused)
+}
+
+// ReduceInRun splits ts into the suites that run, the suites skipped and the
+// methods skipped. focusRun says whether the whole run holds a focused item:
+// then only focused items run, an F_ suite and the F_ methods of the others.
+func (ts TestSuiteSpecSet) ReduceInRun(focusRun bool) (TestSuiteSpecSet, SkippedTestSuites, SkippedTestCases) {
 	effectiveSet := append((TestSuiteSpecSet)(nil), ts...)
 
 	var skippedTestSuites SkippedTestSuites
 	skippedTestCases := SkippedTestCases{}
-	{ // split focused from unfocused
+	if focusRun { // split focused from unfocused
 		focused, unfocused := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
-			return v.IsFocused()
+			return v.IsFocused() || v.focusesMethod()
 		})
-		effectiveSet = unfocused
-		if len(focused) > 0 {
-			effectiveSet, skippedTestSuites = focused, append(skippedTestSuites, unfocused...)
-		}
+		effectiveSet, skippedTestSuites = focused, append(skippedTestSuites, unfocused...)
 	}
 
 	{ // split excluded from included
@@ -99,7 +119,8 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 				return v.IsFocused()
 			})
 			v.th.TestCases = unfocused
-			if len(focused) > 0 {
+			// A suite kept for its F_ methods runs those alone.
+			if len(focused) > 0 || (focusRun && !v.IsFocused()) {
 				v.th.TestCases = focused
 				skippedTestCases[v] = append(skippedTestCases[v], unfocused...)
 			}
@@ -122,7 +143,8 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 				return v.IsFocused()
 			})
 			v.th.Benchmarks = unfocused
-			if len(focused) > 0 {
+			// A suite kept for its F_ methods runs those alone.
+			if len(focused) > 0 || (focusRun && !v.IsFocused()) {
 				v.th.Benchmarks = focused
 				skippedTestCases[v] = append(skippedTestCases[v], unfocused...)
 			}
@@ -145,7 +167,8 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 				return v.IsFocused()
 			})
 			v.th.Fuzzers = unfocused
-			if len(focused) > 0 {
+			// A suite kept for its F_ methods runs those alone.
+			if len(focused) > 0 || (focusRun && !v.IsFocused()) {
 				v.th.Fuzzers = focused
 				skippedTestCases[v] = append(skippedTestCases[v], unfocused...)
 			}

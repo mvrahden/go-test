@@ -170,8 +170,14 @@ type SpecOutcome struct {
 	Fixtures            []*gotestast.FixtureSpec
 }
 
-func (collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, _ error) { //nolint:gocritic // hugeParam: stable API
-	suites, skippedTestSuites, skippedTestCases := result.Suites.ReduceToEffectiveSet()
+func (c collector) ApplyTestSuiteSpecs(result CollectorResult) (spec SpecOutcome, _ error) { //nolint:gocritic // hugeParam: stable API
+	return c.applyInRun(result, result.Suites.Focuses())
+}
+
+// applyInRun is ApplyTestSuiteSpecs inside a run that holds a focused item
+// when focusRun is set, in this package or any other.
+func (collector) applyInRun(result CollectorResult, focusRun bool) (spec SpecOutcome, _ error) { //nolint:gocritic // hugeParam: stable API
+	suites, skippedTestSuites, skippedTestCases := result.Suites.ReduceInRun(focusRun)
 
 	// TODO: sort all by name
 

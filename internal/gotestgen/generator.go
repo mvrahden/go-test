@@ -520,22 +520,32 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 
-	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
+	// Focus is a property of the whole run: collect every package first.
+	type collected struct{ ptest, pxtest CollectorResult }
+	all := make([]collected, len(loadResults))
+	focusRun := false
+	for i, lr := range loadResults {
 		c := collector{sources: lr.sources}
-		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
-		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
-			return nil, err
+		all[i].ptest = c.CollectSuiteSpecs(lr.Ptest)
+		if err := collectorError(lr.Ptest, all[i].ptest.Errs); err != nil {
+			return nil, nil, err
 		}
-		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
-		if err := collectorError(lr.Pxtest, pxtestCollected.Errs); err != nil {
-			return nil, err
+		all[i].pxtest = c.CollectSuiteSpecs(lr.Pxtest)
+		if err := collectorError(lr.Pxtest, all[i].pxtest.Errs); err != nil {
+			return nil, nil, err
 		}
+		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()
+	}
 
-		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
+	results, err := slices.MapErr(loadResults, func(lr *LoadResult, i int) (*GenerateResult, error) {
+		c := collector{sources: lr.sources}
+		ptestCollected, pxtestCollected := all[i].ptest, all[i].pxtest
+
+		ptestSpec, err := c.applyInRun(ptestCollected, focusRun)
 		if err != nil {
 			return nil, err
 		}
-		pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected)
+		pxtestSpec, err := c.applyInRun(pxtestCollected, focusRun)
 		if err != nil {
 			return nil, err
 		}

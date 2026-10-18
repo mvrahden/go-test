@@ -165,7 +165,7 @@ gotest --ci ./...
 
 To opt out when `CI` is set (rare, but occasionally useful for CI debugging), set `GOTEST_CI=0`.
 
-> The focus-prefix guard is important enough to deserve emphasis: without it, a developer who forgets to remove `F_TestLogin` before pushing effectively disables every other test in that package. The suite passes because the one focused test passes. The 49 skipped tests are invisible in the output. CI mode turns this silent skip into a loud failure.
+> The focus-prefix guard is important enough to deserve emphasis: without it, a developer who forgets to remove `F_TestLogin` before pushing effectively disables every other test in the run. The run passes because the one focused test passes. The 49 skipped tests are invisible in the output. CI mode turns this silent skip into a loud failure.
 
 ## Coverage thresholds
 

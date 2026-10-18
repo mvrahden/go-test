@@ -328,13 +328,13 @@ func (s *Suite) TestSomething(t *gotest.T, ctx *MyCtx) {}
 | *(none)* | Normal — runs unless something else is focused |
 
 Rules:
-1. If any suite has an `F_` prefix, all non-`F_` suites *in that test package* are skipped — focus scope is per package (and per ptest/pxtest variant), not repo-global
+1. Focus is run-wide: if any `F_` suite or `F_` method exists in any package of the run, internal or external test package alike, only focused items run — an `F_` suite, and the `F_` methods of any other suite; every other suite is skipped
 2. If any test case within a suite has an `F_` prefix, all non-`F_` cases in that suite are skipped
 3. `X_`-prefixed items are always skipped, regardless of focus state
-4. Exclude takes precedence over focus
-5. Focus/exclude is evaluated independently for `ptest` and `pxtest` suites
+4. Exclude takes precedence over focus: an `F_` method of an `X_` suite focuses nothing
 
-Skipped suites produce a `t.Skipf("test suite was excluded by user")` stub.
+Skipped suites produce a `t.Skipf("test suite was excluded by user")` stub, which starts no fixture.
+
 Skipped test *cases* are simply omitted from the generated code — no per-case skip stub appears in the output.
 
 The `--ci` flag performs a static analysis scan before generation and enables

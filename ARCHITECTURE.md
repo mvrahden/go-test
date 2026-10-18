@@ -134,10 +134,11 @@ Name prefix → behavior:
   F_TestCreateUser   → focused method within suite
   X_TestDeleteUser   → excluded method within suite
 
-ReduceToEffectiveSet() logic:
-  1. If any suite has F_ prefix → run ONLY focused suites, skip rest
+ReduceInRun(focusRun) logic (focusRun: any F_ suite or method in the whole run):
+  1. If focusRun → run ONLY F_ suites and suites with an F_ method, skip rest
   2. Remove all X_ prefixed suites
-  3. Within each surviving suite, apply same logic to methods
+  3. Within each surviving suite, apply same logic to methods; a suite kept
+     for its F_ methods runs those alone
 ```
 
 ---

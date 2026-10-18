@@ -418,7 +418,7 @@ func (s *MyTestSuite) F_TestSpecific(t *gotest.T) {}  // FOCUSED test case
 func (s *MyTestSuite) X_TestBroken(t *gotest.T) {}    // EXCLUDED test case
 ```
 
-- `F_` — focus. If any `F_` suite or test case exists, only focused items run. Causes CI failure with `gotest --ci`.
+- `F_` — focus. If any `F_` suite or test case exists anywhere in the run, only focused items run; every other suite, in any package, is skipped and starts no fixture. Causes CI failure with `gotest --ci`.
 - `X_` — exclude. Always skipped. Compile-time decision (AST level). Use for permanently/temporarily disabled tests.
 
 Focus and exclude apply independently at both suite and test case levels.
