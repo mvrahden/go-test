@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -149,6 +150,30 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 
 			_, err = os.Stat(dir)
 			gotest.True(it, os.IsNotExist(err), "expected overlay without PID file to be removed")
+		})
+
+		w.It("removes a work dir whose owner is dead", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0600)
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.True(it, os.IsNotExist(err), "expected the dead run's work dir to be removed")
+		})
+
+		w.It("keeps a work dir whose owner is alive", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0600)
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.False(it, os.IsNotExist(err), "expected the live run's work dir to be kept")
 		})
 
 		w.It("ignores non-overlay directories", func(it *gotest.T) {
@@ -331,6 +356,41 @@ func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T, ctx *overlayDirsCtx) {
 
 			_, err = os.Stat(freshDir)
 			gotest.False(it, os.IsNotExist(err), "expected fresh cache entry to be kept")
+		})
+	})
+}
+
+// A cache entry is complete or absent: it is written beside its final place
+// and renamed into it, so whatever a crashed run left under the entry's name
+// is replaced whole.
+func (s *OverlayTestSuite) TestCacheEntryIsWrittenWhole(t *gotest.T, ctx *overlayDirsCtx) {
+	root := t.TempDir()
+	t.Setenv(protocol.EnvCacheDir, root)
+	results := gotestgen.GenerateResults{{AbsPath: filepath.Join(root, "pkg"), PTest: []byte("package pkg\n")}}
+	entry := filepath.Join(root, "overlays", gotestrunner.ExportOverlayContentHash(results))
+	gotest.NoError(t, os.MkdirAll(entry, 0o755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(entry, "stray.txt"), []byte("left by a crash"), 0o600))
+
+	dir, err := gotestrunner.ExportWriteOverlayCached(results, false)
+	t.When("a partial entry from a crashed run sits under the hash", func(w *gotest.T) {
+		w.It("the new entry replaces it whole", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Equal(it, entry, dir)
+			_, statErr := os.Stat(filepath.Join(dir, "overlay.json"))
+			gotest.NoError(it, statErr)
+			_, strayErr := os.Stat(filepath.Join(dir, "stray.txt"))
+			gotest.True(it, os.IsNotExist(strayErr), "the crashed run's file survived into the new entry")
+			siblings, _ := filepath.Glob(filepath.Join(root, "overlays", "*"))
+			gotest.Len(it, siblings, 1, "a staging sibling was left behind")
+			data, readErr := os.ReadFile(filepath.Join(dir, "overlay.json"))
+			gotest.NoError(it, readErr)
+			var ov struct{ Replace map[string]string }
+			gotest.NoError(it, json.Unmarshal(data, &ov))
+			for _, replacement := range ov.Replace {
+				gotest.Regexp(it, "^"+regexp.QuoteMeta(dir+string(filepath.Separator)), replacement, "overlay.json names a file outside the entry")
+				_, statErr := os.Stat(replacement)
+				gotest.NoError(it, statErr, "overlay.json names a file that is not there")
+			}
 		})
 	})
 }

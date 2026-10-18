@@ -3079,6 +3079,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the test passes and no such process outlives the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_test_passes_and_no_such_process_outlives_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test starts sleep 4242 and never waits for it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_test_starts_sleep_4242_and_never_waits_for_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SleepLeftBehind",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSleepLeftBehind",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "Orphans",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestOrphansTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 130",
                       "duration": 0,
                       "excluded": false,
@@ -3366,13 +3419,13 @@
     }
   ],
   "stats": {
-    "behaviors": 128,
+    "behaviors": 129,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 24,
+    "suites": 25,
     "tests": 0
   }
 }

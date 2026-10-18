@@ -8,25 +8,48 @@ import (
 	"time"
 )
 
-// CleanStaleOverlays removes temporary overlay directories whose owning
-// process is no longer alive, and evicts aged-out cache entries.
+// CleanStaleOverlays removes the temporary overlay and work directories and
+// the cache staging directories whose owning process is no longer alive, and
+// evicts aged-out cache entries.
 func CleanStaleOverlays() {
 	cleanStaleTmpOverlays()
+	cleanStaleStaging()
 	cleanOldCacheEntries()
 }
 
 func cleanStaleTmpOverlays() {
-	pattern := filepath.Join(os.TempDir(), "gotest-overlay-*")
-	dirs, err := filepath.Glob(pattern)
+	for _, glob := range []string{"gotest-overlay-*", "gotest-work-*"} {
+		dirs, err := filepath.Glob(filepath.Join(os.TempDir(), glob))
+		if err != nil {
+			continue
+		}
+		for _, dir := range dirs {
+			info, err := os.Stat(dir)
+			if err != nil || !info.IsDir() {
+				continue
+			}
+			if isOverlayAlive(dir) {
+				continue
+			}
+			os.RemoveAll(dir)
+		}
+	}
+}
+
+// cleanStaleStaging removes cache entries still being written by a run that
+// is gone; the writer's pid is in the directory's name.
+func cleanStaleStaging() {
+	root, err := cacheRoot()
+	if err != nil {
+		return
+	}
+	dirs, err := filepath.Glob(filepath.Join(root, "overlays", "*.staging-*"))
 	if err != nil {
 		return
 	}
 	for _, dir := range dirs {
-		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
-			continue
-		}
-		if isOverlayAlive(dir) {
+		pid, err := strconv.Atoi(dir[strings.LastIndex(dir, "-")+1:])
+		if err != nil || processAlive(pid) {
 			continue
 		}
 		os.RemoveAll(dir)

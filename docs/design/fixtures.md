@@ -420,6 +420,10 @@ Fuzzing is left to Go once its engine has the selected target: it stops on Ctrl-
 
 **What is not released.** A panic on a goroutine the test started outside `gotest.Go`, a process killed outright, `os.Exit` or `log.Fatal` in the code under test, a fatal runtime error, and `go test`'s own `-timeout`, whose alarm ends the process without cleanups. A resource that must never leak belongs in a shared fixture or behind a reaper of its own.
 
+A process a test started and never waited for is not released by the test, but it does not outlive the run: a suite runs as the root of its own process group, and whatever is left of the group is killed once the suite's process has been reaped (on Linux a child also dies with the runner itself):
+
+> when a test starts sleep 4242 and never waits for it → the test passes and no such process outlives the run
+
 The watcher is a goroutine and a signal handler that live exactly as long as the hold: `goleak.VerifyNone` inside a fixture-bound test sees them, `goleak.VerifyTestMain` does not.
 
 ### Shared-fixture dispatch

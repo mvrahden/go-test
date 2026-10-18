@@ -68,7 +68,14 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	}
 
 	workDir, err := os.MkdirTemp("", "gotest-work-*")
+	if err == nil {
+		// The sweep of a later run removes the work dir of a run that died.
+		err = os.WriteFile(filepath.Join(workDir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0o600)
+	}
 	if err != nil {
+		if workDir != "" {
+			os.RemoveAll(workDir)
+		}
 		if !cached {
 			os.RemoveAll(cacheDir)
 		}
@@ -214,15 +221,33 @@ func writeToCacheDir(root string, results gotestgen.GenerateResults) (string, er
 		return dir, nil
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Written beside its final place and renamed into it, so an entry is
+	// complete or absent: a run that dies mid-write leaves a staging dir the
+	// sweep removes, never a half entry under the hash.
+	staging := stagingDir(dir)
+	if err := os.MkdirAll(staging, 0755); err != nil {
 		return "", fmt.Errorf("create cache dir: %w", err)
 	}
-
-	if err := writeOverlayFiles(dir, results); err != nil {
-		os.RemoveAll(dir)
+	if err := writeOverlayFiles(staging, dir, results); err != nil {
+		os.RemoveAll(staging)
 		return "", err
 	}
+	// Whatever a crashed run left under the hash goes whole.
+	os.RemoveAll(dir)
+	if err := os.Rename(staging, dir); err != nil {
+		os.RemoveAll(staging)
+		if _, statErr := os.Stat(filepath.Join(dir, "overlay.json")); statErr == nil {
+			return dir, nil // another run completed the same entry meanwhile
+		}
+		return "", fmt.Errorf("install cache entry: %w", err)
+	}
 	return dir, nil
+}
+
+// stagingDir names where entry is written before it is renamed into place:
+// a sibling carrying the writer's pid, which the sweep reads.
+func stagingDir(entry string) string {
+	return entry + ".staging-" + strconv.Itoa(os.Getpid())
 }
 
 func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {
@@ -242,14 +267,17 @@ func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {
 		return "", fmt.Errorf("write pid file: %w", err)
 	}
 
-	if err := writeOverlayFiles(tmpDir, results); err != nil {
+	if err := writeOverlayFiles(tmpDir, tmpDir, results); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", err
 	}
 	return tmpDir, nil
 }
 
-func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
+// writeOverlayFiles writes the generated files under dir, and overlay.json
+// naming them under finalDir: the place dir is renamed to once complete, or
+// dir itself.
+func writeOverlayFiles(dir, finalDir string, results gotestgen.GenerateResults) error {
 	overlay := overlayJSON{Replace: map[string]string{}}
 
 	for i, result := range results {
@@ -257,20 +285,19 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 		if err := os.MkdirAll(subDir, 0755); err != nil {
 			return fmt.Errorf("create overlay sub dir: %w", err)
 		}
+		finalSubDir := filepath.Join(finalDir, strconv.Itoa(i))
 
 		if len(result.PTest) > 0 {
-			dst := filepath.Join(subDir, about.PSuite)
-			if err := os.WriteFile(dst, result.PTest, 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(subDir, about.PSuite), result.PTest, 0600); err != nil {
 				return fmt.Errorf("write overlay ptest: %w", err)
 			}
-			overlay.Replace[filepath.Join(result.AbsPath, about.PSuite)] = dst
+			overlay.Replace[filepath.Join(result.AbsPath, about.PSuite)] = filepath.Join(finalSubDir, about.PSuite)
 		}
 		if len(result.PXTest) > 0 {
-			dst := filepath.Join(subDir, about.PXSuite)
-			if err := os.WriteFile(dst, result.PXTest, 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(subDir, about.PXSuite), result.PXTest, 0600); err != nil {
 				return fmt.Errorf("write overlay pxtest: %w", err)
 			}
-			overlay.Replace[filepath.Join(result.AbsPath, about.PXSuite)] = dst
+			overlay.Replace[filepath.Join(result.AbsPath, about.PXSuite)] = filepath.Join(finalSubDir, about.PXSuite)
 		}
 	}
 

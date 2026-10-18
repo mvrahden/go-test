@@ -3,6 +3,7 @@ package proctree_test
 import (
 	"bufio"
 	"fmt"
+	"github.com/mvrahden/go-test/internal/proctree"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -34,6 +35,7 @@ func TestMain(m *testing.M) {
 //   - ignore: swallows shutdown requests; with spawn it first starts an
 //     ignoring grandchild and prints its pid
 //   - orphan: starts an ignoring grandchild, prints its pid and exits
+//   - orphangroup: as orphan, with the grandchild leading its own group
 //   - exit: exits as soon as it is ready
 //   - consoles: prints the pids attached to its console (Windows)
 func runChild(mode string) int {
@@ -54,6 +56,18 @@ func runChild(mode string) int {
 		if _, err := startGrandchild("ignore"); err != nil {
 			return 2
 		}
+		fmt.Println("ready")
+		return 0
+	case "orphangroup":
+		// The grandchild leads a group of its own, as a tree root does, so
+		// nothing but its parent's death reaches it.
+		cmd := exec.Command(os.Args[0]) //nolint:gosec // G204: this test binary
+		cmd.Env = childEnv("ignore")
+		tree := proctree.New(cmd)
+		if err := tree.Start(); err != nil {
+			return 2
+		}
+		fmt.Printf("pid=%d\n", cmd.Process.Pid)
 		fmt.Println("ready")
 		return 0
 	case "exit":

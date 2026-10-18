@@ -104,7 +104,7 @@ func (s *sysTree) kill(int) error {
 	return windows.TerminateProcess(s.process, 1)
 }
 
-func (s *sysTree) release() {
+func (s *sysTree) release(int) {
 	if s.job != 0 {
 		_ = windows.CloseHandle(s.job)
 	}
