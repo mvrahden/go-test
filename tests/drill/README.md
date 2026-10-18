@@ -572,6 +572,13 @@ shards of one run do not add up to every mutant exactly once.
 | `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |
 | `shapes-nested-suite-accepted` | a suite-typed field of a suite is not refused | canary: the `shapes/nested` package exits 0 instead of 2 |
 | `shapes-every-field-rejected` | every field of a suite or fixture is refused | canary: the `shapes/plain` package exits 2 instead of 0 |
+| `alias-receiver-unresolved` | a method whose receiver names the suite through an alias is not read | canary: the `shapes/aliasrecv` package exits 2 instead of 0 |
+| `alias-of-alias-skipped` | an alias of an alias is not unwrapped to the suite it names | canary: the `shapes/aliasalias` alias of an alias has no pass verdict |
+| `defined-over-suite-accepted` | a defined type over a suite is not refused | canary: the `shapes/sigdefined` run has no line naming the defined type |
+| `method-results-accepted` | a Test method that returns a value is not refused | canary: the `shapes/sigresult` run has no line naming the returning method |
+| `shared-fixture-in-test-file-accepted` | a shared fixture declared in a `_test.go` file is not refused | canary: the `shapes/sharedintest` package exits 1 instead of 2 |
+| `cross-package-alias-methods-dropped` | an alias of another package's generic suite is read in its own package only | canary: the `shapes/xpkgcontract` package exits 2 instead of 0 |
+| `cross-package-fixture-hooks-unchecked` | the hook signatures of another package's fixture are not checked | canary: the `shapes/xpkgfixture` package is not refused with the signature it needs |
 
 ## Adding a mutant
 

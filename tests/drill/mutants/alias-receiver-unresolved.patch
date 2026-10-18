@@ -1,0 +1,14 @@
+Expect: shapes aliasrecv: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite is declared through an alias or with an unusual signature → a method declared on a pointer to an alias of the suite runs
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -627,7 +627,7 @@
+ 	}
+ 
+ 	// a receiver may name the suite through an alias
+-	recvType, ok := types.Unalias(recvPtr.Elem()).(*types.Named)
++	recvType, ok := recvPtr.Elem().(*types.Named)
+ 	if !ok {
+ 		return -1, nil
+ 	}

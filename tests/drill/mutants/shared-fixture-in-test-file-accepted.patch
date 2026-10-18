@@ -1,0 +1,15 @@
+Expect: shapes sharedintest: exit code 1, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite is declared through an alias or with an unusual signature → a shared fixture declared in a _test.go file is rejected at its declaration
+--- a/internal/gotestast/fixture.go
++++ b/internal/gotestast/fixture.go
+@@ -124,9 +124,6 @@
+ 	}
+ 
+ 	// the setup program is built from the package's non-test files
+-	if kind == SharedFixture && pkg.Fset != nil && strings.HasSuffix(pkg.Fset.Position(ts.Pos()).Filename, "_test.go") {
+-		return nil, At(ts.Pos(), fmt.Errorf("shared fixture %s is declared in a _test.go file; the setup program cannot import it, move it to a non-test file", name))
+-	}
+ 
+ 	spec := &FixtureSpec{
+ 		Kind: kind, pkg: pkg, n: n, ts: ts, typ: typ,

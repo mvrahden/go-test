@@ -85,7 +85,7 @@ Each directory under `testdata/` is one package with one suite:
 | `dagrelease` | shared fixtures come up each after what they depend on and are released concurrently, a dependent before its dependency; with `DAGRELEASE_HANG=1` the release that never returns is force-killed after 30s plus the longest chain still resident, 35s, a fixture released at the barrier no longer counted |
 | `fuzzseedtype` | a fuzz seed of the wrong type fails its target at the `f.Add` call, not inside gotest's or the generated code |
 | `specmarkdown` | the Markdown spec, live and read from source, keeps each label in its own cell as text, shows an It with a slash as one It under its When, and marks what X_ excludes EXCLUDED when read from source |
-| `shapes/*` | one package per declaration shape: a suite declared alone or embedding a plain type runs; a suite or fixture in a type block, an embedded suite, fixture or type with a method gotest would read, and a suite-typed field each exit 2 at the line written |
+| `shapes/*` | one package per declaration shape: a suite declared alone or embedding a plain type runs, as do a method on a pointer to an alias, an alias of an alias of a generic suite and an alias of a generic suite from another package; a suite or fixture in a type block, an embedded suite, fixture or type with a method gotest would read, a suite-typed field, a defined type over a suite, a Test method with a result, a shared fixture in a `_test.go` file and a mis-signed hook of a fixture from another package each exit 2 at the line written |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

@@ -60,3 +60,19 @@ func (s *CanaryDiscoveryTestSuite) TestDiscoveryShapesAreRejectedWhereWritten(t 
 		{name: "fixtureembeds", exit: 2, shows: `fixtureembeds_suite_test\.go:16:3: fixture CacheFixture embeds fixture DBFixture; fixtures compose through a named pointer field`},
 	})
 }
+
+// An alias names the suite it stands for, also across packages; a defined
+// type, a case with results, a shared fixture in a test file and a mis-signed
+// hook from another package are rejected where they are written.
+func (s *CanaryDiscoveryTestSuite) TestAliasesAndCrossPackageShapes(t *gotest.T) {
+	s.checkShapes(t, []shapeRow{
+		{name: "aliasrecv", passes: "TestRealTestSuite/TestViaAlias"},
+		{name: "aliasalias", passes: "TestIntTestSuite/TestZero"},
+		{name: "aliasalias", passes: "TestIntAgainTestSuite/TestZero"},
+		{name: "xpkgcontract", passes: "TestIntIndexTestSuite/TestZeroValue"},
+		{name: "sigdefined", exit: 2, shows: `sigdefined_suite_test\.go:10:6: suite CopyTestSuite is defined over suite ATestSuite and carries none of its methods; declare an alias \(= ATestSuite\) or a struct of its own`},
+		{name: "sigresult", exit: 2, shows: `sigresult_suite_test\.go:9:22: TestBad on XTestSuite returns a value; a Test method returns nothing`},
+		{name: "sharedintest", exit: 2, shows: `sharedintest_suite_test\.go:10:6: shared fixture PGSharedFixture is declared in a _test\.go file; the setup program cannot import it, move it to a non-test file`},
+		{name: "xpkgfixture", exit: 2, shows: `fix\.go:11:\d+: package fixture "BadFixture": BeforeEach must have signature \(ctx context\.Context\) error`},
+	})
+}

@@ -19,3 +19,22 @@ A suite or fixture SHALL be read only from a type declaration of its own that co
 - **AND** a suite embedding a type with a method gotest would read is rejected at the field
 - **AND** a suite holding a suite in a field is rejected at the field: suites are never nested
 - **AND** a fixture embedding a fixture is rejected at the field and pointed to a named pointer field
+
+### Requirement: Aliases and signatures
+An alias of a suite, at any depth and as a method receiver, SHALL stand for the suite it names; a defined type over a suite, a Test method that returns a value and a shared fixture declared in a _test.go file SHALL be rejected where they are written.
+
+#### Scenario: Aliases and unusual signatures
+- **WHEN** a suite is declared through an alias or with an unusual signature
+- **THEN** a method declared on a pointer to an alias of the suite runs
+- **AND** an alias of an alias of a generic suite runs its methods
+- **AND** a defined type over a suite is rejected at its declaration and pointed to an alias
+- **AND** a Test method that returns a value is rejected at the method
+- **AND** a shared fixture declared in a _test.go file is rejected at its declaration
+
+### Requirement: Declarations from other packages
+A suite SHALL run an alias of a generic suite another package declares, an alias declared in the external test package SHALL be discovered and run whether the package under test, the external test package or a third package declares the generic suite, and a fixture a suite binds from another package SHALL be held to the signature rules a local fixture is held to.
+
+#### Scenario: Across packages
+- **WHEN** a suite reaches across packages
+- **THEN** an alias of a generic suite from another package runs that suite's methods
+- **AND** a package fixture from another package with a mis-signed hook is rejected with the signature it needs

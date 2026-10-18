@@ -6046,6 +6046,177 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "an alias of a generic suite from another package runs that suite's methods",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_alias_of_a_generic_suite_from_another_package_runs_that_suite's_methods",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a package fixture from another package with a mis-signed hook is rejected with the signature it needs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_package_fixture_from_another_package_with_a_mis-signed_hook_is_rejected_with_the_signature_it_needs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite reaches across packages",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_reaches_across_packages",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AcrossPackages",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAcrossPackages",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CrossPackage",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCrossPackageTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a method declared on a pointer to an alias of the suite runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_method_declared_on_a_pointer_to_an_alias_of_the_suite_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an alias of an alias of a generic suite runs its methods",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_alias_of_an_alias_of_a_generic_suite_runs_its_methods",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a defined type over a suite is rejected at its declaration and pointed to an alias",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_defined_type_over_a_suite_is_rejected_at_its_declaration_and_pointed_to_an_alias",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a Test method that returns a value is rejected at the method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_Test_method_that_returns_a_value_is_rejected_at_the_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a shared fixture declared in a _test.go file is rejected at its declaration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_shared_fixture_declared_in_a__test.go_file_is_rejected_at_its_declaration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite is declared through an alias or with an unusual signature",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_is_declared_through_an_alias_or_with_an_unusual_signature",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AliasesAndSignatures",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAliasesAndSignatures",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DiscoveryAliases",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDiscoveryAliasesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a suite declared alone, binding a fixture through a named pointer field, runs",
                       "duration": 0,
                       "excluded": false,
@@ -13097,13 +13268,13 @@
     }
   ],
   "stats": {
-    "behaviors": 432,
+    "behaviors": 439,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 70,
+    "suites": 72,
     "tests": 0
   }
 }

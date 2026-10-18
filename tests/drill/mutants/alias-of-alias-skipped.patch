@@ -1,0 +1,14 @@
+Expect: shapes aliasalias: TestIntAgainTestSuite/TestZero did not pass
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite is declared through an alias or with an unusual signature → an alias of an alias of a generic suite runs its methods
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -523,7 +523,7 @@
+ 	var typ *types.Struct
+ 	var underlyingTypeName string
+ 	// an alias of an alias names the same suite
+-	rawType := types.Unalias(pkg.TypesInfo.TypeOf(ts.Type))
++	rawType := pkg.TypesInfo.TypeOf(ts.Type)
+ 	if t, ok := rawType.(*types.Struct); ok {
+ 		typ = t
+ 	} else if named, ok := rawType.(*types.Named); ok {
