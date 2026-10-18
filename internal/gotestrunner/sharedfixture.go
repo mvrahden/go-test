@@ -527,6 +527,12 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	// and because a signalled process reports no meaningful exit status, the
 	// run still says ok.
 	tree := proctree.New(cmd)
+	// The run's cancellation — Ctrl-C, --timeout — does not reach this
+	// process: the suites are still stopping, and their AfterAlls still need
+	// the fixtures. Teardown, after the last suite, is the one owner of its
+	// shutdown; a runner that dies takes the process with it through the
+	// tree, not through this context.
+	cmd.Cancel = func() error { return nil }
 
 	// The protocol pipe is the runner's own, not exec's StdoutPipe: exec closes
 	// that one as soon as Wait sees the exit, and Wait may not run before the

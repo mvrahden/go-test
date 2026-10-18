@@ -215,3 +215,6 @@ func ExportSetSetupReportFloor(d time.Duration) (restore func()) {
 }
 
 var ExportAssignBudgetFiles = assignBudgetFiles
+
+// ExportExited is closed once the shared fixture process has exited.
+func ExportExited(p *SharedFixtureProcess) <-chan struct{} { return p.done }
