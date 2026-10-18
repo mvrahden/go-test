@@ -1,0 +1,15 @@
+Expect: shapes caseless: discover lists HelperTestSuite
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite declares no case → discover does not list the case-less suite
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -206,9 +206,6 @@
+ 			}
+ 
+ 			for _, suite := range result.Suites {
+-				if gotestgen.DeclaresNoCase(suite) {
+-					continue
+-				}
+ 				ds := buildDiscoverSuite(suite)
+ 				ds.Fixtures = discoverFixtureNames(suite)
+ 				pkgEntry.Suites = append(pkgEntry.Suites, ds)

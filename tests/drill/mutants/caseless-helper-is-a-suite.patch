@@ -1,0 +1,23 @@
+Expect: shapes caseless: exit code 2, want 0
+Expect: suite RealTestSuite has a field of suite type HelperTestSuite
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite declares no case → the run passes with the real suite's methods
+Clause: when a suite declares no case → nothing is generated or reported for the case-less suite
+--- a/internal/gotestast/shapes.go
++++ b/internal/gotestast/shapes.go
+@@ -71,14 +71,7 @@
+ 	if named == nil || !IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+ 		return false
+ 	}
+-	origin := named.Origin()
+-	for i := range origin.NumMethods() {
+-		name := origin.Method(i).Name()
+-		if IS_TEST_CASE.MatchString(name) || IS_BENCHMARK.MatchString(name) || IS_FUZZ.MatchString(name) {
+-			return true
+-		}
+-	}
+-	return false
++	return true
+ }
+ 
+ // namedBehind returns the named type t names, through an alias and one

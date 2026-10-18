@@ -579,6 +579,14 @@ shards of one run do not add up to every mutant exactly once.
 | `shared-fixture-in-test-file-accepted` | a shared fixture declared in a `_test.go` file is not refused | canary: the `shapes/sharedintest` package exits 1 instead of 2 |
 | `cross-package-alias-methods-dropped` | an alias of another package's generic suite is read in its own package only | canary: the `shapes/xpkgcontract` package exits 2 instead of 0 |
 | `cross-package-fixture-hooks-unchecked` | the hook signatures of another package's fixture are not checked | canary: the `shapes/xpkgfixture` package is not refused with the signature it needs |
+| `fixture-field-by-value-accepted` | a fixture field held by value is not refused | canary: the `shapes/fieldvalue` and `shapes/fieldalias` packages exit 1 instead of 2 |
+| `fixture-field-alias-pointer-unbound` | a field typed by an alias of a fixture pointer is not seen as a fixture | canary: the `shapes/fieldaliasptr` package exits 1 instead of 0 |
+| `fixture-field-duplicate-accepted` | a second field of the same fixture type is not refused | canary: the `shapes/fielddup` and `shapes/fielddupparent` packages exit 0 instead of 2 |
+| `unreached-fixture-validated` | every type named like a fixture is checked, bound or not | canary: the `shapes/fieldunreferenced` package exits 2 instead of 0 |
+| `lowercase-after-test-is-a-case` | a method continuing `Test` with a lowercase letter is read as a case | canary: the `shapes/nameistest` package exits 2 instead of 0 |
+| `caseless-suite-rendered` | no suite is treated as declaring no case | canary: `discover` lists the `shapes/caseless` helper suite |
+| `caseless-suite-discovered` | `discover` lists a suite that declares no case | canary: `discover` lists the `shapes/caseless` helper suite |
+| `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package exits 2, its helper field refused as a nested suite |
 
 ## Adding a mutant
 

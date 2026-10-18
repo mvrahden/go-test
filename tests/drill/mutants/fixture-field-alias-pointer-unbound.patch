@@ -1,0 +1,14 @@
+Expect: shapes fieldaliasptr: exit code 1, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite names its fixtures and methods → a fixture field typed by an alias of the fixture pointer binds the fixture
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -1062,7 +1062,7 @@
+ // pointerNamed returns the named type a field points to, through aliases,
+ // or nil.
+ func pointerNamed(field *types.Var) *types.Named {
+-	ptr, ok := types.Unalias(field.Type()).(*types.Pointer)
++	ptr, ok := field.Type().(*types.Pointer)
+ 	if !ok {
+ 		return nil
+ 	}

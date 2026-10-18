@@ -1,0 +1,14 @@
+Expect: shapes caseless: discover lists HelperTestSuite
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite declares no case → discover does not list the case-less suite
+--- a/internal/gotestgen/generator.go
++++ b/internal/gotestgen/generator.go
+@@ -695,7 +695,7 @@
+ // method, excluded or unfocused ones included: a helper type, for which
+ // nothing is generated or reported.
+ func DeclaresNoCase(s *gotestast.TestSuiteSpec) bool {
+-	return !s.DeclaresTests() && len(s.Benchmarks()) == 0 && len(s.Fuzzers()) == 0
++	return !s.DeclaresTests() && len(s.Benchmarks()) == 0 && len(s.Fuzzers()) == 0 && s == nil
+ }
+ 
+ // withoutCaseless drops the suites that declare no case from spec. An

@@ -31,6 +31,26 @@ An alias of a suite, at any depth and as a method receiver, SHALL stand for the 
 - **AND** a Test method that returns a value is rejected at the method
 - **AND** a shared fixture declared in a _test.go file is rejected at its declaration
 
+### Requirement: Fixture fields and case names
+A suite SHALL bind each fixture once, through a pointer field or an alias of one, and a fixture-named type no suite reaches SHALL NOT fail the package, and a method SHALL be a case only by a name go test would run.
+
+#### Scenario: Fields and method names
+- **WHEN** a suite names its fixtures and methods
+- **THEN** a fixture field by value is rejected at the field and told to take a pointer
+- **AND** a fixture field typed by an alias of the fixture pointer binds the fixture
+- **AND** two fields of the same fixture type are rejected at the second field
+- **AND** a fixture-named type no suite reaches cannot fail the package
+- **AND** a method whose name continues Test with a lowercase letter is not a case, as under go test
+
+### Requirement: Case-less suites
+A type named like a suite that declares no case SHALL be treated as a helper: nothing SHALL be generated, run, reported or discovered for it.
+
+#### Scenario: A suite with no case
+- **WHEN** a suite declares no case
+- **THEN** the run passes with the real suite's methods
+- **AND** nothing is generated or reported for the case-less suite
+- **AND** discover does not list the case-less suite
+
 ### Requirement: Declarations from other packages
 A suite SHALL run an alias of a generic suite another package declares, an alias declared in the external test package SHALL be discovered and run whether the package under test, the external test package or a third package declares the generic suite, and a fixture a suite binds from another package SHALL be held to the signature rules a local fixture is held to.
 

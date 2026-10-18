@@ -6046,6 +6046,85 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the run passes with the real suite's methods",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_run_passes_with_the_real_suite's_methods",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "nothing is generated or reported for the case-less suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "nothing_is_generated_or_reported_for_the_case-less_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "discover does not list the case-less suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "discover_does_not_list_the_case-less_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares no case",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_declares_no_case",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HelperSuites",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestHelperSuites",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "Caseless",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCaselessTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "an alias of a generic suite from another package runs that suite's methods",
                       "duration": 0,
                       "excluded": false,
@@ -6206,6 +6285,111 @@
           "focused": false,
           "kind": "suite",
           "name": "TestDiscoveryAliasesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a fixture field by value is rejected at the field and told to take a pointer",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_fixture_field_by_value_is_rejected_at_the_field_and_told_to_take_a_pointer",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a fixture field typed by an alias of the fixture pointer binds the fixture",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_fixture_field_typed_by_an_alias_of_the_fixture_pointer_binds_the_fixture",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "two fields of the same fixture type are rejected at the second field",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "two_fields_of_the_same_fixture_type_are_rejected_at_the_second_field",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a fixture-named type no suite reaches cannot fail the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_fixture-named_type_no_suite_reaches_cannot_fail_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a method whose name continues Test with a lowercase letter is not a case, as under go test",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_method_whose_name_continues_Test_with_a_lowercase_letter_is_not_a_case,_as_under_go_test",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite names its fixtures and methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_names_its_fixtures_and_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FieldsAndNames",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFieldsAndNames",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DiscoveryFields",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDiscoveryFieldsTestSuite",
           "output": [],
           "status": "none"
         },
@@ -13268,13 +13452,13 @@
     }
   ],
   "stats": {
-    "behaviors": 439,
+    "behaviors": 447,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 72,
+    "suites": 74,
     "tests": 0
   }
 }

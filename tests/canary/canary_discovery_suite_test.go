@@ -1,8 +1,10 @@
 package canary_test //nolint:fail-guard
 
 import (
+	"bytes"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -27,11 +29,13 @@ type shapeRow struct {
 	exit                int
 }
 
-// checkShapes runs each row's shapes package and reports every row that
-// ended otherwise.
-func (s *canary) checkShapes(t *gotest.T, rows []shapeRow) {
+// checkShapes runs each row's shapes package, reports every row that ended
+// otherwise and returns each package's last run.
+func (s *canary) checkShapes(t *gotest.T, rows []shapeRow) map[string]result {
+	runs := map[string]result{}
 	for _, row := range rows {
 		r := s.run(t, "shapes/"+row.name, t.TempDir())
+		runs[row.name] = r
 		if r.code != row.exit {
 			t.Errorf("shapes %s: exit code %d, want %d\n%s", row.name, r.code, row.exit, r.stderr)
 			continue
@@ -43,6 +47,7 @@ func (s *canary) checkShapes(t *gotest.T, rows []shapeRow) {
 			t.Errorf("shapes %s: no line matches %q\n%s", row.name, row.shows, r.stderr)
 		}
 	}
+	return runs
 }
 
 // A suite or fixture is one type declaration of its own, composed through
@@ -75,4 +80,37 @@ func (s *CanaryDiscoveryTestSuite) TestAliasesAndCrossPackageShapes(t *gotest.T)
 		{name: "sharedintest", exit: 2, shows: `sharedintest_suite_test\.go:10:6: shared fixture PGSharedFixture is declared in a _test\.go file; the setup program cannot import it, move it to a non-test file`},
 		{name: "xpkgfixture", exit: 2, shows: `fix\.go:11:\d+: package fixture "BadFixture": BeforeEach must have signature \(ctx context\.Context\) error`},
 	})
+}
+
+// A fixture is bound once, through a pointer field, and only a bound one is
+// checked; a method is a case only by the name go test would run, and a
+// suite with no case is a helper nothing is generated or reported for.
+func (s *CanaryDiscoveryTestSuite) TestFieldNameAndCaselessShapes(t *gotest.T) {
+	runs := s.checkShapes(t, []shapeRow{
+		{name: "fieldvalue", exit: 2, shows: `fieldvalue_suite_test\.go:16:2: suite ValueTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field \(\*StoreFixture\)`},
+		{name: "fieldalias", exit: 2, shows: `fieldalias_suite_test\.go:19:2: suite AliasTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field \(\*StoreFixture\)`},
+		{name: "fieldaliasptr", passes: "TestAliasPtrTestSuite/TestOpened"},
+		{name: "fielddup", exit: 2, shows: `fielddup_suite_test\.go:16:5: suite DupTestSuite declares two fields of the same fixture type StoreFixture \(A and B\); keep one`},
+		{name: "fielddupparent", exit: 2, shows: `fielddupparent_suite_test\.go:17:2: fixture CacheFixture declares two fields of the same fixture type StoreFixture \(A and B\); keep one`},
+		{name: "fieldunreferenced", passes: "TestBoundTestSuite/TestOpened"},
+		{name: "nameistest", passes: "TestNameTestSuite/TestRuns"},
+		{name: "caseless", passes: "TestRealTestSuite/TestNames"},
+	})
+	for _, helper := range []string{"Testify", "Benchmarked", "Fuzzy"} {
+		if strings.Contains(runs["nameistest"].stream, `"Test":"TestNameTestSuite/`+helper+`"`) {
+			t.Errorf("shapes nameistest: %s ran as a case: %v", helper, runs["nameistest"].rows)
+		}
+	}
+	if r := runs["caseless"]; strings.Contains(r.stream, "HelperTestSuite") || strings.Contains(r.stderr, "HelperTestSuite") {
+		t.Errorf("shapes caseless: the run reported HelperTestSuite: %v\n%s", r.rows, r.stderr)
+	}
+	code, stdout, stderr := s.invoke(t, t.TempDir(), "discover", "./testdata/shapes/caseless/")
+	switch {
+	case code != 0:
+		t.Errorf("shapes caseless: discover exit code %d, want 0\n%s", code, stderr)
+	case !bytes.Contains(stdout, []byte("RealTestSuite")):
+		t.Errorf("shapes caseless: discover does not list RealTestSuite:\n%s", stdout)
+	case bytes.Contains(stdout, []byte("HelperTestSuite")):
+		t.Errorf("shapes caseless: discover lists HelperTestSuite:\n%s", stdout)
+	}
 }
