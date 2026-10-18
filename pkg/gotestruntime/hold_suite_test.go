@@ -40,14 +40,16 @@ type HoldWatchTestSuite struct{}
 
 func (s *HoldWatchTestSuite) TestWatcher(t *gotest.T) {
 	t.When("a function holds fixtures", func(w *gotest.T) {
-		w.It("watches for a stop exactly while the hold lasts", func(it *gotest.T) {
-			var during bool
+		w.It("is served by the stop watcher exactly while the hold lasts", func(it *gotest.T) {
+			before := gotestruntime.ExportWatchCount()
+			var during int
 			it.T().Run("holder", func(tt *testing.T) { //nolint:suite-lifecycle // the hold must end with a test
 				gotestruntime.HoldFixtures(tt, func() gotestruntime.MainConfig { return gotestruntime.MainConfig{} })
-				during = gotestruntime.ExportWatching()
+				during = gotestruntime.ExportWatchCount()
 			})
-			gotest.True(it, during, "no watcher while the fixtures were held")
-			gotest.False(it, gotestruntime.ExportWatching(), "the watcher outlived the hold: goleak would see it")
+			gotest.True(it, gotestruntime.ExportWatching(), "the suite's own run is watched")
+			gotest.Equal(it, before+1, during, "the hold is not served while it lasts")
+			gotest.Equal(it, before, gotestruntime.ExportWatchCount(), "the hold's watch outlived it: goleak would see it")
 		})
 	})
 }

@@ -64,7 +64,8 @@ func (s *StoppingTestSuite) announced(t *gotest.T, pkg, run string, env ...strin
 }
 
 // A stop while a fixture is still coming up cancels it; what already came up
-// is torn down, and nothing is left behind.
+// is torn down, nothing is left behind, and the process ends with the
+// failure the cancelled setup is.
 func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) {
 	cmd, stop := s.announced(t, "setup", "TestSlowSetupTestSuite")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "container starting")
@@ -74,7 +75,7 @@ func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) 
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"db up", "container starting", "db down"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process still ends as stopped from outside: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // A test holding what a fixture's teardown waits for is told to stop first —
@@ -90,7 +91,7 @@ func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
 
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 10*time.Second, "the teardown waited for the test")
-	gotest.True(t, stoppedFromOutside(err), "%v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // The runner's sidecar variables are read once and taken out of the

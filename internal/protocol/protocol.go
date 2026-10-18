@@ -45,6 +45,13 @@ func StopFilePath(binaryPath string) string {
 	return binaryPath + ".stop"
 }
 
+// StopPIDPath is where the suite process writes its own pid once it watches
+// for a stop, so the runner can signal it and not the converter in front of
+// it, which must live on to relay the final events.
+func StopPIDPath(stopFile string) string {
+	return stopFile + ".pid"
+}
+
 // SplitTestPath cuts a go test name into its subtest levels. The separator is a
 // single slash: a run of them is left alone, so a description like
 // "https:// URI" stays one level instead of becoming three. Both readers of a

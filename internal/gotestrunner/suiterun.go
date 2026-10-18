@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -214,11 +215,13 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 // RunSingleSuite executes a single suite subprocess.
 // When test2json is true, the binary is wrapped with the test2json tool.
 //
-// On context cancellation, cmd.Cancel sends SIGTERM to the process group.
-// A per-process kill timer (from the teardown budget file) then governs
-// when SIGKILL is sent, and nothing else kills. Output is read by the
-// managed process itself, so a grandchild outside the group that keeps the
-// pipes open holds the result for the drain delay at most.
+// On context cancellation, cmd.Cancel announces the stop and signals the
+// suite process by the pid it published, so the converter in front of it
+// relays the stream to its end; a process that published none gets the
+// group's interrupt. A per-process kill timer (from the teardown budget
+// file) then governs when SIGKILL is sent, and nothing else kills. Output is
+// read by the managed process itself, so a grandchild outside the group that
+// keeps the pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer
@@ -233,14 +236,18 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	})
 	// exec cancels only a process still running when ctx ends.
 	var cutShort atomic.Bool
-	cancel := cmd.Cancel
 	cmd.Cancel = func() error {
 		cutShort.Store(true)
-		// Announced before the interrupt: the process reads it on the signal.
+		// Announced before the signal: the process reads it on the signal.
 		if target.StopFile != "" {
 			_ = os.WriteFile(target.StopFile, nil, 0o600)
+			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
+				if err := signalSuite(pid); err == nil {
+					return nil
+				}
+			}
 		}
-		return cancel()
+		return mp.Interrupt()
 	}
 	if err := mp.Start(); err != nil {
 		return SuiteResult{
@@ -587,4 +594,14 @@ func insertBeforeWords(args []string, flag string) []string {
 		}
 	}
 	return append(slices.Clone(args), flag)
+}
+
+// readPID reads the pid a suite process published, 0 when there is none.
+func readPID(path string) int {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the runner's own sidecar file
+	if err != nil {
+		return 0
+	}
+	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+	return pid
 }

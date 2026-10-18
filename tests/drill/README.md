@@ -117,6 +117,8 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
+| `stop-keeps-running-methods` | a stopped run still starts the methods it has not reached | canary: the stopping fixture's later methods are not skipped with `run stopping` |
+| `stop-releases-before-afterall` | a stop tears the fixtures down at once instead of letting the suite finish | canary: the stopping fixture's AfterAll runs after the fixture is released |
 
 ## Adding a mutant
 

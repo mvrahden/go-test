@@ -1,0 +1,13 @@
+Expect: stop: TestStopTestSuite/TestSecond verdict "[a-z]*", want skip
+Clause: when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -52,7 +52,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
+ 					it.Skip("FailFast: earlier test failed")
+ 				}
+ 			}
+-			if runstate.StopContext().Err() != nil {
++			if false && runstate.StopContext().Err() != nil {
+ 				it.Skip("run stopping")
+ 			}
+ 			if m.Parallel {

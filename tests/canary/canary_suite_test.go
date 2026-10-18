@@ -14,9 +14,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -356,6 +358,76 @@ func (s *CanaryTestSuite) TestSharedFixturesReachThroughFixtureChains(t *gotest.
 // fail to come up leaves the run green.
 func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
 	s.check(t, "guardskip")
+}
+
+// A run stopped while a method holds: the methods not yet started are skipped
+// with the reason run stopping, the holding method's context ends, and AfterAll
+// runs before the fixture is released. Ring 0: the conformance suite that
+// states the same cannot judge its own assertion engine.
+func (s *CanaryTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
+	dir := t.TempDir()
+	cmd := exec.Command(s.binary, "-json", "./testdata/stopping/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = childEnv(dir)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	cmd.WaitDelay = 15 * time.Second
+	tree, err := testkit.StartCLI(cmd)
+	if err != nil {
+		fatalf(t, "start: %v", err)
+	}
+	markers := filepath.Join(dir, testkit.MarkersFile)
+	for deadline := time.Now().Add(90 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		got, _ := testkit.ReadMarkers(markers)
+		if slices.Contains(got, "running") {
+			break
+		}
+		if time.Now().After(deadline) {
+			_ = tree.Kill()
+			_ = cmd.Wait()
+			tree.Release()
+			fatalf(t, "stop: the run never held:\n%s%s", stdout.String(), stderr.String())
+		}
+	}
+	if err := testkit.Interrupt(cmd, tree); err != nil {
+		_ = tree.Kill()
+		_ = cmd.Wait()
+		tree.Release()
+		fatalf(t, "stop: signal: %v", err)
+	}
+	_ = cmd.Wait()
+	tree.Release()
+	if code := cmd.ProcessState.ExitCode(); code != 130 {
+		t.Errorf("stop: exit code %d, want 130\n%s", code, stderr.String())
+	}
+	verdict := map[string]string{}
+	output := map[string]string{}
+	for _, ev := range testkit.ParseEvents(stdout.Bytes()) {
+		switch ev.Action {
+		case "pass", "fail", "skip":
+			verdict[ev.Test] = ev.Action
+		case "output":
+			output[ev.Test] += ev.Output
+		}
+	}
+	for _, method := range []string{"TestStopTestSuite/TestSecond", "TestStopTestSuite/TestThird"} {
+		if verdict[method] != "skip" {
+			t.Errorf("stop: %s verdict %q, want skip", method, verdict[method])
+		}
+		if !strings.Contains(output[method], "run stopping") {
+			t.Errorf("stop: %s was not skipped with the reason run stopping:\n%s", method, output[method])
+		}
+	}
+	got, _ := testkit.ReadMarkers(markers)
+	order := []string{"context ended", "suite.AfterAll", "fixture.AfterAll"}
+	last := -1
+	for _, m := range order {
+		idx := slices.Index(got, m)
+		if idx < 0 || idx < last {
+			t.Errorf("stop: markers %v, want %v in order", got, order)
+			break
+		}
+		last = idx
+	}
 }
 
 // benchReport is the part of a bench --json report the canary reads.

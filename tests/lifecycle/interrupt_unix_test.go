@@ -11,18 +11,21 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// stoppedFromOutside reports whether a waited-for process ended by SIGINT or
-// SIGTERM, or, when it started with the signal ignored and could not, by the
-// status a shell gives for it.
-func stoppedFromOutside(err error) bool {
+// endedOnItsOwn reports whether a waited-for process ended with a status of
+// its own: a stopped run finishes its tests and teardown and exits as the
+// testing package does, not by the signal that stopped it.
+func endedOnItsOwn(err error) bool {
+	if err == nil {
+		return true
+	}
 	var exit *exec.ExitError
 	if !errors.As(err, &exit) {
 		return false
 	}
 	if ws, ok := exit.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
-		return ws.Signal() == syscall.SIGINT || ws.Signal() == syscall.SIGTERM
+		return false
 	}
-	return exit.ExitCode() == 128+int(syscall.SIGINT) || exit.ExitCode() == 128+int(syscall.SIGTERM)
+	return exit.ExitCode() != 128+int(syscall.SIGINT) && exit.ExitCode() != 128+int(syscall.SIGTERM)
 }
 
 // Outside the runner only Ctrl-C counts, SIGINT, which proctree never sends:
@@ -36,7 +39,7 @@ func (s *InterruptTestSuite) TestCtrlCReleasesTheFixture(t *gotest.T) {
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process still ends by the signal: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // go test -fuzz runs the ordinary tests first; Go's fuzzing engine takes over
@@ -52,5 +55,5 @@ func (s *InterruptTestSuite) TestCtrlCBeforeFuzzingReleasesTheFixture(t *gotest.
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process still ends by the signal: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }

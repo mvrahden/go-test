@@ -147,7 +147,7 @@ func (s *InterruptTestSuite) TestAnAnnouncedStopReleasesTheFixture(t *gotest.T) 
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process still ends as stopped from outside: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // An interrupt the runner did not announce came from somewhere else, such as

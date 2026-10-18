@@ -1,0 +1,13 @@
+Expect: stop: markers .* want \[context ended suite.AfterAll fixture.AfterAll\] in order
+Clause: when the run is interrupted while a method holds → runs AfterAll before the fixture is released
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -143,7 +143,7 @@ func (w *watcher) stop(sig os.Signal) {
+ 	stopping.Store(true)
+ 	runstate.Stop()
+ 	deadline := time.Now().Add(releaseBound())
+-	if waitSetups(deadline) && waitHoldsEnd(deadline) {
++	if false && waitSetups(deadline) && waitHoldsEnd(deadline) {
+ 		return
+ 	}
+ 	fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")

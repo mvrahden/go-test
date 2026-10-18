@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,9 +33,9 @@ func takeEnv(key string) string {
 // that is gone means the CLI crashed and nobody is left to announce a stop.
 var parentPID = os.Getppid()
 
-// The watcher runs while a hold does: the first hold starts it, the hold
-// that ends last stops it, so it leaves no goroutine and no signal handler
-// behind between holds.
+// The watcher runs while a suite does: the first suite or hold starts it, the
+// one that ends last stops it, so it leaves no goroutine and no signal handler
+// behind between them.
 var (
 	watchMu  sync.Mutex
 	watching int
@@ -83,6 +84,9 @@ func watch(stderr io.Writer) *watcher {
 	candidates := []os.Signal{os.Interrupt}
 	if stopFile != "" {
 		candidates = append(candidates, stopSignals...)
+		// The runner signals this process by pid, so the converter in front
+		// of it lives on to relay the stream to its end.
+		_ = os.WriteFile(protocol.StopPIDPath(stopFile), []byte(strconv.Itoa(os.Getpid())), 0o600)
 	}
 	for _, s := range candidates {
 		if !signal.Ignored(s) {
@@ -128,22 +132,42 @@ func (w *watcher) counts(sig os.Signal) bool {
 	return os.Getppid() != parentPID
 }
 
-// stop releases the held fixtures and ends the process by sig. The tests and
-// the setups in flight are told first — their contexts derive from the stop —
-// so work that honours its context lets go of what teardown needs. A hold
-// already tearing down in its cleanup is waited for, not repeated.
+// stop tells the run to stop and lets it finish on its own: the tests and the
+// setups in flight see their contexts end, the methods not yet started are
+// skipped, AfterAll runs, and the hold's cleanup releases the fixtures, so the
+// stream carries every verdict. A run that does not finish within the release
+// bound — a method ignoring its context — is forced: the fixtures are torn down
+// and the process ends by sig.
 func (w *watcher) stop(sig os.Signal) {
 	signal.Reset(w.sigs...)
 	stopping.Store(true)
 	runstate.Stop()
 	deadline := time.Now().Add(releaseBound())
-	if !waitSetups(deadline) {
-		fmt.Fprintln(w.stderr, "gotest: fixture setup still running at the stop; what it brings up may be left behind")
+	if waitSetups(deadline) && waitHoldsEnd(deadline) {
+		return
 	}
-	if !releaseWithin(deadline) {
+	fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")
+	if !releaseWithin(deadline.Add(releaseBound())) {
 		fmt.Fprintf(w.stderr, "gotest: fixture teardown did not finish within %s; what it holds may be left behind\n", releaseBound())
 	}
 	reraise(sig)
+}
+
+// waitHoldsEnd waits until no fixtures are held, until deadline: the hold's
+// own cleanup drops them once the suite's AfterAll has run.
+func waitHoldsEnd(deadline time.Time) bool {
+	for {
+		heldMu.Lock()
+		n := len(held)
+		heldMu.Unlock()
+		if n == 0 {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // close stops the watcher.

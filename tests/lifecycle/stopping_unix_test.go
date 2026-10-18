@@ -17,9 +17,9 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// Ctrl-C while a hold tears down lets the teardown finish, then the process
-// ends by the signal, not with the tests' exit code.
-func (s *StoppingTestSuite) TestCtrlCDuringTeardownEndsByTheSignal(t *gotest.T) {
+// Ctrl-C while a hold tears down lets the teardown finish; the process then
+// ends with the tests' own status.
+func (s *StoppingTestSuite) TestCtrlCDuringTeardownLetsItFinish(t *gotest.T) {
 	cmd := exec.Command(s.bin["quick"], "-test.run=TestQuickTestSuite") //nolint:gosec // G204: binary built by this suite
 	cmd.Env = append(ownEnv(), "STOPPING_SLOW_TEARDOWN=1")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "db tearing")
@@ -28,7 +28,7 @@ func (s *StoppingTestSuite) TestCtrlCDuringTeardownEndsByTheSignal(t *gotest.T) 
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"db up", "db tearing", "db down"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process ends by the signal: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // A teardown that runs a pipeline: the process handles SIGPIPE for itself

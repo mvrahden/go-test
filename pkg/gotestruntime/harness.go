@@ -54,6 +54,11 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 			tb.Skipf("suite guard: %s", reason)
 		}
 	}
+	// A stop skips the methods not started and runs AfterAll, with or without
+	// fixtures to hold; registered first, the watch ends after every other
+	// cleanup of tb.
+	startWatch()
+	tb.Cleanup(stopWatch)
 	if s.Fixtures != nil {
 		s.Fixtures(tb)
 	}
@@ -245,6 +250,11 @@ func testScopedT(t testing.TB, timeout time.Duration) *gotest.T {
 	if timeout > 0 {
 		cancel()
 		ctx, cancel = context.WithTimeout(t.Context(), timeout)
+	}
+	// AfterFunc runs cancel on its own goroutine; a stop already in effect
+	// must be seen by the first read, so it is applied here as well.
+	if runstate.StopContext().Err() != nil {
+		cancel()
 	}
 	stop := context.AfterFunc(runstate.StopContext(), cancel)
 	t.Cleanup(func() {

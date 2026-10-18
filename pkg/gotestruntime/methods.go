@@ -2,6 +2,7 @@ package gotestruntime
 
 import (
 	"context"
+	"github.com/mvrahden/go-test/internal/runstate"
 	"sync/atomic"
 	"testing"
 
@@ -39,7 +40,8 @@ type Method struct {
 // then the method's Run, then fixture AfterEach hooks in reverse. cfg bounds
 // each method's context and budget is the Timeout it is held to, as returned
 // by [OpenSuite]. With cfg.FailFast, a failure stops the methods that have
-// not started yet.
+// not started yet. Once the run is asked to stop, a method that has not
+// started is skipped with the reason "run stopping".
 func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 	var failed atomic.Bool
 	for _, c := range m.Cases {
@@ -49,6 +51,11 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				if cfg.FailFast && failed.Load() {
 					it.Skip("FailFast: earlier test failed")
 				}
+			}
+			if runstate.StopContext().Err() != nil {
+				it.Skip("run stopping")
+			}
+			if m.Parallel {
 				defer func() {
 					if it.Failed() {
 						failed.Store(true)

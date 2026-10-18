@@ -1,6 +1,10 @@
 package gotestruntime
 
-import "context"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/internal/runstate"
+)
 
 // Shims exposing the runtime's internals to the external ring-0 suites.
 
@@ -39,6 +43,13 @@ func ExportWatching() bool {
 	return active != nil
 }
 
+// ExportWatchCount reports how many suites and holds the stop watcher serves.
+func ExportWatchCount() int {
+	watchMu.Lock()
+	defer watchMu.Unlock()
+	return watching
+}
+
 // ExportUseBudgetFile points the runtime at path for the budget it advertises,
 // as the runner's environment does at start, and forgets earlier budgets.
 func ExportUseBudgetFile(path string) {
@@ -51,3 +62,9 @@ func ExportUseBudgetFile(path string) {
 // ExportUserFrameBelowHarness reads a goroutine traceback as the overrun
 // verdict does.
 var ExportUserFrameBelowHarness = userFrameBelowHarness
+
+// ExportResetStop clears the process-wide stop, for tests that stop the run.
+func ExportResetStop() {
+	stopping.Store(false)
+	runstate.Reset()
+}

@@ -89,7 +89,7 @@ func deliver(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, signal string) {
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGTERM))
 	case "second":
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(time.Second)
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
 	default:
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))

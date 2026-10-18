@@ -284,6 +284,10 @@ func (p *ManagedProcess) WaitWithGrace(ctx context.Context) error {
 	return nil
 }
 
+// Interrupt asks the process tree to shut down, as the grace strategy does
+// on its own when the context ends.
+func (p *ManagedProcess) Interrupt() error { return p.tree.Interrupt() }
+
 func (p *ManagedProcess) Terminate() {
 	if p.cmd.Process == nil {
 		return
