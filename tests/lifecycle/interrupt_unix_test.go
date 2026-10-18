@@ -39,7 +39,7 @@ func (s *InterruptTestSuite) TestCtrlCReleasesTheFixture(t *gotest.T) {
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
-	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
+	gotest.False(t, endedOnItsOwn(err), "under plain go test the process ends by the signal: %v", err)
 }
 
 // go test -fuzz runs the ordinary tests first; Go's fuzzing engine takes over
@@ -55,5 +55,5 @@ func (s *InterruptTestSuite) TestCtrlCBeforeFuzzingReleasesTheFixture(t *gotest.
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
-	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
+	gotest.False(t, endedOnItsOwn(err), "under plain go test the process ends by the signal: %v", err)
 }

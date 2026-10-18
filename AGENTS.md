@@ -328,7 +328,7 @@ For parallel test cases, AfterAll waits for all parallel tests to complete.
 
 > when BeforeAll of a FailFast suite records a failure without stopping and no method fails → runs every method
 
-A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`:
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`; a method that ignores its context for five seconds is cut short, and the process ends by the signal:
 
 > when the run is interrupted while a method holds → ends the holding method's context
 
@@ -421,7 +421,7 @@ it (go test's `-timeout`, `--setup-timeout`, or a shared fixture's teardown forc
 
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that
-nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline(t, d)`, which derives from the suite's context.
+nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline(t, d)`, which derives from the suite's context (`t` may also be a `*testing.T`).
 
 ### SuiteGuard (optional)
 
@@ -439,6 +439,7 @@ Runs before the suite's fixtures, config, `BeforeAll`, and any test method, so f
 A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard:
 
 > when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
+
 Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes

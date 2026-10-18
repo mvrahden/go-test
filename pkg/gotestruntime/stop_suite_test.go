@@ -48,3 +48,24 @@ func (s *StopTestSuite) TestAStopCancelsANewContextAtOnce(t *gotest.T) {
 		})
 	})
 }
+
+func (s *StopTestSuite) TestASuiteOpenedAfterTheStopIsSkipped(t *gotest.T) {
+	runstate.Stop()
+	var calls []string
+	var inner *testing.T
+	t.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // observing testing.T skip semantics
+		inner = tt
+		gotestruntime.OpenSuite(tt, gotestruntime.Suite{
+			Guard:     func() string { calls = append(calls, "guard"); return "" },
+			Fixtures:  func(testing.TB) { calls = append(calls, "fixtures") },
+			BeforeAll: func(*gotest.T) { calls = append(calls, "beforeall") },
+			AfterAll:  func(*gotest.T) { calls = append(calls, "afterall") },
+		})
+	})
+	t.When("a suite opens after the run was stopped", func(w *gotest.T) {
+		w.It("is skipped as run stopping before its guard, fixtures and BeforeAll", func(it *gotest.T) {
+			gotest.True(it, inner.Skipped())
+			gotest.Empty(it, calls)
+		})
+	})
+}

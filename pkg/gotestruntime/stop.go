@@ -58,6 +58,14 @@ func stopWatch() {
 	if watching == 0 {
 		active.close()
 		active = nil
+		// Under plain go test nothing else marks the run interrupted: once the
+		// stopped suite has torn down, the process ends by the signal, and the
+		// suites after it never run. Under the runner the process ends with the
+		// tests' own status, so the stream carries every verdict and the runner
+		// reports the stop.
+		if stopFile == "" && stopping.Load() {
+			reraise(stoppedBy())
+		}
 	}
 }
 
@@ -110,7 +118,7 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
-				w.stop(sig) // does not return
+				w.stop(sig) // returns once the run has stopped, or ends the process
 			}
 		}
 	}
@@ -132,25 +140,65 @@ func (w *watcher) counts(sig os.Signal) bool {
 	return os.Getppid() != parentPID
 }
 
+// stopGrace is how long a stop waits for a running method to return once its
+// context has ended. A method still running then ignores its context, and
+// nothing but ending the process can stop it.
+const stopGrace = 5 * time.Second
+
 // stop tells the run to stop and lets it finish on its own: the tests and the
 // setups in flight see their contexts end, the methods not yet started are
 // skipped, AfterAll runs, and the hold's cleanup releases the fixtures, so the
-// stream carries every verdict. A run that does not finish within the release
-// bound — a method ignoring its context — is forced: the fixtures are torn down
-// and the process ends by sig.
+// stream carries every verdict. A method that does not return within
+// stopGrace, or a run that does not finish within the release bound, is
+// forced: the fixtures are torn down, within that same bound, and the process
+// ends by sig.
 func (w *watcher) stop(sig os.Signal) {
 	signal.Reset(w.sigs...)
+	stoppedSig.Store(sig)
 	stopping.Store(true)
 	runstate.Stop()
 	deadline := time.Now().Add(releaseBound())
-	if waitSetups(deadline) && waitHoldsEnd(deadline) {
-		return
+	grace := time.Now().Add(stopGrace)
+	if grace.After(deadline) {
+		grace = deadline
 	}
-	fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")
-	if !releaseWithin(deadline.Add(releaseBound())) {
+	switch {
+	case !waitBodiesEnd(grace):
+		fmt.Fprintf(w.stderr, "gotest: a method did not return within %s of its context ending; it is cut short, the fixtures are torn down and the process ends by the signal\n", stopGrace)
+	case waitSetups(deadline) && waitHoldsEnd(deadline):
+		return
+	default:
+		fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")
+	}
+	if !releaseWithin(deadline) {
 		fmt.Fprintf(w.stderr, "gotest: fixture teardown did not finish within %s; what it holds may be left behind\n", releaseBound())
 	}
 	reraise(sig)
+}
+
+// stoppedSig is the signal the stop came by, for the process to end by.
+var stoppedSig atomic.Value // os.Signal
+
+func stoppedBy() os.Signal {
+	if sig, ok := stoppedSig.Load().(os.Signal); ok {
+		return sig
+	}
+	return os.Interrupt
+}
+
+// waitBodiesEnd waits until no test method is running, until deadline.
+func waitBodiesEnd(deadline time.Time) bool {
+	for {
+		running := 0
+		bodies.Range(func(any, any) bool { running++; return true })
+		if running == 0 {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // waitHoldsEnd waits until no fixtures are held, until deadline: the hold's

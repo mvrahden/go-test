@@ -301,7 +301,7 @@ A method that panics ends the suite as it would under `go test`, after the suite
 
 > when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
 
-A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through its context and the suite through its teardown:
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through its context and the suite through its teardown; a method that has not returned five seconds after its context ended is cut short, the fixtures torn down and the process ended by the signal (see fixtures.md, Execution Model):
 
 > when the run is interrupted while a method holds → exits 130
 
@@ -358,6 +358,7 @@ With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
 The wait for `done` ends with the goroutine that owns it:
 
 > when the goroutine that owns done fails a fatal assertion → fails the method at once, not at the end of its budget
+
 With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.
 
@@ -635,7 +636,7 @@ Read transferred fields but do not reassign them — use local variables for any
 Subprocess (compiled binary):
   sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
   serialize transferable fields  → JSON (local fields excluded)
-  write to the protocol stream, wait for the runner's teardown verb
+  write to the protocol stream, wait for the runner's signal (or a barrier teardown verb)
   sf.AfterAll(ctx)               → tears down infrastructure
 
 CLI (gotest):
@@ -800,7 +801,7 @@ In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if 
 **Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and breaks the test case loop on first failure when `FailFast` is set.
 Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunTest` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses — located where the phase is running, and also written to stderr, unbuffered, unless test2json streams the verdict (`-json`), where a raw line would be attributed to whichever test printed last — but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
 
-**`NewTWithDeadline(t *gotest.T, d)`:** Creates a `*gotest.T` with a context deadline, derived from the suite's own context.
+**`NewTWithDeadline(t, d)`:** Creates a `*gotest.T` with a context deadline, derived from the suite's own context; `t` is a `*gotest.T` or a `*testing.T`.
 `t.Context()` returns the deadline-aware context.
 
 **`NewTWithContext`:** Creates a `*gotest.T` whose `t.Context()` is the context supplied by the caller, for the cases a deadline off `t.Context()` cannot express — injected values, or a lifetime that must outlive the test's own.

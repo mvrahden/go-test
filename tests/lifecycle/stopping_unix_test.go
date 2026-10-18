@@ -17,8 +17,9 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// Ctrl-C while a hold tears down lets the teardown finish; the process then
-// ends with the tests' own status.
+// Ctrl-C while a hold tears down lets the teardown finish; under plain go
+// test the process then ends by the signal, which alone marks the run as
+// interrupted there.
 func (s *StoppingTestSuite) TestCtrlCDuringTeardownLetsItFinish(t *gotest.T) {
 	cmd := exec.Command(s.bin["quick"], "-test.run=TestQuickTestSuite") //nolint:gosec // G204: binary built by this suite
 	cmd.Env = append(ownEnv(), "STOPPING_SLOW_TEARDOWN=1")
@@ -28,7 +29,20 @@ func (s *StoppingTestSuite) TestCtrlCDuringTeardownLetsItFinish(t *gotest.T) {
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"db up", "db tearing", "db down"}, readEvents(log))
-	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
+	gotest.False(t, endedOnItsOwn(err), "under plain go test the process ends by the signal: %v", err)
+}
+
+// Under plain go test nothing but the process can mark the run interrupted:
+// once the stopped suite has torn down, the process ends by the signal, and
+// the suites after it never run.
+func (s *StoppingTestSuite) TestCtrlCUnderPlainGoTestEndsTheRun(t *gotest.T) {
+	cmd := exec.Command(s.bin["hold"], "-test.run=TestHoldingTestSuite|TestLaterTestSuite") //nolint:gosec // G204: binary built by this suite
+	cmd.Env = append(ownEnv(), "STOPPING_HOLD=1")
+	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
+	gotest.NoError(t, cmd.Process.Signal(os.Interrupt))
+	err := waitWithin(t, tree, cmd, 20*time.Second)
+	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
+	gotest.False(t, endedOnItsOwn(err), "under plain go test the process ends by the signal: %v", err)
 }
 
 // A teardown that runs a pipeline: the process handles SIGPIPE for itself
