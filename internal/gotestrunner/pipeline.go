@@ -404,7 +404,7 @@ func assignBudgetFiles(targets []SuiteTarget) {
 		// Per suite process, not per binary: suites of one binary run as
 		// concurrent processes, each with its own fixtures and budget.
 		targets[i].BudgetFile = protocol.BudgetFilePath(targets[i].BinaryPath + "." + targets[i].SuiteName)
-		targets[i].StopFile = protocol.StopFilePath(targets[i].BinaryPath)
+		targets[i].StopFile = protocol.StopFilePath(targets[i].BinaryPath + "." + targets[i].SuiteName)
 	}
 }
 

@@ -213,3 +213,5 @@ func ExportSetSetupReportFloor(d time.Duration) (restore func()) {
 	setupReportFloor = d
 	return func() { setupReportFloor = was }
 }
+
+var ExportAssignBudgetFiles = assignBudgetFiles
