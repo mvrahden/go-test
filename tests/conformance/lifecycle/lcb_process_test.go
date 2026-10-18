@@ -1,3 +1,5 @@
+//go:build unix
+
 package lifecycle_test
 
 import (
