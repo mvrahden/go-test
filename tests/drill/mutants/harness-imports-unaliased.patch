@@ -1,0 +1,14 @@
+Expect: shapes gencontext: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestGeneratedFilesStayValid
+Clause: when the package declares names the harness imports → a package declaring context, testing, gotest and the other imported names runs its suite
+--- a/internal/gotestgen/imports.go
++++ b/internal/gotestgen/imports.go
+@@ -15,7 +15,7 @@
+ var fixedAliases = map[string]string{
+ 	"context":                         "ƒcontext",
+ 	"math":                            "ƒmath",
+-	"strconv":                         "ƒstrconv",
++	"strconv":                         "strconv",
+ 	"strings":                         "ƒstrings",
+ 	"testing":                         "ƒtesting",
+ 	"time":                            "ƒtime",

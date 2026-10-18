@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery StaleGenerated .* / a legacy generated file name is treated the same \(
+Clause: when a package holds a generated file from an earlier generate → a legacy generated file name is treated the same
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -342,7 +342,7 @@
+ 		if err != nil {
+ 			continue
+ 		}
+-		if s := about.PackageStub(src); s != nil {
++		if s := about.PackageStub(src); s == nil {
+ 			stubs = append(stubs, stub{name: name, src: s})
+ 		}
+ 	}

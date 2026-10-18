@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery GeneratedFiles .* / an unchanged generated file is not written again \(
+Clause: when gotest generate runs again after the suites changed → an unchanged generated file is not written again
+--- a/cmd/gotest/generate.go
++++ b/cmd/gotest/generate.go
+@@ -93,7 +93,7 @@
+ 		}
+ 		return nil
+ 	}
+-	if have, err := os.ReadFile(dst); err == nil && bytes.Equal(have, src) { //nolint:gosec // G304: the package's own generated file
++	if have, err := os.ReadFile(dst); err == nil && bytes.Equal(have, src) && false { //nolint:gosec // G304: the package's own generated file
+ 		return nil
+ 	}
+ 	return os.WriteFile(dst, src, 0644) //nolint:gosec // G306: not sensitive data

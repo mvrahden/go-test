@@ -58,3 +58,29 @@ A suite SHALL run an alias of a generic suite another package declares, an alias
 - **WHEN** a suite reaches across packages
 - **THEN** an alias of a generic suite from another package runs that suite's methods
 - **AND** a package fixture from another package with a mis-signed hook is rejected with the signature it needs
+
+### Requirement: The generated harness
+The generated harness SHALL compile beside whatever names the package declares, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites and files of variants without suites, and SHALL NOT rewrite a file whose content is unchanged.
+
+#### Scenario: Names the harness imports
+- **WHEN** the package declares names the harness imports
+- **THEN** a package declaring context, testing, gotest and the other imported names runs its suite
+- **AND** a suite binding fixtures from two packages both named pg runs
+
+#### Scenario: Generating again
+- **WHEN** gotest generate runs again after the suites changed
+- **THEN** a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes
+- **AND** an unchanged generated file is not written again
+
+### Requirement: Stale generated files and build constraints
+A generated file left on disk by an earlier generate, under its current or legacy name, SHALL neither break nor be compiled into a run and SHALL be read past by discover and spec; --tags SHALL select the suite files built with that tag.
+
+#### Scenario: A stale generated file
+- **WHEN** a package holds a generated file from an earlier generate
+- **THEN** a stale generated file on disk neither breaks the run nor is compiled
+- **AND** discover and spec read past a stale generated file
+- **AND** a legacy generated file name is treated the same
+
+#### Scenario: A build-constrained suite file
+- **WHEN** a suite file carries a build constraint
+- **THEN** --tags= selects the files built with that tag

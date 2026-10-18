@@ -1267,7 +1267,13 @@ func (s *canary) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (
 // invoke runs the CLI with the arguments as given and returns the exit code
 // and both streams as they were.
 func (s *canary) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
+	return s.invokeIn(t, "", canaryDir, args...)
+}
+
+// invokeIn is invoke run in dir, "" the canary's own directory.
+func (s *canary) invokeIn(t *gotest.T, dir, canaryDir string, args ...string) (int, []byte, []byte) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = dir
 	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

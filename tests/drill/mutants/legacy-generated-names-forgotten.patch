@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery StaleGenerated .* / a legacy generated file name is treated the same \(
+Clause: when a package holds a generated file from an earlier generate → a legacy generated file name is treated the same
+--- a/internal/about/git.go
++++ b/internal/about/git.go
+@@ -17,7 +17,7 @@
+ )
+ 
+ // GeneratedFileNames are every name a generated file may have on disk.
+-var GeneratedFileNames = []string{PSuite, PXSuite, LegacyPSuite, LegacyPXSuite}
++var GeneratedFileNames = []string{PSuite, PXSuite}
+ 
+ var PSuiteRegex = regexp.MustCompile(`(gotest|ƒƒ)_p(x)?suite_test\.go$`)
+ 

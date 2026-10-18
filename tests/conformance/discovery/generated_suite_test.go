@@ -1,0 +1,96 @@
+package discovery_test
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/mvrahden/go-test/internal/testkit"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+// GeneratedFilesTestSuite: the generated harness compiles beside whatever the
+// package declares, and gotest generate keeps it in step with the suites.
+type GeneratedFilesTestSuite struct{}
+
+func (s *GeneratedFilesTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+}
+
+func (s *GeneratedFilesTestSuite) TestImports(t *gotest.T) {
+	t.When("the package declares names the harness imports", func(w *gotest.T) {
+		w.It("a package declaring context, testing, gotest and the other imported names runs its suite", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "gencontext", verdict: "TestShadowsTestSuite/TestRuns"})
+		})
+		w.It("a suite binding fixtures from two packages both named pg runs", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "genpgpg", verdict: "TestBothTestSuite/TestBoth"})
+		})
+	})
+}
+
+func (s *GeneratedFilesTestSuite) TestRegenerate(t *gotest.T) {
+	t.When("gotest generate runs again after the suites changed", func(w *gotest.T) {
+		w.It("a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes", func(it *gotest.T) {
+			dir, cli := stageGenerated(it, "genrename")
+			generate(it, cli, dir)
+			gotest.NoError(it, os.Remove(filepath.Join(dir, "genrename", "ext_suite_test.go")))
+			rename(it, filepath.Join(dir, "genrename", "genrename_suite_test.go"), "OldName", "NewName")
+			generate(it, cli, dir)
+
+			harness, err := os.ReadFile(filepath.Join(dir, "genrename", "gotest_psuite_test.go"))
+			gotest.NoError(it, err)
+			gotest.NotContains(it, string(harness), "OldName")
+			gotest.Contains(it, string(harness), "NewNameTestSuite")
+			_, err = os.Stat(filepath.Join(dir, "genrename", "gotest_pxsuite_test.go"))
+			gotest.ErrorIs(it, err, os.ErrNotExist)
+
+			run, err := testkit.RunCLI(it.Context(), dir, "-json", "./genrename/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "pass", run.Verdict("TestNewNameTestSuite/TestRuns"), "stdout: %s", run.Stdout)
+		})
+		w.It("an unchanged generated file is not written again", func(it *gotest.T) {
+			dir, cli := stageGenerated(it, "genrename")
+			generate(it, cli, dir)
+			harness := filepath.Join(dir, "genrename", "gotest_psuite_test.go")
+			past := time.Now().Add(-time.Hour).Truncate(time.Second)
+			gotest.NoError(it, os.Chtimes(harness, past, past))
+			generate(it, cli, dir)
+
+			info, err := os.Stat(harness)
+			gotest.NoError(it, err)
+			gotest.TimeWithin(it, past, info.ModTime(), 0)
+		})
+	})
+}
+
+// stageGenerated stages a shapes package into a module of its own and builds
+// the CLI, returning the module directory and the binary.
+func stageGenerated(t *gotest.T, pkg string) (dir, cli string) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
+	gotest.NoError(t, err)
+	dir = t.TempDir()
+	_, err = testkit.StagePackage(root, filepath.Join("..", "testdata", "shapes", pkg), dir, "example.com/"+pkg)
+	gotest.NoError(t, err)
+	return dir, cli
+}
+
+// generate runs gotest generate over every package of the staged module.
+func generate(t *gotest.T, cli, dir string) {
+	cmd := exec.CommandContext(t.Context(), cli, "generate", "./...") //nolint:gosec // G204: the repo's own CLI with fixed arguments
+	cmd.Dir = dir
+	cmd.Env = testkit.ChildEnv(t.TempDir())
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, string(out))
+}
+
+// rename replaces old with new throughout the file at path.
+func rename(t *gotest.T, path, old, replacement string) {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: a file in the test's own temp dir
+	gotest.NoError(t, err)
+	gotest.NoError(t, os.WriteFile(path, []byte(strings.ReplaceAll(string(data), old, replacement)), 0o600))
+}

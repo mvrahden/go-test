@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery StaleGenerated .* / --tags= selects the files built with that tag \(
+Clause: when a suite file carries a build constraint → --tags= selects the files built with that tag
+--- a/cmd/gotest/args.go
++++ b/cmd/gotest/args.go
+@@ -211,7 +211,7 @@
+ // NormalizeTagsFlag spells --tags as go's -tags, so every subcommand reads
+ // it as the build flag it is. What follows "--" or "-args" is left alone.
+ func NormalizeTagsFlag(args []string) []string {
+-	if len(args) == 0 {
++	if true {
+ 		return args
+ 	}
+ 	out := make([]string, 0, len(args))

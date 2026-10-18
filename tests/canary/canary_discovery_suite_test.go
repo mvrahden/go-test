@@ -2,11 +2,15 @@ package canary_test //nolint:fail-guard
 
 import (
 	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -112,5 +116,75 @@ func (s *CanaryDiscoveryTestSuite) TestFieldNameAndCaselessShapes(t *gotest.T) {
 		t.Errorf("shapes caseless: discover does not list RealTestSuite:\n%s", stdout)
 	case bytes.Contains(stdout, []byte("HelperTestSuite")):
 		t.Errorf("shapes caseless: discover lists HelperTestSuite:\n%s", stdout)
+	}
+}
+
+// The generated harness compiles beside whatever names the package declares,
+// a stale generated file on disk is never read, and a second generate after
+// a rename leaves nothing of the old suite.
+func (s *CanaryDiscoveryTestSuite) TestGeneratedFilesStayValid(t *gotest.T) {
+	s.checkShapes(t, []shapeRow{
+		{name: "gencontext", passes: "TestShadowsTestSuite/TestRuns"},
+		{name: "genpgpg", passes: "TestBothTestSuite/TestBoth"},
+		{name: "stalerename", passes: "TestNewTestSuite/TestRuns"},
+	})
+	code, stdout, stderr := s.invoke(t, t.TempDir(), "discover", "./testdata/shapes/stalerename/")
+	switch {
+	case code != 0:
+		t.Errorf("shapes stalerename: discover exit code %d, want 0\n%s", code, stderr)
+	case !bytes.Contains(stdout, []byte(`"name":"NewTestSuite"`)) || bytes.Contains(stdout, []byte("OldTestSuite")):
+		t.Errorf("shapes stalerename: discover does not list NewTestSuite alone:\n%s", stdout)
+	}
+
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	dir := t.TempDir()
+	pkg, err := testkit.StagePackage(root, filepath.Join("testdata", "shapes", "genrename"), dir, "example.com/genrename")
+	if err != nil {
+		fatalf(t, "shapes genrename: stage: %v", err)
+	}
+	generate := func() bool {
+		code, stdout, stderr := s.invokeIn(t, dir, t.TempDir(), "generate", "./...")
+		if code != 0 {
+			t.Errorf("shapes genrename: generate exit code %d, want 0\n%s%s", code, stdout, stderr)
+		}
+		return code == 0
+	}
+	if !generate() {
+		return
+	}
+	if err := os.Remove(filepath.Join(pkg, "ext_suite_test.go")); err != nil {
+		fatalf(t, "shapes genrename: %v", err)
+	}
+	suite := filepath.Join(pkg, "genrename_suite_test.go")
+	src, err := os.ReadFile(suite) //nolint:gosec // G304: a file in the test's own temp dir
+	if err != nil {
+		fatalf(t, "shapes genrename: %v", err)
+	}
+	if err := os.WriteFile(suite, bytes.ReplaceAll(src, []byte("OldName"), []byte("NewName")), 0o600); err != nil {
+		fatalf(t, "shapes genrename: %v", err)
+	}
+	if !generate() {
+		return
+	}
+	harness, err := os.ReadFile(filepath.Join(pkg, "gotest_psuite_test.go")) //nolint:gosec // G304: a file in the test's own temp dir
+	switch {
+	case err != nil:
+		t.Errorf("shapes genrename: %v", err)
+	case bytes.Contains(harness, []byte("OldName")) || !bytes.Contains(harness, []byte("NewNameTestSuite")):
+		t.Errorf("shapes genrename: the harness does not name NewNameTestSuite alone:\n%s", harness)
+	}
+	if _, err := os.Stat(filepath.Join(pkg, "gotest_pxsuite_test.go")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("shapes genrename: the external harness of a variant without suites is still there: %v", err)
+	}
+	code, stdout, stderr = s.invokeIn(t, dir, t.TempDir(), "-json", "./genrename/")
+	passed := false
+	for _, ev := range testkit.ParseEvents(stdout) {
+		passed = passed || (ev.Action == "pass" && ev.Test == "TestNewNameTestSuite/TestRuns")
+	}
+	if code != 0 || !passed {
+		t.Errorf("shapes genrename: the run after the rename exits %d, TestNewNameTestSuite/TestRuns passed %v\n%s", code, passed, stderr)
 	}
 }
