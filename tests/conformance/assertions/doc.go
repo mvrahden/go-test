@@ -1,2 +1,2 @@
-// Package assertions holds the conformance suites for the "assertions" part of the behavior catalog.
+// Package assertions holds the conformance suites that verify specs/assertions/spec.md.
 package assertions

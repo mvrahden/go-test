@@ -1,18 +1,22 @@
 # Conformance suites
 
-These suites are the behavior catalog of gotest in executable form. Every
-`When`/`It` here is one sentence of the contract; `gotest spec --static` reads
-the sentences from source and `make catalog` indexes them in
-`docs/design/catalog.json`. A CI step fails when the committed index differs
+These suites verify [`specs/`](../../specs/README.md), where gotest's behavior
+is stated. A `When` label and an `It` label directly under it are the key that
+binds a test to a scenario: they equal the scenario's WHEN and one of its THEN
+or AND texts. `gotest spec --static` reads the labels from source and `make
+catalog` indexes them in `docs/design/catalog.json`. A CI step fails when the committed index differs
 from a fresh render, and a conventions suite fails when any behavior is marked
 incomplete, so the index is always the whole, current list.
 
 ## Naming
 
-- One package per catalog section: `cli`, `lifecycle`, `fixtures`,
-  `discovery`, `assertions`, `bench`, `fuzz`, `spec`, `lint`, `migrate`.
-- Suite and method names mirror the headings of `docs/design/spec.md`
-  (`CLIFlagsTestSuite` under "CLI Interface › Flags").
+- One package per capability in `specs/`: `tests/conformance/<capability>`
+  verifies `specs/<capability>/spec.md` (`tests/conformance/cli` verifies
+  `specs/cli/spec.md`). The packages `lifecycle`, `fixtures`, `discovery`,
+  `assertions`, `fuzz`, `spec`, `lint` and `migrate` wait for their spec.
+- A suite groups requirements of its capability (`CLIFlagsTestSuite` in
+  `cli`) and a method verifies scenarios of one requirement. Names bind
+  nothing; the labels do.
 - `When` names the branch, not the connective: `t.When("the run is stopped")`.
 - `It` names one observable: a verdict, an event, an output or a resource
   fact, with the numbers it pins in the text.

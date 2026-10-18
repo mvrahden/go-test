@@ -1,2 +1,2 @@
-// Package discovery holds the conformance suites for the "discovery" part of the behavior catalog.
+// Package discovery holds the conformance suites that verify specs/discovery/spec.md.
 package discovery

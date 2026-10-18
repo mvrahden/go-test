@@ -1,2 +1,2 @@
-// Package fuzz holds the conformance suites for the "fuzz" part of the behavior catalog.
+// Package fuzz holds the conformance suites that verify specs/fuzz/spec.md.
 package fuzz

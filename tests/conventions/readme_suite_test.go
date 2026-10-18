@@ -13,7 +13,7 @@ import (
 // ReadmeExampleTestSuite: the README's first example is kept as a fixture
 // package, runs green as written, and the README shows what it prints. It
 // guards this repository's README, not gotest's behavior, so it is a
-// convention rather than a catalog clause.
+// convention rather than a scenario in specs/.
 type ReadmeExampleTestSuite struct{}
 
 func (s *ReadmeExampleTestSuite) SuiteConfig() gotest.SuiteConfig {

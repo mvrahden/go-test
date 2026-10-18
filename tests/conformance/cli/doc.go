@@ -1,2 +1,2 @@
-// Package cli holds the conformance suites for the "cli" part of the behavior catalog.
+// Package cli holds the conformance suites that verify specs/cli/spec.md.
 package cli

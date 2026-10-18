@@ -1,4 +1,5 @@
-// Command render writes the behavior catalog's JSON index into docs/design.
+// Command render writes the JSON index of the conformance When and It labels
+// into docs/design.
 package main
 
 import (

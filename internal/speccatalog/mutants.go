@@ -10,7 +10,7 @@ import (
 
 // Unmutated reads the "Clause: <when> → <it>" lines of every *.patch in
 // patchDir and returns the clauses no patch names, sorted, and every Clause
-// line naming a sentence the catalog does not hold, as "<patch>: <clause>".
+// line naming a clause specs/ does not state, as "<patch>: <clause>".
 // One reading serves the conventions suite and the listing on the command
 // line, so the two cannot drift apart.
 func Unmutated(clauses []string, patchDir string) (unmutated, unknown []string, err error) {

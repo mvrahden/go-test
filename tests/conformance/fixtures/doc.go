@@ -1,2 +1,2 @@
-// Package fixtures holds the conformance suites for the "fixtures" part of the behavior catalog.
+// Package fixtures holds the conformance suites that verify specs/fixtures/spec.md.
 package fixtures

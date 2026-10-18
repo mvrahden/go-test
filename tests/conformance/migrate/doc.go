@@ -1,2 +1,2 @@
-// Package migrate holds the conformance suites for the "migrate" part of the behavior catalog.
+// Package migrate holds the conformance suites that verify specs/migrate/spec.md.
 package migrate
