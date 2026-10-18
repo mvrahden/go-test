@@ -622,6 +622,14 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |
 | `lint-error-contains-any-receiver` | `Contains(t, v.Error(), s)` becomes `ErrorContains` on a receiver that does not implement error | conformance: the lint It for Error searches sees the fix fail to compile |
 | `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |
+| `lint-fix-all-or-nothing` | a `-fix` run with one fix that does not compile applies none | conformance: the lint `-fix` It finds the run failed and the other fixes unwritten |
+| `lint-fix-errors-repeated` | a compiler error is listed again as the go command printed it | conformance: the lint It for a target that does not compile counts its error twice |
+| `lint-rule-testify-suites-checked` | a struct embedding testify's `suite.Suite` is read as a gotest suite | conformance: the lint It for a testify suite finds gotest suite rules reporting on it |
+| `lint-rule-own-t-method-escapes` | a `T()` call on any type counts as the `*gotest.T` escape | conformance: the lint It for a type with its own `T` method finds `t-escape` findings |
+| `lint-rule-poll-scope-misses-helpers` | `poll-scope` never reports the outer `t` passed to a helper | conformance: the lint It for a helper inside a polling callback finds no `poll-scope` finding |
+| `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
+| `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |
+| `lint-rule-simplify-fix-drops-comments` | the `assertion-simplify` fix drops comments between the arguments | conformance: the lint `-fix` It finds the comment gone |
 
 ## Adding a mutant
 

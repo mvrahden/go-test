@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lint LinterFixes .* / a fix that does not compile is dropped and named \(
+Expect: ^FAIL .*conformance/lint LinterFixes .* / the other fixes are applied \(
+Clause: when a fix does not compile → a fix that does not compile is dropped and named
+Clause: when a fix does not compile → the other fixes are applied
+--- a/internal/lint/fix.go
++++ b/internal/lint/fix.go
+@@ -91,7 +91,7 @@
+ 	switch {
+ 	case err == nil:
+ 		return trial, nil, nil
+-	case !errors.As(err, &ce) || len(ce.broken) == 0:
++	case err != nil || !errors.As(err, &ce):
+ 		return nil, nil, err
+ 	case len(group) == 1:
+ 		fix := group[0]

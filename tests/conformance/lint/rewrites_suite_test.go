@@ -158,7 +158,7 @@ func (s *LinterRewritesTestSuite) BeforeAll(t *gotest.T) {
 	s.before = rowVerdicts(t, s.dir)
 	s.findings = rowFindings(t, s.dir)
 
-	// -fix writes all of a run's fixes or none, so each row is fixed alone.
+	// Each row is fixed alone, so its verdict reads only its own fix.
 	s.fixed = map[string]string{}
 	s.fixErr = map[string]string{}
 	fixes := make([]string, len(rewriteRows))

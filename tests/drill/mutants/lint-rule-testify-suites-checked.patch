@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / gotest's suite rules and generation-rejects leave a testify suite to the testify rule \(
+Clause: when a package holds a testify suite → gotest's suite rules and generation-rejects leave a testify suite to the testify rule
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -483,7 +483,7 @@
+ // isTestifySuite reports whether the package type name is a testify suite.
+ func isTestifySuite(pass *analysis.Pass, name string) bool {
+ 	tn, ok := pass.Pkg.Scope().Lookup(name).(*types.TypeName)
+-	return ok && gotestast.IsTestifySuite(tn.Type())
++	return false && ok && gotestast.IsTestifySuite(tn.Type())
+ }
+ 
+ // X_ (skip) prefixes are intentionally not flagged: a skipped test is visibly

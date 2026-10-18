@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint leaves calls through that T method unreported \(
+Clause: when a type of its own has a T method → lint leaves calls through that T method unreported
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1158,7 +1158,7 @@
+ 		return false
+ 	}
+ 	sel, ok := call.Fun.(*ast.SelectorExpr)
+-	return ok && sel.Sel.Name == "T" && namedPtrType(info.TypeOf(sel.X), gotestImportPath, "T")
++	return ok && sel.Sel.Name == "T" && info != nil
+ }
+ 
+ func checkOrphanedFiles(pass *analysis.Pass) {

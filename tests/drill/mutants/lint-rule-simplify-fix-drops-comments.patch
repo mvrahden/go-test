@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / a rewritten assertion keeps the comment between its arguments \(
+Clause: when lint -fix rewrites assertions that carry messages and comments → a rewritten assertion keeps the comment between its arguments
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -737,7 +737,7 @@
+ 		parts[i] = src.text(pass.Fset, arg)
+ 	}
+ 	newText := qual + to + "(" + strings.Join(parts, ", ") + ")"
+-	stray := src.strayComments(call.Pos(), call.End(), kept)
++	stray := src.strayComments(call.Pos(), call.Pos(), kept)
+ 	if len(stray) > 0 {
+ 		indent, ok := src.lineIndent(call.Pos())
+ 		if !ok {

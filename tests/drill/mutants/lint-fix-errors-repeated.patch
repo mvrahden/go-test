@@ -1,0 +1,19 @@
+Expect: ^FAIL .*conformance/lint LinterFixes .* / a package that does not compile is reported once, with its path relative to the module \(
+Clause: when a lint target does not compile → a package that does not compile is reported once, with its path relative to the module
+--- a/internal/lint/preflight.go
++++ b/internal/lint/preflight.go
+@@ -226,12 +226,12 @@
+ 	var out []string
+ 	for _, e := range p.Errors {
+ 		if build, ok := strings.CutPrefix(e.Msg, "# "); ok && e.Kind == packages.ListError {
+-			if checked {
++			if checked && len(p.Syntax) == 0 {
+ 				continue
+ 			}
+ 			for _, line := range strings.Split(build, "\n")[1:] {
+ 				if m := positioned.FindStringSubmatch(line); m != nil {
+-					out = append(out, r.position(m[1])+": "+m[2])
++					out = append(out, m[1]+": "+m[2])
+ 				} else if line = strings.TrimSpace(line); line != "" {
+ 					out = append(out, line)
+ 				}
