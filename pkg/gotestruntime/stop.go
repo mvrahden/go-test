@@ -73,73 +73,94 @@ func stopWatch() {
 //
 // Under the gotest runner a signal counts only once the runner has created the
 // stop file, so a signal the code under test sends its own process is left to
-// that code; a parent that is gone counts as well, and so does a stream
-// nobody reads any more, which the watcher checks for itself. Under plain go test only
-// SIGINT counts, the Ctrl-C a developer sends. Fuzzing is left to Go once its
-// engine has the target: it stops on an interrupt by itself, saving what it
-// found, and the target returns. A signal ignored when the process started
-// stays ignored.
+// that code. The stop file counts by itself too, which the watcher polls for:
+// on Windows it is the only stop the runner sends. So does a parent that is
+// gone, and a stream nobody reads any more, which the watcher checks for
+// itself. Under plain go test only SIGINT counts, the Ctrl-C a developer
+// sends, and nothing is polled. Fuzzing is left to Go once its engine has the
+// target: it stops on an interrupt by itself, saving what it found, and the
+// target returns. A signal ignored when the process started stays ignored.
 type watcher struct {
-	stderr io.Writer
-	sigs   []os.Signal
-	ch     chan os.Signal
-	quit   chan struct{}
-	done   chan struct{}
-	polled chan struct{}
+	stderr  io.Writer
+	file    string // the runner's stop file; empty under plain go test
+	sigs    []os.Signal
+	ch      chan os.Signal // the signals that arrived
+	found   chan os.Signal // a stop the poll found
+	running bool
+	quit    chan struct{}
+	done    chan struct{}
+	polled  chan struct{}
 }
 
-func watch(stderr io.Writer) *watcher {
+func watch(stderr io.Writer) *watcher { return watchFile(stderr, stopFile) }
+
+func watchFile(stderr io.Writer, file string) *watcher {
 	notePipe()
-	w := &watcher{stderr: stderr, ch: make(chan os.Signal, 1), quit: make(chan struct{}), done: make(chan struct{}), polled: make(chan struct{})}
+	w := &watcher{stderr: stderr, file: file, ch: make(chan os.Signal, 1), found: make(chan os.Signal, 1),
+		quit: make(chan struct{}), done: make(chan struct{}), polled: make(chan struct{})}
 	candidates := []os.Signal{os.Interrupt}
-	if stopFile != "" {
+	if w.file != "" {
 		candidates = append(candidates, stopSignals...)
-		// The runner signals this process by pid, so the converter in front
-		// of it lives on to relay the stream to its end.
-		_ = os.WriteFile(protocol.StopPIDPath(stopFile), []byte(strconv.Itoa(os.Getpid())), 0o600)
+		// The runner stops this process alone, by pid or by the stop file, so
+		// the converter in front of it lives on to relay the stream to its end.
+		_ = os.WriteFile(protocol.StopPIDPath(w.file), []byte(strconv.Itoa(os.Getpid())), 0o600)
 	}
 	for _, s := range candidates {
 		if !signal.Ignored(s) {
 			w.sigs = append(w.sigs, s)
 		}
 	}
-	if len(w.sigs) == 0 {
+	if len(w.sigs) == 0 && w.file == "" {
 		close(w.done)
 		close(w.polled)
 		return w
 	}
-	signal.Notify(w.ch, w.sigs...)
+	if len(w.sigs) > 0 {
+		signal.Notify(w.ch, w.sigs...)
+	}
+	w.running = true
 	go w.loop()
-	if stopFile != "" && watchesStdout() && len(stopSignals) > 0 {
-		go w.pollReader(stopSignals[0])
+	if w.file != "" {
+		sig := os.Interrupt
+		if len(stopSignals) > 0 {
+			sig = stopSignals[0]
+		}
+		go w.poll(sig)
 	} else {
 		close(w.polled)
 	}
 	return w
 }
 
-// readerPoll is how often the watcher checks that its stream is still read.
-const readerPoll = 200 * time.Millisecond
+// stopFilePoll is how often the watcher looks for the runner's stop file;
+// readerPoll how often it checks that its parent lives and its stream is
+// still read.
+const (
+	stopFilePoll = 25 * time.Millisecond
+	readerPoll   = 200 * time.Millisecond
+)
 
-// pollReader hands the loop sig once nobody reads the stream any more: under
-// -json behind an -exec wrapper that stays, the converter's death is the
-// only trace a dead runner leaves. It fires once.
-func (w *watcher) pollReader(sig os.Signal) {
+// poll hands the loop sig once the runner's stop file exists, the parent is
+// gone, or nobody reads the stream any more: under -json behind an -exec
+// wrapper that stays, the converter's death is the only trace a dead runner
+// leaves. It runs under the runner only, and fires once.
+func (w *watcher) poll(sig os.Signal) {
 	defer close(w.polled)
-	tick := time.NewTicker(readerPoll)
+	tick := time.NewTicker(stopFilePoll)
 	defer tick.Stop()
-	for {
+	for n := 0; ; n++ {
 		select {
 		case <-w.quit:
 			return
 		case <-tick.C:
-			if stdoutReaderGone() {
-				select {
-				case w.ch <- sig:
-				default: // a signal is pending; the loop checks the stream for it
-				}
-				return
+		}
+		_, err := os.Stat(w.file)
+		if err == nil || n%int(readerPoll/stopFilePoll) == 0 && (parentExited() || stdoutReaderGone()) {
+			select {
+			case w.found <- sig:
+			default:
 			}
+			return
 		}
 	}
 }
@@ -152,7 +173,11 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
-				w.stop(sig) // returns once the run has stopped, or ends the process
+				w.stop(sig, true) // returns once the run has stopped, or ends the process
+			}
+		case sig := <-w.found:
+			if w.counts(sig) {
+				w.stop(sig, false)
 			}
 		}
 	}
@@ -165,13 +190,13 @@ func (w *watcher) counts(sig os.Signal) bool {
 	if runstate.FuzzTarget() != "" && runstate.FuzzEngine() {
 		return false
 	}
-	if stopFile == "" {
+	if w.file == "" {
 		return sig == os.Interrupt
 	}
-	if _, err := os.Stat(stopFile); err == nil {
+	if _, err := os.Stat(w.file); err == nil {
 		return true
 	}
-	return os.Getppid() != parentPID || stdoutReaderGone()
+	return os.Getppid() != parentPID || parentExited() || stdoutReaderGone()
 }
 
 // stopGrace is how long a stop waits for a running method body to return once
@@ -185,9 +210,13 @@ const stopGrace = 5 * time.Second
 // stream carries every verdict. A method body that does not return within
 // stopGrace, or a run that does not finish within the release bound, is
 // forced: the fixtures are torn down, within that same bound, and the process
-// ends by sig.
-func (w *watcher) stop(sig os.Signal) {
-	signal.Reset(w.sigs...)
+// ends by sig. A stop that came by a signal resets the handlers, so the next
+// one ends the process; one the poll found keeps them, so the runner's own
+// signal that follows its stop file does not.
+func (w *watcher) stop(sig os.Signal, bySignal bool) {
+	if bySignal && len(w.sigs) > 0 {
+		signal.Reset(w.sigs...)
+	}
 	deadline, settled := w.settle(sig, stopGrace)
 	if settled {
 		return
@@ -267,6 +296,8 @@ func waitHoldsEnd(deadline time.Time) bool {
 func (w *watcher) close() {
 	if len(w.sigs) > 0 {
 		signal.Stop(w.ch)
+	}
+	if w.running {
 		close(w.quit)
 	}
 	<-w.done

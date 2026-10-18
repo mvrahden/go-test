@@ -2,8 +2,7 @@
 
 package gotestrunner
 
-import "errors"
-
-// signalSuite has no signal for one process on Windows; the caller falls back
-// to the console interrupt the tree sends.
-func signalSuite(int, int) error { return errors.New("no per-process signal on windows") }
+// signalSuite stops a suite by its stop file alone on Windows: a console
+// event would reach the converter in front of it, which cannot ignore one
+// there and dies, taking the rest of the stream with it.
+var signalSuite = stopFileSignal

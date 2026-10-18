@@ -216,9 +216,9 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 // When test2json is true, the binary is wrapped with the test2json tool.
 //
 // On context cancellation, cmd.Cancel announces the stop and signals the
-// suite process by the pid it published, so the converter in front of it
-// relays the stream to its end; a process that published none gets the
-// group's interrupt. A per-process kill timer (from the teardown budget
+// suite process alone, by the pid it published on Unix and by the stop file
+// itself on Windows, so the converter in front of it relays the stream to its
+// end; a process that published no pid gets the tree's interrupt. A per-process kill timer (from the teardown budget
 // file) then governs when SIGKILL is sent, and nothing else kills. Output is
 // read by the managed process itself, so a grandchild outside the group that
 // keeps the pipes open holds the result for the drain delay at most.
@@ -238,7 +238,8 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	var cutShort atomic.Bool
 	cmd.Cancel = func() error {
 		cutShort.Store(true)
-		// Announced before the signal: the process reads it on the signal.
+		// Announced before the signal: the process reads it on the signal,
+		// or polls for it where no signal comes.
 		if target.StopFile != "" {
 			_ = os.WriteFile(target.StopFile, nil, 0o600)
 			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {

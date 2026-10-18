@@ -27,3 +27,7 @@ func askForParentDeath() {
 		_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
 	}
 }
+
+// parentExited has nothing to add on Linux: the death signal arrives, and
+// the parent pid tells.
+func parentExited() bool { return false }

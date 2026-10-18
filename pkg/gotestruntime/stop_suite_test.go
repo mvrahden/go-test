@@ -3,6 +3,8 @@ package gotestruntime_test
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -39,6 +41,25 @@ func (s *StopTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
 	t.When("the run is asked to stop while a method runs", func(w *gotest.T) {
 		w.It("runs no method that had not started", func(it *gotest.T) {
 			gotest.Equal(it, []string{"TestFirst"}, ran)
+		})
+	})
+}
+
+func (s *StopTestSuite) TestAStopFileWithoutASignalStopsTheRun(t *gotest.T) {
+	path := filepath.Join(t.TempDir(), "stop")
+	stopped := runstate.StopContext()
+	stop := gotestruntime.ExportWatchStopFile(t.T(), path)
+	gotest.NoError(t, os.WriteFile(path, nil, 0o600))
+	var ended bool
+	select {
+	case <-stopped.Done():
+		ended = true
+	case <-time.After(time.Second):
+	}
+	stop()
+	t.When("the runner's stop file appears and no signal follows", func(w *gotest.T) {
+		w.It("stops the run within a second", func(it *gotest.T) {
+			gotest.True(it, ended)
 		})
 	})
 }
