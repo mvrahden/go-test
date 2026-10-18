@@ -245,21 +245,9 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 - Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 - Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
 
-Without `--setup-timeout`, the wait for the whole setup is what the fixtures declare: each reports `Timeout × (Retries+1) + RetryDelay × Retries` as its setup starts and the deadline moves to the latest, 2m until the first report; a fixture without a `Timeout` lifts it.
+Without `--setup-timeout`, the wait for the whole setup is what the fixtures declare: each reports `Timeout × (Retries+1) + RetryDelay × Retries` as its setup starts and the deadline moves to the latest, 2m until the first report; a fixture without a `Timeout` lifts it ([A shared fixture's declared setup budget](../../specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
 
-> when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
-
-The protocol is read whole, line by line, and nothing a fixture prints is part of it:
-
-> when a shared fixture's setup prints to stdout without a newline → its suite receives the state
-
-> when a shared fixture's setup logs a JSON-shaped line → its suite receives the state
-
-> when a shared fixture's setup logs a JSON-shaped line → the line is not an event of the run
-
-> when a shared fixture carries 2 MiB of state → its suite receives the state
-
-> when every such fixture came up → the run passes
+The protocol is read whole, line by line, and nothing a fixture prints is part of it ([Shared fixture state reaches its suites](../../specs/fixtures/spec.md#requirement-shared-fixture-state-reaches-its-suites)).
 
 ### State transfer
 
@@ -397,9 +385,7 @@ Window scheduling is always on; there is no configuration.
 
 Fixture setup does not run at package init.
 Each generated top-level function that binds fixtures — a suite's `Test` function, each of its `Fuzz` seed-replay wrappers, its `Benchmark` wrapper — holds them for itself (`gotestruntime.HoldFixtures`): `OpenSuite` sets the DAG up right after the suite's `SuiteGuard`, before its config and `BeforeAll`, and the hold tears it down in its own cleanup, after the suite's `AfterAll`.
-A suite its guard skips sets up none of its package fixtures and hydrates none of its shared ones; the runner still starts those shared fixtures, since it cannot evaluate the guard:
-
-> when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
+A suite its guard skips sets up none of its package fixtures and hydrates none of its shared ones; the runner still starts those shared fixtures, since it cannot evaluate the guard ([A guard does not hold back a shared fixture](../../specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
 
 A run whose `-run`/`-skip` selects no fixture-bound function never pays setup, and `-count`, `-shuffle` or any other selection flag cannot tear a fixture down under a test that still uses it: nothing counts tests.
 
@@ -411,34 +397,19 @@ A package fixture is therefore set up once per function that binds it, not once 
 Under the runner this changes nothing for tests — each suite runs in a process of its own — but a fixture-bound suite with fuzz methods sets its fixtures up once more for each `Fuzz` wrapper, whose seeds replay in a function of their own; the suite's own `BeforeAll` already runs per wrapper the same way.
 Under plain `go test`, every suite of the package sets the fixtures up for itself.
 A resource too expensive for that belongs in a shared fixture, which comes up once per run.
-A shared fixture's state is written by the runner alone, so a suite that binds one is not plain `go test`'s to run:
-
-> when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
+A shared fixture's state is written by the runner alone, so a suite that binds one is not plain `go test`'s to run ([Shared fixtures need the gotest runner](../../specs/fixtures/spec.md#requirement-shared-fixtures-need-the-gotest-runner)).
 
 **A panic.** The testing package runs the cleanups of the panicking test and of every test above it before it ends the process, so a panic anywhere below a holding function — a method, `It`/`When`/`Each`, `BeforeAll`/`AfterAll`, a fuzz body, a parallel or raw subtest, a cleanup — releases the fixtures. A benchmark is the exception: a panicking sub-benchmark runs only its own cleanups, and the testing package can lose a benchmark's panic altogether, printing PASS and exiting 0. So gotest recovers a panic anywhere on the benchmark path — a benchmark method, its `BeforeEach`/`AfterEach`, the suite's `BeforeAll` or `AfterAll` — prints it with its stack, and fails the benchmark (exit 1); every generated `b.Run` defers `gotestruntime.ReleaseOnPanic` for this. The remaining benchmarks, the suite's `AfterAll` and the fixture teardown then run as after any failure. Under `GODEBUG=panicnil=1` nothing is recovered, since recovering would swallow `panic(nil)`.
+See [A panic among parallel methods](../../specs/lifecycle/spec.md#requirement-a-panic-among-parallel-methods) and [A benchmark that panics](../../specs/lifecycle/spec.md#requirement-a-benchmark-that-panics).
 
-> when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
-
-> when a benchmark panics → runs AfterAll before the fixture is released
-
-**A stop.** Ctrl-C, gotest's `--timeout`, a cancelled run: while a suite runs, a watcher takes the stop. The contexts of test methods and of fixture setup end first, so a test blocked on a resource returns it; the methods not yet started are skipped with the reason `run stopping`; setup in flight is waited for (a cancelled setup tears down what it brought up); `AfterAll` runs and the held fixtures are released. A method that has not returned five seconds after its context ended ignores it, and nothing but ending the process can stop it: it is cut short — the fixtures are torn down and the process ends by the signal, so the runner books the method as cut short. Otherwise, under the runner the process ends with the tests' own status, so the stream carries every verdict and the runner exits 130; under plain `go test` it ends by the signal once the suite has torn down, since nothing else there would mark the run interrupted, and the suites after it never run. A setup that would start after the stop is refused. Releasing is bounded by the teardown budget the process gave the runner; past it the process says what it could not release and ends anyway. A hold already tearing down when the signal arrives finishes first.
-
-> when the run is interrupted while a method holds → exits 130
-
-> when the run is interrupted while a method holds → ends the holding method's context
-
-> when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
-
-> when the run is interrupted while a method holds → runs AfterAll before the fixture is released
+**A stop.** Ctrl-C, gotest's `--timeout`, a cancelled run: while a suite runs, a watcher takes the stop. The contexts of test methods and of fixture setup end first, so a test blocked on a resource returns it; the methods not yet started are skipped with the reason `run stopping`; setup in flight is waited for (a cancelled setup tears down what it brought up); `AfterAll` runs and the held fixtures are released. A method that has not returned five seconds after its context ended ignores it, and nothing but ending the process can stop it: it is cut short — the fixtures are torn down and the process ends by the signal, so the runner books the method as cut short. Otherwise, under the runner the process ends with the tests' own status, so the stream carries every verdict and the runner exits 130; under plain `go test` it ends by the signal once the suite has torn down, since nothing else there would mark the run interrupted, and the suites after it never run. A setup that would start after the stop is refused. Releasing is bounded by the teardown budget the process gave the runner; past it the process says what it could not release and ends anyway. A hold already tearing down when the signal arrives finishes first ([Stopping a run](../../specs/lifecycle/spec.md#requirement-stopping-a-run)).
 
 Under the runner a signal counts only once the runner has announced the stop, so a signal the code under test sends its own process is left to that code — unless the process's parent is gone (the CLI crashed), when nobody is left to announce it. Under plain `go test` only Ctrl-C (SIGINT) counts, so a test that sends SIGINT to its own process while it holds fixtures ends the run; use SIGTERM there, or run under gotest. A signal ignored when the process started stays ignored. Between suites no watcher runs and a signal has Go's default action: nothing is held.
 Fuzzing is left to Go once its engine has the selected target: it stops on Ctrl-C by itself — stopping the workers, saving what it found — and the target returns, so its fixtures tear down after it. `gotest fuzz` stops its fuzzing processes with the same Ctrl-C. A fuzz worker gets about a second from Go's coordinator to exit before it is killed, so a package fixture whose teardown takes longer is cut in the workers; fuzzing against external resources belongs in a shared fixture, which workers only hydrate.
 
 **What is not released.** A panic on a goroutine the test started outside `gotest.Go`, a process killed outright, `os.Exit` or `log.Fatal` in the code under test, a fatal runtime error, and `go test`'s own `-timeout`, whose alarm ends the process without cleanups. A resource that must never leak belongs in a shared fixture or behind a reaper of its own.
 
-A process a test started and never waited for is not released by the test, but it does not outlive the run: a suite runs as the root of its own process group, and whatever is left of the group is killed once the suite's process has been reaped (on Linux a child also dies with the runner itself):
-
-> when a test starts sleep 4242 and never waits for it → the test passes and no such process outlives the run
+A process a test started and never waited for is not released by the test, but it does not outlive the run: a suite runs as the root of its own process group, and whatever is left of the group is killed once the suite's process has been reaped, and on Linux a child also dies with the runner itself ([No process outlives the run](../../specs/lifecycle/spec.md#requirement-no-process-outlives-the-run)).
 
 The watcher is a goroutine and a signal handler that live exactly as long as the suite runs: `goleak.VerifyNone` inside a test sees them, `goleak.VerifyTestMain` does not.
 
@@ -446,11 +417,7 @@ The watcher is a goroutine and a signal handler that live exactly as long as the
 
 A run streams: each shared fixture's state is emitted as its `BeforeAll` completes, and suites are dispatched as soon as *their* transitive dependencies are ready, with per-suite state files.
 
-A shared fixture starts for the suites the run dispatches, and for no other; `-skip` counts in that plan the way `-run` does:
-
-> when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
-
-> when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
+A shared fixture starts for the suites the run dispatches, and for no other; `-skip` decides that as `-run` does ([Selection decides which shared fixtures start](../../specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start)).
 
 `spec`, `summary` and `watch` run the same way.
 A `bench` run waits for its first window of shared fixtures instead, and for every package to compile, before it dispatches: benchmarks run one at a time, each reading its own state file of exactly the fixtures it declares.
@@ -464,9 +431,7 @@ A `bench` run waits for its first window of shared fixtures instead, and for eve
 - Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the function that held it (`fixture teardown failed`).
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
 
-A per-method hook's error is the method's failure, located where the hook produced it:
-
-> when a fixture BeforeEach returns an error → is reported in the hook's own file, not the runtime's
+A per-method hook's error is the method's failure, located where the hook produced it ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
 ### Config markers
 

@@ -65,8 +65,8 @@ the run) AND makes a missing `MatchSnapshot` baseline fail instead of
 being created. `--update-snapshots` rewrites baselines — in CI too, so
 never pass it there. `--spec` renders the spec view
 instead of default output. `--timeout <dur>` is the global pipeline
-deadline (default 15m) and `--setup-timeout <dur>` the shared-fixture
-setup budget (default 2m) — `0` disables either; `--min <pct>` gates
+deadline (default 15m) and `--setup-timeout <dur>` a flat shared-fixture
+setup budget (default: what the fixtures declare, v1.34+) — `0` disables either; `--min <pct>` gates
 coverage, `--no-cache` forces fresh generation and linking, `--debug` keeps overlays.
 
 ## Benchmarks — `gotest bench` (v1.29+)

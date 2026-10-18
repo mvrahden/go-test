@@ -46,16 +46,17 @@ pattern). Shared fixture types must live in a NON-internal package: the
 setup subprocess cannot import `internal/` paths.
 
 Timeouts: `FixtureConfig()` marker; a zero `Timeout` means the default
-(see `config.md`). All shared fixture setup together is also capped by
-`--setup-timeout` (default 2m), so a 5m `ContainerFixtureConfig()` needs
-a larger one.
+(see `config.md`). Without `--setup-timeout` the runner waits for shared
+fixture setup as long as the fixtures declare (v1.34+), so a 5m
+`ContainerFixtureConfig()` needs no flag; `--setup-timeout` sets a flat
+budget instead.
 A DECLARED `Timeout` is a verdict, not advice: it bounds the hook's
 context AND fails the fixture when `BeforeAll` or `AfterAll` returns after
 it — even when the hook ignores its context. A hook that never returns is
 not failed by it; other deadlines end it and fail the run: for a package
 fixture the test binary's `-timeout` (gotest passes 10m unless you set
-one), for a shared fixture `--setup-timeout` (default 2m) on `BeforeAll`
-and a force-kill after its teardown budget on `AfterAll`. No marker →
+one), for a shared fixture the setup wait (its declared budget, or
+`--setup-timeout` when given) on `BeforeAll` and a force-kill after its teardown budget on `AfterAll`. No marker →
 context bounds only;
 a fixture is never failed against a number its author did not write. A
 setup that returns success only after overrunning its budget is not

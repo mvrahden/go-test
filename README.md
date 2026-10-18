@@ -726,11 +726,7 @@ func (s *ParserTestSuite) FuzzParse(f *gotest.F) {
 A fuzz method takes `*gotest.F` and calls `f.Fuzz` with a callback whose first parameter is `*gotest.T`; any number of fuzzed arguments follow, exactly as with `(*testing.F).Fuzz`.
 `f.Add(...)` registers seeds, and the `F_`/`X_` prefixes focus and exclude fuzz methods like tests.
 The suite's `BeforeEach` and `AfterEach` run around every single execution, seeds included, not once per target, so each execution starts from fresh state.
-They pair as a test method's do:
-
-> when a fuzz execution's BeforeEach fails → the execution fails and its AfterEach still runs
-
-> when a fuzz execution's BeforeEach panics → the execution fails and its AfterEach still runs
+They pair as a test method's do: a failing or panicking `BeforeEach` still runs its `AfterEach` ([Execution hooks pair](specs/fuzz/spec.md#requirement-execution-hooks-pair)).
 
 Because `f.Fuzz` takes `any`, the callback's shape is checked when gotest generates, and the message names the method:
 
@@ -973,7 +969,7 @@ lint:
 |-------|------|----------|-------------|
 | `tags` | string | `-tags` | Comma-separated build tags |
 | `timeout` | duration | `--timeout` | Global pipeline deadline (default: 15m, 0 to disable) |
-| `setup-timeout` | duration | `--setup-timeout` | Flat budget for shared fixture setup (default: what the fixtures declare — each one's `Timeout × (Retries+1) + RetryDelay × Retries`, 2m until the first reports; 0 to disable) |
+| `setup-timeout` | duration | `--setup-timeout` | Flat budget for shared fixture setup (default: what the fixtures declare — each one's `Timeout × (Retries+1) + RetryDelay × Retries`, 2m until the first reports; 0 to disable; see [the setup-budget requirement](specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)) |
 | `min-coverage` | int | `--min` | Minimum coverage percentage (0–100) |
 | `parallel` | int | `--parallel` | Total concurrent test method budget |
 | `compile-parallel` | int | `--compile-parallel` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |

@@ -307,3 +307,8 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    reports `PASS` with exit 0 (a Go race, about 1 run in 200 under load):
    on an older pin, never take one green benchmark run as proof that the
    code under it does not panic.
+3. **Shared fixture setup waits for the declared budget** — without
+   `--setup-timeout`, the runner waits as long as the fixtures'
+   `SharedFixtureConfig()` declares ([the setup-budget requirement](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
+   Below v1.34 the wait is a flat 2m whatever the marker says, so a
+   slower fixture needs `--setup-timeout` raised.

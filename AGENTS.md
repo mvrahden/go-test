@@ -19,8 +19,7 @@ Calling `t.T().Helper()` is counterproductive — it removes useful location inf
 Without it, failures show both where the assertion was called (inside the helper) and where the helper was called (in the test).
 This applies to all gotest assertion functions (`gotest.Equal`, `gotest.True`, etc.).
 If you pass `t.T()` to third-party code that uses Go's standard `t.Errorf`, Go's `t.Helper()` convention applies as normal.
-
-> when a helper fails in a module whose path has no dot, built with -trimpath → the failure names the helper's line and the caller's
+This holds in a module whose path has no dot and under `-trimpath` too ([Failure locations](specs/assertions/spec.md#requirement-failure-locations)).
 
 **Never call `t.T().Cleanup()` inside suite methods.**
 Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources.
@@ -177,39 +176,17 @@ On subsequent runs, the value is compared against the stored snapshot.
 The optional `name` disambiguates multiple snapshots within the same test case.
 Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
 
-A section is keyed by the exact subtest name, the `#0` of an unnamed `Each` row and the `#01` testing gives a twin included; `B` and `F` carry `Name()` so a benchmark's or fuzz target's snapshot is keyed too:
-
-> when Each rows and same-named subtests match snapshots → #0, #1, x and x#01 each read their own section
-
-> when a snapshot name spans lines or spells a section header → is refused before anything is written
-
-> when the package is built with -trimpath → the baselines are still found beside the test, _ext suffix included
-
-> when GOTEST_UPDATE_SNAPSHOTS is 0 → a stale baseline still fails and is left as it was
+A section is keyed by the exact subtest name, the `#0` of an unnamed `Each` row and the `#01` testing gives a twin included; `B` and `F` carry `Name()` so a benchmark's or fuzz target's snapshot is keyed too ([Snapshot sections](specs/assertions/spec.md#requirement-snapshot-sections)).
+A name that spans lines or spells a section header is refused ([Snapshot names](specs/assertions/spec.md#requirement-snapshot-names)), and `GOTEST_UPDATE_SNAPSHOTS=0` leaves a stale baseline failing and untouched ([Snapshot updates switched off](specs/assertions/spec.md#requirement-snapshot-updates-switched-off)).
 
 ### Typing
 
 Assertions take the types they are given at face value and say what they cannot work with:
 
-> when Regexp is given a pattern of a named string type → compiles and matches it like a string
-
-> when Contains compares named string kinds → checks the substring as it does for strings
-
-> when Contains is given a needle no element of the haystack could be → fails naming the haystack's type and the needle's
-
-> when InDelta is given a NaN delta → fails: no distance is within NaN
-
-> when InDelta compares two equal infinities → they are within any delta
-
-> when an assertion's first extra argument is not a string → every extra argument is in the message
-
-> when ErrorAs is given an error of another type → names the type it expected
-
-> when JSONEq compares integers beyond float64's exact range → tells 9007199254740993 from 9007199254740992
-
-> when JSONEq compares an integer with its decimal spelling → 1 equals 1.0
-
-> when Equal fails on values whose rendering spans lines → the message carries a unified diff: hunks of changes with three lines of context
+- `Regexp` and `Contains` treat a named string type as a string ([Named string types](specs/assertions/spec.md#requirement-named-string-types)); a `Contains` needle the haystack cannot hold fails naming both types ([A needle of the wrong type](specs/assertions/spec.md#requirement-a-needle-of-the-wrong-type)).
+- `InDelta` fails on a NaN delta and holds equal infinities within any delta ([InDelta at the edges of float64](specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64)).
+- A non-string first extra argument puts every extra argument in the message, and `ErrorAs` names the type it expected ([Failure messages](specs/assertions/spec.md#requirement-failure-messages)).
+- `JSONEq` compares numbers by value ([JSON numbers](specs/assertions/spec.md#requirement-json-numbers)), and `Equal` on multi-line values shows a unified diff ([Multi-line diffs](specs/assertions/spec.md#requirement-multi-line-diffs)).
 
 ## Eventually & Consistently
 
@@ -227,15 +204,7 @@ gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, func(poll *gotest.R)
 
 There are no method forms on `*T`. Only package-level `gotest.Eventually()` and `gotest.Consistently()` exist.
 
-A poll is held to the deadline it was given, and the arguments are checked before the first poll:
-
-> when an Eventually poll runs past waitFor → fails at the deadline and says the poll is still running
-
-> when a Consistently poll runs past waitFor → fails at the deadline and says the poll is still running
-
-> when tick is longer than waitFor and the first poll fails → a final poll runs at the deadline and can still pass
-
-> when waitFor or tick is not positive → fails with a type-guard message and polls nothing
+A poll is held to the deadline it was given ([Polls end at waitFor](specs/assertions/spec.md#requirement-polls-end-at-waitfor)), and a `waitFor` or `tick` that is not positive fails before the first poll ([Polling arguments](specs/assertions/spec.md#requirement-polling-arguments)).
 
 **Critical constraint:** Inside the callback, `poll` is a `*gotest.R`, not a `*gotest.T`.
 `poll` has no `T()` method. All code in the callback must use gotest assertions only.
@@ -275,14 +244,9 @@ gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
 
 A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
 so it waits for a goroutine nothing has stopped yet.
+A fatal assertion on the goroutine fails the method at the wait ([Goroutines started by gotest.Go](specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
 
-> when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops → the suite passes: the wait comes after AfterAll
-
-> when a goroutine started by gotest.Go fails a fatal assertion → the wait on it fails the method there, and nothing after the wait runs
-
-A process the test starts and never waits for is not the test's to release, but it does not outlive the run:
-
-> when a test starts sleep 4242 and never waits for it → the test passes and no such process outlives the run
+A process the test starts and never waits for is not the test's to release, but it does not outlive the run ([No process outlives the run](specs/lifecycle/spec.md#requirement-no-process-outlives-the-run)).
 
 ## Suite Conventions
 
@@ -322,19 +286,9 @@ All are optional.
 Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
 
-`FailFast` is judged per method; a failure `BeforeAll` records without stopping skips nothing:
+`FailFast` is judged per method; a failure `BeforeAll` records without stopping skips nothing ([FailFast](specs/lifecycle/spec.md#requirement-failfast)).
 
-> when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
-
-> when BeforeAll of a FailFast suite records a failure without stopping and no method fails → runs every method
-
-A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`; a method that ignores its context for five seconds is cut short, and the process ends by the signal:
-
-> when the run is interrupted while a method holds → ends the holding method's context
-
-> when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
-
-> when the run is interrupted while a method holds → runs AfterAll before the fixture is released
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`; a method that ignores its context for five seconds is cut short, and the process ends by the signal ([Stopping a run](specs/lifecycle/spec.md#requirement-stopping-a-run)).
 
 **On failure and panic.**
 `AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
@@ -345,9 +299,7 @@ does not: with nothing returned there is no context to release, and the per-test
 would clean up was never created.
 A panic in a method ends the suite as it would under `go test`: the method's own
 teardown and `AfterAll` run, and in a parallel suite the siblings still running are cut
-short with it:
-
-> when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
+short with it ([A panic among parallel methods](specs/lifecycle/spec.md#requirement-a-panic-among-parallel-methods)).
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
@@ -436,10 +388,7 @@ func (s *MyTestSuite) SuiteGuard() string {
 
 Returns empty string to run, non-empty to skip with that reason.
 Runs before the suite's fixtures, config, `BeforeAll`, and any test method, so fixture fields are still nil inside it.
-A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard:
-
-> when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
-
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard ([A guard does not hold back a shared fixture](specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
 Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes
@@ -489,8 +438,7 @@ type UserTestSuite struct {
 
 When both fixture and suite define `BeforeEach`/`AfterEach`, the fixture's hooks wrap the suite's:
 fixture.BeforeEach -> suite.BeforeEach -> test -> suite.AfterEach -> fixture.AfterEach.
-
-> when a fixture BeforeEach returns an error → is reported in the hook's own file, not the runtime's
+A fixture hook's failure is reported at the hook's own source ([Where a fixture hook failure is reported](specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
 Fixtures compose via pointer fields (DAG — dependencies set up first):
 
@@ -510,9 +458,7 @@ func (f *DBFixture) FixtureConfig() gotest.FixtureConfig {
 ```
 
 Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 1 retry, 5s delay).
-The declared `Timeout` is also how long the runner waits for a shared fixture's setup:
-
-> when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
+The declared `Timeout` is also how long the runner waits for a shared fixture's setup when no `--setup-timeout` is given ([A shared fixture's declared setup budget](specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
 
 **Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
 panics fails the run — for package and shared fixtures alike. A panic in one fixture's
@@ -549,13 +495,7 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 ```
 
 Fields assigned in `Hydrate` are automatically classified as local and excluded from serialization.
-The state travels on a pipe of its own, so the fixture may print what it likes to stdout, and only the runner can provide it:
-
-> when a shared fixture's setup prints to stdout without a newline → its suite receives the state
-
-> when a shared fixture's setup logs a JSON-shaped line → the line is not an event of the run
-
-> when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
+The state travels on a pipe of its own, so the fixture may print what it likes to stdout ([Shared fixture state reaches its suites](specs/fixtures/spec.md#requirement-shared-fixture-state-reaches-its-suites)), and only the runner can provide it: under plain `go test` the suite fails before any method runs ([Shared fixtures need the gotest runner](specs/fixtures/spec.md#requirement-shared-fixtures-need-the-gotest-runner)).
 
 Shared fixture configuration uses a method named `SharedFixtureConfig()` (not `FixtureConfig()`) but returns the same `gotest.FixtureConfig` type:
 
@@ -568,10 +508,7 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 Suites reference shared fixtures via pointer fields (same as package fixtures).
 Shared fixtures must not live in `internal/` packages.
 Shared fixtures are window-scheduled: each is resident exactly while a scheduled suite needs it — never started when no dispatched suite requires it, and released or started at the bulk→exclusive-tail barrier as the phases' needs differ.
-
-> when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
-
-> when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
+`-skip` counts: a fixture no selected suite binds never starts ([Selection decides which shared fixtures start](specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start)).
 
 ### Generic test suites (contract testing)
 
@@ -628,13 +565,7 @@ for t, entry := range gotest.Each(t, entries) {
 Subtest names are derived from the entry struct's `Desc` or `Name` string field (if present), otherwise `#0`, `#1`, etc.
 Every row is its own subtest with its own verdict. A row that leaves early ends the method
 there — Go's range-over-func cannot resume a loop whose body left through `FailNow` or
-`Skipf` — so a row that should merely be passed over uses `continue`:
-
-> when one row of an Each table fails → fails that row and the method, and the rows after it never run
-
-> when one row of an Each table skips → skips that row and the method from there, and the rows after it never run
-
-> when the loop over an Each table breaks → stops at the break and the method goes on
+`Skipf` — so a row that should merely be passed over uses `continue` ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)).
 
 ## Utilities
 
