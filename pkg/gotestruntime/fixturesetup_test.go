@@ -176,3 +176,27 @@ func (s *FixtureSetupTestSuite) TestParentCancellation(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FixtureSetupTestSuite) TestCancellationDuringTheRetryDelay(t *gotest.T) {
+	t.When("the parent context is cancelled while the retry delay runs", func(w *gotest.T) {
+		w.It("reports the cancellation without running AfterAll, which the caller's teardown runs once", func(it *gotest.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			afterAlls := 0
+			err := gotestruntime.RunFixtureSetup(ctx, gotestruntime.FixtureSetup{
+				Name:       "Delayed",
+				Retries:    1,
+				RetryDelay: 2 * time.Second,
+				BeforeAll: func(context.Context) error {
+					time.AfterFunc(50*time.Millisecond, cancel)
+					return errors.New("not yet")
+				},
+				AfterAll: func(context.Context) error {
+					afterAlls++
+					return nil
+				},
+			})
+			gotest.ErrorIs(it, err, context.Canceled)
+			gotest.Zero(it, afterAlls)
+		})
+	})
+}

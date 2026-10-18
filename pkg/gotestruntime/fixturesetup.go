@@ -61,7 +61,7 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 	var lastErr error
 
 	for i := range attempts {
-		if ctx.Err() != nil {
+		if i == 0 && ctx.Err() != nil {
 			return ctx.Err()
 		}
 
@@ -102,16 +102,19 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 		}
 		if i < attempts-1 {
 			fmt.Fprintf(os.Stderr, "%s.BeforeAll attempt %d/%d failed: %v\n", s.Name, i+1, attempts, lastErr)
-			if s.AfterAll != nil {
-				if RunFixtureTeardown(ctx, FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: s.AfterAll}) {
-					fmt.Fprintf(os.Stderr, "%s.AfterAll between attempts failed; the retry runs anyway\n", s.Name)
-				}
-			}
+			// The delay runs before the release: a parent cancelled meanwhile
+			// returns with the attempt still held, and the caller's teardown
+			// releases it once, as it does any attempted fixture.
 			if s.RetryDelay > 0 {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
 				case <-time.After(s.RetryDelay):
+				}
+			}
+			if s.AfterAll != nil {
+				if RunFixtureTeardown(ctx, FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: s.AfterAll}) {
+					fmt.Fprintf(os.Stderr, "%s.AfterAll between attempts failed; the retry runs anyway\n", s.Name)
 				}
 			}
 		}
