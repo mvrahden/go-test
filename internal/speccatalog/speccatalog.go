@@ -40,8 +40,12 @@ func Render(ctx context.Context, repoRoot string) (md, js []byte, err error) {
 	return md, js, nil
 }
 
+// render reads the catalog as linux sees the source, on every host: a
+// build-constrained conformance file (unix-only, say) would otherwise make the
+// committed catalog depend on where it was rendered. What only another
+// platform compiles is not catalogued.
 func render(ctx context.Context, repoRoot, format string) ([]byte, error) {
-	run, err := testkit.RunCLI(ctx, repoRoot, "spec", "--static", "--format="+format, Pattern)
+	run, err := testkit.RunCLIWithEnv(ctx, repoRoot, []string{"GOOS=linux"}, "spec", "--static", "--format="+format, Pattern)
 	if err != nil {
 		return nil, err
 	}
