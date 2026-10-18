@@ -67,6 +67,7 @@ Each directory under `testdata/` is one package with one suite:
 | `cancelbeforesetup` | a run stopped while a shared fixture's dependency sets up runs no `AfterAll` for the fixture, whose `BeforeAll` never ran, and the dependency's `AfterAll` |
 | `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
 | `killedcli` | the CLI killed while a shared fixture is up: the fixture's `AfterAll`, which logs and takes 2s, runs to its end and its process exits (Unix only) |
+| `latebudget` | a shared fixture started for the exclusive tail is released under the teardown budget its declared 2s `Timeout` gives: its `AfterAll`, which never returns, is force-killed after 32s, not the default's 2m30s |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

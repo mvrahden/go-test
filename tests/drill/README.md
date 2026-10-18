@@ -201,6 +201,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `late-start-waits-the-default` | a shared fixture started late, for the exclusive tail or a bench slot, is waited for the default 2m instead of its declared budget | fixtures conformance: the tail and bench-slot waits outlast the fixture's 2s budget |
 | `reported-teardown-budget-ignored` | the runner ignores the teardown budget on the setup process's `_done` line | fixtures conformance: the sibling's 8s AfterAll is force-killed at the 5s fallback |
 | `late-start-outlives-the-run` | the wait for a late shared fixture start ignores the run's cancellation | fixtures conformance: the run's --timeout no longer ends the wait, and the fixture process is left behind |
+| `late-teardown-budget-unreported` | the shared fixture process's acknowledgement of a start carries no teardown budget, so a fixture started late is released under the budget reported before it came up | canary: the `latebudget` fixture's hung AfterAll is force-killed after 30s instead of its 32s |
 | `unready-fixture-served-empty` | a shared fixture that never came up is taken for one that did, and its state file is written without its state | fixtures conformance: the suite, the exclusive-tail suite and the benchmark reading a hung fixture run against an empty one |
 | `given-up-setup-passes-the-run` | a shared fixture setup that is given up is not booked, and the suite reading it is recorded as passed | fixtures conformance: the run whose setup was given up beside a released sibling exits 0 |
 

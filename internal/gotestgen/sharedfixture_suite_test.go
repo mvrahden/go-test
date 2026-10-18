@@ -289,8 +289,10 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// budget is the SUM of the members' floored budgets — a max would
 			// force-kill a fixture set whose teardowns each obeyed their own
 			// declared Timeout.
-			gotest.Contains(it, code, "ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)",
-				"each member's budget must go through the shared floor and into the sum")
+			gotest.Contains(it, code, "ƒshares[i] = gotestruntime.SupervisorBudget(timeout)",
+				"each member's budget must go through the shared floor")
+			gotest.Contains(it, code, "ƒbudget += ƒs",
+				"and into the sum")
 			gotest.NotContains(it, code, "func ƒsupervisorBudget(",
 				"no local copy of the floor may remain")
 			gotest.NotContains(it, code, "ƒb > ƒmaxTimeout",
@@ -373,9 +375,9 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			code := string(src)
 			gotest.Contains(it, code, "ƒparent := os.Getppid()")
 			gotest.Contains(it, code, "if os.Getppid() == ƒparent {")
-			gotest.Contains(it, code, "ƒlife.Reported(ƒteardownBudget)",
+			gotest.Regexp(it, `ƒlife\.Reported\(ƒbudget\)\s+return ƒbudget`, code,
 				"the bound is the budget the runner was told")
-			gotest.Contains(it, code, `ƒbudgetStr := ƒquote(ƒteardownBudget.String())`)
+			gotest.Contains(it, code, `ƒbudgetStr := ƒquote(ƒteardownBudget().String())`)
 		})
 
 		w.It("bounds a setup that hangs once the runner is gone", func(it *gotest.T) {

@@ -3,6 +3,7 @@
 package fixtures_test
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -28,15 +29,20 @@ func fixtureProcessGone(t *gotest.T, markers []string) bool {
 }
 
 func (s *FixtureWindowTestSuite) TestAStoppedRunEndsTheWait(t *gotest.T) {
+	// A run that does not end its wait is stopped at the bound and fails here,
+	// rather than at the suite's Timeout.
+	const bound = 2 * time.Minute
+	ctx, cancel := context.WithTimeout(testkit.WithStopGrace(t.Context(), 5*time.Second), bound)
 	began := time.Now()
-	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), []string{"FIXA_UNBOUNDED=1"}, "../testdata/fixatail/", "--timeout=20s")
+	run, err := testkit.RunPackageWithEnv(ctx, t.TempDir(), []string{"FIXA_UNBOUNDED=1"}, "../testdata/fixatail/", "--timeout=20s")
 	elapsed := time.Since(began)
+	cancel()
 	gotest.NoError(t, err)
 	t.When("the run's --timeout expires while a shared fixture started for the exclusive tail hangs with no Timeout", func(w *gotest.T) {
 		w.It("the wait ends with the run and the run fails", func(it *gotest.T) {
 			gotest.Contains(it, run.Stderr, "shared fixture start cancelled")
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			gotest.Less(it, elapsed, 4*time.Minute)
+			gotest.Less(it, elapsed, bound)
 		})
 		w.It("leaves no fixture process behind", func(it *gotest.T) {
 			gotest.True(it, fixtureProcessGone(it, run.Markers), "markers: %v", run.Markers)

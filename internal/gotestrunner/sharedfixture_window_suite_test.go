@@ -78,3 +78,29 @@ func (s *SharedFixtureWindowTestSuite) TestAStoppedRunEndsTheWaitForAWindow(t *g
 		})
 	})
 }
+
+func (s *SharedFixtureWindowTestSuite) TestALateFixturesTeardownIsNotCutShort(t *gotest.T) {
+	const key = "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.BudgetedTeardownSharedFixture"
+	t.Setenv(fixtures.EnvBudgetedTeardownTimeout, (3 * time.Minute).String())
+	t.Setenv(fixtures.EnvBudgetedTeardownDelay, (2 * time.Second).String())
+	late := budgetedTeardownFixture()
+	late[0].Deferred = true
+	ctx, cancel := context.WithCancel(t.Context())
+	proc, err := gotestrunner.StartSharedFixtures(ctx, t.TempDir(), late, 0)
+	gotest.NoError(t, err, "starting the shared fixture subprocess")
+	gotest.NoError(t, proc.WaitAllReady(ctx, 0), "waiting for the up-front phase")
+	// The up-front report shrunk below the late fixture's 2s AfterAll: only
+	// the budget its start reports covers it, without sleeping out minutes.
+	gotestrunner.ExportSetTeardownTimeout(proc, time.Second)
+	startErr := proc.StartKeys(ctx, []string{key}, 0)
+	teardownErr := proc.Teardown()
+	cancel()
+	t.When("a fixture declaring a 3m Timeout starts for a window and its AfterAll takes 2s", func(w *gotest.T) {
+		w.It("comes up", func(it *gotest.T) {
+			gotest.NoError(it, startErr)
+		})
+		w.It("its AfterAll runs to its end under the budget its start reports, not force-killed", func(it *gotest.T) {
+			gotest.NoError(it, teardownErr)
+		})
+	})
+}

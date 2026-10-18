@@ -110,6 +110,17 @@ A shared fixture started for the exclusive tail together with a dependency only 
 - **THEN** both come up, the dependency first, and the suite reading them passes
 - **AND** both are torn down, the dependent first
 
+### Requirement: A late fixture's teardown budget
+A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run.
+
+#### Scenario: A tail fixture whose AfterAll never returns
+- **WHEN** a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns
+- **THEN** its process is force-killed once its 32s teardown budget has passed, and the run fails
+
+#### Scenario: A bench slot's fixture whose AfterAll never returns
+- **WHEN** a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns
+- **THEN** the slot's release is given up once its 32s teardown budget has passed, and the run fails
+
 ### Requirement: A stopped run ends the wait for a late fixture
 A run whose --timeout expires while a shared fixture started for the exclusive tail hangs SHALL end the wait, fail, and leave no fixture process behind.
 

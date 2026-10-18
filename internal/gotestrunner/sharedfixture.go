@@ -71,6 +71,9 @@ type SharedFixtureProcess struct {
 	setupDeadline  time.Time // the latest reported budget's end; zero until one was reported
 	setupUnbounded bool
 	budgetSeen     chan struct{}
+	// teardownSeen wakes a waiting teardown when a command's acknowledgement
+	// reports a new teardown budget: a fixture started late came up.
+	teardownSeen chan struct{}
 
 	stdin   io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
 	cmdMu   sync.Mutex     // serializes commands: one in flight, one _cmd ack each
@@ -308,8 +311,9 @@ func (p *SharedFixtureProcess) shutdown() {
 // awaitExit waits up to budget for the subprocess to exit on its own,
 // force-killing the group when it does not, and reports whether force was
 // needed and how long the process was given. A process still setting up
-// reports its teardown budget on _done, as its teardown begins: from then on
-// it is given that budget.
+// reports its teardown budget on _done, as its teardown begins, and a start
+// command's acknowledgement reports it once the fixtures it started came up:
+// from then on it is given that budget.
 func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool, allowed time.Duration) {
 	began := time.Now()
 	deadline := began.Add(budget)
@@ -327,10 +331,9 @@ func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool
 			return false, deadline.Sub(began)
 		case <-reported:
 			reported = nil
-			if at := time.Now().Add(p.teardownBudget()); at.After(deadline) {
-				deadline = at
-				timer.Reset(time.Until(at))
-			}
+			deadline = p.extendTo(deadline, timer)
+		case <-p.teardownSeen:
+			deadline = p.extendTo(deadline, timer)
 		case <-timer.C:
 			allowed = deadline.Sub(began).Round(time.Millisecond)
 			fmt.Fprintf(os.Stderr, "WARN: shared fixture process did not exit within %v, forcing termination\n", allowed)
@@ -341,8 +344,20 @@ func (p *SharedFixtureProcess) awaitExit(budget time.Duration) (forceKilled bool
 	}
 }
 
-// teardownBudget returns the budget the subprocess reported on its _done line,
-// floored to 30 seconds when none arrived.
+// extendTo moves deadline, and timer with it, to the reported budget from
+// now when that ends later.
+func (p *SharedFixtureProcess) extendTo(deadline time.Time, timer *time.Timer) time.Time {
+	at := time.Now().Add(p.teardownBudget())
+	if !at.After(deadline) {
+		return deadline
+	}
+	timer.Reset(time.Until(at))
+	return at
+}
+
+// teardownBudget returns the budget the subprocess last reported, on its
+// _done line or a command's acknowledgement, floored to 30 seconds when none
+// arrived.
 func (p *SharedFixtureProcess) teardownBudget() time.Duration {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -698,6 +713,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 		stdin:           stdin,
 		cmdResp:         make(chan string, 1),
 		budgetSeen:      make(chan struct{}, 1),
+		teardownSeen:    make(chan struct{}, 1),
 		failures:        newFailureLog(os.Stderr),
 	}
 
@@ -754,15 +770,7 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 			if entry.Error != "" {
 				p.setSetupErr(fmt.Errorf("%s", entry.Error))
 			}
-			if entry.TeardownBudget != "" {
-				if d, err := time.ParseDuration(entry.TeardownBudget); err == nil && d > 0 {
-					// Under p.mu: an interrupted run can reach Teardown
-					// while this goroutine is still draining a late _done.
-					p.mu.Lock()
-					p.teardownTimeout = d
-					p.mu.Unlock()
-				}
-			}
+			p.noteTeardownBudget(entry.TeardownBudget)
 			doneSeen = true
 			close(p.allDone)
 			continue
@@ -774,6 +782,13 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 			continue
 		}
 		if entry.Key == "_cmd" {
+			// Before the ack: the command's waiter reads the budget next.
+			if p.noteTeardownBudget(entry.TeardownBudget) {
+				select {
+				case p.teardownSeen <- struct{}{}:
+				default:
+				}
+			}
 			// Ack for the one in-flight command; drop it if no one waits
 			// (the commander timed out) rather than stall the scan.
 			select {
@@ -800,6 +815,20 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 		p.setSetupErr(fmt.Errorf("subprocess exited without _done sentinel"))
 	}
 	close(p.allDone)
+}
+
+// noteTeardownBudget takes a teardown budget the process reported and says
+// whether there was one. Under p.mu: an interrupted run can reach Teardown
+// while the stream is still being read.
+func (p *SharedFixtureProcess) noteTeardownBudget(reported string) bool {
+	d, err := time.ParseDuration(reported)
+	if err != nil || d <= 0 {
+		return false
+	}
+	p.mu.Lock()
+	p.teardownTimeout = d
+	p.mu.Unlock()
+	return true
 }
 
 // protocolError records a stream the process got wrong after its setup was

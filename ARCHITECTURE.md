@@ -510,9 +510,10 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │                                                                       │
 │  Each fixture's state emitted to stdout immediately after BeforeAll   │
 │  Include _teardownBudget = sum of SupervisorBudget(Timeout) + 30s     │
-│  (teardown below is sequential, so the members' budgets add; the      │
-│  budget rides both _done forms — a failed setup still has succeeded   │
-│  siblings to release under it)                                        │
+│  over the fixtures whose setup was reached (teardown below is         │
+│  sequential, so the members' budgets add; the budget rides both _done │
+│  forms — a failed setup still has succeeded siblings to release under │
+│  it — and the _cmd acknowledging a start that brought one up late)    │
 │                                                                       │
 │  ═══════════ block on SIGTERM/SIGINT ═══════════                      │
 │                                                                       │
