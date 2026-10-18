@@ -109,16 +109,13 @@ func runScaffoldType(target string) int {
 }
 
 func runScaffoldFile(target string) int {
+	// The package is loaded from the file's directory as named, so a path
+	// through a symlink (macOS's temp directories) or a short name (Windows's)
+	// still lands in the module and workspace go finds from there.
 	dir := filepath.Dir(target)
-	// A path through a symlink (macOS's temp directories, for one) names a
-	// directory go would place outside the workspace it belongs to.
-	if real, err := filepath.EvalSymlinks(dir); err == nil {
-		dir = real
-	}
 	filename := filepath.Base(target)
-	pkgPattern := dirPattern(dir)
 
-	info, err := scaffold.IntrospectFile(pkgPattern, filename)
+	info, err := scaffold.IntrospectFile(dir, filename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "scaffold: %v\n", err)
 		return 1
