@@ -164,6 +164,30 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 			gotest.True(it, os.IsNotExist(err), "expected the dead run's work dir to be removed")
 		})
 
+		w.It("keeps a fresh work dir with no pid file: an earlier gotest, which wrote none, may still be running in it", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the fresh work dir to be kept")
+		})
+
+		w.It("removes a work dir with no pid file once it is a day old", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			old := time.Now().Add(-25 * time.Hour)
+			gotest.NoError(it, os.Chtimes(dir, old, old))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.True(it, os.IsNotExist(err), "expected the day-old work dir to be removed")
+		})
+
 		w.It("keeps a work dir whose owner is alive", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
 			gotest.NoError(it, err)

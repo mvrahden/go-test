@@ -17,6 +17,10 @@ func CleanStaleOverlays() {
 	cleanOldCacheEntries()
 }
 
+// workDirGrace is how long a work dir with no pid file is left alone: an
+// earlier gotest, which wrote none, may still be running in it.
+const workDirGrace = 24 * time.Hour
+
 func cleanStaleTmpOverlays() {
 	for _, glob := range []string{"gotest-overlay-*", "gotest-work-*"} {
 		dirs, err := filepath.Glob(filepath.Join(os.TempDir(), glob))
@@ -31,9 +35,18 @@ func cleanStaleTmpOverlays() {
 			if isOverlayAlive(dir) {
 				continue
 			}
+			if glob == "gotest-work-*" && !hasPID(dir) && time.Since(info.ModTime()) < workDirGrace {
+				continue
+			}
 			os.RemoveAll(dir)
 		}
 	}
+}
+
+// hasPID reports whether dir carries the pid file a current gotest writes.
+func hasPID(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, ".pid"))
+	return err == nil
 }
 
 // cleanStaleStaging removes cache entries still being written by a run that
