@@ -50,6 +50,7 @@ var diagnosticFixtures = []string{
 var rewriteFixtures = []string{
 	"withsimplify",
 	"withsimplifyverdicts",
+	"withsimplifytypes",
 	"withfailguard",
 	"withfailguard_noimport",
 	"withredundant",

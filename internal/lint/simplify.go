@@ -11,6 +11,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/mvrahden/go-test/internal/typeclass"
 )
 
 func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
@@ -213,7 +215,7 @@ func mapEquality(pass *analysis.Pass, left, right ast.Expr, negated, isNeq bool)
 		return equal(l, convertToAny(pass, r))
 	case isAnyInterface(tr) && bridgesToAny(tl):
 		return equal(convertToAny(pass, l), r)
-	case assertEqual && implementsError(tl) && implementsError(tr) && (isInterfaceType(tl) || isInterfaceType(tr)):
+	case assertEqual && typeclass.ImplementsError(tl) && typeclass.ImplementsError(tr) && (isInterfaceType(tl) || isInterfaceType(tr)):
 		return conditionMapping{target: "ErrorIs", args: []ast.Expr{l, r}, desc: "error " + desc, noFix: "errors.Is also matches wrapped errors"}, true
 	}
 	return conditionMapping{}, false
@@ -255,17 +257,13 @@ func bridgesToAny(t types.Type) bool {
 }
 
 func isPointerType(t types.Type) bool {
-	_, ok := types.Unalias(t).Underlying().(*types.Pointer)
+	_, ok := typeclass.CoreType(t).(*types.Pointer)
 	return ok
 }
 
 func isInterfaceType(t types.Type) bool {
-	_, ok := types.Unalias(t).Underlying().(*types.Interface)
+	_, ok := typeclass.CoreType(t).(*types.Interface)
 	return ok
-}
-
-func implementsError(t types.Type) bool {
-	return types.AssignableTo(t, types.Universe.Lookup("error").Type())
 }
 
 // mapNilComparison handles comparisons against nil. handled reports that the
@@ -470,7 +468,7 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 	source := pick(negated, "NotEqual", "Equal")
 
 	// Bool literals: Equal(t, true, x) / Equal(t, x, true)
-	if v, expr, ok := extractBoolLiteral(expected, actual); ok {
+	if v, expr, ok := extractBoolLiteral(expected, actual); ok && isBoolType(pass, expr) {
 		positive := v != negated // true+Equal or false+NotEqual → True; otherwise False
 		emitSimplify(pass, call, source, pick(!positive, "False", "True"), []ast.Expr{tArg, expr}, msgArgs, "bool literal comparison")
 		return
@@ -574,6 +572,9 @@ func simplifyContainsErrMsg(pass *analysis.Pass, call *ast.CallExpr) {
 	}
 	recv, ok := isErrorMethodCall(call.Args[1])
 	if !ok {
+		return
+	}
+	if t := pass.TypesInfo.TypeOf(recv); t == nil || !typeclass.ImplementsError(t) {
 		return
 	}
 	emitSimplify(pass, call, "Contains", "ErrorContains", []ast.Expr{call.Args[0], recv, call.Args[2]}, call.Args[3:], "err.Error() contains check")
@@ -845,6 +846,12 @@ func isEmptyableType(pass *analysis.Pass, expr ast.Expr) bool {
 		return u.Kind() == types.String
 	}
 	return false
+}
+
+// isBoolType reports whether expr is a bool, the one type True and False take.
+func isBoolType(pass *analysis.Pass, expr ast.Expr) bool {
+	b, ok := types.Unalias(pass.TypesInfo.TypeOf(expr)).(*types.Basic)
+	return ok && (b.Kind() == types.Bool || b.Kind() == types.UntypedBool)
 }
 
 func isStringType(pass *analysis.Pass, expr ast.Expr) bool {

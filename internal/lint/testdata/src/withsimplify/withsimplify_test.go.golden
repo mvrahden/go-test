@@ -368,10 +368,10 @@ func TestFuncNilComparison(t *testing.T) {
 // === Nil/NotNil type guard ===
 
 func TestNilTypeGuard(t *testing.T) {
-	// error — should use NoError/Error
+	// error — NoError/Error, without a fix: Nil looks through to a nil pointer it holds
 	var err error
-	gotest.Nil(t, err)    // want `use NoError instead of Nil for error nil check`
-	gotest.NotNil(t, err) // want `use Error instead of NotNil for error nil check`
+	gotest.Nil(t, err)    // want `use NoError instead of Nil for error nil check — Nil looks through the error to a nil pointer it holds`
+	gotest.NotNil(t, err) // want `use Error instead of NotNil for error nil check — NotNil looks through the error`
 
 	// pointer — should use Zero/NotZero
 	var p *int
@@ -383,10 +383,10 @@ func TestNilTypeGuard(t *testing.T) {
 	gotest.Zero(t, ch)    // want `use Zero instead of Nil for nil check`
 	gotest.NotZero(t, ch) // want `use NotZero instead of NotNil for nil check`
 
-	// interface — should use Zero/NotZero
+	// interface — Zero/NotZero, without a fix: Nil looks through to a nil pointer it holds
 	var iface any
-	gotest.Nil(t, iface)    // want `use Zero instead of Nil for nil check`
-	gotest.NotNil(t, iface) // want `use NotZero instead of NotNil for nil check`
+	gotest.Nil(t, iface)    // want `use Zero instead of Nil for nil check — Nil looks through the interface to a nil pointer it holds`
+	gotest.NotNil(t, iface) // want `use NotZero instead of NotNil for nil check — NotNil looks through the interface`
 
 	// non-nilable — type guard error
 	gotest.Nil(t, 42)    // want `type int is not nilable`
@@ -398,10 +398,10 @@ func TestNilTypeGuard(t *testing.T) {
 // === Empty/NotEmpty type guard ===
 
 func TestEmptyTypeGuard(t *testing.T) {
-	// error — should use NoError/Error
+	// error — NoError/Error, without a fix: Empty looks through to the value it holds
 	var err error
-	gotest.Empty(t, err)    // want `use NoError instead of Empty for error empty check`
-	gotest.NotEmpty(t, err) // want `use Error instead of NotEmpty for error empty check`
+	gotest.Empty(t, err)    // want `use NoError instead of Empty for error empty check — Empty looks through the error to the value it holds`
+	gotest.NotEmpty(t, err) // want `use Error instead of NotEmpty for error empty check — NotEmpty looks through the error`
 
 	// non-emptyable — type guard error
 	gotest.Empty(t, 42)    // want `type int cannot be empty`
