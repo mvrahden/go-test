@@ -69,17 +69,29 @@ func walk(n, when *node, fn func(when, it *node)) {
 }
 
 // Quotes finds the blockquote lines of doc shaped like a clause: "> " followed
-// by a condition, the arrow and an outcome. Line numbers start at 1.
+// by a condition, the arrow and an outcome. Lines inside code fences are
+// skipped. Line numbers start at 1.
 func Quotes(file string, doc []byte) []Quote {
 	var quotes []Quote
-	for i, line := range strings.Split(string(doc), "\n") {
+	prose(doc, func(n int, line string) {
 		text, ok := strings.CutPrefix(strings.TrimSpace(line), "> ")
-		if !ok || !strings.Contains(text, Arrow) {
-			continue
+		if ok && strings.Contains(text, Arrow) {
+			quotes = append(quotes, Quote{File: file, Line: n, Text: strings.TrimSpace(text)})
 		}
-		quotes = append(quotes, Quote{File: file, Line: i + 1, Text: strings.TrimSpace(text)})
-	}
+	})
 	return quotes
+}
+
+// WhenBullets finds the scenario WHEN bullets of doc outside code fences.
+func WhenBullets(file string, doc []byte) []Quote {
+	var found []Quote
+	prose(doc, func(n int, line string) {
+		text := strings.TrimSpace(line)
+		if m := bullet.FindStringSubmatch(text); m != nil && m[1] == "WHEN" {
+			found = append(found, Quote{File: file, Line: n, Text: text})
+		}
+	})
+	return found
 }
 
 // Unresolved names every quote that matches no clause, as "file:line: text".

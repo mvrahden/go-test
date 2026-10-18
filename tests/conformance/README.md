@@ -28,21 +28,24 @@ whole, current list.
 `GOTEST_CANARY_DIR/markers`. Testdata packages live under
 `tests/conformance/testdata`.
 
-## Quoting a clause in prose
+## Specifying a behavior
 
-`docs/design/spec.md`, `AGENTS.md`, `README.md` and the agent skill state a
-behavior only by quoting a clause as a blockquote:
+A behavior is stated once, in `specs/<capability>/spec.md`, and written in
+this order:
 
-> when the version subcommand runs → exits 0 and prints the version on stdout
+1. **Spec first.** Add a scenario under its requirement in the spec. The
+   binding suite in `tests/conventions` goes red: the scenario has no clause.
+2. **Then the clause.** Write the conformance `When`/`It` whose labels equal
+   the scenario's WHEN text and each of its THEN and AND texts. A clause is an
+   `It` directly under a `When`; the rows of an `Each` table are not clauses,
+   and nothing under a suite the `X_` prefix disables is one.
+3. **Then the behavior.** Make the clause pass.
 
-The text before the arrow is a `When` label as the catalog renders it (the
-connective included) and the text after it is the `It` label directly under
-it. A conventions suite looks every quote up in `docs/design/catalog.json`,
-so a sentence that no longer matches a clause fails the build.
-
-Only an `It` directly under a `When` is a quotable clause. The rows of an
-`Each` table are pinned in prose by a link to their catalog section, never by
-a quote. Nothing under a suite the `X_` prefix disables is a clause.
+Guides (`README.md`, `AGENTS.md`, `docs/`, the agent skill) link the
+requirement, for example
+[the version requirement](../../specs/cli/spec.md#requirement-version), and
+never restate it. Rewording a promise changes the spec, the `When`/`It` label
+and any drill `Clause:` line in one commit.
 
 ## Verdict clauses and the drill
 

@@ -17,8 +17,9 @@ const sampleCatalog = `{"packages":[{"nodes":[{"kind":"suite","display":"CLIVers
 
 const sampleDoc = "# Title\n\nProse.\n\n> when the version subcommand runs → exits 0 and prints the version on stdout\n\n> given a broken config → still prints the version\n\n> when nothing is asked → nothing happens\n\n> not a quote\n"
 
-// QuotesTestSuite: prose may state a behavior only by quoting a clause the
-// catalog holds, and an unresolved quote is named with its file and line.
+// QuotesTestSuite: the catalog's clauses are read as "when → it" sentences,
+// and clause-shaped lines and WHEN bullets outside fences are found with
+// their file and line.
 type QuotesTestSuite struct{}
 
 func (s *QuotesTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -66,6 +67,44 @@ func (s *QuotesTestSuite) TestQuotesAreExtractedWithTheirLine(t *gotest.T) {
 			gotest.Len(it, quotes, 3)
 			gotest.Equal(it, speccatalog.Quote{File: "doc.md", Line: 5, Text: "when the version subcommand runs → exits 0 and prints the version on stdout"}, quotes[0])
 			gotest.Equal(it, 9, quotes[2].Line)
+		})
+	})
+}
+
+const fencedDoc = "> when outside → is found\n" +
+	"```markdown\n" +
+	"> when fenced → is skipped\n" +
+	"```\n" +
+	"> when after the fence → is found\n" +
+	"  ```\n" +
+	"> when unterminated → is skipped\n"
+
+func (s *QuotesTestSuite) TestQuotesInFencesAreSkipped(t *gotest.T) {
+	quotes := speccatalog.Quotes("doc.md", []byte(fencedDoc))
+	t.When("a document holds clause-shaped lines inside code fences", func(w *gotest.T) {
+		w.It("finds only the lines outside them, and an unterminated fence runs to the end", func(it *gotest.T) {
+			gotest.Equal(it, []speccatalog.Quote{
+				{File: "doc.md", Line: 1, Text: "when outside → is found"},
+				{File: "doc.md", Line: 5, Text: "when after the fence → is found"},
+			}, quotes)
+		})
+	})
+}
+
+const bulletDoc = "- **WHEN** a guide restates a scenario\n" +
+	"- **THEN** is found\n" +
+	"```\n- **WHEN** fenced\n```\n" +
+	"Prose naming **WHEN** bullets.\n" +
+	"* **WHEN** starred\n"
+
+func (s *QuotesTestSuite) TestWhenBulletsAreFound(t *gotest.T) {
+	bullets := speccatalog.WhenBullets("doc.md", []byte(bulletDoc))
+	t.When("a document holds WHEN bullets inside and outside fences", func(w *gotest.T) {
+		w.It("finds the bullets outside them with their lines", func(it *gotest.T) {
+			gotest.Equal(it, []speccatalog.Quote{
+				{File: "doc.md", Line: 1, Text: "- **WHEN** a guide restates a scenario"},
+				{File: "doc.md", Line: 7, Text: "* **WHEN** starred"},
+			}, bullets)
 		})
 	})
 }

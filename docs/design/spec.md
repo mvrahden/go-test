@@ -1,10 +1,8 @@
 # gotest Specification
 
-> **Normative.** This document is the source of truth for gotest's design.
-> `AGENTS.md`, `README.md`, help texts, and the site derive from it — update this file first.
-> One drift guard enforces partial sync: the CLI-surface test in `cmd/gotest`
-> (subcommand/flag table membership, both directions).
-> API coverage and prose semantics remain hand-verified.
+> **Rationale.** Every behavioral promise gotest makes is stated once in [`specs/`](../../specs/README.md), where a test binds to each scenario; this document links there.
+> Its sections hold the design's principles, architecture and non-goals. A behavior stated here without a link to a requirement in `specs/` or to a [catalog](catalog.md) section is not yet verified.
+> One drift guard covers this file directly: the CLI-surface test in `cmd/gotest` (subcommand/flag table membership, both directions).
 
 Go tests that write themselves, organize themselves, and explain themselves.
 
@@ -192,33 +190,14 @@ gotest ./... --debug                     # keep generated files for inspection
 
 Registered `go test` flags pass through to the underlying run; a single-dash flag gotest does not know is a usage error (exit 2) unless it follows a bare `--` or `-args`, which forward it to the test binary verbatim ([CLIPassthrough](catalog.md#clipassthrough)). The flags gotest implements itself — `-run` on a fuzz wrapper, `-exec`, `-p`, the refused `-o` — are pinned in [CLIGoTestFlags](catalog.md#cligotestflags).
 How a `--gotest` flag is spelled, that the last spelling wins, and that a flag another command owns is refused with `flag <name> is not valid for this subcommand` are pinned in [CLIFlags](catalog.md#cliflags); the commands each flag belongs to are the table above.
-`-json` is intercepted and re-emitted by the runner:
+`-json` is intercepted and re-emitted by the runner, and the stream it writes holds JSON lines only ([the go test -json stream requirement](../../specs/cli/spec.md#requirement-the-go-test--json-stream)).
+Every other document gotest writes stays pure the same way, and color follows the terminal rather than the command ([CLIStreams](catalog.md#clistreams)).
+gotest adds no link flag of its own to a `go test` invocation, so a build go test refuses fails here too ([the build rules requirement](../../specs/cli/spec.md#requirement-build-rules)).
+A module that imports gotest without requiring it is told what to run ([the module requirement](../../specs/cli/spec.md#requirement-a-module-without-gotest)), and `gotest version` answers as [the version requirement](../../specs/cli/spec.md#requirement-version) states.
 
-> when the go test -json stream is asked for → holds JSON lines only, inside GitHub Actions too
-
-Every other document gotest writes stays pure the same way, and color follows the terminal rather than the command ([CLIStreams](catalog.md#clistreams)). gotest adds no link flag of its own to a `go test` invocation:
-
-> when a package references a runtime symbol through a linkname the linker refuses → fails to build with exit 2, as under go test
-
-A module that imports gotest without requiring it is told what to run:
-
-> when a suite imports gotest in a module that does not require it → names the go get -tool command to run
-
-> when the version subcommand runs → exits 0 and prints the version on stdout
-
-**Benchmark comparison and gate** (`bench`):
-
-> when --save and --against name the same file → is refused before anything runs, since the run would be compared against itself
-
-> when no benchmark is in both the baseline and the run → fails the gate and says there was nothing to compare
-
-> when no benchmark is in both the baseline and the run → lists the baseline's benchmarks that did not run and the run's that the baseline lacks
-
-> when --gate is given with -count below 4 → exits 2 naming -count=4 as the requirement
-
-> when --gate is given with -count=4 → judges the run
-
-> when only --against is given and a side has fewer than 4 samples → still compares and marks each such row as a ±20% heuristic
+**Benchmark comparison and gate** (`bench`): a run never saves over the baseline it compares against ([the baseline requirement](../../specs/bench/spec.md#requirement-the-baseline-is-not-the-runs-own-output)).
+A gate with no benchmark in common fails and says what each side lacks ([the nothing-to-compare requirement](../../specs/bench/spec.md#requirement-a-gate-with-nothing-to-compare)).
+A gate judges only with four samples or more ([the sample requirement](../../specs/bench/spec.md#requirement-a-gate-needs-four-samples)), while a comparison without a gate compares whatever the count and marks thin rows as a heuristic ([the comparison requirement](../../specs/bench/spec.md#requirement-a-comparison-without-a-gate)).
 
 ---
 
