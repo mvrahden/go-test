@@ -187,6 +187,20 @@ func (s *InterruptTestSuite) TestTheRunnerWaitsForTheRelease(t *gotest.T) {
 	}
 }
 
+// fuzzingWorkers waits until a worker is fuzzing beside the coordinator: each
+// process logs "running" once it executes the target. The engine owns Ctrl-C
+// only from then on; a worker signalled before it answered the coordinator's
+// first ping is reported as having terminated without fuzzing.
+func fuzzingWorkers(t *gotest.T, tree *proctree.Tree, cmd *exec.Cmd, log string) {
+	for deadline := time.Now().Add(30 * time.Second); countEvents(readEvents(log), "running") < 2; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			_ = tree.Kill()
+			_ = wait(tree, cmd)
+			gotest.Fail(t, "no worker started fuzzing:\n%s%s", cmd.Stdout, cmd.Stderr) //nolint:fail-guard // it must kill the tree before failing
+		}
+	}
+}
+
 func countEvents(events []string, kind string) int {
 	n := 0
 	for _, e := range events {
@@ -204,6 +218,7 @@ func (s *InterruptTestSuite) TestCtrlCEndsFuzzingGracefully(t *gotest.T) {
 	cmd := exec.Command(s.binary, "-test.run=^$", "-test.fuzz=FuzzFuzzingTestSuite_FuzzSpins", "-test.parallel=2", "-test.fuzztime=60s", "-test.fuzzcachedir="+t.TempDir()) //nolint:gosec // G204: binary built by this suite
 	cmd.Env = append(ownEnv(), "INTERRUPT_FUZZ=1")
 	tree, log := startTree(t, cmd)
+	fuzzingWorkers(t, tree, cmd, log)
 	tree.InterruptLikeCtrlC()
 
 	gotest.NoError(t, tree.Interrupt())
@@ -223,6 +238,7 @@ func (s *InterruptTestSuite) TestStoppingGotestFuzzReleasesTheFixture(t *gotest.
 	cmd.Dir = s.root
 	cmd.Env = append(ownEnv(), "INTERRUPT_FUZZ=1")
 	tree, log := startTree(t, cmd)
+	fuzzingWorkers(t, tree, cmd, log)
 
 	gotest.NoError(t, tree.Interrupt())
 	_ = wait(tree, cmd)
