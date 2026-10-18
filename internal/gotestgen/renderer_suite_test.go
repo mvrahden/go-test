@@ -176,6 +176,22 @@ func (s *RendererTestSuite) TestCaselessSuites(t *gotest.T) {
 	})
 }
 
+func (s *RendererTestSuite) TestHelperSuites(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestGenerator_HelperSuites")
+	output, _ := renderTestPkg(t.T(), pkg, false)
+
+	t.It("renders nothing for a suite that declares no case", func(it *gotest.T) {
+		for _, suite := range []string{"HelperTestSuite", "HookedHelperTestSuite", "BoundHelperTestSuite"} {
+			gotest.NotContains(it, output, suite, output)
+		}
+	})
+
+	t.It("opens only the suite with a case", func(it *gotest.T) {
+		gotest.Equal(it, 1, strings.Count(output, "gotestruntime.OpenSuite(t,"), output)
+		gotest.Contains(it, output, "func TestPlainTestSuite(t *testing.T)")
+	})
+}
+
 func (s *RendererTestSuite) TestFixtureClosure(t *gotest.T) {
 	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestLifecycle_FixtureClosure")
 	output, _ := renderTestPkg(t.T(), pkg, false)

@@ -146,6 +146,37 @@ func (s *GeneratorTestSuite) TestGenerateFromLoaded_TestRunSuiteNames(t *gotest.
 	})
 }
 
+func (s *GeneratorTestSuite) TestGenerateFromLoaded_HelperSuites(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestGenerator_HelperSuites")
+	results, _, err := gotestgen.GenerateFromLoaded([]*gotestgen.LoadResult{
+		{PkgPath: pkg.PkgPath, PkgDir: "/fake/dir", Ptest: pkg},
+	})
+	gotest.NoError(t, err)
+	gotest.Len(t, results, 1)
+	r := results[0]
+
+	t.It("schedules, skips and benches no suite that declares no case", func(it *gotest.T) {
+		gotest.Equal(it, []string{"PlainTestSuite"}, r.SuiteNames)
+		gotest.Empty(it, r.SkippedSuiteNames)
+		gotest.Empty(it, r.BenchSuiteNames)
+	})
+
+	t.It("renders nothing for it", func(it *gotest.T) {
+		gotest.NotContains(it, string(r.PTest), "HelperTestSuite")
+	})
+
+	t.It("reports no skip for it when another suite is focused", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestGenerator_HelperSuitesFocused")
+		results, _, err := gotestgen.GenerateFromLoaded([]*gotestgen.LoadResult{
+			{PkgPath: pkg.PkgPath, PkgDir: "/fake/dir", Ptest: pkg},
+		})
+		gotest.NoError(it, err)
+		gotest.Len(it, results, 1)
+		gotest.Equal(it, []string{"OtherTestSuite"}, results[0].SkippedSuiteNames)
+		gotest.NotContains(it, string(results[0].PTest), "HelperTestSuite")
+	})
+}
+
 func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 	t.When("packages without test suites", func(w *gotest.T) {
 		for sub, tC := range gotest.Each(w, []struct {

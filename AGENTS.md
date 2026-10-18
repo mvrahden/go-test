@@ -265,7 +265,7 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 
 - Name must end with `TestSuite`
 - All methods must use pointer receivers
-- Must have at least one `Test*`, `Benchmark*` or `Fuzz*` method. Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
+- A suite that should run needs at least one `Test*`, `Benchmark*` or `Fuzz*` method; a `*TestSuite` type with none is a helper the generator emits nothing for. Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
 
 ### Test methods
 

@@ -92,6 +92,7 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	if pkg == nil {
 		return nil, nil, nil
 	}
+	spec = withoutCaseless(spec)
 	if len(spec.EffectiveTestSuites) == 0 {
 		return nil, nil, nil
 	}

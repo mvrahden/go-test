@@ -531,6 +531,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		if err != nil {
 			return nil, err
 		}
+		ptestSpec, pxtestSpec = withoutCaseless(ptestSpec), withoutCaseless(pxtestSpec)
 
 		fuzzParams := map[string][]string{}
 		fuzzDecoded := map[string]bool{}
@@ -710,6 +711,38 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		return allSharedFixtures[i].Identifier < allSharedFixtures[j].Identifier
 	})
 	return results, allSharedFixtures, nil
+}
+
+// DeclaresNoCase reports whether a suite declares no Test, Benchmark or Fuzz
+// method, excluded or unfocused ones included: a helper type, for which
+// nothing is generated or reported.
+func DeclaresNoCase(s *gotestast.TestSuiteSpec) bool {
+	return !s.DeclaresTests() && len(s.Benchmarks()) == 0 && len(s.Fuzzers()) == 0
+}
+
+// withoutCaseless drops the suites that declare no case from spec. An
+// effective suite whose only cases were excluded keeps them in
+// SkippedTestCases, so it stays.
+func withoutCaseless(spec SpecOutcome) SpecOutcome { //nolint:gocritic // hugeParam: stable API
+	caseless := func(s *gotestast.TestSuiteSpec) bool {
+		return DeclaresNoCase(s) && len(spec.SkippedTestCases[s]) == 0
+	}
+	var effective gotestast.TestSuiteSpecSet
+	for _, s := range spec.EffectiveTestSuites {
+		if caseless(s) {
+			delete(spec.SkippedTestCases, s)
+			continue
+		}
+		effective = append(effective, s)
+	}
+	var skipped gotestast.SkippedTestSuites
+	for _, s := range spec.SkippedTestSuites {
+		if !caseless(s) {
+			skipped = append(skipped, s)
+		}
+	}
+	spec.EffectiveTestSuites, spec.SkippedTestSuites = effective, skipped
+	return spec
 }
 
 // generateForPkg renders one package variant. fuzzParams and fuzzDecoded are
