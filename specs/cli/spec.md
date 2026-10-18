@@ -120,3 +120,17 @@ The version subcommand SHALL exit 0 and print the version on stdout.
 #### Scenario: Asking for the version
 - **WHEN** the version subcommand runs
 - **THEN** exits 0 and prints the version on stdout
+
+### Requirement: The setup budget's default in the help
+Every help text that lists --setup-timeout SHALL give its default as the fixtures' declared budgets, 2m until the first reports. The cases are the table in `tests/conformance/cli/help_suite_test.go`.
+
+#### Scenario: A help text that lists --setup-timeout
+- **WHEN** a help text lists --setup-timeout
+- **THEN** gives its default as the fixtures' declared budgets, 2m until the first reports
+
+### Requirement: Hooks that call t.T() under a fuzz or benchmark wrapper
+gotest SHALL refuse with exit 2 a suite with fuzz or benchmark methods whose hooks call t.T(), in one error that names every such hook in source order and is located at the first. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
+
+#### Scenario: Several hooks call t.T()
+- **WHEN** several hooks call t.T() in a suite with fuzz or benchmark methods
+- **THEN** fails with exit 2 and one error on stderr that names every such hook in source order, located at the first

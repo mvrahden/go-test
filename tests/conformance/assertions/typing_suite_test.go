@@ -45,6 +45,28 @@ func (s *AssertionTypingTestSuite) TestContains(t *gotest.T) {
 			gotest.Contains(it, n.Message(), "a map[string]int cannot hold a key of type int")
 		})
 	})
+	t.When("Contains is asked for a nil key in a map keyed by an interface or pointer type", func(w *gotest.T) {
+		w.It("finds the key when present and reports it absent otherwise", func(it *gotest.T) {
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[any]int{nil: 1}, nil) }),
+				gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[*int]int{nil: 1}, nil) }),
+				gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[any]int{"a": 1}, nil) }),
+				gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[*int]int{new(int): 1}, nil) }),
+			} {
+				gotest.False(it, m.Failed(), m.Message())
+			}
+			miss := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[any]int{"a": 1}, nil) })
+			gotest.True(it, miss.Failed())
+			gotest.Contains(it, miss.Message(), "does not contain")
+		})
+	})
+	t.When("Contains is asked for a nil key in a map whose key type cannot be nil", func(w *gotest.T) {
+		w.It("fails naming the map's type", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"": 1}, nil) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "a map[string]int cannot hold a key of type <nil>")
+		})
+	})
 	t.When("Contains compares named string kinds", func(w *gotest.T) {
 		w.It("checks the substring as it does for strings", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, note("hello world"), note("lo w")) })
@@ -97,6 +119,16 @@ func (s *AssertionTypingTestSuite) TestJSONEq(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			same := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"n":9007199254740993}`, `{"n":9007199254740993}`) })
 			gotest.False(it, same.Failed(), same.Message())
+		})
+	})
+	t.When("JSONEq is given a value followed by a stray } or ]", func(w *gotest.T) {
+		w.It("fails: the input is not valid JSON", func(it *gotest.T) {
+			for _, pair := range [][2]string{{`{"a":1}}`, `{"a":1}`}, {`[1]]`, `[1]`}} {
+				m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, pair[0], pair[1]) })
+				gotest.True(it, m.Failed(), pair[0])
+				gotest.Contains(it, m.Message(), "could not normalize expected", pair[0])
+				gotest.Contains(it, m.Message(), "trailing data after the value", pair[0])
+			}
 		})
 	})
 	t.When("JSONEq compares an integer with its decimal spelling", func(w *gotest.T) {

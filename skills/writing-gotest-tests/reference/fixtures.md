@@ -49,7 +49,10 @@ Timeouts: `FixtureConfig()` marker; a zero `Timeout` means the default
 (see `config.md`). Without `--setup-timeout` the runner waits for shared
 fixture setup as long as the fixtures declare (v1.34+), so a 5m
 `ContainerFixtureConfig()` needs no flag; `--setup-timeout` sets a flat
-budget instead.
+budget instead. The declared budget counts every attempt and, with an
+`AfterAll`, the release between attempts (v1.34+); an `AfterAll` that
+fails between attempts fails the run even when a later attempt comes up
+(v1.34+).
 A DECLARED `Timeout` is a verdict, not advice: it bounds the hook's
 context AND fails the fixture when `BeforeAll` or `AfterAll` returns after
 it — even when the hook ignores its context. A hook that never returns is

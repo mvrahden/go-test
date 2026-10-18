@@ -28,3 +28,22 @@ func (s *SetupBudgetTestSuite) TestContainerConfig(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SetupBudgetTestSuite) TestDeclaredBudgetBounds(t *gotest.T) {
+	// Without a bound the fixture's 10-minute hang would outlast the run.
+	began := time.Now()
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixahang/")
+	elapsed := time.Since(began)
+	gotest.NoError(t, err)
+	t.When("a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given", func(w *gotest.T) {
+		w.It("fails the run within 60s, saying the setup timed out", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Less(it, elapsed, 60*time.Second)
+			gotest.Regexp(it, `shared fixture setup timed out after 2(\.[0-9]+)?s\b`, run.Stderr)
+		})
+		w.It("never runs the suite reading the fixture", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestHangTestSuite"), "stdout: %s", run.Stdout)
+			gotest.NotContains(it, run.Markers, "suite ran")
+		})
+	})
+}

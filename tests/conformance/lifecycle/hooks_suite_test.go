@@ -31,7 +31,7 @@ func (s *SuiteHooksTestSuite) TestAHookOrBodyGoesWrong(t *gotest.T) {
 				{Desc: "suite BeforeEach panics", at: "suite.BeforeEach", mode: "panic",
 					ran: suiteEndsBeforeBody, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
 				{Desc: "suite BeforeEach overruns the Timeout", at: "suite.BeforeEach", mode: "overrun",
-					verdicts: map[string]string{body: "fail"}, exit: 1},
+					ran: bodySkipped, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
 				{Desc: "the body fails an assertion", at: "body", mode: "assert",
 					ran: cleanRun, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
 				{Desc: "the body panics", at: "body", mode: "panic",

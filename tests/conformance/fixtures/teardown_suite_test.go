@@ -17,9 +17,11 @@ func (s *FixtureTeardownTestSuite) TestFailedSharedSetupIsReleased(t *gotest.T) 
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/failingshared/")
 	gotest.NoError(t, err)
 	t.When("a shared fixture's setup fails on its last attempt", func(w *gotest.T) {
-		w.It("fails the run and still runs the fixture's AfterAll, releasing what the attempt reached", func(it *gotest.T) {
+		w.It("fails the run", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-			gotest.True(it, run.MarkerOrder("leak.BeforeAll", "leak.AfterAll"), "markers: %v", run.Markers)
+		})
+		w.It("runs AfterAll after each of its 2 attempts, releasing what each reached before the next", func(it *gotest.T) {
+			gotest.Equal(it, []string{"leak.BeforeAll", "leak.AfterAll", "leak.BeforeAll", "leak.AfterAll"}, run.Markers)
 		})
 	})
 }

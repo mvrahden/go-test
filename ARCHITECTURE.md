@@ -769,7 +769,8 @@ still run — never speculatively.
 │                                                                        │
 │  --setup-timeout (CLI flag)                                            │
 │  └─ Total budget for shared fixture subprocess to emit JSON state      │
-│     Default: 2m (0 to disable)                                         │
+│     Default: the fixtures' declared budgets, 2m until the first        │
+│     reports (0 to disable)                                             │
 │                                                                        │
 │  SharedFixtureConfig.Timeout (per shared fixture)                      │
 │  └─ Deadline on each BeforeAll/AfterAll call in the setup subprocess   │
@@ -868,6 +869,16 @@ executable (`GOTEST_INTERNAL_INTERRUPT_CONSOLE`, handled in an `init` of
 `internal/proctree`) with no console; it attaches to the tree's console and
 sends the event there. The job object, with kill-on-close, is also what stops
 the tree when the runner itself is killed.
+
+On Linux a tree's root also gets SIGTERM from the kernel when the runner dies
+(`Pdeathsig`), so a suite or shared-fixture process tears down before it
+exits. On every OS the suite process watches for a dead runner itself (its
+parent gone, or nobody reading its stdout), and a shared-fixture process
+tears down when its stdin closes, exiting with status 1 once its setup and
+teardown budgets have passed if a hook never returns. A wrapper that
+re-pipes stdout (`tee`) or runs the suite remotely (`ssh`, `docker`) hides
+both traces. See [A suite whose parent is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone)
+and [A shared fixture process whose CLI is killed](specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed).
 
 A tree holds its root until `Release`, which runs once the root has been
 waited for; after it, the root's pid may name another process, so nothing is

@@ -128,7 +128,7 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 	// status 130" with exit 1, while a group SIGTERM ends go run itself by
 	// the signal.
 	t.When("a run is stopped by a signal, however gotest was launched", func(w *gotest.T) {
-		w.It("stops with its launcher's exit code, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind", func(it *gotest.T) {
+		w.It("ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind", func(it *gotest.T) {
 			for sub, row := range gotest.Each(it, []launcherRow{
 				{Desc: "direct, SIGINT", launcher: "direct", signal: "SIGINT"},
 				{Desc: "direct, SIGTERM", launcher: "direct", signal: "SIGTERM"},

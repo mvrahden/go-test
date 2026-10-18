@@ -30,6 +30,17 @@ Contains and NotContains SHALL fail, naming the haystack's type and the needle's
 - **WHEN** Contains is given a needle no element of the haystack could be
 - **THEN** fails naming the haystack's type and the needle's
 
+### Requirement: A nil map key
+Contains SHALL look up a nil needle as the nil key of a map keyed by an interface or pointer type, and SHALL fail naming the map's type when the map's key type cannot be nil.
+
+#### Scenario: A map whose keys can be nil
+- **WHEN** Contains is asked for a nil key in a map keyed by an interface or pointer type
+- **THEN** finds the key when present and reports it absent otherwise
+
+#### Scenario: A map whose keys cannot be nil
+- **WHEN** Contains is asked for a nil key in a map whose key type cannot be nil
+- **THEN** fails naming the map's type
+
 ### Requirement: InDelta at the edges of float64
 InDelta SHALL fail when the delta is NaN, and SHALL hold two equal infinities within any delta.
 
@@ -63,6 +74,13 @@ JSONEq SHALL compare numbers by value: integers beyond float64's exact range sta
 - **WHEN** JSONEq compares an integer with its decimal spelling
 - **THEN** 1 equals 1.0
 
+### Requirement: One JSON value
+JSONEq SHALL fail when an input holds anything but whitespace after its JSON value.
+
+#### Scenario: A stray closing bracket
+- **WHEN** JSONEq is given a value followed by a stray } or ]
+- **THEN** fails: the input is not valid JSON
+
 ### Requirement: Multi-line diffs
 When Equal fails on values whose rendering spans lines, its message SHALL carry a unified diff whose hunks hold three lines of context.
 
@@ -70,16 +88,24 @@ When Equal fails on values whose rendering spans lines, its message SHALL carry 
 - **WHEN** Equal fails on values whose rendering spans lines
 - **THEN** the message carries a unified diff: hunks of changes with three lines of context
 
-### Requirement: Polls end at waitFor
-Eventually and Consistently SHALL fail at waitFor when a poll is still running, saying so, and Eventually SHALL run a final poll at the deadline when tick is longer than waitFor.
+### Requirement: Polls and their deadline
+Eventually and Consistently SHALL judge a poll that started before waitFor by its result, even when it returns after waitFor; SHALL fail, saying the poll is still running, when a poll has not returned one tick past waitFor; and Eventually SHALL run a final poll at the deadline when tick is longer than waitFor.
 
 #### Scenario: An Eventually poll that hangs
 - **WHEN** an Eventually poll runs past waitFor
-- **THEN** fails at the deadline and says the poll is still running
+- **THEN** fails no later than one tick past waitFor and says the poll is still running
 
 #### Scenario: A Consistently poll that hangs
 - **WHEN** a Consistently poll runs past waitFor
-- **THEN** fails at the deadline and says the poll is still running
+- **THEN** fails no later than one tick past waitFor and says the poll is still running
+
+#### Scenario: A passing Consistently poll that ends after waitFor
+- **WHEN** every Consistently poll passes but one runs past waitFor
+- **THEN** passes
+
+#### Scenario: An Eventually poll that passes after waitFor
+- **WHEN** an Eventually poll started before waitFor passes after it
+- **THEN** passes
 
 #### Scenario: A tick longer than waitFor
 - **WHEN** tick is longer than waitFor and the first poll fails
@@ -93,7 +119,7 @@ Eventually and Consistently SHALL fail without polling when waitFor or tick is n
 - **THEN** fails with a type-guard message and polls nothing
 
 ### Requirement: Snapshot sections
-MatchSnapshot SHALL key each section by the exact subtest name and SHALL find the baselines beside the test whatever the build does to paths.
+MatchSnapshot SHALL key each section by the exact subtest name and SHALL find the baselines beside the test, also when the package is built with -trimpath.
 
 #### Scenario: Each rows and twin subtests
 - **WHEN** Each rows and same-named subtests match snapshots

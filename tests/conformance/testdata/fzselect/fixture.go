@@ -1,0 +1,38 @@
+// Package fzselect has a suite with a test method and a fuzz method, so -skip
+// can name either of its functions.
+package fzselect
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"sync"
+)
+
+var markMu sync.Mutex
+
+// mark appends event to the markers file of the run's canary directory.
+func mark(event string) {
+	markMu.Lock()
+	defer markMu.Unlock()
+	f, err := os.OpenFile(filepath.Join(os.Getenv("GOTEST_CANARY_DIR"), "markers"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(event + "\n")
+}
+
+// MarkSharedFixture marks its setup; the runner starts it only for a suite
+// the run dispatches.
+type MarkSharedFixture struct {
+	State string
+}
+
+func (f *MarkSharedFixture) BeforeAll(ctx context.Context) error {
+	mark("shared up")
+	f.State = "up"
+	return nil
+}
+
+func (f *MarkSharedFixture) AfterAll(ctx context.Context) error { return nil }

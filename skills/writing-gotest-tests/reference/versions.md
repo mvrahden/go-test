@@ -312,3 +312,39 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    `SharedFixtureConfig()` declares ([the setup-budget requirement](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
    Below v1.34 the wait is a flat 2m whatever the marker says, so a
    slower fixture needs `--setup-timeout` raised.
+4. **A poll that started before `waitFor` is judged by its result**, and
+   one still running a tick past `waitFor` fails as still running
+   ([polls](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-polls-and-their-deadline)).
+   Below v1.34 a slow but passing poll that crossed the deadline failed
+   `Consistently` and lost a late `Eventually` success. `JSONEq` refuses
+   trailing `}`/`]`, and `Contains` finds a nil key in a map keyed by an
+   interface or pointer type.
+5. **Async methods wait for `done` even after another goroutine fails**
+   ([async](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-async-methods)); their
+   `AfterEach` is held to the `Timeout`. Below v1.34 any goroutine's
+   failure ended the wait while the owner of `done` kept running.
+6. **`gotest.Go` on a `NewTWithDeadline` T in `BeforeAll` is waited for
+   after `AfterAll`**, and every such goroutine is waited for even when
+   one fails ([goroutines](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+   Below v1.34 the derived T's wait ran before `AfterAll` and deadlocked.
+   `NewTWithContext` still cannot carry the waits.
+7. **A stop's 5s grace bounds only the method body**
+   ([grace](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)):
+   a slow `AfterEach` runs to its end, then `AfterAll`. Below v1.34 a slow
+   `AfterEach` skipped `AfterAll`.
+8. **A suite or shared fixture whose CLI died tears down by itself**
+   ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone),
+   [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)):
+   `AfterAll` runs and the process exits. Below v1.34 a CLI killed with
+   `kill -9`, an OOM or a crash took them down on Linux without any
+   teardown, leaking containers. A wrapper that re-pipes stdout (`tee`)
+   or runs the suite remotely (`ssh`, `docker`) still hides the death.
+9. **A failed release between setup attempts fails the run**
+   ([release](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-failed-release-between-attempts)),
+   and the declared setup budget counts those releases. Below v1.34 a
+   later successful attempt made the run green.
+10. **`-skip` naming a suite's `Test` function keeps its fuzz seeds
+    replaying** ([skip](https://github.com/mvrahden/go-test/blob/main/specs/fuzz/spec.md#requirement-skipping-a-suites-functions)).
+    Below v1.34 the seeds silently stopped replaying.
+11. **The t.T() hook rejection names every offending hook**, in source
+    order. Below v1.34 it named one, picked at random per run.

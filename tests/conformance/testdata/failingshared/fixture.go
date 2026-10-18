@@ -1,5 +1,6 @@
-// Package failingshared binds a shared fixture that never comes up, and whose
-// AfterAll must still run; see the fixtures conformance suite.
+// Package failingshared binds a shared fixture that never comes up in its two
+// attempts, and whose AfterAll must run after each; see the fixtures
+// conformance suite.
 package failingshared
 
 import (
@@ -7,11 +8,17 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// LeakSharedFixture reserves something, then fails to come up.
+// LeakSharedFixture reserves something, then fails to come up, twice.
 type LeakSharedFixture struct {
 	State string
+}
+
+func (f *LeakSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
+	return gotest.FixtureConfig{Retries: 1}
 }
 
 func (f *LeakSharedFixture) BeforeAll(ctx context.Context) error {

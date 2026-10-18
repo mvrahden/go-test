@@ -109,7 +109,9 @@ those are your job, below.
    out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
    prefixes focus/exclude. A `Test*Async` method takes a trailing
    `done func()` and completes when it is called, not when it returns
-   (the suite's `Timeout` fails it if never); prefer `Eventually` for
+   (the suite's `Timeout` fails it if never; v1.34+: a failure on another
+   of its goroutines fails it but the wait still ends only at `done`, the
+   owner's failure, a stop or the `Timeout`); prefer `Eventually` for
    anything that can be polled. A generic suite runs only through one
    type alias per concrete type
    (`type ArticleIndexTestSuite = IndexContractTestSuite[Article]`);
@@ -126,6 +128,9 @@ those are your job, below.
    `wait := gotest.Go(…); defer wait()` is the one `defer` that belongs in
    a test, and only for work that finishes on its own — never wait in the
    test on a server or poller that `AfterEach` stops (it deadlocks).
+   A goroutine `BeforeAll` starts for `AfterAll` to stop goes on the hook's
+   `t` or a `gotest.NewTWithDeadline` `T` (v1.34+), never a
+   `NewTWithContext` one: its wait runs before `AfterAll` and deadlocks.
    Every `BeforeAll` needs an `AfterAll` (`lifecycle-pair`, integrity
    tier). A suite's `AfterAll` runs even when its `BeforeAll` failed or
    panicked midway, so release only what was actually set up — nil-check

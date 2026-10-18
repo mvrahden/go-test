@@ -35,6 +35,7 @@ Helpers built on gotest assertions work in every position.
 **Never use `t.T().Skip()` for environment gating.**
 Use `SuiteGuard() string` instead.
 SuiteGuard runs before the suite's fixtures, config resolution, `BeforeAll`, and every test method — the suite's own setup never executes.
+A shared fixture the suite binds is the exception: the runner starts it anyway, and its setup failure fails the suite before the guard is evaluated ([A guard does not hold back a shared fixture](specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
 A guard reads the environment, not fixture fields: they are still nil when it runs.
 `t.T().Skip()` inside `BeforeAll` runs even later, after suite setup has started.
 
@@ -204,7 +205,7 @@ gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, func(poll *gotest.R)
 
 There are no method forms on `*T`. Only package-level `gotest.Eventually()` and `gotest.Consistently()` exist.
 
-A poll is held to the deadline it was given ([Polls end at waitFor](specs/assertions/spec.md#requirement-polls-end-at-waitfor)), and a `waitFor` or `tick` that is not positive fails before the first poll ([Polling arguments](specs/assertions/spec.md#requirement-polling-arguments)).
+A poll that started before the deadline is judged by its result, and one that has not returned a tick past it fails as still running ([Polls and their deadline](specs/assertions/spec.md#requirement-polls-and-their-deadline)), and a `waitFor` or `tick` that is not positive fails before the first poll ([Polling arguments](specs/assertions/spec.md#requirement-polling-arguments)).
 
 **Critical constraint:** Inside the callback, `poll` is a `*gotest.R`, not a `*gotest.T`.
 `poll` has no `T()` method. All code in the callback must use gotest assertions only.
@@ -244,7 +245,9 @@ gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
 
 A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
 so it waits for a goroutine nothing has stopped yet.
-A fatal assertion on the goroutine fails the method at the wait ([Goroutines started by gotest.Go](specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+A fatal assertion on the goroutine fails the method at the wait, and every goroutine `BeforeAll` started is waited for before the fixtures are released, even when one of them fails ([Goroutines started by gotest.Go](specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+A `T` from `gotest.NewTWithDeadline` keeps those waits where its parent's go, so `gotest.Go` on it in `BeforeAll` is still waited for after `AfterAll`.
+`gotest.NewTWithContext` takes a `testing.TB` and cannot: a goroutine started on its `T` is waited for by the testing package's cleanup, which runs before `AfterAll`, so a goroutine only `AfterAll` stops deadlocks there. Start such a goroutine on the hook's own `t` or on a `NewTWithDeadline` `T`.
 
 A process the test starts and never waits for is not the test's to release, but it does not outlive the run ([No process outlives the run](specs/lifecycle/spec.md#requirement-no-process-outlives-the-run)).
 
@@ -271,7 +274,7 @@ Methods can also accept `*testing.T` for stdlib compatibility.
 
 A test that calls `os.Exit` fails, `os.Exit(0)` included, as under `go test`.
 
-A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is, located at the method's declaration — and only that: a method waiting for `done()` is not reported as still running. Prefer `Eventually` for anything that can be polled.
+A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is, located at the method's declaration — and only that: a method waiting for `done()` is not reported as still running. A fatal failure on another of the method's goroutines fails it but does not end the wait; the wait ends when `done()` is called, the goroutine that owns it fails, the run is stopped or the `Timeout` passes, and `AfterEach` is held to the same `Timeout` ([Async methods](specs/lifecycle/spec.md#requirement-async-methods)). Prefer `Eventually` for anything that can be polled.
 
 ### Lifecycle methods
 
@@ -288,7 +291,7 @@ For parallel test cases, AfterAll waits for all parallel tests to complete.
 
 `FailFast` is judged per method; a failure `BeforeAll` records without stopping skips nothing ([FailFast](specs/lifecycle/spec.md#requirement-failfast)).
 
-A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`; a method that ignores its context for five seconds is cut short, and the process ends by the signal ([Stopping a run](specs/lifecycle/spec.md#requirement-stopping-a-run)).
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`; a method body that ignores its context for five seconds is cut short, its fixtures released without `AfterAll`, and the process ends by the signal; the five seconds bound only the body, so a slow `AfterEach` still runs to its end before `AfterAll` ([Stopping a run](specs/lifecycle/spec.md#requirement-stopping-a-run), [The grace a stopped method gets](specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)). A suite whose runner died stops the same way by itself ([A suite whose parent is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone)), except behind a wrapper that re-pipes its stdout or runs it remotely (`tee`, `ssh`, `docker`), which hides the runner's death.
 
 **On failure and panic.**
 `AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
@@ -388,7 +391,7 @@ func (s *MyTestSuite) SuiteGuard() string {
 
 Returns empty string to run, non-empty to skip with that reason.
 Runs before the suite's fixtures, config, `BeforeAll`, and any test method, so fixture fields are still nil inside it.
-A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard ([A guard does not hold back a shared fixture](specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard, and its setup failure fails the suite before the guard is evaluated ([A guard does not hold back a shared fixture](specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
 Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes
@@ -438,7 +441,7 @@ type UserTestSuite struct {
 
 When both fixture and suite define `BeforeEach`/`AfterEach`, the fixture's hooks wrap the suite's:
 fixture.BeforeEach -> suite.BeforeEach -> test -> suite.AfterEach -> fixture.AfterEach.
-A fixture hook's failure is reported at the hook's own source ([Where a fixture hook failure is reported](specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
+An error a fixture's `BeforeEach` or `AfterEach` returns is reported at the hook's own source ([Where a fixture hook failure is reported](specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
 Fixtures compose via pointer fields (DAG — dependencies set up first):
 
@@ -463,10 +466,14 @@ The declared `Timeout` is also how long the runner waits for a shared fixture's 
 **Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
 panics fails the run — for package and shared fixtures alike. A panic in one fixture's
 teardown is contained, so every other fixture still finishes releasing its resources.
+That includes the release between two setup attempts: it fails the run even when a later
+attempt comes up ([A failed release between attempts](specs/fixtures/spec.md#requirement-a-failed-release-between-attempts)).
 
 `Retries` covers panics as well as returned errors — a `BeforeAll` that panics is
 retried like one that fails. If a shared fixture's process dies before teardown, the
-run fails: its `AfterAll` never ran and whatever it held is orphaned.
+run fails: its `AfterAll` never ran and whatever it held is orphaned. A CLI that is
+killed does not orphan it: the process runs `AfterAll` for what came up, then exits
+([A shared fixture process whose CLI is killed](specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)).
 
 ### Shared fixtures
 

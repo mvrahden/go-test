@@ -969,7 +969,7 @@ lint:
 |-------|------|----------|-------------|
 | `tags` | string | `-tags` | Comma-separated build tags |
 | `timeout` | duration | `--timeout` | Global pipeline deadline (default: 15m, 0 to disable) |
-| `setup-timeout` | duration | `--setup-timeout` | Flat budget for shared fixture setup (default: what the fixtures declare — each one's `Timeout × (Retries+1) + RetryDelay × Retries`, 2m until the first reports; 0 to disable; see [the setup-budget requirement](specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)) |
+| `setup-timeout` | duration | `--setup-timeout` | Flat budget for shared fixture setup (default: what the fixtures declare — each one's `Timeout × (Retries+1) + RetryDelay × Retries`, plus `Timeout × Retries` for the releases between attempts when it has an `AfterAll`, 2m until the first reports; 0 to disable; see [the setup-budget requirement](specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)) |
 | `min-coverage` | int | `--min` | Minimum coverage percentage (0–100) |
 | `parallel` | int | `--parallel` | Total concurrent test method budget |
 | `compile-parallel` | int | `--compile-parallel` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |

@@ -39,6 +39,9 @@ var (
 	// test: the next method never starts and has no verdict.
 	suiteEndsAtBeforeEach = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.AfterAll", "fixture.AfterAll"}
 	suiteEndsAfterBody    = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "body", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
+	// A fixture BeforeEach that overran but returned set up what it reached:
+	// the body never runs, every AfterEach releases it, and the next method runs.
+	bodyNeverRan = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "suite.AfterEach", "fixture.AfterEach", "fixture.BeforeEach", "suite.BeforeEach", "next", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
 )
 
 func runHooks(t *gotest.T, at, mode string) testkit.Run {
@@ -65,7 +68,7 @@ func (s *FixtureHooksTestSuite) TestAFixtureHookGoesWrong(t *gotest.T) {
 				{Desc: "fixture BeforeEach panics", at: "fixture.BeforeEach", mode: "panic",
 					ran: suiteEndsAtBeforeEach, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1},
 				{Desc: "fixture BeforeEach overruns the Timeout", at: "fixture.BeforeEach", mode: "overrun",
-					verdicts: map[string]string{body: "fail"}, exit: 1},
+					ran: bodyNeverRan, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
 				{Desc: "fixture AfterEach returns an error", at: "fixture.AfterEach", mode: "error",
 					ran: cleanRun, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1},
 				{Desc: "fixture AfterEach panics", at: "fixture.AfterEach", mode: "panic",
@@ -89,6 +92,14 @@ func (s *FixtureHooksTestSuite) TestAFixtureHookGoesWrong(t *gotest.T) {
 
 	t.When("a fixture BeforeEach returns an error", func(w *gotest.T) {
 		run := runHooks(w, "fixture.BeforeEach", "error")
+		w.It("is reported in the hook's own file, not the runtime's", func(it *gotest.T) {
+			gotest.Contains(it, run.Stdout, "fixture.go:")
+			gotest.NotContains(it, run.Stdout, "methods.go:")
+		})
+	})
+
+	t.When("a fixture AfterEach returns an error", func(w *gotest.T) {
+		run := runHooks(w, "fixture.AfterEach", "error")
 		w.It("is reported in the hook's own file, not the runtime's", func(it *gotest.T) {
 			gotest.Contains(it, run.Stdout, "fixture.go:")
 			gotest.NotContains(it, run.Stdout, "methods.go:")

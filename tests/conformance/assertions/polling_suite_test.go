@@ -21,7 +21,7 @@ func hang(*gotest.R) { time.Sleep(10 * time.Second) }
 
 func (s *PollingTestSuite) TestHangingPoll(t *gotest.T) {
 	t.When("an Eventually poll runs past waitFor", func(w *gotest.T) {
-		w.It("fails at the deadline and says the poll is still running", func(it *gotest.T) {
+		w.It("fails no later than one tick past waitFor and says the poll is still running", func(it *gotest.T) {
 			began := time.Now()
 			m := gotest.Record(func(r *gotest.R) { gotest.Eventually(r, 200*time.Millisecond, 50*time.Millisecond, hang) })
 			gotest.True(it, m.Failed())
@@ -30,12 +30,31 @@ func (s *PollingTestSuite) TestHangingPoll(t *gotest.T) {
 		})
 	})
 	t.When("a Consistently poll runs past waitFor", func(w *gotest.T) {
-		w.It("fails at the deadline and says the poll is still running", func(it *gotest.T) {
+		w.It("fails no later than one tick past waitFor and says the poll is still running", func(it *gotest.T) {
 			began := time.Now()
 			m := gotest.Record(func(r *gotest.R) { gotest.Consistently(r, 200*time.Millisecond, 50*time.Millisecond, hang) })
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "poll still running after 200ms")
 			gotest.Less(it, time.Since(began), 2*time.Second)
+		})
+	})
+}
+
+// slowPass passes after 700ms: started before a 500ms waitFor, it returns
+// after it and within the 500ms tick that follows.
+func slowPass(*gotest.R) { time.Sleep(700 * time.Millisecond) }
+
+func (s *PollingTestSuite) TestLatePoll(t *gotest.T) {
+	t.When("every Consistently poll passes but one runs past waitFor", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Consistently(r, 500*time.Millisecond, 500*time.Millisecond, slowPass) })
+			gotest.False(it, m.Failed(), m.Message())
+		})
+	})
+	t.When("an Eventually poll started before waitFor passes after it", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Eventually(r, 500*time.Millisecond, 500*time.Millisecond, slowPass) })
+			gotest.False(it, m.Failed(), m.Message())
 		})
 	})
 }

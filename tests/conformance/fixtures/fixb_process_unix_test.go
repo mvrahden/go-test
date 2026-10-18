@@ -1,0 +1,62 @@
+//go:build unix
+
+package fixtures_test
+
+import (
+	"os"
+	"path/filepath"
+	"strconv"
+	"syscall"
+	"time"
+
+	"github.com/mvrahden/go-test/internal/testkit"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+// SharedProcessTestSuite: what a shared fixture process hands a process its
+// setup starts, and how it releases siblings when a setup is given up.
+type SharedProcessTestSuite struct{}
+
+func (s *SharedProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.IntegrationSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+func (s *SharedProcessTestSuite) TestAProcessTheSetupStarts(t *gotest.T) {
+	markerDir := t.TempDir()
+	began := time.Now()
+	run, err := testkit.RunPackage(t.Context(), markerDir, "../testdata/fixbdetached/")
+	took := time.Since(began)
+	gotest.NoError(t, err)
+	t.When("a shared fixture's setup starts a process that outlives it", func(w *gotest.T) {
+		w.It("the run passes before that process ends", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "pass", run.Verdict("TestDetachTestSuite/TestStateArrived"))
+			gotest.Less(it, took, 25*time.Second, "the run waited for the 30s process")
+		})
+		w.It("the process sees no protocol variable, and what it writes to descriptor 3 is not read", func(it *gotest.T) {
+			gotest.Contains(it, run.Markers, "env=")
+			gotest.NotContains(it, run.Stdout+run.Stderr, "written by a process the fixture started")
+		})
+	})
+	if data, err := os.ReadFile(filepath.Join(markerDir, "detached-pid")); err == nil {
+		if pid, err := strconv.Atoi(string(data)); err == nil {
+			_ = syscall.Kill(-pid, syscall.SIGKILL)
+		}
+	}
+}
+
+func (s *SharedProcessTestSuite) TestASetupGivenUp(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixbsibling/")
+	gotest.NoError(t, err)
+	t.When("a shared fixture's setup is given up while a sibling that came up is still to be released", func(w *gotest.T) {
+		w.It("fails the run", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		})
+		w.It("the sibling's 8s AfterAll runs to its end under the teardown budget the process reports", func(it *gotest.T) {
+			gotest.True(it, run.MarkerOrder("healthy up", "hung returned", "healthy released"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
+			gotest.NotContains(it, run.Stderr, "forcing termination")
+		})
+	})
+}

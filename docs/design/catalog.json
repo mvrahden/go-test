@@ -78,6 +78,60 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "finds the key when present and reports it absent otherwise",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "finds_the_key_when_present_and_reports_it_absent_otherwise",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Contains is asked for a nil key in a map keyed by an interface or pointer type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "Contains_is_asked_for_a_nil_key_in_a_map_keyed_by_an_interface_or_pointer_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails naming the map's type",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_naming_the_map's_type",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Contains is asked for a nil key in a map whose key type cannot be nil",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "Contains_is_asked_for_a_nil_key_in_a_map_whose_key_type_cannot_be_nil",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "checks the substring as it does for strings",
                       "duration": 0,
                       "excluded": false,
@@ -279,6 +333,33 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails: the input is not valid JSON",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails:_the_input_is_not_valid_JSON",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when JSONEq is given a value followed by a stray } or ]",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "JSONEq_is_given_a_value_followed_by_a_stray_}_or_]",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "1 equals 1.0",
                       "duration": 0,
                       "excluded": false,
@@ -425,13 +506,13 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails at the deadline and says the poll is still running",
+                      "display": "fails no later than one tick past waitFor and says the poll is still running",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "fails_at_the_deadline_and_says_the_poll_is_still_running",
+                      "name": "fails_no_later_than_one_tick_past_waitFor_and_says_the_poll_is_still_running",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -452,13 +533,13 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails at the deadline and says the poll is still running",
+                      "display": "fails no later than one tick past waitFor and says the poll is still running",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "fails_at_the_deadline_and_says_the_poll_is_still_running",
+                      "name": "fails_no_later_than_one_tick_past_waitFor_and_says_the_poll_is_still_running",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -483,6 +564,73 @@
               "focused": false,
               "kind": "method",
               "name": "TestHangingPoll",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when every Consistently poll passes but one runs past waitFor",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "every_Consistently_poll_passes_but_one_runs_past_waitFor",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an Eventually poll started before waitFor passes after it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_Eventually_poll_started_before_waitFor_passes_after_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LatePoll",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLatePoll",
               "output": [],
               "status": "none"
             },
@@ -1664,6 +1812,138 @@
                       "children": [
                         {
                           "children": [],
+                          "display": "help",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "help",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "help watch",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "help_watch",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "help spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "help_spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "help summary",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "help_summary",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "help bench",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "help_bench",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "help config",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "help_config",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "gives its default as the fixtures' declared budgets, 2m until the first reports",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "gives_its_default_as_the_fixtures'_declared_budgets,_2m_until_the_first_reports",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a help text lists --setup-timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_help_text_lists_--setup-timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheSetupTimeoutDefault",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheSetupTimeoutDefault",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIHelp",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIHelpTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
                           "display": "version still prints",
                           "duration": 0,
                           "excluded": false,
@@ -2063,6 +2343,86 @@
           "focused": false,
           "kind": "suite",
           "name": "TestCLIPassthroughTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "fuzz methods",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "fuzz_methods",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "benchmark methods",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "benchmark_methods",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails with exit 2 and one error on stderr that names every such hook in source order, located at the first",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_with_exit_2_and_one_error_on_stderr_that_names_every_such_hook_in_source_order,_located_at_the_first",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when several hooks call t.T() in a suite with fuzz or benchmark methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "several_hooks_call_t.T()_in_a_suite_with_fuzz_or_benchmark_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HooksCallingT",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestHooksCallingT",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIRejections",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIRejectionsTestSuite",
           "output": [],
           "status": "none"
         },
@@ -2560,6 +2920,59 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "runs no AfterAll for the fixture, and the dependency's AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_no_AfterAll_for_the_fixture,_and_the_dependency's_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is interrupted while a shared fixture's dependency sets up, before the fixture's own BeforeAll runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_is_interrupted_while_a_shared_fixture's_dependency_sets_up,_before_the_fixture's_own_BeforeAll_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SetupEndsBeforeBeforeAll",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSetupEndsBeforeBeforeAll",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureCancel",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureCancelTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -2728,6 +3141,33 @@
                   "output": [],
                   "status": "none",
                   "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported in the hook's own file, not the runtime's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_reported_in_the_hook's_own_file,_not_the_runtime's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture AfterEach returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fixture_AfterEach_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
                 }
               ],
               "display": "AFixtureHookGoesWrong",
@@ -2748,6 +3188,152 @@
           "focused": false,
           "kind": "suite",
           "name": "TestFixtureHooksTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reports that AfterAll's error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_that_AfterAll's_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's AfterAll fails between its attempts and the second attempt comes up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_fixture's_AfterAll_fails_between_its_attempts_and_the_second_attempt_comes_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reports that AfterAll's error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_that_AfterAll's_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's AfterAll fails between its attempts and the second attempt comes up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_AfterAll_fails_between_its_attempts_and_the_second_attempt_comes_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFailedReleaseBetweenAttempts",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFailedReleaseBetweenAttempts",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the run passes: the wait counts the release",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_run_passes:_the_wait_counts_the_release",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture with a 2s Timeout and 1 retry spends 1.6s on each attempt and on the release between them, and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_with_a_2s_Timeout_and_1_retry_spends_1.6s_on_each_attempt_and_on_the_release_between_them,_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasesCountTowardTheWait",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasesCountTowardTheWait",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureRetry",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureRetryTestSuite",
           "output": [],
           "status": "none"
         },
@@ -2879,13 +3465,26 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails the run and still runs the fixture's AfterAll, releasing what the attempt reached",
+                      "display": "fails the run",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "fails_the_run_and_still_runs_the_fixture's_AfterAll,_releasing_what_the_attempt_reached",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll after each of its 2 attempts, releasing what each reached before the next",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_after_each_of_its_2_attempts,_releasing_what_each_reached_before_the_next",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -2921,6 +3520,364 @@
           "focused": false,
           "kind": "suite",
           "name": "TestFixtureTeardownTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait ends at the declared budget and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_ends_at_the_declared_budget_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "never runs the suite reading it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "never_runs_the_suite_reading_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_the_exclusive_tail_hangs_past_its_declared_2s_Timeout_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheExclusiveTail",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheExclusiveTail",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait ends at the declared budget and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_ends_at_the_declared_budget_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "never runs the benchmark reading it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "never_runs_the_benchmark_reading_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_a_bench_slot_hangs_past_its_declared_2s_Timeout_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABenchSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABenchSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait ends with the run and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_ends_with_the_run_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no fixture process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_no_fixture_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run's --timeout expires while a shared fixture started for the exclusive tail hangs with no Timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run's_--timeout_expires_while_a_shared_fixture_started_for_the_exclusive_tail_hangs_with_no_Timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStoppedRunEndsTheWait",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStoppedRunEndsTheWait",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureWindow",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureWindowTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture's AfterAll runs to its end, then its process exits",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture's_AfterAll_runs_to_its_end,_then_its_process_exits",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed while a shared fixture is up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_while_a_shared_fixture_is_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "KilledWhileUp",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestKilledWhileUp",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the setup's context ends, the fixture's AfterAll runs, then its process exits",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_setup's_context_ends,_the_fixture's_AfterAll_runs,_then_its_process_exits",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed while a shared fixture's BeforeAll waits on its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_while_a_shared_fixture's_BeforeAll_waits_on_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "KilledDuringSetup",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestKilledDuringSetup",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "KilledCLI",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestKilledCLITestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture process exits with status 1 once the 31s teardown budget it reported has passed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_process_exits_with_status_1_once_the_31s_teardown_budget_it_reported_has_passed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed and the shared fixture's AfterAll never returns",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_and_the_shared_fixture's_AfterAll_never_returns",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATeardownThatNeverReturns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATeardownThatNeverReturns",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture process exits with status 1 once its 1s setup budget and 31s teardown budget have passed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_process_exits_with_status_1_once_its_1s_setup_budget_and_31s_teardown_budget_have_passed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed while a shared fixture's BeforeAll ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_while_a_shared_fixture's_BeforeAll_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASetupThatIgnoresItsContext",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASetupThatIgnoresItsContext",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "OrphanedFixture",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestOrphanedFixtureTestSuite",
           "output": [],
           "status": "none"
         },
@@ -3016,6 +3973,59 @@
               "focused": false,
               "kind": "method",
               "name": "TestContainerConfig",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run within 60s, saying the setup timed out",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run_within_60s,_saying_the_setup_timed_out",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "never runs the suite reading the fixture",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "never_runs_the_suite_reading_the_fixture",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_declaring_a_2s_Timeout_hangs_in_BeforeAll_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "DeclaredBudgetBounds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestDeclaredBudgetBounds",
               "output": [],
               "status": "none"
             }
@@ -3144,13 +4154,13 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when every such fixture came up",
+                  "display": "when every protocol fixture comes up despite its output",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
                   "focused": false,
                   "kind": "block",
-                  "name": "every_such_fixture_came_up",
+                  "name": "every_protocol_fixture_comes_up_despite_its_output",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -3176,6 +4186,125 @@
           "name": "TestSharedFixtureProtocolTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the run passes before that process ends",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_run_passes_before_that_process_ends",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the process sees no protocol variable, and what it writes to descriptor 3 is not read",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_process_sees_no_protocol_variable,_and_what_it_writes_to_descriptor_3_is_not_read",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's setup starts a process that outlives it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_setup_starts_a_process_that_outlives_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AProcessTheSetupStarts",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAProcessTheSetupStarts",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the sibling's 8s AfterAll runs to its end under the teardown budget the process reports",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_sibling's_8s_AfterAll_runs_to_its_end_under_the_teardown_budget_the_process_reports",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's setup is given up while a sibling that came up is still to be released",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_setup_is_given_up_while_a_sibling_that_came_up_is_still_to_be_released",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASetupGivenUp",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASetupGivenUp",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SharedProcess",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSharedProcessTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -3185,6 +4314,59 @@
     {
       "duration": 0,
       "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the execution skips, its body never runs and its AfterEach still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_execution_skips,_its_body_never_runs_and_its_AfterEach_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fuzz execution's BeforeEach skips",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fuzz_execution's_BeforeEach_skips",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BeforeEachSkips",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBeforeEachSkips",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FuzzHookSkip",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFuzzHookSkipTestSuite",
+          "output": [],
+          "status": "none"
+        },
         {
           "children": [
             {
@@ -3264,6 +4446,112 @@
           "name": "TestFuzzHooksTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its fuzz seeds still replay and pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "its_fuzz_seeds_still_replay_and_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "its test method does not run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "its_test_method_does_not_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -skip names a suite's Test function and the suite has fuzz methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "-skip_names_a_suite's_Test_function_and_the_suite_has_fuzz_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SkipTheTestFunction",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSkipTheTestFunction",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite does not run: its shared fixture never starts and the run passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_suite_does_not_run:_its_shared_fixture_never_starts_and_the_run_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -skip names every Test and Fuzz function of a suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "-skip_names_every_Test_and_Fuzz_function_of_a_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SkipEveryFunction",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSkipEveryFunction",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FuzzSelection",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFuzzSelectionTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -3293,13 +4581,13 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when the goroutine that owns done fails a fatal assertion",
+                  "display": "when the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
                   "focused": false,
                   "kind": "block",
-                  "name": "the_goroutine_that_owns_done_fails_a_fatal_assertion",
+                  "name": "the_goroutine_that_owns_done_fails_a_fatal_assertion_and_no_other_goroutine_of_the_method_is_left",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -3312,6 +4600,126 @@
               "focused": false,
               "kind": "method",
               "name": "TestAFatalGoroutine",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "the owner calls done",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_owner_calls_done",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the owner fails",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_owner_fails",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the owner outlasts the Timeout",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_owner_outlasts_the_Timeout",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails the method, and the wait ends only when the owner calls done, fails or outlasts the Timeout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_method,_and_the_wait_ends_only_when_the_owner_calls_done,_fails_or_outlasts_the_Timeout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine of an async method other than the one that owns done fails a fatal assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_of_an_async_method_other_than_the_one_that_owns_done_fails_a_fatal_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnotherGoroutineFails",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnotherGoroutineFails",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the method for the overrun",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_method_for_the_overrun",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an async method calls done in time and its AfterEach overruns the declared Timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_async_method_calls_done_in_time_and_its_AfterEach_overruns_the_declared_Timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AfterEachOverruns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAfterEachOverruns",
               "output": [],
               "status": "none"
             }
@@ -3415,6 +4823,59 @@
           "focused": false,
           "kind": "suite",
           "name": "TestBenchPanicTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names only the hung test as running when the timeout expired",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_only_the_hung_test_as_running_when_the_timeout_expired",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one suite's process crashed on its own and another suite hangs until --timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_suite's_process_crashed_on_its_own_and_another_suite_hangs_until_--timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ACrashBeforeTheTimeout",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestACrashBeforeTheTimeout",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DeadlineNaming",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDeadlineNamingTestSuite",
           "output": [],
           "status": "none"
         },
@@ -3652,6 +5113,85 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "sends that process no signal",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "sends_that_process_no_signal",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "interrupts the suite's process group instead",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "interrupts_the_suite's_process_group_instead",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is interrupted and the pid the suite published names a process outside its group",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run_is_interrupted_and_the_pid_the_suite_published_names_a_process_outside_its_group",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ThePublishedPidIsAStranger",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestThePublishedPidIsAStranger",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ForeignPid",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestForeignPidTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "the suite passes: the wait comes after AfterAll",
                       "duration": 0,
                       "excluded": false,
@@ -3710,6 +5250,100 @@
               "focused": false,
               "kind": "method",
               "name": "TestWaits",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite passes: the wait comes after AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_suite_passes:_the_wait_comes_after_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll starts a goroutine with gotest.Go on a T from NewTWithDeadline that only AfterAll stops",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "BeforeAll_starts_a_goroutine_with_gotest.Go_on_a_T_from_NewTWithDeadline_that_only_AfterAll_stops",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "the last goroutine fails",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_last_goroutine_fails",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the last goroutine panics",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_last_goroutine_panics",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails the suite and waits for every other one before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_suite_and_waits_for_every_other_one_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the last of several goroutines BeforeAll started with gotest.Go fails or panics",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_last_of_several_goroutines_BeforeAll_started_with_gotest.Go_fails_or_panics",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SetupWaits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSetupWaits",
               "output": [],
               "status": "none"
             }
@@ -3850,13 +5484,13 @@
                           "vocab": "each"
                         }
                       ],
-                      "display": "stops with its launcher's exit code, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind",
+                      "display": "ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "stops_with_its_launcher's_exit_code,_finishes_the_fixture_teardown_unless_a_second_signal_abandons_it_saying_so,_and_leaves_no_suite_process_behind",
+                      "name": "ends_with_its_exit_code,_or_by_the_signal_where_go_run_dies_of_a_SIGTERM,_finishes_the_fixture_teardown_unless_a_second_signal_abandons_it_saying_so,_and_leaves_no_suite_process_behind",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -4009,13 +5643,330 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "exits 130",
+                      "display": "ends the holding method's context",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "exits_130",
+                      "name": "ends_the_holding_method's_context",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the methods that have not started never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_methods_that_have_not_started_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no suite process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_no_suite_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the parent of a suite process under the runner is killed while a method holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_parent_of_a_suite_process_under_the_runner_is_killed_while_a_method_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheParentIsKilled",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheParentIsKilled",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ParentGone",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestParentGoneTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "skips the methods that have not started with the reason run stopping",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "skips_the_methods_that_have_not_started_with_the_reason_run_stopping",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "every verdict reaches the stream: the holding method's, the suite's and the package's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "every_verdict_reaches_the_stream:_the_holding_method's,_the_suite's_and_the_package's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is interrupted on Windows, where only the stop file reaches the suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_is_interrupted_on_Windows,_where_only_the_stop_file_reaches_the_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "OnlyTheStopFileStopsTheSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestOnlyTheStopFileStopsTheSuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "StopFile",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestStopFileTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "cuts the body short after 5s, saying so",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "cuts_the_body_short_after_5s,_saying_so",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "releases the fixture without running AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_without_running_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is stopped and a method body ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run_is_stopped_and_a_method_body_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABodyIgnoringItsContext",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABodyIgnoringItsContext",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterEach_to_its_end,_then_AfterAll,_then_releases_the_fixture:_the_grace_bounds_only_the_body",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is stopped and a method's AfterEach outlasts the 5s grace its body gets",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run_is_stopped_and_a_method's_AfterEach_outlasts_the_5s_grace_its_body_gets",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASlowAfterEach",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASlowAfterEach",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_wait_at_the_stop,_then_runs_AfterEach_and_AfterAll,_and_fails_the_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is stopped while an async method waits for done after another of its goroutines failed",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run_is_stopped_while_an_async_method_waits_for_done_after_another_of_its_goroutines_failed",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnAsyncWaitAfterAFailure",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnAsyncWaitAfterAFailure",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "StopGrace",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestStopGraceTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 130 when gotest runs directly",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_130_when_gotest_runs_directly",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -4090,6 +6041,138 @@
           "focused": false,
           "kind": "suite",
           "name": "TestStopTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "ends the holding method's context",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_holding_method's_context",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the methods that have not started never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_methods_that_have_not_started_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no suite process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_no_suite_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the runner and its converter are killed under -json while an -exec wrapper waits on the suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_runner_and_its_converter_are_killed_under_-json_while_an_-exec_wrapper_waits_on_the_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheRunnerAndConverterDie",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheRunnerAndConverterDie",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the holding method runs on: its context does not end",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_holding_method_runs_on:_its_context_does_not_end",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite run by its test binary outside the gotest runner loses the reader of its stdout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_run_by_its_test_binary_outside_the_gotest_runner_loses_the_reader_of_its_stdout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APlainRunLosesItsReader",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAPlainRunLosesItsReader",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "StreamReader",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestStreamReaderTestSuite",
           "output": [],
           "status": "none"
         },
@@ -4310,13 +6393,13 @@
     }
   ],
   "stats": {
-    "behaviors": 148,
+    "behaviors": 216,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 31,
+    "suites": 47,
     "tests": 0
   }
 }

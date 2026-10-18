@@ -39,7 +39,7 @@ func (s *SharedFixtureProtocolTestSuite) TestSetupOutputAndState(t *gotest.T) {
 			gotest.Equal(it, "pass", run.Verdict("TestBigTestSuite/TestStateArrived"), "stderr: %s", run.Stderr)
 		})
 	})
-	t.When("every such fixture came up", func(w *gotest.T) {
+	t.When("every protocol fixture comes up despite its output", func(w *gotest.T) {
 		w.It("the run passes", func(it *gotest.T) {
 			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})

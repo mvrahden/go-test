@@ -94,7 +94,7 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 	run := finished(cmd, tree, markerDir)
 
 	t.When("the run is interrupted while a method holds", func(w *gotest.T) {
-		w.It("exits 130", func(it *gotest.T) {
+		w.It("exits 130 when gotest runs directly", func(it *gotest.T) {
 			gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 		w.It("ends the holding method's context", func(it *gotest.T) {
