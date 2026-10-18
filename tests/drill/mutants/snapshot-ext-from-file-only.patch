@@ -1,0 +1,13 @@
+Expect: snapshotting built with -trimpath: verdicts differ
+Clause: when the package is built with -trimpath → the baselines are still found beside the test, _ext suffix included
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -32,7 +32,7 @@
+ // external test package: its package path ends in _test. The symbol survives
+ // -trimpath, which turns the caller's file into a path that cannot be opened.
+ func externalBySymbol(fn string) (ext, known bool) {
+-	if fn == "" {
++	if fn == "" || true {
+ 		return false, false
+ 	}
+ 	pkg := fn[strings.LastIndex(fn, "/")+1:]

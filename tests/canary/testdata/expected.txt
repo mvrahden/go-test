@@ -50,6 +50,7 @@ failing fail TestFailingTestSuite/TestPanics
 failing fail TestFailingTestSuite/TestRegexp
 failing fail TestFailingTestSuite/TestRegexpNamed
 failing fail TestFailingTestSuite/TestSame
+failing fail TestFailingTestSuite/TestSnapshotBadName
 failing fail TestFailingTestSuite/TestSubset
 failing fail TestFailingTestSuite/TestTimeIsNow
 failing fail TestFailingTestSuite/TestTimeWithin
@@ -124,6 +125,12 @@ snapshotting fail -
 snapshotting fail TestSnapshottingTestSuite
 snapshotting fail TestSnapshottingTestSuite/TestDiffersFromBaseline
 snapshotting pass TestSnapshottingTestSuite/TestMatchesBaseline
+snapshotting pass TestSnapshottingTestSuite/TestRows
+snapshotting pass TestSnapshottingTestSuite/TestRows/#0
+snapshotting pass TestSnapshottingTestSuite/TestRows/#1
+snapshotting pass TestSnapshottingTestSuite/TestTwins
+snapshotting pass TestSnapshottingTestSuite/TestTwins/x
+snapshotting pass TestSnapshottingTestSuite/TestTwins/x#01
 exclusive exit 0
 exclusive pass -
 exclusive pass TestBulkOneTestSuite

@@ -21,10 +21,26 @@ import (
 )
 
 var (
-	dedupSuffixRe = regexp.MustCompile(`#\d+$`)
-	pkgCache      sync.Map // callerFile → bool (true if _test package)
-	snapMu        sync.Map // snapPath → *sync.Mutex
+	pkgCache sync.Map // callerFile → bool (true if _test package)
+	snapMu   sync.Map // snapPath → *sync.Mutex
 )
+
+// headerGrammar is what a section key must not spell: the file's own header.
+var headerGrammar = regexp.MustCompile(`=== SNAP `)
+
+// externalBySymbol reports whether the function fn names was compiled into an
+// external test package: its package path ends in _test. The symbol survives
+// -trimpath, which turns the caller's file into a path that cannot be opened.
+func externalBySymbol(fn string) (ext, known bool) {
+	if fn == "" {
+		return false, false
+	}
+	pkg := fn[strings.LastIndex(fn, "/")+1:]
+	if dot := strings.Index(pkg, "."); dot >= 0 {
+		pkg = pkg[:dot]
+	}
+	return strings.HasSuffix(pkg, "_test"), true
+}
 
 func isExternalPackage(callerFile string) bool {
 	if v, ok := pkgCache.Load(callerFile); ok {
@@ -117,10 +133,14 @@ func snapshotContent(value any) (string, error) {
 }
 
 func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
-	_, callerFile, _, ok := runtime.Caller(callerSkip)
+	callerPC, callerFile, _, ok := runtime.Caller(callerSkip)
 	if !ok {
 		fail(t, "MatchSnapshot: unable to determine caller file", nil)
 		return
+	}
+	callerFunc := ""
+	if f := runtime.FuncForPC(callerPC); f != nil {
+		callerFunc = f.Name()
 	}
 
 	content, err := snapshotContent(value)
@@ -155,9 +175,17 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	if sectionKey == "" {
 		sectionKey = "_"
 	}
+	if strings.ContainsAny(sectionKey, "\r\n") || headerGrammar.MatchString(sectionKey) {
+		failf(t, "MatchSnapshot: snapshot name %q must be one line and must not spell a section header", sectionKey)
+		return
+	}
 
 	suffix := ""
-	if isExternalPackage(callerFile) {
+	ext, known := externalBySymbol(callerFunc)
+	if !known {
+		ext = isExternalPackage(callerFile)
+	}
+	if ext {
 		suffix = "_ext"
 	}
 
@@ -184,7 +212,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		}
 	}
 
-	if os.Getenv(protocol.EnvUpdateSnapshots) != "" {
+	if updateSnapshots() {
 		if idx >= 0 {
 			sections[idx].Content = content + "\n"
 		} else {
@@ -226,8 +254,29 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 // MatchSnapshot itself point it at a temp dir, away from the source tree.
 var snapshotDirFor = defaultSnapshotDir
 
+// defaultSnapshotDir is testdata/__snapshots__ beside the caller's file; under
+// -trimpath that file is a path only the build knew, so the package directory
+// go test runs the binary in stands in.
 func defaultSnapshotDir(callerFile string) string {
-	return filepath.Join(filepath.Dir(callerFile), "testdata", "__snapshots__")
+	dir := filepath.Dir(callerFile)
+	if !filepath.IsAbs(dir) || !dirExists(dir) {
+		if wd, err := os.Getwd(); err == nil {
+			dir = wd
+		}
+	}
+	return filepath.Join(dir, "testdata", "__snapshots__")
+}
+
+func dirExists(dir string) bool {
+	info, err := os.Stat(dir)
+	return err == nil && info.IsDir()
+}
+
+// updateSnapshots reports whether baselines are rewritten: GOTEST_UPDATE_SNAPSHOTS
+// set to anything but 0 or false, the way GOTEST_CI is read.
+func updateSnapshots() bool {
+	v := os.Getenv(protocol.EnvUpdateSnapshots)
+	return v != "" && v != "0" && v != "false"
 }
 
 // snapshotReadonly returns true when MatchSnapshot should refuse to generate
@@ -238,9 +287,12 @@ func snapshotReadonly() bool {
 	return v != "" && v != "0" && v != "false"
 }
 
+// splitTestName splits a test name into its top-level function and the rest,
+// kept exactly: testing's #01 on a twin and #0 on an unnamed row are part of
+// the name, and each gets a section of its own.
 func splitTestName(name string) (topLevel, rest string) {
 	if top, sub, ok := strings.Cut(name, "/"); ok {
-		return top, dedupSuffixRe.ReplaceAllString(sub, "")
+		return top, sub
 	}
 	return name, ""
 }

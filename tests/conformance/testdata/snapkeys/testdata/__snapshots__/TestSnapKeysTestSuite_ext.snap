@@ -1,0 +1,10 @@
+=== SNAP TestRows/#0 ===
+row zero
+=== SNAP TestRows/#1 ===
+row one
+=== SNAP TestStale ===
+old
+=== SNAP TestTwins/x ===
+first twin
+=== SNAP TestTwins/x#01 ===
+second twin

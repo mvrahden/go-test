@@ -14,6 +14,7 @@ func ExportSeeds(f *F) [][]any { return f.seeds }
 var (
 	ExportIsExternalPackage = isExternalPackage
 	ExportSplitTestName     = splitTestName
+	ExportExternalBySymbol  = externalBySymbol
 	ExportSnapshotReadonly  = snapshotReadonly
 	ExportPkgCache          = &pkgCache
 )

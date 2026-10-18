@@ -175,6 +175,16 @@ On subsequent runs, the value is compared against the stored snapshot.
 The optional `name` disambiguates multiple snapshots within the same test case.
 Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
 
+A section is keyed by the exact subtest name, the `#0` of an unnamed `Each` row and the `#01` testing gives a twin included; `B` and `F` carry `Name()` so a benchmark's or fuzz target's snapshot is keyed too:
+
+> when Each rows and same-named subtests match snapshots → #0, #1, x and x#01 each read their own section
+
+> when a snapshot name spans lines or spells a section header → is refused before anything is written
+
+> when the package is built with -trimpath → the baselines are still found beside the test, _ext suffix included
+
+> when GOTEST_UPDATE_SNAPSHOTS is 0 → a stale baseline still fails and is left as it was
+
 ### Typing
 
 Assertions take the types they are given at face value and say what they cannot work with:

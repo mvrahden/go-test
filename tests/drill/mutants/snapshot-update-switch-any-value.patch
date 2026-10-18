@@ -1,0 +1,13 @@
+Expect: snapshotting with GOTEST_UPDATE_SNAPSHOTS=0: verdicts differ
+Clause: when GOTEST_UPDATE_SNAPSHOTS is 0 → a stale baseline still fails and is left as it was
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -275,7 +275,7 @@
+ // set to anything but 0 or false, the way GOTEST_CI is read.
+ func updateSnapshots() bool {
+ 	v := os.Getenv(protocol.EnvUpdateSnapshots)
+-	return v != "" && v != "0" && v != "false"
++	return v != ""
+ }
+ 
+ // snapshotReadonly returns true when MatchSnapshot should refuse to generate

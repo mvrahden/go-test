@@ -144,6 +144,11 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `erroras-type-unnamed` | ErrorAs reports a mismatch without the type it wanted | canary: no failure names the expected type |
 | `jsoneq-numbers-as-float64` | JSONEq decodes numbers into float64 | canary: two integers a float64 cannot tell apart compare equal |
 | `jsoneq-numbers-by-spelling` | JSONEq tells numbers apart by how they are written | canary: the passing fixture's 1 and 1.0 differ |
+| `snapshot-keys-strip-twin-suffix` | a snapshot key drops testing's #01 and #0 | canary: twins and unnamed rows share one baseline and the second fails |
+| `snapshot-update-switch-any-value` | GOTEST_UPDATE_SNAPSHOTS=0 rewrites baselines | canary: the stale baseline passes and the file changes |
+| `snapshot-ext-from-file-only` | the _ext suffix comes from opening the caller's file alone | canary: under -trimpath the baselines are not found |
+| `snapshot-dir-from-file-only` | the snapshot dir is always beside the caller's file path | canary: under -trimpath the baselines are not found |
+| `snapshot-name-unchecked` | a multi-line snapshot name is written as it is | canary: the failing fixture's bad name passes |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |

@@ -1,0 +1,13 @@
+Expect: failing: verdicts differ from the golden list
+Clause: when a snapshot name spans lines or spells a section header → is refused before anything is written
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -175,7 +175,7 @@
+ 	if sectionKey == "" {
+ 		sectionKey = "_"
+ 	}
+-	if strings.ContainsAny(sectionKey, "\r\n") || headerGrammar.MatchString(sectionKey) {
++	if false && (strings.ContainsAny(sectionKey, "\r\n") || headerGrammar.MatchString(sectionKey)) {
+ 		failf(t, "MatchSnapshot: snapshot name %q must be one line and must not spell a section header", sectionKey)
+ 		return
+ 	}

@@ -101,8 +101,13 @@ type event struct {
 // run executes the CLI in -json mode over one fixture package and returns
 // its exit code and the verdict rows it produced, in golden form.
 func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []string) {
+	return s.runEnv(t, pkg, canaryDir, nil, extra...)
+}
+
+// runEnv is run with extra variables in the child's environment.
+func (s *CanaryTestSuite) runEnv(t *gotest.T, pkg, canaryDir string, env []string, extra ...string) (int, []string) {
 	cmd := exec.Command(s.binary, append(append([]string{"-json"}, extra...), "./testdata/"+pkg+"/")...) //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = childEnv(canaryDir)
+	cmd.Env = append(childEnv(canaryDir), env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
@@ -615,6 +620,36 @@ func (s *CanaryTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gote
 		if !strings.Contains(s.lastStream, want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}
+	}
+}
+
+// A snapshot section is the exact name testing gave the subtest, found
+// beside the test under -trimpath too; an update switch spelled off is off.
+func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
+	want := s.expected["snapshotting"]
+	baseline := filepath.Join("testdata", "snapshotting", "testdata", "__snapshots__", "TestSnapshottingTestSuite_ext.snap")
+	before, err := os.ReadFile(baseline)
+	if err != nil {
+		fatalf(t, "baseline: %v", err)
+	}
+	for _, c := range []struct {
+		how   string
+		env   []string
+		flags []string
+	}{
+		{"built with -trimpath", nil, []string{"-trimpath"}},
+		{"with GOTEST_UPDATE_SNAPSHOTS=0", []string{"GOTEST_UPDATE_SNAPSHOTS=0"}, nil},
+		{"with GOTEST_UPDATE_SNAPSHOTS=false", []string{"GOTEST_UPDATE_SNAPSHOTS=false"}, nil},
+	} {
+		code, rows := s.runEnv(t, "snapshotting", t.TempDir(), c.env, c.flags...)
+		if code != want.exit || strings.Join(rows, "\n") != strings.Join(want.rows, "\n") {
+			t.Errorf("snapshotting %s: verdicts differ from the golden list (exit %d)\n got:\n  %s", c.how, code, strings.Join(rows, "\n  "))
+		}
+	}
+	after, _ := os.ReadFile(baseline)
+	if string(after) != string(before) {
+		t.Errorf("snapshotting: a run with the update switch off rewrote the baseline")
+		_ = os.WriteFile(baseline, before, 0o600)
 	}
 }
 

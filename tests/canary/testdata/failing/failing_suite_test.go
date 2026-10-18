@@ -100,3 +100,7 @@ func (s *FailingTestSuite) TestRegexpNamed(t *gotest.T) {
 func (s *FailingTestSuite) TestJSONEqBigInts(t *gotest.T) {
 	gotest.JSONEq(t, `{"n":9007199254740993}`, `{"n":9007199254740992}`)
 }
+
+func (s *FailingTestSuite) TestSnapshotBadName(t *gotest.T) {
+	gotest.MatchSnapshot(t, "v", "two\nlines")
+}

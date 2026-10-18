@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -25,8 +24,11 @@ type SnapshotInternalsTestSuite struct {
 // BeforeEach redirects snapshots into a temp dir, so no test writes into
 // the source tree.
 func (s *SnapshotInternalsTestSuite) BeforeEach(t *gotest.T) {
-	_, file, _, _ := runtime.Caller(0)
-	s.dir = filepath.Dir(file)
+	// The package directory, where go test runs the binary: the caller's file
+	// would do as well, until -trimpath makes it a path nothing can open.
+	dir, err := os.Getwd()
+	gotest.NoError(t, err)
+	s.dir = dir
 	s.snapDir = t.TempDir()
 	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
 }
@@ -96,9 +98,10 @@ func (s *SnapshotInternalsTestSuite) TestSplitTestName(t *gotest.T) {
 		{Desc: "top-level only", input: "TestFoo", wantTopLevel: "TestFoo", wantRest: ""},
 		{Desc: "with subtest", input: "TestFoo/bar", wantTopLevel: "TestFoo", wantRest: "bar"},
 		{Desc: "nested subtests", input: "TestFoo/bar/baz", wantTopLevel: "TestFoo", wantRest: "bar/baz"},
-		{Desc: "strips dedup suffix", input: "TestFoo/bar#01", wantTopLevel: "TestFoo", wantRest: "bar"},
-		{Desc: "strips dedup suffix nested", input: "TestFoo/bar/baz#03", wantTopLevel: "TestFoo", wantRest: "bar/baz"},
-		{Desc: "no dedup suffix", input: "TestFoo/bar#notnum", wantTopLevel: "TestFoo", wantRest: "bar#notnum"},
+		{Desc: "keeps a twin's number", input: "TestFoo/bar#01", wantTopLevel: "TestFoo", wantRest: "bar#01"},
+		{Desc: "keeps a nested twin's number", input: "TestFoo/bar/baz#03", wantTopLevel: "TestFoo", wantRest: "bar/baz#03"},
+		{Desc: "keeps an unnamed row's number", input: "TestFoo/#0", wantTopLevel: "TestFoo", wantRest: "#0"},
+		{Desc: "keeps any other hash", input: "TestFoo/bar#notnum", wantTopLevel: "TestFoo", wantRest: "bar#notnum"},
 	}) {
 		topLevel, rest := gotest.ExportSplitTestName(tc.input)
 		if topLevel != tc.wantTopLevel {
@@ -242,4 +245,26 @@ func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_CIMode_ComparesExistingBa
 
 	t.Setenv("GOTEST_CI", "1")
 	gotest.MatchSnapshot(t, "expected value")
+}
+
+// The _ext suffix follows the caller's package as the function symbol names
+// it, which -trimpath leaves intact where it rewrites the file's path.
+func (s *SnapshotInternalsTestSuite) TestExternalBySymbol(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc   string
+		symbol string
+		ext    bool
+		known  bool
+	}{
+		{Desc: "an external test package's method", symbol: "github.com/x/pkg_test.(*Suite).TestOne", ext: true, known: true},
+		{Desc: "a closure inside it", symbol: "github.com/x/pkg_test.(*Suite).TestOne.func1", ext: true, known: true},
+		{Desc: "the package's own test file", symbol: "github.com/x/pkg.(*Suite).TestOne", ext: false, known: true},
+		{Desc: "a package whose name ends in _test only inside its path", symbol: "github.com/x/a_test/pkg.Run", ext: false, known: true},
+		{Desc: "no symbol", symbol: "", ext: false, known: false},
+	}) {
+		ext, known := gotest.ExportExternalBySymbol(tc.symbol)
+		if ext != tc.ext || known != tc.known {
+			sub.Errorf("externalBySymbol(%q): got (%v, %v), want (%v, %v)", tc.symbol, ext, known, tc.ext, tc.known)
+		}
+	}
 }
