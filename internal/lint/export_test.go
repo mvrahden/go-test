@@ -21,3 +21,10 @@ var (
 	ExportIsBenchmarkMethodName = isBenchmarkMethodName
 	ExportIsFuzzMethodName      = isFuzzMethodName
 )
+
+// ExportOnAnalyze makes f see the package paths of every analysis until
+// the returned restore runs.
+func ExportOnAnalyze(f func(paths []string)) (restore func()) {
+	analyzed = f
+	return func() { analyzed = nil }
+}

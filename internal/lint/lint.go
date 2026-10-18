@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -65,6 +66,9 @@ const (
 	// GenerationRejects is integrity: a package the generator rejects does
 	// not run at all.
 	GenerationRejects Rule = "generation-rejects"
+	// NolintUnknown is integrity: a nolint comment naming a rule that does
+	// not exist suppresses nothing, whatever it was meant to.
+	NolintUnknown Rule = "nolint-unknown"
 )
 
 // Tier classifies what breaks when a rule's finding is ignored, and derives
@@ -129,6 +133,7 @@ var ruleMeta = map[Rule]struct {
 	NoEmbedding:             {TierIntegrity, ScopeSuites},
 	FixtureHookCall:         {TierIntegrity, ScopeSuites},
 	GenerationRejects:       {TierIntegrity, ScopeSuites},
+	NolintUnknown:           {TierIntegrity, ScopeEverywhere},
 
 	// fuzz-determinism is integrity: a target reading the clock/RNG/env
 	// breaks the replayability the corpus depends on — its outcomes lie.
@@ -225,6 +230,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkFixtureHookCall(pass, insp)
 
 	checkOrphanedFiles(pass)
+	checkNolintIDs(pass)
 	checkStdlibTests(pass, insp)
 	checkTestifyImports(pass)
 
@@ -394,6 +400,20 @@ func startsItsLine(fset *token.FileSet, file *ast.File, cg *ast.CommentGroup) bo
 }
 
 func parseNolint(text string) (rules map[Rule]bool, ok bool) {
+	ids, ok := nolintIDs(text)
+	if !ok || len(ids) == 0 || slices.Contains(ids, "all") {
+		return nil, ok
+	}
+	rules = make(map[Rule]bool, len(ids))
+	for _, id := range ids {
+		rules[Rule(id)] = true
+	}
+	return rules, true
+}
+
+// nolintIDs returns the ids a nolint comment names; none means every rule.
+// A reason may follow after " //", with or without ids.
+func nolintIDs(text string) (ids []string, ok bool) {
 	var rest string
 	switch {
 	case strings.HasPrefix(text, "//nolint"):
@@ -407,27 +427,21 @@ func parseNolint(text string) (rules map[Rule]bool, ok bool) {
 		return nil, true
 	}
 	if rest[0] != ':' {
+		if reason := strings.TrimLeft(rest, " \t"); reason != rest && strings.HasPrefix(reason, "//") {
+			return nil, true
+		}
 		return nil, false
 	}
 	rest = rest[1:]
 	if idx := strings.Index(rest, " //"); idx >= 0 {
 		rest = rest[:idx]
 	}
-	rest = strings.TrimSpace(rest)
-	if rest == "" {
-		return nil, true
-	}
-	rules = make(map[Rule]bool)
-	for _, r := range strings.Split(rest, ",") {
-		r = strings.TrimSpace(r)
-		if r != "" {
-			rules[Rule(r)] = true
+	for _, id := range strings.Split(rest, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, id)
 		}
 	}
-	if len(rules) == 0 {
-		return nil, true
-	}
-	return rules, true
+	return ids, true
 }
 
 type suiteInfo struct {
@@ -1137,10 +1151,19 @@ func isTMethodCall(info *types.Info, expr ast.Expr) bool {
 func checkOrphanedFiles(pass *analysis.Pass) {
 	for _, file := range pass.Files {
 		name := filepath.Base(pass.Fset.File(file.Pos()).Name())
-		if about.PSuiteRegex.MatchString(name) {
+		if about.PSuiteRegex.MatchString(name) && !untracked(pass.Fset.File(file.Pos()).Name()) {
 			report(pass, GeneratedFile, file.Pos(), "generated file %s should not be checked into version control", name)
 		}
 	}
+}
+
+// untracked reports whether git says it does not track path; outside a
+// repository, or without git, nothing is known to be untracked.
+func untracked(path string) bool {
+	cmd := exec.Command("git", "ls-files", "-z", "--", filepath.Base(path)) //nolint:gosec // G204: git with a file the load read
+	cmd.Dir = filepath.Dir(path)
+	out, err := cmd.Output()
+	return err == nil && len(out) == 0
 }
 
 func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {

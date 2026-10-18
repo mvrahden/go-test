@@ -89,7 +89,12 @@ func analyze(ctx context.Context, t *Targets, overlay map[string][]byte) (*Resul
 	if err != nil {
 		return nil, fmt.Errorf("analyze: %w", err)
 	}
+	noteAnalyzed(graph.Roots)
+	return newResult(graph)
+}
 
+// newResult reads the findings of graph's roots.
+func newResult(graph *checker.Graph) (*Result, error) {
 	res := &Result{graph: graph}
 	seen := map[Finding]bool{}
 	fixFiles := map[string]bool{}

@@ -13,30 +13,55 @@ import (
 	"go/types"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/mvrahden/go-test/internal/filewrite"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/ast/astutil"
+	"golang.org/x/tools/go/packages"
 )
 
 // fixPasses bounds the passes of one Fix. A pass applies every fix that
 // overlaps no other; the next applies what it held back or revealed.
 const fixPasses = 10
 
+// analyzed, when set, sees the package paths each analysis covers.
+var analyzed func(paths []string)
+
+// noteAnalyzed hands analyzed the paths of roots, test mains left out.
+func noteAnalyzed(roots []*checker.Action) {
+	if analyzed == nil {
+		return
+	}
+	var paths []string
+	for _, act := range roots {
+		if !isTestMain(act.Package) && !slices.Contains(paths, act.Package.PkgPath) {
+			paths = append(paths, act.Package.PkgPath)
+		}
+	}
+	analyzed(paths)
+}
+
+// isTestMain reports whether p is the main package go test generates.
+func isTestMain(p *packages.Package) bool {
+	return p.Name == "main" && strings.HasSuffix(p.PkgPath, ".test")
+}
+
 // Change is one file Fix rewrote.
 type Change = filewrite.Change
 
 // Fix applies the fixes res carries in memory, exactly as the go/analysis
-// driver's -fix would write them, and re-analyzes the fixed sources until no
-// fix is left or a pass changes nothing. It writes nothing: it returns the
-// analysis of the fixed sources and the files that changed, sorted. A fix
-// whose result does not compile is dropped and named in the result's
-// Unapplied; the others apply. Fixed sources that no longer load otherwise
-// are an error, with no changes.
+// driver's -fix would write them, and re-analyzes the packages each pass
+// changed until no fix is left or a pass changes nothing. It writes nothing:
+// it returns the analysis of the fixed sources and the files that changed,
+// sorted. A fix whose result does not compile is dropped and named in the
+// result's Unapplied; the others apply. Fixed sources that no longer load
+// otherwise are an error, with no changes.
 func Fix(ctx context.Context, t *Targets, res *Result) (*Result, []Change, error) {
 	f := &fixer{current: map[string][]byte{}, original: map[string][]byte{}, dropped: map[string]int{}}
 	defer f.forget()
@@ -61,10 +86,11 @@ func Fix(ctx context.Context, t *Targets, res *Result) (*Result, []Change, error
 		if err != nil {
 			return nil, nil, err
 		}
-		if !f.set(p, contents) {
+		changed := f.set(p, contents)
+		if len(changed) == 0 {
 			break
 		}
-		if res, err = analyze(ctx, t, f.current); err != nil {
+		if res, err = reanalyze(ctx, t, res, changed, f.current); err != nil {
 			return nil, nil, fmt.Errorf("after applying fixes: %w", err)
 		}
 	}
@@ -209,9 +235,9 @@ func (p *fixPass) contents(fixes []pendingFix) (map[string][]byte, error) {
 	return out, nil
 }
 
-// set makes contents the fixed sources and reports whether any changed.
-func (f *fixer) set(p *fixPass, contents map[string][]byte) bool {
-	progress := false
+// set makes contents the fixed sources and returns the files that changed.
+func (f *fixer) set(p *fixPass, contents map[string][]byte) []string {
+	var changed []string
 	for _, file := range slices.Sorted(maps.Keys(contents)) {
 		fixed := contents[file]
 		src := p.baselines[file]
@@ -219,12 +245,108 @@ func (f *fixer) set(p *fixPass, contents map[string][]byte) bool {
 			f.original[file] = src
 		}
 		if !bytes.Equal(src, fixed) {
-			progress = true
+			changed = append(changed, file)
 		}
 		f.current[file] = fixed
 		sources.Store(file, fixed)
 	}
-	return progress
+	return changed
+}
+
+// reanalyze returns prev with the packages changed touches analysed anew,
+// along with the target packages that import them: the analyzer exports no
+// facts, so a package's findings rest on its own files and the types of
+// its imports alone. Where affectedPatterns cannot name them it analyses
+// every target again.
+func reanalyze(ctx context.Context, t *Targets, prev *Result, changed []string, overlay map[string][]byte) (*Result, error) {
+	patterns, ok := affectedPatterns(t, prev.graph.Roots, changed)
+	if !ok {
+		return analyze(ctx, t, overlay)
+	}
+	sub := *t
+	sub.Patterns = patterns
+	pkgs, err := load(ctx, &sub, overlay)
+	if err != nil {
+		return nil, err
+	}
+	graph, err := checker.Analyze([]*analysis.Analyzer{Analyzer}, pkgs, nil)
+	if err != nil {
+		return nil, fmt.Errorf("analyze: %w", err)
+	}
+	noteAnalyzed(graph.Roots)
+	// Each root keeps its place, so the next pass meets the fixes in the
+	// order a full analysis lists them.
+	fresh := map[string]*checker.Action{}
+	for _, act := range graph.Roots {
+		fresh[act.Package.ID] = act
+	}
+	var roots []*checker.Action
+	for _, act := range prev.graph.Roots {
+		if next, ok := fresh[act.Package.ID]; ok {
+			act = next
+			delete(fresh, act.Package.ID)
+		}
+		roots = append(roots, act)
+	}
+	for _, act := range graph.Roots {
+		if fresh[act.Package.ID] != nil {
+			roots = append(roots, act)
+		}
+	}
+	return newResult(&checker.Graph{Roots: roots})
+}
+
+// affectedPatterns returns a directory pattern, relative to t.Dir, for each
+// root holding a changed file and each root importing one of those; false
+// when one of them lies outside t.Dir or the targets name files, whose
+// directory holds more than they do.
+func affectedPatterns(t *Targets, roots []*checker.Action, changed []string) ([]string, bool) {
+	if slices.ContainsFunc(t.Patterns, func(p string) bool { return strings.HasSuffix(p, ".go") }) {
+		return nil, false
+	}
+	base, err := filepath.Abs(cmp.Or(t.Dir, "."))
+	if err != nil {
+		return nil, false
+	}
+	affected := map[string]bool{} // by package ID
+	for _, act := range roots {
+		if slices.ContainsFunc(act.Package.CompiledGoFiles, func(f string) bool { return slices.Contains(changed, f) }) {
+			affected[act.Package.ID] = true
+		}
+	}
+	for grown := true; grown; {
+		grown = false
+		for _, act := range roots {
+			if affected[act.Package.ID] {
+				continue
+			}
+			for _, imp := range act.Package.Imports {
+				if affected[imp.ID] {
+					affected[act.Package.ID] = true
+					grown = true
+					break
+				}
+			}
+		}
+	}
+	var patterns []string
+	for _, act := range roots {
+		if !affected[act.Package.ID] || isTestMain(act.Package) || len(act.Package.GoFiles) == 0 {
+			continue
+		}
+		rel, err := filepath.Rel(base, filepath.Dir(act.Package.GoFiles[0]))
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil, false
+		}
+		pattern := "./" + filepath.ToSlash(rel)
+		if rel == "." {
+			pattern = "."
+		}
+		if !slices.Contains(patterns, pattern) {
+			patterns = append(patterns, pattern)
+		}
+	}
+	return patterns, len(patterns) > 0
 }
 
 // collect gathers one pass of the driver's -fix over graph (x/tools

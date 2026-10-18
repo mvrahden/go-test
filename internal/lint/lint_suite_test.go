@@ -182,6 +182,10 @@ func (s *LintTestSuite) TestParseNolint(t *gotest.T) {
 		{"regular comment", "// some comment", false, nil},
 		{"nolint-like", "//nolinting is fun", false, nil},
 		{"focus rule", "//nolint:focus", true, map[lint.Rule]bool{lint.Focus: true}},
+		{"blanket nolint with reason", "//nolint // legacy test", true, nil},
+		{"nolint all", "//nolint:all", true, nil},
+		{"nolint all beside a rule", "//nolint:focus,all // why", true, nil},
+		{"nolint followed by words", "//nolint because", false, nil},
 	}
 
 	for _, tc := range tests {

@@ -757,6 +757,7 @@ Rules:
                         Reads of a shared fixture the suite never declared as a
                         field (only declared fixtures are started)
   generation-rejects    Shapes the generator rejects, where and as it rejects them
+  nolint-unknown        //nolint ids that name no gotest rule or golangci-lint linter
   suite-declaration     Suites/fixtures declared inside a type ( … ) block
   no-embedding          Embedded suites, fixtures or hook-carrying types, and
                         suite-typed fields of a suite or fixture
@@ -820,6 +821,7 @@ Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line, or a comment block of its own
                                    ending on the line directly above
   package foo //nolint:stdlib-test  Suppress for entire file
+  //nolint // reason               Every rule (so does //nolint:all)
 
 A pattern that matches no package while others do only warns on stderr,
   warning: "<pattern>" matched no packages

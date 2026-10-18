@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type Annotation struct {
@@ -91,28 +92,53 @@ func diagnosticTitle(output []string) string {
 	return "package-level failure"
 }
 
+// annotationCap bounds an annotation's message, in bytes.
+const annotationCap = 1024
+
+// WriteGitHubAnnotations writes each annotation as an ::error workflow
+// command, its message cut to annotationCap on a rune boundary.
 func WriteGitHubAnnotations(w io.Writer, annotations []Annotation) {
 	for _, a := range annotations {
-		msg := a.Message
-		if len(msg) > 1024 {
-			msg = msg[:1021] + "..."
+		msg := escapeData(truncateRunes(a.Message, annotationCap))
+		props := "file=" + escapeProperty(a.File)
+		if a.Line > 0 {
+			props += ",line=" + strconv.Itoa(a.Line)
+			if a.Col > 0 {
+				props += ",col=" + strconv.Itoa(a.Col)
+			}
 		}
-		msg = strings.ReplaceAll(msg, "\n", "%0A")
-		msg = strings.ReplaceAll(msg, "\r", "")
-
-		switch {
-		case a.Line > 0 && a.Col > 0:
-			fmt.Fprintf(w, "::error file=%s,line=%d,col=%d,title=%s::%s\n",
-				a.File, a.Line, a.Col, a.Title, msg)
-		case a.Line > 0:
-			fmt.Fprintf(w, "::error file=%s,line=%d,title=%s::%s\n",
-				a.File, a.Line, a.Title, msg)
-		default:
-			fmt.Fprintf(w, "::error file=%s,title=%s::%s\n",
-				a.File, a.Title, msg)
-		}
+		props += ",title=" + escapeProperty(a.Title)
+		fmt.Fprintf(w, "::error %s::%s\n", props, msg)
 	}
 }
+
+// truncateRunes cuts s to at most limit bytes, "..." included, never
+// inside a multibyte character.
+func truncateRunes(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	cut := limit - len("...")
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "..."
+}
+
+// escapeData escapes a workflow command's message.
+func escapeData(s string) string {
+	return dataEscaper.Replace(s)
+}
+
+// escapeProperty escapes a workflow command's property value.
+func escapeProperty(s string) string {
+	return propertyEscaper.Replace(s)
+}
+
+var (
+	dataEscaper     = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A")
+	propertyEscaper = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A", ":", "%3A", ",", "%2C")
+)
 
 func ReadModulePath(dir string) string {
 	f, err := os.Open(filepath.Join(dir, "go.mod"))

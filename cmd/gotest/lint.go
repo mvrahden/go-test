@@ -115,6 +115,8 @@ func parseLintArgs(args []string) (lintArgs, error) {
 		switch {
 		case lintAnalyzerFlag(name):
 			a.analyzer = append(a.analyzer, "-"+name+"="+value)
+		case strings.HasPrefix(name, "skip-") && lint.Known(lint.Rule(strings.TrimPrefix(name, "skip-"))):
+			return a, integrityRuleError("-"+name, strings.TrimPrefix(name, "skip-"))
 		case name == "fix":
 			a.fix, err = strconv.ParseBool(value)
 		case name == "diff":
@@ -527,6 +529,12 @@ func appendLintStepSummary(annotations []gotestspec.Annotation) {
 	fmt.Fprintln(f)
 }
 
+// integrityRuleError refuses to skip an integrity rule, naming where the
+// attempt came from.
+func integrityRuleError(source, rule string) error {
+	return fmt.Errorf("integrity lint rule in %s: %q can only be suppressed per line with //nolint", source, rule)
+}
+
 // lintSkipFlags returns analyzer flags derived from the config's lint.skip
 // list, omitting any rules that are already set via CLI args.
 func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { //nolint:gocritic // hugeParam: stable API
@@ -534,7 +542,7 @@ func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { 
 	for _, rule := range cfg.Lint.Skip {
 		if !lint.SkippableRules[lint.Rule(rule)] {
 			if lint.Known(lint.Rule(rule)) {
-				return nil, fmt.Errorf("integrity lint rule in %s: %q can only be suppressed per line with //nolint", config.FileName, rule)
+				return nil, integrityRuleError(config.FileName, rule)
 			}
 			return nil, fmt.Errorf("unknown lint rule in %s: %q", config.FileName, rule)
 		}

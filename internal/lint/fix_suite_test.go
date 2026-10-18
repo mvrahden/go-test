@@ -148,6 +148,83 @@ func (s *FixTestSuite) TestParity(t *gotest.T) {
 	})
 }
 
+func (s *FixTestSuite) TestReanalysis(t *gotest.T) {
+	t.When("a pass changes the files of some packages only", func(w *gotest.T) {
+		w.Setenv("GOFLAGS", "")
+		dir := w.TempDir()
+		gotest.NoError(w, testkit.WriteModule(gotest.Must(filepath.Abs("../..")), dir, "reanalysis"))
+		for name, body := range reanalysisProbe {
+			gotest.NoError(w, os.MkdirAll(filepath.Join(dir, filepath.Dir(name)), 0o755))
+			gotest.NoError(w, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600))
+		}
+		runs := map[string]int{}
+		restore := lint.ExportOnAnalyze(func(paths []string) {
+			for _, p := range paths {
+				runs[p]++
+			}
+		})
+		targets := &lint.Targets{Dir: dir, Patterns: []string{"./..."}, Tests: true}
+		res, err := lint.Analyze(w.Context(), targets)
+		gotest.NoError(w, err)
+		fixed, changes, err := lint.Fix(w.Context(), targets, res)
+		restore()
+		gotest.NoError(w, err)
+		for _, c := range changes {
+			gotest.NoError(w, os.WriteFile(c.File, c.After, 0o600))
+		}
+		full, err := lint.Analyze(w.Context(), targets)
+		gotest.NoError(w, err)
+
+		w.It("re-analyses only the packages a pass changed", func(it *gotest.T) {
+			// a needs two passes, b one, c none: each is analysed once more
+			// per pass that changed it.
+			gotest.Equal(it, map[string]int{"reanalysis/a": 3, "reanalysis/b": 2, "reanalysis/c": 1}, runs)
+		})
+		w.It("ends with the findings a full analysis reports", func(it *gotest.T) {
+			gotest.NotEmpty(it, full.Findings)
+			gotest.Equal(it, full.Findings, fixed.Findings)
+			gotest.Empty(it, full.FixFiles)
+		})
+	})
+}
+
+// reanalysisProbe is a module whose package a holds overlapping fixes, b a
+// single fix and c a finding without one.
+var reanalysisProbe = map[string]string{
+	"a/a_test.go": `package a
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type ATestSuite struct{}
+
+func (s *ATestSuite) TestOverlap(t *gotest.T) {
+	x := 3
+	if x != 3 {
+		gotest.Fail(t.T(), "bad")
+	}
+}
+`,
+	"b/b_test.go": `package b
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type BTestSuite struct{}
+
+func (s *BTestSuite) TestEqual(t *gotest.T) {
+	x := 3
+	gotest.True(t, x == 3)
+}
+`,
+	"c/c_test.go": `package c
+
+import "testing"
+
+func TestPlain(t *testing.T) {
+	t.Log("plain")
+}
+`,
+}
+
 // fixProbe is a module whose fixes overlap (fail-guard spans t-escape), drop
 // imports (a named one, and one only a local shadows afterwards), keep an
 // import named unlike its path, and include a generated file.
