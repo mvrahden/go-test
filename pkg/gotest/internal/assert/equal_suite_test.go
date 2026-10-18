@@ -66,7 +66,7 @@ func (m multilineValue) GoString() string {
 func (s *EqualTestSuite) TestCheckEqual_UnequalMultilineValues_HasDiff(t *gotest.T, _ *ring0Ctx) {
 	expected := multilineValue{[]string{"line one", "line two", "line three"}}
 	actual := multilineValue{[]string{"line one", "line changed", "line three"}}
-	mustFail(t, assert.CheckEqual(expected, actual), "unequal multiline values", "diff:", "- ", "+ ")
+	mustFail(t, assert.CheckEqual(expected, actual), "unequal multiline values", "diff:", "-line two", "+line changed")
 }
 
 func (s *EqualTestSuite) TestCheckEqual_UnequalSingleLineStrings_NoDiff(t *gotest.T, _ *ring0Ctx) {

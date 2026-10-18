@@ -621,7 +621,7 @@ func (s *CanaryTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gote
 	if took := time.Since(began); took > 8*time.Second {
 		t.Errorf("failing: the run took %s; a hanging poll was waited out instead of failed at its deadline", took)
 	}
-	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive"} {
+	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive", "@@ -1,5 +1,5 @@"} {
 		if !strings.Contains(s.lastStream, want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}

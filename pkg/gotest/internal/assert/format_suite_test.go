@@ -79,17 +79,17 @@ func (s *FormatTestSuite) Test_diff_MultilineIdentical(t *gotest.T, _ *ring0Ctx)
 
 func (s *FormatTestSuite) Test_diff_MultilineAddedLine(t *gotest.T, _ *ring0Ctx) {
 	got := assert.Diff("line1\nline2", "line1\nline2\nline3")
-	mustFail(t, got, "diff with added line", "+ line3", "  line1", "  line2")
+	mustFail(t, got, "diff with added line", "+line3", " line1", " line2", "@@ ")
 }
 
 func (s *FormatTestSuite) Test_diff_MultilineRemovedLine(t *gotest.T, _ *ring0Ctx) {
 	got := assert.Diff("line1\nline2\nline3", "line1\nline3")
-	mustFail(t, got, "diff with removed line", "- line2")
+	mustFail(t, got, "diff with removed line", "-line2")
 }
 
 func (s *FormatTestSuite) Test_diff_MultilineChangedLine(t *gotest.T, _ *ring0Ctx) {
 	got := assert.Diff("line1\nlineA\nline3", "line1\nlineB\nline3")
-	mustFail(t, got, "diff with changed line", "- lineA", "+ lineB")
+	mustFail(t, got, "diff with changed line", "-lineA", "+lineB")
 }
 
 func (s *FormatTestSuite) Test_FormatMessage_Empty(t *gotest.T, _ *ring0Ctx) {
@@ -151,7 +151,7 @@ func (s *FormatTestSuite) TestFormatValueExpanded_MapKeysSorted(t *gotest.T, _ *
 func (s *FormatTestSuite) TestCheckEqualViaExpansion_LargeStructsGetDiff(t *gotest.T, _ *ring0Ctx) {
 	want := wideOrder{ID: "A-0001", Amount: 100, Items: []string{"alpha", "beta"}, Region: "eu-central-1"}
 	got := wideOrder{ID: "A-0001", Amount: 150, Items: []string{"alpha"}, Region: "eu-central-1"}
-	mustFail(t, assert.CheckEqual(want, got), "large-struct inequality", "diff:", "- ", "+ ")
+	mustFail(t, assert.CheckEqual(want, got), "large-struct inequality", "diff:", "\n    -", "\n    +")
 }
 
 func (s *FormatTestSuite) TestFormatValueExpanded_HugeValuesStaySingleLine(t *gotest.T, _ *ring0Ctx) {

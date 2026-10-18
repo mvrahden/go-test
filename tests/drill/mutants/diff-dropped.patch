@@ -1,0 +1,13 @@
+Expect: failing: no failure message says "@@ -1,5 \+1,5 @@"
+Clause: when Equal fails on values whose rendering spans lines → the message carries a unified diff: hunks of changes with three lines of context
+--- a/pkg/gotest/internal/assert/format.go
++++ b/pkg/gotest/internal/assert/format.go
+@@ -116,7 +116,7 @@
+ 	}
+ 	// Values are compared line by line; whether the last line ends in a
+ 	// newline is not a difference worth a hunk.
+-	return unidiff.Diff("expected", "actual", []byte(withFinalNewline(expected)), []byte(withFinalNewline(actual)))
++	return unidiff.Diff("expected", "actual", nil, nil)
+ }
+ 
+ func withFinalNewline(s string) string {

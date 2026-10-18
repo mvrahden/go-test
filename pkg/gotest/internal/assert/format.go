@@ -2,6 +2,7 @@ package assert
 
 import (
 	"fmt"
+	"github.com/mvrahden/go-test/internal/unidiff"
 	"reflect"
 	"sort"
 	"strings"
@@ -103,98 +104,26 @@ func FormatValue(v any) string {
 	return fmt.Sprintf("%#v", v)
 }
 
-// diff renders a minimal unified diff between two multiline strings.
-// Returns "" if values are identical or if both strings are single-line.
-// Uses - for removed lines (expected), + for added lines (actual),
-// space for common lines.
+// Diff renders the unified diff from expected to actual, hunks of changes
+// with three lines of context, or "" when they are equal or both single-line
+// (the message already shows both). The diff is linear in the inputs' size.
 func Diff(expected, actual string) string {
 	if expected == actual {
 		return ""
 	}
-	expectedLines := strings.Split(expected, "\n")
-	actualLines := strings.Split(actual, "\n")
-	if len(expectedLines) == 1 && len(actualLines) == 1 {
+	if !strings.Contains(expected, "\n") && !strings.Contains(actual, "\n") {
 		return ""
 	}
-
-	lcs := longestCommonSubsequence(expectedLines, actualLines)
-
-	var sb strings.Builder
-	i, j, k := 0, 0, 0
-	for k < len(lcs) {
-		for i < len(expectedLines) && expectedLines[i] != lcs[k] {
-			sb.WriteString("- ")
-			sb.WriteString(expectedLines[i])
-			sb.WriteByte('\n')
-			i++
-		}
-		for j < len(actualLines) && actualLines[j] != lcs[k] {
-			sb.WriteString("+ ")
-			sb.WriteString(actualLines[j])
-			sb.WriteByte('\n')
-			j++
-		}
-		sb.WriteString("  ")
-		sb.WriteString(lcs[k])
-		sb.WriteByte('\n')
-		i++
-		j++
-		k++
-	}
-	// remaining lines after LCS
-	for i < len(expectedLines) {
-		sb.WriteString("- ")
-		sb.WriteString(expectedLines[i])
-		sb.WriteByte('\n')
-		i++
-	}
-	for j < len(actualLines) {
-		sb.WriteString("+ ")
-		sb.WriteString(actualLines[j])
-		sb.WriteByte('\n')
-		j++
-	}
-	return sb.String()
+	// Values are compared line by line; whether the last line ends in a
+	// newline is not a difference worth a hunk.
+	return unidiff.Diff("expected", "actual", []byte(withFinalNewline(expected)), []byte(withFinalNewline(actual)))
 }
 
-// longestCommonSubsequence computes the LCS of two string slices.
-func longestCommonSubsequence(a, b []string) []string {
-	m, n := len(a), len(b)
-	dp := make([][]int, m+1)
-	for i := range dp {
-		dp[i] = make([]int, n+1)
+func withFinalNewline(s string) string {
+	if strings.HasSuffix(s, "\n") {
+		return s
 	}
-	for i := 1; i <= m; i++ {
-		for j := 1; j <= n; j++ {
-			switch {
-			case a[i-1] == b[j-1]:
-				dp[i][j] = dp[i-1][j-1] + 1
-			case dp[i-1][j] >= dp[i][j-1]:
-				dp[i][j] = dp[i-1][j]
-			default:
-				dp[i][j] = dp[i][j-1]
-			}
-		}
-	}
-	lcs := make([]string, 0, dp[m][n])
-	i, j := m, n
-	for i > 0 && j > 0 {
-		switch {
-		case a[i-1] == b[j-1]:
-			lcs = append(lcs, a[i-1])
-			i--
-			j--
-		case dp[i-1][j] >= dp[i][j-1]:
-			i--
-		default:
-			j--
-		}
-	}
-	// reverse
-	for l, r := 0, len(lcs)-1; l < r; l, r = l+1, r-1 {
-		lcs[l], lcs[r] = lcs[r], lcs[l]
-	}
-	return lcs
+	return s + "\n"
 }
 
 // FormatMessage formats optional user messages for error output.

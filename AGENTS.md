@@ -207,6 +207,8 @@ Assertions take the types they are given at face value and say what they cannot 
 
 > when JSONEq compares an integer with its decimal spelling → 1 equals 1.0
 
+> when Equal fails on values whose rendering spans lines → the message carries a unified diff: hunks of changes with three lines of context
+
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.

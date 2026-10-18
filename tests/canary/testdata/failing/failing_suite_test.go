@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -115,4 +116,12 @@ func (s *FailingTestSuite) TestConsistentlyHangingPoll(t *gotest.T) {
 
 func (s *FailingTestSuite) TestEventuallyZeroTick(t *gotest.T) {
 	gotest.Eventually(t, time.Second, 0, func(poll *gotest.R) {})
+}
+
+type lines []string
+
+func (v lines) GoString() string { return strings.Join(v, "\n") }
+
+func (s *FailingTestSuite) TestEqualMultiline(t *gotest.T) {
+	gotest.Equal(t, lines{"a", "b", "c", "d", "e"}, lines{"a", "b", "C", "d", "e"})
 }

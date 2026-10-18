@@ -24,6 +24,7 @@ failing fail TestFailingTestSuite/TestEachRow/second
 failing fail TestFailingTestSuite/TestElementsMatch
 failing fail TestFailingTestSuite/TestEmpty
 failing fail TestFailingTestSuite/TestEqual
+failing fail TestFailingTestSuite/TestEqualMultiline
 failing fail TestFailingTestSuite/TestError
 failing fail TestFailingTestSuite/TestErrorAs
 failing fail TestFailingTestSuite/TestErrorContains

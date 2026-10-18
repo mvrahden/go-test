@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"math"
+	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -104,6 +105,26 @@ func (s *AssertionTypingTestSuite) TestJSONEq(t *gotest.T) {
 			gotest.False(it, m.Failed(), m.Message())
 			e := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `[1e2]`, `[100]`) })
 			gotest.False(it, e.Failed(), e.Message())
+		})
+	})
+}
+
+type lines []string
+
+func (v lines) GoString() string { return strings.Join(v, "\n") }
+
+func (s *AssertionTypingTestSuite) TestDiffs(t *gotest.T) {
+	t.When("Equal fails on values whose rendering spans lines", func(w *gotest.T) {
+		w.It("the message carries a unified diff: hunks of changes with three lines of context", func(it *gotest.T) {
+			before := lines{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+			after := append(lines(nil), before...)
+			after[5] = "F"
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, before, after) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "@@ -3,7 +3,7 @@")
+			gotest.Contains(it, m.Message(), "-f\n")
+			gotest.Contains(it, m.Message(), "+F\n")
+			gotest.NotContains(it, m.Message(), "@@ -1,", "the hunk began before its three lines of context")
 		})
 	})
 }

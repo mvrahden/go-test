@@ -153,6 +153,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `poll-final-skipped` | the deadline fails Eventually without a last poll | canary: the passing fixture's final poll never passes |
 | `poll-args-unchecked` | a zero tick or waitFor is polled with | canary: the zero-tick method passes and no type guard is reported |
 | `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
+| `diff-dropped` | a multi-line mismatch is reported without its diff | canary: no failure carries a unified hunk header |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
