@@ -144,11 +144,10 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 		node.Init()
 	}
 
-	// Attempted before BeforeAll runs: whatever it reaches, a failed, panicked
-	// or cancelled setup included, is released by AfterAll in the teardown
-	// pass, which must tolerate partial state.
-	tracker.markAttempted(node)
-	if err := runBeforeAllWithRetry(ctx, node); err != nil {
+	// Attempted once BeforeAll is entered: whatever it reaches, a failed,
+	// panicked or cancelled setup included, is released by AfterAll in the
+	// teardown pass. A setup cancelled before then has nothing to release.
+	if err := runBeforeAllWithRetry(ctx, node, func() { tracker.markAttempted(node) }); err != nil {
 		return err
 	}
 
@@ -212,8 +211,9 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 
 // runBeforeAllWithRetry adapts a DAG node onto RunFixtureSetup, the single
 // policy the generated shared-fixture subprocess runs BeforeAll under too, and
-// names the fixture in whatever comes back.
-func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
+// names the fixture in whatever comes back. started runs just before the
+// first BeforeAll, never for a setup cancelled before it.
+func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode, started func()) error {
 	wrapErr := func(err error) error {
 		if err == nil {
 			return nil
@@ -229,6 +229,7 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 		RetryDelay: node.Config.RetryDelay,
 		BeforeAll:  node.BeforeAll,
 		AfterAll:   node.AfterAll,
+		Started:    started,
 	}))
 }
 

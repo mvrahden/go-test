@@ -73,7 +73,8 @@ func stopWatch() {
 //
 // Under the gotest runner a signal counts only once the runner has created the
 // stop file, so a signal the code under test sends its own process is left to
-// that code; a parent that is gone counts as well. Under plain go test only
+// that code; a parent that is gone counts as well, and so does a stream
+// nobody reads any more, which the watcher checks for itself. Under plain go test only
 // SIGINT counts, the Ctrl-C a developer sends. Fuzzing is left to Go once its
 // engine has the target: it stops on an interrupt by itself, saving what it
 // found, and the target returns. A signal ignored when the process started
@@ -84,11 +85,12 @@ type watcher struct {
 	ch     chan os.Signal
 	quit   chan struct{}
 	done   chan struct{}
+	polled chan struct{}
 }
 
 func watch(stderr io.Writer) *watcher {
 	notePipe()
-	w := &watcher{stderr: stderr, ch: make(chan os.Signal, 1), quit: make(chan struct{}), done: make(chan struct{})}
+	w := &watcher{stderr: stderr, ch: make(chan os.Signal, 1), quit: make(chan struct{}), done: make(chan struct{}), polled: make(chan struct{})}
 	candidates := []os.Signal{os.Interrupt}
 	if stopFile != "" {
 		candidates = append(candidates, stopSignals...)
@@ -103,11 +105,43 @@ func watch(stderr io.Writer) *watcher {
 	}
 	if len(w.sigs) == 0 {
 		close(w.done)
+		close(w.polled)
 		return w
 	}
 	signal.Notify(w.ch, w.sigs...)
 	go w.loop()
+	if stopFile != "" && watchesStdout() && len(stopSignals) > 0 {
+		go w.pollReader(stopSignals[0])
+	} else {
+		close(w.polled)
+	}
 	return w
+}
+
+// readerPoll is how often the watcher checks that its stream is still read.
+const readerPoll = 200 * time.Millisecond
+
+// pollReader hands the loop sig once nobody reads the stream any more: under
+// -json behind an -exec wrapper that stays, the converter's death is the
+// only trace a dead runner leaves. It fires once.
+func (w *watcher) pollReader(sig os.Signal) {
+	defer close(w.polled)
+	tick := time.NewTicker(readerPoll)
+	defer tick.Stop()
+	for {
+		select {
+		case <-w.quit:
+			return
+		case <-tick.C:
+			if stdoutReaderGone() {
+				select {
+				case w.ch <- sig:
+				default: // a signal is pending; the loop checks the stream for it
+				}
+				return
+			}
+		}
+	}
 }
 
 func (w *watcher) loop() {
@@ -137,43 +171,54 @@ func (w *watcher) counts(sig os.Signal) bool {
 	if _, err := os.Stat(stopFile); err == nil {
 		return true
 	}
-	return os.Getppid() != parentPID
+	return os.Getppid() != parentPID || stdoutReaderGone()
 }
 
-// stopGrace is how long a stop waits for a running method to return once its
-// context has ended. A method still running then ignores its context, and
+// stopGrace is how long a stop waits for a running method body to return once
+// its context has ended. A method still running then ignores its context, and
 // nothing but ending the process can stop it.
 const stopGrace = 5 * time.Second
 
 // stop tells the run to stop and lets it finish on its own: the tests and the
 // setups in flight see their contexts end, the methods not yet started are
 // skipped, AfterAll runs, and the hold's cleanup releases the fixtures, so the
-// stream carries every verdict. A method that does not return within
+// stream carries every verdict. A method body that does not return within
 // stopGrace, or a run that does not finish within the release bound, is
 // forced: the fixtures are torn down, within that same bound, and the process
 // ends by sig.
 func (w *watcher) stop(sig os.Signal) {
 	signal.Reset(w.sigs...)
-	stoppedSig.Store(sig)
-	stopping.Store(true)
-	runstate.Stop()
-	deadline := time.Now().Add(releaseBound())
-	grace := time.Now().Add(stopGrace)
-	if grace.After(deadline) {
-		grace = deadline
-	}
-	switch {
-	case !waitBodiesEnd(grace):
-		fmt.Fprintf(w.stderr, "gotest: a method did not return within %s of its context ending; it is cut short, the fixtures are torn down and the process ends by the signal\n", stopGrace)
-	case waitSetups(deadline) && waitHoldsEnd(deadline):
+	deadline, settled := w.settle(sig, stopGrace)
+	if settled {
 		return
-	default:
-		fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")
 	}
 	if !releaseWithin(deadline) {
 		fmt.Fprintf(w.stderr, "gotest: fixture teardown did not finish within %s; what it holds may be left behind\n", releaseBound())
 	}
 	reraise(sig)
+}
+
+// settle stops the run and waits for it to finish on its own, as [stop]
+// describes, giving a running method grace to return. It reports whether
+// the run finished, and the deadline a forced release must keep.
+func (w *watcher) settle(sig os.Signal, grace time.Duration) (deadline time.Time, settled bool) {
+	stoppedSig.Store(sig)
+	stopping.Store(true)
+	runstate.Stop()
+	deadline = time.Now().Add(releaseBound())
+	graceEnd := time.Now().Add(grace)
+	if graceEnd.After(deadline) {
+		graceEnd = deadline
+	}
+	switch {
+	case !waitBodiesEnd(graceEnd):
+		fmt.Fprintf(w.stderr, "gotest: a method did not return within %s of its context ending; it is cut short, the fixtures are torn down and the process ends by the signal\n", grace)
+	case waitSetups(deadline) && waitHoldsEnd(deadline):
+		return deadline, true
+	default:
+		fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")
+	}
+	return deadline, false
 }
 
 // stoppedSig is the signal the stop came by, for the process to end by.
@@ -186,12 +231,12 @@ func stoppedBy() os.Signal {
 	return os.Interrupt
 }
 
-// waitBodiesEnd waits until no test method is running, until deadline.
+// waitBodiesEnd waits until no test-method body is running, until deadline.
+// The hooks around a body are not waited for here: they run on within the
+// release bound, so AfterEach and AfterAll finish before the fixtures go.
 func waitBodiesEnd(deadline time.Time) bool {
 	for {
-		running := 0
-		bodies.Range(func(any, any) bool { running++; return true })
-		if running == 0 {
+		if runningBodies.Load() == 0 {
 			return true
 		}
 		if time.Now().After(deadline) {
@@ -225,6 +270,7 @@ func (w *watcher) close() {
 		close(w.quit)
 	}
 	<-w.done
+	<-w.polled
 }
 
 // releaseWithin tears the held fixtures down, giving up waiting at deadline.

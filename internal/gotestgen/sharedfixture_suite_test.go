@@ -347,6 +347,56 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.NotContains(it, code, "signal.Notify(sig",
 				"the late signal registration left a window where SIGTERM killed the process mid-setup")
 		})
+
+		w.It("ends its command loop when the runner's end of stdin closes", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			// Without a death signal, stdin is the one sign the runner is gone.
+			gotest.Contains(it, code, "defer close(ƒeof)")
+			gotest.Regexp(it, `case <-ƒeof:\s+break ƒloop`, code)
+		})
+
+		w.It("exits on its own once the teardown budget has passed with the runner gone", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			gotest.Contains(it, code, "ƒparent := os.Getppid()")
+			gotest.Contains(it, code, "if os.Getppid() == ƒparent {")
+			gotest.Contains(it, code, "ƒlife.Reported(ƒteardownBudget)",
+				"the bound is the budget the runner was told")
+			gotest.Contains(it, code, `ƒbudgetStr := ƒquote(ƒteardownBudget.String())`)
+		})
+
+		w.It("bounds a setup that hangs once the runner is gone", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, HasConfig: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			setupWait := strings.Index(code, "ƒwg.Wait()")
+			gotest.Contains(it, code, "go ƒlife.ExitWhenOrphaned(ƒgone)")
+			gotest.Less(it, strings.Index(code, "go ƒlife.ExitWhenOrphaned(ƒgone)"), setupWait,
+				"the bound must hold while setup runs, not only after it")
+			gotest.Less(it, strings.Index(code, "defer close(ƒeof)"), setupWait,
+				"the end of stdin must be seen during setup")
+			gotest.Regexp(it, `ƒlife\.SetupBegins\(0, ƒsetup\)\s+fmt\.Fprintf\(ƒproto, "\{\\"key\\":\\"_setup\\"`, code)
+			gotest.Regexp(it, `RunFixtureSetup\(ƒctx, ƒsetup\)\s+ƒlife\.SetupEnds\(0\)`, code)
+			gotest.Contains(it, code, "ƒlife.Released(0)")
+		})
 	})
 
 	t.When("teardown policy", func(w *gotest.T) {
@@ -379,6 +429,26 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"a fixture whose BeforeAll never ran has nothing to release")
 			gotest.NotContains(it, code, "if ƒerrs[0] == nil",
 				"a fixture whose BeforeAll ran is released however it came out: a failed attempt may hold what it reached")
+		})
+
+		w.It("marks a fixture for release only once its BeforeAll is entered", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					HasAfterAll:    true,
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			// A shutdown that cancels setup before BeforeAll runs leaves
+			// nothing to release; AfterAll on it would see a bare fixture.
+			gotest.Contains(it, code, "Started:    func() { ƒattempted[0] = true },")
+			gotest.Equal(it, 1, strings.Count(code, "ƒattempted[0] = true"))
 		})
 
 		w.It("gives an undeclared config no teardown verdict", func(it *gotest.T) {
@@ -420,7 +490,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// An inlined second copy of the loop is how the subprocess ended up
 			// without panic containment, retry-on-panic or a Timeout verdict
 			// while the DAG had all three.
-			gotest.Contains(it, code, "gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{",
+			gotest.Contains(it, code, "gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)",
 				"setup must go through the shared policy")
 			gotest.NotContains(it, code, "ƒattempts := 1 + ƒcfg_sf0.Retries",
 				"no second copy of the retry loop may remain")

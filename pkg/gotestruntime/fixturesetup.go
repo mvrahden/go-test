@@ -34,6 +34,10 @@ type FixtureSetup struct {
 	// runs, so a retry never builds on top of a half-initialised one. Nil
 	// releases nothing between attempts.
 	AfterAll func(ctx context.Context) error
+	// Started, if set, is called once, just before the first attempt's
+	// BeforeAll runs. A setup cancelled before then never calls it: there is
+	// nothing to release.
+	Started func()
 }
 
 // ErrSetupOverran reports a BeforeAll that returned success only after its
@@ -42,6 +46,11 @@ type FixtureSetup struct {
 // to keep the fixture eligible for teardown: the resources it created exist
 // and must be released even though the run is failing.
 var ErrSetupOverran = errors.New("exceeded its configured Timeout")
+
+// ErrReleaseFailed reports an AfterAll between attempts that failed. The setup
+// fails with it even when a later attempt succeeds: what the failed attempt
+// reached may still be held.
+var ErrReleaseFailed = errors.New("AfterAll between attempts failed")
 
 // RunFixtureSetup runs BeforeAll under s's timeout and retry policy and returns
 // the last error, unwrapped — callers add their own context. A nil BeforeAll is
@@ -53,16 +62,24 @@ var ErrSetupOverran = errors.New("exceeded its configured Timeout")
 // fixture's resources, so none of their AfterAlls would ever run. It is also
 // the same class of failure Retries exists for — a half-initialised client, an
 // empty response indexed into — so it is retried like a returned error.
+//
+// An AfterAll between attempts that fails does not stop the retry, but the
+// setup then fails with ErrReleaseFailed however its attempts end.
 func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 	if s.BeforeAll == nil {
 		return nil
 	}
 	attempts := 1 + s.Retries
-	var lastErr error
+	var lastErr, releaseErr error
 
 	for i := range attempts {
-		if i == 0 && ctx.Err() != nil {
-			return ctx.Err()
+		if i == 0 {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if s.Started != nil {
+				s.Started()
+			}
 		}
 
 		var attemptCtx context.Context
@@ -95,7 +112,10 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 		}
 
 		if lastErr == nil {
-			return nil
+			if releaseErr != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll succeeded on attempt %d/%d, but %v\n", s.Name, i+1, attempts, releaseErr)
+			}
+			return releaseErr
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -112,16 +132,38 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 				case <-time.After(s.RetryDelay):
 				}
 			}
-			if s.AfterAll != nil {
-				if RunFixtureTeardown(ctx, FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: s.AfterAll}) {
-					fmt.Fprintf(os.Stderr, "%s.AfterAll between attempts failed; the retry runs anyway\n", s.Name)
-				}
+			if err := release(ctx, s); err != nil {
+				// The retry runs anyway, but the setup fails however it ends.
+				releaseErr = errors.Join(releaseErr, err)
 			}
 		}
 	}
 
 	fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll failed after %d attempt(s): %v\n", s.Name, attempts, lastErr)
+	if releaseErr != nil {
+		return errors.Join(lastErr, releaseErr)
+	}
 	return lastErr
+}
+
+// release runs AfterAll between attempts and returns ErrReleaseFailed, with
+// AfterAll's own error when it returned one, if the release failed.
+func release(ctx context.Context, s FixtureSetup) error {
+	if s.AfterAll == nil {
+		return nil
+	}
+	var cause error
+	afterAll := func(ctx context.Context) error {
+		cause = s.AfterAll(ctx)
+		return cause
+	}
+	if !RunFixtureTeardown(ctx, FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: afterAll}) {
+		return nil
+	}
+	if cause != nil {
+		return fmt.Errorf("%w: %w", ErrReleaseFailed, cause)
+	}
+	return ErrReleaseFailed
 }
 
 // attemptSetup runs one attempt, turning a panic into an error. debug.Stack()

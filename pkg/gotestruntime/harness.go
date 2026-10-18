@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -105,14 +106,15 @@ var (
 )
 
 // drainSetupWaits runs the waits tb's BeforeAll registered, last first, as
-// cleanups would.
+// cleanups would. Each runs deferred, so one that fails or panics still
+// leaves the others to be waited for.
 func drainSetupWaits(tb testing.TB) {
 	setupWaitsMu.Lock()
 	waits := setupWaits[tb]
 	delete(setupWaits, tb)
 	setupWaitsMu.Unlock()
-	for i := len(waits) - 1; i >= 0; i-- {
-		waits[i]()
+	for _, wait := range waits {
+		defer wait()
 	}
 }
 
@@ -132,40 +134,63 @@ func RunTest(t *gotest.T, budget time.Duration, run func()) {
 	if budget > 0 && t.Context().Err() != nil && t.T().Failed() {
 		return
 	}
+	runningBodies.Add(1)
+	defer runningBodies.Add(-1)
 	run()
 }
+
+// runningBodies counts the test-method bodies running now. A stop gives them
+// grace to return; the hooks around them run within the release bound.
+var runningBodies atomic.Int64
 
 // watchMethod starts the budget watch of one test method, covering its hooks
 // and body, and returns what ends it; an async method's body ends before the
 // method does (see [AwaitDoneAt]), so the watch is kept per method.
 func watchMethod(t *testing.T, budget time.Duration) (end func()) {
-	watch := watchPhase(t, budget, "", "Timeout")
-	bodies.Store(t, methodWatch{end: watch, budget: budget})
+	w := &methodWatch{budget: budget, deadline: time.Now().Add(budget)}
+	w.end = watchPhase(t, budget, "", "Timeout")
+	methodWatches.Store(t, w)
 	return func() {
-		bodies.Delete(t)
-		watch()
+		methodWatches.Delete(t)
+		w.end()
 	}
 }
 
 // methodWatch is the budget watch of one running test method: what ends it,
-// and the budget the method's suite declared (zero for none).
+// the budget the method's suite declared (zero for none) and when it runs
+// out. Only the method's own goroutine touches it.
 type methodWatch struct {
-	end    func()
-	budget time.Duration
+	end      func()
+	budget   time.Duration
+	deadline time.Time
 }
 
-// bodies holds, per running test method, its budget watch.
-var bodies sync.Map // *testing.T -> methodWatch
+// methodWatches holds, per running test method, its budget watch.
+var methodWatches sync.Map // *testing.T -> *methodWatch
 
 // endBody ends the budget watch of t's method, whose body has returned, and
 // reports the budget the method was declared; zero when there is none.
 func endBody(t *testing.T) time.Duration {
-	w, ok := bodies.Load(t)
+	w, ok := methodWatches.Load(t)
 	if !ok {
 		return 0
 	}
-	w.(methodWatch).end()
-	return w.(methodWatch).budget
+	w.(*methodWatch).end()
+	return w.(*methodWatch).budget
+}
+
+// resumeHooks holds the hooks left to run after t's method, whose watch
+// [endBody] ended, to what remains of the method's budget. A body that ended
+// at the deadline leaves the hooks none to be held to.
+func resumeHooks(t *testing.T) {
+	v, ok := methodWatches.Load(t)
+	if !ok {
+		return
+	}
+	w := v.(*methodWatch)
+	if left := time.Until(w.deadline); w.budget > 0 && left > 0 {
+		w.end = watchPhaseFor(t, left, w.budget, "", "Timeout")
+	}
 }
 
 // RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
@@ -214,12 +239,18 @@ func watchWhile(tb testing.TB, timeout time.Duration, what, budget string, run f
 // legal: the testing package panics on a log from a test that has already
 // completed, and the test cannot complete before the watch has ended.
 func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end func()) {
-	if timeout <= 0 {
+	return watchPhaseFor(tb, timeout, timeout, what, budget)
+}
+
+// watchPhaseFor is [watchPhase] with the watch ending after wait, for a phase
+// left only part of its configured timeout.
+func watchPhaseFor(tb testing.TB, wait, timeout time.Duration, what, budget string) (end func()) {
+	if wait <= 0 || timeout <= 0 {
 		return func() {}
 	}
 	done := make(chan struct{})
 	stopped := make(chan struct{})
-	go watchDeadline(tb, goroutineID(), timeout, what, budget, done, stopped)
+	go watchDeadline(tb, goroutineID(), wait, timeout, what, budget, done, stopped)
 	return sync.OnceFunc(func() {
 		close(done)
 		<-stopped
@@ -227,12 +258,12 @@ func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end 
 }
 
 // watchDeadline fails tb if the phase, running on goroutine gid, has not
-// finished within timeout. Reporting is safe from another goroutine while the
+// finished within wait, naming timeout as the budget it overran. Reporting is safe from another goroutine while the
 // test is still running, which ending the watch (see [watchPhase]) guarantees.
-func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
+func watchDeadline(tb testing.TB, gid uint64, wait, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
 	defer close(stopped)
 
-	timer := time.NewTimer(timeout)
+	timer := time.NewTimer(wait)
 	defer timer.Stop()
 	select {
 	case <-done:

@@ -40,22 +40,26 @@ func phaseFrame(gid uint64) string {
 // goroutineStack returns goroutine gid's traceback from a dump of all
 // goroutines, nil when it is not in the dump.
 func goroutineStack(gid uint64) []byte {
-	buf := make([]byte, 64<<10)
-	for {
-		n := runtime.Stack(buf, true)
-		if n < len(buf) || len(buf) >= 64<<20 {
-			buf = buf[:n]
-			break
-		}
-		buf = make([]byte, 2*len(buf))
-	}
 	header := []byte("goroutine " + strconv.FormatUint(gid, 10) + " [")
-	for block := range bytes.SplitSeq(buf, []byte("\n\n")) {
+	for block := range bytes.SplitSeq(allStacks(), []byte("\n\n")) {
 		if bytes.HasPrefix(block, header) {
 			return block
 		}
 	}
 	return nil
+}
+
+// allStacks dumps the tracebacks of all goroutines, one block each,
+// separated by blank lines.
+func allStacks() []byte {
+	buf := make([]byte, 64<<10)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) || len(buf) >= 64<<20 {
+			return buf[:n]
+		}
+		buf = make([]byte, 2*len(buf))
+	}
 }
 
 // userFrameBelowHarness walks a traceback, innermost frame first, to the

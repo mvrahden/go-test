@@ -74,14 +74,19 @@ func RunFixtureTeardown(ctx context.Context, td FixtureTeardown) (failed bool) {
 	return false
 }
 
-// SetupBudget is how long a fixture's setup may take at most under cfg:
-// every attempt's Timeout plus the delays between attempts. Zero when the
-// Timeout is unbounded.
-func SetupBudget(cfg gotest.FixtureConfig) time.Duration {
-	if cfg.Timeout <= 0 {
+// SetupBudget is how long s may take at most: every attempt's Timeout, the
+// delays between attempts and, when there is an AfterAll, the release between
+// them, each bounded by the Timeout too. Zero when the Timeout is unbounded.
+func SetupBudget(s FixtureSetup) time.Duration {
+	if s.Timeout <= 0 {
 		return 0
 	}
-	return cfg.Timeout*time.Duration(1+cfg.Retries) + cfg.RetryDelay*time.Duration(cfg.Retries)
+	retries := time.Duration(s.Retries)
+	budget := s.Timeout*(1+retries) + s.RetryDelay*retries
+	if s.AfterAll != nil {
+		budget += s.Timeout * retries
+	}
+	return budget
 }
 
 // SupervisorBudget is how long a fixture's own lifecycle stage may take, for

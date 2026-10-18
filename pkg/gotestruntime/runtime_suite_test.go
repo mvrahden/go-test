@@ -1480,7 +1480,7 @@ func (s *RuntimeTestSuite) TestBeforeAllError_IncludesFixtureName(t *gotest.T) {
 		},
 	}
 
-	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node)
+	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node, nil)
 
 	mustErrorContain(t, err, "Database.BeforeAll")
 	mustErrorContain(t, err, "connection refused")
@@ -1497,7 +1497,7 @@ func (s *RuntimeTestSuite) TestBeforeAllError_WrapsOriginalError(t *gotest.T) {
 		},
 	}
 
-	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node)
+	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node, nil)
 
 	mustErrorIs(t, err, sentinel)
 }
@@ -1515,7 +1515,7 @@ func (s *RuntimeTestSuite) TestBeforeAllError_ContextCancelIncludesFixtureName(t
 		},
 	}
 
-	err := gotestruntime.ExportRunBeforeAllWithRetry(ctx, node)
+	err := gotestruntime.ExportRunBeforeAllWithRetry(ctx, node, nil)
 
 	mustErrorContain(t, err, "Slow.BeforeAll")
 	mustErrorIs(t, err, context.Canceled)
@@ -1608,6 +1608,27 @@ func (s *RuntimeTestSuite) TestDAG_OverrunSetupIsStillTornDown(t *gotest.T) {
 	mustErrorIs(t, err, gotestruntime.ErrSetupOverran)
 	mustEqual(t, []string{"slow.afterAll"}, rec.names(),
 		"an overrun-but-successful setup created real resources; skipping its AfterAll leaks them")
+}
+
+// A setup cancelled before BeforeAll is entered has nothing to release:
+// AfterAll on it would run against a fixture that never set up.
+func (s *RuntimeTestSuite) TestDAG_CancelledBeforeBeforeAllIsNotTornDown(t *gotest.T) {
+	rec := &recorder{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	node := &gotestruntime.FixtureNode{
+		Name:      "Never",
+		Config:    gotest.DefaultFixtureConfig(),
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { rec.record("never.beforeAll"); return nil },
+		AfterAll:  func(ctx context.Context) error { rec.record("never.afterAll"); return nil },
+	}
+
+	_, err := gotestruntime.SetupFixtureDAG(ctx, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+
+	mustErrorIs(t, err, context.Canceled)
+	mustEqual(t, []string{}, rec.names(), "BeforeAll never ran, so AfterAll must not either")
 }
 
 // A dependent that was merely waiting on the fixture that failed must not

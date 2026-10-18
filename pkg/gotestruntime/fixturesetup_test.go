@@ -200,3 +200,93 @@ func (s *FixtureSetupTestSuite) TestCancellationDuringTheRetryDelay(t *gotest.T)
 		})
 	})
 }
+
+func (s *FixtureSetupTestSuite) TestReleaseFailureBetweenAttempts(t *gotest.T) {
+	t.When("the release between attempts fails and a later attempt succeeds", func(w *gotest.T) {
+		w.It("fails the setup with the release's error", func(it *gotest.T) {
+			attempts := 0
+			err := gotestruntime.RunFixtureSetup(context.Background(), gotestruntime.FixtureSetup{
+				Name:    "Leaky",
+				Retries: 1,
+				BeforeAll: func(context.Context) error {
+					attempts++
+					if attempts == 1 {
+						return errors.New("not ready yet")
+					}
+					return nil
+				},
+				AfterAll: func(context.Context) error { return errors.New("container leaked") },
+			})
+			gotest.ErrorIs(it, err, gotestruntime.ErrReleaseFailed)
+			gotest.ErrorContains(it, err, "container leaked")
+			gotest.Equal(it, 2, attempts)
+		})
+	})
+
+	t.When("the release between attempts panics and a later attempt succeeds", func(w *gotest.T) {
+		w.It("fails the setup", func(it *gotest.T) {
+			attempts := 0
+			err := gotestruntime.RunFixtureSetup(context.Background(), gotestruntime.FixtureSetup{
+				Name:    "Leaky",
+				Retries: 1,
+				BeforeAll: func(context.Context) error {
+					attempts++
+					if attempts == 1 {
+						return errors.New("not ready yet")
+					}
+					return nil
+				},
+				AfterAll: func(context.Context) error { panic("nil pool") },
+			})
+			gotest.ErrorIs(it, err, gotestruntime.ErrReleaseFailed)
+		})
+	})
+
+	t.When("the release between attempts fails and every attempt fails", func(w *gotest.T) {
+		w.It("reports both the last attempt's error and the release's", func(it *gotest.T) {
+			err := gotestruntime.RunFixtureSetup(context.Background(), gotestruntime.FixtureSetup{
+				Name:      "Leaky",
+				Retries:   1,
+				BeforeAll: func(context.Context) error { return errors.New("not ready yet") },
+				AfterAll:  func(context.Context) error { return errors.New("container leaked") },
+			})
+			gotest.ErrorContains(it, err, "not ready yet")
+			gotest.ErrorContains(it, err, "container leaked")
+		})
+	})
+}
+
+func (s *FixtureSetupTestSuite) TestStarted(t *gotest.T) {
+	t.When("BeforeAll runs, failing and retried", func(w *gotest.T) {
+		w.It("reports the start once, before the first attempt", func(it *gotest.T) {
+			var events []string
+			attempts := 0
+			_ = gotestruntime.RunFixtureSetup(context.Background(), gotestruntime.FixtureSetup{
+				Name:    "Flaky",
+				Retries: 1,
+				Started: func() { events = append(events, "started") },
+				BeforeAll: func(context.Context) error {
+					attempts++
+					events = append(events, "before")
+					return errors.New("not ready yet")
+				},
+			})
+			gotest.Equal(it, []string{"started", "before", "before"}, events)
+		})
+	})
+
+	t.When("the setup is cancelled before BeforeAll runs", func(w *gotest.T) {
+		w.It("never reports a start", func(it *gotest.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			started := false
+			err := gotestruntime.RunFixtureSetup(ctx, gotestruntime.FixtureSetup{
+				Name:      "Cancelled",
+				Started:   func() { started = true },
+				BeforeAll: func(context.Context) error { return nil },
+			})
+			gotest.ErrorIs(it, err, context.Canceled)
+			gotest.False(it, started)
+		})
+	})
+}

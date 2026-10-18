@@ -89,3 +89,49 @@ func (s *FixtureTeardownTestSuite) TestBudget(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FixtureTeardownTestSuite) TestSetupBudget(t *gotest.T) {
+	t.When("every attempt and every release between them runs to its Timeout", func(w *gotest.T) {
+		w.It("finishes within the budget the setup reports", func(it *gotest.T) {
+			attempts := 0
+			setup := gotestruntime.FixtureSetup{
+				Name:    "Slow",
+				Timeout: 200 * time.Millisecond,
+				Retries: 1,
+				BeforeAll: func(ctx context.Context) error {
+					attempts++
+					<-ctx.Done()
+					if attempts == 1 {
+						return ctx.Err()
+					}
+					return nil
+				},
+				AfterAll: func(ctx context.Context) error {
+					<-ctx.Done()
+					return nil
+				},
+			}
+			start := time.Now()
+			gotest.NoError(it, gotestruntime.RunFixtureSetup(context.Background(), setup))
+			elapsed := time.Since(start)
+			gotest.LessOrEqual(it, elapsed, gotestruntime.SetupBudget(setup)+100*time.Millisecond)
+		})
+	})
+
+	t.When("there is no AfterAll to release between attempts", func(w *gotest.T) {
+		w.It("counts the attempts and the delays between them", func(it *gotest.T) {
+			gotest.Equal(it, 35*time.Second, gotestruntime.SetupBudget(gotestruntime.FixtureSetup{
+				Timeout:    10 * time.Second,
+				Retries:    2,
+				RetryDelay: 2500 * time.Millisecond,
+				BeforeAll:  func(context.Context) error { return nil },
+			}))
+		})
+	})
+
+	t.When("the Timeout is unbounded", func(w *gotest.T) {
+		w.It("has no budget", func(it *gotest.T) {
+			gotest.Zero(it, gotestruntime.SetupBudget(gotestruntime.FixtureSetup{Timeout: gotest.NoDeadline, Retries: 1}))
+		})
+	})
+}

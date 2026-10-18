@@ -2,6 +2,8 @@ package gotestruntime_test
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -285,6 +287,35 @@ func (s *HarnessTTestSuite) TestAwaitDone(t *gotest.T) {
 				}()
 			})
 			gotest.True(it, called)
+		})
+	})
+}
+
+func (s *HarnessTTestSuite) TestSetupGoroutinesAreAllWaited(t *gotest.T) {
+	if inChild() {
+		var finished atomic.Bool
+		t.T().Run("inner", func(tt *testing.T) { //nolint:suite-lifecycle // the suite fails by design in the child
+			gotestruntime.OpenSuite(tt, gotestruntime.Suite{
+				Fixtures: func(tb testing.TB) {
+					tb.Cleanup(func() { fmt.Printf("fixture released, first goroutine finished: %v\n", finished.Load()) })
+				},
+				BeforeAll: func(st *gotest.T) {
+					gotest.Go(st, func() {
+						time.Sleep(200 * time.Millisecond)
+						finished.Store(true)
+					})
+					gotest.Go(st, func() { gotest.Fail(st, "second goroutine fails") })
+				},
+				AfterAll: func(*gotest.T) {},
+			})
+		})
+		return
+	}
+	out := runChild(t, "TestHarnessTTestSuite", "TestSetupGoroutinesAreAllWaited")
+	t.When("the last of two goroutines BeforeAll started fails fatally", func(w *gotest.T) {
+		w.It("still waits for the first before the fixtures are released", func(it *gotest.T) {
+			gotest.Contains(it, out, "second goroutine fails")
+			gotest.Contains(it, out, "fixture released, first goroutine finished: true")
 		})
 	})
 }

@@ -3,6 +3,8 @@ package gotestruntime
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -119,8 +121,14 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 //
 // Once start returns, the method's budget watch ends: from then on the
 // method is waiting for done, and the context's deadline is its verdict.
+// The hooks after the wait are held to what remains of the budget.
+//
+// A failure recorded while waiting ends the wait only once no goroutine the
+// method started is left to call done: the failure of another goroutine
+// leaves the one that owns done its work, and AfterEach waits for it.
 func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 	done := make(chan struct{}, 1)
+	mine := ownGoroutines()
 	start(func() {
 		select {
 		case done <- struct{}{}:
@@ -128,6 +136,7 @@ func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 		}
 	})
 	budget := endBody(t.T())
+	defer resumeHooks(t.T())
 	select {
 	case <-done:
 		return // called in time, even if the deadline has passed since
@@ -139,7 +148,9 @@ func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 	if budget > 0 {
 		deadline = t.Context().Done()
 	}
-	// The failure of the goroutine that owns done leaves nothing to wait for.
+	// After a failure without a declared budget, the context's end bounds the
+	// wait; the method is failed already.
+	var settled <-chan struct{}
 	failed := time.NewTicker(failedPoll)
 	defer failed.Stop()
 	for {
@@ -154,9 +165,17 @@ func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 			}
 			reportAt(t.T(), callsite.Declared(at), name+": done() was not called before the test deadline")
 			t.T().FailNow() //nolint:t-escape // runtime verdict, located at the declaration
+		case <-settled:
+			return
 		case <-failed.C:
-			if t.T().Failed() {
-				return
+			if !t.T().Failed() {
+				continue
+			}
+			if deadline == nil {
+				settled = t.Context().Done()
+			}
+			if !mine.anyLeft() {
+				return // the goroutine that owns done is gone: nothing will call it
 			}
 		}
 	}
@@ -165,3 +184,90 @@ func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
 // failedPoll is how often an async wait looks for a failure recorded by
 // another goroutine; testing has no signal for one.
 const failedPoll = 10 * time.Millisecond
+
+// methodGoroutines tells the goroutines an async method started from the
+// ones that were there before it: self runs the method, before were alive
+// when it began.
+type methodGoroutines struct {
+	self   uint64
+	before map[uint64]bool
+}
+
+func ownGoroutines() methodGoroutines {
+	m := methodGoroutines{self: goroutineID(), before: map[uint64]bool{}}
+	for id := range liveGoroutines() {
+		m.before[id] = true
+	}
+	return m
+}
+
+// anyLeft reports whether a goroutine the method started, directly or
+// through another, is still alive. Goroutines the standard library or this
+// runtime started are not the method's: a server's accept loop never calls
+// done. One whose creator is gone counts as the method's when that creator
+// was not there before it, since nothing tells it apart.
+func (m methodGoroutines) anyLeft() bool {
+	live := liveGoroutines()
+	var mine func(id uint64, hops int) bool
+	mine = func(id uint64, hops int) bool {
+		if id == m.self {
+			return true
+		}
+		if m.before[id] || id == 0 || hops > len(live) {
+			return false
+		}
+		g, alive := live[id]
+		if !alive {
+			return true
+		}
+		return !g.foreign && mine(g.parent, hops+1)
+	}
+	for id, g := range live {
+		if id != m.self && !m.before[id] && !g.foreign && mine(g.parent, 0) {
+			return true
+		}
+	}
+	return false
+}
+
+// liveGoroutine is a live goroutine as its traceback names it: the goroutine
+// that created it (zero when none is named), and whether the standard
+// library or this runtime did.
+type liveGoroutine struct {
+	parent  uint64
+	foreign bool
+}
+
+// liveGoroutines reads every live goroutine from a dump of all of them.
+func liveGoroutines() map[uint64]liveGoroutine {
+	live := map[uint64]liveGoroutine{}
+	for block := range strings.SplitSeq(string(allStacks()), "\n\n") {
+		rest, ok := strings.CutPrefix(block, "goroutine ")
+		if !ok {
+			continue
+		}
+		idText, _, _ := strings.Cut(rest, " ")
+		id, err := strconv.ParseUint(idText, 10, 64)
+		if err != nil {
+			continue
+		}
+		var g liveGoroutine
+		lines := strings.Split(strings.TrimRight(block, "\n"), "\n")
+		for i, line := range lines {
+			by, ok := strings.CutPrefix(line, "created by ")
+			if !ok {
+				continue
+			}
+			fn, parent, _ := strings.Cut(by, " in goroutine ")
+			g.parent, _ = strconv.ParseUint(parent, 10, 64)
+			file := ""
+			if i+1 < len(lines) {
+				file, _, _ = strings.Cut(strings.TrimPrefix(lines[i+1], "\t"), " +0x")
+				file, _, _ = cutLine(file)
+			}
+			g.foreign = callsite.IsStd(fn, file) || strings.HasPrefix(fn, "github.com/mvrahden/go-test/pkg/gotestruntime.")
+		}
+		live[id] = g
+	}
+	return live
+}
