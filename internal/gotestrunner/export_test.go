@@ -205,3 +205,11 @@ func ExportReadProtocol(stream io.Reader) *SharedFixtureProcess {
 	p.readProtocol(stream)
 	return p
 }
+
+// ExportSetSetupReportFloor shrinks the wait before the first reported budget
+// and returns what restores it.
+func ExportSetSetupReportFloor(d time.Duration) (restore func()) {
+	was := setupReportFloor
+	setupReportFloor = d
+	return func() { setupReportFloor = was }
+}

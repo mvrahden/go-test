@@ -67,6 +67,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -101,6 +102,7 @@ func main() {
 		}
 		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/redis.RedisFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf1).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "RedisFixture",
 			Timeout:    ƒcfg_sf1.Timeout,
@@ -333,6 +335,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -527,6 +530,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.SetupFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "SetupFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -706,6 +710,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -902,6 +907,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/shared.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -936,6 +942,7 @@ func main() {
 		}
 		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/shared.RedisFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf1).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "RedisFixture",
 			Timeout:    ƒcfg_sf1.Timeout,
@@ -1168,6 +1175,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -1360,6 +1368,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -1552,6 +1561,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -1744,6 +1754,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -1941,6 +1952,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -1975,6 +1987,7 @@ func main() {
 		}
 		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/redis.RedisFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf1).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "RedisFixture",
 			Timeout:    ƒcfg_sf1.Timeout,
@@ -2207,6 +2220,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -2407,6 +2421,7 @@ func main() {
 		}
 		ƒbudget_sf0 = ƒcfg.Timeout
 		ƒcfg_sf0 = gotestruntime.WithFixtureDefaults(ƒcfg)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -2604,6 +2619,7 @@ func main() {
 		}
 		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf0).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
 			Timeout:    ƒcfg_sf0.Timeout,
@@ -2638,6 +2654,7 @@ func main() {
 		}
 		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/gcs.GCSFixture"), ƒquote(gotestruntime.SetupBudget(ƒcfg_sf1).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
 			Name:       "GCSFixture",
 			Timeout:    ƒcfg_sf1.Timeout,

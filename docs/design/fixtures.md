@@ -244,6 +244,10 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 - `BeforeEach`/`AfterEach` are not allowed on shared fixtures.
 - Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 
+Without `--setup-timeout`, the wait for the whole setup is what the fixtures declare: each reports `Timeout × (Retries+1) + RetryDelay × Retries` as its setup starts and the deadline moves to the latest, 2m until the first report; a fixture without a `Timeout` lifts it.
+
+> when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
+
 The protocol is read whole, line by line, and nothing a fixture prints is part of it:
 
 > when a shared fixture's setup prints to stdout without a newline → its suite receives the state

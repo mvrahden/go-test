@@ -19,16 +19,22 @@ import (
 	"github.com/mvrahden/go-test/internal/schedinfo"
 )
 
+// DefaultSetupTimeout bounds the wait for shared fixtures only until the
+// first fixture reports the budget its setup is held to; from then on the
+// wait is the fixtures' own (see SharedFixtureProcess.WaitSetup).
 const DefaultSetupTimeout = 2 * time.Minute
 
+// resolveSetupTimeout turns the --setup-timeout flag into WaitSetup's flat
+// budget: a positive duration as given, zero (the flag absent) for the
+// fixtures' declared budgets, negative (the flag at 0) for no deadline.
 func resolveSetupTimeout(d time.Duration) time.Duration {
 	switch {
 	case d > 0:
 		return d
 	case d < 0:
-		return 0
+		return -1
 	default:
-		return DefaultSetupTimeout
+		return 0
 	}
 }
 
@@ -375,23 +381,16 @@ func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []got
 				return
 			}
 			p.proc = proc
-			var deadline <-chan time.Time
-			if setupTimeout > 0 {
-				timer := time.NewTimer(setupTimeout)
-				defer timer.Stop()
-				deadline = timer.C
-			}
-			select {
-			case <-proc.AllDone():
-				if err := proc.SetupErr(); err != nil {
-					p.setupErr = fmt.Errorf("shared fixture setup failed: %w", err)
-				}
-			case <-ctx.Done():
-			case <-deadline:
+			var timedOut *SetupTimeoutError
+			switch err := proc.WaitSetup(ctx, setupTimeout); {
+			case err == nil, ctx.Err() != nil:
+			case errors.As(err, &timedOut):
 				// Scheduling context: a setup deadline is a wall-clock
 				// verdict, and a starved setup looks exactly like a hung one.
 				p.setupTimedOut = true
-				p.setupErr = fmt.Errorf("shared fixture setup timed out after %v %s", setupTimeout, schedinfo.Summary())
+				p.setupErr = fmt.Errorf("%w %s", err, schedinfo.Summary())
+			default:
+				p.setupErr = err
 			}
 		}()
 	}
@@ -719,21 +718,14 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			if err != nil {
 				return
 			}
-			var setupDeadline <-chan time.Time
-			if resolvedSetupTimeout > 0 {
-				timer := time.NewTimer(resolvedSetupTimeout)
-				defer timer.Stop()
-				setupDeadline = timer.C
-			}
-			select {
-			case <-setupProc.AllDone():
-				if err := setupProc.SetupErr(); err != nil {
-					failSetup(fmt.Errorf("shared fixture setup failed: %w", err))
-				}
-			case <-streamCtx.Done():
-			case <-setupDeadline:
+			var timedOut *SetupTimeoutError
+			switch err := setupProc.WaitSetup(streamCtx, resolvedSetupTimeout); {
+			case err == nil, streamCtx.Err() != nil:
+			case errors.As(err, &timedOut):
 				setupTimedOut = true
-				failSetup(fmt.Errorf("shared fixture setup timed out after %v %s", resolvedSetupTimeout, schedinfo.Summary()))
+				failSetup(fmt.Errorf("%w %s", err, schedinfo.Summary()))
+			default:
+				failSetup(err)
 			}
 		}()
 	} else {

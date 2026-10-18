@@ -544,6 +544,16 @@ func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T)
 	s.check(t, "noisysetup")
 }
 
+// Without --setup-timeout the wait for a shared fixture is the budget the
+// fixture declared: a 2s Timeout taking 15s fails the run in 2s, not 15.
+func (s *CanaryTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
+	began := time.Now()
+	s.check(t, "setupbudget")
+	if took := time.Since(began); took > 10*time.Second {
+		t.Errorf("setupbudget: the run took %s; the wait outlived the fixture's declared 2s budget", took)
+	}
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

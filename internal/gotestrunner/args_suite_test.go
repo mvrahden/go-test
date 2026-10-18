@@ -502,10 +502,10 @@ func (s *ArgsTestSuite) TestResolveSetupTimeout(t *gotest.T) {
 		input  time.Duration
 		expect time.Duration
 	}{
-		{"not set defaults to 2m", 0, 2 * time.Minute},
+		{"not set is the fixtures' declared budgets", 0, 0},
 		{"positive passed through", 5 * time.Minute, 5 * time.Minute},
-		{"negative means no limit", -1, 0},
-		{"large negative means no limit", -30 * time.Second, 0},
+		{"negative means no limit", -1, -1},
+		{"large negative means no limit", -30 * time.Second, -1},
 		{"small positive passed through", 10 * time.Second, 10 * time.Second},
 	}) {
 		got := gotestrunner.ExportResolveSetupTimeout(tc.input)

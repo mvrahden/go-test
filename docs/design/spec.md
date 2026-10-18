@@ -140,7 +140,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--output=<path>` | Write formatted output to file |
 | `--no-color` | Strip ANSI codes from terminal output |
 | `--min=<pct>` | Fail if coverage below threshold (enables `-coverprofile`) |
-| `--setup-timeout=<dur>` | Total budget for shared fixture setup (default: 2m; 0 disables) |
+| `--setup-timeout=<dur>` | Flat budget for shared fixture setup (default: the fixtures' declared budgets, 2m until the first reports; 0 disables) |
 | `--timeout=<dur>` | Global pipeline deadline (default: 15m; 0 disables); refused by `fuzz`, whose deadline follows `--for` |
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
 | `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
@@ -210,7 +210,7 @@ Omitted keys fall back to the defaults; duration keys are pointers, so an explic
 ```yaml
 tags: "integration,e2e"    # -tags
 timeout: 15m               # --timeout   (0 disables)
-setup-timeout: 5m          # --setup-timeout (0 disables)
+setup-timeout: 5m          # --setup-timeout (flat; absent: the fixtures' declared budgets; 0 disables)
 min-coverage: 80           # --min
 parallel: 12               # --parallel
 compile-parallel: 4        # --compile-parallel

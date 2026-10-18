@@ -2043,6 +2043,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the run passes: the wait is the fixture's declared budget",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_run_passes:_the_wait_is_the_fixture's_declared_budget",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_declaring_ContainerFixtureConfig_takes_130s_to_come_up_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ContainerConfig",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestContainerConfig",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SetupBudget",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSetupBudgetTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "its suite receives the state",
                       "duration": 0,
                       "excluded": false,
@@ -3193,13 +3246,13 @@
     }
   ],
   "stats": {
-    "behaviors": 124,
+    "behaviors": 125,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 22,
+    "suites": 23,
     "tests": 0
   }
 }

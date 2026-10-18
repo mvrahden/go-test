@@ -1,0 +1,13 @@
+Expect: setupbudget: the run took .*; the wait outlived the fixture's declared 2s budget
+Clause: when a shared fixture declaring ContainerFixtureConfig takes 130s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -657,7 +657,7 @@
+ 			continue
+ 		}
+ 		if entry.Key == "_setup" {
+-			if d, err := time.ParseDuration(entry.Budget); err == nil {
++			if d, err := time.ParseDuration(entry.Budget); err == nil && d < 0 {
+ 				p.noteSetupBudget(d)
+ 			}
+ 			continue

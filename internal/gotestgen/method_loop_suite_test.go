@@ -56,8 +56,8 @@ func (s *MethodLoopTestSuite) TestAsyncDeadline(t *gotest.T) {
 		gotest.Contains(it, run.output, "TestNeverDoneAsync: done() was not called before the test deadline")
 	})
 	t.It("locates the verdict at the method's declaration, not inside gotest", func(it *gotest.T) {
-		// test.go:56 declares TestNeverDoneAsync in the fixture source.
-		gotest.Regexp(it, `(?m)^\s+test\.go:56: TestNeverDoneAsync: done\(\) was not called`, run.output)
+		// test.go:62 declares TestNeverDoneAsync in the fixture source.
+		gotest.Regexp(it, `(?m)^\s+test\.go:62: TestNeverDoneAsync: done\(\) was not called`, run.output)
 		gotest.NotContains(it, run.output, "methods.go:", run.output)
 	})
 }
@@ -120,7 +120,7 @@ func (s *MethodLoopTestSuite) TestCallSites(t *gotest.T) {
 	// between t.Run and the method must not displace.
 	t.It("reports the method's line behind a helper's for a returning BeforeEach and an async method", func(it *gotest.T) {
 		gotest.False(it, run.passed, run.output)
-		gotest.Regexp(it, `TestReturning\n\s+test\.go:75: test\.go:67: Equal failed`, run.output)
-		gotest.Regexp(it, `TestWaitsAsync\n\s+test\.go:75: test\.go:72: Equal failed`, run.output)
+		gotest.Regexp(it, `TestReturning\n\s+test\.go:81: test\.go:73: Equal failed`, run.output)
+		gotest.Regexp(it, `TestWaitsAsync\n\s+test\.go:81: test\.go:78: Equal failed`, run.output)
 	})
 }
