@@ -1,0 +1,11 @@
+Expect: failing: no failure message says
+Clause: when an assertion's first extra argument is not a string → every extra argument is in the message
+--- a/pkg/gotest/internal/assert/format.go
++++ b/pkg/gotest/internal/assert/format.go
+@@ -214,5 +214,5 @@
+ 		return fmt.Sprintf(format, msgAndArgs[1:]...)
+ 	}
+ 	// No format to place them by: every argument, in order.
+-	return strings.TrimSuffix(fmt.Sprintln(msgAndArgs...), "\n")
++	return strings.TrimSuffix(fmt.Sprintln(msgAndArgs[0]), "\n")
+ }

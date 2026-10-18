@@ -607,6 +607,17 @@ func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *got
 	}
 }
 
+// A failed assertion says what it could not work with: the type ErrorAs
+// expected, the needle a haystack cannot hold, and every extra argument.
+func (s *CanaryTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gotest.T) {
+	s.check(t, "failing")
+	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN"} {
+		if !strings.Contains(s.lastStream, want) {
+			t.Errorf("failing: no failure message says %q", want)
+		}
+	}
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {

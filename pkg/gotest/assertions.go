@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,9 +80,9 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 
 // Contains asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps).
 func Contains(t testingT, s, contains any, msgAndArgs ...any) {
-	found, valid := assert.IncludesElement(s, contains)
-	if !valid {
-		fail(t, fmt.Sprintf("Contains failed:\n  object of type %T is not a string, slice, array, or map", s), msgAndArgs)
+	found, guard := assert.IncludesElement(s, contains)
+	if guard != "" {
+		fail(t, "Contains failed:\n  "+guard, msgAndArgs)
 		return
 	}
 	if !found {
@@ -138,7 +140,7 @@ func Error(t testingT, err error, msgAndArgs ...any) {
 func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
 	var target E
 	if !errors.As(err, &target) {
-		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v does not match expected type", err), msgAndArgs)
+		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v is not a %s", err, reflect.TypeFor[E]()), msgAndArgs)
 	}
 	return target
 }
@@ -225,7 +227,15 @@ func GreaterOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 
 // InDelta asserts that expected and actual differ by at most delta.
 func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
-	diff := math.Abs(float64(expected) - float64(actual))
+	if math.IsNaN(delta) {
+		fail(t, "InDelta: delta is NaN; no distance is within it", msgAndArgs)
+		return
+	}
+	e, a := float64(expected), float64(actual)
+	if math.IsInf(e, 0) && e == a {
+		return // the same infinity, whose difference has no value
+	}
+	diff := math.Abs(e - a)
 	if math.IsNaN(diff) || diff > delta {
 		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)
 	}
@@ -290,9 +300,9 @@ func NoError(t testingT, err error, msgAndArgs ...any) {
 
 // NotContains asserts that s does NOT contain the given element.
 func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
-	found, valid := assert.IncludesElement(s, contains)
-	if !valid {
-		fail(t, fmt.Sprintf("NotContains failed:\n  object of type %T is not a string, slice, array, or map", s), msgAndArgs)
+	found, guard := assert.IncludesElement(s, contains)
+	if guard != "" {
+		fail(t, "NotContains failed:\n  "+guard, msgAndArgs)
 		return
 	}
 	if found {
@@ -380,23 +390,41 @@ func Panics(t testingT, f func(), msgAndArgs ...any) any {
 func Regexp[P regexpPattern](t testingT, rx P, str string, msgAndArgs ...any) {
 	var re *regexp.Regexp
 	switch v := any(rx).(type) {
-	case string:
-		var err error
-		re, err = regexp.Compile(v)
-		if err != nil {
-			fail(t, fmt.Sprintf("Regexp failed:\n  invalid pattern %q: %v", v, err), msgAndArgs)
-			return
-		}
 	case *regexp.Regexp:
 		if v == nil {
 			fail(t, "Regexp failed:\n  regexp is nil", msgAndArgs)
 			return
 		}
 		re = v
+	default:
+		// Any string kind, named ones included.
+		pattern := reflect.ValueOf(v).String()
+		var err error
+		re, err = compilePattern(pattern)
+		if err != nil {
+			fail(t, fmt.Sprintf("Regexp failed:\n  invalid pattern %q: %v", pattern, err), msgAndArgs)
+			return
+		}
 	}
 	if !re.MatchString(str) {
 		fail(t, fmt.Sprintf("Regexp failed:\n  %q does not match pattern %q", str, re.String()), msgAndArgs)
 	}
+}
+
+// compiledPatterns keeps every pattern Regexp compiled: a table of a few
+// patterns asserted thousands of times compiles each once.
+var compiledPatterns sync.Map // string -> *regexp.Regexp
+
+func compilePattern(pattern string) (*regexp.Regexp, error) {
+	if re, ok := compiledPatterns.Load(pattern); ok {
+		return re.(*regexp.Regexp), nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	compiledPatterns.Store(pattern, re)
+	return re, nil
 }
 
 // Subset asserts that every element of subset exists in list.

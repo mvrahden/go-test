@@ -31,3 +31,10 @@ func ExportRedirectSnapshots(dir string) (restore func()) {
 // ExportMatchSnapshotFromPtest calls MatchSnapshot from this internal test
 // file, so caller-package detection sees a ptest caller and picks no suffix.
 func ExportMatchSnapshotFromPtest(t testingT, value any) { MatchSnapshot(t, value) }
+
+// ExportCompiledPatterns counts the patterns Regexp has compiled and kept.
+func ExportCompiledPatterns() int {
+	n := 0
+	compiledPatterns.Range(func(any, any) bool { n++; return true })
+	return n
+}

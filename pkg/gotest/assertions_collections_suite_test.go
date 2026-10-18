@@ -502,10 +502,10 @@ func (s *CollectionAssertionsTestSuite) TestContains(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not a string, slice, array, or map")
 		})
-		w.It("fails with type error for map with mismatched key type", func(it *gotest.T) {
+		w.It("fails with a type guard for a map with a mismatched key type", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"a": 1}, 42) })
 			gotest.True(it, m.Failed())
-			gotest.Contains(it, m.Message(), "does not contain")
+			gotest.Contains(it, m.Message(), "a map[string]int cannot hold a key of type int")
 		})
 	})
 }
@@ -572,9 +572,10 @@ func (s *CollectionAssertionsTestSuite) TestNotContains(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not a string, slice, array, or map")
 		})
-		w.It("passes without panic for map with mismatched key type", func(it *gotest.T) {
+		w.It("fails with a type guard for a map with a mismatched key type", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[string]int{"a": 1}, 42) })
-			gotest.False(it, m.Failed())
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "a map[string]int cannot hold a key of type int")
 		})
 	})
 }

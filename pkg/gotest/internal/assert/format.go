@@ -213,5 +213,6 @@ func FormatMessage(msgAndArgs []any) string {
 	if format, ok := msgAndArgs[0].(string); ok {
 		return fmt.Sprintf(format, msgAndArgs[1:]...)
 	}
-	return fmt.Sprintf("%v", msgAndArgs[0])
+	// No format to place them by: every argument, in order.
+	return strings.TrimSuffix(fmt.Sprintln(msgAndArgs...), "\n")
 }

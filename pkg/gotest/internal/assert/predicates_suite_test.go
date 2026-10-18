@@ -117,29 +117,33 @@ func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestIncludesElement(t *gotest.T, _ *predicatesCtx) {
+	type named string
 	for _, c := range []struct {
 		what       string
 		s, element any
 		found      bool
-		valid      bool
+		guarded    bool // the pair is one the question cannot be asked of
 	}{
-		{"substring present", "abc", "b", true, true},
-		{"substring absent", "abc", "z", false, true},
+		{"substring present", "abc", "b", true, false},
+		{"substring absent", "abc", "z", false, false},
+		{"substring of a named kind", named("abc"), named("b"), true, false},
 		{"non-string needle in a string", "abc", 1, false, true},
-		{"slice element present", []int{1, 2}, 2, true, true},
-		{"slice element absent", []int{1, 2}, 3, false, true},
-		{"array element present", [2]string{"a", "b"}, "a", true, true},
-		{"deep-equal element", []struct{ N int }{{1}}, struct{ N int }{1}, true, true},
-		{"map key present", map[string]int{"k": 1}, "k", true, true},
-		{"map key absent", map[string]int{"k": 1}, "z", false, true},
+		{"slice element present", []int{1, 2}, 2, true, false},
+		{"slice element absent", []int{1, 2}, 3, false, false},
+		{"slice element of a type it cannot hold", []int{1, 2}, "x", false, true},
+		{"any-slice holds every type", []any{1, "x"}, "x", true, false},
+		{"array element present", [2]string{"a", "b"}, "a", true, false},
+		{"deep-equal element", []struct{ N int }{{1}}, struct{ N int }{1}, true, false},
+		{"map key present", map[string]int{"k": 1}, "k", true, false},
+		{"map key absent", map[string]int{"k": 1}, "z", false, false},
 		{"map key of the wrong type", map[string]int{"k": 1}, 1, false, true},
-		{"nil haystack", nil, "a", false, true},
-		{"int haystack is invalid", 42, 4, false, false},
-		{"struct haystack is invalid", struct{}{}, "a", false, false},
+		{"nil haystack", nil, "a", false, false},
+		{"int haystack is invalid", 42, 4, false, true},
+		{"struct haystack is invalid", struct{}{}, "a", false, true},
 	} {
-		found, valid := assert.IncludesElement(c.s, c.element)
-		if found != c.found || valid != c.valid {
-			t.Errorf("IncludesElement(%s): got (%v, %v), want (%v, %v)", c.what, found, valid, c.found, c.valid)
+		found, guard := assert.IncludesElement(c.s, c.element)
+		if found != c.found || (guard != "") != c.guarded {
+			t.Errorf("IncludesElement(%s): got (%v, %q), want (%v, guarded=%v)", c.what, found, guard, c.found, c.guarded)
 		}
 	}
 }

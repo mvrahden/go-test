@@ -2,6 +2,7 @@ package failing_test
 
 import (
 	"errors"
+	"math"
 	"os"
 	"time"
 
@@ -83,4 +84,15 @@ func (s *FailingTestSuite) TestEachRow(t *gotest.T) {
 	for it, r := range gotest.Each(t, []failingRow{{"first", true}, {"second", false}}) {
 		gotest.True(it, r.ok)
 	}
+}
+
+// The failures below carry the message the canary reads back.
+func (s *FailingTestSuite) TestInDeltaNaN(t *gotest.T)    { gotest.InDelta(t, 1.0, 1.0, math.NaN()) }
+func (s *FailingTestSuite) TestContainsAnInt(t *gotest.T) { gotest.Contains(t, []int{1, 2}, "x") }
+func (s *FailingTestSuite) TestNonStringArgs(t *gotest.T) { gotest.True(t, false, 42, "retries left") }
+
+type route string
+
+func (s *FailingTestSuite) TestRegexpNamed(t *gotest.T) {
+	gotest.Regexp(t, route(`^/api/`), "/web/users")
 }

@@ -5,6 +5,7 @@ passing pass TestPassingTestSuite/TestOne
 passing pass TestPassingTestSuite/TestTwo
 passing pass TestPassingTestSuite/TestTwo/a_behavior_is_declared
 passing pass TestPassingTestSuite/TestTwo/a_behavior_is_declared/passes
+passing pass TestPassingTestSuite/TestTypedArguments
 failing exit 1
 failing fail -
 failing fail TestFailingTestSuite
@@ -13,6 +14,7 @@ failing fail TestFailingTestSuite/TestBehavior/a_behavior_fails
 failing fail TestFailingTestSuite/TestBehavior/a_behavior_fails/is_reported_at_the_leaf
 failing fail TestFailingTestSuite/TestConsistently
 failing fail TestFailingTestSuite/TestContains
+failing fail TestFailingTestSuite/TestContainsAnInt
 failing fail TestFailingTestSuite/TestEachRow
 failing fail TestFailingTestSuite/TestEachRow/second
 failing fail TestFailingTestSuite/TestElementsMatch
@@ -28,12 +30,14 @@ failing fail TestFailingTestSuite/TestFalse
 failing fail TestFailingTestSuite/TestGreater
 failing fail TestFailingTestSuite/TestGreaterOrEqual
 failing fail TestFailingTestSuite/TestInDelta
+failing fail TestFailingTestSuite/TestInDeltaNaN
 failing fail TestFailingTestSuite/TestJSONEq
 failing fail TestFailingTestSuite/TestLen
 failing fail TestFailingTestSuite/TestLess
 failing fail TestFailingTestSuite/TestLessOrEqual
 failing fail TestFailingTestSuite/TestNil
 failing fail TestFailingTestSuite/TestNoError
+failing fail TestFailingTestSuite/TestNonStringArgs
 failing fail TestFailingTestSuite/TestNotContains
 failing fail TestFailingTestSuite/TestNotEmpty
 failing fail TestFailingTestSuite/TestNotEqual
@@ -42,6 +46,7 @@ failing fail TestFailingTestSuite/TestNotSame
 failing fail TestFailingTestSuite/TestNotZero
 failing fail TestFailingTestSuite/TestPanics
 failing fail TestFailingTestSuite/TestRegexp
+failing fail TestFailingTestSuite/TestRegexpNamed
 failing fail TestFailingTestSuite/TestSame
 failing fail TestFailingTestSuite/TestSubset
 failing fail TestFailingTestSuite/TestTimeIsNow

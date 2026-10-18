@@ -1,0 +1,15 @@
+Expect: failing: verdicts differ from the golden list
+Clause: when InDelta is given a NaN delta → fails: no distance is within NaN
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -227,10 +227,6 @@
+ 
+ // InDelta asserts that expected and actual differ by at most delta.
+ func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArgs ...any) {
+-	if math.IsNaN(delta) {
+-		fail(t, "InDelta: delta is NaN; no distance is within it", msgAndArgs)
+-		return
+-	}
+ 	e, a := float64(expected), float64(actual)
+ 	if math.IsInf(e, 0) && e == a {
+ 		return // the same infinity, whose difference has no value

@@ -135,6 +135,13 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `release-leaves-the-group` | releasing a suite's process tree leaves its stragglers alive | canary: a sleep the test never waited for outlives the run |
 | `method-panic-recovered` | the method loop swallows a method's panic | canary: the panicking method passes and its sibling runs to the end |
 | `each-rows-share-the-method-verdict` | an Each row's assertions report on the method, not the row's subtest | canary: the failing row passes on its own and the row verdicts of the golden list are off |
+| `regexp-named-pattern-is-empty` | a named string pattern compiles as the empty pattern | canary: the failing fixture's named pattern matches everything |
+| `contains-type-guard-silent` | a needle a slice cannot hold is reported as merely absent | canary: no failure names the two types |
+| `contains-named-kinds-refused` | a named string haystack is not a string | canary: the passing fixture's named-kind substring check fails |
+| `indelta-nan-delta-passes` | a NaN delta admits every distance | canary: the failing fixture's NaN-delta assertion passes |
+| `indelta-infinities-differ` | two equal infinities are not within any delta | canary: the passing fixture's infinity comparison fails |
+| `message-drops-trailing-args` | a non-string first argument silences the arguments after it | canary: no failure carries the trailing argument |
+| `erroras-type-unnamed` | ErrorAs reports a mismatch without the type it wanted | canary: no failure names the expected type |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |

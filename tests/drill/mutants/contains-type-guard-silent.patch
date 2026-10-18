@@ -1,0 +1,13 @@
+Expect: failing: no failure message says
+Clause: when Contains is given a needle no element of the haystack could be → fails naming the haystack's type and the needle's
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -43,7 +43,7 @@
+ 	case reflect.Slice, reflect.Array:
+ 		ev := reflect.ValueOf(element)
+ 		if ev.IsValid() && !ev.Type().AssignableTo(rv.Type().Elem()) && rv.Type().Elem().Kind() != reflect.Interface {
+-			return false, fmt.Sprintf("a %T cannot hold a %T", s, element)
++			return false, ""
+ 		}
+ 		for i := 0; i < rv.Len(); i++ {
+ 			if reflect.DeepEqual(rv.Index(i).Interface(), element) {

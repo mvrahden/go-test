@@ -20,6 +20,17 @@ func (s *ShapeAssertionsTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
+func (s *ShapeAssertionsTestSuite) TestRegexpCompilesOnce(t *gotest.T) {
+	t.When("the same pattern is asserted twice", func(w *gotest.T) {
+		before := gotest.ExportCompiledPatterns()
+		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, `^cached-[a-z]+$`, "cached-once") })
+		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, `^cached-[a-z]+$`, "cached-twice") })
+		w.It("compiles it once and keeps it", func(it *gotest.T) {
+			gotest.Equal(it, before+1, gotest.ExportCompiledPatterns())
+		})
+	})
+}
+
 func (s *ShapeAssertionsTestSuite) TestRegexp(t *gotest.T) {
 	t.When("string matches pattern", func(w *gotest.T) {
 		w.It("passes for string pattern", func(it *gotest.T) {

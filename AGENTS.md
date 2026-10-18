@@ -175,6 +175,24 @@ On subsequent runs, the value is compared against the stored snapshot.
 The optional `name` disambiguates multiple snapshots within the same test case.
 Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
 
+### Typing
+
+Assertions take the types they are given at face value and say what they cannot work with:
+
+> when Regexp is given a pattern of a named string type → compiles and matches it like a string
+
+> when Contains compares named string kinds → checks the substring as it does for strings
+
+> when Contains is given a needle no element of the haystack could be → fails naming the haystack's type and the needle's
+
+> when InDelta is given a NaN delta → fails: no distance is within NaN
+
+> when InDelta compares two equal infinities → they are within any delta
+
+> when an assertion's first extra argument is not a string → every extra argument is in the message
+
+> when ErrorAs is given an error of another type → names the type it expected
+
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.

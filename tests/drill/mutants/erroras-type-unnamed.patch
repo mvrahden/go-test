@@ -1,0 +1,13 @@
+Expect: failing: no failure message says
+Clause: when ErrorAs is given an error of another type → names the type it expected
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -140,7 +140,7 @@
+ func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
+ 	var target E
+ 	if !errors.As(err, &target) {
+-		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v is not a %s", err, reflect.TypeFor[E]()), msgAndArgs)
++		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v does not match expected type", err), msgAndArgs)
+ 	}
+ 	return target
+ }

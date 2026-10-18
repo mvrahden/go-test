@@ -1,0 +1,14 @@
+Expect: passing: verdicts differ from the golden list
+Clause: when InDelta compares two equal infinities → they are within any delta
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -232,9 +232,6 @@
+ 		return
+ 	}
+ 	e, a := float64(expected), float64(actual)
+-	if math.IsInf(e, 0) && e == a {
+-		return // the same infinity, whose difference has no value
+-	}
+ 	diff := math.Abs(e - a)
+ 	if math.IsNaN(diff) || diff > delta {
+ 		fail(t, fmt.Sprintf("InDelta failed:\n  |%v - %v| = %v exceeds delta %v", expected, actual, diff, delta), msgAndArgs)

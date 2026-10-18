@@ -1,0 +1,14 @@
+Expect: passing: verdicts differ from the golden list
+Clause: when Contains compares named string kinds → checks the substring as it does for strings
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -35,6 +35,9 @@
+ 	rv := reflect.ValueOf(s)
+ 	switch rv.Kind() {
+ 	case reflect.String:
++		if _, plain := s.(string); !plain {
++			return false, fmt.Sprintf("object of type %T is not a string, slice, array, or map", s)
++		}
+ 		ev := reflect.ValueOf(element)
+ 		if !ev.IsValid() || ev.Kind() != reflect.String {
+ 			return false, fmt.Sprintf("a %T cannot hold a %T", s, element)

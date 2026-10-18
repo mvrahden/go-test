@@ -25,36 +25,40 @@ func DidPanic(f func()) (recovered any, panicked bool) {
 }
 
 // IncludesElement reports whether s contains element: a substring of a
-// string, an element of a slice or array (deep equality), or a key of a map.
-// valid is false when s is none of those.
-func IncludesElement(s, element any) (found, valid bool) {
+// string kind, an element of a slice or array, a key of a map. guard names
+// what the pair cannot be when s is none of those or element is a type s
+// could not hold; it is empty when the question was answerable.
+func IncludesElement(s, element any) (found bool, guard string) {
 	if s == nil {
-		return false, true
-	}
-	if str, ok := s.(string); ok {
-		sub, ok := element.(string)
-		if !ok {
-			return false, true
-		}
-		return strings.Contains(str, sub), true
+		return false, ""
 	}
 	rv := reflect.ValueOf(s)
 	switch rv.Kind() {
+	case reflect.String:
+		ev := reflect.ValueOf(element)
+		if !ev.IsValid() || ev.Kind() != reflect.String {
+			return false, fmt.Sprintf("a %T cannot hold a %T", s, element)
+		}
+		return strings.Contains(rv.String(), ev.String()), ""
 	case reflect.Slice, reflect.Array:
+		ev := reflect.ValueOf(element)
+		if ev.IsValid() && !ev.Type().AssignableTo(rv.Type().Elem()) && rv.Type().Elem().Kind() != reflect.Interface {
+			return false, fmt.Sprintf("a %T cannot hold a %T", s, element)
+		}
 		for i := 0; i < rv.Len(); i++ {
 			if reflect.DeepEqual(rv.Index(i).Interface(), element) {
-				return true, true
+				return true, ""
 			}
 		}
-		return false, true
+		return false, ""
 	case reflect.Map:
 		mapKey := reflect.ValueOf(element)
 		if !mapKey.IsValid() || !mapKey.Type().AssignableTo(rv.Type().Key()) {
-			return false, true
+			return false, fmt.Sprintf("a %T cannot hold a key of type %T", s, element)
 		}
-		return rv.MapIndex(mapKey).IsValid(), true
+		return rv.MapIndex(mapKey).IsValid(), ""
 	}
-	return false, false
+	return false, fmt.Sprintf("object of type %T is not a string, slice, array, or map", s)
 }
 
 // IsNil reports whether object is nil, for the kinds that can be.
