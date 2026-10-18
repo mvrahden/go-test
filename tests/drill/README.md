@@ -33,16 +33,17 @@ The drill exits 0 only when every mutant was caught. It runs in CI
 `bash tests/drill/drill.sh <name> ...` runs only the named mutants, which is
 how a new patch is tried without waiting for the whole set.
 
-## Mutants and the behavior catalog
+## Mutants and the specs
 
-A patch may carry `Clause: <when> → <it>` lines above its diff, naming the
-clauses of `docs/design/catalog.md` it falsifies. `bash tests/drill/drill.sh
---list-unmutated` prints the clauses no patch names. Their number may not
-exceed `tests/drill/unmutated-allow.txt`: a new clause either gets a mutant or
-the budget is raised on purpose in the same change. A conventions suite
-enforces both, and that every `Clause:` line names a clause that exists; the
-listing and the suite share one reading (`internal/speccatalog`), so they
-cannot disagree about what is unmutated.
+A patch may carry `Clause: when <WHEN> → <THEN>` lines above its diff, naming
+the scenario outcomes in [`specs/`](../../specs/README.md) it falsifies: one
+WHEN bullet and one of its THEN or AND bullets, joined as written. `bash
+tests/drill/drill.sh --list-unmutated` prints the clauses no patch names.
+Their number may not exceed `tests/drill/unmutated-allow.txt`: a new clause
+either gets a mutant or the budget is raised on purpose in the same change. A
+conventions suite enforces both, and that every `Clause:` line names a clause
+a scenario states; the listing and the suite share one reading
+(`internal/speccatalog`), so they cannot disagree about what is unmutated.
 
 A conformance suite cannot be the drill's oracle: it asserts with gotest, and
 a mutated assertion engine could pass its own test. A clause whose outcome is

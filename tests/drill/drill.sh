@@ -9,7 +9,7 @@ set -uo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/... ./tests/canary/...)
 
-# --list-unmutated prints the catalog clauses no patch names on a Clause: line,
+# --list-unmutated prints the clauses of specs/ no patch names on a Clause: line,
 # by the reading the conventions suite holds the budget to.
 if [ "${1:-}" = "--list-unmutated" ]; then
   (cd "$root" && go run ./internal/speccatalog/clauses --unmutated)

@@ -67,6 +67,26 @@ func (s *BindingTestSuite) TestClausesOf(t *gotest.T) {
 	})
 }
 
+const excludedCatalog = `{"packages":[{"path":"github.com/mvrahden/go-test/tests/conformance/cli","nodes":[
+ {"kind":"suite","display":"Parked","excluded":true,"children":[
+ {"kind":"method","display":"Parked","children":[
+  {"kind":"block","vocab":"when","display":"when the suite is parked","name":"the_suite_is_parked","children":[
+   {"kind":"block","vocab":"it","display":"is not a sentence anyone may quote","children":[]}]}]}]},
+ {"kind":"suite","display":"Live","children":[
+ {"kind":"method","display":"Live","children":[
+  {"kind":"block","vocab":"when","display":"when the suite runs","name":"the_suite_runs","children":[
+   {"kind":"block","vocab":"it","display":"is a sentence","children":[]}]}]}]}]}]}`
+
+func (s *BindingTestSuite) TestExcludedSuitesYieldNoClauses(t *gotest.T) {
+	cs, err := speccatalog.ClausesOf([]byte(excludedCatalog))
+	gotest.NoError(t, err)
+	t.When("a catalog holds an excluded suite beside a live one", func(w *gotest.T) {
+		w.It("yields the live suite's clauses alone", func(it *gotest.T) {
+			gotest.Equal(it, []speccatalog.Clause{{Capability: "cli", When: "the suite runs", It: "is a sentence"}}, cs)
+		})
+	})
+}
+
 func (s *BindingTestSuite) TestBind(t *gotest.T) {
 	t.When("every scenario equals a clause and every clause a scenario", func(w *gotest.T) {
 		w.It("reports nothing", func(it *gotest.T) {

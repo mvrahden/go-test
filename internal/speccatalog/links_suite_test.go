@@ -48,7 +48,7 @@ const linkDoc = "See [the version requirement](../../specs/cli/spec.md#requireme
 	"```\n[fenced](../../specs/x.md)\n```\n" +
 	"[ref]: ../../specs/bench/spec.md\n" +
 	"Online: https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-version and [web](https://example.com).\n" +
-	"[other](catalog.md#cli) and [top](#top).\n"
+	"[other](fixtures.md#cli) and [top](#top).\n"
 
 func (s *LinksTestSuite) TestSpecLinks(t *gotest.T) {
 	links := speccatalog.SpecLinks("docs/design/spec.md", []byte(linkDoc))

@@ -1,5 +1,6 @@
-// Package speccatalog renders the behavior catalog: the conformance suites'
-// When/It sentences as gotest spec --static reads them from source.
+// Package speccatalog reads the behavioral promises in specs/ and binds them
+// to the conformance suites' When/It sentences, which it indexes as gotest
+// spec --static reads them from source.
 package speccatalog
 
 import (
@@ -11,41 +12,29 @@ import (
 	"github.com/mvrahden/go-test/internal/testkit"
 )
 
-// Paths of the committed catalog, relative to the repository root.
-const (
-	MarkdownPath = "docs/design/catalog.md"
-	JSONPath     = "docs/design/catalog.json"
-)
+// JSONPath is the committed catalog index, relative to the repository root.
+const JSONPath = "docs/design/catalog.json"
 
 // Pattern selects every conformance package.
 const Pattern = "./tests/conformance/..."
 
-// Render reads the conformance suites from source and returns the markdown
-// catalog and its JSON twin. The JSON's version field names the CLI build
-// that rendered it, so it is dropped: the catalog describes behavior, not
-// the binary that read it.
-func Render(ctx context.Context, repoRoot string) (md, js []byte, err error) {
-	md, err = render(ctx, repoRoot, "md")
+// Render reads the conformance suites from source and returns the catalog
+// JSON. Its version field names the CLI build that rendered it, so it is
+// dropped: the catalog describes behavior, not the binary that read it.
+func Render(ctx context.Context, repoRoot string) ([]byte, error) {
+	raw, err := render(ctx, repoRoot)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	raw, err := render(ctx, repoRoot, "json")
-	if err != nil {
-		return nil, nil, err
-	}
-	js, err = withoutVersion(raw)
-	if err != nil {
-		return nil, nil, err
-	}
-	return md, js, nil
+	return withoutVersion(raw)
 }
 
 // render reads the catalog as linux sees the source, on every host: a
 // build-constrained conformance file (unix-only, say) would otherwise make the
 // committed catalog depend on where it was rendered. What only another
 // platform compiles is not catalogued.
-func render(ctx context.Context, repoRoot, format string) ([]byte, error) {
-	run, err := testkit.RunCLIWithEnv(ctx, repoRoot, []string{"GOOS=linux"}, "spec", "--static", "--format="+format, Pattern)
+func render(ctx context.Context, repoRoot string) ([]byte, error) {
+	run, err := testkit.RunCLIWithEnv(ctx, repoRoot, []string{"GOOS=linux"}, "spec", "--static", "--format=json", Pattern)
 	if err != nil {
 		return nil, err
 	}

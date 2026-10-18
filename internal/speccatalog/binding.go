@@ -136,3 +136,31 @@ func sortedClauses(clauses []Clause) []Clause {
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Capability < out[j].Capability })
 	return out
 }
+
+// node is the part of a catalog node ClausesOf reads.
+type node struct {
+	Display  string `json:"display"`
+	Name     string `json:"name"`
+	Vocab    string `json:"vocab"`
+	Excluded bool   `json:"excluded"`
+	Children []node `json:"children"`
+}
+
+// walk calls fn for every It below a When, with the innermost When above it.
+// Nothing under an excluded node is visited.
+func walk(n, when *node, fn func(when, it *node)) {
+	if n.Excluded {
+		return
+	}
+	switch n.Vocab {
+	case "when":
+		when = n
+	case "it":
+		if when != nil {
+			fn(when, n)
+		}
+	}
+	for i := range n.Children {
+		walk(&n.Children[i], when, fn)
+	}
+}

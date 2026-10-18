@@ -44,7 +44,7 @@ jobs:
       - name: OpenSpec validate
         run: make spec-validate
       - name: Spec sync
-        run: make catalog && git diff --exit-code docs/design/catalog.md docs/design/catalog.json
+        run: make catalog && git diff --exit-code docs/design/catalog.json
       # The skill's consumer fixture is the only in-repo proof of the
       # consumer-facing API shape; nothing else builds it.
       - name: Consumer fixture (skill evals)

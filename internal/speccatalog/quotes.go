@@ -1,7 +1,6 @@
 package speccatalog
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -16,56 +15,31 @@ type Quote struct {
 	Text string
 }
 
-// node is the part of a catalog node the resolver reads.
-type node struct {
-	Display  string `json:"display"`
-	Name     string `json:"name"`
-	Vocab    string `json:"vocab"`
-	Excluded bool   `json:"excluded"`
-	Children []node `json:"children"`
-}
-
-// Clauses lists every "<when> → <it>" sentence the catalog JSON holds: one per
-// It block, paired with the innermost When block above it, both as rendered.
-// An excluded suite or method is parked, not promised: nothing under it is a
-// clause.
-func Clauses(js []byte) ([]string, error) {
-	var doc struct {
-		Packages []struct {
-			Nodes []node `json:"nodes"`
-		} `json:"packages"`
-	}
-	if err := json.Unmarshal(js, &doc); err != nil {
-		return nil, fmt.Errorf("catalog json: %w", err)
-	}
+// Clauses lists every "<when> → <then>" sentence the specs state, once each,
+// in spec order: one per THEN and AND bullet, after its scenario's WHEN with
+// the "when " connective in front. A WHEN that opens with "when" keeps its
+// own. A scenario without exactly one WHEN states no clause.
+func Clauses(specs []Spec) []string {
 	var clauses []string
-	for _, p := range doc.Packages {
-		for _, n := range p.Nodes {
-			walk(&n, nil, func(when, it *node) {
-				clauses = append(clauses, when.Display+Arrow+it.Display)
-			})
+	seen := map[string]bool{}
+	for _, s := range specs {
+		for _, r := range s.Requirements {
+			for _, sc := range r.Scenarios {
+				if len(sc.Whens) != 1 {
+					continue
+				}
+				when := "when " + strings.TrimPrefix(sc.Whens[0], "when ")
+				for _, then := range sc.Thens {
+					c := when + Arrow + then
+					if !seen[c] {
+						seen[c] = true
+						clauses = append(clauses, c)
+					}
+				}
+			}
 		}
 	}
-	return clauses, nil
-}
-
-// walk calls fn for every It below a When, with the innermost When above it.
-// Nothing under an excluded node is visited.
-func walk(n, when *node, fn func(when, it *node)) {
-	if n.Excluded {
-		return
-	}
-	switch n.Vocab {
-	case "when":
-		when = n
-	case "it":
-		if when != nil {
-			fn(when, n)
-		}
-	}
-	for i := range n.Children {
-		walk(&n.Children[i], when, fn)
-	}
+	return clauses
 }
 
 // Quotes finds the blockquote lines of doc shaped like a clause: "> " followed

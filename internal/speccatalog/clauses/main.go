@@ -1,7 +1,7 @@
-// Command clauses prints the behavior catalog's clauses, one per line, as
-// "<when> → <it>", read from the committed docs/design/catalog.json. With
-// --unmutated it prints the clauses no drill mutant names on a Clause: line,
-// by the same reading the conventions suite holds the budget to.
+// Command clauses prints the clauses the scenarios in specs/ state, one per
+// line, as "when <WHEN> → <THEN>". With --unmutated it prints the clauses no
+// drill mutant names on a Clause: line, by the same reading the conventions
+// suite holds the budget to.
 package main
 
 import (
@@ -18,14 +18,11 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	js, err := os.ReadFile(filepath.Join(root, speccatalog.JSONPath)) //nolint:gosec // G304: the committed catalog
+	specs, err := speccatalog.LoadSpecs(root)
 	if err != nil {
 		fail(err)
 	}
-	clauses, err := speccatalog.Clauses(js)
-	if err != nil {
-		fail(err)
-	}
+	clauses := speccatalog.Clauses(specs)
 	if len(os.Args) > 1 && os.Args[1] == "--unmutated" {
 		clauses, _, err = speccatalog.Unmutated(clauses, filepath.Join(root, "tests", "drill", "mutants"))
 		if err != nil {

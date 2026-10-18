@@ -2,11 +2,10 @@
 
 These suites are the behavior catalog of gotest in executable form. Every
 `When`/`It` here is one sentence of the contract; `gotest spec --static` reads
-the sentences from source and `make catalog` writes them to
-`docs/design/catalog.md` and `docs/design/catalog.json`. A CI step fails when
-the committed catalog differs from a fresh render, and a conventions suite
-fails when any behavior is marked incomplete, so the catalog is always the
-whole, current list.
+the sentences from source and `make catalog` indexes them in
+`docs/design/catalog.json`. A CI step fails when the committed index differs
+from a fresh render, and a conventions suite fails when any behavior is marked
+incomplete, so the index is always the whole, current list.
 
 ## Naming
 
@@ -54,5 +53,5 @@ the event stream — ships with a ring-0 twin in `tests/canary`: the same check
 written with plain Go, no gotest assertion. Conformance suites assert with
 gotest, so a bug in the assertion engine could pass its own test; the twin is
 what the mutation drill holds the kernel to. The mutant's `Expect:` lines
-match the twin's output, and its `Clause:` line records which catalog
-sentence the twin protects.
+match the twin's output, and its `Clause:` line records which scenario
+outcome the twin protects.

@@ -1,7 +1,7 @@
 # gotest Specification
 
 > **Rationale.** Every behavioral promise gotest makes is stated once in [`specs/`](../../specs/README.md), where a test binds to each scenario; this document links there.
-> Its sections hold the design's principles, architecture and non-goals. A behavior stated here without a link to a requirement in `specs/` or to a [catalog](catalog.md) section is not yet verified.
+> Its sections hold the design's principles, architecture and non-goals. A behavior stated here without a link to a requirement in `specs/` is not yet verified.
 > One drift guard covers this file directly: the CLI-surface test in `cmd/gotest` (subcommand/flag table membership, both directions).
 
 Go tests that write themselves, organize themselves, and explain themselves.
@@ -170,7 +170,7 @@ The first argument is checked (literally) against the known subcommand set.
 If it matches, it's consumed.
 Otherwise, it's a package pattern.
 `gotest ./watch` tests the `watch` package; `gotest watch` enters watch mode.
-A first word that is almost a subcommand is suggested, a help topic is answered, and a package named like nothing runs as a pattern ([CLINewcomer](catalog.md#clinewcomer)).
+A first word that is almost a subcommand is suggested, a help topic is answered, and a package named like nothing runs as a pattern ([CLINewcomer](../../tests/conformance/cli/newcomer_suite_test.go)).
 Past the first argument, every positional argument that is not a flag's value is a package pattern, as `go test` reads it: import paths such as `fmt` and the meta patterns `all`, `std`, `cmd`, `tool` and `work` included. A flag gotest does not know takes the non-flag after it as its value, as `go test` assumes, and everything after `-args` goes to the test binary.
 
 ### Examples
@@ -188,10 +188,10 @@ gotest ./... --ci -v -race               # CI mode (fail on F_ prefixes)
 gotest ./... --debug                     # keep generated files for inspection
 ```
 
-Registered `go test` flags pass through to the underlying run; a single-dash flag gotest does not know is a usage error (exit 2) unless it follows a bare `--` or `-args`, which forward it to the test binary verbatim ([CLIPassthrough](catalog.md#clipassthrough)). The flags gotest implements itself — `-run` on a fuzz wrapper, `-exec`, `-p`, the refused `-o` — are pinned in [CLIGoTestFlags](catalog.md#cligotestflags).
-How a `--gotest` flag is spelled, that the last spelling wins, and that a flag another command owns is refused with `flag <name> is not valid for this subcommand` are pinned in [CLIFlags](catalog.md#cliflags); the commands each flag belongs to are the table above.
+Registered `go test` flags pass through to the underlying run; a single-dash flag gotest does not know is a usage error (exit 2) unless it follows a bare `--` or `-args`, which forward it to the test binary verbatim ([CLIPassthrough](../../tests/conformance/cli/passthrough_suite_test.go)). The flags gotest implements itself — `-run` on a fuzz wrapper, `-exec`, `-p`, the refused `-o` — are pinned in [CLIGoTestFlags](../../tests/conformance/cli/goflags_suite_test.go).
+How a `--gotest` flag is spelled, that the last spelling wins, and that a flag another command owns is refused with `flag <name> is not valid for this subcommand` are pinned in [CLIFlags](../../tests/conformance/cli/flags_suite_test.go); the commands each flag belongs to are the table above.
 `-json` is intercepted and re-emitted by the runner, and the stream it writes holds JSON lines only ([the go test -json stream requirement](../../specs/cli/spec.md#requirement-the-go-test--json-stream)).
-Every other document gotest writes stays pure the same way, and color follows the terminal rather than the command ([CLIStreams](catalog.md#clistreams)).
+Every other document gotest writes stays pure the same way, and color follows the terminal rather than the command ([CLIStreams](../../tests/conformance/cli/streams_suite_test.go)).
 gotest adds no link flag of its own to a `go test` invocation, so a build go test refuses fails here too ([the build rules requirement](../../specs/cli/spec.md#requirement-build-rules)).
 A module that imports gotest without requiring it is told what to run ([the module requirement](../../specs/cli/spec.md#requirement-a-module-without-gotest)), and `gotest version` answers as [the version requirement](../../specs/cli/spec.md#requirement-version) states.
 
@@ -1216,9 +1216,9 @@ go test -json ./... | gotest summary --input=- # post-process an existing JSON s
 
 A `go test -json` stream — replayed or gotest's own — carries a failed build as `build-output` and `build-fail` events keyed by the build's `ImportPath`, which the failing package names in its verdict's `FailedBuild` (Go 1.24+). `spec` and `summary` route those diagnostics to every package the build failed, so a compile error renders with its cause.
 
-`--github` is auto-enabled when `GITHUB_ACTIONS=true`; a `--format json` document carries no annotations and no color codes there or anywhere, and two output modes asked for at once are refused ([CLIStreams](catalog.md#clistreams)).
-The coverage table is statement-weighted with block deduplication (see Coverage Model); the profile is read under either `-coverprofile` spelling ([CLICoverageProfile](catalog.md#clicoverageprofile)).
-A package holding stdlib tests alone is noted on stderr, in `summary` as in every other mode ([CLINewcomer](catalog.md#clinewcomer)).
+`--github` is auto-enabled when `GITHUB_ACTIONS=true`; a `--format json` document carries no annotations and no color codes there or anywhere, and two output modes asked for at once are refused ([CLIStreams](../../tests/conformance/cli/streams_suite_test.go)).
+The coverage table is statement-weighted with block deduplication (see Coverage Model); the profile is read under either `-coverprofile` spelling ([CLICoverageProfile](../../tests/conformance/cli/coverage_suite_test.go)).
+A package holding stdlib tests alone is noted on stderr, in `summary` as in every other mode ([CLINewcomer](../../tests/conformance/cli/newcomer_suite_test.go)).
 Formats: terminal (default), `md`, `json`.
 The repository's composite GitHub Action (`action.yml`) wraps this subcommand.
 
@@ -1272,7 +1272,7 @@ A run names the same position in front of a generation error (`path/suite_test.g
 `methods[].parallel` is reserved and `false` (parallelism is a suite-level property).
 Respects `-tags`.
 
-Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document, and it opens with `version`: the CLI that produced it, as `gotest version` reports it, so a consumer can gate on the producer before it reads the rest ([CLIVersion](catalog.md#cliversion)). The flags `discover` refuses are pinned in [CLIFlags](catalog.md#cliflags).
+Every JSON gotest emits — `discover`, `spec --format=json`, `summary --format=json`, `prepare` — is one compact line, not an indented document, and it opens with `version`: the CLI that produced it, as `gotest version` reports it, so a consumer can gate on the producer before it reads the rest ([CLIVersion](../../tests/conformance/cli/version_suite_test.go)). The flags `discover` refuses are pinned in [CLIFlags](../../tests/conformance/cli/flags_suite_test.go).
 The behavior trees carried here make indentation more than half the bytes, and the readers are programs; a human reading it by hand can pipe through `jq`.
 Nothing bounds the size of this payload, so a consumer must stream it: reading it through a fixed buffer is what once cost the VS Code extension its whole test tree on a repository large enough to exceed the buffer's default.
 
