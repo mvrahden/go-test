@@ -39,10 +39,10 @@ type CanaryTestSuite struct {
 	canary
 }
 
+// No Timeout is declared: each case is bounded by its own checks, not by a
+// budget the suite would hold every case to.
 func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 type expectation struct {

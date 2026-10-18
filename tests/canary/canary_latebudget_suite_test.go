@@ -10,7 +10,7 @@ import (
 // A shared fixture started for the exclusive tail is released under the
 // teardown budget its declared 2s Timeout gives: its AfterAll, which never
 // returns, is force-killed once 32s have passed, not the default's 2m30s.
-func (s *CanaryTestSuite) TestALateFixtureIsReleasedUnderItsDeclaredBudget(t *gotest.T) {
+func (s *CanaryTimingTestSuite) TestALateFixtureIsReleasedUnderItsDeclaredBudget(t *gotest.T) {
 	began := time.Now()
 	r := s.checkFixture(t, "latebudget", t.TempDir())
 	if !strings.Contains(r.stderr, "force-killed after 32s;") {

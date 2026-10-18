@@ -11,9 +11,7 @@ type CanaryTimingTestSuite struct {
 }
 
 func (s *CanaryTimingTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
+	return gotest.SuiteConfig{Exclusive: true}
 }
 
 func (s *CanaryTimingTestSuite) BeforeAll(t *gotest.T) { s.setUp(t) }
