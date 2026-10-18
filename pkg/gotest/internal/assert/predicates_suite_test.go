@@ -137,6 +137,10 @@ func (s *PredicatesTestSuite) TestIncludesElement(t *gotest.T, _ *predicatesCtx)
 		{"map key present", map[string]int{"k": 1}, "k", true, false},
 		{"map key absent", map[string]int{"k": 1}, "z", false, false},
 		{"map key of the wrong type", map[string]int{"k": 1}, 1, false, true},
+		{"nil key in an any-keyed map", map[any]int{nil: 1}, nil, true, false},
+		{"nil key absent from an any-keyed map", map[any]int{"k": 1}, nil, false, false},
+		{"nil key in a pointer-keyed map", map[*int]int{nil: 1}, nil, true, false},
+		{"nil key in a string-keyed map", map[string]int{"": 1}, nil, false, true},
 		{"nil haystack", nil, "a", false, false},
 		{"int haystack is invalid", 42, 4, false, true},
 		{"struct haystack is invalid", struct{}{}, "a", false, true},
@@ -186,6 +190,14 @@ func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
 	}
 	if _, err := assert.NormalizeJSON(func() {}); err == nil {
 		t.Errorf("NormalizeJSON(unmarshalable): expected an error")
+	}
+	for _, in := range []string{`{"a":1}}`, `[1]]`, `{"a":1} 2`, `1 ]`} {
+		if _, err := assert.NormalizeJSON(in); err == nil {
+			t.Errorf("NormalizeJSON(%s): trailing data must be an error", in)
+		}
+	}
+	if _, err := assert.NormalizeJSON("{\"a\":1}\n \t"); err != nil {
+		t.Errorf("NormalizeJSON(trailing whitespace): %v", err)
 	}
 }
 

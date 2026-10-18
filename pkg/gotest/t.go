@@ -63,7 +63,8 @@ func (t *T) Context() context.Context {
 // NewTWithDeadline wraps t with a context that expires after timeout, so a test
 // can hold work to a tighter budget than the suite's own. The context is derived
 // from t.Context() — the suite's, deadline and stop included — and is released
-// when the test ends. A *testing.T derives from its own Context.
+// when the test ends. A *testing.T derives from its own Context. [Go] waits
+// go where t's go, so one started in BeforeAll is still awaited after AfterAll.
 func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	var base *T
 	switch v := any(t).(type) {
@@ -74,7 +75,7 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 	}
 	ctx, cancel := context.WithTimeout(base.Context(), timeout)
 	base.testingTB().Cleanup(cancel)
-	return &T{t: base.t, tb: base.tb, ctx: ctx}
+	return &T{t: base.t, tb: base.tb, ctx: ctx, goWait: base.goWait}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the

@@ -54,8 +54,17 @@ func IncludesElement(s, element any) (found bool, guard string) {
 		}
 		return false, ""
 	case reflect.Map:
+		keyType := rv.Type().Key()
 		mapKey := reflect.ValueOf(element)
-		if !mapKey.IsValid() || !mapKey.Type().AssignableTo(rv.Type().Key()) {
+		if !mapKey.IsValid() {
+			// An untyped nil is the zero key of a nilable key type.
+			switch keyType.Kind() {
+			case reflect.Interface, reflect.Ptr, reflect.Chan, reflect.UnsafePointer:
+				mapKey = reflect.Zero(keyType)
+			default:
+				return false, fmt.Sprintf("a %T cannot hold a key of type %T", s, element)
+			}
+		} else if !mapKey.Type().AssignableTo(keyType) {
 			return false, fmt.Sprintf("a %T cannot hold a key of type %T", s, element)
 		}
 		return rv.MapIndex(mapKey).IsValid(), ""
@@ -168,7 +177,8 @@ func NormalizeJSON(v any) (any, error) {
 	if err := dec.Decode(&out); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
-	if dec.More() {
+	// Anything but whitespace after the value, a stray } or ] included, is an error.
+	if err := dec.Decode(new(any)); err != io.EOF {
 		return nil, fmt.Errorf("failed to unmarshal JSON: trailing data after the value")
 	}
 	return out, nil

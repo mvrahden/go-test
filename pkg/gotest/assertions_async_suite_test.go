@@ -51,6 +51,31 @@ func (s *AsyncAssertionsTestSuite) TestEventually(t *gotest.T) {
 		})
 	})
 
+	t.When("a poll started before the deadline passes after it", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			var calls atomic.Int32
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Eventually(r, 60*time.Millisecond, 40*time.Millisecond, func(poll *gotest.R) {
+					gotest.NotEqual(poll, 1, calls.Add(1)) // the first poll fails
+					time.Sleep(40 * time.Millisecond)      // ends past the deadline, inside one tick of it
+				})
+			})
+			gotest.False(it, m.Failed(), m.Message())
+		})
+	})
+
+	t.When("a poll never returns", func(w *gotest.T) {
+		w.It("fails as still running", func(it *gotest.T) {
+			release := make(chan struct{})
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Eventually(r, 20*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) { <-release })
+			})
+			close(release)
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "poll still running")
+		})
+	})
+
 	t.When("condition never becomes true", func(w *gotest.T) {
 		w.It("fails after timeout", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) {
@@ -72,6 +97,29 @@ func (s *AsyncAssertionsTestSuite) TestConsistently(t *gotest.T) {
 				})
 			})
 			gotest.False(it, m.Failed())
+		})
+	})
+
+	t.When("every poll passes but one runs past the deadline", func(w *gotest.T) {
+		w.It("passes", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Consistently(r, 100*time.Millisecond, 30*time.Millisecond, func(poll *gotest.R) {
+					time.Sleep(40 * time.Millisecond)
+				})
+			})
+			gotest.False(it, m.Failed(), m.Message())
+		})
+	})
+
+	t.When("a poll never returns", func(w *gotest.T) {
+		w.It("fails as still running", func(it *gotest.T) {
+			release := make(chan struct{})
+			m := gotest.Record(func(r *gotest.R) {
+				gotest.Consistently(r, 20*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) { <-release })
+			})
+			close(release)
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "poll still running")
 		})
 	})
 

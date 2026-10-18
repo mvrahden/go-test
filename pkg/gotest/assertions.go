@@ -64,8 +64,7 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	polls := 0
 	for {
 		polls++
-		final := !time.Now().Before(deadline)
-		rec, ok := pollUntil(fn, pollLimit(deadline, tick, final))
+		rec, ok := pollUntil(fn, pollLimit(deadline, tick))
 		if !ok {
 			failf(t, "Consistently failed on poll %d:\n    poll still running after %v", polls, waitFor)
 			return
@@ -74,8 +73,8 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 			failf(t, "Consistently failed on poll %d:\n    %s", polls, rec.Message())
 			return
 		}
-		if final {
-			return
+		if !time.Now().Before(deadline) {
+			return // this poll reached the deadline
 		}
 		sleepUntil(earliest(time.Now().Add(tick), deadline))
 	}
@@ -91,13 +90,14 @@ func pollArgs(t testingT, name string, waitFor, tick time.Duration) bool {
 	return true
 }
 
-// pollLimit is how long a poll may run: until the deadline, or for one tick
-// when it is the final poll the deadline itself started.
-func pollLimit(deadline time.Time, tick time.Duration, final bool) time.Time {
-	if final {
-		return time.Now().Add(tick)
+// pollLimit is how long a poll may run: until one tick past the deadline, or
+// one tick from now when the deadline has passed. A poll still running then
+// counts as hung.
+func pollLimit(deadline time.Time, tick time.Duration) time.Time {
+	if now := time.Now(); now.After(deadline) {
+		return now.Add(tick)
 	}
-	return deadline
+	return deadline.Add(tick)
 }
 
 // pollUntil runs fn on a goroutine of its own, as Record does, and gives it
@@ -245,8 +245,7 @@ func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	polls := 0
 	for {
 		polls++
-		final := !time.Now().Before(deadline)
-		rec, ok := pollUntil(fn, pollLimit(deadline, tick, final))
+		rec, ok := pollUntil(fn, pollLimit(deadline, tick))
 		if !ok {
 			failf(t, "Eventually failed after %v (%d polls):\n  poll still running after %v", waitFor, polls, waitFor)
 			return
@@ -254,7 +253,7 @@ func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 		if !rec.Failed() {
 			return
 		}
-		if final {
+		if !time.Now().Before(deadline) { // this poll reached the deadline
 			failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, rec.Message())
 			return
 		}
