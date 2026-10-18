@@ -9,7 +9,7 @@ type DBFixture struct{ Conn string }
 
 func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type EmbeddedTestSuite struct{ *DBFixture }
+type EmbeddedTestSuite struct{ DBFixture *DBFixture }
 
 func (s *EmbeddedTestSuite) TestOne(t *gotest.T) {}
 

@@ -244,7 +244,7 @@ Requirements:
 - Methods use pointer receivers (`*MyTestSuite`, not `MyTestSuite`)
 - Each suite must be its own `type` declaration (not block-style)
 - Type names must be exported when the suite has test cases — otherwise a generation error (`go test` would never run its generated `Test` function).
-  Unexported case-less `*TestSuite` types (embed bases, helpers) are allowed
+  Unexported case-less `*TestSuite` helper types are allowed, but may not be embedded in a suite
 
 ### Lifecycle Hooks
 

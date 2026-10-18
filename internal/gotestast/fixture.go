@@ -82,7 +82,16 @@ func (f *FixtureSpec) ExportedFieldNames() []string {
 // the matching type is not a struct.
 func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 	decl, ok := n.(*ast.GenDecl)
-	if !ok || decl.Tok != token.TYPE || len(decl.Specs) != 1 {
+	if !ok || decl.Tok != token.TYPE {
+		return nil, nil
+	}
+	// A fixture is one declaration of its own, as a suite is.
+	if len(decl.Specs) != 1 {
+		for _, spec := range decl.Specs {
+			if ts, ok := spec.(*ast.TypeSpec); ok && strings.HasSuffix(ts.Name.Name, suffixFixture) {
+				return nil, At(ts.Pos(), fmt.Errorf("fixture %s is declared inside a type block; give it its own type declaration", ts.Name.Name))
+			}
+		}
 		return nil, nil
 	}
 

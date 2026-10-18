@@ -253,7 +253,7 @@ func (s *RendererTestSuite) TestStdlibTSupport(t *gotest.T) {
 // --- Shared fixture tests ---
 
 func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
-	t.When("embedding", func(w *gotest.T) {
+	t.When("suite binds a shared fixture through a named pointer field", func(w *gotest.T) {
 		w.It("renders shared fixture as DAG node", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmbedding")
 			output, _ := renderTestPkg(it.T(), pkg, true)
@@ -408,8 +408,8 @@ func (s *RendererTestSuite) TestNamedFields(t *gotest.T) {
 // --- Mixed field styles test ---
 
 func (s *RendererTestSuite) TestMixedFieldStyles(t *gotest.T) {
-	t.When("same fixture with embedded and named fields", func(w *gotest.T) {
-		w.It("uses type name for embedded and custom name for named field", func(it *gotest.T) {
+	t.When("same fixture behind a type-named field and a custom-named field", func(w *gotest.T) {
+		w.It("uses each field's own name", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_MixedFieldStyles_SameFixture")
 			output, _ := renderTestPkg(it.T(), pkg, true)
 			gotest.MatchSnapshot(it, output)

@@ -19,7 +19,7 @@ func (f *GoResourceFixture) AfterAll(_ context.Context) error {
 // bare `go`, that aborts the process with no cleanup at all; started with
 // gotest.Go, it is carried back to the test's own goroutine.
 type GoroutinePanicTestSuite struct {
-	*GoResourceFixture
+	GoResourceFixture *GoResourceFixture
 }
 
 func (s *GoroutinePanicTestSuite) AfterAll(t *gotest.T) {

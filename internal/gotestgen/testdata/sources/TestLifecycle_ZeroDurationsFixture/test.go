@@ -54,8 +54,8 @@ func (f *NoDeadlineFixture) AfterAll(ctx context.Context) error {
 
 // FixtureBoundTestSuite leaves its durations at zero while bound to both fixtures.
 type FixtureBoundTestSuite struct {
-	*PartialFixture
-	*NoDeadlineFixture
+	PartialFixture    *PartialFixture
+	NoDeadlineFixture *NoDeadlineFixture
 }
 
 func (s *FixtureBoundTestSuite) SuiteConfig() gotest.SuiteConfig {

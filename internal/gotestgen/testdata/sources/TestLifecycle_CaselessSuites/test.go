@@ -24,7 +24,7 @@ func (s *BenchOnlyTestSuite) BenchmarkNoop(b *gotest.B) {
 }
 
 type BoundBenchTestSuite struct {
-	*MarkFixture
+	MarkFixture *MarkFixture
 }
 
 func (s *BoundBenchTestSuite) BenchmarkNoop(b *gotest.B) {

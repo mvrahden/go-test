@@ -11,7 +11,7 @@ type SimpleFixture struct{}
 func (f *SimpleFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type BasicTestSuite struct {
-	*SimpleFixture
+	SimpleFixture *SimpleFixture
 }
 
 func (s *BasicTestSuite) TestOne(t *gotest.T) {}

@@ -14,7 +14,7 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *DBFixture) AfterAll(ctx context.Context) error  { return nil }
 
 type QueryTestSuite struct {
-	*DBFixture
+	DBFixture *DBFixture
 }
 
 func (s *QueryTestSuite) BeforeEach(t *gotest.T) {}

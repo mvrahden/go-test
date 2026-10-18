@@ -12,6 +12,6 @@ type BadSharedFixture struct {
 
 func (f *BadSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type MyTestSuite struct{ *BadSharedFixture }
+type MyTestSuite struct{ BadSharedFixture *BadSharedFixture }
 
 func (s *MyTestSuite) TestOne(t *gotest.T) {}

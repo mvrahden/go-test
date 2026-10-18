@@ -39,8 +39,8 @@ func (s *BindingTestSuite) TestIsInternalPkgPath(t *gotest.T) {
 }
 
 func (s *BindingTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
-	t.When("suite embeds fixture", func(w *gotest.T) {
-		w.It("resolves fixture binding via embedding", func(it *gotest.T) {
+	t.When("suite binds a fixture through a pointer field named after its type", func(w *gotest.T) {
+		w.It("resolves the binding under the type name", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_SuiteToFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
@@ -85,7 +85,7 @@ func (s *BindingTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 }
 
 func (s *BindingTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
-	t.When("child embeds parent fixture", func(w *gotest.T) {
+	t.When("child fixture binds its parent through a named pointer field", func(w *gotest.T) {
 		w.It("resolves parent-child fixture hierarchy", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_ChildToParentFixture")
 			c := gotestgen.NewCollector()
@@ -157,7 +157,7 @@ func (s *BindingTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 		})
 	})
 
-	t.When("suite directly embeds shared fixture", func(w *gotest.T) {
+	t.When("suite binds a shared fixture through a named pointer field", func(w *gotest.T) {
 		w.It("resolves as standalone with shared fixture reference", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DirectSharedFixture_Embedded")
 			c := gotestgen.NewCollector()
@@ -332,9 +332,9 @@ func (s *BindingTestSuite) TestResolutionErrors(t *gotest.T) {
 			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, `shared fixture "QueueSharedFixture" declares BeforeEach, but shared fixtures have no per-test hooks, so it would never run; do that work in the BeforeEach of a package fixture that binds QueueSharedFixture, or in the suite's BeforeEach`)
 			at := pkg.Fset.Position(gotestast.PosOf(err))
-			// extfixtures/test.go:30 declares QueueSharedFixture.BeforeEach.
+			// extfixtures/test.go:25 declares QueueSharedFixture.BeforeEach.
 			gotest.Regexp(it, `extfixtures/test\.go$`, filepath.ToSlash(at.Filename))
-			gotest.Equal(it, 30, at.Line)
+			gotest.Equal(it, 25, at.Line)
 		})
 	})
 
@@ -588,16 +588,12 @@ func (s *BindingTestSuite) TestHookLocations(t *gotest.T) {
 	gotest.Len(t, byName, 2)
 
 	t.It("names a hook in the suite's own directory by its base name", func(it *gotest.T) {
-		// test.go:17 declares LocalFixture.BeforeEach.
-		gotest.Equal(it, "test.go:17", byName["LocalFixture"].BeforeEachAt)
+		// test.go:14 declares LocalFixture.BeforeEach.
+		gotest.Equal(it, "test.go:14", byName["LocalFixture"].BeforeEachAt)
 	})
 	t.It("locates a hook of a fixture another package declares, relative to the suite's directory", func(it *gotest.T) {
 		// extfixtures/test.go:16 declares RemoteFixture.BeforeEach.
 		gotest.Equal(it, "../extfixtures/test.go:16", byName["RemoteFixture"].BeforeEachAt)
-	})
-	t.It("locates a hook promoted from another package's type, relative to the suite's directory", func(it *gotest.T) {
-		// extfixtures/test.go:21 declares Hooks.AfterEach.
-		gotest.Equal(it, "../extfixtures/test.go:21", byName["LocalFixture"].AfterEachAt)
 	})
 }
 

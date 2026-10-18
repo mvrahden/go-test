@@ -12,6 +12,6 @@ type PGSharedFixture struct {
 func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *PGSharedFixture) Hydrate(ctx context.Context) error   { return nil }
 
-type MyTestSuite struct{ *PGSharedFixture }
+type MyTestSuite struct{ PGSharedFixture *PGSharedFixture }
 
 func (s *MyTestSuite) TestOne(t *gotest.T) {}

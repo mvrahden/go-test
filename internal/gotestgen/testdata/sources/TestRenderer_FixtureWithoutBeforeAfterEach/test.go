@@ -11,7 +11,7 @@ type MinimalFixture struct{}
 func (f *MinimalFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type MinimalTestSuite struct {
-	*MinimalFixture
+	MinimalFixture *MinimalFixture
 }
 
 func (s *MinimalTestSuite) TestOne(t *gotest.T) {}

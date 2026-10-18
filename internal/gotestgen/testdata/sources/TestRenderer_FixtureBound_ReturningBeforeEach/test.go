@@ -13,7 +13,7 @@ func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 type myCtx struct{ pool string }
 
 type QueryTestSuite struct {
-	*DBFixture
+	DBFixture *DBFixture
 }
 
 func (s *QueryTestSuite) BeforeEach(t *gotest.T) *myCtx      { return &myCtx{} }

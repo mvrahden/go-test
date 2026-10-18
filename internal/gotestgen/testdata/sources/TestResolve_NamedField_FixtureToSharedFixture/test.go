@@ -14,6 +14,6 @@ type AppFixture struct{ pg *PGSharedFixture }
 
 func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type UserTestSuite struct{ *AppFixture }
+type UserTestSuite struct{ AppFixture *AppFixture }
 
 func (s *UserTestSuite) TestOne(t *gotest.T) {}

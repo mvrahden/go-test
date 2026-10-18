@@ -13,7 +13,7 @@ type DBFixture struct {
 func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type MyTestSuite struct {
-	*DBFixture
+	DBFixture *DBFixture
 }
 
 func (s *MyTestSuite) TestSomething(t *gotest.T) {}

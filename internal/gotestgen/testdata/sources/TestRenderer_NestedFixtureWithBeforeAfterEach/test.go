@@ -13,7 +13,7 @@ func (f *InfraFixture) BeforeEach(ctx context.Context) error { return nil }
 func (f *InfraFixture) AfterEach(ctx context.Context) error  { return nil }
 
 type APIFixture struct {
-	*InfraFixture
+	InfraFixture *InfraFixture
 }
 
 func (f *APIFixture) BeforeAll(ctx context.Context) error  { return nil }
@@ -21,7 +21,7 @@ func (f *APIFixture) BeforeEach(ctx context.Context) error { return nil }
 func (f *APIFixture) AfterEach(ctx context.Context) error  { return nil }
 
 type HandlerTestSuite struct {
-	*APIFixture
+	APIFixture *APIFixture
 }
 
 func (s *HandlerTestSuite) BeforeEach(t *gotest.T) {}

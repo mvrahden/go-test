@@ -15,11 +15,6 @@ type RemoteFixture struct{}
 func (f *RemoteFixture) BeforeAll(ctx context.Context) error  { return nil }
 func (f *RemoteFixture) BeforeEach(ctx context.Context) error { return nil }
 
-// Hooks lends its AfterEach to a fixture that embeds it.
-type Hooks struct{}
-
-func (h *Hooks) AfterEach(ctx context.Context) error { return nil }
-
 // QueueSharedFixture declares a per-test hook, which shared fixtures do not
 // have.
 type QueueSharedFixture struct {

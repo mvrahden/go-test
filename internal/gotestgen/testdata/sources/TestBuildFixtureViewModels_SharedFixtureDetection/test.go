@@ -14,13 +14,13 @@ type PGSharedFixture struct {
 func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type DBFixture struct {
-	*PGSharedFixture
+	PGSharedFixture *PGSharedFixture
 }
 
 func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type DBTestSuite struct {
-	*DBFixture
+	DBFixture *DBFixture
 }
 
 func (s *DBTestSuite) TestQuery(t *gotest.T) {}

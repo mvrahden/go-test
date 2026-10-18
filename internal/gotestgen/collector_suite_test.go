@@ -70,8 +70,8 @@ func (s *CollectorTestSuite) TestFixtureCollection(t *gotest.T) {
 }
 
 func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
-	t.When("suite embeds fixture", func(w *gotest.T) {
-		w.It("detects fixture embedding in test suite", func(it *gotest.T) {
+	t.When("suite binds a fixture through a named pointer field", func(w *gotest.T) {
+		w.It("detects the fixture", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FixtureEmbeddingInTestSuite")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
@@ -82,7 +82,7 @@ func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
 		})
 	})
 
-	t.When("suite does not embed fixture", func(w *gotest.T) {
+	t.When("suite has no fixture field", func(w *gotest.T) {
 		w.It("reports no fixture", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_NoFixtureEmbedding")
 			c := gotestgen.NewCollector()
@@ -93,13 +93,25 @@ func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
 		})
 	})
 
-	t.When("fixture embeds fixture", func(w *gotest.T) {
+	t.When("fixture binds a fixture through a named pointer field", func(w *gotest.T) {
 		w.It("collects both fixtures", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FixtureToFixtureEmbedding")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.Empty(it, result.Errs)
 			gotest.Len(it, result.Fixtures, 2)
+		})
+	})
+
+	t.When("suite embeds a fixture", func(w *gotest.T) {
+		w.It("rejects the embedded field", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_EmbeddedFixtureRejected")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Len(it, result.Errs, 1)
+			gotest.ErrorContains(it, result.Errs[0].Err, "embeds fixture DBFixture")
+			gotest.ErrorContains(it, result.Errs[0].Err, "named pointer field")
+			gotest.Equal(it, 16, pkg.Fset.Position(result.Errs[0].Pos).Line, "reported at the embedded field")
 		})
 	})
 
@@ -736,11 +748,13 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			gotest.ErrorContains(it, result.Errs[0].Err, "must be exported")
 		})
 
-		w.It("is allowed as a case-less embed base", func(it *gotest.T) {
+		w.It("is rejected when embedded, like any suite", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedCaselessBase")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Empty(it, result.Errs, "helper/base types ending in TestSuite must stay legal")
+			gotest.Len(it, result.Errs, 1)
+			gotest.ErrorContains(it, result.Errs[0].Err, "embeds suite baseTestSuite")
+			gotest.ErrorContains(it, result.Errs[0].Err, "generic contract suite")
 		})
 	})
 

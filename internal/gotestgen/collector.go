@@ -60,7 +60,7 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
 		f, err := gotestast.DetermineFixture(n, pkg)
 		if err != nil {
-			errs = append(errs, CollectorError{Err: err, Pos: n.Pos()})
+			errs = append(errs, CollectorError{Err: err, Pos: gotestast.PosOf(gotestast.At(n.Pos(), err))})
 			return
 		}
 		if f == nil {
@@ -68,6 +68,22 @@ func (collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		}
 		fixtures = append(fixtures, f)
 	})
+	if len(errs) > 0 {
+		return CollectorResult{Errs: errs}
+	}
+
+	// a suite or fixture composes through named fields; embedding and nesting
+	// are refused where they are written
+	for _, s := range suites {
+		if pos, err := gotestast.ValidateSuiteShape(s); err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: pos})
+		}
+	}
+	for _, f := range fixtures {
+		if pos, err := gotestast.ValidateFixtureShape(f); err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: pos})
+		}
+	}
 	if len(errs) > 0 {
 		return CollectorResult{Errs: errs}
 	}

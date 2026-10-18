@@ -15,7 +15,7 @@ func (f *CFGFixture) FixtureConfig() gotest.FixtureConfig {
 }
 
 type CFGTestSuite struct {
-	*CFGFixture
+	CFGFixture *CFGFixture
 }
 
 func (s *CFGTestSuite) TestOne(t *gotest.T) {}

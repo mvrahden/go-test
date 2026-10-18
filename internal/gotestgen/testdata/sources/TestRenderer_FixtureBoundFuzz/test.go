@@ -14,7 +14,7 @@ func (f *PoolFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *PoolFixture) AfterAll(ctx context.Context) error  { return nil }
 
 type ParserFuzzTestSuite struct {
-	*PoolFixture
+	PoolFixture *PoolFixture
 }
 
 func (s *ParserFuzzTestSuite) FuzzParse(f *gotest.F) {

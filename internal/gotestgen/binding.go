@@ -396,7 +396,6 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		}
 	}
 
-	mset := types.NewMethodSet(types.NewPointer(named))
 	typePkg := named.Obj().Pkg()
 
 	// A referenced fixture with value-receiver hooks would silently run no-ops;
@@ -412,15 +411,15 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		Named:        named,
 		Pkg:          pkg,
 		Spec:         spec,
-		BeforeAll:    mset.Lookup(typePkg, "BeforeAll") != nil,
-		AfterAll:     mset.Lookup(typePkg, "AfterAll") != nil,
-		BeforeEach:   mset.Lookup(typePkg, "BeforeEach") != nil,
-		AfterEach:    mset.Lookup(typePkg, "AfterEach") != nil,
-		BeforeEachAt: hookAt(r.targetPkg, mset.Lookup(typePkg, "BeforeEach")),
-		AfterEachAt:  hookAt(r.targetPkg, mset.Lookup(typePkg, "AfterEach")),
-		HasHydrate:   mset.Lookup(typePkg, "Hydrate") != nil,
-		HasDehydrate: mset.Lookup(typePkg, "Dehydrate") != nil,
-		HasConfig:    detectConfigMethod(mset, typePkg, kind),
+		BeforeAll:    declaredMethod(named, "BeforeAll") != nil,
+		AfterAll:     declaredMethod(named, "AfterAll") != nil,
+		BeforeEach:   declaredMethod(named, "BeforeEach") != nil,
+		AfterEach:    declaredMethod(named, "AfterEach") != nil,
+		BeforeEachAt: hookAt(r.targetPkg, declaredMethod(named, "BeforeEach")),
+		AfterEachAt:  hookAt(r.targetPkg, declaredMethod(named, "AfterEach")),
+		HasHydrate:   declaredMethod(named, "Hydrate") != nil,
+		HasDehydrate: declaredMethod(named, "Dehydrate") != nil,
+		HasConfig:    detectConfigMethod(named, kind),
 	}
 
 	if isLocal {
@@ -517,13 +516,18 @@ func rejectValueReceiverHooks(named *types.Named, _ *types.Package, identifier s
 
 // declaresHook reports whether the named type itself (not via embedding)
 // declares a method with the given name.
-func declaresHook(named *types.Named, name string) bool {
-	for i := 0; i < named.NumMethods(); i++ {
-		if named.Method(i).Name() == name {
-			return true
+func declaresHook(named *types.Named, name string) bool { return declaredMethod(named, name) != nil }
+
+// declaredMethod returns the method named declares itself, never one promoted
+// through an embedded field: what gotest reads off a type is what the type
+// declares.
+func declaredMethod(named *types.Named, name string) *types.Func {
+	for i := range named.NumMethods() {
+		if m := named.Method(i); m.Name() == name {
+			return m
 		}
 	}
-	return false
+	return nil
 }
 
 // hasCtxErrSignature reports whether fn is func(context.Context) error.
@@ -558,9 +562,8 @@ func (r *binder) buildSharedFixtureRef(named *types.Named, idx int) (_ SharedFix
 
 	isLocal := typePkgPath == r.targetPkg.PkgPath
 
-	mset := types.NewMethodSet(types.NewPointer(named))
-	hasHydrate := mset.Lookup(typePkg, "Hydrate") != nil
-	hasDehydrate := mset.Lookup(typePkg, "Dehydrate") != nil
+	hasHydrate := declaredMethod(named, "Hydrate") != nil
+	hasDehydrate := declaredMethod(named, "Dehydrate") != nil
 
 	var qualifiedType, pkgPath string
 	if isLocal {
@@ -629,25 +632,24 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		)
 	}
 
-	mset := types.NewMethodSet(types.NewPointer(named))
-	hasHydrate := mset.Lookup(typePkg, "Hydrate") != nil
-	hasDehydrate := mset.Lookup(typePkg, "Dehydrate") != nil
-	hasConfig := detectConfigMethod(mset, typePkg, gotestast.SharedFixture)
-	hasAfterAll := mset.Lookup(typePkg, "AfterAll") != nil
+	hasHydrate := declaredMethod(named, "Hydrate") != nil
+	hasDehydrate := declaredMethod(named, "Dehydrate") != nil
+	hasConfig := detectConfigMethod(named, gotestast.SharedFixture)
+	hasAfterAll := declaredMethod(named, "AfterAll") != nil
 
 	// Validate here (not only in the collector) so cross-package shared fixtures,
 	// which are resolved by method-set lookup alone, get clean errors instead of
 	// subprocess compile failures or silent misbehavior.
 	for _, hook := range []string{"BeforeAll", "AfterAll", "Hydrate", "Dehydrate"} {
-		sel := mset.Lookup(typePkg, hook)
-		if sel == nil {
+		fn := declaredMethod(named, hook)
+		if fn == nil {
 			continue
 		}
-		if fn, ok := sel.Obj().(*types.Func); ok && !hasCtxErrSignature(fn) {
+		if !hasCtxErrSignature(fn) {
 			return fmt.Errorf("shared fixture %q: %s must have signature (ctx context.Context) error", identifier, hook)
 		}
 	}
-	if mset.Lookup(typePkg, "BeforeAll") == nil {
+	if declaredMethod(named, "BeforeAll") == nil {
 		return fmt.Errorf("shared fixture %q must define BeforeAll(ctx context.Context) error", identifier)
 	}
 	if hasHydrate != hasDehydrate {
@@ -991,12 +993,12 @@ func topologicalSort(resolved map[*types.Named]*BoundFixture) ([]*BoundFixture, 
 	return sorted, nil
 }
 
-func detectConfigMethod(mset *types.MethodSet, typePkg *types.Package, kind gotestast.FixtureKind) bool {
+func detectConfigMethod(named *types.Named, kind gotestast.FixtureKind) bool {
 	switch kind {
 	case gotestast.PackageFixture:
-		return mset.Lookup(typePkg, "FixtureConfig") != nil
+		return declaredMethod(named, "FixtureConfig") != nil
 	case gotestast.SharedFixture:
-		return mset.Lookup(typePkg, "SharedFixtureConfig") != nil
+		return declaredMethod(named, "SharedFixtureConfig") != nil
 	}
 	return false
 }
@@ -1086,11 +1088,11 @@ func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]Fix
 // directory (its base name when it is there), or "" for a hook the fixture
 // does not declare. The hook's position belongs to target's FileSet, where
 // target's type-check put every type it reached, other packages' included.
-func hookAt(target *packages.Package, sel *types.Selection) string {
-	if sel == nil || target == nil || target.Fset == nil {
+func hookAt(target *packages.Package, fn *types.Func) string {
+	if fn == nil || target == nil || target.Fset == nil {
 		return ""
 	}
-	p := target.Fset.Position(sel.Obj().Pos())
+	p := target.Fset.Position(fn.Pos())
 	if !p.IsValid() {
 		return ""
 	}

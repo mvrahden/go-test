@@ -505,9 +505,14 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 		return nil, -1, nil
 	}
 
-	// assert underlying enum type
+	// A suite is one declaration of its own: a block hides it from the
+	// readers that look for its declaration, so it is refused there.
 	if len(decl.Specs) != 1 {
-		// hint: we don't want blocks of type declarations for test suites
+		for _, spec := range decl.Specs {
+			if ts, ok := spec.(*ast.TypeSpec); ok && IS_TEST_SUITE.MatchString(ts.Name.Name) {
+				return nil, ts.Pos(), At(ts.Pos(), fmt.Errorf("suite %s is declared inside a type block; give it its own type declaration", ts.Name.Name))
+			}
+		}
 		return nil, -1, nil // not a test suite
 	}
 	ts, ok := decl.Specs[0].(*ast.TypeSpec)
@@ -801,7 +806,7 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 
 	// An unexported suite with test cases is a silent false-green: go test only
 	// runs exported Test functions, so its generated Test func would never
-	// execute. Unexported case-less types (embed bases, helpers) stay legal.
+	// execute. Unexported case-less types (helpers) stay legal.
 	if len(ts.th.TestCases) > 0 && !ts.ts.Name.IsExported() {
 		return fmt.Errorf("test suite %q must be exported — go test never runs its generated Test function", suiteName)
 	}

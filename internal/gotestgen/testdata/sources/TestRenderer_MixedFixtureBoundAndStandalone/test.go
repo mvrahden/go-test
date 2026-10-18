@@ -11,7 +11,7 @@ type AppFixture struct{}
 func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type BoundTestSuite struct {
-	*AppFixture
+	AppFixture *AppFixture
 }
 
 func (s *BoundTestSuite) TestBound(t *gotest.T) {}

@@ -43,7 +43,7 @@ func (s *PlainTestSuite) TestOne(t *gotest.T) {}
 // Fixture-bound suites render through the fixture template.
 
 type BoundBenchTestSuite struct {
-	*PoolFixture
+	PoolFixture *PoolFixture
 }
 
 func (s *BoundBenchTestSuite) BenchmarkNoop(b *gotest.B) {
@@ -52,7 +52,7 @@ func (s *BoundBenchTestSuite) BenchmarkNoop(b *gotest.B) {
 }
 
 type BoundExcludedTestSuite struct {
-	*PoolFixture
+	PoolFixture *PoolFixture
 }
 
 func (s *BoundExcludedTestSuite) X_TestOne(t *gotest.T) {}

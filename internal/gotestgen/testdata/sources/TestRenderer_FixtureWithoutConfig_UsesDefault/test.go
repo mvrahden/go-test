@@ -11,7 +11,7 @@ type PlainFixture struct{}
 func (f *PlainFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type PlainTestSuite struct {
-	*PlainFixture
+	PlainFixture *PlainFixture
 }
 
 func (s *PlainTestSuite) TestOne(t *gotest.T) {}

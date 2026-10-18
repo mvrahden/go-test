@@ -7,11 +7,8 @@ import (
 	"testpkg/extfixtures"
 )
 
-// LocalFixture declares its BeforeEach and promotes extfixtures.Hooks'
-// AfterEach.
-type LocalFixture struct {
-	extfixtures.Hooks
-}
+// LocalFixture declares its BeforeEach.
+type LocalFixture struct{}
 
 func (f *LocalFixture) BeforeAll(ctx context.Context) error  { return nil }
 func (f *LocalFixture) BeforeEach(ctx context.Context) error { return nil }
