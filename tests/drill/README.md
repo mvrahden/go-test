@@ -616,6 +616,12 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-suite-declaration-fix-drops-comment` | the `suite-declaration` fix moves the suite without its doc comment | conformance: the lint `-fix` It finds the doc comment left behind in the block |
 | `lint-no-embedding-silent` | `no-embedding` never reports a field | conformance: the lint It for an embedded fixture finds no `no-embedding` finding |
 | `lint-fixture-hook-call-silent` | `fixture-hook-call` never reports a call | conformance: the lint It for a hook call finds no `fixture-hook-call` finding |
+| `lint-error-mapping-accepts-implementers` | a nil check maps to `NoError`/`Error` for any type implementing error, a concrete pointer included | conformance: the lint It for a concrete pointer's nil comparison sees a typed nil fail `NoError` |
+| `lint-nil-check-of-interface-fixed` | `Nil`/`NotNil` of an error is fixed into `NoError`/`Error` | conformance: the lint It for a Nil check of an interface sees an error holding a nil pointer flip its verdict |
+| `lint-type-parameter-read-as-constraint` | a type parameter's operand is read as its constraint interface, not its core type | conformance: the lint It for type parameters finds no `Zero` fix and a `Zero` that does not compile |
+| `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |
+| `lint-error-contains-any-receiver` | `Contains(t, v.Error(), s)` becomes `ErrorContains` on a receiver that does not implement error | conformance: the lint It for Error searches sees the fix fail to compile |
+| `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |
 
 ## Adding a mutant
 

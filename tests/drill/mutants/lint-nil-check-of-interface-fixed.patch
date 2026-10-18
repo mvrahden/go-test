@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / a Nil check of an interface is reported without a fix( / .*)? \(
+Clause: when an assertion checks an operand against nil → a Nil check of an interface is reported without a fix
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -645,8 +645,7 @@
+ 		target := pick(isNot, "NotZero", "Zero")
+ 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, arg}, msgArgs, "nil check")
+ 	case errorIface:
+-		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for error nil check — %s looks through the error to a nil pointer it holds",
+-			pick(isNot, "Error", "NoError"), source, source)
++		emitSimplify(pass, call, source, pick(isNot, "Error", "NoError"), []ast.Expr{tArg, arg}, msgArgs, "error nil check")
+ 	case otherIface:
+ 		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for nil check — %s looks through the interface to a nil pointer it holds",
+ 			pick(isNot, "NotZero", "Zero"), source, source)

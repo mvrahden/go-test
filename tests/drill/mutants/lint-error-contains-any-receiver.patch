@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / the search is rewritten into ErrorContains only on a receiver that implements error( / .*)? \(
+Clause: when an assertion searches the result of an Error call → the search is rewritten into ErrorContains only on a receiver that implements error
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -618,7 +618,7 @@
+ 	if !ok {
+ 		return
+ 	}
+-	if t := pass.TypesInfo.TypeOf(recv); t == nil || !typeclass.ImplementsError(t) {
++	if t := pass.TypesInfo.TypeOf(recv); t == nil {
+ 		return
+ 	}
+ 	emitSimplify(pass, call, "Contains", "ErrorContains", []ast.Expr{call.Args[0], recv, call.Args[2]}, call.Args[3:], "err.Error() contains check")

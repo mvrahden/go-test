@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / the comparison is rewritten into True or False only for an operand of type bool( / .*)? \(
+Clause: when an assertion compares an operand with a bool literal → the comparison is rewritten into True or False only for an operand of type bool
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -515,7 +515,7 @@
+ 	source := pick(negated, "NotEqual", "Equal")
+ 
+ 	// Bool literals: Equal(t, true, x) / Equal(t, x, true)
+-	if v, expr, ok := extractBoolLiteral(expected, actual); ok && isBoolType(pass, expr) {
++	if v, expr, ok := extractBoolLiteral(expected, actual); ok {
+ 		positive := v != negated // true+Equal or false+NotEqual → True; otherwise False
+ 		emitSimplify(pass, call, source, pick(!positive, "False", "True"), []ast.Expr{tArg, expr}, msgArgs, "bool literal comparison")
+ 		return
