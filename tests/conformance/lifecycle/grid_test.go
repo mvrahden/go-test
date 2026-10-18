@@ -23,7 +23,7 @@ func runGrid(t *gotest.T, at, mode string) testkit.Run {
 }
 
 // checkGrid holds a run to its row.
-func checkGrid(t *gotest.T, row gridRow, run *testkit.Run) {
+func checkGrid(t *gotest.T, row *gridRow, run *testkit.Run) {
 	gotest.Equal(t, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 	if row.ran != nil {
 		gotest.Equal(t, row.ran, run.Markers)

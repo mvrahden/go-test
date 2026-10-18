@@ -47,7 +47,7 @@ func (s *SuiteHooksTestSuite) TestAHookOrBodyGoesWrong(t *gotest.T) {
 				ran: cleanRun, verdicts: map[string]string{suite: "fail", body: "pass", next: "pass"}, exit: 1},
 		}) {
 			run := runGrid(it, row.at, row.mode)
-			checkGrid(it, row, &run)
+			checkGrid(it, &row, &run)
 		}
 	})
 }

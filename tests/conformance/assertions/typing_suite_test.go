@@ -83,7 +83,7 @@ func (s *AssertionTypingTestSuite) TestMessages(t *gotest.T) {
 	})
 	t.When("ErrorAs is given an error of another type", func(w *gotest.T) {
 		w.It("names the type it expected", func(it *gotest.T) {
-			m := gotest.Record(func(r *gotest.R) { gotest.ErrorAs[*fs.PathError](r, errors.New("plain")) })
+			m := gotest.Record(func(r *gotest.R) { _ = gotest.ErrorAs[*fs.PathError](r, errors.New("plain")) })
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "is not a *fs.PathError")
 		})

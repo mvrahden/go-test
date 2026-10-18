@@ -39,9 +39,9 @@ func slowSetupFixture() []gotestgen.SharedFixtureInfo {
 
 // startSlowSetup boots the subprocess with the fixture declaring timeout and
 // taking delay, and waits for its setup under flat (zero: the fixtures' own
-// budgets), returning the wait's error and how long it took. The caller tears
+// budgets), returning how long the wait took and its error. The caller tears
 // the process down and releases its context.
-func startSlowSetup(t *gotest.T, timeout, delay, flat time.Duration) (proc *gotestrunner.SharedFixtureProcess, release func(), err error, took time.Duration) {
+func startSlowSetup(t *gotest.T, timeout, delay, flat time.Duration) (proc *gotestrunner.SharedFixtureProcess, release func(), took time.Duration, err error) {
 	t.Setenv(fixtures.EnvSlowSetupTimeout, timeout.String())
 	t.Setenv(fixtures.EnvSlowSetupDelay, delay.String())
 	ctx, cancel := context.WithCancel(t.Context())
@@ -53,11 +53,11 @@ func startSlowSetup(t *gotest.T, timeout, delay, flat time.Duration) (proc *gote
 		cancel()
 		_ = proc.Teardown()
 	}
-	return proc, release, err, time.Since(began)
+	return proc, release, time.Since(began), err
 }
 
 func (s *SharedFixtureSetupBudgetTestSuite) TestTheWaitIsTheDeclaredBudget(t *gotest.T) {
-	_, release, err, took := startSlowSetup(t, time.Second, 15*time.Second, 0)
+	_, release, took, err := startSlowSetup(t, time.Second, 15*time.Second, 0)
 	defer release()
 	t.When("no --setup-timeout is given and a fixture outlives the Timeout it declared", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget as a setup timeout", func(it *gotest.T) {
@@ -72,7 +72,7 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheBudgetOutlivesTheFloor(t *got
 	// shrunk here so the declared budget, not the floor, is what is tested.
 	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
 	defer restore()
-	proc, release, err, _ := startSlowSetup(t, 20*time.Second, 3*time.Second, 0)
+	proc, release, _, err := startSlowSetup(t, 20*time.Second, 3*time.Second, 0)
 	defer release()
 	key := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.SlowSetupSharedFixture"
 	t.When("a fixture declares a Timeout longer than the runner's floor and needs it", func(w *gotest.T) {
@@ -86,7 +86,7 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheBudgetOutlivesTheFloor(t *got
 }
 
 func (s *SharedFixtureSetupBudgetTestSuite) TestAFlatTimeoutIsStillTheBudget(t *gotest.T) {
-	_, release, err, took := startSlowSetup(t, 20*time.Second, 5*time.Second, time.Second)
+	_, release, took, err := startSlowSetup(t, 20*time.Second, 5*time.Second, time.Second)
 	defer release()
 	t.When("--setup-timeout is given below a fixture's declared Timeout", func(w *gotest.T) {
 		w.It("the flag is the budget", func(it *gotest.T) {
