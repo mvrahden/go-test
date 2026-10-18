@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / refuses a missing value, an unknown flag and another command's flag with exit 2 / a flag another command owns is refused \(
+Clause: when a value flag or an unknown flag is given to a command → refuses a missing value, an unknown flag and another command's flag with exit 2
+--- a/cmd/gotest/args.go
++++ b/cmd/gotest/args.go
+@@ -138,9 +138,6 @@ func SplitArgs(args []string, allowed ma
+ 			if kind == 0 {
+ 				return OwnFlags{}, nil, fmt.Errorf("unknown flag: %s", name)
+ 			}
+-			if !allowed[name] {
+-				return OwnFlags{}, nil, fmt.Errorf("flag %s is not valid for this subcommand", name)
+-			}
+ 			switch kind {
+ 			case BoolFlag:
+ 				if !hasEquals {

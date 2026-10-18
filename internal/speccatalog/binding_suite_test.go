@@ -139,3 +139,31 @@ func (s *BindingTestSuite) TestBind(t *gotest.T) {
 		})
 	})
 }
+
+const tableCatalog = `{"packages":[{"path":"github.com/mvrahden/go-test/tests/conformance/cli","nodes":[
+ {"kind":"suite","display":"CLIFlags","children":[
+ {"kind":"method","display":"Spellings","children":[
+  {"kind":"block","vocab":"when","display":"when a flag is spelled two ways","name":"a_flag_is_spelled_two_ways","children":[
+   {"kind":"block","vocab":"each","display":"--x","children":[]},
+   {"kind":"block","vocab":"each","display":"--x=true","children":[]}]},
+  {"kind":"block","vocab":"when","display":"when each row holds an It","name":"each_row_holds_an_it","children":[
+   {"kind":"block","vocab":"each","display":"one","children":[
+    {"kind":"block","vocab":"it","display":"passes","children":[]}]}]},
+  {"kind":"block","vocab":"when","display":"when the table is stated","name":"the_table_is_stated","children":[
+   {"kind":"block","vocab":"it","display":"reads every spelling","children":[
+    {"kind":"block","vocab":"each","display":"--x","children":[]}]}]},
+  {"kind":"block","vocab":"when","display":"when the table is parked","name":"the_table_is_parked","excluded":true,"children":[
+   {"kind":"block","vocab":"each","display":"--x","children":[]}]}]}]}]}]}`
+
+func (s *BindingTestSuite) TestUnstatedTables(t *gotest.T) {
+	t.When("a When holds Each rows and no It of its own", func(w *gotest.T) {
+		w.It("is named with its package, suite and method", func(it *gotest.T) {
+			tables, err := speccatalog.UnstatedTables([]byte(tableCatalog))
+			gotest.NoError(it, err)
+			gotest.Equal(it, []string{
+				`tests/conformance/cli: CLIFlags.Spellings: When "a flag is spelled two ways"`,
+				`tests/conformance/cli: CLIFlags.Spellings: When "each row holds an It"`,
+			}, tables)
+		})
+	})
+}

@@ -48,10 +48,12 @@ and any drill `Clause:` line in one commit.
 
 ## Verdict clauses and the drill
 
-A clause whose outcome is a verdict — an exit code, a pass or fail, a row of
-the event stream — ships with a ring-0 twin in `tests/canary`: the same check
-written with plain Go, no gotest assertion. Conformance suites assert with
-gotest, so a bug in the assertion engine could pass its own test; the twin is
-what the mutation drill holds the kernel to. The mutant's `Expect:` lines
-match the twin's output, and its `Clause:` line records which scenario
-outcome the twin protects.
+A ring-0 twin in `tests/canary` — the same check written with plain Go, no
+gotest assertion — is required exactly when the mutant lives in what a test
+binary links (`pkg/gotest`, `pkg/gotestruntime`, `internal/gotestgen`).
+Conformance suites assert with that code, so a mutant there could pass its own
+test; the drill then judges without the conformance suites, and the mutant's
+`Expect:` lines match the twin's output. Any other clause is judged by its own
+conformance suite: the drill adds the packages whose specs state the patch's
+`Clause:` lines, and the `Expect:` line is that It's failure line as the judge
+prints it.

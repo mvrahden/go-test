@@ -88,21 +88,21 @@ func ownBaseline(t *gotest.T, count string) string {
 func (s *BenchGateTestSuite) TestAGateNeedsSamples(t *gotest.T) {
 	baseline := ownBaseline(t, "4")
 	t.When("--gate is given with -count below 4", func(w *gotest.T) {
-		for run, count := range gotest.Each(w, []struct {
-			Desc string
-			args []string
-		}{
-			{"-count absent", nil},
-			{"-count=2", []string{"-count=2"}},
-		}) {
-			args := append([]string{"bench", "--against=" + baseline, "--gate=10", "../testdata/benching/", "-benchtime=1x"}, count.args...)
-			res, err := testkit.RunCLI(run.Context(), ".", args...)
-			gotest.NoError(run, err)
-			run.It("exits 2 naming -count=4 as the requirement", func(it *gotest.T) {
-				gotest.Equal(it, 2, res.Exit, "stdout: %s\nstderr: %s", res.Stdout, res.Stderr)
-				gotest.Contains(it, res.Stderr, "--gate needs -count=4 or more")
-			})
-		}
+		w.It("exits 2 naming -count=4 as the requirement", func(it *gotest.T) {
+			for run, count := range gotest.Each(it, []struct {
+				Desc string
+				args []string
+			}{
+				{"-count absent", nil},
+				{"-count=2", []string{"-count=2"}},
+			}) {
+				args := append([]string{"bench", "--against=" + baseline, "--gate=10", "../testdata/benching/", "-benchtime=1x"}, count.args...)
+				res, err := testkit.RunCLI(run.Context(), ".", args...)
+				gotest.NoError(run, err)
+				gotest.Equal(run, 2, res.Exit, "stdout: %s\nstderr: %s", res.Stdout, res.Stderr)
+				gotest.Contains(run, res.Stderr, "--gate needs -count=4 or more")
+			}
+		})
 	})
 	t.When("--gate is given with -count=4", func(w *gotest.T) {
 		res, err := testkit.RunCLI(w.Context(), ".", "bench", "--against="+baseline, "--gate=1000", "../testdata/benching/", "-benchtime=1x", "-count=4")

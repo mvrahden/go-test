@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/cli .* / still prints version and help, and a run reports the config error with exit 2 / version still prints \(
+Clause: when .gotest.yml does not parse → still prints version and help, and a run reports the config error with exit 2
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -24,6 +24,11 @@ func main() {
+ 
+ 	subcmd, remaining := ParseSubcommand(args)
+ 
++	if _, err := config.Load("."); err != nil {
++		fmt.Fprintf(os.Stderr, "FAIL: loading %s: %s\n", config.FileName, err)
++		os.Exit(2)
++	}
++
+ 	// version and help need no project: a config that does not parse must
+ 	// not stand between a newcomer and the page that explains it.
+ 	switch subcmd {

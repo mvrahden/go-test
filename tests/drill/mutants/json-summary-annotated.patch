@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / prints one JSON document with no color codes or annotations, inside GitHub Actions too / summary --format json inside GitHub Actions carries no annotations \(
+Clause: when a JSON document is asked for → prints one JSON document with no color codes or annotations, inside GitHub Actions too
+--- a/cmd/gotest/summary.go
++++ b/cmd/gotest/summary.go
+@@ -223,7 +223,7 @@ func writeSummaryOutput(tree []*gotestsp
+ 
+ 	// Annotations are workflow commands for a human-readable log; a JSON or
+ 	// markdown document on stdout must stay the document alone.
+-	if github && format == "terminal" {
++	if github && format != "md" {
+ 		modulePath := gotestspec.ReadModulePath(".")
+ 		annotations := gotestspec.CollectAnnotations(tree, modulePath)
+ 		gotestspec.WriteGitHubAnnotations(os.Stdout, annotations)

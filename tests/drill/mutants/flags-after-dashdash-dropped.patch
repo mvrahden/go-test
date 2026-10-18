@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli .* / reaches the test binary after -- or -args, and the binary fails its check without it / after -- it reaches the binary and the pattern stays a package \(
+Clause: when a flag only the test binary declares is passed → reaches the test binary after -- or -args, and the binary fails its check without it
+--- a/cmd/gotest/args.go
++++ b/cmd/gotest/args.go
+@@ -117,7 +117,11 @@ func SplitArgs(args []string, allowed ma
+ 		arg := args[i]
+ 
+ 		if arg == "--" {
+-			goTestArgs = append(goTestArgs, args[i+1:]...)
++			for _, a := range args[i+1:] {
++				if !strings.HasPrefix(a, "-") {
++					goTestArgs = append(goTestArgs, a)
++				}
++			}
+ 			return own, goTestArgs, nil
+ 		}
+ 

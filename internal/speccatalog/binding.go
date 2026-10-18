@@ -164,3 +164,57 @@ func walk(n, when *node, fn func(when, it *node)) {
 		walk(&n.Children[i], when, fn)
 	}
 }
+
+// UnstatedTables names each When whose children include Each rows but no It:
+// its table is a behavior no clause states. Excluded nodes are skipped.
+func UnstatedTables(js []byte) ([]string, error) {
+	var doc struct {
+		Packages []struct {
+			Path  string `json:"path"`
+			Nodes []node `json:"nodes"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(js, &doc); err != nil {
+		return nil, fmt.Errorf("catalog json: %w", err)
+	}
+	var out []string
+	for _, p := range doc.Packages {
+		_, capability, _ := strings.Cut(p.Path, "/"+ConformanceDir+"/")
+		pkg := ConformanceDir + "/" + capability
+		for _, suite := range p.Nodes {
+			if suite.Excluded {
+				continue
+			}
+			for _, method := range suite.Children {
+				var visit func(n *node)
+				visit = func(n *node) {
+					if n.Excluded {
+						return
+					}
+					if n.Vocab == "when" && holdsTableOnly(n) {
+						out = append(out, fmt.Sprintf("%s: %s.%s: When %q", pkg, suite.Display, method.Display, whenLabel(n.Display, n.Name)))
+					}
+					for i := range n.Children {
+						visit(&n.Children[i])
+					}
+				}
+				visit(&method)
+			}
+		}
+	}
+	return out, nil
+}
+
+// holdsTableOnly reports whether n has Each children and no It child.
+func holdsTableOnly(n *node) bool {
+	var each, it bool
+	for _, c := range n.Children {
+		switch c.Vocab {
+		case "each":
+			each = true
+		case "it":
+			it = true
+		}
+	}
+	return each && !it
+}

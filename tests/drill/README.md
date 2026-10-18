@@ -16,8 +16,8 @@ For every `mutants/<name>.patch`, `drill.sh`:
    exact context and no fuzz (a line offset is accepted: the context still
    matches verbatim);
 3. builds the copy and compiles the test binaries of the drill packages;
-4. runs the ring-0 test packages and the canary in the copy with
-   `gotest summary`;
+4. runs the ring-0 test packages, the canary and the conformance packages
+   stating the patch's clauses in the copy with `gotest summary`;
 5. expects that run to exit non-zero, and every `Expect:` line of the patch
    to match a line of its log.
 
@@ -45,11 +45,14 @@ conventions suite enforces both, and that every `Clause:` line names a clause
 a scenario states; the listing and the suite share one reading
 (`internal/speccatalog`), so they cannot disagree about what is unmutated.
 
-A conformance suite cannot be the drill's oracle: it asserts with gotest, and
-a mutated assertion engine could pass its own test. A clause whose outcome is
-a verdict therefore ships with a ring-0 twin in `tests/canary`, the same check
-in plain Go. The mutant's `Expect:` lines match the twin's output; the
-`Clause:` line names the sentence the twin protects.
+A ring-0 twin in `tests/canary`, the same check in plain Go, is required
+exactly when the mutant lives in what a test binary links (`pkg/gotest`,
+`pkg/gotestruntime`, `internal/gotestgen`): a conformance suite asserts with
+that code, so the drill then judges without the conformance suites, and the
+`Expect:` lines match the twin's output. Any other clause is judged by its own
+conformance suite: the drill adds the packages whose specs state the patch's
+`Clause:` lines, and the `Expect:` line is that It's failure line as the judge
+prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 
 ## Reading a failure
 
@@ -65,6 +68,8 @@ in plain Go. The mutant's `Expect:` lines match the twin's output; the
   landed somewhere else, or the named check lost its hold; the unmatched
   expectations and the first failures follow.
 - `DRILL  <name>: no Expect: line` — the patch does not name its check.
+- `DRILL  <name>: Clause line names no clause of specs/` — a `Clause:` line
+  quotes a sentence no scenario states; the unknown clauses follow.
 - `DRILL  could not build the judge` — the unmodified tree does not compile.
 
 ## The mutants
@@ -93,6 +98,18 @@ in plain Go. The mutant's `Expect:` lines match the twin's output; the
 | `bench-heuristic-mark-dropped` | a delta row judged by the ±20% rule of thumb is not marked as one | ring-0 render suite: the heuristic row lacks its mark |
 | `bench-gate-zero-judges` | `--gate=0` arms a gate instead of disabling it | canary: a zero gate without `-count` is refused with exit 2 |
 | `bench-verbose-behind-args` | the `-v` a bench run adds lands behind the user's `-args` | canary: a bench run with words after `-args` fails on the binary's flag parsing |
+| `bool-false-reads-true` | a boolean flag given any explicit value, `=false` included, reads as true | cli conformance: `--ci=false` does not let a focused run pass |
+| `foreign-flag-accepted` | a command takes a gotest flag another command owns | cli conformance: `clean --debug` is not refused with exit 2 |
+| `flags-after-dashdash-dropped` | the flags after a bare `--` never reach the test binary | cli conformance: the binary's own check fails after `--` |
+| `exec-command-left-in-build-flags` | `-exec <cmd>` lifts the command but leaves it among the build flags | cli conformance: a run under `-exec env` fails |
+| `spaced-coverprofile-missed` | `-coverprofile <file>` is not read as the run's profile | cli conformance: summary prints no coverage for the spaced spelling |
+| `spec-skips-stdlib-note` | spec runs without noting the stdlib tests it left to go test | cli conformance: spec's stderr lacks the stdlib note |
+| `color-codes-into-pipe` | color follows only `--no-color` and `NO_COLOR`, never the terminal | cli conformance: summary into a pipe prints color codes |
+| `json-summary-annotated` | summary writes GitHub annotations after a JSON document too | cli conformance: the JSON summary inside GitHub Actions carries `::error` |
+| `summary-accepts-json-flag` | summary takes `-json` beside its terminal format | cli conformance: `summary -json` is not refused with exit 2 |
+| `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
+| `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
+| `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
 
 ## Adding a mutant
 

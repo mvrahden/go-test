@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value / --ci=false lets a focused run pass \(
+Clause: when a boolean flag is spelled in each accepted form → reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value
+--- a/cmd/gotest/args.go
++++ b/cmd/gotest/args.go
+@@ -151,7 +151,7 @@ func SplitArgs(args []string, allowed ma
+ 				if perr != nil {
+ 					return OwnFlags{}, nil, fmt.Errorf("invalid boolean value %q for %s", value, name)
+ 				}
+-				own.set(name, strconv.FormatBool(b))
++				own.set(name, strconv.FormatBool(b || value != ""))
+ 			case ValueFlag:
+ 				if hasEquals {
+ 					own.set(name, value)

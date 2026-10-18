@@ -50,6 +50,20 @@ func (s *SpecBindingTestSuite) TestEveryClauseIsSpecified(t *gotest.T) {
 	})
 }
 
+func (s *SpecBindingTestSuite) TestEveryTableIsStated(t *gotest.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	gotest.NoError(t, err)
+	js, err := os.ReadFile(filepath.Join(root, speccatalog.JSONPath))
+	gotest.NoError(t, err)
+	tables, err := speccatalog.UnstatedTables(js)
+	gotest.NoError(t, err)
+	t.When("each conformance When that holds an Each table is inspected", func(w *gotest.T) {
+		w.It("has a direct It that states what every row shows", func(it *gotest.T) {
+			gotest.Empty(it, tables, "a table under a When needs a direct It that states it; wrap the loop in w.It(…):\n%s", strings.Join(tables, "\n"))
+		})
+	})
+}
+
 func (s *SpecBindingTestSuite) TestSpecShape(t *gotest.T) {
 	specs, _ := loadBinding(t)
 	var problems []string
