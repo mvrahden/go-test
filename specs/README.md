@@ -1,0 +1,3 @@
+# Specs
+
+Each `<capability>/spec.md` here is written in [OpenSpec](https://github.com/Fission-AI/OpenSpec)'s spec format (`## Purpose`, `## Requirements`, `### Requirement:` with SHALL or MUST, `#### Scenario:` with `**WHEN**`, `**THEN**` and `**AND**` bullets), kept at the repository root as `specs/` instead of `openspec/specs/`. It is the one place gotest's behavior is stated: each scenario's WHEN text and each of its THEN and AND texts equal a `When` label and an `It` label directly under it in `tests/conformance/<capability>/`, and a conventions suite fails when a scenario has no such clause or a clause has no scenario. Guides link here; they never restate a scenario.

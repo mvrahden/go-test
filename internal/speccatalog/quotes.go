@@ -19,6 +19,7 @@ type Quote struct {
 // node is the part of a catalog node the resolver reads.
 type node struct {
 	Display  string `json:"display"`
+	Name     string `json:"name"`
 	Vocab    string `json:"vocab"`
 	Excluded bool   `json:"excluded"`
 	Children []node `json:"children"`
@@ -40,26 +41,30 @@ func Clauses(js []byte) ([]string, error) {
 	var clauses []string
 	for _, p := range doc.Packages {
 		for _, n := range p.Nodes {
-			collect(n, "", &clauses)
+			walk(&n, nil, func(when, it *node) {
+				clauses = append(clauses, when.Display+Arrow+it.Display)
+			})
 		}
 	}
 	return clauses, nil
 }
 
-func collect(n node, when string, out *[]string) {
+// walk calls fn for every It below a When, with the innermost When above it.
+// Nothing under an excluded node is visited.
+func walk(n, when *node, fn func(when, it *node)) {
 	if n.Excluded {
 		return
 	}
 	switch n.Vocab {
 	case "when":
-		when = n.Display
+		when = n
 	case "it":
-		if when != "" {
-			*out = append(*out, when+Arrow+n.Display)
+		if when != nil {
+			fn(when, n)
 		}
 	}
-	for _, c := range n.Children {
-		collect(c, when, out)
+	for i := range n.Children {
+		walk(&n.Children[i], when, fn)
 	}
 }
 
