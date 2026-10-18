@@ -9,13 +9,11 @@ set -uo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 pkgs=(./pkg/gotest/internal/... ./pkg/gotestruntime/... ./internal/gotestspec/... ./tests/canary/...)
 
-# --list-unmutated prints the catalog clauses no patch names on a Clause: line.
+# --list-unmutated prints the catalog clauses no patch names on a Clause: line,
+# by the reading the conventions suite holds the budget to.
 if [ "${1:-}" = "--list-unmutated" ]; then
-  (cd "$root" && go run ./internal/speccatalog/clauses) | sort -u > "${TMPDIR:-/tmp}/clauses.$$"
-  sed -n 's/^Clause: //p' "$root"/tests/drill/mutants/*.patch | sort -u > "${TMPDIR:-/tmp}/named.$$"
-  comm -23 "${TMPDIR:-/tmp}/clauses.$$" "${TMPDIR:-/tmp}/named.$$"
-  rm -f "${TMPDIR:-/tmp}/clauses.$$" "${TMPDIR:-/tmp}/named.$$"
-  exit 0
+  (cd "$root" && go run ./internal/speccatalog/clauses --unmutated)
+  exit $?
 fi
 
 # Names on the command line select the mutants to run; none means all.

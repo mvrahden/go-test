@@ -40,7 +40,9 @@ clauses of `docs/design/catalog.md` it falsifies. `bash tests/drill/drill.sh
 --list-unmutated` prints the clauses no patch names. Their number may not
 exceed `tests/drill/unmutated-allow.txt`: a new clause either gets a mutant or
 the budget is raised on purpose in the same change. A conventions suite
-enforces both, and that every `Clause:` line names a clause that exists.
+enforces both, and that every `Clause:` line names a clause that exists; the
+listing and the suite share one reading (`internal/speccatalog`), so they
+cannot disagree about what is unmutated.
 
 A conformance suite cannot be the drill's oracle: it asserts with gotest, and
 a mutated assertion engine could pass its own test. A clause whose outcome is

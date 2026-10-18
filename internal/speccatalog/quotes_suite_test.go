@@ -1,6 +1,9 @@
 package speccatalog_test
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -74,6 +77,24 @@ func (s *QuotesTestSuite) TestUnresolvedQuotesAreNamed(t *gotest.T) {
 	t.When("a quote has no clause", func(w *gotest.T) {
 		w.It("is reported by file, line and text, and resolved quotes are not", func(it *gotest.T) {
 			gotest.Equal(it, []string{"doc.md:9: when nothing is asked → nothing happens"}, unresolved)
+		})
+	})
+}
+
+func (s *QuotesTestSuite) TestMutantsNameTheClausesTheyFalsify(t *gotest.T) {
+	dir := t.TempDir()
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "a.patch"), []byte("Expect: x\nClause: when a → b\nClause: when c → d\n--- a/x.go\n+++ b/x.go\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "b.patch"), []byte("Expect: y\nClause: when a → b\n--- a/y.go\n+++ b/y.go\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("Clause: when ignored → file\n"), 0o600))
+	clauses := []string{"when a → b", "when e → f", "when g → h"}
+	unmutated, unknown, err := speccatalog.Unmutated(clauses, dir)
+	gotest.NoError(t, err)
+	t.When("the mutants' Clause lines are read against the catalog", func(w *gotest.T) {
+		w.It("lists the clauses no patch names, sorted", func(it *gotest.T) {
+			gotest.Equal(it, []string{"when e → f", "when g → h"}, unmutated)
+		})
+		w.It("names a Clause line the catalog does not hold, with its patch", func(it *gotest.T) {
+			gotest.Equal(it, []string{"a.patch: when c → d"}, unknown)
 		})
 	})
 }

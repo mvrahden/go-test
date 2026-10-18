@@ -3,7 +3,6 @@ package conventions_test
 import (
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -24,37 +23,8 @@ func (s *UnmutatedClausesTestSuite) TestClausesWithoutAMutantStayWithinBudget(t 
 	gotest.NoError(t, err)
 	clauses, err := speccatalog.Clauses(js)
 	gotest.NoError(t, err)
-	known := map[string]bool{}
-	for _, c := range clauses {
-		known[c] = true
-	}
-
-	patches, err := filepath.Glob(filepath.Join(root, "tests", "drill", "mutants", "*.patch"))
+	unmutated, unknown, err := speccatalog.Unmutated(clauses, filepath.Join(root, "tests", "drill", "mutants"))
 	gotest.NoError(t, err)
-	named := map[string]bool{}
-	var unknown []string
-	for _, p := range patches {
-		data, err := os.ReadFile(p) //nolint:gosec // G304: the repository's own patches
-		gotest.NoError(t, err)
-		for _, line := range strings.Split(string(data), "\n") {
-			clause, ok := strings.CutPrefix(line, "Clause: ")
-			if !ok {
-				continue
-			}
-			if !known[clause] {
-				unknown = append(unknown, filepath.Base(p)+": "+clause)
-			}
-			named[clause] = true
-		}
-	}
-
-	var unmutated []string
-	for _, c := range clauses {
-		if !named[c] {
-			unmutated = append(unmutated, c)
-		}
-	}
-	sort.Strings(unmutated)
 
 	allowData, err := os.ReadFile(filepath.Join(root, "tests", "drill", "unmutated-allow.txt"))
 	gotest.NoError(t, err)
