@@ -428,7 +428,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 			fuzzFuncsByPkg := map[string]map[string][]string{
 				"example.com/pkg": {"FooSuite": {"FuzzFooSuite_A", "FuzzFooSuite_B"}},
 			}
-			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "")
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "TestFooSuite", targets[0].SuiteName)
 			gotest.Equal(it, []string{"FuzzFooSuite_A", "FuzzFooSuite_B"}, targets[0].FuzzFuncs)
@@ -439,14 +439,14 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 			fuzzFuncsByPkg := map[string]map[string][]string{
 				"example.com/pkg": {"OtherSuite": {"FuzzOtherSuite_A"}},
 			}
-			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "")
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Empty(it, targets[0].FuzzFuncs)
 		})
 
 		w.It("tolerates a nil fuzzFuncsByPkg map", func(it *gotest.T) {
 			suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
-			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, "")
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Empty(it, targets[0].FuzzFuncs)
 		})

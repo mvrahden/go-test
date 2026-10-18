@@ -33,8 +33,8 @@ type fixtureWindows struct {
 // planFixtureWindows computes the residency plan for a run. The suite
 // selection mirrors BuildSuiteTargets minus compile results, which do not
 // exist yet: fixtures must not wait for the compiler.
-func planFixtureWindows(overlay *OverlayResult, userRunFilter string) fixtureWindows {
-	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, userRunFilter)
+func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter string) fixtureWindows {
+	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, userRunFilter, userSkipFilter)
 	w := fixtureWindows{
 		Bulk: aliveFixtureKeys(bulk, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
 		Tail: aliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
@@ -89,15 +89,16 @@ func (w *fixtureWindows) reportSkipped() {
 	}
 }
 
-// planSuitePhases splits the suites the run will dispatch into the two phases.
+// planSuitePhases splits the suites the run will dispatch into the two phases:
+// those -run selects and -skip does not drop whole.
 // Values are test function names ("Test" + suite name) — the keying
 // SuiteRequiredSharedFixtureKeys uses.
-func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, userRunFilter string) (bulk, tail map[string][]string) {
+func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, userRunFilter, userSkipFilter string) (bulk, tail map[string][]string) {
 	bulk, tail = map[string][]string{}, map[string][]string{}
 	for pkg, suites := range suitesByPkg {
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) {
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) || skipsSuite(userSkipFilter, testFuncName) {
 				continue
 			}
 			phase := bulk

@@ -1,0 +1,12 @@
+Expect: guardedshared: verdicts differ from the golden list
+Clause: when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -827,7 +827,6 @@
+ 					switch {
+ 					case recorded:
+ 					case missing != "":
+-						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
+ 					default:
+ 						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+ 					}

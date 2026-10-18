@@ -140,3 +140,8 @@ noisysetup pass TestNoisyTestSuite/TestStateArrived
 setupbudget exit 1
 setupbudget fail -
 setupbudget fail TestSlowTestSuite
+guardedshared exit 1
+guardedshared fail -
+guardedshared fail TestGuardedTestSuite
+guardedshared pass TestFreeTestSuite
+guardedshared pass TestFreeTestSuite/TestOne

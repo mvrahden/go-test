@@ -342,7 +342,7 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 // exclusiveByPkg (import path → suite struct name → true) marks suites with
 // SuiteConfig{Exclusive: true}; their targets carry Exclusive and are
 // dispatched strictly alone, after every non-exclusive suite.
-func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter string) []SuiteTarget {
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
@@ -362,7 +362,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
 			fuzzFuncs := fuzzFuncsByPkg[pkg][suiteName]
-			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) {
+			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) || skipsSuite(userSkipFilter, testFuncName) {
 				continue
 			}
 			target := SuiteTarget{
@@ -398,6 +398,22 @@ func selectsSuite(userRunFilter, testFuncName string, fuzzFuncs []string) bool {
 	}
 	for _, f := range fuzzFuncs {
 		if matchesSuiteFunc(userRunFilter, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// skipsSuite reports whether the user's -skip filter drops a suite whole: one
+// of its alternatives names the Test function with no subtest segment. An
+// alternative with a subtest segment skips methods inside a suite that still
+// runs, and the binary applies it.
+func skipsSuite(userSkipFilter, testFuncName string) bool {
+	if userSkipFilter == "" {
+		return false
+	}
+	for _, alt := range splitTopLevelOr(userSkipFilter) {
+		if !strings.Contains(alt, "/") && matchesSuiteFunc(alt, testFuncName) {
 			return true
 		}
 	}

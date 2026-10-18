@@ -1,0 +1,13 @@
+Expect: skipped: the shared fixture started although -skip left no suite needing it
+Clause: when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -413,7 +413,7 @@
+ 		return false
+ 	}
+ 	for _, alt := range splitTopLevelOr(userSkipFilter) {
+-		if !strings.Contains(alt, "/") && matchesSuiteFunc(alt, testFuncName) {
++		if false && !strings.Contains(alt, "/") && matchesSuiteFunc(alt, testFuncName) {
+ 			return true
+ 		}
+ 	}

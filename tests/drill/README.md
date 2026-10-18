@@ -129,6 +129,9 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `fuzz-aftereach-skipped-when-beforeeach-leaves` | a fuzz execution registers AfterEach only once BeforeEach returned | canary: the fuzz-only suites' AfterEach markers are missing |
 | `fixture-stdout-is-protocol` | a shared fixture's stdout is the protocol stream | canary: a setup that prints a fragment and a forged `_done` fails the run |
 | `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full |
+| `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | canary: the fixture of a suite -skip names whole still starts |
+| `skip-of-a-method-drops-the-suite` | a -skip naming one method drops the whole suite from the plan | canary: the suite's other method runs without its fixture |
+| `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | canary: the guarded suite's failed row is missing from the stream |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |

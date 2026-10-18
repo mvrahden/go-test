@@ -662,7 +662,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	baseEnv := buildBaseEnv(cfg)
 
-	win := planFixtureWindows(overlay, pf.UserRunFilter)
+	win := planFixtureWindows(overlay, pf.UserRunFilter, pf.UserSkipFilter)
 	win.reportSkipped()
 
 	// Exclusive suites collected during the stream, run serially after it.
@@ -785,7 +785,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter, pf.UserSkipFilter)
 		withExec(targets, pf.Exec)
 
 		if len(targets) == 0 {

@@ -363,7 +363,9 @@ func (s *MyTestSuite) SuiteGuard() string {
 
 Returns empty string to run, non-empty to skip with that reason.
 Runs before the suite's fixtures, config, `BeforeAll`, and any test method, so fixture fields are still nil inside it.
-A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard.
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard:
+
+> when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
 Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes

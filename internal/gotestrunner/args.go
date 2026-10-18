@@ -272,6 +272,9 @@ func stripFlag(flags []string, name string) []string {
 // ExtractRunFilter returns the value of -run from run flags, if present.
 func ExtractRunFilter(runFlags []string) string { return extractFlag(runFlags, "-run") }
 
+// ExtractSkipFilter returns the value of -skip from run flags, if present.
+func ExtractSkipFilter(runFlags []string) string { return extractFlag(runFlags, "-skip") }
+
 // StripRunFilter removes -run and its value from run flags.
 func StripRunFilter(runFlags []string) []string { return stripFlag(runFlags, "-run") }
 

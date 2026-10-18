@@ -1990,6 +1990,126 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the fixture is never started and the other suite passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_is_never_started_and_the_other_suite_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -skip names the only suite binding a shared fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "-skip_names_the_only_suite_binding_a_shared_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture starts and the suite's other method passes against it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_starts_and_the_suite's_other_method_passes_against_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -skip names one method of the suite binding a shared fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "-skip_names_one_method_of_the_suite_binding_a_shared_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SkipFlag",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSkipFlag",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture is started for it and its failure fails the run and the suite, whose guard never runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_is_started_for_it_and_its_failure_fails_the_run_and_the_suite,_whose_guard_never_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a guard-skipped suite binds a shared fixture whose setup fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_guard-skipped_suite_binds_a_shared_fixture_whose_setup_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GuardedSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGuardedSuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureSelection",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureSelectionTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails naming the shared fixture it binds and go tool gotest, before any method runs",
                       "duration": 0,
                       "excluded": false,
@@ -3246,13 +3366,13 @@
     }
   ],
   "stats": {
-    "behaviors": 125,
+    "behaviors": 128,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 23,
+    "suites": 24,
     "tests": 0
   }
 }

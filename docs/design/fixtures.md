@@ -425,6 +425,12 @@ The watcher is a goroutine and a signal handler that live exactly as long as the
 ### Shared-fixture dispatch
 
 A run streams: each shared fixture's state is emitted as its `BeforeAll` completes, and suites are dispatched as soon as *their* transitive dependencies are ready, with per-suite state files.
+
+A shared fixture starts for the suites the run dispatches, and for no other; `-skip` counts in that plan the way `-run` does:
+
+> when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
+
+> when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
 `spec`, `summary` and `watch` run the same way.
 A `bench` run waits for its first window of shared fixtures instead, and for every package to compile, before it dispatches: benchmarks run one at a time, each reading its own state file of exactly the fixtures it declares.
 

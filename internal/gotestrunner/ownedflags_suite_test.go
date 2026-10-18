@@ -22,7 +22,7 @@ func (s *OwnedGoTestFlagsTestSuite) TestRunFilterSelectsAFuzzWrapper(t *gotest.T
 	suites := map[string][]string{"example.com/p": {"FuzzyTestSuite", "OtherTestSuite"}}
 	fuzz := map[string]map[string][]string{"example.com/p": {"FuzzyTestSuite": {"FuzzFuzzyTestSuite_FuzzUpper"}}}
 	t.When("-run names a generated fuzz wrapper", func(w *gotest.T) {
-		targets := gotestrunner.BuildSuiteTargets(compiled, suites, map[string]string{"example.com/p": "/src/p"}, fuzz, nil, nil, "FuzzFuzzyTestSuite_FuzzUpper")
+		targets := gotestrunner.BuildSuiteTargets(compiled, suites, map[string]string{"example.com/p": "/src/p"}, fuzz, nil, nil, "FuzzFuzzyTestSuite_FuzzUpper", "")
 		w.It("selects the suite that owns it, and only that suite", func(it *gotest.T) {
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "TestFuzzyTestSuite", targets[0].SuiteName)
@@ -30,7 +30,7 @@ func (s *OwnedGoTestFlagsTestSuite) TestRunFilterSelectsAFuzzWrapper(t *gotest.T
 		w.It("runs the binary with the user's filter", func(it *gotest.T) {
 			gotest.Equal(it, "FuzzFuzzyTestSuite_FuzzUpper", targets[0].RunFilter)
 		})
-		bulk, _ := gotestrunner.ExportPlanSuitePhases(suites, nil, fuzz, "FuzzFuzzyTestSuite_FuzzUpper")
+		bulk, _ := gotestrunner.ExportPlanSuitePhases(suites, nil, fuzz, "FuzzFuzzyTestSuite_FuzzUpper", "")
 		w.It("plans the suite's fixtures for the run", func(it *gotest.T) {
 			gotest.Equal(it, []string{"TestFuzzyTestSuite"}, bulk["example.com/p"])
 		})

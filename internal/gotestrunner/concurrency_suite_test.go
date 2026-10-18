@@ -24,7 +24,7 @@ func (s *ConcurrencyTestSuite) TestExclusiveDispatch(t *gotest.T) {
 		compiled := []gotestrunner.CompileResult{{Package: "example.com/pkg", BinaryPath: "/tmp/pkg.test"}}
 		suitesByPkg := map[string][]string{"example.com/pkg": {"TimingTestSuite", "PlainTestSuite"}}
 		exclusiveByPkg := map[string]map[string]bool{"example.com/pkg": {"TimingTestSuite": true}}
-		targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, map[string]string{"example.com/pkg": "/src"}, nil, exclusiveByPkg, nil, "")
+		targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, map[string]string{"example.com/pkg": "/src"}, nil, exclusiveByPkg, nil, "", "")
 
 		w.It("carries the flag on exactly that suite's target", func(it *gotest.T) {
 			byName := map[string]bool{}

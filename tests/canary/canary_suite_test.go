@@ -554,6 +554,38 @@ func (s *CanaryTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
 	}
 }
 
+// A shared fixture bound by one suite alone never starts when -skip names
+// that suite: nothing dispatched requires it.
+func (s *CanaryTestSuite) TestASkippedSuitesFixtureNeverStarts(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "skipped", dir, "-skip=TestBoundTestSuite")
+	if code != 0 {
+		t.Errorf("skipped: exit code %d, want 0: %v", code, rows)
+	}
+	if !slices.Contains(rows, "skipped pass TestFreeTestSuite/TestOne") {
+		t.Errorf("skipped: the free suite did not pass: %v", rows)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "markers")); strings.Contains(string(got), "shared up") {
+		t.Errorf("skipped: the shared fixture started although -skip left no suite needing it")
+	}
+	// A -skip naming one method leaves the suite running: its fixture starts.
+	dir = t.TempDir()
+	code, rows = s.run(t, "skipped", dir, "-skip=TestBoundTestSuite/TestOne")
+	if code != 0 || !slices.Contains(rows, "skipped pass TestBoundTestSuite/TestTwo") {
+		t.Errorf("skipped: -skip of one method did not leave the rest of the suite passing (exit %d): %v", code, rows)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "markers")); !strings.Contains(string(got), "shared up") {
+		t.Errorf("skipped: -skip of one method kept the suite's fixture from starting")
+	}
+}
+
+// The runner cannot read a suite's guard, so a guard-skipped suite's shared
+// fixture is started for it; when it fails, the run and the suite fail, the
+// guard never having run.
+func (s *CanaryTestSuite) TestAGuardedSuitesSharedFixtureStillFailsTheRun(t *gotest.T) {
+	s.check(t, "guardedshared")
+}
+
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {
