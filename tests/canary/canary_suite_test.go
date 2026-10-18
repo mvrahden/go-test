@@ -399,6 +399,24 @@ func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 	}
 }
 
+// A benchmark that panics fails instead of being lost: the run is red, the
+// benchmark after it still reports, and AfterAll runs before the fixture is
+// released.
+func (s *CanaryTestSuite) TestAPanickingBenchmarkStillTearsDown(t *gotest.T) {
+	dir := t.TempDir()
+	code, names := s.bench(t, "benchpanic", dir)
+	if code != 1 {
+		t.Errorf("benchpanic: exit code %d, want 1", code)
+	}
+	if want := "BenchmarkStillRuns"; strings.Join(names, ",") != want {
+		t.Errorf("benchpanic: results %v, want [%s]", names, want)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if !testkit.MarkerOrderOf(got, "panics", "suite.AfterAll", "fixture.AfterAll") {
+		t.Errorf("benchpanic: markers %v, want panics, suite.AfterAll, fixture.AfterAll in order", got)
+	}
+}
+
 // A run stopped while a method holds: the methods not yet started are skipped
 // with the reason run stopping, the holding method's context ends, and AfterAll
 // runs before the fixture is released. Ring 0: the conformance suite that

@@ -118,17 +118,20 @@ func (r *Run) Verdict(path string) string {
 
 // MarkerOrder reports whether the markers appear in the run in the order
 // given, judged by each marker's first occurrence; an absent marker is false.
-func (r *Run) MarkerOrder(markers ...string) bool {
+func (r *Run) MarkerOrder(markers ...string) bool { return MarkerOrderOf(r.Markers, markers...) }
+
+// MarkerOrderOf is MarkerOrder over markers read some other way.
+func MarkerOrderOf(got []string, markers ...string) bool {
 	last := -1
 	for _, m := range markers {
 		idx := -1
-		for i, got := range r.Markers {
-			if got == m {
+		for i, g := range got {
+			if g == m {
 				idx = i
 				break
 			}
 		}
-		if idx < 0 || idx <= last {
+		if idx < 0 || idx < last {
 			return false
 		}
 		last = idx

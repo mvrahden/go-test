@@ -1,0 +1,11 @@
+Expect: benchpanic: (exit code|results|markers)
+--- a/internal/gotestgen/static/gotest.bench.tpl
++++ b/internal/gotestgen/static/gotest.bench.tpl
+@@ -5,7 +5,6 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
+ {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "b" "Assign" "") }}
+ {{ range $bm := $ts.Benchmarks }}
+   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
+-    defer gotestruntime.ReleaseOnPanic(b)
+     b.StopTimer()
+     ƒeachT := gotest.NewTFromTB(b)
+     defer func() {

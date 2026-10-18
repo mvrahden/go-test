@@ -122,6 +122,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `fixture-aftereach-without-before` | a fixture's AfterEach runs for a method whose BeforeEach failed | canary: the hook-failing fixture's AfterEach shows up after the failed BeforeEach |
 | `fixture-report-in-runtime` | a failing fixture hook is reported from the runtime's own file | canary: the hook-failing fixture's report does not name the hook's file |
 | `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixture's method passes instead of failing its budget |
+| `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 
 ## Adding a mutant
 
