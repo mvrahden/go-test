@@ -4,13 +4,13 @@ Clause: when a suite or fixture is declared → a suite declared alone, binding 
 Clause: when a suite or fixture is declared → a suite embedding a plain type runs
 --- a/internal/gotestast/shapes.go
 +++ b/internal/gotestast/shapes.go
-@@ -43,6 +43,9 @@
- 	}
- 	for i := range st.NumFields() {
- 		field := st.Field(i)
-+		if field != nil {
-+			return field.Pos(), fmt.Errorf("%s %s has a field", kind, owner)
-+		}
- 		named := namedBehind(field.Type())
- 		if !field.Anonymous() {
- 			if isSuiteType(named) {
+@@ -53,6 +53,9 @@
+ // rejected with, or nil when the field is accepted. kind is "suite" or
+ // "fixture".
+ func FieldShapeError(kind, owner string, field *types.Var, in *types.Package) error {
++	if field != nil {
++		return fmt.Errorf("%s %s has a field", kind, owner)
++	}
+ 	named := namedBehind(field.Type())
+ 	if !field.Anonymous() {
+ 		if isSuiteType(named) {

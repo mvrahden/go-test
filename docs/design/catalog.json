@@ -13846,6 +13846,226 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lint reports a suite declared in a type block at its declaration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_reports_a_suite_declared_in_a_type_block_at_its_declaration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lint -fix moves it into its own declaration, doc comment kept, and the package then generates",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_-fix_moves_it_into_its_own_declaration,_doc_comment_kept,_and_the_package_then_generates",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite is declared inside a type block",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_is_declared_inside_a_type_block",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TypeBlocks",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTypeBlocks",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports an embedded fixture at the field with the alternative",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_reports_an_embedded_fixture_at_the_field_with_the_alternative",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite embeds a fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_embeds_a_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Embedding",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestEmbedding",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports a direct call of a fixture's lifecycle hook at the call",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_reports_a_direct_call_of_a_fixture's_lifecycle_hook_at_the_call",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite method calls a fixture's lifecycle hook",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_method_calls_a_fixture's_lifecycle_hook",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HookCalls",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestHookCalls",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterDeclarations",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestLinterDeclarationsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports each shape the generator rejects at the position it rejects it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_reports_each_shape_the_generator_rejects_at_the_position_it_rejects_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "discover marks the package broken and names each rejection at its position",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "discover_marks_the_package_broken_and_names_each_rejection_at_its_position",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package holds shapes the generator rejects",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_holds_shapes_the_generator_rejects",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GenerationRejects",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGenerationRejects",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterGeneration",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestLinterGenerationTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/lint",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "keeps each behavior on one row of its table",
                       "duration": 0,
                       "excluded": false,
@@ -14124,13 +14344,13 @@
     }
   ],
   "stats": {
-    "behaviors": 476,
+    "behaviors": 482,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 79,
+    "suites": 81,
     "tests": 0
   }
 }

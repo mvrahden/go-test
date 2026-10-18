@@ -9,13 +9,13 @@ Clause: when a suite or fixture is declared → a suite embedding a type with a 
 Clause: when a suite or fixture is declared → a fixture embedding a fixture is rejected at the field and pointed to a named pointer field
 --- a/internal/gotestast/shapes.go
 +++ b/internal/gotestast/shapes.go
-@@ -43,6 +43,9 @@
- 	}
- 	for i := range st.NumFields() {
- 		field := st.Field(i)
-+		if field.Anonymous() {
-+			continue
-+		}
- 		named := namedBehind(field.Type())
- 		if !field.Anonymous() {
- 			if isSuiteType(named) {
+@@ -53,6 +53,9 @@
+ // rejected with, or nil when the field is accepted. kind is "suite" or
+ // "fixture".
+ func FieldShapeError(kind, owner string, field *types.Var, in *types.Package) error {
++	if field.Anonymous() {
++		return nil
++	}
+ 	named := namedBehind(field.Type())
+ 	if !field.Anonymous() {
+ 		if isSuiteType(named) {

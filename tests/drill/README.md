@@ -610,6 +610,12 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-alias-methods-read-in-alias-package` | a fuzz method of a generic suite another package declares is read with the alias's package's types | conformance: the fuzz It for a cross-package alias sees the method refused as never calling `f.Fuzz` |
 | `fuzz-alias-type-parameter-unread` | a fuzz callback's type parameter is not read as the type the alias instantiates | conformance: the fuzz It for a type-parameter callback sees the target refused as not fuzzable |
 | `testify-suite-generated` | the generator reads a testify suite as a gotest suite | cli conformance: the package holding a testify suite beside a gotest suite fails with exit 2 |
+| `lint-generation-rejects-silent` | the `generation-rejects` lint rule reports nothing | conformance: the lint It for a package the generator rejects finds no `generation-rejects` finding |
+| `discover-rejected-not-broken` | `discover` lists a package the generator rejects without marking it broken | conformance: the lint It for `discover` on a rejected package sees no `broken` flag |
+| `lint-suite-declaration-silent` | `suite-declaration` never reports a suite inside a type block | conformance: the lint It for a suite in a type block finds no `suite-declaration` finding |
+| `lint-suite-declaration-fix-drops-comment` | the `suite-declaration` fix moves the suite without its doc comment | conformance: the lint `-fix` It finds the doc comment left behind in the block |
+| `lint-no-embedding-silent` | `no-embedding` never reports a field | conformance: the lint It for an embedded fixture finds no `no-embedding` finding |
+| `lint-fixture-hook-call-silent` | `fixture-hook-call` never reports a call | conformance: the lint It for a hook call finds no `fixture-hook-call` finding |
 
 ## Adding a mutant
 

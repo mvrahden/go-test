@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterGeneration .* / discover marks the package broken and names each rejection at its position \(
+Clause: when a package holds shapes the generator rejects → discover marks the package broken and names each rejection at its position
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -193,7 +193,7 @@
+ 				for _, ce := range rejected {
+ 					warn(pkg, ce.Pos, ce.Err.Error())
+ 				}
+-				pkgEntry.Broken = true
++				pkgEntry.Broken = false
+ 				continue
+ 			}
+ 			for _, w := range result.Warnings {

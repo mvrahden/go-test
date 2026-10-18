@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterGeneration .* / lint reports each shape the generator rejects at the position it rejects it \(
+Clause: when a package holds shapes the generator rejects → lint reports each shape the generator rejects at the position it rejects it
+--- a/internal/lint/generation.go
++++ b/internal/lint/generation.go
+@@ -61,7 +61,7 @@
+ 	if len(rejected) == 0 {
+ 		rejected = gotestgen.FuzzRejections(pkg, result.Suites)
+ 	}
+-	for _, ce := range rejected {
++	for _, ce := range rejected[:0] {
+ 		pos := ce.Pos
+ 		if !pos.IsValid() {
+ 			pos = pass.Files[0].Name.Pos()

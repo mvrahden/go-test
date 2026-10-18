@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterDeclarations .* / lint reports an embedded fixture at the field with the alternative \(
+Clause: when a suite embeds a fixture → lint reports an embedded fixture at the field with the alternative
+--- a/internal/lint/embedding.go
++++ b/internal/lint/embedding.go
+@@ -41,7 +41,7 @@
+ 			}
+ 			for i := range st.NumFields() {
+ 				field := st.Field(i)
+-				if err := gotestast.FieldShapeError(kind, ts.Name.Name, field, pass.Pkg); err != nil {
++				if err := gotestast.FieldShapeError(kind, ts.Name.Name, field, pass.Pkg); err != nil && false {
+ 					report(pass, NoEmbedding, field.Pos(), "%s", err)
+ 				}
+ 			}
