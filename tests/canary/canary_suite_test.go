@@ -445,6 +445,23 @@ func (s *CanaryTestSuite) TestFailFastIgnoresASoftSuiteFailure(t *gotest.T) {
 	}
 }
 
+// A fixture whose BeforeAll failed still gets its AfterAll: whatever the setup
+// reached is released, and the suite that binds it never opens.
+func (s *CanaryTestSuite) TestAFixtureThatFailedToStartIsReleased(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "fixturesetupfail", dir)
+	if code != 1 {
+		t.Errorf("fixturesetupfail: exit code %d, want 1", code)
+	}
+	if slices.Contains(rows, "fixturesetupfail pass TestNeverOpensTestSuite/TestNever") {
+		t.Errorf("fixturesetupfail: the suite ran without its fixture: %v", rows)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if want := []string{"fixture.BeforeAll", "fixture.AfterAll"}; strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("fixturesetupfail: hooks ran %v, want %v", got, want)
+	}
+}
+
 // A run stopped while a method holds: the methods not yet started are skipped
 // with the reason run stopping, the holding method's context ends, and AfterAll
 // runs before the fixture is released. Ring 0: the conformance suite that

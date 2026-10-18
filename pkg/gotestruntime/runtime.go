@@ -32,8 +32,10 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 		done[f.Name] = make(chan struct{})
 	}
 
-	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	// A failure cancels the siblings with itself as the cause, so a victim
+	// records why it was cancelled, not that it was.
+	childCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
 	errs := make(map[string]error)
 	var mu sync.Mutex
@@ -46,10 +48,11 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 			defer close(done[node.Name])
 			defer func() {
 				if r := recover(); r != nil {
+					err := fmt.Errorf("%s: panic: %v", node.Name, r)
 					mu.Lock()
-					errs[node.Name] = fmt.Errorf("%s: panic: %v", node.Name, r)
+					errs[node.Name] = err
 					mu.Unlock()
-					cancel()
+					cancel(err)
 				}
 			}()
 
@@ -60,15 +63,16 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 					depErr := errs[dep]
 					mu.Unlock()
 					if depErr != nil {
+						err := fmt.Errorf("skipped: dependency %q failed", dep)
 						mu.Lock()
-						errs[node.Name] = fmt.Errorf("skipped: dependency %q failed", dep)
+						errs[node.Name] = err
 						mu.Unlock()
-						cancel()
+						cancel(err)
 						return
 					}
 				case <-childCtx.Done():
 					mu.Lock()
-					errs[node.Name] = childCtx.Err()
+					errs[node.Name] = context.Cause(childCtx)
 					mu.Unlock()
 					return
 				}
@@ -78,7 +82,7 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 				mu.Lock()
 				errs[node.Name] = err
 				mu.Unlock()
-				cancel()
+				cancel(err)
 			}
 		}(f)
 	}
@@ -143,13 +147,11 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 		node.Init()
 	}
 
+	// Attempted before BeforeAll runs: whatever it reaches, a failed, panicked
+	// or cancelled setup included, is released by AfterAll in the teardown
+	// pass, which must tolerate partial state.
+	tracker.markAttempted(node)
 	if err := runBeforeAllWithRetry(ctx, node); err != nil {
-		// An overrun setup completed its work before the verdict landed, so the
-		// resources it created exist. Marking it succeeded keeps its AfterAll in
-		// the teardown pass; the run still fails on the returned error.
-		if errors.Is(err, ErrSetupOverran) {
-			tracker.markSucceeded(node)
-		}
 		return err
 	}
 
@@ -184,21 +186,20 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 				<-done[dep]
 			}
 
-			if tracker.isSucceeded(node) {
-				if node.SharedState != nil {
-					if runDehydrate(node) {
-						mu.Lock()
-						failed[node.Name] = true
-						mu.Unlock()
-					}
-					return // shared state nodes don't have AfterAll in test process
-				}
-
-				if runAfterAll(node) {
+			if node.SharedState != nil {
+				if tracker.isSucceeded(node) && runDehydrate(node) {
 					mu.Lock()
 					failed[node.Name] = true
 					mu.Unlock()
 				}
+				return // shared state nodes don't have AfterAll in test process
+			}
+			// A fixture whose BeforeAll ran is released whether it succeeded
+			// or not; one that never started has nothing to release.
+			if tracker.isAttempted(node) && runAfterAll(node) {
+				mu.Lock()
+				failed[node.Name] = true
+				mu.Unlock()
 			}
 		}(f)
 	}
@@ -230,6 +231,7 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 		Retries:    node.Config.Retries,
 		RetryDelay: node.Config.RetryDelay,
 		BeforeAll:  node.BeforeAll,
+		AfterAll:   node.AfterAll,
 	}))
 }
 
@@ -343,12 +345,33 @@ func anyNodeHasSharedState(fixtures []*FixtureNode) bool {
 type nodeTracker struct {
 	mu        sync.Mutex
 	succeeded map[*FixtureNode]bool
+	attempted map[*FixtureNode]bool
 }
 
 func (t *nodeTracker) markSucceeded(node *FixtureNode) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.succeeded[node] = true
+	if t.attempted == nil {
+		t.attempted = map[*FixtureNode]bool{}
+	}
+	t.attempted[node] = true
+}
+
+// markAttempted records that node's BeforeAll ran, whatever came of it.
+func (t *nodeTracker) markAttempted(node *FixtureNode) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.attempted == nil {
+		t.attempted = map[*FixtureNode]bool{}
+	}
+	t.attempted[node] = true
+}
+
+func (t *nodeTracker) isAttempted(node *FixtureNode) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.attempted[node]
 }
 
 func (t *nodeTracker) isSucceeded(node *FixtureNode) bool {

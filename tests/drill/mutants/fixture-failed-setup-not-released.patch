@@ -1,0 +1,12 @@
+Expect: fixturesetupfail: hooks ran \[fixture.BeforeAll\], want
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -196,7 +196,7 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
+ 			}
+ 			// A fixture whose BeforeAll ran is released whether it succeeded
+ 			// or not; one that never started has nothing to release.
+-			if tracker.isAttempted(node) && runAfterAll(node) {
++			if tracker.isSucceeded(node) && runAfterAll(node) {
+ 				mu.Lock()
+ 				failed[node.Name] = true
+ 				mu.Unlock()

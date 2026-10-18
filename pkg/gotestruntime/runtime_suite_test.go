@@ -184,7 +184,8 @@ func (s *RuntimeTestSuite) TestRetry_SucceedsOnSecondAttempt(t *gotest.T) {
 
 	mustEqual(t, 0, exitCode)
 	mustEqual(t, 2, attempts)
-	mustEqual(t, []string{"root.init", "root.beforeAll", "m.run", "root.afterAll"}, rec.names())
+	// The failed first attempt is released before the retry builds anew.
+	mustEqual(t, []string{"root.init", "root.afterAll", "root.beforeAll", "m.run", "root.afterAll"}, rec.names())
 }
 
 func (s *RuntimeTestSuite) TestRetry_ExhaustedRetriesReturnsExitCode2(t *gotest.T) {
@@ -214,7 +215,8 @@ func (s *RuntimeTestSuite) TestRetry_ExhaustedRetriesReturnsExitCode2(t *gotest.
 	mustEqual(t, 2, exitCode)
 	mustEqual(t, 2, attempts)
 	mustFalse(t, mRunCalled)
-	mustEqual(t, []string{}, rec.names())
+	// Released once between the two attempts and once after the final failure.
+	mustEqual(t, []string{"root.afterAll", "root.afterAll"}, rec.names())
 }
 
 func (s *RuntimeTestSuite) TestRetry_DelayObservedBetweenAttempts(t *gotest.T) {
@@ -514,14 +516,50 @@ func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
-	// ChildA.AfterAll NOT called (never succeeded)
-	mustNotContain(t, events, "childA.afterAll")
-	// ChildB.AfterAll NOT called (cancelled before success)
-	mustNotContain(t, events, "childB.afterAll")
+	// ChildA's BeforeAll ran and failed: whatever it reached is released.
+	mustContain(t, events, "childA.afterAll")
+	// ChildB's BeforeAll ran and was cancelled: released as well.
+	mustContain(t, events, "childB.afterAll")
 	// ChildB.BeforeAll should have been cancelled, not completed
 	mustNotContain(t, events, "childB.beforeAll.completed")
 	// Root.AfterAll IS called (root succeeded)
 	mustContain(t, events, "root.afterAll")
+}
+
+func (s *RuntimeTestSuite) TestChildFailure_ReportsTheCause(t *gotest.T) {
+	aFailed := make(chan struct{})
+	a := &gotestruntime.FixtureNode{Name: "A", Config: gotest.FixtureConfig{Timeout: time.Minute},
+		BeforeAll: func(ctx context.Context) error { close(aFailed); return errors.New("A refused to start") }}
+	b := &gotestruntime.FixtureNode{Name: "B", Config: gotest.FixtureConfig{Timeout: time.Minute},
+		BeforeAll: func(ctx context.Context) error { <-aFailed; <-ctx.Done(); return ctx.Err() }}
+	err := gotestruntime.ExportSetupDAG(context.Background(), []*gotestruntime.FixtureNode{a, b}, nil, gotestruntime.ExportNewNodeTracker())
+	// B saw its context end, but the error the run reports is why: A's failure.
+	gotest.ErrorContains(t, err, "A refused to start")
+	gotest.NotContains(t, err.Error(), "context canceled")
+}
+
+func (s *RuntimeTestSuite) TestChildFailure_SkippedChildIsNotTornDown(t *gotest.T) {
+	rec := &recorder{}
+	root := &gotestruntime.FixtureNode{
+		Name:      "Root",
+		Config:    gotest.DefaultFixtureConfig(),
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { rec.record("root.beforeAll"); return errors.New("root fails") },
+		AfterAll:  func(ctx context.Context) error { rec.record("root.afterAll"); return nil },
+	}
+	child := &gotestruntime.FixtureNode{
+		Name:      "Child",
+		Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { rec.record("child.beforeAll"); return nil },
+		AfterAll:  func(ctx context.Context) error { rec.record("child.afterAll"); return nil },
+	}
+
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: under(root, child)})
+
+	mustEqual(t, 2, exitCode)
+	// The root ran and failed: released. The child never started: nothing to release.
+	mustEqual(t, []string{"root.beforeAll", "root.afterAll"}, rec.names())
 }
 
 func (s *RuntimeTestSuite) TestChildFailure_SucceededSiblingGetsAfterAll(t *gotest.T) {
@@ -571,8 +609,8 @@ func (s *RuntimeTestSuite) TestChildFailure_SucceededSiblingGetsAfterAll(t *gote
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
-	// ChildA never succeeded
-	mustNotContain(t, events, "childA.afterAll")
+	// ChildA ran and failed → AfterAll releases what it reached
+	mustContain(t, events, "childA.afterAll")
 	// ChildB succeeded → AfterAll must be called
 	mustContain(t, events, "childB.afterAll")
 	// Root succeeded → AfterAll must be called
@@ -725,8 +763,9 @@ func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
-	mustNotContain(t, events, "rootA.afterAll")
-	mustNotContain(t, events, "rootB.afterAll")
+	// A failed and B was cancelled mid-setup: both ran BeforeAll, both are released.
+	mustContain(t, events, "rootA.afterAll")
+	mustContain(t, events, "rootB.afterAll")
 }
 
 func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentTeardown(t *gotest.T) {
@@ -1146,7 +1185,8 @@ func (s *RuntimeTestSuite) TestDAG_DependencyFailure_SkipsDependents(t *gotest.T
 	events := rec.names()
 	mustNotContain(t, events, "child.beforeAll")
 	mustNotContain(t, events, "child.afterAll")
-	mustNotContain(t, events, "root.afterAll")
+	// The root ran and failed: released. The child never started: not.
+	mustContain(t, events, "root.afterAll")
 }
 
 func (s *RuntimeTestSuite) TestDAG_DependencyFailure_PartialTeardown(t *gotest.T) {
@@ -1202,7 +1242,8 @@ func (s *RuntimeTestSuite) TestDAG_DependencyFailure_PartialTeardown(t *gotest.T
 	events := rec.names()
 	mustContain(t, events, "a.beforeAll")
 	mustContain(t, events, "a.afterAll")
-	mustNotContain(t, events, "b.afterAll")
+	// B ran and failed: released with whatever it reached.
+	mustContain(t, events, "b.afterAll")
 }
 
 func (s *RuntimeTestSuite) TestDAG_ComputeMaxPath(t *gotest.T) {

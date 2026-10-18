@@ -122,6 +122,9 @@ func main() {
 			Retries:    ƒcfg_{{ $f.VarName }}.Retries,
 			RetryDelay: ƒcfg_{{ $f.VarName }}.RetryDelay,
 			BeforeAll:  {{ $f.VarName }}.BeforeAll,
+{{- if $f.HasAfterAll }}
+			AfterAll:   {{ $f.VarName }}.AfterAll,
+{{- end }}
 		})
 		if ƒerrs[{{ $i }}] != nil {
 			return

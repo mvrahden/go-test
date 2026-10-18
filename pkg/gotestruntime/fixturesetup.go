@@ -30,6 +30,10 @@ type FixtureSetup struct {
 	// up" and reports success — callers that populate a FixtureSetup by hand and
 	// leave this out get a pass, not a failure.
 	BeforeAll func(ctx context.Context) error
+	// AfterAll releases what a failed attempt reached before the next attempt
+	// runs, so a retry never builds on top of a half-initialised one. Nil
+	// releases nothing between attempts.
+	AfterAll func(ctx context.Context) error
 }
 
 // ErrSetupOverran reports a BeforeAll that returned success only after its
@@ -98,6 +102,11 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 		}
 		if i < attempts-1 {
 			fmt.Fprintf(os.Stderr, "%s.BeforeAll attempt %d/%d failed: %v\n", s.Name, i+1, attempts, lastErr)
+			if s.AfterAll != nil {
+				if RunFixtureTeardown(ctx, FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: s.AfterAll}) {
+					fmt.Fprintf(os.Stderr, "%s.AfterAll between attempts failed; the retry runs anyway\n", s.Name)
+				}
+			}
 			if s.RetryDelay > 0 {
 				select {
 				case <-ctx.Done():

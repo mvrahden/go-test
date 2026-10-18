@@ -43,6 +43,33 @@ func (s *FixtureSetupTestSuite) TestPanicIsContained(t *gotest.T) {
 	})
 }
 
+func (s *FixtureSetupTestSuite) TestRetriesReleaseBetweenAttempts(t *gotest.T) {
+	t.When("BeforeAll fails and is retried", func(w *gotest.T) {
+		w.It("runs AfterAll before each retry, releasing what the failed attempt reached, and not after the success", func(it *gotest.T) {
+			var events []string
+			attempts := 0
+			err := gotestruntime.RunFixtureSetup(context.Background(), gotestruntime.FixtureSetup{
+				Name:    "Flaky",
+				Retries: 2,
+				BeforeAll: func(ctx context.Context) error {
+					attempts++
+					events = append(events, "before")
+					if attempts < 3 {
+						return errors.New("not ready yet")
+					}
+					return nil
+				},
+				AfterAll: func(ctx context.Context) error {
+					events = append(events, "after")
+					return nil
+				},
+			})
+			gotest.NoError(it, err)
+			gotest.Equal(it, []string{"before", "after", "before", "after", "before"}, events)
+		})
+	})
+}
+
 func (s *FixtureSetupTestSuite) TestBudget(t *gotest.T) {
 	t.When("BeforeAll ignores its context and outlives a declared budget", func(w *gotest.T) {
 		w.It("fails the attempt", func(it *gotest.T) {

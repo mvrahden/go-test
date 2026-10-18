@@ -72,6 +72,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -105,6 +106,7 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -334,6 +336,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -525,6 +528,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -701,6 +705,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -894,6 +899,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -927,6 +933,7 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -1156,6 +1163,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1345,6 +1353,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1534,6 +1543,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1723,6 +1733,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1917,6 +1928,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1950,6 +1962,7 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -2179,6 +2192,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -2376,6 +2390,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -2570,6 +2585,7 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -2603,6 +2619,7 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
 		})
 		if ƒerrs[1] != nil {
 			return
