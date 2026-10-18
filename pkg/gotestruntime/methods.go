@@ -46,17 +46,32 @@ type Method struct {
 // AfterEach pairs with its BeforeEach: it is registered only once that
 // succeeded, so a hook never releases what was never acquired. cfg bounds
 // each method's context and budget is the Timeout it is held to, as returned
-// by [OpenSuite]; the budget covers the hooks and the body alike. With cfg.FailFast, a failure stops the methods that have
-// not started yet. Once the run is asked to stop, a method that has not
-// started is skipped with the reason "run stopping".
+// by [OpenSuite]; the budget covers the hooks and the body alike. With
+// cfg.FailFast, the first method that fails stops the ones that have not
+// started: each is skipped with the reason "FailFast: <that method>". The
+// decision reads each method's own verdict, so a failure the suite's
+// BeforeAll recorded without stopping does not trip it. Among parallel
+// methods the stop is best effort: methods already running finish. Once the
+// run is asked to stop, a method that has not started is skipped with the
+// reason "run stopping".
 func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
-	var failed atomic.Bool
+	var failedFirst atomic.Pointer[string]
+	tripped := func() string {
+		if first := failedFirst.Load(); cfg.FailFast && first != nil {
+			return *first
+		}
+		return ""
+	}
 	for _, c := range m.Cases {
-		t.Run(c.Name, func(it *testing.T) {
+		if first := tripped(); first != "" {
+			t.Run(c.Name, func(it *testing.T) { it.Skipf("FailFast: %s", first) })
+			continue
+		}
+		passed := t.Run(c.Name, func(it *testing.T) {
 			if m.Parallel {
 				it.Parallel()
-				if cfg.FailFast && failed.Load() {
-					it.Skip("FailFast: earlier test failed")
+				if first := tripped(); first != "" {
+					it.Skipf("FailFast: %s", first)
 				}
 			}
 			if runstate.StopContext().Err() != nil {
@@ -65,7 +80,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			if m.Parallel {
 				defer func() {
 					if it.Failed() {
-						failed.Store(true)
+						failedFirst.CompareAndSwap(nil, &c.Name)
 					}
 				}()
 			}
@@ -90,8 +105,8 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			}
 			c.Run(tt, func(method func()) { RunTest(tt, budget.Timeout, method) })
 		})
-		if !m.Parallel && cfg.FailFast && t.Failed() {
-			return
+		if !passed {
+			failedFirst.CompareAndSwap(nil, &c.Name)
 		}
 	}
 }

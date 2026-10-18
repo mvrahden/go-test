@@ -42,3 +42,15 @@ func (s *FailFastTestSuite) TestTheRemainingMethodsAreReported(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FailFastTestSuite) TestASoftFailureBeforeTheMethods(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/failfastsoft/")
+	gotest.NoError(t, err)
+	t.When("BeforeAll of a FailFast suite records a failure without stopping and no method fails", func(w *gotest.T) {
+		w.It("runs every method", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "pass", run.Verdict("TestSoftFailFastTestSuite/TestFirst"))
+			gotest.Equal(it, "pass", run.Verdict("TestSoftFailFastTestSuite/TestSecond"))
+		})
+	})
+}

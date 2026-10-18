@@ -1,0 +1,12 @@
+Expect: failfast: missing "failfast skip TestFailFastTestSuite/TestSecond"
+Clause: when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -64,7 +64,6 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
+ 	}
+ 	for _, c := range m.Cases {
+ 		if first := tripped(); first != "" {
+-			t.Run(c.Name, func(it *testing.T) { it.Skipf("FailFast: %s", first) })
+ 			continue
+ 		}
+ 		passed := t.Run(c.Name, func(it *testing.T) {

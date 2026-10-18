@@ -417,6 +417,34 @@ func (s *CanaryTestSuite) TestAPanickingBenchmarkStillTearsDown(t *gotest.T) {
 	}
 }
 
+// After the first failure a FailFast suite reports the methods it did not
+// run: each is skipped, naming the method that stopped the suite.
+func (s *CanaryTestSuite) TestFailFastReportsWhatItSkipped(t *gotest.T) {
+	code, rows := s.run(t, "failfast", t.TempDir())
+	if code != 1 {
+		t.Errorf("failfast: exit code %d, want 1", code)
+	}
+	for _, want := range []string{"failfast fail TestFailFastTestSuite/TestFirst", "failfast skip TestFailFastTestSuite/TestSecond", "failfast skip TestFailFastTestSuite/TestThird"} {
+		if !slices.Contains(rows, want) {
+			t.Errorf("failfast: missing %q in %v", want, rows)
+		}
+	}
+	if !strings.Contains(s.lastStream, "FailFast: TestFirst") {
+		t.Errorf("failfast: the skipped methods do not name TestFirst as the reason")
+	}
+}
+
+// FailFast reads each method's own verdict: a failure BeforeAll recorded
+// without stopping does not stop the methods.
+func (s *CanaryTestSuite) TestFailFastIgnoresASoftSuiteFailure(t *gotest.T) {
+	_, rows := s.run(t, "failfastsoft", t.TempDir())
+	for _, want := range []string{"failfastsoft pass TestSoftFailFastTestSuite/TestFirst", "failfastsoft pass TestSoftFailFastTestSuite/TestSecond"} {
+		if !slices.Contains(rows, want) {
+			t.Errorf("failfastsoft: missing %q in %v", want, rows)
+		}
+	}
+}
+
 // A run stopped while a method holds: the methods not yet started are skipped
 // with the reason run stopping, the holding method's context ends, and AfterAll
 // runs before the fixture is released. Ring 0: the conformance suite that

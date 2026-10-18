@@ -123,6 +123,8 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `fixture-report-in-runtime` | a failing fixture hook is reported from the runtime's own file | canary: the hook-failing fixture's report does not name the hook's file |
 | `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixture's method passes instead of failing its budget |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
+| `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
+| `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
 
 ## Adding a mutant
 

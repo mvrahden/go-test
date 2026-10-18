@@ -2415,6 +2415,46 @@
               "name": "TestTheRemainingMethodsAreReported",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs every method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_every_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll of a FailFast suite records a failure without stopping and no method fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "BeforeAll_of_a_FailFast_suite_records_a_failure_without_stopping_and_no_method_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASoftFailureBeforeTheMethods",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASoftFailureBeforeTheMethods",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FailFast",
@@ -2879,7 +2919,7 @@
     }
   ],
   "stats": {
-    "behaviors": 117,
+    "behaviors": 118,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
