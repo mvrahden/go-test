@@ -375,8 +375,10 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"no second copy of the teardown policy may remain")
 			gotest.Contains(it, code, "Budget:   ƒbudget_sf0,",
 				"a declared Timeout must become a teardown verdict")
-			gotest.Contains(it, code, "if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {",
-				"a setup that overran its budget still initialized — its resources exist and must be released")
+			gotest.Contains(it, code, "if ƒtorn[0] || !ƒattempted[0] {",
+				"a fixture whose BeforeAll never ran has nothing to release")
+			gotest.NotContains(it, code, "if ƒerrs[0] == nil",
+				"a fixture whose BeforeAll ran is released however it came out: a failed attempt may hold what it reached")
 		})
 
 		w.It("gives an undeclared config no teardown verdict", func(it *gotest.T) {
@@ -471,7 +473,6 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"bufio",
 				"context",
 				"encoding/json",
-				"errors",
 				"fmt",
 				"os",
 				"os/signal",
