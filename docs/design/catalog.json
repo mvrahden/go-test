@@ -2604,52 +2604,13 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails that row and no other",
+                      "display": "fails that row and the method, and the rows after it never run",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "fails_that_row_and_no_other",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "fails the method",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "fails_the_method",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "still runs the rows after it",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "still_runs_the_rows_after_it",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "runs the rest of the method after the table",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "runs_the_rest_of_the_method_after_the_table",
+                      "name": "fails_that_row_and_the_method,_and_the_rows_after_it_never_run",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -2662,6 +2623,33 @@
                   "focused": false,
                   "kind": "block",
                   "name": "one_row_of_an_Each_table_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "skips that row and the method from there, and the rows after it never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "skips_that_row_and_the_method_from_there,_and_the_rows_after_it_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one row of an Each table skips",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_row_of_an_Each_table_skips",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -2694,13 +2682,13 @@
                   "vocab": "when"
                 }
               ],
-              "display": "RowsAreIsolated",
+              "display": "RowsAreSubtests",
               "duration": 0,
               "excluded": false,
               "external": false,
               "focused": false,
               "kind": "method",
-              "name": "TestRowsAreIsolated",
+              "name": "TestRowsAreSubtests",
               "output": [],
               "status": "none"
             }
@@ -3472,7 +3460,7 @@
     }
   ],
   "stats": {
-    "behaviors": 130,
+    "behaviors": 128,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

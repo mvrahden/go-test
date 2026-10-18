@@ -134,6 +134,7 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
 | `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | canary: the guarded suite's failed row is missing from the stream |
 | `release-leaves-the-group` | releasing a suite's process tree leaves its stragglers alive | canary: a sleep the test never waited for outlives the run |
 | `method-panic-recovered` | the method loop swallows a method's panic | canary: the panicking method passes and its sibling runs to the end |
+| `each-rows-share-the-method-verdict` | an Each row's assertions report on the method, not the row's subtest | canary: the failing row passes on its own and the row verdicts of the golden list are off |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture's run, results or teardown order differ |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |

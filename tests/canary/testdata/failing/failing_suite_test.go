@@ -71,3 +71,16 @@ func (s *FailingTestSuite) TestBehavior(t *gotest.T) {
 		w.It("is reported at the leaf", func(it *gotest.T) { gotest.Equal(it, "a", "b") })
 	})
 }
+
+type failingRow struct {
+	Desc string
+	ok   bool
+}
+
+// TestEachRow fails in its second row: the row and the method fail, the
+// first row passes on its own.
+func (s *FailingTestSuite) TestEachRow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []failingRow{{"first", true}, {"second", false}}) {
+		gotest.True(it, r.ok)
+	}
+}

@@ -59,14 +59,26 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	var result bool
 
 	// Deferred, so the subtest is released and awaited even when yield leaves
-	// via Goexit — that unwinds straight past the inner closure below.
+	// via Goexit — that unwinds straight past the inner closure below. A body
+	// that left early cannot be resumed: Go's range-over-func refuses to go
+	// on after the loop body exited abnormally. So the Goexit carries on into
+	// the method with the row's verdict — failed, or skipped with its reason —
+	// instead of reaching the testing package as a bare Goexit, which it
+	// reports as a failure.
 	defer func() {
 		close(done)
 		<-finished
 		if captured != nil {
 			panic(captured)
 		}
-		if goexited && tt.Failed() {
+		switch {
+		case !goexited:
+		case tt.Failed():
+			parent.t.FailNow()
+		case tt.Skipped():
+			parent.t.Skipf("skipped at row %s", name)
+		default:
+			parent.t.Errorf("row %s left through runtime.Goexit without a verdict", name)
 			parent.t.FailNow()
 		}
 	}()

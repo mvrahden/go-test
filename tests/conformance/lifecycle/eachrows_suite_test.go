@@ -5,8 +5,9 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// EachRowsTestSuite: every row of an Each table is its own subtest; one
-// failing row fails the method, not the table.
+// EachRowsTestSuite: every row of an Each table is its own subtest with its
+// own verdict; a row that leaves early ends the method there, as a fatal
+// assertion anywhere in a method does.
 type EachRowsTestSuite struct{}
 
 func (s *EachRowsTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -15,24 +16,26 @@ func (s *EachRowsTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
-func (s *EachRowsTestSuite) TestRowsAreIsolated(t *gotest.T) {
+func (s *EachRowsTestSuite) TestRowsAreSubtests(t *gotest.T) {
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/eachrows/")
 	gotest.NoError(t, err)
 	t.When("one row of an Each table fails", func(w *gotest.T) {
-		w.It("fails that row and no other", func(it *gotest.T) {
+		w.It("fails that row and the method, and the rows after it never run", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestAFailingRow/first"))
 			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestAFailingRow/second"))
-			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestAFailingRow/third"))
-		})
-		w.It("fails the method", func(it *gotest.T) {
 			gotest.Equal(it, "fail", run.Verdict("TestEachRowsTestSuite/TestAFailingRow"))
+			gotest.NotContains(it, run.Markers, "row third")
+			gotest.NotContains(it, run.Markers, "after the loop")
 		})
-		w.It("still runs the rows after it", func(it *gotest.T) {
-			gotest.Contains(it, run.Markers, "row third")
-		})
-		w.It("runs the rest of the method after the table", func(it *gotest.T) {
-			gotest.Contains(it, run.Markers, "after the loop")
+	})
+	t.When("one row of an Each table skips", func(w *gotest.T) {
+		w.It("skips that row and the method from there, and the rows after it never run", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestEachRowsTestSuite/TestASkippingRow/first"))
+			gotest.Equal(it, "skip", run.Verdict("TestEachRowsTestSuite/TestASkippingRow/second"))
+			gotest.Equal(it, "skip", run.Verdict("TestEachRowsTestSuite/TestASkippingRow"), "stdout: %s", run.Stdout)
+			gotest.NotContains(it, run.Markers, "skip third")
+			gotest.NotContains(it, run.Markers, "after the skip")
 		})
 	})
 	t.When("the loop over an Each table breaks", func(w *gotest.T) {

@@ -541,6 +541,15 @@ for t, entry := range gotest.Each(t, entries) {
 }
 ```
 Subtest names are derived from the entry struct's `Desc` or `Name` string field (if present), otherwise `#0`, `#1`, etc.
+Every row is its own subtest with its own verdict. A row that leaves early ends the method
+there — Go's range-over-func cannot resume a loop whose body left through `FailNow` or
+`Skipf` — so a row that should merely be passed over uses `continue`:
+
+> when one row of an Each table fails → fails that row and the method, and the rows after it never run
+
+> when one row of an Each table skips → skips that row and the method from there, and the rows after it never run
+
+> when the loop over an Each table breaks → stops at the break and the method goes on
 
 ## Utilities
 

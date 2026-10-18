@@ -1,4 +1,5 @@
-// Package eachrows runs Each tables in which one row fails and one loop breaks.
+// Package eachrows runs Each tables in which one row fails, one row skips
+// and one loop breaks.
 package eachrows
 
 import (
@@ -40,4 +41,14 @@ func (s *EachRowsTestSuite) TestBreak(t *gotest.T) {
 		break
 	}
 	mark("after the break")
+}
+
+func (s *EachRowsTestSuite) TestASkippingRow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"first", true}, {"second", false}, {"third", true}}) {
+		mark("skip " + r.Desc)
+		if !r.ok {
+			it.Skipf("the %s row is not for this run", r.Desc)
+		}
+	}
+	mark("after the skip")
 }
