@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -79,7 +80,11 @@ func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {
 
 	t.When("the first cycle over an absolute path completes", func(w *gotest.T) {
 		w.It("announced the cycle's start and end with a green exit", func(it *gotest.T) {
-			gotest.Contains(it, start, pkg)
+			var started struct {
+				Package string `json:"Package"`
+			}
+			gotest.NoError(it, json.Unmarshal([]byte(start), &started), "watch-start line: %s", start)
+			gotest.Equal(it, pkg, started.Package)
 			gotest.Contains(it, end, `"Exit":0`)
 		})
 	})

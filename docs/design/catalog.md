@@ -1,6 +1,6 @@
 # Behavior Specification
 
-11 suites, 68 behaviors. Read from source; nothing was executed.
+11 suites, 69 behaviors. Read from source; nothing was executed.
 
 ## BenchGate
 
@@ -173,6 +173,13 @@
 | **when a source file is named by path** |
 | &nbsp;&nbsp;a relative path scaffolds beside the file |
 | &nbsp;&nbsp;an absolute path scaffolds beside the file |
+
+### ASymlinkedPath
+
+| Behavior |
+|----------|
+| **when a source file is named by an absolute path through a symlinked directory** |
+| &nbsp;&nbsp;scaffolds beside the file |
 
 ## CLIStreams
 

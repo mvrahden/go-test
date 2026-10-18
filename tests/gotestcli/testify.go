@@ -24,6 +24,10 @@ type TestifyModuleSharedFixture struct {
 func (f *TestifyModuleSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 	cfg := gotest.DefaultFixtureConfig()
 	cfg.Timeout = 5 * time.Minute
+	// go mod tidy downloads testify; a runner's DNS blip is retried, not
+	// counted against the suites that read the module.
+	cfg.Retries = 2
+	cfg.RetryDelay = 10 * time.Second
 	return cfg
 }
 

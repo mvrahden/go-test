@@ -76,3 +76,28 @@ func (s *RunOraclesTestSuite) TestRunCLIReportsStreamsAndExit(t *gotest.T) {
 		})
 	})
 }
+
+// RepoRootTestSuite: the repository is found by its go.mod however the
+// checkout wrote the file's line endings.
+type RepoRootTestSuite struct{}
+
+func (s *RepoRootTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
+func (s *RepoRootTestSuite) TestTheModuleLineIsRecognised(t *gotest.T) {
+	t.When("go.mod names this module", func(w *gotest.T) {
+		w.It("is recognised with LF line endings", func(it *gotest.T) {
+			gotest.True(it, testkit.ExportIsRepoModule([]byte("module github.com/mvrahden/go-test\n\ngo 1.26.0\n")))
+		})
+		w.It("is recognised with CRLF line endings, as a Windows checkout writes them", func(it *gotest.T) {
+			gotest.True(it, testkit.ExportIsRepoModule([]byte("module github.com/mvrahden/go-test\r\n\r\ngo 1.26.0\r\n")))
+		})
+		w.It("does not take a consumer module for the repository", func(it *gotest.T) {
+			gotest.False(it, testkit.ExportIsRepoModule([]byte("module github.com/mvrahden/go-test-consumer\n")))
+			gotest.False(it, testkit.ExportIsRepoModule([]byte("module example.com/m\n\nrequire github.com/mvrahden/go-test v1.0.0\n")))
+		})
+	})
+}

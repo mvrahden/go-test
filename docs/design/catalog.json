@@ -1267,6 +1267,46 @@
               "name": "TestFilePaths",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "scaffolds beside the file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "scaffolds_beside_the_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a source file is named by an absolute path through a symlinked directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_source_file_is_named_by_an_absolute_path_through_a_symlinked_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASymlinkedPath",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASymlinkedPath",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIScaffoldPaths",
@@ -1757,7 +1797,7 @@
     }
   ],
   "stats": {
-    "behaviors": 68,
+    "behaviors": 69,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

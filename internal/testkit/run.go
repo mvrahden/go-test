@@ -212,7 +212,7 @@ func RepoRoot() (string, error) {
 	}
 	for {
 		data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
-		if err == nil && strings.HasPrefix(string(data), "module github.com/mvrahden/go-test\n") {
+		if err == nil && isRepoModule(data) {
 			return dir, nil
 		}
 		parent := filepath.Dir(dir)
@@ -221,4 +221,12 @@ func RepoRoot() (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// isRepoModule reports whether a go.mod declares this repository's module. A
+// Windows checkout writes CRLF line endings, so the first line is compared
+// without its terminator.
+func isRepoModule(goMod []byte) bool {
+	first, _, _ := strings.Cut(string(goMod), "\n")
+	return strings.TrimRight(first, "\r") == "module github.com/mvrahden/go-test"
 }

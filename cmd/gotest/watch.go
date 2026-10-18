@@ -574,10 +574,12 @@ func dirsToPatterns(dirs []string) []string {
 
 // dirPattern is the package pattern for a directory: an absolute or an
 // explicitly relative path is one already; a bare relative one needs ./ so
-// go does not read it as an import path.
+// go does not read it as an import path. A slash-rooted path counts as
+// absolute on every platform: Windows would call it relative for lacking a
+// volume, and "./" in front of it names nothing.
 func dirPattern(dir string) string {
 	dir = filepath.ToSlash(dir)
-	if dir == "." || filepath.IsAbs(dir) || strings.HasPrefix(dir, "./") || strings.HasPrefix(dir, "../") {
+	if dir == "." || filepath.IsAbs(dir) || strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, "./") || strings.HasPrefix(dir, "../") {
 		return dir
 	}
 	return "./" + dir
