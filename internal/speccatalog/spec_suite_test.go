@@ -191,3 +191,42 @@ func (s *SpecTestSuite) TestShape(t *gotest.T) {
 		})
 	})
 }
+
+const longFenceSpec = "# CLI Specification\n" +
+	"\n" +
+	"## Purpose\n" +
+	"How the gotest command line answers the invocations it is given.\n" +
+	"\n" +
+	"## Requirements\n" +
+	"\n" +
+	"### Requirement: Version\n" +
+	"The version subcommand SHALL exit 0.\n" +
+	"\n" +
+	"#### Scenario: Asking for the version\n" +
+	"- **WHEN** the version subcommand runs\n" +
+	"- **THEN** exits 0\n" +
+	"\n" +
+	"````markdown\n" +
+	"```\n" +
+	"- **WHEN** inside\n" +
+	"### Requirement: Inside the fence\n" +
+	"````\n" +
+	"\n" +
+	"### Requirement: After the fence\n" +
+	"It SHALL be read.\n" +
+	"\n" +
+	"#### Scenario: Read\n" +
+	"- **WHEN** the fence has closed\n" +
+	"- **THEN** is read\n"
+
+func (s *SpecTestSuite) TestFences(t *gotest.T) {
+	spec := speccatalog.ParseSpec("cli", "specs/cli/spec.md", []byte(longFenceSpec))
+	t.When("a four-backtick fence holds a three-backtick line", func(w *gotest.T) {
+		w.It("stays open until a closing line as long as its opener", func(it *gotest.T) {
+			gotest.Len(it, spec.Requirements, 2)
+			gotest.Equal(it, []string{"the version subcommand runs"}, spec.Requirements[0].Scenarios[0].Whens)
+			gotest.Equal(it, "After the fence", spec.Requirements[1].Name)
+			gotest.Empty(it, spec.Problems())
+		})
+	})
+}

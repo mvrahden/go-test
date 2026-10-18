@@ -84,15 +84,17 @@ func (s *GuidesTestSuite) TestLinksIntoSpecsResolve(t *gotest.T) {
 		for _, l := range speccatalog.SpecLinks(g.path, g.data) {
 			a, ok := anchors[l.Spec]
 			if !ok {
-				data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(l.Spec))) //nolint:gosec // G304: a path under specs/
-				if err == nil {
+				p := filepath.Join(root, filepath.FromSlash(l.Spec))
+				if info, err := os.Stat(p); err == nil && info.IsDir() {
+					a = map[string]bool{} // a directory has no anchor
+				} else if data, err := os.ReadFile(p); err == nil { //nolint:gosec // G304: a path under specs/
 					a = speccatalog.Anchors(data)
 				}
 				anchors[l.Spec] = a
 			}
 			switch {
 			case a == nil:
-				broken = append(broken, fmt.Sprintf("%s:%d: %s: the link names no file in specs/; link an existing spec", l.File, l.Line, l.Target))
+				broken = append(broken, fmt.Sprintf("%s:%d: %s: the link names no file or directory in specs/; link an existing spec", l.File, l.Line, l.Target))
 			case l.Anchor != "" && !a[l.Anchor]:
 				broken = append(broken, fmt.Sprintf("%s:%d: %s: the link names no requirement in %s; use the anchor of its heading", l.File, l.Line, l.Target, l.Spec))
 			}

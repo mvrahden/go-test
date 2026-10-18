@@ -72,7 +72,7 @@ func ParseSpec(capability, file string, data []byte) Spec {
 		req     *Requirement
 		reqText []string
 		sc      *Scenario
-		fence   string
+		f       fence
 	)
 	closeScenario := func() {
 		if sc != nil {
@@ -93,17 +93,10 @@ func ParseSpec(capability, file string, data []byte) Spec {
 	}
 	text := strings.ReplaceAll(string(data), "\r\n", "\n")
 	for i, raw := range strings.Split(text, "\n") {
+		if f.skip(raw) {
+			continue
+		}
 		line := strings.TrimSpace(raw)
-		if fence != "" {
-			if strings.HasPrefix(line, fence) {
-				fence = ""
-			}
-			continue
-		}
-		if strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~") {
-			fence = line[:3]
-			continue
-		}
 		switch {
 		case strings.HasPrefix(line, "#### "):
 			if req == nil {
