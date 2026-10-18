@@ -44,6 +44,12 @@ func RunPackage(ctx context.Context, markerDir, pkg string, args ...string) (Run
 	return runCLI(ctx, ".", markerDir, nil, append([]string{"-json", pkg}, args...)...)
 }
 
+// RunPackageWithEnv is RunPackage with extra KEY=VALUE pairs for the child,
+// so a fixture package under test can be told how to behave.
+func RunPackageWithEnv(ctx context.Context, markerDir string, env []string, pkg string, args ...string) (Run, error) {
+	return runCLI(ctx, ".", markerDir, env, append([]string{"-json", pkg}, args...)...)
+}
+
 // RunCLI runs the built CLI in dir with args and returns its exit code and
 // streams; -json events on stdout are parsed when present. Markers go to a
 // temporary directory that is discarded, so Markers is empty.
@@ -84,8 +90,8 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 		run.Exit = exitErr.ExitCode()
 	}
 	run.Stdout, run.Stderr = stdout.String(), stderr.String()
-	run.Events = parseEvents(stdout.Bytes())
-	run.Markers, err = readMarkers(filepath.Join(markerDir, MarkersFile))
+	run.Events = ParseEvents(stdout.Bytes())
+	run.Markers, err = ReadMarkers(filepath.Join(markerDir, MarkersFile))
 	return run, err
 }
 
@@ -149,7 +155,8 @@ func childEnv(markerDir string) []string {
 	return append(env, "GOTEST_CANARY_DIR="+markerDir)
 }
 
-func parseEvents(stdout []byte) []Event {
+// ParseEvents reads the go test -json events among stdout's lines.
+func ParseEvents(stdout []byte) []Event {
 	var events []Event
 	for _, line := range bytes.Split(stdout, []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {
@@ -164,7 +171,8 @@ func parseEvents(stdout []byte) []Event {
 	return events
 }
 
-func readMarkers(path string) ([]string, error) {
+// ReadMarkers reads the markers file at path; a missing file is no markers.
+func ReadMarkers(path string) ([]string, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // G304: a file inside the caller's own marker directory
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
