@@ -160,13 +160,13 @@ func childEnv(canaryDir string) []string {
 }
 
 // check runs a fixture and compares exit code and rows with the golden.
-func (s *CanaryTestSuite) check(t *gotest.T, pkg string) string {
+func (s *CanaryTestSuite) check(t *gotest.T, pkg string, extra ...string) string {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)
 	}
 	dir := t.TempDir()
-	code, rows := s.run(t, pkg, dir)
+	code, rows := s.run(t, pkg, dir, extra...)
 	if code != want.exit {
 		t.Errorf("%s: exit code %d, want %d", pkg, code, want.exit)
 	}
@@ -270,7 +270,9 @@ func (s *CanaryTestSuite) TestSeedsReplayWithVerdicts(t *gotest.T) {
 // An async method completes when done() is called from any goroutine; one
 // that never calls it fails at the suite's deadline instead of hanging.
 func (s *CanaryTestSuite) TestAsyncMethodsWaitForDone(t *gotest.T) {
-	s.check(t, "asynchronous")
+	// A wait for done that nothing bounds would hold this run until go test's
+	// own timeout; the global bound names it within a minute instead.
+	s.check(t, "asynchronous", "--timeout=60s")
 }
 
 // Two suites share one package fixture; each runs in its own process with
