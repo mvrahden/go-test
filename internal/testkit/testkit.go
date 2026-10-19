@@ -20,6 +20,13 @@ const goLine = "go 1.26.0"
 
 // BuildCLI builds repoRoot's ./cmd/gotest into dir and returns the binary's path.
 func BuildCLI(ctx context.Context, repoRoot, dir string) (string, error) {
+	if cache := os.Getenv("GOTEST_TEST_CLI_CACHE_DIR"); cache != "" {
+		return cachedCLI(ctx, repoRoot, dir, cache)
+	}
+	return buildCLI(ctx, repoRoot, dir)
+}
+
+func buildCLI(ctx context.Context, repoRoot, dir string) (string, error) {
 	binary := filepath.Join(dir, cliName())
 	cmd := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
 	cmd.Dir = repoRoot

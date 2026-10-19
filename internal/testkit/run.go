@@ -184,13 +184,12 @@ func MarkerOrderOf(got []string, markers ...string) bool {
 }
 
 // cacheDir is the gotest cache of the runs whose markers go to markerDir.
-func cacheDir(markerDir string) string { return filepath.Join(markerDir, "cache") }
 
 // childEnv is the CLI's environment: the caller's, minus the GitHub Actions
 // variables, the CI switches and the snapshot update switch, plus the marker
 // directory, so a run under test sees only the flags it was given. Its gotest
-// cache lives in the marker directory and goes with it: a run from a fresh
-// directory never hits a cache, so it must not fill the user's.
+// cache uses the drill's private worker root when supplied, otherwise the
+// marker directory; neither fills the user's cache.
 func childEnv(markerDir string) []string {
 	env := make([]string, 0, len(os.Environ())+2)
 	for _, kv := range os.Environ() {
@@ -206,7 +205,7 @@ func childEnv(markerDir string) []string {
 		}
 		env = append(env, kv)
 	}
-	return append(env, "GOTEST_CANARY_DIR="+markerDir, protocol.EnvCacheDir+"="+cacheDir(markerDir))
+	return append(env, "GOTEST_CANARY_DIR="+markerDir, protocol.EnvCacheDir+"="+ChildCacheDir(markerDir))
 }
 
 // ChildEnv is the environment runCLI gives the CLI, for a check that starts

@@ -6,7 +6,7 @@ import "time"
 var ExportIsRepoModule = isRepoModule
 
 // ExportCacheDir exposes where a run's gotest cache goes.
-var ExportCacheDir = cacheDir
+var ExportCacheDir = ChildCacheDir
 
 // ExportResolveCLI exposes the build-or-reuse step cli runs once per process.
 var ExportResolveCLI = resolveCLI

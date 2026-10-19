@@ -12,3 +12,5 @@ require (
 )
 
 require golang.org/x/sync v0.23.0 // indirect
+
+tool github.com/mvrahden/go-test/cmd/gotest
