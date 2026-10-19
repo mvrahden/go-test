@@ -167,17 +167,17 @@ func (e *compileError) Error() string {
 	return strings.Join(lines, "\n")
 }
 
-// firstMessage is the first compiler error, without its position.
+// firstMessage is the first compiler error, without its position. A
+// package is only listed as broken with at least one error.
 func (e *compileError) firstMessage() string {
-	for _, b := range e.broken {
-		for _, line := range b.errs {
-			if m := positioned.FindStringSubmatch(line); m != nil {
-				return m[2]
-			}
-			return line
-		}
+	if len(e.broken) == 0 {
+		return ""
 	}
-	return ""
+	line := e.broken[0].errs[0]
+	if m := positioned.FindStringSubmatch(line); m != nil {
+		return m[2]
+	}
+	return line
 }
 
 // positioned matches "file:line[:col]: message".

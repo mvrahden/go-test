@@ -127,7 +127,7 @@ var rewriteRows = []rewriteRow{
 // rowPkg names the package row i is staged in.
 func rowPkg(i int) string { return fmt.Sprintf("row%02d", i) }
 
-func rowSource(i int, row rewriteRow) string {
+func rowSource(i int, row *rewriteRow) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "package %s\n\nimport (\n\t\"testing\"\n", rowPkg(i))
 	for _, imp := range row.imports {
@@ -149,10 +149,10 @@ func (s *LinterRewritesTestSuite) BeforeAll(t *gotest.T) {
 	s.dir, err = os.MkdirTemp("", "gotest-rewrites-")
 	gotest.NoError(t, err)
 	gotest.NoError(t, testkit.WriteModule(root, s.dir, "rewrites"))
-	for i, row := range rewriteRows {
+	for i := range rewriteRows {
 		pkg := filepath.Join(s.dir, rowPkg(i))
 		gotest.NoError(t, os.MkdirAll(pkg, 0o750))
-		gotest.NoError(t, os.WriteFile(filepath.Join(pkg, "row_test.go"), []byte(rowSource(i, row)), 0o600))
+		gotest.NoError(t, os.WriteFile(filepath.Join(pkg, "row_test.go"), []byte(rowSource(i, &rewriteRows[i])), 0o600))
 	}
 
 	s.before = rowVerdicts(t, s.dir)
@@ -233,11 +233,11 @@ func (s *LinterRewritesTestSuite) checkRows(t *gotest.T, group string) {
 	type indexed struct {
 		Desc string
 		i    int
-		row  rewriteRow
+		row  *rewriteRow
 	}
 	var rows []indexed
-	for i, row := range rewriteRows {
-		if row.group == group {
+	for i := range rewriteRows {
+		if row := &rewriteRows[i]; row.group == group {
 			rows = append(rows, indexed{Desc: row.Desc, i: i, row: row})
 		}
 	}
@@ -315,7 +315,7 @@ func fixRow(t *gotest.T, dir, pkg string) string {
 	if fix.Exit != 0 && fix.Exit != 3 {
 		return fmt.Sprintf("lint -fix exit %d: %s", fix.Exit, fix.Stderr)
 	}
-	cmd := exec.CommandContext(t.Context(), "go", "vet", "./"+pkg)
+	cmd := exec.CommandContext(t.Context(), "go", "vet", "./"+pkg) //nolint:gosec // G204: a package this suite staged
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "go vet: " + string(out)
