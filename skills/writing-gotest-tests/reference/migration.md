@@ -11,9 +11,11 @@ did not compile before (it is left untouched) or the files could not all
 be written (nothing is). Generated test files are skipped (named on
 stderr), and only the host OS's builds are checked: run it on each
 platform whose test files differ. The suite's own `s.Equal`,
-`s.Run` (as `t.It`), direct hook calls and most assertions are converted;
-a suite built on a base suite from another package, promoted mixin hooks
-and method values are marked. The module must require go-test first
+`s.Run` (as `t.It`), direct hook calls and most assertions are converted,
+and so is a suite built on a base suite of the same test files (the base
+becomes a helper the child calls); promoted mixin hooks and method values
+are marked, and a base suite declared outside the migrated test files
+exits 2 naming its package. The module must require go-test first
 (`go get -tool`, see `setup.md`). `--dry-run` prints the diff without
 writing (v1.30.2+). Exit 0 does not run the tests: run both runners
 afterwards, and the lint pair (`lint -fix`, then `lint`). Below v1.33 a

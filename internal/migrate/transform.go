@@ -8,6 +8,8 @@ import (
 	"go/types"
 	"strconv"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/refactor"
 )
 
 // transformFile migrates f in place for the unit's migrated suites, wherever
@@ -20,7 +22,20 @@ func (u *unit) transformFile(f *ast.File) bool {
 		}
 		return true
 	})
-	changed := false
+	changed := u.rewriteEmbedded(f)
+
+	// A base kept as a helper under a name gotest would run is renamed
+	// by what each identifier resolves to.
+	for _, s := range u.suites {
+		if !s.helper || !s.migrated() || s.newName == s.obj.Name() {
+			continue
+		}
+		target := refactor.Object{PkgPath: s.obj.Pkg().Path(), Type: s.obj.Name()}
+		for _, id := range refactor.Idents([]*ast.File{f}, u.info, target) {
+			id.Name = s.newName
+			changed = true
+		}
+	}
 
 	// 1. Rename every identifier that resolves to a migrated suite type.
 	// A field, variable or key spelled the same resolves elsewhere.
@@ -90,6 +105,10 @@ func (u *unit) transformFile(f *ast.File) bool {
 					}
 				}
 				st.Fields.List = filtered
+				// A base becomes a named field.
+				for _, e := range s.embeds {
+					e.field.Names = []*ast.Ident{{Name: e.name, NamePos: e.field.Type.Pos()}}
+				}
 				changed = true
 			}
 
@@ -100,6 +119,13 @@ func (u *unit) transformFile(f *ast.File) bool {
 
 	if changed {
 		u.rewriteImports(f, orig)
+	}
+	// The forwarding methods added after formatting take *gotest.T.
+	for _, s := range u.suites {
+		if s.migrated() && s.file.f == f && len(s.forwards) > 0 && !hasImport(f, gotestImport) {
+			addImport(f, gotestImport)
+			changed = true
+		}
 	}
 	return changed
 }
@@ -113,12 +139,17 @@ func (u *unit) transformFunc(f *ast.File, d *ast.FuncDecl) bool {
 	if onSuite {
 		name := d.Name.Name
 		newName, hook := lifecycleRenames[name]
-		if hook || strings.HasPrefix(name, "Test") {
+		fn, _ := u.info.Defs[d.Name].(*types.Func)
+		switch {
+		case hook || strings.HasPrefix(name, "Test"):
 			if hook {
 				d.Name.Name = newName
 			}
 			addGotestTParam(d, freeName(d))
 			u.pointerReceiver(d)
+			changed = true
+		case fn != nil && u.needsT[methodKey(fn)]:
+			addGotestTParam(d, freeName(d))
 			changed = true
 		}
 	}

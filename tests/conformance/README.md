@@ -12,7 +12,7 @@ incomplete, so the index is always the whole, current list.
 
 - One package per capability in `specs/`: `tests/conformance/<capability>`
   verifies `specs/<capability>/spec.md` (`tests/conformance/cli` verifies
-  `specs/cli/spec.md`). The package `migrate` waits for its spec.
+  `specs/cli/spec.md`).
 - A suite groups requirements of its capability (`CLIFlagsTestSuite` in
   `cli`) and a method verifies scenarios of one requirement. Names bind
   nothing; the labels do.

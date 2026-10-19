@@ -50,6 +50,9 @@ func (u *unit) gate() {
 			continue
 		}
 		addPart(parts, s, s.file)
+		if s.helper {
+			continue // gotest does not run it
+		}
 		if !ran[s] {
 			s.note = "no suite.Run ran " + s.obj.Name() + ", so testify never did; gotest runs every suite — prefix it with X_ to keep it off"
 			continue

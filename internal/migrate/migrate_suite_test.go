@@ -210,8 +210,8 @@ func TestScopedSuite(t *testing.T) {
 }
 `
 
-// indirectSrc embeds one suite in another: the base would be renamed and the
-// child left behind, so the file is refused whole.
+// indirectSrc embeds one suite in another by value: the child holds the
+// base in a named field, and the base becomes a helper.
 const indirectSrc = `package sample
 
 import (
@@ -226,6 +226,33 @@ type BaseSuite struct {
 
 type OrderSuite struct {
 	BaseSuite
+}
+
+func (s *OrderSuite) TestOrder() {
+	s.Equal(1, 1)
+}
+
+func TestOrderSuite(t *testing.T) {
+	suite.Run(t, new(OrderSuite))
+}
+`
+
+// indirectPtrSrc embeds one suite in another by pointer, which gotest's new
+// would leave nil, so the file is refused whole.
+const indirectPtrSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type BaseSuite struct {
+	suite.Suite
+}
+
+type OrderSuite struct {
+	*BaseSuite
 }
 
 func (s *OrderSuite) TestOrder() {
@@ -513,17 +540,35 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 		run := s.migrateFile(w, indirectSrc)
 		out := run.files["sample/sample_test.go"]
 
+		w.It("migrates the child and reports the base as a helper", func(it *gotest.T) {
+			gotest.Len(it, run.results, 2)
+			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true}, run.results[0])
+			gotest.Equal(it, "OrderTestSuite", run.results[1].NewName)
+			gotest.Zero(it, run.markers())
+		})
+
+		w.It("holds the base in a named field", func(it *gotest.T) {
+			gotest.Contains(it, out, "type BaseSuite struct {\n}\n\ntype OrderTestSuite struct {\n\tbase BaseSuite\n}")
+			gotest.Contains(it, out, "func (s *OrderTestSuite) TestOrder(t *gotest.T) {\n\tgotest.Equal(t, 1, 1)\n}")
+			gotest.NotContains(it, out, "suite.Run")
+		})
+	})
+
+	t.When("a suite embeds another suite by pointer", func(w *gotest.T) {
+		run := s.migrateFile(w, indirectPtrSrc)
+		out := run.files["sample/sample_test.go"]
+
 		w.It("refuses the file and says why in the result", func(it *gotest.T) {
 			gotest.Len(it, run.results, 1)
-			gotest.Contains(it, run.results[0].Refusal, "OrderSuite embeds BaseSuite")
+			gotest.Contains(it, run.results[0].Refusal, "OrderSuite embeds *BaseSuite; gotest creates a suite with new, which leaves that pointer nil")
 			gotest.Equal(it, 1, run.results[0].Markers)
 		})
 
 		w.It("leaves the source unmigrated apart from the marker", func(it *gotest.T) {
 			gotest.Contains(it, out,
-				"// TODO(gotest-migrate): OrderSuite embeds BaseSuite, not suite.Suite — migrate this file by hand\ntype OrderSuite struct {")
+				"// TODO(gotest-migrate): OrderSuite embeds *BaseSuite; gotest creates a suite with new, which leaves that pointer nil — embed BaseSuite by value, or migrate this file by hand\ntype OrderSuite struct {")
 			gotest.Contains(it, out, "suite.Run(t, new(OrderSuite))")
-			gotest.NotContains(it, out, "BaseTestSuite")
+			gotest.NotContains(it, out, "OrderTestSuite")
 		})
 	})
 
@@ -540,7 +585,7 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 	})
 
 	t.When("a refused file is run again", func(w *gotest.T) {
-		run := s.migrateFile(w, indirectSrc)
+		run := s.migrateFile(w, indirectPtrSrc)
 		results := rerun(w, run)
 
 		w.It("still counts the marker", func(it *gotest.T) {

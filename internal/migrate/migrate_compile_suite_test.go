@@ -497,20 +497,28 @@ func TestAPI(t *testing.T) { suite.Run(t, new(APISuite)) }
 `
 
 func (s *MigrateCompileTestSuite) TestForeignBaseSuite(t *gotest.T) {
-	run := s.migrate(t, map[string]string{
+	root := t.TempDir()
+	files := map[string]string{
 		"testutil/base.go": baseSuiteSrc,
 		"api/a_test.go":    usesBaseSrc,
+	}
+	gotest.NoError(t, s.Mod.Write(root, files))
+	_, err := migrate.MigratePackages([]string{filepath.Join(root, "...")}, migrate.Options{})
+
+	t.It("fails the run, naming the base's package and where the child embeds it", func(it *gotest.T) {
+		outside := gotest.ErrorAs[*migrate.OutsideBaseError](it, err)
+		gotest.Equal(it, filepath.Join(root, "api", "a_test.go"), outside.File)
+		gotest.Equal(it, 10, outside.Line)
+		gotest.Contains(it, outside.Msg, "APISuite embeds testutil.BaseSuite, a testify suite declared outside the test files being migrated, in package example.com/m/testutil")
 	})
 
-	t.It("refuses the suite with a marker, never as nothing found", func(it *gotest.T) {
-		gotest.Len(it, run.results, 1)
-		gotest.Contains(it, run.results[0].Refusal, "APISuite embeds testutil.BaseSuite, a testify suite of another package")
-		gotest.Equal(it, 1, run.markers())
-		gotest.Contains(it, run.files["api/a_test.go"], "// TODO(gotest-migrate): APISuite embeds testutil.BaseSuite")
-	})
-
-	t.It("leaves the code compiling as it was", func(it *gotest.T) {
-		gotest.Empty(it, compiles(it, run.dir))
+	t.It("writes nothing, and the code compiles as it was", func(it *gotest.T) {
+		for name, src := range files {
+			got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+			gotest.NoError(it, err)
+			gotest.Equal(it, src, string(got))
+		}
+		gotest.Empty(it, compiles(it, root))
 	})
 }
 

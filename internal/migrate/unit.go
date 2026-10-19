@@ -58,6 +58,11 @@ type unit struct {
 	// hooks maps a suite method gotest calls with t, by methodKey, to
 	// its gotest name.
 	hooks map[string]string
+	// needsT marks, by methodKey, the methods of a base that gain t
+	// although gotest does not call them.
+	needsT map[string]bool
+	// embedField maps the fields through which a child embeds its base.
+	embedField map[*ast.Field]*embedding
 }
 
 // suiteDecl is a struct type embedding suite.Suite.
@@ -78,6 +83,14 @@ type suiteDecl struct {
 	reserved map[string]string
 	// testifyHooks names the testify hooks the suite declares.
 	testifyHooks map[string]bool
+	// st is the struct of a suite that embeds its base; embeds are the
+	// fields it does so through.
+	st     *ast.StructType
+	embeds []*embedding
+	// helper: a base no suite.Run ran; it is migrated as a helper type
+	// the suites embedding it call, which gotest does not run.
+	helper   bool
+	forwards []forward
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
@@ -218,12 +231,14 @@ func embedsTestifySuite(t types.Type, seen map[types.Type]bool) bool {
 }
 
 // findSuites collects every struct type a test file declares with
-// suite.Suite embedded. A testify suite it cannot convert is marked and
-// its file refused: a generic one, or one that inherits suite.Suite from
-// a type of another package.
-func (u *unit) findSuites() map[*unitFile]bool {
+// suite.Suite embedded, directly or through a base. A testify suite it
+// cannot convert is marked and its file refused: a generic one. A suite
+// whose base is declared outside these test files is an error.
+func (u *unit) findSuites() (map[*unitFile]bool, error) {
 	u.byKey = map[string]*suiteDecl{}
+	u.embedField = map[*ast.Field]*embedding{}
 	refused := map[*unitFile]bool{}
+	var cands []childCand
 	for _, uf := range u.files {
 		if uf.skipped() {
 			continue
@@ -259,41 +274,14 @@ func (u *unit) findSuites() map[*unitFile]bool {
 					u.suites = append(u.suites, s)
 					u.byKey[objKey(obj)] = s
 				default:
-					if base := u.foreignBase(st); base != "" {
-						uf.marks = append(uf.marks, mark{pos: specPos(gd, ts), msg: obj.Name() + " embeds " + base + ", a testify suite of another package; gotest suites do not inherit hooks or assertions — migrate both by hand"})
-						refused[uf] = true
+					if embedsTestifySuite(obj.Type(), map[types.Type]bool{}) {
+						cands = append(cands, childCand{uf: uf, gd: gd, ts: ts, st: st, obj: obj})
 					}
 				}
 			}
 		}
 	}
-	return refused
-}
-
-// foreignBase names the embedded type of another package st inherits
-// suite.Suite through, empty for none.
-func (u *unit) foreignBase(st *ast.StructType) string {
-	for _, field := range st.Fields.List {
-		if len(field.Names) != 0 {
-			continue
-		}
-		t := u.info.TypeOf(field.Type)
-		if t == nil {
-			continue
-		}
-		base := t
-		if p, ok := base.(*types.Pointer); ok {
-			base = p.Elem()
-		}
-		n, ok := base.(*types.Named)
-		if !ok || n.Obj().Pkg() == nil || u.scopes[n.Obj().Pkg().Path()] != nil {
-			continue // declared here: refuse handles a suite embedding a suite
-		}
-		if embedsTestifySuite(t, map[types.Type]bool{}) {
-			return n.Obj().Pkg().Name() + "." + n.Obj().Name()
-		}
-	}
-	return ""
+	return refused, u.findChildren(cands, refused)
 }
 
 // specPos is where a marker for ts goes: above its own line, or above the
@@ -305,12 +293,14 @@ func specPos(gd *ast.GenDecl, ts *ast.TypeSpec) token.Pos {
 	return ts.Pos()
 }
 
-// refuse decides which suites stay as they are. A suite another struct
-// embeds would strand the child when renamed, so it is refused, with the
-// file declaring it and the file declaring the child; so is a suite whose
-// new name is taken, and one a file migrate cannot type-check refers to. A
-// refused file is left whole, so every suite it declares or refers to is
-// refused too, until nothing changes.
+// refuse decides which suites stay as they are. A package-level struct
+// embedding a suite by value migrates with it; one embedding it by pointer,
+// or any other struct embedding one, would strand the child, so the suite
+// is refused with the file declaring it and the file declaring the child.
+// So is a suite whose new name is taken, and one a file migrate cannot
+// type-check refers to. A refused file is left whole, so every suite it
+// declares or refers to is refused too, and a child goes with its base,
+// until nothing changes.
 func (u *unit) refuse(refused map[*unitFile]bool) {
 	for _, uf := range u.files {
 		if uf.skipped() {
@@ -329,6 +319,10 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 				if base == nil {
 					continue
 				}
+				e := u.embedField[field]
+				if e != nil && !e.ptr {
+					continue // the migration names the field
+				}
 				child, pos := "a struct", field.Pos()
 				for i := len(stack) - 1; i >= 0; i-- {
 					if ts, ok := stack[i].(*ast.TypeSpec); ok {
@@ -339,7 +333,11 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 						break
 					}
 				}
-				uf.marks = append(uf.marks, mark{pos: pos, msg: child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"})
+				msg := child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"
+				if e != nil {
+					msg = child + " embeds *" + base.obj.Name() + "; gotest creates a suite with new, which leaves that pointer nil — embed " + base.obj.Name() + " by value, or migrate this file by hand"
+				}
+				uf.marks = append(uf.marks, mark{pos: pos, msg: msg})
 				if base.migrated() {
 					base.refusal = base.obj.Name() + " is embedded by " + child + " in " + filepath.Base(uf.path) + " — migrate this file by hand"
 					base.marked = true
@@ -350,6 +348,8 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 			return true
 		})
 	}
+
+	u.markHelpers()
 
 	// A suite keeping its name holds it; one renamed onto a name taken,
 	// or still unexported, is refused.
@@ -363,7 +363,7 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		if !s.migrated() {
 			continue
 		}
-		if token.IsExported(s.newName) && !runsPlain(s.newName) {
+		if !s.helper && token.IsExported(s.newName) && !runsPlain(s.newName) {
 			s.refusal = s.obj.Name() + " would become " + s.newName + ", which gotest does not run as a plain suite — rename it and migrate this file by hand"
 			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
 			refused[s.file] = true
@@ -388,7 +388,7 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		}
 		taken[key] = true
 		switch {
-		case !token.IsExported(s.newName):
+		case !s.helper && !token.IsExported(s.newName):
 			s.refusal = s.obj.Name() + " cannot take an exported name, and gotest runs only exported suites — rename it and migrate this file by hand"
 		case clash:
 			s.refusal = "renaming " + s.obj.Name() + " to " + s.newName + " collides with another declaration — migrate this file by hand"
@@ -458,9 +458,26 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 					s.marked = true
 				}
 			}
+			for _, e := range s.embeds {
+				if s.migrated() && !e.base.migrated() {
+					s.refusal = s.obj.Name() + " embeds " + e.base.obj.Name() + ", which is left for hand migration — migrate this file by hand"
+					s.marked = true
+				}
+			}
 			if !s.migrated() {
 				refused[s.file] = true
 				changed = true
+			}
+		}
+		// A child left as it is still embeds its base, so the base stays too.
+		for _, s := range u.suites {
+			for _, e := range s.embeds {
+				if !s.migrated() && e.base.migrated() {
+					e.base.refusal = e.base.obj.Name() + " is embedded by " + s.obj.Name() + " in " + filepath.Base(s.file.path) + " — migrate this file by hand"
+					e.base.marked = true
+					refused[e.base.file] = true
+					changed = true
+				}
 			}
 		}
 	}
@@ -514,7 +531,10 @@ func importsTestify(f *ast.File) bool {
 // leaves a refused one with its markers. What the result still needs is
 // marked later, from its own type-check.
 func (u *unit) migrate() error {
-	refused := u.findSuites()
+	refused, err := u.findSuites()
+	if err != nil {
+		return err
+	}
 	u.refuse(refused)
 
 	migrated := false
@@ -523,6 +543,8 @@ func (u *unit) migrate() error {
 	}
 	if migrated {
 		u.collectHooks()
+		u.collectNeedsT()
+		u.collectForwards()
 		u.gate()
 	}
 	for _, uf := range u.files {
@@ -551,7 +573,11 @@ func (u *unit) migrate() error {
 		if err := format.Node(&buf, u.fset, uf.f); err != nil {
 			return fmt.Errorf("format %s: %w", uf.path, err)
 		}
-		out, err := formatImports(uf.path, buf.Bytes())
+		src, err := insertForwards(buf.Bytes(), u.forwardsIn(uf))
+		if err != nil {
+			return fmt.Errorf("format %s: %w", uf.path, err)
+		}
+		out, err := formatImports(uf.path, src)
 		if err != nil {
 			return fmt.Errorf("gofmt %s: %w", uf.path, err)
 		}

@@ -146,6 +146,9 @@ type MigrateResult struct {
 	// Generated marks a file headed "Code generated ... DO NOT EDIT." that
 	// uses testify: migrate leaves it to its generator.
 	Generated bool
+	// Helper marks a base suite no suite.Run ran, migrated as a helper
+	// type the suites embedding it call: gotest does not run it.
+	Helper bool
 }
 
 // DeriveNewName computes the new suite name from an old one, exported:
@@ -290,6 +293,10 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 			return all, err
 		}
 		if err := u.migrate(); err != nil {
+			var outside *OutsideBaseError
+			if errors.As(err, &outside) && shown[outside.File] != "" {
+				outside.File = shown[outside.File]
+			}
 			return all, err
 		}
 		units = append(units, &jobUnit{job: j, u: u})
@@ -492,6 +499,7 @@ func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int
 			OldName: s.obj.Name(),
 			NewName: s.newName,
 			Markers: markers,
+			Helper:  s.helper,
 		})
 		markers = 0 // the file's markers are counted once, on its first suite
 	}

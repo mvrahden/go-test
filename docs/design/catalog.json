@@ -15848,6 +15848,146 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the migrated child compiles and gotest runs the base's hooks and tests on it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_migrated_child_compiles_and_gotest_runs_the_base's_hooks_and_tests_on_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the base becomes a helper type gotest does not run as a suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_base_becomes_a_helper_type_gotest_does_not_run_as_a_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "migrate leaves no marker for the embedding",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_no_marker_for_the_embedding",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "gotest lint reports no testify finding on the migrated code",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "gotest_lint_reports_no_testify_finding_on_the_migrated_code",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a testify suite embeds a base suite of the migrated test files",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_testify_suite_embeds_a_base_suite_of_the_migrated_test_files",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ChildOfABase",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestChildOfABase",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate exits 2 naming the base's package and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_exits_2_naming_the_base's_package_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a testify suite embeds a base suite declared outside the migrated test files",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_testify_suite_embeds_a_base_suite_declared_outside_the_migrated_test_files",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BaseOutsideTheMigratedFiles",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBaseOutsideTheMigratedFiles",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "MigrateBaseSuites",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestMigrateBaseSuitesTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/migrate",
+      "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "keeps each behavior on one row of its table",
                       "duration": 0,
                       "excluded": false,
@@ -16126,13 +16266,13 @@
     }
   ],
   "stats": {
-    "behaviors": 532,
+    "behaviors": 537,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 88,
+    "suites": 89,
     "tests": 0
   }
 }

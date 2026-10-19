@@ -12,8 +12,10 @@ import (
 // It exits 0 only when every migrated package compiles and no
 // TODO(gotest-migrate) marker is left anywhere; 1 when a marker is left,
 // including one an earlier run placed, or an error has no line to carry
-// one; 2 on a usage error or when a package does not compile before the
-// migration, which then leaves it alone. A generated test file is skipped
+// one; 2 on a usage error, when a package does not compile before the
+// migration, which then leaves it alone, or when a suite's base suite is
+// declared outside the test files being migrated, which leaves everything
+// alone. A generated test file is skipped
 // and named on stderr without changing the answer: its generator owns it,
 // and a suite it uses is refused. --dry-run prints the diff instead of
 // writing and answers the same way.
@@ -69,6 +71,8 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		case r.OldName == "":
 			// No suite left to convert; only an earlier run's markers.
 			leftover = append(leftover, fmt.Sprintf("  %s: %d marker%s", r.File, r.Markers, plural(r.Markers)))
+		case r.Helper:
+			lines = append(lines, fmt.Sprintf("  %s: %s → %s, a helper the suites embedding it call", r.File, r.OldName, r.NewName))
 		default:
 			suites++
 			lines = append(lines, fmt.Sprintf("  %s: %s → %s", r.File, r.OldName, r.NewName))

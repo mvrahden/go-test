@@ -664,6 +664,11 @@ shards of one run do not add up to every mutant exactly once.
 | `rename-generic-type-unnamed` | the rename engine cannot name a generic type, so the `focus` fix renames only its declaration | conformance: the lint `-fix` It for a generic suite finds the fix dropped |
 | `lint-focus-fix-external-package-skipped` | the `focus` fix leaves the external test package out | conformance: the lint `-fix` It for the external test package finds the fix dropped |
 | `lint-focus-tests-only` | the `focus` rule reports only focused suites and Test methods, not benchmark or fuzz methods | conformance: the lint `-fix` It for benchmark and fuzz methods finds their `F_` left |
+| `migrate-base-tests-not-forwarded` | a child of a base suite gets no forwarding method for the base's tests | conformance: the migrate It for a child of a base finds no verdict for the base's test |
+| `migrate-helper-keeps-suite-name` | a base no runner ran keeps a name gotest runs as a suite | conformance: the migrate It for the helper base finds gotest running the base as a suite |
+| `migrate-value-embedding-refused` | a child embedding its base by value is refused as before | conformance: the migrate It for a child of a base finds the embedding marker |
+| `migrate-helper-keeps-suite-embedding` | a helper base keeps its `suite.Suite` embedding | conformance: the migrate It for a child of a base finds a testify lint finding |
+| `migrate-outside-base-ignored` | a base declared outside the migrated test files does not fail the run | conformance: the migrate It for an outside base finds an exit other than 2 |
 
 ## Adding a mutant
 
