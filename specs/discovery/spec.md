@@ -71,7 +71,7 @@ A suite SHALL run an alias of a generic suite another package declares, an alias
 - **AND** an alias of a generic suite from a third package runs that suite's methods
 
 ### Requirement: Focus across a run
-Focus SHALL be decided over the whole run: a focused suite or a focused method of any kind, Test, Benchmark or Fuzz, in any package or test package variant SHALL skip every unfocused suite, which then starts no fixture, and --ci SHALL still refuse a run with a focused suite or Test method.
+Focus SHALL be decided over the whole run: a focused suite or a focused method of any kind, Test, Benchmark or Fuzz, in any package or test package variant SHALL skip every unfocused suite, which then starts no fixture, and --ci SHALL still refuse the run, whatever kind of method is focused.
 
 #### Scenario: A focused suite in the run
 - **WHEN** a run holds a focused suite
@@ -84,6 +84,25 @@ Focus SHALL be decided over the whole run: a focused suite or a focused method o
 - **WHEN** a run holds a focused method
 - **THEN** a focused method in one package skips every unfocused suite in the others
 - **AND** a focused fuzz method in one package skips every unfocused suite in the others
+
+### Requirement: Toggling focus
+refactor toggle-focus SHALL add or remove the F_ prefix of a suite at every reference to it in the suite's package, the receivers in other files, generic receivers, aliases and the external test package included, so that the package still compiles, and SHALL leave a same-named identifier that refers to something else as it was.
+
+#### Scenario: Methods in several files
+- **WHEN** focus is toggled on a suite whose methods are spread over several files
+- **THEN** refactor toggle-focus renames every receiver and the package still compiles
+
+#### Scenario: A generic suite with aliases
+- **WHEN** focus is toggled on a generic suite that aliases instantiate
+- **THEN** refactor toggle-focus renames every generic receiver, alias and literal, and the package still compiles
+
+#### Scenario: The external test package
+- **WHEN** focus is toggled on a suite the external test package refers to
+- **THEN** refactor toggle-focus renames the external test package's references too
+
+#### Scenario: A reused name
+- **WHEN** focus is toggled on a suite whose name another scope reuses
+- **THEN** refactor toggle-focus leaves the identifiers of the other scope as they were
 
 ### Requirement: The generated harness
 The generated harness SHALL compile beside whatever names the package declares, except a name Go predeclares that the harness uses with Go's meaning, which SHALL be rejected at its declaration, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites, files of variants without suites and the files an older gotest generated under its legacy names, and SHALL NOT rewrite a file whose content is unchanged.

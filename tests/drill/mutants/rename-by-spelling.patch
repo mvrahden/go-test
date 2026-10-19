@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus leaves the identifiers of the other scope as they were \(
+Clause: when focus is toggled on a suite whose name another scope reuses → refactor toggle-focus leaves the identifiers of the other scope as they were
+--- a/internal/refactor/rename.go
++++ b/internal/refactor/rename.go
+@@ -88,7 +88,7 @@
+ 			// An embedded field's name is in both: Defs holds the field,
+ 			// Uses the type.
+ 			for _, obj := range []types.Object{info.Defs[id], info.Uses[id]} {
+-				if o, ok := ObjectOf(obj); ok && o == target {
++				if obj != nil {
+ 					out = append(out, id)
+ 					break
+ 				}

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus renames every receiver and the package still compiles \(
+Clause: when focus is toggled on a suite whose methods are spread over several files → refactor toggle-focus renames every receiver and the package still compiles
+--- a/internal/refactor/togglefocus.go
++++ b/internal/refactor/togglefocus.go
+@@ -119,6 +119,9 @@
+ 	for _, v := range views {
+ 		for _, id := range Idents(v.files, v.info, target) {
+ 			p := v.fset.Position(id.Pos())
++			if p.Filename != fileNamed(v, filePath) {
++				continue
++			}
+ 			if key := fmt.Sprintf("%s:%d", p.Filename, p.Offset); !seen[key] {
+ 				seen[key] = true
+ 				out[p.Filename] = append(out[p.Filename], p.Offset)

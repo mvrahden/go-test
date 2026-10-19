@@ -1,0 +1,10 @@
+package lintfocusgeneric
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type F_ContractTestSuite[T comparable] struct{ zero T }
+
+func (s *F_ContractTestSuite[T]) TestZero(t *gotest.T) {
+	var v T
+	gotest.Equal(t, v, s.zero)
+}

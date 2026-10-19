@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus renames every generic receiver, alias and literal, and the package still compiles \(
+Clause: when focus is toggled on a generic suite that aliases instantiate → refactor toggle-focus renames every generic receiver, alias and literal, and the package still compiles
+--- a/internal/refactor/rename.go
++++ b/internal/refactor/rename.go
+@@ -81,6 +81,9 @@
+ 			continue
+ 		}
+ 		ast.Inspect(file, func(n ast.Node) bool {
++			if _, ok := n.(*ast.IndexExpr); ok {
++				return false
++			}
+ 			id, ok := n.(*ast.Ident)
+ 			if !ok || id.Name != target.Name() {
+ 				return true

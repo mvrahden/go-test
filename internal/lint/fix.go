@@ -398,8 +398,15 @@ fixes:
 	for _, fa := range fixes {
 		fix := &fa.diag.SuggestedFixes[0]
 		fset := fa.act.Package.Fset
+		edits := make([]fileEdit, 0, len(fix.TextEdits))
 		for _, e := range fix.TextEdits {
-			if generated[fset.File(e.Pos)] {
+			edits = append(edits, fileEdit{tf: fset.File(e.Pos), pkg: fa.act.Package.Types, edit: e})
+		}
+		if fa.diag.Category == string(Focus) {
+			edits = append(edits, focusReferences(graph.Roots, fa.act, fix.TextEdits)...)
+		}
+		for _, e := range edits {
+			if generated[e.tf] {
 				continue fixes
 			}
 		}
@@ -419,8 +426,8 @@ fixes:
 			continue
 		}
 		fileEdits := map[string][]edit{}
-		for _, e := range fix.TextEdits {
-			tf := fset.File(e.Pos)
+		for _, fe := range edits {
+			tf, e := fe.tf, fe.edit
 			src, err := baseline(tf.Name())
 			if err != nil {
 				continue fixes
@@ -430,7 +437,7 @@ fixes:
 				return nil, fmt.Errorf("concurrent file modification detected in file %s (size changed from %d -> %d bytes); aborting fix",
 					tf.Name(), tf.Size(), len(src))
 			}
-			p.filePkgs[tf.Name()] = fa.act.Package.Types
+			p.filePkgs[tf.Name()] = fe.pkg
 			fileEdits[tf.Name()] = append(fileEdits[tf.Name()], edit{tf.Offset(e.Pos), tf.Offset(e.End), string(e.NewText)})
 		}
 		merged := map[string][]edit{}

@@ -1,24 +1,27 @@
 package refactor
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
-type replacement struct {
-	pos     int
-	oldName string
-	newName string
-}
-
+// ToggleFocus adds or removes the F_ prefix of the suite or method
+// identifier names ("Suite" or "Suite.Method"), declared in filePath, at
+// every reference to it in the package's files, test files of both test
+// packages included. Nothing is written unless every edit applies.
 func ToggleFocus(filePath string, identifier string) error {
 	src, err := os.ReadFile(filePath)
 	if err != nil {
@@ -31,93 +34,49 @@ func ToggleFocus(filePath string, identifier string) error {
 		return fmt.Errorf("parsing %s: %w", filePath, err)
 	}
 
-	parts := strings.SplitN(identifier, ".", 2)
-	suiteName := parts[0]
-	methodName := ""
-	if len(parts) == 2 {
-		methodName = parts[1]
+	suiteName, methodName, _ := strings.Cut(identifier, ".")
+	var name *ast.Ident
+	if methodName != "" {
+		if name = methodIdent(file, suiteName, methodName); name == nil {
+			return fmt.Errorf("method %s.%s not found in %s", suiteName, methodName, filePath)
+		}
+	} else if name = typeIdent(file, suiteName); name == nil {
+		return fmt.Errorf("type %s not found in %s", suiteName, filePath)
 	}
 
-	if methodName != "" {
-		return toggleMethod(filePath, src, fset, file, suiteName, methodName)
+	offsets, err := references(filePath, fset.Position(name.Pos()).Offset)
+	if err != nil {
+		return err
 	}
-	return toggleSuite(filePath, src, fset, file, suiteName)
+	return applyToggle(offsets, name.Name, togglePrefix(name.Name))
 }
 
-func toggleSuite(filePath string, src []byte, fset *token.FileSet, file *ast.File, suiteName string) error {
-	newName := togglePrefix(suiteName)
-
-	var found bool
-	var replacements []replacement
-
+func typeIdent(file *ast.File, suiteName string) *ast.Ident {
 	for _, decl := range file.Decls {
 		gd, ok := decl.(*ast.GenDecl)
 		if !ok || gd.Tok != token.TYPE {
 			continue
 		}
 		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok || ts.Name.Name != suiteName {
-				continue
+			if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name.Name == suiteName {
+				return ts.Name
 			}
-			found = true
-			replacements = append(replacements, replacement{
-				pos:     fset.Position(ts.Name.Pos()).Offset,
-				oldName: suiteName,
-				newName: newName,
-			})
 		}
 	}
-
-	if !found {
-		return fmt.Errorf("type %s not found in %s", suiteName, filePath)
-	}
-
-	for _, decl := range file.Decls {
-		fd, ok := decl.(*ast.FuncDecl)
-		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
-			continue
-		}
-		recvType := receiverTypeName(fd.Recv.List[0].Type)
-		if recvType != suiteName {
-			continue
-		}
-		pos := receiverNameOffset(fset, fd.Recv.List[0].Type)
-		if pos >= 0 {
-			replacements = append(replacements, replacement{
-				pos:     pos,
-				oldName: suiteName,
-				newName: newName,
-			})
-		}
-	}
-
-	return applyReplacements(filePath, src, replacements)
+	return nil
 }
 
-func toggleMethod(filePath string, src []byte, fset *token.FileSet, file *ast.File, suiteName, methodName string) error {
-	newName := togglePrefix(methodName)
-
+func methodIdent(file *ast.File, suiteName, methodName string) *ast.Ident {
 	for _, decl := range file.Decls {
 		fd, ok := decl.(*ast.FuncDecl)
 		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
 			continue
 		}
-		recvType := receiverTypeName(fd.Recv.List[0].Type)
-		if recvType != suiteName {
-			continue
+		if gotestast.ReceiverTypeName(fd.Recv.List[0].Type) == suiteName && fd.Name.Name == methodName {
+			return fd.Name
 		}
-		if fd.Name.Name != methodName {
-			continue
-		}
-		return applyReplacements(filePath, src, []replacement{{
-			pos:     fset.Position(fd.Name.Pos()).Offset,
-			oldName: methodName,
-			newName: newName,
-		}})
 	}
-
-	return fmt.Errorf("method %s.%s not found in %s", suiteName, methodName, filePath)
+	return nil
 }
 
 func togglePrefix(name string) string {
@@ -127,37 +86,155 @@ func togglePrefix(name string) string {
 	return protocol.PrefixFocused + name
 }
 
-func receiverTypeName(expr ast.Expr) string {
-	return gotestast.ReceiverTypeName(expr)
+// checked is one type-check of a package's files.
+type checked struct {
+	fset  *token.FileSet
+	files []*ast.File
+	info  *types.Info
 }
 
-func receiverNameOffset(fset *token.FileSet, expr ast.Expr) int {
-	switch t := expr.(type) {
-	case *ast.StarExpr:
-		if ident, ok := t.X.(*ast.Ident); ok {
-			return fset.Position(ident.Pos()).Offset
-		}
-	case *ast.Ident:
-		return fset.Position(t.Pos()).Offset
+// references returns, by file, the offsets of every identifier referring
+// to the object declared at offset in filePath, over each variant of its
+// package.
+func references(filePath string, offset int) (map[string][]int, error) {
+	views, err := load(filePath)
+	if err != nil {
+		return nil, err
 	}
-	return -1
+	var target Object
+	found := false
+	for _, v := range views {
+		if name := fileNamed(v, filePath); name != "" {
+			tf := fileOf(v, name)
+			if target, found = DeclaredAt(v.info, tf.Pos(offset)); found {
+				break
+			}
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("no type information for the declaration at %s:%d", filePath, offset)
+	}
+	out := map[string][]int{}
+	seen := map[string]bool{}
+	for _, v := range views {
+		for _, id := range Idents(v.files, v.info, target) {
+			p := v.fset.Position(id.Pos())
+			if key := fmt.Sprintf("%s:%d", p.Filename, p.Offset); !seen[key] {
+				seen[key] = true
+				out[p.Filename] = append(out[p.Filename], p.Offset)
+			}
+		}
+	}
+	return out, nil
 }
 
-func applyReplacements(filePath string, src []byte, repls []replacement) error {
-	sort.Slice(repls, func(i, j int) bool {
-		return repls[i].pos > repls[j].pos
-	})
-
-	result := make([]byte, len(src))
-	copy(result, src)
-
-	for _, r := range repls {
-		end := r.pos + len(r.oldName)
-		if end > len(result) || string(result[r.pos:end]) != r.oldName {
-			return fmt.Errorf("unexpected content at offset %d: expected %q", r.pos, r.oldName)
+func fileOf(v checked, name string) *token.File {
+	for _, f := range v.files {
+		if tf := v.fset.File(f.FileStart); tf.Name() == name {
+			return tf
 		}
-		result = append(result[:r.pos], append([]byte(r.newName), result[end:]...)...)
 	}
+	return nil
+}
 
-	return os.WriteFile(filePath, result, 0644) //nolint:gosec // G306: not sensitive data
+// fileNamed returns the name v knows filePath by, or "".
+func fileNamed(v checked, filePath string) string {
+	want, err := os.Stat(filePath)
+	if err != nil {
+		return ""
+	}
+	for _, f := range v.files {
+		name := v.fset.File(f.FileStart).Name()
+		if fi, err := os.Stat(name); err == nil && os.SameFile(fi, want) {
+			return name
+		}
+	}
+	return ""
+}
+
+// load type-checks the variants of filePath's package with go/packages.
+// Where that leaves the file out, outside a module for one, it type-checks
+// the directory's files by package clause, without their imports.
+func load(filePath string) ([]checked, error) {
+	dir := filepath.Dir(filePath)
+	cfg := &packages.Config{
+		Dir:   dir,
+		Mode:  packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
+		Tests: true,
+	}
+	var views []checked
+	if pkgs, err := packages.Load(cfg, "."); err == nil {
+		for _, p := range pkgs {
+			if p.TypesInfo != nil {
+				views = append(views, checked{p.Fset, p.Syntax, p.TypesInfo})
+			}
+		}
+	}
+	for _, v := range views {
+		if fileNamed(v, filePath) != "" {
+			return views, nil
+		}
+	}
+	return checkDir(dir)
+}
+
+// checkDir type-checks dir's Go files, one package per package clause.
+func checkDir(dir string) ([]checked, error) {
+	matches, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		return nil, err
+	}
+	fset := token.NewFileSet()
+	byPkg := map[string][]*ast.File{}
+	for _, path := range matches {
+		f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s: %w", path, err)
+		}
+		byPkg[f.Name.Name] = append(byPkg[f.Name.Name], f)
+	}
+	var views []checked
+	for _, files := range byPkg {
+		info := &types.Info{Defs: map[*ast.Ident]types.Object{}, Uses: map[*ast.Ident]types.Object{}}
+		conf := types.Config{
+			Importer: noImports{},
+			Error:    func(error) {}, // unresolved imports leave the package's own objects intact
+		}
+		_, _ = conf.Check(files[0].Name.Name, fset, files, info)
+		views = append(views, checked{fset, files, info})
+	}
+	return views, nil
+}
+
+type noImports struct{}
+
+func (noImports) Import(string) (*types.Package, error) {
+	return nil, errors.New("imports are not loaded")
+}
+
+// applyToggle replaces oldName with newName at each offset and writes the
+// files, once every edit is known to apply.
+func applyToggle(offsets map[string][]int, oldName, newName string) error {
+	contents := map[string][]byte{}
+	for file, offs := range offsets {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		sort.Sort(sort.Reverse(sort.IntSlice(offs)))
+		for _, pos := range offs {
+			end := pos + len(oldName)
+			if end > len(src) || string(src[pos:end]) != oldName {
+				return fmt.Errorf("unexpected content in %s at offset %d: expected %q", file, pos, oldName)
+			}
+			src = append(src[:pos], append([]byte(newName), src[end:]...)...)
+		}
+		contents[file] = src
+	}
+	for file, src := range contents {
+		if err := os.WriteFile(file, src, 0o644); err != nil { //nolint:gosec // G306: not sensitive data
+			return err
+		}
+	}
+	return nil
 }

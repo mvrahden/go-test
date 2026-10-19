@@ -898,9 +898,10 @@ Usage:
 Commands:
   toggle-focus <file> <identifier>
 
-    Toggle the F_ prefix on a suite type or method. The identifier is
-    either "SuiteName" (toggles the suite) or "SuiteName.MethodName"
-    (toggles a single method).
+    Toggle the F_ prefix on a suite type or method, declared in <file>,
+    at every reference to it in the package and its test packages. The
+    identifier is either "SuiteName" (toggles the suite) or
+    "SuiteName.MethodName" (toggles a single method).
 
 Examples:
   gotest refactor toggle-focus user_test.go UserTestSuite

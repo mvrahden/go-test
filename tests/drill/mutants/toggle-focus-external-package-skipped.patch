@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus renames the external test package's references too \(
+Clause: when focus is toggled on a suite the external test package refers to → refactor toggle-focus renames the external test package's references too
+--- a/internal/refactor/togglefocus.go
++++ b/internal/refactor/togglefocus.go
+@@ -117,6 +117,9 @@
+ 	out := map[string][]int{}
+ 	seen := map[string]bool{}
+ 	for _, v := range views {
++		if strings.HasSuffix(v.files[0].Name.Name, "_test") {
++			continue
++		}
+ 		for _, id := range Idents(v.files, v.info, target) {
+ 			p := v.fset.Position(id.Pos())
+ 			if key := fmt.Sprintf("%s:%d", p.Filename, p.Offset); !seen[key] {

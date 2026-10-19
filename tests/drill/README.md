@@ -641,6 +641,13 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-erg-integrity-skip-usage` | `-skip-<integrity rule>` falls through to the driver's usage text | conformance: the lint It for `-skip-focus` finds the usage text instead of the refusal |
 | `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
 | `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |
+| `toggle-focus-declaring-file-only` | `refactor toggle-focus` renames only the references in the file that declares the suite | conformance: the discovery It for a suite spread over several files finds receivers left unrenamed |
+| `rename-skips-instantiations` | the rename engine does not look inside a type instantiation, so `X[T]` receivers, literals and aliases keep the old name | conformance: the discovery It for a generic suite finds them unrenamed |
+| `toggle-focus-external-package-skipped` | `refactor toggle-focus` leaves the external test package out | conformance: the discovery It for the external test package finds its reference unrenamed |
+| `rename-by-spelling` | the rename engine renames every identifier spelled like the suite | conformance: the discovery It for a reused name finds the other scope's identifiers renamed |
+| `lint-focus-fix-declaring-file-only` | the `focus` fix renames only the references in the file that declares the suite | conformance: the lint `-fix` It for a suite spread over several files finds the fix dropped |
+| `rename-generic-type-unnamed` | the rename engine cannot name a generic type, so the `focus` fix renames only its declaration | conformance: the lint `-fix` It for a generic suite finds the fix dropped |
+| `lint-focus-fix-external-package-skipped` | the `focus` fix leaves the external test package out | conformance: the lint `-fix` It for the external test package finds the fix dropped |
 
 ## Adding a mutant
 

@@ -445,11 +445,10 @@ func nolintIDs(text string) (ids []string, ok bool) {
 }
 
 type suiteInfo struct {
-	name              string
-	pos               token.Pos
-	methods           map[string]token.Pos
-	recvTypePositions []token.Pos
-	fixtureFields     map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
+	name          string
+	pos           token.Pos
+	methods       map[string]token.Pos
+	fixtureFields map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
 }
 
 func discoverSuites(pass *analysis.Pass, insp *inspector.Inspector) map[string]*suiteInfo {
@@ -494,22 +493,10 @@ func checkFocusPrefixes(pass *analysis.Pass, suites map[string]*suiteInfo) {
 	for name, s := range suites {
 		if strings.HasPrefix(name, protocol.PrefixFocused) {
 			stripped := strings.TrimPrefix(name, protocol.PrefixFocused)
-			edits := []analysis.TextEdit{{
-				Pos:     s.pos,
-				End:     s.pos + 2,
-				NewText: []byte(""),
-			}}
-			for _, p := range s.recvTypePositions {
-				edits = append(edits, analysis.TextEdit{
-					Pos:     p,
-					End:     p + 2,
-					NewText: []byte(""),
-				})
-			}
 			reportWithFix(pass, Focus, s.pos,
 				[]analysis.SuggestedFix{{
 					Message:   fmt.Sprintf("rename %s to %s", name, stripped),
-					TextEdits: edits,
+					TextEdits: unfocusEdits(pass, s.pos),
 				}},
 				"focused suite %s should not be committed", name)
 		}
@@ -532,10 +519,6 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		methodName := fd.Name.Name
 		suite.methods[methodName] = fd.Pos()
 
-		if p := recvTypePos(fd.Recv); p != token.NoPos {
-			suite.recvTypePositions = append(suite.recvTypePositions, p)
-		}
-
 		if !isPointerReceiver(fd.Recv) {
 			reportWithFix(pass, Receiver, fd.Pos(),
 				[]analysis.SuggestedFix{{
@@ -554,12 +537,8 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			if strings.HasPrefix(methodName, protocol.PrefixFocused) {
 				reportWithFix(pass, Focus, fd.Pos(),
 					[]analysis.SuggestedFix{{
-						Message: fmt.Sprintf("rename %s to %s", methodName, strings.TrimPrefix(methodName, protocol.PrefixFocused)),
-						TextEdits: []analysis.TextEdit{{
-							Pos:     fd.Name.Pos(),
-							End:     fd.Name.Pos() + 2,
-							NewText: []byte(""),
-						}},
+						Message:   fmt.Sprintf("rename %s to %s", methodName, strings.TrimPrefix(methodName, protocol.PrefixFocused)),
+						TextEdits: unfocusEdits(pass, fd.Name.Pos()),
 					}},
 					"focused method %s.%s should not be committed", recvName, methodName)
 			}
@@ -1260,26 +1239,6 @@ func isPointerReceiver(recv *ast.FieldList) bool {
 	}
 	_, ok := recv.List[0].Type.(*ast.StarExpr)
 	return ok
-}
-
-func recvTypePos(recv *ast.FieldList) token.Pos {
-	t := recv.List[0].Type
-	if star, ok := t.(*ast.StarExpr); ok {
-		t = star.X
-	}
-	switch x := t.(type) {
-	case *ast.Ident:
-		return x.Pos()
-	case *ast.IndexExpr:
-		if ident, ok := x.X.(*ast.Ident); ok {
-			return ident.Pos()
-		}
-	case *ast.IndexListExpr:
-		if ident, ok := x.X.(*ast.Ident); ok {
-			return ident.Pos()
-		}
-	}
-	return token.NoPos
 }
 
 func isLifecycleHook(name string) bool {

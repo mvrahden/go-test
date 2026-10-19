@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterFocusFix .* / lint -fix renames every receiver and use, and the package still compiles \(
+Clause: when lint -fix removes the focus of a suite whose methods and uses are spread over several files → lint -fix renames every receiver and use, and the package still compiles
+--- a/internal/lint/focus.go
++++ b/internal/lint/focus.go
+@@ -21,7 +21,7 @@
+ 		return edits
+ 	}
+ 	for _, id := range refactor.Idents(pass.Files, pass.TypesInfo, target) {
+-		if id.Pos() != decl {
++		if id.Pos() != decl && pass.Fset.File(id.Pos()) == pass.Fset.File(decl) {
+ 			edits = append(edits, unfocus(id.Pos()))
+ 		}
+ 	}

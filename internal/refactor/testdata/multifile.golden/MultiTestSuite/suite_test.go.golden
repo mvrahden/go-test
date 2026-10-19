@@ -1,0 +1,9 @@
+package multifile
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type F_MultiTestSuite struct{ count int }
+
+func (s *F_MultiTestSuite) BeforeEach(t *gotest.T) { s.count = 0 }
+
+func (s *F_MultiTestSuite) TestOne(t *gotest.T) { s.add(t) }
