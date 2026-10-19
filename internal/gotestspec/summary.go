@@ -286,16 +286,16 @@ func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...Render
 		if len(rows) == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "\n**%s**\n\n", pkg.Path)
+		fmt.Fprintf(w, "\n**%s**\n\n", EscapeMarkdown(pkg.Path))
 		fmt.Fprintln(w, "| Benchmark | ns/op | B/op | allocs/op |")
 		fmt.Fprintln(w, "|---|---|---|---|")
 		for _, r := range rows {
 			if r.node.Iterations == 0 {
-				fmt.Fprintf(w, "| %s | — | — | — |\n", r.key)
+				fmt.Fprintf(w, "| %s | — | — | — |\n", EscapeMarkdown(r.key))
 				continue
 			}
 			fmt.Fprintf(w, "| %s | %s | %d | %d |\n",
-				r.key, formatNs(r.node.NsPerOp), r.node.BytesPerOp, r.node.AllocsPerOp)
+				EscapeMarkdown(r.key), formatNs(r.node.NsPerOp), r.node.BytesPerOp, r.node.AllocsPerOp)
 		}
 	}
 
@@ -357,7 +357,7 @@ func renderMarkdownBenchDeltaTable(w io.Writer, deltas []BenchDelta) {
 			sign = "+"
 		}
 		fmt.Fprintf(w, "| %s | %.1f | %.1f | %s%.1f%%%s |\n",
-			d.Key, d.OldNs, d.NewNs, sign, d.PercentChange, deltaMarks(d))
+			EscapeMarkdown(d.Key), d.OldNs, d.NewNs, sign, d.PercentChange, deltaMarks(d))
 	}
 	fmt.Fprintln(w)
 }

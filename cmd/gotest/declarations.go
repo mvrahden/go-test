@@ -99,8 +99,28 @@ func buildDeclarationIndex(loadResults []*gotestgen.LoadResult) gotestspec.Decla
 	return idx
 }
 
-func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath, parentPath string, behaviors []*gotestast.Behavior) {
+// reportedBehaviors folds each implied level back into the names beneath it,
+// "reads a" over "b paths" into "reads a/b paths": go test reports one subtest
+// for a description with a slash, so the spec has one behavior for it.
+func reportedBehaviors(behaviors []*gotestast.Behavior) []*gotestast.Behavior {
+	var out []*gotestast.Behavior
 	for _, b := range behaviors {
+		if !b.Implied {
+			out = append(out, b)
+			continue
+		}
+		for _, c := range reportedBehaviors(b.Children) {
+			joined := *c
+			joined.Name = b.Name + "/" + c.Name
+			joined.Display = b.Display + "/" + c.Display
+			out = append(out, &joined)
+		}
+	}
+	return out
+}
+
+func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath, parentPath string, behaviors []*gotestast.Behavior) {
+	for _, b := range reportedBehaviors(behaviors) {
 		// A declared behavior carries the exact go test segment, "#01" and all.
 		// The tree keys duplicates under the name the developer wrote, so the
 		// index drops the suffix the same way — otherwise the second of two

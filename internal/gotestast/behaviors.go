@@ -39,7 +39,7 @@ type Behavior struct {
 	// Name is the subtest segment go test will produce: the same sanitisation
 	// the testing package applies, plus the "#01" it appends to a name that
 	// repeats among its siblings. A description containing a slash is split
-	// into one Behavior per level, because that is what go test does with it.
+	// into one Behavior per level, the levels a -run pattern matches it by.
 	// All of this has to match byte for byte, because it is how a
 	// statically-known behavior is reconciled with the one observed at run time.
 	Name     string
@@ -47,6 +47,9 @@ type Behavior struct {
 	Kind     BehaviorKind
 	Line     int
 	Children []*Behavior
+	// Implied marks a level no call declares: the text before a slash in the
+	// descriptions beneath it. go test reports no subtest for it.
+	Implied bool
 }
 
 // MethodSpec is the behavior tree of a single test method. Complete reports
@@ -165,6 +168,7 @@ func insertPath(out []*Behavior, segments, displays []string, leaf *Behavior) []
 			Display: displayAt(displays, 0, head),
 			Kind:    BehaviorWhen,
 			Line:    leaf.Line,
+			Implied: true,
 		}
 		out = append(out, node)
 	}

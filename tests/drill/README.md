@@ -553,6 +553,11 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-seed-error-at-flush` | a seed of the wrong type is reported where gotest flushes the seeds, not at its `f.Add` call | canary: the `fuzzseedtype` failure does not name the fixture's `f.Add` line |
 | `promote-splices-the-echo-whole` | a decoding target's echo of several arguments is spliced as one value | conformance: the fuzz promote It for a decoding target of several arguments finds no seed added |
 | `fuzz-session-drops-other-targets` | a fuzz session's record drops the crashers of targets it did not fuzz | conformance: the fuzz session It for another checkout finds its crasher not promoted |
+| `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: a label with a pipe breaks its table row; canary: the `specmarkdown` rows have the wrong number of cells |
+| `spec-label-html-unescaped` | the Markdown spec leaves angle brackets in a label unescaped | spec conformance: a label's tags reach the reader as HTML; canary: the `specmarkdown` spec carries `<b>` |
+| `spec-slash-splits-run` | the tree of a run reads a slash in an It's name as a level | spec conformance: the run's spec shows "reads a" as a level; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
+| `spec-slash-splits-source` | the spec read from source keeps the level a slash implies | spec conformance: the static spec shows "reads a" as a level |
+| `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `### Parked — EXCLUDED` |
 
 ## Adding a mutant
 

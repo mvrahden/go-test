@@ -12402,16 +12402,183 @@
       "output": [],
       "path": "github.com/mvrahden/go-test/tests/conformance/lifecycle",
       "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "keeps each behavior on one row of its table",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "keeps_each_behavior_on_one_row_of_its_table",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "renders the label as text, with no HTML tag and no code span",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "renders_the_label_as_text,_with_no_HTML_tag_and_no_code_span",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_label_holds_a_pipe,_a_backslash,_an_angle_bracket,_a_backtick_or_a_line_break",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Labels",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLabels",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a run's spec shows it as one It under its When",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_run's_spec_shows_it_as_one_It_under_its_When",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the spec read from source shows it as one It under its When",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_spec_read_from_source_shows_it_as_one_It_under_its_When",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It's label holds a slash",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_It's_label_holds_a_slash",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Slashes",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSlashes",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "marks each excluded suite, method and behavior EXCLUDED",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "marks_each_excluded_suite,_method_and_behavior_EXCLUDED",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the spec is read from source with X_ suites and methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_spec_is_read_from_source_with_X__suites_and_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Excluded",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestExcluded",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecMarkdown",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSpecMarkdownTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/spec",
+      "status": "none"
     }
   ],
   "stats": {
-    "behaviors": 407,
+    "behaviors": 412,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 66,
+    "suites": 67,
     "tests": 0
   }
 }

@@ -515,8 +515,7 @@ func appendLintStepSummary(annotations []gotestspec.Annotation) {
 	fmt.Fprintln(f, "| Rule | Location | Message |")
 	fmt.Fprintln(f, "| --- | --- | --- |")
 	for _, a := range annotations {
-		msg := strings.ReplaceAll(a.Message, "|", "\\|")
-		fmt.Fprintf(f, "| %s | %s:%d | %s |\n", a.Title, a.File, a.Line, msg)
+		fmt.Fprintf(f, "| %s | %s:%d | %s |\n", gotestspec.EscapeMarkdown(a.Title), gotestspec.EscapeMarkdown(a.File), a.Line, gotestspec.EscapeMarkdown(a.Message))
 	}
 	fmt.Fprintln(f)
 }

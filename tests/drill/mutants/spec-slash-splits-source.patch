@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when an It's label holds a slash / the spec read from source shows it as one It under its When \(
+Clause: when an It's label holds a slash → the spec read from source shows it as one It under its When
+--- a/cmd/gotest/declarations.go
++++ b/cmd/gotest/declarations.go
+@@ -105,7 +105,7 @@
+ func reportedBehaviors(behaviors []*gotestast.Behavior) []*gotestast.Behavior {
+ 	var out []*gotestast.Behavior
+ 	for _, b := range behaviors {
+-		if !b.Implied {
++		if b != nil {
+ 			out = append(out, b)
+ 			continue
+ 		}

@@ -220,6 +220,8 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	buildOutput := map[string][]string{}
 	failedBuild := map[string]string{}
 	benchScans := map[*Node]*benchScan{}
+	// The levels each subtest was placed at when it started, by test name.
+	levels := map[string]map[string][]string{}
 
 	for i := range events {
 		ev := &events[i]
@@ -235,6 +237,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			pkgs[ev.Package] = pkg
 			nodes[ev.Package] = map[string]*Node{}
 			topRunCount[ev.Package] = map[string]int{}
+			levels[ev.Package] = map[string][]string{}
 		}
 
 		if ev.Test == "" {
@@ -253,8 +256,15 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			continue
 		}
 
-		segments := splitTestPath(ev.Test)
 		nmap := nodes[ev.Package]
+		segments, placed := levels[ev.Package][ev.Test]
+		if !placed {
+			segments = splitTestPath(ev.Test)
+			if ev.Action == ActionRun {
+				segments = joinUnstartedLevels(segments, nmap, levels[ev.Package])
+				levels[ev.Package][ev.Test] = segments
+			}
+		}
 
 		// Detect duplicate top-level run (ptest/pxtest same-name suite).
 		if ev.Action == ActionRun && len(segments) == 1 {
@@ -389,6 +399,27 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		return result[i].Path < result[j].Path
 	})
 	return result
+}
+
+// joinUnstartedLevels keeps a slash in a subtest's own name. go test starts
+// every subtest under a parent that has already started, and reports no level
+// for a slash in a name: "reads a/b paths" is one subtest. So the levels below
+// the deepest started ancestor are one name, not parents nothing started,
+// and the ancestor keeps the levels it was placed at. With no started
+// ancestor the path is left as split.
+func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[string][]string) []string {
+	for i := len(segments) - 1; i >= 1; i-- {
+		parent := strings.Join(segments[:i], "/")
+		if nmap[parent] == nil {
+			continue
+		}
+		head := segments[:i]
+		if levels, ok := placed[parent]; ok {
+			head = levels
+		}
+		return append(slices.Clone(head), strings.Join(segments[i:], "/"))
+	}
+	return segments
 }
 
 // resolveDuplicateSegments checks if a child path belongs to a duplicate

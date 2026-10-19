@@ -35,19 +35,54 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 		}
 		// A build failure, a fixture that failed: no behavior carries it.
 		if !cfg.withoutVerdicts && PkgFailedOnItsOwn(pkg) {
-			fmt.Fprintf(w, "## %s — FAILED\n\n", pkg.Path)
+			fmt.Fprintf(w, "## %s — FAILED\n\n", EscapeMarkdown(pkg.Path))
 			markdownOutput(w, pkg.Output)
 		}
 	}
 }
 
-// markdownOutput renders what a failure wrote as a code block.
+// markdownEscaper turns a label into text: no character of it may end a
+// cell, start a row, open a code span or reach the reader as HTML. The
+// backslash goes first, so the escapes it adds are not escaped again.
+var markdownEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	"|", `\|`,
+	"`", "\\`",
+	"<", "&lt;",
+	">", "&gt;",
+	"\r\n", " ",
+	"\n", " ",
+	"\r", " ",
+)
+
+// EscapeMarkdown is the one escape for every table cell and inline label a
+// Markdown document carries. A line break becomes a space: a cell is one line.
+func EscapeMarkdown(s string) string { return markdownEscaper.Replace(s) }
+
+// markdownOutput renders what a failure wrote as a code block. The fence is
+// longer than any backtick run in the output, so the output cannot close it.
 func markdownOutput(w io.Writer, output []string) {
 	lines := filterOutput(output)
 	if len(lines) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "```\n%s\n```\n\n", strings.Join(lines, "\n"))
+	body := strings.Join(lines, "\n")
+	fence := strings.Repeat("`", max(3, longestRun(body, '`')+1))
+	fmt.Fprintf(w, "%s\n%s\n%s\n\n", fence, body, fence)
+}
+
+// longestRun is the length of the longest run of c in s.
+func longestRun(s string, c byte) int {
+	longest, run := 0, 0
+	for i := 0; i < len(s); i++ {
+		if s[i] != c {
+			run = 0
+			continue
+		}
+		run++
+		longest = max(longest, run)
+	}
+	return longest
 }
 
 const incompleteNote = "this method declares further behaviors whose names or existence depend on runtime values"
@@ -56,6 +91,10 @@ const incompleteNote = "this method declares further behaviors whose names or ex
 // Duration column, because a document that prints "<1ms" beside a behavior
 // nothing ran is stating a measurement that was never taken.
 func markdownRow(w io.Writer, indent, display string, n *Node, bare bool) {
+	display = EscapeMarkdown(display)
+	if bare && n.Excluded {
+		display += " — EXCLUDED"
+	}
 	if n.Incomplete {
 		// A method with no behaviors to tabulate is rendered as a row of its
 		// suite's table. Without the marker it reads as a behavior that simply
@@ -96,13 +135,20 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 
 	case KindSuite:
 		heading := strings.Repeat("#", headingLevel)
-		label := n.Display
+		label := EscapeMarkdown(n.Display)
 		if n.Focused {
 			label += " — FOCUSED"
+		}
+		if bare && n.Excluded {
+			// Read from source, a parked suite still lists what it declares;
+			// unmarked, those behaviors read as live ones.
+			label += " — EXCLUDED"
 		}
 		if len(n.Children) == 0 {
 			// A suite without behaviors has no table to carry its verdict.
 			switch {
+			case bare && n.Excluded:
+				// Nothing ran, so nothing was skipped.
 			case n.Status == StatusSkip || n.Excluded:
 				label += " — SKIPPED"
 			case n.Status == StatusFail && !bare:
@@ -146,9 +192,13 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 
 	case KindMethod, KindTest, KindFuzz:
 		heading := strings.Repeat("#", headingLevel)
+		label := EscapeMarkdown(n.Display)
+		if bare && n.Excluded {
+			label += " — EXCLUDED"
+		}
 		if n.Kind == KindFuzz && len(n.Children) == 0 {
 			// A declared target, or one that replayed nothing.
-			fmt.Fprintf(w, "%s %s (fuzz target)\n\n", heading, n.Display)
+			fmt.Fprintf(w, "%s %s (fuzz target)\n\n", heading, label)
 			return
 		}
 		if len(n.Children) == 0 {
@@ -156,12 +206,12 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 			// tabulate, but dropping it would delete a declared method from the
 			// specification without saying so.
 			if n.Incomplete {
-				fmt.Fprintf(w, "%s %s\n\n", heading, n.Display)
+				fmt.Fprintf(w, "%s %s\n\n", heading, label)
 				markdownNote(w, n)
 			}
 			return
 		}
-		fmt.Fprintf(w, "%s %s\n\n", heading, n.Display)
+		fmt.Fprintf(w, "%s %s\n\n", heading, label)
 		markdownNote(w, n)
 		markdownHeader(w, bare)
 		renderMarkdownTable(w, n.Children, 0, bare)
@@ -173,16 +223,16 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		}
 		// A bare top-level benchmark node with no enclosing suite.
 		heading := strings.Repeat("#", headingLevel)
-		fmt.Fprintf(w, "%s %s\n\n", heading, n.Display)
+		fmt.Fprintf(w, "%s %s\n\n", heading, EscapeMarkdown(n.Display))
 		renderMarkdownBenchTable(w, []*Node{n})
 
 	default:
 		if len(n.Children) == 0 {
 			if bare {
-				fmt.Fprintf(w, "- %s\n", n.Display)
+				fmt.Fprintf(w, "- %s\n", EscapeMarkdown(n.Display))
 				return
 			}
-			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), n.Display, formatDuration(EffectiveDuration(n)))
+			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), EscapeMarkdown(n.Display), formatDuration(EffectiveDuration(n)))
 		}
 	}
 }
@@ -192,7 +242,7 @@ func renderMarkdownBenchTable(w io.Writer, nodes []*Node) {
 	fmt.Fprintln(w, "|-----------|-------|------|-----------|")
 	for _, c := range nodes {
 		fmt.Fprintf(w, "| %s | %s | %d | %d |\n",
-			c.Display, formatNs(c.NsPerOp), c.BytesPerOp, c.AllocsPerOp)
+			EscapeMarkdown(c.Display), formatNs(c.NsPerOp), c.BytesPerOp, c.AllocsPerOp)
 	}
 	fmt.Fprintln(w)
 }
@@ -201,10 +251,15 @@ func renderMarkdownTable(w io.Writer, nodes []*Node, depth int, bare bool) {
 	indent := strings.Repeat("&nbsp;&nbsp;", depth)
 	for _, n := range nodes {
 		if len(n.Children) > 0 {
+			label := EscapeMarkdown(n.Display)
 			if bare {
-				fmt.Fprintf(w, "| %s**%s** |\n", indent, n.Display)
+				suffix := ""
+				if n.Excluded {
+					suffix = " — EXCLUDED"
+				}
+				fmt.Fprintf(w, "| %s**%s**%s |\n", indent, label, suffix)
 			} else {
-				fmt.Fprintf(w, "| %s**%s** | | |\n", indent, n.Display)
+				fmt.Fprintf(w, "| %s**%s** | | |\n", indent, label)
 			}
 			renderMarkdownTable(w, n.Children, depth+1, bare)
 		} else {
