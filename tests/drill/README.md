@@ -544,6 +544,13 @@ shards of one run do not add up to every mutant exactly once.
 | `events-file-held-until-exit` | the `--events-file` file is buffered in memory and written only when the CLI exits | cli conformance: a CLI killed mid-run leaves the events of the suites that had ended out of the file |
 | `events-file-open-error-ignored` | a `--events-file` path that cannot be created is ignored and the run goes on | cli conformance: the run builds its packages instead of exiting 2 at once |
 | `group-expr-accepted` | an `ExclusiveGroup` the generator cannot resolve is read as the default group | cli conformance: the suite runs instead of exit 2 naming the accepted forms |
+| `promote-refusal-unlocated` | a crasher file outside Go's corpus format is refused without its line | conformance: the fuzz promote It for a call in a crasher finds no `file:line` |
+| `promote-refusal-promotes-the-rest` | a refused crasher fails the run but the session's other crashers are still promoted | conformance: the fuzz promote It for a call in a crasher finds the valid crasher promoted |
+| `fuzz-session-not-recorded` | a fuzz session records none of the crashers it wrote | conformance: the fuzz session It finds promote adding no seed |
+| `promote-takes-every-corpus-file` | promote takes every corpus file of a target, not only the latest session's | conformance: the fuzz promote It for a file the session did not write finds it promoted |
+| `promote-splices-raw-leaves` | a decoding target's crasher whose re-run echoes nothing is spliced from its raw leaves | conformance: the fuzz promote It for a decoding target finds the raw leaf spliced |
+| `stale-corpus-suggests-promote` | the stale-corpus warning tells the user to run promote | conformance: the fuzz session It finds promote in the warning |
+| `fuzz-seed-error-at-flush` | a seed of the wrong type is reported where gotest flushes the seeds, not at its `f.Add` call | canary: the `fuzzseedtype` failure does not name the fixture's `f.Add` line |
 
 ## Adding a mutant
 

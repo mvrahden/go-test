@@ -386,7 +386,9 @@ func shortTypeStr(t types.Type) string {
 // removing a field changes the count and the entry is rejected loudly — but
 // swapping two same-kind fields keeps it loading and silently turns a kept
 // regression input into a different test. The durable form of such a crasher
-// is a typed f.Add seed: `gotest fuzz promote` emits it and deletes the file.
+// is a typed f.Add seed: `gotest fuzz promote` emits it and deletes the file
+// for a crasher the latest `gotest fuzz` session wrote; an older entry is
+// deleted or written as a seed by hand.
 // Integrity tier: a silently reinterpreted corpus makes test outcomes lie;
 // the transient state between finding a crasher and promoting it is
 // suppressible per line.
@@ -427,7 +429,7 @@ func checkFuzzStructCorpus(pass *analysis.Pass, insp *inspector.Inspector, suite
 			plural = "y"
 		}
 		report(pass, FuzzStructCorpus, fd.Pos(),
-			"fuzz target %s keeps %d corpus entr%s under testdata/fuzz/%s/ bound to the declaration order of %s's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; run gotest fuzz promote to turn them into typed f.Add seeds",
+			"fuzz target %s keeps %d corpus entr%s under testdata/fuzz/%s/ bound to the declaration order of %s's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; delete them, or write their inputs as typed f.Add seeds (gotest fuzz promote does so for the crashers the latest gotest fuzz session wrote)",
 			recvName+"."+fd.Name.Name, count, plural, wrapper, shortTypeStr(boundArg))
 	})
 }

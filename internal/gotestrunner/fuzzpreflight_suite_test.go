@@ -113,7 +113,7 @@ func (s *FuzzPreflightTestSuite) TestCorpusMismatchMessage(t *gotest.T, c *fuzzP
 			Want: []string{"string", "[]byte"},
 		}
 
-		gotest.Equal(it, "fuzz: FuzzT_A: testdata/fuzz/FuzzT_A/bbb has 1 values of [string], but the target now takes 2 [string, []byte] — it predates a change to the fuzzed type's fields; run gotest fuzz promote to turn it into a typed f.Add seed, or delete it", m.Message())
+		gotest.Equal(it, "fuzz: FuzzT_A: testdata/fuzz/FuzzT_A/bbb has 1 values of [string], but the target now takes 2 [string, []byte] — it predates a change to the fuzzed type's fields; delete it, or write its input as a typed f.Add seed", m.Message())
 	})
 }
 

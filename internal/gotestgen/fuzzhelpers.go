@@ -47,6 +47,10 @@ type fuzzEmitter struct {
 	needsStrconv bool
 	needsMath    bool
 
+	// decoded names the targets with a position that is not handed to the
+	// engine as declared: their input is decoded from the leaves.
+	decoded map[string]bool
+
 	// fans/fanOrder hold the fan-in/fan-out function pairs (ƒ_fuzzin_*/
 	// ƒ_fuzzout_*) keyed on the same identifiers assignName hands out;
 	// fanInfos memoises the leaf shape per unaliased type string, and
@@ -69,6 +73,7 @@ func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
 		taken:    map[string]bool{},
 		helpers:  map[string]string{},
 		literals: map[string]string{},
+		decoded:  map[string]bool{},
 		fans:     map[string]string{},
 		fanInfos: map[string]*fanInfo{},
 		hybrids:  map[string]string{},

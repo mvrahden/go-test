@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -272,6 +274,18 @@ func FuzzSeedTypeMismatch(f *testing.F) {
 	gf.Fuzz(func(t *gotest.T, v fanReq) {})
 }
 
+// FuzzNativeSeedTypeMismatch is FuzzSeedTypeMismatch without a generated
+// target: the reflective binding checks the seed's type itself. Armed by env.
+func FuzzNativeSeedTypeMismatch(f *testing.F) {
+	gf := gotest.NewF(f, nil, nil, nil)
+	if os.Getenv("GOTEST_TEST_FUZZ_BAD_NATIVE_SEED") != "" {
+		gf.Add(int64(5))
+	} else {
+		gf.Add(5)
+	}
+	gf.Fuzz(func(t *gotest.T, n int) {})
+}
+
 // FuzzWrongCallbackShape proves a callback the generated target was not
 // built for fails the target with the expected signature named. Armed by
 // env.
@@ -361,6 +375,20 @@ func (s *FWrapperTestSuite) TestSeedBuffering(t *gotest.T) {
 	})
 }
 
+// sourceLine is "f_suite_test.go:<line>" of the line in this file holding
+// needle.
+func sourceLine(t *gotest.T, needle string) string {
+	src, err := os.ReadFile("f_suite_test.go")
+	gotest.NoError(t, err)
+	for i, line := range strings.Split(string(src), "\n") {
+		if strings.Contains(line, needle) && !strings.Contains(line, "sourceLine") {
+			return "f_suite_test.go:" + strconv.Itoa(i+1)
+		}
+	}
+	gotest.Fail(t, "no line holds "+needle)
+	return ""
+}
+
 // runArmedFuzzTarget re-runs one of the env-armed targets above in a
 // subprocess with the arming variable set. The target fails deliberately
 // once armed, so the non-zero exit is expected. -count=1 defeats the cache.
@@ -420,6 +448,18 @@ func (s *FWrapperTestSuite) TestSeedGuards(t *gotest.T) {
 		out := runArmedFuzzTarget("FuzzSeedTypeMismatch", "GOTEST_TEST_FUZZ_BAD_SEED")
 		gotest.Contains(it, out, "seed #1: value 1: f.Add was given string, but this fuzz target takes gotest_test.fanReq")
 		gotest.Contains(it, out, "FAIL")
+	})
+
+	t.It("locates a seed of the wrong type at its f.Add call", func(it *gotest.T) {
+		out := runArmedFuzzTarget("FuzzSeedTypeMismatch", "GOTEST_TEST_FUZZ_BAD_SEED")
+		gotest.Contains(it, out, sourceLine(it, `gf.Add("not a fanReq")`)+": seed #1: value 1:")
+		gotest.NotContains(it, out, "f.go:")
+	})
+
+	t.It("locates a seed of the wrong type at its f.Add call without a generated target", func(it *gotest.T) {
+		out := runArmedFuzzTarget("FuzzNativeSeedTypeMismatch", "GOTEST_TEST_FUZZ_BAD_NATIVE_SEED")
+		gotest.Contains(it, out, sourceLine(it, "gf.Add(int64(5))")+": seed #1: value 1: f.Add was given int64, but this fuzz target takes int")
+		gotest.NotContains(it, out, "fuzztarget.go:")
 	})
 
 	t.It("fails the target when f.Add is called after f.Fuzz", func(it *gotest.T) {

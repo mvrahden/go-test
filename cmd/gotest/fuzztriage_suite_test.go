@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
 )
@@ -25,6 +26,8 @@ type FuzzTriagePromoteTestSuite struct {
 	suiteTestPath    string
 	corpusFile       string
 	structCorpusFile string
+	scaleCorpusFile  string
+	cache            string
 }
 
 func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -64,7 +67,32 @@ func (s *FuzzTriagePromoteTestSuite) BeforeEach(t *gotest.T) {
 	scaleDir := filepath.Join(fuzzRoot, "FuzzMessageTestSuite_FuzzScale")
 	gotest.NoError(t, os.MkdirAll(scaleDir, 0o750))
 	// Reading's one leaf: the little-endian bits of a float64 NaN.
-	gotest.NoError(t, os.WriteFile(filepath.Join(scaleDir, "nan-seed"), []byte("go test fuzz v1\n[]byte(\"\\x00\\x00\\x00\\x00\\x00\\x00\\xf8\\x7f\")\n"), 0o600))
+	s.scaleCorpusFile = filepath.Join(scaleDir, "nan-seed")
+	gotest.NoError(t, os.WriteFile(s.scaleCorpusFile, []byte("go test fuzz v1\n[]byte(\"\\x00\\x00\\x00\\x00\\x00\\x00\\xf8\\x7f\")\n"), 0o600))
+
+	// The three are the latest session's crashers, recorded in a cache of
+	// this test's own.
+	s.cache = t.TempDir()
+	s.record(t, s.corpusFile, s.structCorpusFile, s.scaleCorpusFile)
+}
+
+// record makes files the latest session's crashers, as the session that
+// wrote them would have.
+func (s *FuzzTriagePromoteTestSuite) record(t *gotest.T, files ...string) {
+	var session gotestrunner.FuzzSession
+	for _, file := range files {
+		c, err := gotestrunner.NewSessionCrasher(s.pkgDir, filepath.Base(filepath.Dir(file)), filepath.Base(file))
+		gotest.NoError(t, err)
+		session.Crashers = append(session.Crashers, c)
+	}
+	gotest.NoError(t, gotestrunner.WriteFuzzSession(gotestrunner.FuzzSessionFile(s.cache), session))
+}
+
+// source reads the staged suite file.
+func (s *FuzzTriagePromoteTestSuite) source(t *gotest.T) string {
+	src, err := os.ReadFile(s.suiteTestPath)
+	gotest.NoError(t, err)
+	return string(src)
 }
 
 // vet compiles the staged package with its test files, the way a user's next
@@ -77,7 +105,7 @@ func (s *FuzzTriagePromoteTestSuite) vet(t *gotest.T) (string, error) {
 }
 
 func (s *FuzzTriagePromoteTestSuite) runCLIExit(t *gotest.T, args ...string) (string, int) {
-	return runGotestIn(t, s.cli.binary, s.pkgDir, nil, args...)
+	return runGotestIn(t, s.cli.binary, s.pkgDir, []string{"GOTEST_CACHE_DIR=" + s.cache}, args...)
 }
 
 func (s *FuzzTriagePromoteTestSuite) TestTriage_StaleCrasherNoLongerFailing(t *gotest.T) {
@@ -244,6 +272,7 @@ func (s *FuzzTriagePromoteTestSuite) TestPromote_RefusesRawLeavesWithoutEcho(t *
 	// the target runs, so the re-run prints no decoded input.
 	short := filepath.Join(filepath.Dir(s.structCorpusFile), "short-seed")
 	gotest.NoError(t, os.WriteFile(short, []byte("go test fuzz v1\nstring(\"a@b.c\")\nstring(\"welcome\")\n"), 0o600))
+	s.record(t, short)
 	before, err := os.ReadFile(s.suiteTestPath)
 	gotest.NoError(t, err)
 
@@ -252,7 +281,7 @@ func (s *FuzzTriagePromoteTestSuite) TestPromote_RefusesRawLeavesWithoutEcho(t *
 	t.It("exits 1 and says why the entry was skipped", func(it *gotest.T) {
 		gotest.Equal(it, 1, code, out)
 		gotest.Contains(it, out, "short-seed: skipped:")
-		gotest.Contains(it, out, "takes 1 argument")
+		gotest.Contains(it, out, "decodes its input from 4 leaves")
 	})
 
 	t.It("leaves the crasher file and the FuzzSummary source alone", func(it *gotest.T) {
@@ -262,5 +291,93 @@ func (s *FuzzTriagePromoteTestSuite) TestPromote_RefusesRawLeavesWithoutEcho(t *
 		gotest.NoError(it, err)
 		gotest.NotContains(it, string(after), `f.Add("a@b.c", "welcome")`)
 		gotest.Contains(it, string(before), "FuzzSummary")
+	})
+}
+
+// A struct of one leaf takes a crasher of one value: the value count cannot
+// tell a raw leaf from the struct, and only the codec's echo can build it.
+func (s *FuzzTriagePromoteTestSuite) TestPromote_RefusesASingleRawLeafForAStruct(t *gotest.T) {
+	gotest.NoError(t, os.WriteFile(s.scaleCorpusFile, []byte("go test fuzz v1\nstring(\"x\")\n"), 0o600))
+	s.record(t, s.scaleCorpusFile)
+
+	out, code := s.runCLIExit(t, "fuzz", "promote", ".")
+
+	t.It("exits 1 and says the target decodes its input", func(it *gotest.T) {
+		gotest.Equal(it, 1, code, out)
+		gotest.Contains(it, out, "nan-seed: skipped: FuzzMessageTestSuite_FuzzScale decodes its input from 1 leaf")
+	})
+	t.It("splices no raw leaf and keeps the crasher file", func(it *gotest.T) {
+		gotest.NotContains(it, s.source(it), `f.Add("x")`)
+		_, err := os.Stat(s.scaleCorpusFile)
+		gotest.NoError(it, err)
+	})
+}
+
+func (s *FuzzTriagePromoteTestSuite) TestPromote_LeavesFilesOutsideTheSession(t *gotest.T) {
+	old := filepath.Join(filepath.Dir(s.corpusFile), "old-seed")
+	gotest.NoError(t, os.WriteFile(old, []byte("go test fuzz v1\nstring(\"older\")\n"), 0o600))
+
+	out, code := s.runCLIExit(t, "fuzz", "promote", ".")
+
+	t.It("promotes the session's crashers and exits 0", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, out)
+		gotest.Contains(it, out, "promoted FuzzMessageTestSuite_FuzzTrim/stale-seed")
+	})
+	t.It("names the file it left and why", func(it *gotest.T) {
+		gotest.Contains(it, out, filepath.Join("testdata", "fuzz", "FuzzMessageTestSuite_FuzzTrim", "old-seed")+": left in place: not written by the latest fuzz session")
+	})
+	t.It("keeps the file and adds no seed from it", func(it *gotest.T) {
+		_, err := os.Stat(old)
+		gotest.NoError(it, err)
+		gotest.NotContains(it, s.source(it), `"older"`)
+	})
+}
+
+func (s *FuzzTriagePromoteTestSuite) TestPromote_WithoutASession(t *gotest.T) {
+	gotest.NoError(t, os.Remove(gotestrunner.FuzzSessionFile(s.cache)))
+	before := s.source(t)
+
+	out, code := s.runCLIExit(t, "fuzz", "promote", ".")
+
+	t.It("promotes nothing and exits 0", func(it *gotest.T) {
+		gotest.Equal(it, 0, code, out)
+		gotest.Contains(it, out, "no crashers from the latest fuzz session")
+		gotest.Equal(it, before, s.source(it))
+	})
+}
+
+func (s *FuzzTriagePromoteTestSuite) TestPromote_RefusesAChangedCrasher(t *gotest.T) {
+	gotest.NoError(t, os.WriteFile(s.corpusFile, []byte("go test fuzz v1\nstring(\"swapped\")\n"), 0o600))
+	before := s.source(t)
+
+	out, code := s.runCLIExit(t, "fuzz", "promote", ".")
+
+	t.It("exits 1, naming the file", func(it *gotest.T) {
+		gotest.Equal(it, 1, code, out)
+		gotest.Contains(it, out, "stale-seed: changed since the fuzz session wrote it")
+	})
+	t.It("promotes no crasher of the run", func(it *gotest.T) {
+		gotest.Equal(it, before, s.source(it))
+		_, err := os.Stat(s.structCorpusFile)
+		gotest.NoError(it, err)
+	})
+}
+
+func (s *FuzzTriagePromoteTestSuite) TestPromote_RefusesCode(t *gotest.T) {
+	gotest.NoError(t, os.WriteFile(s.corpusFile, []byte("go test fuzz v1\nstring(os.Getenv(\"HOME\"))\n"), 0o600))
+	s.record(t, s.corpusFile, s.structCorpusFile, s.scaleCorpusFile)
+	before := s.source(t)
+
+	out, code := s.runCLIExit(t, "fuzz", "promote", ".")
+
+	t.It("exits 1, naming the file and line", func(it *gotest.T) {
+		gotest.Equal(it, 1, code, out)
+		gotest.Contains(it, out, filepath.Join("testdata", "fuzz", "FuzzMessageTestSuite_FuzzTrim", "stale-seed")+":2: ")
+		gotest.Contains(it, out, "nothing promoted")
+	})
+	t.It("splices nothing, the other crashers included", func(it *gotest.T) {
+		after := s.source(it)
+		gotest.Equal(it, before, after)
+		gotest.NotContains(it, after, "os.Getenv")
 	})
 }

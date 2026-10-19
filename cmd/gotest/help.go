@@ -555,12 +555,16 @@ Triage:
   cannot decode are reported and skipped, one file at a time.
 
 Promote:
-  "gotest fuzz promote" splices each crasher into its FuzzX method as a
-  permanent f.Add(...) seed, after the method's last f.Add, and deletes
-  the file; the seed then replays on every ordinary run:
+  "gotest fuzz promote" splices each crasher the latest "gotest fuzz"
+  session wrote into its FuzzX method as a permanent f.Add(...) seed,
+  after the method's last f.Add, and deletes the file; the seed then
+  replays on every ordinary run:
     promoted FuzzParserTestSuite_FuzzParse/1a2b3c -> f.Add("a@\x00") in parser_test.go:42
-  A crasher whose method cannot be located with confidence is left in
-  place with a warning; promote never partially edits source.
+  Other corpus files are left in place. A session crasher that is not in
+  Go's corpus format, or changed since the session, promotes nothing and
+  exits 1. A struct target's seed is the value its codec decodes; a
+  crasher whose method cannot be located with confidence is left in place
+  with a warning; promote never partially edits source.
 
 Seed harvesting is on by default: literal arguments from table tests and
 call sites in _test.go files become extra f.Add seeds at generation time
@@ -770,7 +774,7 @@ Rules:
   fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
   fuzz-seed             Fuzz targets with no f.Add seeds
   fuzz-struct-corpus    On-disk corpus entries for struct-typed targets
-                        (field-order-bound — promote them to typed seeds)
+                        (field-order-bound — delete them or write typed seeds)
   fuzz-hook-io          IO in BeforeEach/AfterEach of fuzzing suites
                         (hooks replay around every execution)
   fuzz-raw-seed         Raw []byte seeds on positions not taking []byte

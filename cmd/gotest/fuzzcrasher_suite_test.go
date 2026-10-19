@@ -20,6 +20,7 @@ type FuzzCrasherLoopTestSuite struct {
 	CLI    *gotestcli.BinarySharedFixture
 	cli    cliRunner
 	pkgDir string
+	env    []string // a gotest cache of the test's own, where the session is recorded
 }
 
 func (s *FuzzCrasherLoopTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -32,6 +33,7 @@ func (s *FuzzCrasherLoopTestSuite) BeforeAll(t *gotest.T) {
 
 func (s *FuzzCrasherLoopTestSuite) BeforeEach(t *gotest.T) {
 	s.pkgDir = stageFuzzModule(t, s.cli.repoRoot, t.TempDir())
+	s.env = []string{"GOTEST_CACHE_DIR=" + t.TempDir()}
 }
 
 func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
@@ -40,7 +42,7 @@ func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
 
 	t.When("a session finds a crasher", func(w *gotest.T) {
 		summaryPath := filepath.Join(w.TempDir(), "summary.md")
-		env := []string{"GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY=" + summaryPath}
+		env := append([]string{"GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY=" + summaryPath}, s.env...)
 		// No --for: the default budget applies, and the crash ends the
 		// session long before it runs out.
 		out, code := runGotestIn(w, s.cli.binary, s.pkgDir, env, "fuzz", "--target="+target, ".")
@@ -69,7 +71,7 @@ func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
 		})
 
 		w.When("the crasher is triaged", func(w *gotest.T) {
-			out, code := runGotestIn(w, s.cli.binary, s.pkgDir, nil, "fuzz", "triage", ".")
+			out, code := runGotestIn(w, s.cli.binary, s.pkgDir, s.env, "fuzz", "triage", ".")
 			w.It("reproduces with the decoded input and the cause", func(it *gotest.T) {
 				gotest.Equal(it, 1, code, "triage output:\n%s", out)
 				gotest.Contains(it, out, "input:")
@@ -78,7 +80,7 @@ func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
 		})
 
 		w.When("the crasher is promoted", func(w *gotest.T) {
-			out, code := runGotestIn(w, s.cli.binary, s.pkgDir, nil, "fuzz", "promote", ".")
+			out, code := runGotestIn(w, s.cli.binary, s.pkgDir, s.env, "fuzz", "promote", ".")
 			w.It("splices a second seed and removes the corpus file", func(it *gotest.T) {
 				gotest.Equal(it, 0, code, "promote output:\n%s", out)
 				src, err := os.ReadFile(filepath.Join(s.pkgDir, "suite_test.go"))
@@ -89,7 +91,7 @@ func (s *FuzzCrasherLoopTestSuite) TestCrasherLoop(t *gotest.T) {
 				gotest.Empty(it, entries)
 			})
 			w.It("replays the promoted seed as an ordinary failing subtest", func(it *gotest.T) {
-				out, code := runGotestIn(w, s.cli.binary, s.pkgDir, nil, ".")
+				out, code := runGotestIn(w, s.cli.binary, s.pkgDir, s.env, ".")
 				gotest.Equal(it, 1, code, "replay output:\n%s", out)
 				gotest.Contains(it, out, target+"/seed#1")
 				gotest.Contains(it, out, "unexpected input")

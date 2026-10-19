@@ -215,7 +215,7 @@ type Frame struct {
 // must not fire.
 type FuzzStructCorpusTestSuite struct{}
 
-func (s *FuzzStructCorpusTestSuite) FuzzFrame(f *gotest.F) { // want `fuzz target FuzzStructCorpusTestSuite.FuzzFrame keeps 1 corpus entry under testdata/fuzz/FuzzFuzzStructCorpusTestSuite_FuzzFrame/ bound to the declaration order of fuzz.Frame's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; run gotest fuzz promote to turn them into typed f.Add seeds`
+func (s *FuzzStructCorpusTestSuite) FuzzFrame(f *gotest.F) { // want `fuzz target FuzzStructCorpusTestSuite.FuzzFrame keeps 1 corpus entry under testdata/fuzz/FuzzFuzzStructCorpusTestSuite_FuzzFrame/ bound to the declaration order of fuzz.Frame's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; delete them, or write their inputs as typed f.Add seeds \(gotest fuzz promote does so for the crashers the latest gotest fuzz session wrote\)`
 	f.Add(Frame{Version: 1, Topic: "orders"})
 	f.Fuzz(func(t *gotest.T, in Frame) {
 		gotest.Equal(t, in, in)

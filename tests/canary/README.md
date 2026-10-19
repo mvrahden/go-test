@@ -82,6 +82,7 @@ Each directory under `testdata/` is one package with one suite:
 | `slowretry` | a shared fixture whose attempts and the release between them each take 1.6s of its 2s `Timeout` is waited for: the budget counts the release |
 | `latebudget` | a shared fixture started for the exclusive tail is released under the teardown budget its declared 2s `Timeout` gives: its `AfterAll`, which never returns, is force-killed after 32s, not the default's 2m30s |
 | `dagrelease` | shared fixtures come up each after what they depend on and are released concurrently, a dependent before its dependency; with `DAGRELEASE_HANG=1` the release that never returns is force-killed after 30s plus the longest chain still resident, 35s, a fixture released at the barrier no longer counted |
+| `fuzzseedtype` | a fuzz seed of the wrong type fails its target at the `f.Add` call, not inside gotest's or the generated code |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

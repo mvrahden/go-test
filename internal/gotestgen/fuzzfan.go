@@ -47,6 +47,10 @@ type FuzzTargetSet struct {
 	// the corpus type name of each argument the engine sees ("string",
 	// "[]byte", "bool"). A corpus entry whose values do not match is stale.
 	ParamsByFunc map[string][]string
+
+	// DecodedFuncs names the wrappers whose input is decoded from the leaves
+	// rather than handed to the engine as declared.
+	DecodedFuncs map[string]bool
 }
 
 // BuildFuzzTargets resolves the f.Fuzz call of every fuzz method in pkg and
@@ -113,6 +117,7 @@ func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) 
 		NeedsStrconv: e.needsStrconv,
 		NeedsMath:    e.needsMath,
 		ParamsByFunc: params,
+		DecodedFuncs: e.decoded,
 	}, nil
 }
 
@@ -202,6 +207,7 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	for _, fi := range infos {
 		if !fi.passthrough {
 			allLiteral = true
+			e.decoded[funcName] = true
 		}
 	}
 	for _, t := range typs {

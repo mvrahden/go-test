@@ -1448,7 +1448,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
 | `bench-loop` | `Benchmark*` suite methods that never touch `b.Loop()`/`b.N` — nothing iterates, so the numbers lie |
 | `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
-| `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; `gotest fuzz promote` turns them into typed `f.Add` seeds |
+| `fuzz-struct-corpus` | On-disk corpus entries for a shape-bound fuzz target (struct, pointer, array, non-byte slice) — one value per leaf in field order, so a same-kind reorder silently reinterprets them and an added or removed field rejects them; delete them or write them as typed `f.Add` seeds; `gotest fuzz promote` does so only for the crashers the latest `gotest fuzz` session wrote |
 
 **Expressiveness** — the test is correct but says it worse. Suppressible per line or project-wide via `lint.skip`.
 

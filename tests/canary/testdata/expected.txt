@@ -251,3 +251,6 @@ timeoutscalefast fail -
 timeoutscalefast fail TestBudgetedTestSuite
 timeoutscalefast fail TestFixtureBoundTestSuite
 timeoutscalefast fail TestSlowerFixtureBoundTestSuite
+fuzzseedtype exit 1
+fuzzseedtype fail -
+fuzzseedtype fail FuzzSeedTypeTestSuite_FuzzCount

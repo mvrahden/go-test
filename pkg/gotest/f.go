@@ -2,11 +2,15 @@ package gotest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/mvrahden/go-test/internal/callsite"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
@@ -27,6 +31,7 @@ type F struct {
 	afterEach  func(*T)
 	target     *FuzzTarget
 	seeds      [][]any
+	seedAt     []string // the file:line of each seed's f.Add call
 	fuzzed     bool
 	echoAll    bool
 }
@@ -67,13 +72,28 @@ func (f *F) Skipf(format string, args ...any) {
 // value). Seeds are forwarded, in order, at the top of Fuzz.
 func (f *F) Add(args ...any) {
 	if f.fuzzed {
+		assert.SkipInternalFrames(f.f)
 		f.f.Fatalf("f.Add called after f.Fuzz — add every seed before the Fuzz call")
 		return
 	}
 	seed := make([]any, len(args))
 	copy(seed, args)
 	f.seeds = append(f.seeds, seed)
+	at := ""
+	if _, file, line, ok := runtime.Caller(1); ok {
+		at = callsite.Format(file, line)
+	}
+	f.seedAt = append(f.seedAt, at)
 }
+
+// seedError is a seed explode refused, by its index among the f.Add calls.
+type seedError struct {
+	index int
+	err   error
+}
+
+func (e *seedError) Error() string { return fmt.Sprintf("seed #%d: %v", e.index+1, e.err) }
+func (e *seedError) Unwrap() error { return e.err }
 
 // explodeSeeds runs every buffered seed through explode (which checks the
 // tuple's arity and types itself), returning the leaf tuples to forward or
@@ -84,7 +104,7 @@ func (f *F) explodeSeeds(explode func(seed []any) ([]any, error)) ([][]any, erro
 	for i, seed := range f.seeds {
 		vals, err := explode(seed)
 		if err != nil {
-			return nil, fmt.Errorf("seed #%d: %w", i+1, err)
+			return nil, &seedError{index: i, err: err}
 		}
 		out = append(out, vals)
 	}
@@ -99,10 +119,17 @@ func plural(n int) string {
 }
 
 // flushSeeds forwards the buffered seeds to testing.F.Add through explode,
-// failing the target on the first bad seed.
+// failing the target on the first bad seed, located at its f.Add call.
 func (f *F) flushSeeds(explode func(seed []any) ([]any, error)) {
 	tuples, err := f.explodeSeeds(explode)
 	if err != nil {
+		var se *seedError
+		if errors.As(err, &se) && se.index < len(f.seedAt) && f.seedAt[se.index] != "" {
+			// Undecorated: testing would name this line, not the f.Add call.
+			fmt.Fprintln(f.f.Output(), strings.ReplaceAll(f.seedAt[se.index]+": "+err.Error(), "\n", "\n    "))
+			f.f.FailNow()
+			return
+		}
 		f.f.Fatalf("%s", err)
 		return
 	}

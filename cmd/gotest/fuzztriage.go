@@ -1,13 +1,17 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -68,12 +72,17 @@ func rejectFuzzSubcommandFlags(sub string, args []string) error {
 // echo a re-run prints, and this decoding is the fallback display.
 type corpusArg gotestrunner.CorpusArg
 
-// parseCorpusFile decodes a Go fuzz corpus file. Any error is the caller's cue
-// to report it and skip the whole file, per the documented
-// per-file-graceful-skip triage/promote behavior.
+// parseCorpusFile decodes a Go fuzz corpus file. A file that is not in Go's
+// corpus format is an error located at its line, the path as displayed.
 func parseCorpusFile(path string) ([]corpusArg, error) {
 	parsed, err := gotestrunner.ParseCorpusFile(path)
 	if err != nil {
+		var ce *gotestrunner.CorpusError
+		if errors.As(err, &ce) {
+			located := *ce
+			located.Path = displayPath(ce.Path)
+			return nil, &located
+		}
 		return nil, err
 	}
 	args := make([]corpusArg, len(parsed))
@@ -86,7 +95,7 @@ func parseCorpusFile(path string) ([]corpusArg, error) {
 // display renders the arg the way it appears in the corpus file, e.g.
 // `string("a@\x00")` — used for triage's "input:" line.
 func (a corpusArg) display() string {
-	return a.TypeName + "(" + a.SourceExpr + ")"
+	return gotestrunner.CorpusArg(a).Corpus()
 }
 
 // spliceExpr renders the arg the way it should appear inside a spliced
@@ -98,7 +107,7 @@ func (a corpusArg) display() string {
 // default type (e.g. plain `5` defaults to `int`, not `int64`) would
 // otherwise silently change the argument's static type.
 func (a corpusArg) spliceExpr() string {
-	if a.TypeName == "string" || a.TypeName == "bool" {
+	if !a.Bits && (a.TypeName == "string" || a.TypeName == "bool") {
 		return a.SourceExpr
 	}
 	return a.display()
@@ -118,23 +127,23 @@ func displayArgs(args []corpusArg) string {
 // generation, returning the generated overlay (needed for triage's re-run
 // and promote's suite/method reverse lookup) and the flattened, sorted list
 // of fuzz targets.
-func loadFuzzOverlayTargets(args []string) (*gotestrunner.OverlayResult, []gotestrunner.FuzzTarget, func(), error) {
+func loadFuzzOverlayTargets(args []string) (*gotestrunner.OverlayResult, []gotestrunner.FuzzTarget, []*gotestgen.LoadResult, func(), error) {
 	patterns, err := ExtractPackagePatterns(args)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	loaded, broken, err := gotestgen.LoadPackages(patterns, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if len(broken) > 0 {
-		return nil, nil, nil, fmt.Errorf("cannot triage crashers in uncompilable packages: %s", broken[0].PkgPath)
+		return nil, nil, nil, nil, fmt.Errorf("cannot triage crashers in uncompilable packages: %s", broken[0].PkgPath)
 	}
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, false, false, false)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return overlay, collectFuzzTargets(overlay), cleanup, nil
+	return overlay, collectFuzzTargets(overlay), loaded, cleanup, nil
 }
 
 // crasherFilesFor scans target's testdata/fuzz/<Func>/ directory (LOCKED
@@ -182,7 +191,7 @@ func runFuzzTriage(args []string) (code int) {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	overlay, targets, cleanup, err := loadFuzzOverlayTargets(args)
+	overlay, targets, _, cleanup, err := loadFuzzOverlayTargets(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -245,7 +254,7 @@ func runFuzzTriage(args []string) (code int) {
 				// A crasher that cannot even be read is a failure, exactly
 				// as promote treats it — exiting 0 here would let a
 				// directory of unreadable crashers "pass" triage.
-				fmt.Printf("triage: %s: %s\n", file, perr)
+				fmt.Printf("triage: %s\n", perr)
 				failed = true
 				continue
 			}
@@ -347,22 +356,19 @@ func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzT
 
 // extractDecodedInput scans a re-run's combined output for
 // protocol.FuzzInputPrefix lines and returns the literal carried by the
-// LAST one (a failing execution may run the callback body more than once,
-// e.g. under -race retries, so the last line is the one describing the
-// execution whose outcome the caller is reporting). Returns "" when no such
-// line is present — the target isn't struct-typed, or the marker was lost
-// (a truncated or filtered run), in which case the caller falls back to the
-// raw corpus display. Codec shape is no longer a reason: every type the
-// codec generator accepts also gets a Literal function.
+// FIRST one. The codec echoes the decoded input before the execution's hooks
+// and body run, so the first marker is the codec's; one the body prints
+// after it, from the input it was handed, is never read. Returns "" when no
+// such line is present — the target isn't decoded, or the engine refused the
+// entry before the target ran.
 func extractDecodedInput(output string) string {
-	lit := ""
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		if rest, ok := strings.CutPrefix(line, protocol.FuzzInputPrefix); ok {
-			lit = rest
+			return rest
 		}
 	}
-	return lit
+	return ""
 }
 
 // extractCause pulls the reason out of a failed re-run's output for the
@@ -431,37 +437,100 @@ func lookupSuiteMethod(overlay *gotestrunner.OverlayResult, pkg, funcName string
 	return "", "", false
 }
 
-// runFuzzPromote splices every crasher file found for every discovered fuzz
-// target into its originating fuzz method as a permanent f.Add(...) seed,
-// then deletes the crasher file. Exit code is 1 if any crasher could not be
-// parsed or promoted (the file is left in place so it isn't silently lost);
-// 0 otherwise, including when no crashers exist.
+// runFuzzPromote splices the latest fuzz session's crashers into their
+// originating fuzz methods as permanent f.Add(...) seeds, then deletes each
+// crasher file. Every other corpus file is left in place. A session crasher
+// that is not in Go's corpus format, or changed since the session wrote it,
+// refuses the whole run: nothing is promoted and it exits 1. Otherwise it
+// exits 1 if any crasher could not be promoted (its file is left in place)
+// and 0 when every one was, or there were none.
 func runFuzzPromote(args []string) (code int) {
 	if err := rejectFuzzSubcommandFlags("promote", args); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
-	overlay, targets, cleanup, err := loadFuzzOverlayTargets(args)
+	overlay, targets, loaded, cleanup, err := loadFuzzOverlayTargets(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
 	defer cleanup()
 
-	anyCrashers := false
-	failed := false
+	sessionPath, err := gotestrunner.CurrentFuzzSessionFile()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	session, _, err := gotestrunner.ReadFuzzSession(sessionPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
-	// A fanned target's readable seed comes from a re-run, which reads the
-	// shared fixtures its suite binds.
-	var withCrashers []gotestrunner.FuzzTarget
+	type promotion struct {
+		target        gotestrunner.FuzzTarget
+		suite, method string
+		file          string
+	}
+	var queue []promotion
+	failed, refused := false, false
+
 	for _, target := range targets { //nolint:gocritic // rangeValCopy: intentional
-		if files, _ := crasherFilesFor(target); len(files) > 0 {
-			withCrashers = append(withCrashers, target)
+		files, err := crasherFilesFor(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "promote: %s: %s\n", target.Func, err)
+			failed = true
+			continue
+		}
+		mine := map[string]gotestrunner.SessionCrasher{}
+		for _, c := range session.For(target) {
+			mine[c.Name] = c
+		}
+		suite, method, resolved := lookupSuiteMethod(overlay, target.Package, target.Func)
+		for _, file := range files {
+			c, ok := mine[filepath.Base(file)]
+			if !ok {
+				fmt.Printf("promote: %s: left in place: not written by the latest fuzz session\n", displayPath(file))
+				continue
+			}
+			if err := c.Check(); err != nil {
+				fmt.Printf("promote: %s: %s\n", displayPath(file), err)
+				refused = true
+				continue
+			}
+			if _, err := parseCorpusFile(file); err != nil {
+				fmt.Printf("promote: %s\n", err)
+				refused = true
+				continue
+			}
+			if !resolved {
+				fmt.Printf("promote: %s: skipped: could not resolve originating suite/method\n", target.Func)
+				failed = true
+				continue
+			}
+			queue = append(queue, promotion{target: target, suite: suite, method: method, file: file})
+		}
+	}
+
+	if refused {
+		fmt.Println("promote: nothing promoted: a crasher of the latest fuzz session is not one it wrote in Go's corpus format")
+		return 1
+	}
+	if len(queue) == 0 && !failed {
+		fmt.Println("no crashers from the latest fuzz session")
+		return 0
+	}
+	// A decoding target's seed comes from a re-run, which reads the shared
+	// fixtures its suite binds.
+	var rerun []gotestrunner.FuzzTarget
+	for _, p := range queue {
+		if overlay.FuzzDecodedByFunc[p.target.Package][p.target.Func] {
+			rerun = append(rerun, p.target)
 		}
 	}
 	ctx, stop := shutdownContext()
 	defer stop()
-	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, withCrashers, 0)
+	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, rerun, 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 1
@@ -472,39 +541,14 @@ func runFuzzPromote(args []string) (code int) {
 			code = max(code, 1)
 		}
 	}()
-
-	for _, target := range targets { //nolint:gocritic // rangeValCopy: intentional
-		files, err := crasherFilesFor(target)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "promote: %s: %s\n", target.Func, err)
-			failed = true
-			continue
-		}
-		if len(files) == 0 {
-			continue
-		}
-		anyCrashers = true
-		// A fixture that did not come up leaves only the raw corpus values.
-		env, _ := fixtures.Env(target)
-
-		suite, method, ok := lookupSuiteMethod(overlay, target.Package, target.Func)
+	for _, p := range queue {
+		// A fixture that did not come up leaves the re-run without its state.
+		env, _ := fixtures.Env(p.target)
+		msg, ok := promoteCrasher(overlay, p.target, p.suite, p.method, p.file, seedTypes(loaded, p.target.Package), env)
+		fmt.Println(msg)
 		if !ok {
-			fmt.Printf("promote: %s: skipped: could not resolve originating suite/method\n", target.Func)
 			failed = true
-			continue
 		}
-
-		for _, file := range files {
-			msg, ok := promoteCrasher(overlay, target, suite, method, file, env)
-			fmt.Println(msg)
-			if !ok {
-				failed = true
-			}
-		}
-	}
-
-	if !anyCrashers && !failed {
-		fmt.Println("no crashers found")
 	}
 	if failed {
 		return 1
@@ -512,51 +556,100 @@ func runFuzzPromote(args []string) (code int) {
 	return 0
 }
 
-// promoteCrasher processes a single crasher file once its originating
-// suite/method is already resolved: it decodes the corpus file and hands
-// the splice-ready argument expressions to refactor.PromoteFuzzSeed, which
-// owns the "never corrupt user code" contract — if it can't locate the fuzz
-// method's *gotest.F parameter, its body, or an insertion point with
-// confidence, it returns an error and leaves every file untouched. On any
-// failure (decode or splice), the crasher file is deliberately left in
-// place (never silently lost) and ok=false is returned so the caller can
-// fail the run. Only once the splice has actually landed on disk is the
-// crasher file removed.
-//
-// Extracted out of runFuzzPromote's loop so this confident-skip contract —
-// "skipped: ..." printed, crasher file survives — is directly unit
-// testable without a full go/packages load.
-func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, suite, method, file string, env []string) (message string, ok bool) { //nolint:gocritic // hugeParam: stable API
+// seedTypes names the types a seed spliced into pkgPath's suites may convert
+// to: the predeclared ones, the package's own and those of every package it
+// reaches, each by the name it is qualified with.
+func seedTypes(loaded []*gotestgen.LoadResult, pkgPath string) refactor.TypeNames {
+	var roots []*types.Package
+	for _, lr := range loaded {
+		if lr.PkgPath != pkgPath {
+			continue
+		}
+		for _, p := range []*packages.Package{lr.Ptest, lr.Pxtest} {
+			if p != nil && p.Types != nil {
+				roots = append(roots, p.Types)
+			}
+		}
+	}
+	isType := func(p *types.Package, name string) bool {
+		_, ok := p.Scope().Lookup(name).(*types.TypeName)
+		return ok
+	}
+	return func(qual, name string) bool {
+		if qual == "" {
+			if _, ok := types.Universe.Lookup(name).(*types.TypeName); ok {
+				return true
+			}
+			for _, r := range roots {
+				if isType(r, name) {
+					return true
+				}
+			}
+			return false
+		}
+		seen := map[*types.Package]bool{}
+		var reach func(p *types.Package) bool
+		reach = func(p *types.Package) bool {
+			if seen[p] {
+				return false
+			}
+			seen[p] = true
+			if p.Name() == qual && isType(p, name) {
+				return true
+			}
+			for _, imp := range p.Imports() {
+				if reach(imp) {
+					return true
+				}
+			}
+			return false
+		}
+		for _, r := range roots {
+			if reach(r) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// promoteCrasher splices one crasher file of the latest session into its
+// originating suite/method, which is already resolved. A target that hands
+// the engine its arguments as declared takes the corpus values as written. A
+// target that decodes its input from the leaves takes only the value its
+// codec decodes, as the re-run echoes it; without that echo the crasher is
+// refused, since raw leaves are not the target's input. refactor.PromoteFuzzSeed
+// owns the "never corrupt user code" contract and splices literals only. On
+// any failure the crasher file is left in place and ok is false; only once
+// the splice has landed on disk is the file removed.
+func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, suite, method, file string, typeNames refactor.TypeNames, env []string) (message string, ok bool) { //nolint:gocritic // hugeParam: stable API
 	hashBase := filepath.Base(file)
 
 	corpusArgs, perr := parseCorpusFile(file)
 	if perr != nil {
-		return fmt.Sprintf("promote: %s: %s", file, perr), false
+		return fmt.Sprintf("promote: %s", perr), false
 	}
 
-	spliceArgs := make([]string, len(corpusArgs))
-	for i, a := range corpusArgs {
-		spliceArgs[i] = a.spliceExpr()
-	}
-	// A fanned target's corpus entry is one typed line per leaf — numeric
-	// leaves as fixed-width bytes, hybrid leaves opaque. Re-run it with input
-	// echo on and splice the fanned-in literal instead, so the promoted seed
-	// is readable, keyed source that survives any change to the fuzzed type's
-	// field layout. The echo carries a complete f.Add argument list (one
-	// literal per declared position), so it replaces the whole splice.
-	out, _, _ := rerunCrasher(overlay, target, hashBase, env)
-	lit := extractDecodedInput(out)
-	if lit != "" {
-		spliceArgs = []string{lit}
-	}
-
-	editedFile, line, err := refactor.PromoteFuzzSeed(target.Dir, suite, method, spliceArgs)
-	if err != nil {
-		note := ""
+	var spliceArgs []string
+	if overlay.FuzzDecodedByFunc[target.Package][target.Func] {
+		out, _, _ := rerunCrasher(overlay, target, hashBase, env)
+		lit := extractDecodedInput(out)
 		if lit == "" {
-			note = " (the re-run echoed no decoded input, so only the raw corpus values were available)"
+			leaves := len(overlay.FuzzParamsByFunc[target.Package][target.Func])
+			return fmt.Sprintf("promote: %s/%s: skipped: %s decodes its input from %d lea%s, and the re-run echoed no decoded value; raw leaves are not its input",
+				target.Func, hashBase, target.Func, leaves, leafSuffix(leaves)), false
 		}
-		return fmt.Sprintf("promote: %s/%s: skipped: %s%s", target.Func, hashBase, err, note), false
+		spliceArgs = []string{lit}
+	} else {
+		spliceArgs = make([]string, len(corpusArgs))
+		for i, a := range corpusArgs {
+			spliceArgs[i] = a.spliceExpr()
+		}
+	}
+
+	editedFile, line, err := refactor.PromoteFuzzSeed(target.Dir, suite, method, spliceArgs, typeNames)
+	if err != nil {
+		return fmt.Sprintf("promote: %s/%s: skipped: %s", target.Func, hashBase, err), false
 	}
 
 	if err := os.Remove(file); err != nil {
@@ -564,4 +657,12 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	}
 
 	return fmt.Sprintf("promoted %s/%s -> f.Add(%s) in %s:%d", target.Func, hashBase, strings.Join(spliceArgs, ", "), displayPath(editedFile), line), true
+}
+
+
+func leafSuffix(n int) string {
+	if n == 1 {
+		return "f"
+	}
+	return "ves"
 }

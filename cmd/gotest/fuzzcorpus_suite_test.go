@@ -100,6 +100,11 @@ func (s *FuzzCorpusTestSuite) TestExtractDecodedInput(t *gotest.T) {
 		gotest.Equal(it, `Request{Name: "a"}`, main.ExportExtractDecodedInput(out))
 	})
 
+	t.It("takes the codec's echo, printed first, over a marker the body printed after it", func(it *gotest.T) {
+		out := "=== RUN   FuzzX/abc\n" + protocol.FuzzInputPrefix + `Request{Name: "a"}` + "\n" + protocol.FuzzInputPrefix + `os.Exit(1)` + "\n"
+		gotest.Equal(it, `Request{Name: "a"}`, main.ExportExtractDecodedInput(out))
+	})
+
 	t.It("is empty without a marker", func(it *gotest.T) {
 		gotest.Empty(it, main.ExportExtractDecodedInput("no marker here\n"))
 	})
@@ -151,7 +156,7 @@ func (s *FuzzCorpusTestSuite) TestPromoteCrasher(t *gotest.T) {
 			gotest.NoError(it, os.WriteFile(corpusPath, []byte("go test fuzz v1\nstring(\"stale\")\n"), 0600))
 
 			target := gotestrunner.FuzzTarget{Package: "example.com/foo", Dir: dir, Func: "FuzzFooTestSuite_FuzzTrim"}
-			msg, ok := main.ExportPromoteCrasher(&gotestrunner.OverlayResult{}, target, "FooTestSuite", "FuzzTrim", corpusPath, nil)
+			msg, ok := main.ExportPromoteCrasher(&gotestrunner.OverlayResult{}, target, "FooTestSuite", "FuzzTrim", corpusPath, nil, nil)
 
 			gotest.False(it, ok, "msg=%q", msg)
 			gotest.Contains(it, msg, "skipped:")

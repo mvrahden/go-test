@@ -1,10 +1,12 @@
 package refactor
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	gotypes "go/types"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,7 +27,7 @@ import (
 // If the method can't be located unambiguously, or splicing would produce
 // invalid Go, no file is modified and an error is returned — this never
 // partially edits or corrupts user source.
-func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string) (filePath string, line int, err error) {
+func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string, types TypeNames) (filePath string, line int, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", 0, fmt.Errorf("reading %s: %w", dir, err)
@@ -41,7 +43,7 @@ func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string) (file
 			return "", 0, fmt.Errorf("reading %s: %w", p, err)
 		}
 
-		edited, found, err := insertFuzzAdd(p, src, suiteName, methodName, argExprs)
+		edited, found, err := insertFuzzAdd(p, src, suiteName, methodName, argExprs, types)
 		if err != nil {
 			return "", 0, fmt.Errorf("%s: %w", p, err)
 		}
@@ -81,13 +83,18 @@ func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string) (file
 // differs from the f.Fuzz callback's arguments, so callers can tell "try
 // another file" apart from "found it, but something is wrong" and abort
 // instead of silently skipping a genuine problem.
-func InsertFuzzAdd(src []byte, suiteName, methodName string, argExprs []string) (edited []byte, found bool, err error) {
-	return insertFuzzAdd("", src, suiteName, methodName, argExprs)
+func InsertFuzzAdd(src []byte, suiteName, methodName string, argExprs []string, types TypeNames) (edited []byte, found bool, err error) {
+	return insertFuzzAdd("", src, suiteName, methodName, argExprs, types)
 }
+
+// TypeNames reports whether qual.name (name alone when qual is empty) names
+// a type where the seed is spliced. Only a conversion to a type is a
+// literal; a nil TypeNames admits the predeclared types alone.
+type TypeNames func(qual, name string) bool
 
 // insertFuzzAdd is InsertFuzzAdd with the file's path, which decides where
 // imports are resolved from.
-func insertFuzzAdd(filename string, src []byte, suiteName, methodName string, argExprs []string) (edited []byte, found bool, err error) {
+func insertFuzzAdd(filename string, src []byte, suiteName, methodName string, argExprs []string, types TypeNames) (edited []byte, found bool, err error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 	if err != nil {
@@ -112,6 +119,13 @@ func insertFuzzAdd(filename string, src []byte, suiteName, methodName string, ar
 	if arity, ok := declaredArity(decl, paramName); ok && arity != len(argExprs) {
 		return nil, true, fmt.Errorf("fuzz method %s.%s takes %d argument%s, the seed has %d value%s",
 			suiteName, methodName, arity, plural(arity), len(argExprs), plural(len(argExprs)))
+	}
+
+	// Only literal values become a seed: a call or an operator is code.
+	for _, e := range argExprs {
+		if err := checkSeedLiteral(e, types); err != nil {
+			return nil, true, fmt.Errorf("seed value %s is not a literal: %w", e, err)
+		}
 	}
 
 	insertOffset, ok := addInsertOffset(fset, file, decl, paramName)
@@ -324,4 +338,184 @@ func lastAddLine(edited []byte, suiteName, methodName string) (int, error) {
 		return 0, fmt.Errorf("fuzz method %s.%s: no Add call found after edit", suiteName, methodName)
 	}
 	return fset.Position(decl.Body.List[lastIdx].Pos()).Line, nil
+}
+
+// conversionMath are the math functions a seed literal may call: the ones
+// that spell float specials and float bits.
+var conversionMath = map[string]int{"NaN": 0, "Inf": 1, "Float64frombits": 1, "Float32frombits": 1}
+
+// checkSeedLiteral admits a value literal as a corpus file or a codec's echo
+// spells it: basic literals, signed ones, true/false/nil, conversions of a
+// literal, composite literals of literals, &T{...} and &[]T{v}[0], and the
+// math calls that spell float specials. Anything else is code.
+func checkSeedLiteral(src string, types TypeNames) error {
+	expr, err := parser.ParseExpr(src)
+	if err != nil {
+		return err
+	}
+	if types == nil {
+		types = predeclaredType
+	}
+	return seedChecker{types}.literal(expr)
+}
+
+// predeclaredType admits the predeclared types alone.
+func predeclaredType(qual, name string) bool {
+	if qual != "" {
+		return false
+	}
+	_, ok := gotypes.Universe.Lookup(name).(*gotypes.TypeName)
+	return ok
+}
+
+type seedChecker struct{ types TypeNames }
+
+func (c seedChecker) literal(e ast.Expr) error {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		return nil
+	case *ast.Ident:
+		switch x.Name {
+		case "true", "false", "nil", "NaN", "Inf":
+			return nil
+		}
+		return fmt.Errorf("identifier %s", x.Name)
+	case *ast.ParenExpr:
+		return c.literal(x.X)
+	case *ast.UnaryExpr:
+		switch x.Op {
+		case token.SUB, token.ADD:
+			return c.literal(x.X)
+		case token.AND:
+			switch inner := x.X.(type) {
+			case *ast.CompositeLit:
+				return c.literal(inner)
+			case *ast.IndexExpr:
+				return c.literal(inner)
+			}
+		}
+		return fmt.Errorf("operator %s", x.Op)
+	case *ast.IndexExpr:
+		// &[]T{v}[0]: the one addressable spelling of a pointer to a value.
+		lit, ok := x.X.(*ast.CompositeLit)
+		idx, isLit := x.Index.(*ast.BasicLit)
+		if !ok || !isLit || idx.Kind != token.INT {
+			return errors.New("index expression")
+		}
+		return c.literal(lit)
+	case *ast.CompositeLit:
+		if x.Type != nil {
+			if err := c.typ(x.Type); err != nil {
+				return err
+			}
+		}
+		for _, elt := range x.Elts {
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				if _, ok := kv.Key.(*ast.Ident); !ok {
+					if err := c.literal(kv.Key); err != nil {
+						return err
+					}
+				}
+				if err := c.literal(kv.Value); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := c.literal(elt); err != nil {
+				return err
+			}
+		}
+		return nil
+	case *ast.CallExpr:
+		if x.Ellipsis.IsValid() {
+			return errors.New("spread call")
+		}
+		if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
+			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "math" {
+				n, known := conversionMath[sel.Sel.Name]
+				if !known || len(x.Args) != n {
+					return fmt.Errorf("call of math.%s", sel.Sel.Name)
+				}
+				for _, a := range x.Args {
+					if err := c.literal(a); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		}
+		// A conversion: one literal argument to a type.
+		if len(x.Args) != 1 {
+			return errors.New("call")
+		}
+		if err := c.conversion(x.Fun); err != nil {
+			return err
+		}
+		return c.literal(x.Args[0])
+	}
+	return fmt.Errorf("%T", e)
+}
+
+// conversion admits the callee of a conversion: a name only when it names a
+// type, which tells a conversion from a function call.
+func (c seedChecker) conversion(fun ast.Expr) error {
+	switch x := fun.(type) {
+	case *ast.Ident:
+		if !c.types("", x.Name) {
+			return fmt.Errorf("call of %s", x.Name)
+		}
+		return nil
+	case *ast.SelectorExpr:
+		if q, ok := x.X.(*ast.Ident); ok && c.types(q.Name, x.Sel.Name) {
+			return nil
+		}
+		return fmt.Errorf("call of %s", gotypes.ExprString(fun))
+	case *ast.ParenExpr:
+		return c.conversion(x.X)
+	}
+	return c.typ(fun)
+}
+
+// typ admits the type expressions a seed literal names.
+func (c seedChecker) typ(e ast.Expr) error {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return nil
+	case *ast.SelectorExpr:
+		if _, ok := x.X.(*ast.Ident); ok {
+			return nil
+		}
+	case *ast.ParenExpr:
+		return c.typ(x.X)
+	case *ast.StarExpr:
+		return c.typ(x.X)
+	case *ast.ArrayType:
+		if x.Len != nil {
+			if err := c.literal(x.Len); err != nil {
+				return err
+			}
+		}
+		return c.typ(x.Elt)
+	case *ast.MapType:
+		if err := c.typ(x.Key); err != nil {
+			return err
+		}
+		return c.typ(x.Value)
+	case *ast.IndexExpr:
+		if err := c.typ(x.X); err != nil {
+			return err
+		}
+		return c.typ(x.Index)
+	case *ast.IndexListExpr:
+		if err := c.typ(x.X); err != nil {
+			return err
+		}
+		for _, i := range x.Indices {
+			if err := c.typ(i); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("type %T", e)
 }
