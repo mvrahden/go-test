@@ -1,6 +1,6 @@
 //go:build windows
 
-package gotestrunner
+package proctree
 
 import (
 	"math"
@@ -8,7 +8,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func processAlive(pid int) bool {
+// Alive reports whether a process with pid is running.
+func Alive(pid int) bool {
 	if pid <= 0 || uint64(pid) > math.MaxUint32 {
 		return false
 	}

@@ -262,12 +262,7 @@ func cli(ctx context.Context) (string, error) {
 			cliErr = err
 			return
 		}
-		dir, err := os.MkdirTemp("", "gotest-cli-")
-		if err != nil {
-			cliErr = err
-			return
-		}
-		cliBinary, cliErr = BuildCLI(ctx, root, dir)
+		cliBinary, cliErr = resolveCLI(ctx, root)
 	})
 	return cliBinary, cliErr
 }

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/proctree"
 )
 
 // CleanStaleOverlays removes the temporary overlay and work directories and
@@ -66,7 +68,7 @@ func cleanStaleStaging() {
 	}
 	for _, dir := range dirs {
 		pid, err := strconv.Atoi(dir[strings.LastIndex(dir, "-")+1:])
-		if err != nil || processAlive(pid) {
+		if err != nil || proctree.Alive(pid) {
 			continue
 		}
 		os.RemoveAll(dir)
@@ -113,5 +115,5 @@ func isOverlayAlive(dir string) bool {
 	if err != nil {
 		return false
 	}
-	return processAlive(pid)
+	return proctree.Alive(pid)
 }

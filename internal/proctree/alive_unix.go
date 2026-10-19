@@ -1,6 +1,6 @@
-//go:build !windows
+//go:build unix
 
-package gotestrunner
+package proctree
 
 import (
 	"errors"
@@ -8,7 +8,12 @@ import (
 	"syscall"
 )
 
-func processAlive(pid int) bool {
+// Alive reports whether a process with pid is running.
+func Alive(pid int) bool {
+	// 0 and -1 would signal a group, not a process.
+	if pid <= 0 {
+		return false
+	}
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return false

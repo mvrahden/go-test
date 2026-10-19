@@ -75,8 +75,12 @@ for patch in "${patches[@]}"; do
     failed=1
     continue
   fi
+  # Every temp dir the mutant's build and run make lives in the copy and goes
+  # with it, whatever a killed or leaking test leaves behind.
+  tmp="$work/.tmp"
+  mkdir -p "$tmp"
   # The judge exits 2 on a build failure, which would pass for caught.
-  if ! (cd "$work" && go build ./... && go test -vet=off -c -o "$work/.drillbin/" "${pkgs[@]}" "${extra[@]}") >"$work/build.log" 2>&1; then
+  if ! (export TMPDIR="$tmp" && cd "$work" && go build ./... && go test -vet=off -c -o "$work/.drillbin/" "${pkgs[@]}" "${extra[@]}") >"$work/build.log" 2>&1; then
     echo "DRILL  $name: mutant does not compile, refresh it"
     sed 's/^/       /' "$work/build.log" | tail -5
     failed=1
@@ -84,7 +88,7 @@ for patch in "${patches[@]}"; do
   fi
   # Each mutant runs from a fresh copy, so no cache entry is ever hit again:
   # the cache lives in the copy and goes with it, never in the user's.
-  if (cd "$work" && GOTEST_CACHE_DIR="$work/.gotest-cache" "$judge" summary --no-cache "${pkgs[@]}" "${extra[@]}" >"$work/drill.log" 2>&1); then
+  if (export TMPDIR="$tmp" && cd "$work" && GOTEST_CACHE_DIR="$work/.gotest-cache" "$judge" summary --no-cache "${pkgs[@]}" "${extra[@]}" >"$work/drill.log" 2>&1); then
     echo "DRILL  $name: SURVIVED, the guards did not catch it"
     sed 's/^/       /' "$work/drill.log" | tail -5
     failed=1

@@ -35,7 +35,8 @@ func (f *BinarySharedFixture) BeforeAll(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	dir, err := os.MkdirTemp("", "gotest-cli-*")
+	// Stamped, so a run that kills this process leaves a dir the next sweep takes.
+	dir, err := testkit.NewCLIDir()
 	if err != nil {
 		return err
 	}

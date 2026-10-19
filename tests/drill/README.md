@@ -11,7 +11,8 @@ The checks themselves are described in `ARCHITECTURE.md` under "Testing gotest",
 
 For every `mutants/<name>.patch`, `drill.sh`:
 
-1. copies the repository to a scratch directory;
+1. copies the repository to a scratch directory, whose `.tmp` is the
+   `TMPDIR` of everything the mutant builds and runs;
 2. applies the patch, which introduces one bug in a core component, with
    exact context and no fuzz (a line offset is accepted: the context still
    matches verbatim);
