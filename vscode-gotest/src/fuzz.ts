@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, realpath, stat } from "node:fs/promises";
 import type { DiscoveryCache } from "./discovery.js";
 import {
   buildCliCommand,
@@ -18,6 +19,7 @@ import { spawnTestProcess } from "./runnerUtils.js";
 // detection (corpus-directory scan), and source splicing (promote). This
 // module only turns those contracts into editor affordances — a budget
 // picker, a cancellable progress notification, and finding-driven actions.
+// The Promote CodeLens reads the session record promote reads, by its rules.
 
 // --- pure parsing helpers (unit-tested) ---
 
@@ -76,21 +78,120 @@ export function isValidGoDuration(s: string): boolean {
   return /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/.test(s.trim());
 }
 
-// countCrasherEntries returns the number of corpus entry files on disk for
-// a generated wrapper, or 0 when the directory does not exist. Used by the
-// CodeLens provider to surface pending crashers where the target lives.
-export async function countCrasherEntries(
+// fuzzSessionFile is where the CLI records the latest fuzz session:
+// $GOTEST_CACHE_DIR (relative to the CLI's cwd), else Go's os.UserCacheDir
+// plus "gotest". undefined when neither resolves, as the CLI then fails too.
+export function fuzzSessionFile(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+  cwd?: string,
+): string | undefined {
+  const root = gotestCacheRoot(env, platform);
+  if (root === undefined) return undefined;
+  return path.join(cwd ? path.resolve(cwd, root) : root, "fuzz-session.json");
+}
+
+function gotestCacheRoot(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+): string | undefined {
+  if (env.GOTEST_CACHE_DIR) return env.GOTEST_CACHE_DIR;
+  let base: string | undefined;
+  switch (platform) {
+    case "win32":
+      base = env.LocalAppData ?? env.LOCALAPPDATA;
+      break;
+    case "darwin":
+      base = env.HOME && `${env.HOME}/Library/Caches`;
+      break;
+    default:
+      if (env.XDG_CACHE_HOME) {
+        // Go refuses a relative $XDG_CACHE_HOME.
+        base = path.isAbsolute(env.XDG_CACHE_HOME)
+          ? env.XDG_CACHE_HOME
+          : undefined;
+      } else {
+        base = env.HOME && `${env.HOME}/.cache`;
+      }
+  }
+  return base ? path.join(base, "gotest") : undefined;
+}
+
+interface SessionCrasher {
+  dir: string;
+  func: string;
+  name: string;
+  sha256: string;
+}
+
+// sessionCrasherCounts counts, per fuzz wrapper of the package in pkgDir, the
+// crashers `gotest fuzz promote` will take: those the latest session recorded
+// that are still on disk with the content it wrote. A recorded crasher whose
+// content changed makes promote refuse the whole run, so then none count.
+// Files the session did not write never count.
+export async function sessionCrasherCounts(
   pkgDir: string,
-  wrapperName: string,
-): Promise<number> {
+  wrappers: ReadonlySet<string>,
+  opts: { env?: NodeJS.ProcessEnv; cwd?: string } = {},
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const file = fuzzSessionFile(opts.env, process.platform, opts.cwd);
+  if (!file) return counts;
+  let crashers: unknown;
   try {
-    const entries = await readdir(
-      path.join(pkgDir, "testdata", "fuzz", wrapperName),
-      { withFileTypes: true },
-    );
-    return entries.filter((e) => e.isFile()).length;
+    crashers = (
+      JSON.parse(await readFile(file, "utf-8")) as { crashers?: unknown }
+    ).crashers;
   } catch {
-    return 0;
+    return counts;
+  }
+  if (!Array.isArray(crashers)) return counts;
+
+  const pkg = await resolveDir(pkgDir);
+  const seen = new Set<string>();
+  for (const c of crashers as Partial<SessionCrasher>[]) {
+    if (
+      typeof c?.dir !== "string" ||
+      typeof c.func !== "string" ||
+      typeof c.name !== "string" ||
+      typeof c.sha256 !== "string"
+    ) {
+      continue;
+    }
+    // Promote only visits the visible files of the package's targets.
+    if (!wrappers.has(c.func) || c.name.startsWith(".")) continue;
+    if (c.name !== path.basename(c.name)) continue;
+    if ((await resolveDir(c.dir)) !== pkg) continue;
+    const key = `${c.func}/${c.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const entry = path.join(pkgDir, "testdata", "fuzz", c.func, c.name);
+    try {
+      if ((await stat(entry)).isDirectory()) continue;
+    } catch {
+      continue; // gone: promote never sees it
+    }
+    let digest: string;
+    try {
+      digest = createHash("sha256")
+        .update(await readFile(entry))
+        .digest("hex");
+    } catch {
+      return new Map();
+    }
+    if (digest !== c.sha256) return new Map();
+    counts.set(c.func, (counts.get(c.func) ?? 0) + 1);
+  }
+  return counts;
+}
+
+async function resolveDir(dir: string): Promise<string> {
+  const abs = path.resolve(dir);
+  try {
+    return path.normalize(await realpath(abs));
+  } catch {
+    return path.normalize(abs);
   }
 }
 

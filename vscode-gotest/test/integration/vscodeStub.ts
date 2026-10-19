@@ -85,6 +85,16 @@ export function buildVscodeStub(state: StubState) {
         public range: unknown,
       ) {}
     },
+    CodeLens: class {
+      constructor(
+        public range: unknown,
+        public command?: {
+          title: string;
+          command: string;
+          arguments?: unknown[];
+        },
+      ) {}
+    },
     // Coverage value types. Real classes rather than spies, so a test can read
     // the covered file and its statement counts back out.
     StatementCoverage: class {
