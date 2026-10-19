@@ -34,3 +34,6 @@ var ExportCLIName = cliName
 
 // ExportNewStampedDir creates a CLI dir stamped with pid, without sweeping.
 var ExportNewStampedDir = newStampedDir
+
+// ExportPublish moves a build to its keyed path the way a builder does.
+var ExportPublish = publish

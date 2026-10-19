@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -34,6 +35,9 @@ func lateBudgetReports(t *gotest.T, timeout time.Duration) (done, ack string) {
 	gotest.NoError(t, err)
 	dir := t.TempDir()
 	file, bin := filepath.Join(dir, "setup.go"), filepath.Join(dir, "setup")
+	if runtime.GOOS == "windows" {
+		bin += ".exe" // exec finds no program by a bare name there
+	}
 	gotest.NoError(t, os.WriteFile(file, src, 0o600))
 	out, err := exec.CommandContext(t.Context(), "go", "build", "-o", bin, file).CombinedOutput() //nolint:gosec // G204: the program this test generated
 	gotest.NoError(t, err, "build: %s", out)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,10 +36,12 @@ const keyedLinger = 10 * time.Minute
 // stamped none, may still be running from it.
 const cliDirGrace = 24 * time.Hour
 
-// lockFile is a CLI dir's lock: a claim holds it while it checks the binary
-// and stamps the dir, a sweep while it judges and empties the dir, so a sweep
-// never takes a dir a process has claimed or is claiming.
-const lockFile = ".lock"
+// lockSuffix ends the name of a published build's lock, which sits beside
+// its dir: Windows refuses to move a dir while a file in it is open. A claim
+// holds it while it checks the binary and stamps the dir, a sweep while it
+// judges and moves the dir aside, a publisher while it moves a build in, so a
+// sweep never takes a build a process has claimed or is claiming.
+const lockSuffix = ".lock"
 
 // pidFile is the creator's stamp; a process reusing the dir adds its own
 // pidFile.<pid> beside it.
@@ -56,11 +60,9 @@ func newStampedDir(pid int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for name, data := range map[string]string{lockFile: "", pidFile: strconv.Itoa(pid)} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o600); err != nil {
-			_ = os.RemoveAll(dir)
-			return "", err
-		}
+	if err := os.WriteFile(filepath.Join(dir, pidFile), []byte(strconv.Itoa(pid)), 0o600); err != nil {
+		_ = os.RemoveAll(dir)
+		return "", err
 	}
 	return dir, nil
 }
@@ -89,7 +91,7 @@ func resolveCLI(ctx context.Context, root string) (string, error) {
 	if keyErr != nil {
 		return binary, nil
 	}
-	if os.Rename(dir, keyed) == nil {
+	if publish(dir, keyed) {
 		return filepath.Join(keyed, cliName()), nil
 	}
 	// Another process published the same build first.
@@ -123,30 +125,49 @@ func claimAs(keyed string, pid int, alive func(int) bool) (string, bool) {
 	return binary, true
 }
 
-// lockDir takes dir's lock, waiting for it unless try. It fails when dir has
-// no lock, when try finds it held, or when the lock taken is no longer dir's
-// because a sweep removed it meanwhile.
+// publish moves the build in dir to keyed, under keyed's lock.
+func publish(dir, keyed string) bool {
+	unlock, ok := lockDir(keyed, false)
+	if !ok {
+		return false
+	}
+	defer unlock()
+	return os.Rename(dir, keyed) == nil
+}
+
+// lockDir takes the lock beside dir, creating it, waiting for it unless try.
+// It fails when try finds it held. Unlocking removes the lock when dir is
+// gone, so no lock outlives its dir; a waiter whose lock was removed
+// meanwhile opens the current one, where try fails.
 func lockDir(dir string, try bool) (unlock func(), ok bool) {
-	path := filepath.Join(dir, lockFile)
-	f, err := openLock(path)
-	if err != nil {
-		return nil, false
-	}
-	if lockFD(f, try) != nil {
-		_ = f.Close()
-		return nil, false
-	}
-	unlock = func() {
+	path := dir + lockSuffix
+	for range 3 {
+		f, err := openLock(path)
+		if err != nil {
+			return nil, false
+		}
+		if lockFD(f, try) != nil {
+			_ = f.Close()
+			return nil, false
+		}
+		held, err := f.Stat()
+		current, err2 := os.Stat(path)
+		if err == nil && err2 == nil && os.SameFile(held, current) {
+			return func() {
+				if _, err := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) {
+					_ = os.Remove(path)
+				}
+				unlockFD(f)
+				_ = f.Close()
+			}, true
+		}
 		unlockFD(f)
 		_ = f.Close()
+		if try {
+			break
+		}
 	}
-	held, err := f.Stat()
-	current, err2 := os.Stat(path)
-	if err != nil || err2 != nil || !os.SameFile(held, current) {
-		unlock()
-		return nil, false
-	}
-	return unlock, true
+	return nil, false
 }
 
 // cliKey names a build of root's ./cmd/gotest by what goes into it: the
@@ -200,17 +221,20 @@ func sweepCLIDir(dir string, rules sweepRules) {
 		_ = os.RemoveAll(dir)
 		return
 	}
+	if lockOf, isLock := strings.CutSuffix(dir, lockSuffix); isLock {
+		// A lock left by a process that died holding it; unlocking removes
+		// it once its dir is gone.
+		if _, err := os.Lstat(lockOf); errors.Is(err, fs.ErrNotExist) {
+			if unlock, ok := lockDir(lockOf, true); ok {
+				unlock()
+			}
+		}
+		return
+	}
 	if !stale(dir, rules) {
 		return
 	}
-	if _, err := os.Stat(filepath.Join(dir, lockFile)); err != nil {
-		if strings.HasPrefix(filepath.Base(dir), keyedPrefix) {
-			// Not one testkit published, which always carries its lock. A
-			// build may be published at its path since the judging, so only
-			// an empty one goes.
-			_ = os.Remove(dir)
-			return
-		}
+	if !strings.HasPrefix(filepath.Base(dir), keyedPrefix) {
 		// No claim takes an unpublished dir: an earlier testkit's, or a
 		// build's whose owner is gone.
 		_ = os.RemoveAll(dir)
@@ -226,10 +250,10 @@ func sweepCLIDir(dir string, rules sweepRules) {
 		return
 	}
 	// Moved aside before the lock is released: a claim that waited for it
-	// then finds the lock is no longer the dir's, and a build published
-	// meanwhile is never the one removed.
+	// then finds no binary, and a build published meanwhile is never the
+	// one removed.
 	aside := filepath.Join(filepath.Dir(dir), gonePrefix+strconv.Itoa(os.Getpid())+"-"+strconv.FormatInt(goneSeq.Add(1), 10))
-	err := os.Rename(dir, aside)
+	err := renameDir(dir, aside)
 	unlock()
 	if err == nil {
 		_ = os.RemoveAll(aside)

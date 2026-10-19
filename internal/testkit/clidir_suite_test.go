@@ -28,6 +28,8 @@ func (s *CLIDirTestSuite) TestStaleCLIDirsAreSwept(t *gotest.T) {
 	live := cliDir(t, tmp, "gotest-cli-live", ".pid", strconv.Itoa(os.Getpid()))
 	fresh := cliDir(t, tmp, "gotest-cli-fresh", "", "")
 	old := cliDir(t, tmp, "gotest-cli-old", "", "")
+	orphanLock := filepath.Join(tmp, "gotest-cli-key-orphan.lock")
+	write(t, orphanLock, "")
 	aged := time.Now().Add(-48 * time.Hour) // past the grace an unstamped dir gets
 	gotest.NoError(t, os.Chtimes(old, aged, aged))
 	gotest.NoError(t, os.Chtimes(staleBuild, aged, aged))
@@ -43,6 +45,12 @@ func (s *CLIDirTestSuite) TestStaleCLIDirsAreSwept(t *gotest.T) {
 		})
 		w.It("removes a reusable build no live process used for a while", func(it *gotest.T) {
 			gotest.False(it, exists(staleBuild))
+		})
+		w.It("removes the lock of a build it removed", func(it *gotest.T) {
+			gotest.False(it, exists(staleBuild+".lock"))
+		})
+		w.It("removes a lock whose build is gone", func(it *gotest.T) {
+			gotest.False(it, exists(orphanLock))
 		})
 		w.It("keeps a reusable build used moments ago, for the next process", func(it *gotest.T) {
 			gotest.True(it, exists(idleBuild))
@@ -158,7 +166,7 @@ func (s *CLIDirTestSuite) TestASweepNeverTakesAClaimedBuild(t *gotest.T) {
 			builder := pid()
 			dir, err := testkit.ExportNewStampedDir(builder)
 			if err == nil && os.WriteFile(filepath.Join(dir, testkit.ExportCLIName()), []byte("cli"), 0o600) == nil {
-				if os.Rename(dir, keyed) == nil {
+				if testkit.ExportPublish(dir, keyed) {
 					published.Add(1)
 				} else {
 					_ = os.RemoveAll(dir)
@@ -228,7 +236,7 @@ func cliDir(t *gotest.T, tmp, name, pidFile, pid string) string {
 // publishedBuild makes a build published as tmp/name whose users are gone.
 func publishedBuild(t *gotest.T, tmp, name string) string {
 	dir := cliDir(t, tmp, name, ".pid."+deadPID, deadPID)
-	write(t, filepath.Join(dir, ".lock"), "")
+	write(t, dir+".lock", "")
 	write(t, filepath.Join(dir, testkit.ExportCLIName()), "cli")
 	return dir
 }

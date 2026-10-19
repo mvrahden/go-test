@@ -21,5 +21,5 @@ func lockFD(f *os.File, try bool) error {
 func unlockFD(f *os.File) { _ = unix.Flock(int(f.Fd()), unix.LOCK_UN) } //nolint:gosec // G115: a file descriptor fits an int
 
 func openLock(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_RDWR, 0) //nolint:gosec // G304: the lock file of a gotest-cli- temp dir
+	return os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600) //nolint:gosec // G304: the lock of a gotest-cli- temp dir
 }

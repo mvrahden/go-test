@@ -24,5 +24,5 @@ func unlockFD(f *os.File) {
 }
 
 func openLock(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_RDWR, 0) //nolint:gosec // G304: the lock file of a gotest-cli- temp dir
+	return os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600) //nolint:gosec // G304: the lock of a gotest-cli- temp dir
 }
