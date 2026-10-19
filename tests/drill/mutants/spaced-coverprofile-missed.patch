@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLICoverageProfileTestSuite/TestProfileSpellings/a_fully_covered_package_runs_with_a_minimum_and_a_profile/finds_the_profile_in_every_spelling_go_test_accepts,_for_the_--min_gate_and_for_summary/summary_-coverprofile_file_prints_the_coverage
 Expect: ^FAIL .*conformance/cli .* / finds the profile in every spelling go test accepts, for the --min gate and for summary / summary -coverprofile file prints the coverage \(
 Clause: when a fully covered package runs with a minimum and a profile → finds the profile in every spelling go test accepts, for the --min gate and for summary
 --- a/internal/gotestrunner/args.go

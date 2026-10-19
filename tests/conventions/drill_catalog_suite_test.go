@@ -6,13 +6,15 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // DrillCatalogTestSuite pins tests/drill/README.md to tests/drill/mutants:
 // every patch is listed, every listed name has a patch, and every patch
-// names the check that must catch it. A mutant the README does not mention
-// is a guard nobody knows exists; a row without a patch guards nothing.
+// names the check that must catch it and what runs to judge it. A mutant the
+// README does not mention is a guard nobody knows exists; a row without a
+// patch guards nothing.
 type DrillCatalogTestSuite struct{}
 
 // catalogRowRe matches a table row whose first cell is a backticked mutant name.
@@ -50,6 +52,23 @@ func (s *DrillCatalogTestSuite) TestEveryMutantIsCatalogued(t *gotest.T) {
 				data, err := os.ReadFile(f)
 				gotest.NoError(it, err)
 				gotest.Regexp(it, "(?m)^Expect: .+", string(data), "%s has no Expect: line", filepath.Base(f))
+			}
+		})
+		w.It("is judged by runs naming only clauses the specs state and tests their packages declare", func(it *gotest.T) {
+			specs, err := speccatalog.LoadSpecs(root)
+			gotest.NoError(it, err)
+			catalog, err := os.ReadFile(filepath.Join(root, speccatalog.JSONPath))
+			gotest.NoError(it, err)
+			for _, f := range patchFiles {
+				data, err := os.ReadFile(f)
+				gotest.NoError(it, err)
+				runs, problems := speccatalog.JudgeRuns(specs, catalog, data)
+				for _, r := range runs {
+					_, declared, err := r.Alone(root)
+					gotest.NoError(it, err)
+					problems = append(problems, declared...)
+				}
+				gotest.Empty(it, problems, "%s", filepath.Base(f))
 			}
 		})
 	})

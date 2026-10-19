@@ -1,4 +1,5 @@
 Expect: asyncfatal: the run took .*; the wait outlived the failed goroutine
+Judge: ./tests/canary CanaryTimingTestSuite/TestAFatalGoroutineEndsAnAsyncWait
 Clause: when the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left → fails the method at once, not at the end of its budget
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go

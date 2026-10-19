@@ -1,5 +1,6 @@
 Expect: ^FAIL .*conformance/lifecycle ForeignPid .* / sends that process no signal \(
 Expect: ^FAIL .*conformance/lifecycle ForeignPid .* / interrupts the suite.s process group instead \(
+Alone: the stranger and the suite's group record their signals a sleep after it lands, so a loaded machine can judge the run first
 Clause: when the run is interrupted and the pid the suite published names a process outside its group → sends that process no signal
 Clause: when the run is interrupted and the pid the suite published names a process outside its group → interrupts the suite's process group instead
 --- a/internal/gotestrunner/stop_unix.go

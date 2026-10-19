@@ -1,4 +1,5 @@
 Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
 Clause: when JSONEq compares an integer with its decimal spelling → 1 equals 1.0
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go

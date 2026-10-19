@@ -1,4 +1,5 @@
 Expect: guardedshared: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestAGuardedSuitesSharedFixtureStillFailsTheRun
 Clause: when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go

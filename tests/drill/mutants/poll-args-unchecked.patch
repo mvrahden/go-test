@@ -1,4 +1,5 @@
 Expect: failing: (verdicts differ from the golden list|no failure message says "must be positive")
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when waitFor or tick is not positive → fails with a type-guard message and polls nothing
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go

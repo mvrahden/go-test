@@ -1,4 +1,5 @@
 Expect: hookoverrun: TestSlow did not fail
+Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a suite hook or the body fails an assertion, panics or overruns the Timeout → fails the run with exit 1 and the method or suite whose hook went wrong, running the later hooks the row lists and, after a panic in a method's hooks or body, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go

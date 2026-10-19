@@ -1,4 +1,5 @@
 Expect: failing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when one row of an Each table fails → fails that row and the method, and the rows after it never run
 Clause: when one row of an Each table skips → skips that row and the method from there, and the rows after it never run
 --- a/pkg/gotest/utils.go

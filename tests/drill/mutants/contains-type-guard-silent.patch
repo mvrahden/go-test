@@ -1,4 +1,5 @@
 Expect: failing: no failure message says
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when Contains is given a needle no element of the haystack could be → fails naming the haystack's type and the needle's
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go

@@ -1,4 +1,5 @@
 Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
 Clause: when tick is longer than waitFor and the first poll fails → a final poll runs at the deadline and can still pass
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go

@@ -1,4 +1,5 @@
 Expect: --gate=0 without -count: exit code 2, want 0
+Judge: ./tests/canary CanaryTestSuite/TestAGateOfZeroIsNoGate
 Clause: when --gate=0 is given → compares without a gate, whatever -count says
 --- a/cmd/gotest/bench.go
 +++ b/cmd/gotest/bench.go

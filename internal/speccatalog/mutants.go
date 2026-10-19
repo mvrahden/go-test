@@ -72,33 +72,3 @@ func LinksIntoTestBinaries(patch []byte) bool {
 	}
 	return false
 }
-
-// PackagesOf returns the conformance package directories, as "./<dir>",
-// whose specs state the clauses the patch names on its Clause: lines, sorted
-// and distinct, and every named clause no spec states.
-func PackagesOf(specs []Spec, patch []byte) (pkgs, unknown []string) {
-	byClause := map[string]string{}
-	for _, s := range specs {
-		for _, c := range Clauses([]Spec{s}) {
-			byClause[c] = "./" + ConformanceDir + "/" + s.Capability
-		}
-	}
-	seen := map[string]bool{}
-	for _, line := range strings.Split(string(patch), "\n") {
-		clause, ok := strings.CutPrefix(line, "Clause: ")
-		if !ok {
-			continue
-		}
-		dir, ok := byClause[clause]
-		if !ok {
-			unknown = append(unknown, clause)
-			continue
-		}
-		if !seen[dir] {
-			seen[dir] = true
-			pkgs = append(pkgs, dir)
-		}
-	}
-	sort.Strings(pkgs)
-	return pkgs, unknown
-}

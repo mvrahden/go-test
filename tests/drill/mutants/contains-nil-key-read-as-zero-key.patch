@@ -1,4 +1,5 @@
 Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
 Clause: when Contains is asked for a nil key in a map whose key type cannot be nil → fails naming the map's type
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go

@@ -1,4 +1,5 @@
 Expect: failing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when JSONEq compares integers beyond float64's exact range → tells 9007199254740993 from 9007199254740992
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go

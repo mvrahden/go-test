@@ -1,4 +1,5 @@
 Expect: slowretry: exit code 1, want 0
+Judge: ./tests/canary CanaryTestSuite/TestTheSetupWaitCountsTheReleaseBetweenAttempts
 Clause: when a shared fixture with a 2s Timeout and 1 retry spends 1.6s on each attempt and on the release between them, and no --setup-timeout is given → the run passes: the wait counts the release
 --- a/pkg/gotestruntime/fixtureteardown.go
 +++ b/pkg/gotestruntime/fixtureteardown.go

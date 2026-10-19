@@ -1,5 +1,6 @@
 Expect: latepolls: verdicts differ from the golden list
 Expect: latepolls: a poll started before waitFor was failed as still running
+Judge: ./tests/canary CanaryTestSuite/TestALatePollIsJudgedByItsResult
 Clause: when every Consistently poll passes but one runs past waitFor → passes
 Clause: when an Eventually poll started before waitFor passes after it → passes
 --- a/pkg/gotest/assertions.go

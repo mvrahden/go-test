@@ -1,4 +1,5 @@
 Expect: snapshotting with GOTEST_UPDATE_SNAPSHOTS=0: verdicts differ
+Judge: ./tests/canary CanaryTestSuite/TestSnapshotsKeyOnTheExactName
 Clause: when GOTEST_UPDATE_SNAPSHOTS is 0 → a stale baseline still fails and is left as it was
 --- a/pkg/gotest/snapshot.go
 +++ b/pkg/gotest/snapshot.go

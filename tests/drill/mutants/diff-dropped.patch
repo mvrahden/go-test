@@ -1,4 +1,5 @@
 Expect: failing: no failure message says "@@ -1,5 \+1,5 @@"
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when Equal fails on values whose rendering spans lines → the message carries a unified diff: hunks of changes with three lines of context
 --- a/pkg/gotest/internal/assert/format.go
 +++ b/pkg/gotest/internal/assert/format.go

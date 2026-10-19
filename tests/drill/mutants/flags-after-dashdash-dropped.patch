@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIPassthroughTestSuite/TestUnknownFlagsReachTheBinary/a_flag_only_the_test_binary_declares_is_passed/reaches_the_test_binary_after_--_or_-args,_and_the_binary_fails_its_check_without_it/after_--_it_reaches_the_binary_and_the_pattern_stays_a_package
 Expect: ^FAIL .*conformance/cli .* / reaches the test binary after -- or -args, and the binary fails its check without it / after -- it reaches the binary and the pattern stays a package \(
 Clause: when a flag only the test binary declares is passed → reaches the test binary after -- or -args, and the binary fails its check without it
 --- a/cmd/gotest/args.go

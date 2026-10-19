@@ -1,4 +1,5 @@
 Expect: noisysetup: exit code [12], want 0
+Judge: ./tests/canary CanaryTestSuite/TestASharedFixturesStdoutIsNotTheProtocol
 Clause: when a shared fixture's setup prints to stdout without a newline → its suite receives the state
 Clause: when a shared fixture's setup logs a JSON-shaped line → its suite receives the state
 Clause: when a shared fixture's setup logs a JSON-shaped line → the line is not an event of the run

@@ -179,8 +179,8 @@ func (s *canary) runEnv(t *gotest.T, pkg, canaryDir string, env []string, extra 
 // childEnv is the fixture process's environment: the canary dir, and never
 // the snapshot update switch. A refresh of the repository's own snapshots
 // must not rewrite the snapshotting fixture's deliberately stale baseline.
-// The gotest cache lives in the canary dir and goes with it: a run from a
-// fresh copy of the tree never hits a cache, so it must not fill the user's.
+// Build artifacts use the drill's private worker cache when supplied;
+// otherwise the cache lives beside this run's markers, never in the user's.
 func childEnv(canaryDir string) []string {
 	env := make([]string, 0, len(os.Environ())+2)
 	for _, kv := range os.Environ() {
@@ -189,16 +189,19 @@ func childEnv(canaryDir string) []string {
 		}
 		env = append(env, kv)
 	}
-	return append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+filepath.Join(canaryDir, "cache"))
+	return append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+testkit.ChildCacheDir(canaryDir))
 }
 
 // check runs a fixture and compares exit code and rows with the golden.
 func (s *canary) check(t *gotest.T, pkg string, extra ...string) string {
+	return s.checkIn(t, pkg, t.TempDir(), extra...)
+}
+
+func (s *canary) checkIn(t *gotest.T, pkg, dir string, extra ...string) string {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)
 	}
-	dir := t.TempDir()
 	code, rows := s.run(t, pkg, dir, extra...)
 	if code != want.exit {
 		t.Errorf("%s: exit code %d, want %d", pkg, code, want.exit)
@@ -214,8 +217,14 @@ func (s *CanaryTestSuite) TestPassingSuiteIsGreen(t *gotest.T) {
 	s.check(t, "passing")
 }
 
+// The same fixture checks verdicts and diagnostic content in one run.
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	s.check(t, "failing")
+	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive", "@@ -1,5 +1,5 @@"} {
+		if !strings.Contains(s.lastStream(t), want) {
+			t.Errorf("failing: no failure message says %q", want)
+		}
+	}
 }
 
 // A baseline the value no longer matches must fail; MatchSnapshot comparing
@@ -603,8 +612,9 @@ func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T)
 // Without --setup-timeout the wait for a shared fixture is the budget the
 // fixture declared: a 2s Timeout taking 15s fails the run in 2s, not 15.
 func (s *CanaryTimingTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
+	dir := s.warm(t, "setupbudget")
 	began := time.Now()
-	s.check(t, "setupbudget")
+	s.checkIn(t, "setupbudget", dir)
 	if took := time.Since(began); took > 10*time.Second {
 		t.Errorf("setupbudget: the run took %s; the wait outlived the fixture's declared 2s budget", took)
 	}
@@ -673,19 +683,18 @@ func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *got
 	}
 }
 
-// A failed assertion says what it could not work with: the type ErrorAs
-// expected, the needle a haystack cannot hold, and every extra argument.
-func (s *CanaryTimingTestSuite) TestAssertionFailuresSayWhatTheyCannotWorkWith(t *gotest.T) {
+// Poll deadlines are elapsed-time verdicts; message content is checked
+// separately so unrelated assertion mutants can share the machine.
+func (s *CanaryTimingTestSuite) TestHangingPollsEndAtTheirDeadline(t *gotest.T) {
+	dir := s.warm(t, "failing")
 	began := time.Now()
-	s.check(t, "failing")
+	s.checkIn(t, "failing", dir)
 	// Two polls sleep 10s each; a run held to its deadlines ends long before that.
 	if took := time.Since(began); took > 8*time.Second {
 		t.Errorf("failing: the run took %s; a hanging poll was waited out instead of failed at its deadline", took)
 	}
-	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive", "@@ -1,5 +1,5 @@"} {
-		if !strings.Contains(s.lastStream(t), want) {
-			t.Errorf("failing: no failure message says %q", want)
-		}
+	if !strings.Contains(s.lastStream(t), "poll still running after 100ms") {
+		t.Errorf("failing: no failure message says %q", "poll still running after 100ms")
 	}
 }
 
@@ -743,8 +752,9 @@ func (s *CanaryTestSuite) TestAHelperFailureNamesBothLinesUnderTrimpath(t *gotes
 // An async method whose done-owning goroutine fails fatally fails at once:
 // nothing is left to call done, so nothing waits for the budget.
 func (s *CanaryTimingTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {
+	dir := s.warm(t, "asyncfatal")
 	began := time.Now()
-	code, rows := s.run(t, "asyncfatal", t.TempDir())
+	code, rows := s.run(t, "asyncfatal", dir)
 	if code != 1 {
 		t.Errorf("asyncfatal: exit code %d, want 1", code)
 	}
@@ -1021,4 +1031,16 @@ func (s *CanaryTestSuite) TestFailingBenchmarksReportNoResult(t *gotest.T) {
 	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {
 		t.Errorf("the statement after FailNow ran: the benchmark did not halt")
 	}
+}
+
+// warm compiles the test harness with no suite selected, before a timing
+// verdict starts its clock. It never runs fixture setup or a test body.
+// Shared-fixture setup compilation still belongs to the subsequent run.
+func (s *canary) warm(t *gotest.T, pkg string) string {
+	dir := t.TempDir()
+	code, _, stderr := s.invoke(t, dir, "-run=^$", "./testdata/"+pkg+"/")
+	if code != 0 {
+		fatalf(t, "prepare %s: exit %d: %s", pkg, code, stderr)
+	}
+	return dir
 }

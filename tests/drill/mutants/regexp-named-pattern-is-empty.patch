@@ -1,4 +1,5 @@
 Expect: failing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when Regexp is given a pattern of a named string type → compiles and matches it like a string
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go

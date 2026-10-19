@@ -1,4 +1,5 @@
 Expect: helpers under -trimpath: the failure does not name both lines
+Judge: ./tests/canary CanaryTestSuite/TestAHelperFailureNamesBothLinesUnderTrimpath
 Clause: when a helper fails in a module whose path has no dot, built with -trimpath → the failure names the helper's line and the caller's
 --- a/internal/callsite/callsite.go
 +++ b/internal/callsite/callsite.go

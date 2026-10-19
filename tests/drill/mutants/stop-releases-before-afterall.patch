@@ -1,4 +1,5 @@
 Expect: stop: markers .* want \[context ended suite.AfterAll fixture.AfterAll\] in order
+Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted
 Clause: when the run is interrupted while a method holds → runs AfterAll before the fixture is released
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go

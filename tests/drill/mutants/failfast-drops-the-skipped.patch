@@ -1,4 +1,5 @@
 Expect: failfast: missing "failfast skip TestFailFastTestSuite/TestSecond"
+Judge: ./tests/canary CanaryTestSuite/TestFailFastReportsWhatItSkipped
 Clause: when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go

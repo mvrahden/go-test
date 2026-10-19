@@ -1,5 +1,6 @@
 Expect: asynchelper: TestHelperFailsTestSuite/TestOwnerCallsDoneAsync: the wait ended before owner called done
 Expect: stopgrace: markers .*, want interrupted, async AfterEach, async AfterAll in order
+Judge: ./tests/canary CanaryTestSuite/TestAnotherGoroutinesFailureLeavesTheWaitToTheOwner CanaryTestSuite/TestAStopEndsAnAsyncWaitAfterAFailure
 Clause: when a goroutine of an async method other than the one that owns done fails a fatal assertion → fails the method, and the wait ends only when the owner calls done, fails or outlasts the Timeout
 Clause: when the run is stopped while an async method waits for done after another of its goroutines failed → ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method
 --- a/pkg/gotestruntime/methods.go

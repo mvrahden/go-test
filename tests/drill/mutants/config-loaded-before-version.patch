@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLINewcomerTestSuite/TestABrokenConfigStillHelps/.gotest.yml_does_not_parse/still_prints_version_and_help,_and_a_run_reports_the_config_error_with_exit_2/version_still_prints
 Expect: ^FAIL .*conformance/cli .* / still prints version and help, and a run reports the config error with exit 2 / version still prints \(
 Clause: when .gotest.yml does not parse → still prints version and help, and a run reports the config error with exit 2
 --- a/cmd/gotest/cli.go

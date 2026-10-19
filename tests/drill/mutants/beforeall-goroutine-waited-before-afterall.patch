@@ -1,4 +1,5 @@
 Expect: goroutines: the suite whose BeforeAll started a goroutine did not pass
+Judge: ./tests/canary CanaryTestSuite/TestAGoroutineFromBeforeAllIsWaitedForAfterAfterAll
 Clause: when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops → the suite passes: the wait comes after AfterAll
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go

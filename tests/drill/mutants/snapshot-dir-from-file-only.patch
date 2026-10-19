@@ -1,4 +1,5 @@
 Expect: snapshotting built with -trimpath: verdicts differ
+Judge: ./tests/canary CanaryTestSuite/TestSnapshotsKeyOnTheExactName
 Clause: when the package is built with -trimpath → the baselines are still found beside the test, _ext suffix included
 --- a/pkg/gotest/snapshot.go
 +++ b/pkg/gotest/snapshot.go

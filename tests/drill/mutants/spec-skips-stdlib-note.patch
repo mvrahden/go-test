@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLINewcomerTestSuite/TestStdlibTestsAreNotedInEveryMode/a_package_has_only_stdlib_tests/notes_them_on_stderr_in_the_plain,_-json,_summary_and_spec_modes/spec_notes_them_on_stderr
 Expect: ^FAIL .*conformance/cli .* / notes them on stderr in the plain, -json, summary and spec modes / spec notes them on stderr \(
 Clause: when a package has only stdlib tests → notes them on stderr in the plain, -json, summary and spec modes
 --- a/cmd/gotest/spec.go

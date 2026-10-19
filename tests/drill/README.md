@@ -9,30 +9,67 @@ The checks themselves are described in `ARCHITECTURE.md` under "Testing gotest",
 
 ## What a run does
 
-For every `mutants/<name>.patch`, `drill.sh`:
+`drill.sh` starts the pristine Python orchestrator (`driver.py`). The drill
+requires Linux, Python 3.9+ with pidfd support, Go, `patch` and `grep`.
+Each supervised worker becomes a Linux subreaper, so processes that fork,
+detach or leave a process group are still collected when the worker ends.
+Neither the supervisor nor its verdict accounting uses the mutated framework.
 
-1. copies the repository to a scratch directory, whose `.tmp` is the
-   `TMPDIR` of everything the mutant builds and runs;
-2. applies the patch, which introduces one bug in a core component, with
-   exact context and no fuzz (a line offset is accepted: the context still
-   matches verbatim);
-3. builds the copy and compiles the test binaries of the drill packages;
-4. runs the ring-0 test packages, the canary and the conformance packages
-   stating the patch's clauses in the copy with `gotest summary`;
-5. expects that run to exit non-zero, and every `Expect:` line of the patch
-   to match a line of its log.
+The orchestrator snapshots the current repository, including uncommitted
+changes, then builds the judge and reads the selection plan from that snapshot.
+For each mutant, a worker:
 
-The `gotest` that judges each run is built from the unmodified tree before
-any patch is applied. The copy's test binaries still link the copy's mutated
-runtime and assertion code, and the canary inside the copy builds and tests
-the copy's own CLI. This is what lets a bug in the CLI's exit-code path be
-caught: a mutated CLI cannot be trusted to report on itself.
+1. restores the snapshot at its fixed source path and creates fresh temporary
+   state; private build caches outside the source and temp trees survive;
+2. applies the patch with exact context and no fuzz;
+3. runs `go build ./...` to retain the whole-source compilation contract;
+4. runs only its selected checks using the pristine judge's `-json` pipeline,
+   which generates and compiles the actual harness once;
+5. rejects any structured `build-fail` event, abnormal process termination or
+   empty/malformed event stream, then renders the stream with the pristine
+   `summary --input --render-only` command;
+6. requires a nonzero judge result and every `Expect:` expression to match the
+   rendered log, using POSIX ERE matching as before.
 
-The drill exits 0 only when every mutant was caught. It runs in CI
-(`quality.yml`) on every push and pull request.
+A worker has an independent wall-clock deadline covering copying, compilation,
+execution and rendering. Expiry, missing results, planner failure, cancellation
+and failed cleanup fail the drill; none count as a caught mutant. All selected
+mutants must have exactly one terminal result. Every supervisor cleans its
+remaining descendants before the worker directory is reused.
 
-`bash tests/drill/drill.sh <name> ...` runs only the named mutants, which is
-how a new patch is tried without waiting for the whole set.
+Build caches contain artifacts, never test verdicts. Go validates stable binary
+outputs against current sources on every build. The testkit copies its cached
+CLI to a caller-private executable under a lock; marker files, snapshots and
+other mutable test state are never reused. The canary does not depend on shared
+fixture machinery to obtain its CLI.
+
+The drill exits 0 only when every selected mutant was caught. CI splits it into
+four shards and retains each shard's logs and phase timings even on failure.
+
+`bash tests/drill/drill.sh <name> ...` selects named mutants; no names selects all.
+
+| Variable | Meaning |
+|---|---|
+| `DRILL_JOBS` | Concurrent mutants; defaults to half the available CPUs, at least one. |
+| `DRILL_SHARD=i/n` | Select one deterministic shard, with `1 <= i <= n`. |
+| `DRILL_TIMEOUT` | Independent deadline per mutant in seconds, default 600. |
+| `DRILL_LOGS` | Parent for a unique log directory per invocation; the actual path is printed. |
+| `DRILL_TIMINGS` | Optional JSON file mapping mutant names to previous elapsed seconds. All shards must read the same file and use the same job count. |
+
+Historical durations schedule long mutants first and greedily balance projected
+shard wall time, accounting for the serial timing-sensitive tail. Unknown mutants
+get an estimate of 30 seconds. The output `timings-i-of-n.json` files contain
+successful observations; merge their objects to supply the next run's input.
+Every result also records copy, patch, build, judge and render durations. A
+`*.phase.json` file identifies the active phase if a worker times out.
+Concurrent workers divide the available CPUs through `GOMAXPROCS`, Go's `-p`,
+and the judge's compile and dispatch limits. Isolated mutants get the full budget.
+
+The orchestrator's synthetic-process tests do not execute the drill:
+
+```sh
+python3 -m unittest discover -s tests/drill -p 'test_*.py'
+```
 
 ## Mutants and the specs
 
@@ -56,16 +93,45 @@ a scenario states; the listing and the suite share one reading
 A ring-0 twin in `tests/canary`, the same check in plain Go, is required
 exactly when the mutant lives in what a test binary links (`pkg/gotest`,
 `pkg/gotestruntime`, `internal/gotestgen`): a conformance suite asserts with
-that code, so the drill then judges without the conformance suites, and the
-`Expect:` lines match the twin's output. Any other clause is judged by its own
-conformance suite: the drill adds the packages whose specs state the patch's
-`Clause:` lines, and the `Expect:` line is that It's failure line as the judge
-prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
+that code, so such a mutant is judged without the conformance suites, and
+its `Expect:` lines match the twin's output. Any other clause is judged by its
+own conformance suite, and the `Expect:` line is that It's failure line as the
+judge prints it: `^FAIL .*conformance/<capability> ...`. A `Clause:` line
+naming no clause of `specs/` fails the drill.
+
+### What judges a mutant
+
+A mutant runs only what its `Expect:` lines can match. A check left out of
+the run cannot match them, so running less never passes for a catch: at
+worst it turns one into a failure of the drill.
+
+- An `Expect:` line anchored to a conformance package's `FAIL` line is
+  judged by that package, under a `-run` selecting the suites and methods
+  that state the patch's `Clause:` lines of that capability, read from
+  `docs/design/catalog.json`; with no such `Clause:` line the whole package
+  runs.
+- Every other `Expect:` line is judged by the patch's `Judge:` lines, each
+  selecting `Judge: <package dir> [<Suite>/<Method>[/<subtest>...] ...]`, the tests named by
+  their declarations (`Judge: ./tests/canary CanaryTestSuite/TestLifecycleRunsInOrder`),
+  with no test names selecting the whole package. Nested paths use literal subtest names
+  from `catalog.json`, including underscores, and run separately to avoid regex
+  cross-products. An explicit `Judge:` for a conformance package replaces that
+  package's automatic method selection; unknown catalog paths are rejected.
+  Without a `Judge:` line the ring-0 packages and the whole canary run.
+- A mutant whose runs reach a suite whose `SuiteConfig` sets `Exclusive`
+  (the canary's timing suite) runs alone, after the others: its verdicts
+  read the wall clock, so no other mutant may load the machine meanwhile.
+  So does a patch with an `Alone: <why>` line, for a check that races the
+  clock in a suite that does not declare `Exclusive`.
+
+A conventions suite holds every patch to this reading
+(`internal/speccatalog`): each `Judge:` line names a package directory and
+tests it declares, and each `Clause:` line a clause `specs/` states.
 
 ## Reading a failure
 
 - `DRILL  <name>: SURVIVED` — the bug went unnoticed. A check has a hole;
-  the log tail shows what the run reported. Fix the check, not the mutant.
+  its retained log shows what the run reported. Fix the check, not the mutant.
 - `DRILL  <name>: patch does not apply, refresh it` — the code the mutant
   targets has changed. Re-create the patch against the current source.
 - `DRILL  <name>: mutant does not compile, refresh it` — the patch applies
@@ -76,8 +142,11 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
   landed somewhere else, or the named check lost its hold; the unmatched
   expectations and the first failures follow.
 - `DRILL  <name>: no Expect: line` — the patch does not name its check.
-- `DRILL  <name>: Clause line names no clause of specs/` — a `Clause:` line
-  quotes a sentence no scenario states; the unknown clauses follow.
+- `DRILL  <name>: Clause line names no clause of specs/: <clause>` — a
+  `Clause:` line quotes a sentence no scenario states.
+- `DRILL  <name>: ./<dir> declares no <Suite>/<Method>` (or another
+  `Judge:` line complaint) — a `Judge:` line names a test that is not
+  there; a renamed check needs its `Judge:` lines renamed with it.
 - `DRILL  could not build the judge` — the unmodified tree does not compile.
 
 ## The mutants
@@ -218,7 +287,10 @@ prints it. A `Clause:` line naming no clause of `specs/` fails the drill.
    signal of the named check above the diff, each matching a line of the
    log with colors stripped (a census verdict, a ring-0 suite's FAIL line,
    a canary golden mismatch), not merely a failure.
-4. Run `make drill`. The new mutant must be reported as caught; add it to
+4. Unless every `Expect:` line is a conformance `FAIL` line, add `Judge:`
+   lines naming the tests that print them, so the mutant does not run the
+   whole canary.
+5. Run `make drill`. The new mutant must be reported as caught; add it to
    the table above with the check its `Expect:` lines name.
 
 A patch that stops applying exactly, stops compiling, or is caught by

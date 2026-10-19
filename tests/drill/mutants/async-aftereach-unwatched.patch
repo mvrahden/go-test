@@ -1,4 +1,5 @@
 Expect: asynchelper: TestHookOverrunTestSuite/TestCallsDoneAsync did not fail for its AfterEach.s overrun
+Judge: ./tests/canary CanaryTestSuite/TestAnAsyncAfterEachIsHeldToTheTimeout
 Clause: when an async method calls done in time and its AfterEach overruns the declared Timeout → fails the method for the overrun
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go

@@ -1,4 +1,5 @@
 Expect: latebudget: the late fixture was not released under its 32s teardown budget
+Judge: ./tests/canary CanaryTimingTestSuite/TestALateFixtureIsReleasedUnderItsDeclaredBudget
 Clause: when a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns → its process is force-killed once its 32s teardown budget has passed, and the run fails
 Clause: when a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns → the slot's release is given up once its 32s teardown budget has passed, and the run fails
 --- a/internal/gotestgen/static/sharedfixture.go.tpl

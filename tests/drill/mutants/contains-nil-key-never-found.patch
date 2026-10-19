@@ -1,4 +1,5 @@
 Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
 Clause: when Contains is asked for a nil key in a map keyed by an interface or pointer type → finds the key when present and reports it absent otherwise
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go

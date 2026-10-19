@@ -1,5 +1,6 @@
 Expect: failfast: exit code 0, want 1
 Expect: failfast: missing "failfast fail TestFailFastTestSuite/TestFirst"
+Judge: ./tests/canary CanaryTestSuite/TestFailFastReportsWhatItSkipped
 Clause: when the first method of a FailFast suite fails → fails the method
 Clause: when the first method of a FailFast suite fails → fails the run
 --- a/pkg/gotestruntime/methods.go

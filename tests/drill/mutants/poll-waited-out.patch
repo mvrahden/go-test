@@ -1,4 +1,5 @@
 Expect: failing: no failure message says "poll still running after 100ms"
+Judge: ./tests/canary CanaryTimingTestSuite/TestHangingPollsEndAtTheirDeadline
 Clause: when an Eventually poll runs past waitFor → fails no later than one tick past waitFor and says the poll is still running
 Clause: when a Consistently poll runs past waitFor → fails no later than one tick past waitFor and says the poll is still running
 --- a/pkg/gotest/assertions.go

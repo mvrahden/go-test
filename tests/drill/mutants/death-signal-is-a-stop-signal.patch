@@ -1,4 +1,5 @@
 Expect: the death signal abandoned the teardown
+Judge: ./pkg/gotestruntime ParentDeathDuringStopTestSuite/TestTheDeathSignalLeavesARequestedStopToFinish
 Clause: when the parent of a suite process under the runner is killed while a method holds → runs AfterAll before the fixture is released
 --- a/pkg/gotestruntime/parentdeath_linux.go
 +++ b/pkg/gotestruntime/parentdeath_linux.go

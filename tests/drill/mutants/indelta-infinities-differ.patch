@@ -1,4 +1,5 @@
 Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
 Clause: when InDelta compares two equal infinities → they are within any delta
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go

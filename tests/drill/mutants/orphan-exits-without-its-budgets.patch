@@ -1,4 +1,5 @@
 Expect: killedcli: the fixture's AfterAll did not run to its end
+Judge: ./tests/canary CanaryTestSuite/TestAKilledCLIsFixtureStillReleases
 Clause: when the CLI is killed while a shared fixture is up → the fixture's AfterAll runs to its end, then its process exits
 Clause: when the CLI is killed while a shared fixture's BeforeAll waits on its context → the setup's context ends, the fixture's AfterAll runs, then its process exits
 Clause: when the CLI is killed and the shared fixture's AfterAll never returns → the fixture process exits with status 1 once the 31s teardown budget it reported has passed

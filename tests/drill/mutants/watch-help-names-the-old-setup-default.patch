@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIHelpTestSuite/TestTheSetupTimeoutDefault/a_help_text_lists_--setup-timeout/gives_its_default_as_the_fixtures'_declared_budgets,_30s_until_the_first_reports/help_watch
 Expect: ^FAIL .*conformance/cli .* / gives its default as the fixtures' declared budgets, 30s until the first reports / help watch \(
 Clause: when a help text lists --setup-timeout → gives its default as the fixtures' declared budgets, 30s until the first reports
 --- a/cmd/gotest/help.go

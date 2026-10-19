@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIRejectionsTestSuite/TestHooksCallingT/several_hooks_call_t.T()_in_a_suite_with_fuzz_or_benchmark_methods/fails_with_exit_2_and_one_error_on_stderr_that_names_every_such_hook_in_source_order,_located_at_the_first/fuzz_methods
 Expect: ^FAIL .*conformance/cli .* / fails with exit 2 and one error on stderr that names every such hook in source order, located at the first / fuzz methods \(
 Clause: when several hooks call t.T() in a suite with fuzz or benchmark methods → fails with exit 2 and one error on stderr that names every such hook in source order, located at the first
 --- a/internal/gotestast/spec.go

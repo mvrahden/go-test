@@ -1,0 +1,176 @@
+"""Tests of the pristine orchestrator; these never apply or run a mutant."""
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest import mock
+
+import driver
+
+
+class PlanningTests(unittest.TestCase):
+    def test_shards_cover_every_mutant_once_and_balance_long_jobs(self):
+        names = ['a', 'b', 'c', 'd', 'e']
+        modes = dict.fromkeys(names, 'shared')
+        weights = dict(a=100, b=80, c=20, d=10, e=10)
+        result = driver.schedule(names, modes, weights, 2, 1)
+        self.assertEqual(sorted(sum(result, [])), names)
+        self.assertEqual([sum(weights[n] for n in shard) for shard in result], [110, 110])
+        self.assertEqual(result, driver.schedule(list(reversed(names)), modes, weights, 2, 1))
+
+    def test_isolated_time_is_not_divided_by_worker_count(self):
+        self.assertEqual(driver.schedule(['a', 'b', 'c'], dict(a='alone', b='shared', c='shared'),
+                                         dict(a=10, b=10, c=10), 2, 2), [['a'], ['b', 'c']])
+
+    def test_incomplete_or_duplicate_plans_are_rejected(self):
+        for text in ['mutant\ta\tshared\n', 'mutant\ta\tshared\nmutant\ta\tshared\n',
+                     'bad\ta\tno such test\n', 'mutant\ta\tshared\nrun\tb\t-\t./x\n']:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                driver.read_plan(text, ['a'])
+
+    def test_valid_plan_preserves_literal_filters(self):
+        modes, runs = driver.read_plan('mutant\ta\talone\nrun\ta\t^(TestA)$/^(TestB)$\t./x ./y\n', ['a'])
+        self.assertEqual(modes, {'a': 'alone'})
+        self.assertEqual(runs['a'], [('^(TestA)$/^(TestB)$', ['./x', './y'])])
+
+    def test_build_failure_cannot_be_accepted_as_an_assertion_failure(self):
+        self.assertTrue(driver.build_failure('{"Action":"build-fail","ImportPath":"p"}\n'))
+        self.assertFalse(driver.build_failure('{"Action":"fail","Test":"TestA"}\n'))
+        with self.assertRaises(ValueError):
+            driver.build_failure('not JSON')
+
+    def test_missing_or_stale_result_and_dead_worker_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'result'
+            clean = {'exit': 0, 'timeout': False}
+            self.assertFalse(driver.read_result(path, 'a', clean, 0)['caught'])
+            path.write_text(json.dumps({'name': 'b', 'caught': True}))
+            self.assertFalse(driver.read_result(path, 'a', clean, 0)['caught'])
+            path.write_text(json.dumps({'name': 'a', 'caught': True}))
+            self.assertTrue(driver.read_result(path, 'a', clean, 0)['caught'])
+            for status, code in [({}, 0), ({'exit': -9}, 0), ({'exit': 0, 'timeout': True}, 0),
+                                 ({'exit': 0, 'cleanup_error': 'failed'}, 0), (clean, 1)]:
+                self.assertFalse(driver.read_result(path, 'a', status, code)['caught'])
+
+
+class WorkerTests(unittest.TestCase):
+    # Exercise the orchestration with synthetic events, not a real CLI, patch
+    # or Go invocation. Only grep actually runs, against the synthetic log.
+    def worker(self, stream, exit_code=1, build_code=0):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            snapshot = root / 'snapshot'
+            snapshot.mkdir()
+            patch = root / 'synthetic.patch'
+            patch.write_text('Expect: a named failure\n--- a/unused\n')
+            result = root / 'result.json'
+            spec = dict(name='synthetic', work=str(root / 'worker'), snapshot=str(snapshot),
+                        patch=str(patch), log=str(root / 'output.log'), result=str(result),
+                        runs=[('-', ['./synthetic'])], judge='synthetic-judge', cpus=1)
+            real_run = subprocess.run
+            def run(command, **kwargs):
+                if command[0] == 'grep':
+                    return real_run(command, **kwargs)
+                if command[0] == 'go':
+                    return subprocess.CompletedProcess(command, build_code)
+                if '-json' in command:
+                    kwargs['stdout'].write(stream)
+                    return subprocess.CompletedProcess(command, exit_code)
+                if 'summary' in command:
+                    kwargs['stdout'].write('a named failure\n')
+                return subprocess.CompletedProcess(command, 0)
+            with mock.patch.object(driver.subprocess, 'run', side_effect=run):
+                driver.worker(spec)
+            return json.loads(result.read_text())
+
+    def test_assertion_failure_matches_the_named_check(self):
+        result = self.worker('{"Action":"fail","Test":"TestCheck"}\n')
+        self.assertTrue(result['caught'])
+        self.assertEqual(set(result['phases']), {'copy', 'patch', 'build', 'judge', 'render'})
+
+    def test_build_failure_is_never_a_catch(self):
+        result = self.worker('{"Action":"build-fail","ImportPath":"p"}\n', exit_code=2)
+        self.assertFalse(result['caught'])
+        self.assertIn('harness does not compile', result['reason'])
+        self.assertFalse(self.worker('', build_code=1)['caught'])
+
+    def test_a_survivor_cannot_pass_through_matching_log_text(self):
+        self.assertFalse(self.worker('{"Action":"pass"}\n', exit_code=0)['caught'])
+
+    def test_empty_malformed_and_abnormal_runs_fail(self):
+        for stream, code in [('', 2), ('not JSON', 1), ('[]', 1), ('{"Action":"fail"}\n', -9)]:
+            with self.subTest(stream=stream, code=code):
+                self.assertFalse(self.worker(stream, code)['caught'])
+
+
+@unittest.skipUnless(sys.platform == 'linux', 'Linux subreaper')
+class SupervisorTests(unittest.TestCase):
+    def supervise(self, source, seconds=3, interrupt=False):
+        with tempfile.TemporaryDirectory() as tmp:
+            status, pidfile = Path(tmp) / 'status', Path(tmp) / 'pid'
+            proc = subprocess.Popen([sys.executable, str(driver.HERE / 'supervise.py'), str(seconds),
+                                     str(status), sys.executable, '-c', source, str(pidfile)])
+            try:
+                limit = time.monotonic() + 3
+                while not pidfile.exists() and time.monotonic() < limit:
+                    time.sleep(0.01)
+                self.assertTrue(pidfile.exists(), 'child never started')
+                child = int(pidfile.read_text())
+                if interrupt:
+                    proc.send_signal(signal.SIGTERM)
+                code = proc.wait(timeout=8)
+                result = json.loads(status.read_text())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(child, 0)
+                return code, result
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait()
+
+    def test_normal_exit_reaps_double_forked_detached_child(self):
+        source = '''import os,sys,time
+pid=os.fork()
+if pid==0:
+ os.setsid()
+ if os.fork(): os._exit(0)
+ open(sys.argv[1],'w').write(str(os.getpid()))
+ time.sleep(60)
+else:
+ os.waitpid(pid,0)
+ # Wait until the detached child published its pid before exiting.
+ while not os.path.exists(sys.argv[1]): time.sleep(.01)
+'''
+        code, result = self.supervise(source)
+        self.assertEqual(code, 0)
+        self.assertEqual(result['exit'], 0)
+        self.assertFalse(result['timeout'])
+
+    def test_timeout_cleans_a_child_in_a_separate_session(self):
+        source = '''import subprocess,sys,time
+p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'],start_new_session=True)
+open(sys.argv[1],'w').write(str(p.pid))
+time.sleep(60)
+'''
+        code, result = self.supervise(source, seconds=.3)
+        self.assertNotEqual(code, 0)
+        self.assertTrue(result['timeout'])
+
+    def test_cancellation_cleans_descendants(self):
+        source = '''import subprocess,sys,time
+p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'],start_new_session=True)
+open(sys.argv[1],'w').write(str(p.pid))
+time.sleep(60)
+'''
+        code, result = self.supervise(source, interrupt=True)
+        self.assertNotEqual(code, 0)
+        self.assertTrue(result['interrupted'])
+
+
+if __name__ == '__main__':
+    unittest.main()

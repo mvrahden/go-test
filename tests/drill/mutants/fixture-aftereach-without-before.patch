@@ -1,4 +1,5 @@
 Expect: fixturehookfail: hooks ran \[fixture.BeforeAll fixture.BeforeEach fixture.AfterEach
+Judge: ./tests/canary CanaryTestSuite/TestAFailedFixtureBeforeEachPairsWithNothing
 Clause: when a package fixture hook returns an error, panics or overruns the Timeout → fails the run, runs the later hooks its row names and gives the verdicts its row names
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go

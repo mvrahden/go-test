@@ -1,4 +1,5 @@
 Expect: stopgrace: markers .*, want the fixture released without AfterAll and the body cut short
+Judge: ./tests/canary CanaryTimingTestSuite/TestABodyIgnoringItsContextIsCutShort
 Clause: when the run is stopped and a method body ignores its context → releases the fixture without running AfterAll
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go

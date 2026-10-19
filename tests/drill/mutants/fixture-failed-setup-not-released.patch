@@ -1,4 +1,5 @@
 Expect: fixturesetupfail: hooks ran \[fixture.BeforeAll\], want
+Judge: ./tests/canary CanaryTestSuite/TestAFixtureThatFailedToStartIsReleased
 --- a/pkg/gotestruntime/runtime.go
 +++ b/pkg/gotestruntime/runtime.go
 @@ -196,7 +196,7 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {

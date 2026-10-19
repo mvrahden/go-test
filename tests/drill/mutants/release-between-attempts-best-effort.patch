@@ -1,6 +1,7 @@
 Expect: (packagerelease|sharedrelease): exit code 0, want 1
 Expect: packagerelease: the run does not report the release's error
 Expect: sharedrelease: the run does not report the release's error
+Judge: ./tests/canary CanaryTestSuite/TestAFailedReleaseBetweenAttemptsFailsTheRun
 Clause: when a package fixture's AfterAll fails between its attempts and the second attempt comes up → fails the run
 Clause: when a package fixture's AfterAll fails between its attempts and the second attempt comes up → reports that AfterAll's error
 Clause: when a shared fixture's AfterAll fails between its attempts and the second attempt comes up → fails the run

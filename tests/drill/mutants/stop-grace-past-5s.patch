@@ -1,4 +1,5 @@
 Expect: stopgrace: the body was not cut short after 5s, saying so
+Judge: ./tests/canary CanaryTimingTestSuite/TestABodyIgnoringItsContextIsCutShort
 Clause: when the run is stopped and a method body ignores its context → cuts the body short after 5s, saying so
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go

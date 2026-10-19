@@ -1,4 +1,5 @@
 Expect: skipped: the shared fixture started although -skip left no suite needing it
+Judge: ./tests/canary CanaryTestSuite/TestASkippedSuitesFixtureNeverStarts
 Clause: when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go

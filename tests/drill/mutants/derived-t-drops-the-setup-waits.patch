@@ -1,4 +1,5 @@
 Expect: setupwaits: the suite whose BeforeAll started a goroutine on a derived T did not pass
+Judge: ./tests/canary CanaryTestSuite/TestADerivedTsGoroutineIsWaitedForAfterAfterAll
 Clause: when BeforeAll starts a goroutine with gotest.Go on a T from NewTWithDeadline that only AfterAll stops → the suite passes: the wait comes after AfterAll
 --- a/pkg/gotest/t.go
 +++ b/pkg/gotest/t.go

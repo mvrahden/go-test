@@ -1,4 +1,5 @@
 Expect: cancelbeforesetup: markers \[.*later\.AfterAll.*\], want \[hold\.BeforeAll hold\.AfterAll\]
+Judge: ./tests/canary CanaryTestSuite/TestASetupCancelledBeforeBeforeAllReleasesNothing
 Clause: when a run is interrupted while a shared fixture's dependency sets up, before the fixture's own BeforeAll runs → runs no AfterAll for the fixture, and the dependency's AfterAll
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl

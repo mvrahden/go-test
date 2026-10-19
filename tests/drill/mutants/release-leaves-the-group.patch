@@ -1,4 +1,5 @@
 Expect: orphan: sleep 4242 outlived the run
+Judge: ./tests/canary CanaryTestSuite/TestNothingOutlivesTheRun
 Clause: when a test starts sleep 4242 and never waits for it → the test passes and no such process outlives the run
 --- a/internal/proctree/tree_unix.go
 +++ b/internal/proctree/tree_unix.go

@@ -1,4 +1,5 @@
 Expect: pkg/gotest/internal/assert Predicates / NormalizeJSON
+Judge: ./pkg/gotest/internal/assert
 Clause: when JSONEq is given a value followed by a stray } or ] → fails: the input is not valid JSON
 --- a/pkg/gotest/internal/assert/predicates.go
 +++ b/pkg/gotest/internal/assert/predicates.go

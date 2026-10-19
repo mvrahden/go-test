@@ -1,4 +1,5 @@
 Expect: eachbreak: the method did not go on after the break
+Judge: ./tests/canary CanaryTestSuite/TestABreakOutOfEachStopsTheRows
 Clause: when the loop over an Each table breaks → stops at the break and the method goes on
 --- a/pkg/gotest/utils.go
 +++ b/pkg/gotest/utils.go

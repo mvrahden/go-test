@@ -1,4 +1,5 @@
 Expect: detachedchild: the started process saw the protocol variable
+Judge: ./tests/canary CanaryTimingTestSuite/TestAProcessTheSetupStartsGetsNoProtocol
 Clause: when a shared fixture's setup starts a process that outlives it → the process sees no protocol variable, and what it writes to descriptor 3 is not read
 Clause: when a shared fixture's setup starts a process that outlives it → the run passes before that process ends
 --- a/pkg/gotestruntime/sharedprotocol.go

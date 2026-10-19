@@ -1,4 +1,5 @@
 Expect: fixtureafterfail: the failure is (not reported at the hook's file|reported inside the runtime's file)
+Judge: ./tests/canary CanaryTestSuite/TestAFixtureAfterEachErrorIsReportedAtTheHook
 Clause: when a fixture AfterEach returns an error → is reported in the hook's own file, not the runtime's
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go

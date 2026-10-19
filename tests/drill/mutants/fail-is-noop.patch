@@ -1,5 +1,6 @@
 Expect: failing: exit code 0, want 1
 Expect: ^ *failing pass TestFailingTestSuite$
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go
 @@ -20,6 +20,9 @@

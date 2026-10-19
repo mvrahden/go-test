@@ -1,5 +1,6 @@
 Expect: benchpanic: results \[\], want \[BenchmarkStillRuns\]
 Expect: benchpanic: markers \[fixture.BeforeAll panics\], want panics, suite.AfterAll, fixture.AfterAll in order
+Judge: ./tests/canary CanaryTestSuite/TestAPanickingBenchmarkStillTearsDown
 Clause: when a benchmark panics → reports no result for it and a result for the benchmark after it
 Clause: when a benchmark panics → runs AfterAll before the fixture is released
 --- a/internal/gotestgen/static/gotest.bench.tpl

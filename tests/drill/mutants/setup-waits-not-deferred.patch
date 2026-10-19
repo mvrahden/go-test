@@ -1,5 +1,6 @@
 Expect: setupwaits: TestFailLastTestSuite released its fixture before every goroutine ended
 Expect: setupwaits: TestPanicLastTestSuite released its fixture before every goroutine ended
+Judge: ./tests/canary CanaryTestSuite/TestEveryGoroutineBeforeAllStartedIsWaitedFor
 Clause: when the last of several goroutines BeforeAll started with gotest.Go fails or panics → fails the suite and waits for every other one before the fixture is released
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go

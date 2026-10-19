@@ -1,4 +1,5 @@
 Expect: failing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when a snapshot name spans lines or spells a section header → is refused before anything is written
 --- a/pkg/gotest/snapshot.go
 +++ b/pkg/gotest/snapshot.go

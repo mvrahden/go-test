@@ -1,4 +1,5 @@
 Expect: guardskip: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestAGuardRunsBeforeTheFixtures
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
 @@ -54,6 +54,9 @@

@@ -1,4 +1,5 @@
 Expect: benchpanic: exit code 0, want 1
+Judge: ./tests/canary CanaryTestSuite/TestAPanickingBenchmarkStillTearsDown
 Clause: when a benchmark panics → fails the run
 --- a/pkg/gotestruntime/hold.go
 +++ b/pkg/gotestruntime/hold.go

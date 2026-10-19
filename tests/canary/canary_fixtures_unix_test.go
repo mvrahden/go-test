@@ -20,7 +20,7 @@ import (
 // A process a shared fixture's setup starts gets neither the protocol
 // descriptor nor the variable naming it, and the run does not wait for it.
 func (s *CanaryTimingTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) {
-	dir := t.TempDir()
+	dir := s.warm(t, "detachedchild")
 	began := time.Now()
 	r := s.checkFixture(t, "detachedchild", dir)
 	took := time.Since(began)
