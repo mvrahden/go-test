@@ -1,6 +1,12 @@
 package testkit_test
 
 import (
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -100,4 +106,61 @@ func (s *RepoRootTestSuite) TestTheModuleLineIsRecognised(t *gotest.T) {
 			gotest.False(it, testkit.ExportIsRepoModule([]byte("module example.com/m\n\nrequire github.com/mvrahden/go-test v1.0.0\n")))
 		})
 	})
+}
+
+// UserCacheTestSuite: a run started through the helpers keeps its gotest
+// cache beside its markers, never in the user's cache. The CLI resolves that
+// one from XDG_CACHE_HOME, else HOME/.cache, so the run gets both fake.
+type UserCacheTestSuite struct {
+	home    string
+	markers string
+	run     testkit.Run
+}
+
+func (s *UserCacheTestSuite) BeforeAll(t *gotest.T) {
+	s.home, s.markers = t.TempDir(), t.TempDir()
+	// The go caches stay the real ones, so the fake HOME costs no rebuild.
+	out, err := exec.CommandContext(t.Context(), "go", "env", "GOCACHE", "GOMODCACHE", "GOPATH", "GOENV").Output()
+	gotest.NoError(t, err)
+	goEnv := strings.Split(strings.TrimSpace(string(out)), "\n")
+	gotest.Len(t, goEnv, 4)
+	env := []string{
+		"HOME=" + s.home,
+		"XDG_CACHE_HOME=" + filepath.Join(s.home, ".cache"),
+		"GOCACHE=" + goEnv[0], "GOMODCACHE=" + goEnv[1], "GOPATH=" + goEnv[2], "GOENV=" + goEnv[3],
+	}
+	s.run, err = testkit.RunPackageWithEnv(t.Context(), s.markers, env, "./testdata/markers/")
+	gotest.NoError(t, err)
+}
+
+func (s *UserCacheTestSuite) AfterAll(t *gotest.T) {}
+
+func (s *UserCacheTestSuite) TestTheUserCacheStaysUntouched(t *gotest.T) {
+	t.When("a package ran through the helper", func(w *gotest.T) {
+		w.It("ran it", func(it *gotest.T) {
+			gotest.Equal(it, "pass", s.run.Verdict("TestMarkerTestSuite/TestOne"), s.run.Stderr)
+		})
+		w.It("leaves nothing in the user's gotest cache", func(it *gotest.T) {
+			gotest.Empty(it, files(it, filepath.Join(s.home, ".cache", "gotest")))
+		})
+		w.It("keeps the test binaries in the run's own cache", func(it *gotest.T) {
+			gotest.NotEmpty(it, files(it, filepath.Join(testkit.ExportCacheDir(s.markers), "bin")))
+		})
+	})
+}
+
+// files lists the regular files under dir; a missing dir has none.
+func files(t *gotest.T, dir string) []string {
+	var found []string
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if errors.Is(err, os.ErrNotExist) {
+			return filepath.SkipDir
+		}
+		if err == nil && !d.IsDir() {
+			found = append(found, path)
+		}
+		return err
+	})
+	gotest.NoError(t, err)
+	return found
 }

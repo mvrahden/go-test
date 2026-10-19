@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/proctree"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // goLine is the go directive of every staged go.mod and go.work.
@@ -104,6 +105,13 @@ func writeGoWork(repoRoot, dir string) error {
 func ScrubActionsEnv() {
 	os.Unsetenv("GITHUB_ACTIONS")
 	os.Unsetenv("GITHUB_STEP_SUMMARY")
+}
+
+// PrivateCache points this process's gotest cache at dir, for every child
+// CLI that inherits the environment. A run from a fresh directory never hits
+// a cache entry, so it must not fill the user's; dir should go with the run.
+func PrivateCache(dir string) error {
+	return os.Setenv(protocol.EnvCacheDir, dir)
 }
 
 // StartCLI starts cmd as the root of its own process tree, so Interrupt can

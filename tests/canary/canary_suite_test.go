@@ -179,15 +179,17 @@ func (s *canary) runEnv(t *gotest.T, pkg, canaryDir string, env []string, extra 
 // childEnv is the fixture process's environment: the canary dir, and never
 // the snapshot update switch. A refresh of the repository's own snapshots
 // must not rewrite the snapshotting fixture's deliberately stale baseline.
+// The gotest cache lives in the canary dir and goes with it: a run from a
+// fresh copy of the tree never hits a cache, so it must not fill the user's.
 func childEnv(canaryDir string) []string {
-	env := make([]string, 0, len(os.Environ())+1)
+	env := make([]string, 0, len(os.Environ())+2)
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS=") {
+		if strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS=") || strings.HasPrefix(kv, "GOTEST_CACHE_DIR=") {
 			continue
 		}
 		env = append(env, kv)
 	}
-	return append(env, "GOTEST_CANARY_DIR="+canaryDir)
+	return append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+filepath.Join(canaryDir, "cache"))
 }
 
 // check runs a fixture and compares exit code and rows with the golden.

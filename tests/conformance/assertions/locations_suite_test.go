@@ -27,6 +27,7 @@ func (s *FailureLocationsTestSuite) BeforeAll(t *gotest.T) {
 	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	gotest.NoError(t, testkit.PrivateCache(t.TempDir()))
 	s.staged = t.TempDir()
 	_, err = testkit.StagePackage(root, filepath.Join("..", "testdata", "helpers"), s.staged, "plainmod")
 	gotest.NoError(t, err)

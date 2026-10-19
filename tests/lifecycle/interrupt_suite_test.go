@@ -41,6 +41,7 @@ func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
 	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	gotest.NoError(t, testkit.PrivateCache(t.TempDir()))
 	s.root = stageTestdata(t, root)
 	gen := exec.Command(s.cli, "generate", "./testdata/interrupt/") //nolint:gosec // G204: controlled binary with fixed args
 	gen.Dir = s.root
