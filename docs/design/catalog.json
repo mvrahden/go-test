@@ -5574,6 +5574,272 @@
                       "children": [
                         {
                           "children": [],
+                          "display": "a generic type",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_generic_type",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a generic function",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_generic_function",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a method of a generic type",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_method_of_a_generic_type",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses it on stderr with exit 1 and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refuses_it_on_stderr_with_exit_1_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a generic type, a generic function or a method of a generic type is scaffolded",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_generic_type,_a_generic_function_or_a_method_of_a_generic_type_is_scaffolded",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GenericTargets",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGenericTargets",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a type in the package's test files",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_type_in_the_package's_test_files",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a func in the external test package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_func_in_the_external_test_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses it on stderr with exit 1, naming the declaration and its file, and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refuses_it_on_stderr_with_exit_1,_naming_the_declaration_and_its_file,_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the package already declares the suite name scaffold would write",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_package_already_declares_the_suite_name_scaffold_would_write",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TakenSuiteNames",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTakenSuiteNames",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a type with methods",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_type_with_methods",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "an interface",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "an_interface",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a file of functions",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_file_of_functions",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a function with an inverse",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_function_with_an_inverse",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a function without one",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_function_without_one",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "writes a file go vet passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "writes_a_file_go_vet_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when each target shape is scaffolded",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "each_target_shape_is_scaffolded",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TargetShapes",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTargetShapes",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIScaffoldCompiles",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIScaffoldCompilesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
                           "display": "a relative path scaffolds beside the file",
                           "duration": 0,
                           "excluded": false,
@@ -5638,6 +5904,73 @@
                 {
                   "children": [
                     {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a type",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_type",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a function to fuzz",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_function_to_fuzz",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "scaffolds into the package's directory",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "scaffolds_into_the_package's_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a type or a function is named by an absolute package path from outside its module",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_type_or_a_function_is_named_by_an_absolute_package_path_from_outside_its_module",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "PackagePaths",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestPackagePaths",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [],
                       "display": "scaffolds beside the file",
                       "duration": 0,
@@ -5670,6 +6003,46 @@
               "focused": false,
               "kind": "method",
               "name": "TestASymlinkedPath",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "scaffolds into the package's directory",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "scaffolds_into_the_package's_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a type is named by an absolute package path through a symlinked directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_type_is_named_by_an_absolute_package_path_through_a_symlinked_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASymlinkedPackagePath",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASymlinkedPackagePath",
               "output": [],
               "status": "none"
             }
@@ -16679,13 +17052,13 @@
     }
   ],
   "stats": {
-    "behaviors": 547,
+    "behaviors": 560,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 90,
+    "suites": 91,
     "tests": 0
   }
 }

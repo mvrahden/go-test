@@ -676,6 +676,12 @@ Creates a new _test.go file next to the target: a suite struct holding
 the subject, a BeforeEach that constructs it, and one Test method per
 exported method with It stubs (a happy path and an error case for
 methods that return an error). Existing files are never overwritten.
+A package path may be relative or absolute.
+
+Scaffold writes only code that compiles. It refuses a generic type or
+function, and a method of a generic type, since a suite would need type
+arguments it cannot choose; and it refuses a suite name the package
+already declares, naming that declaration and its file.
 
 Flags:
   --fuzz    Scaffold a Fuzz<Func> method for a package-level function
@@ -722,7 +728,8 @@ prints:
 
 Exit codes:
   0   The skeleton was written
-  1   The target could not be scaffolded: not found, or its file exists
+  1   The target could not be scaffolded: not found, a method, generic,
+      its suite name already declared, or its file exists
   2   Usage error: no target, more than one, a target naming no type or
       function, or an unknown flag
 
