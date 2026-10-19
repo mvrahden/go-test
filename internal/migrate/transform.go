@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/refactor"
+	"golang.org/x/tools/go/ast/astutil"
 )
 
 // transformFile migrates f in place for the unit's migrated suites, wherever
@@ -521,6 +522,9 @@ func (r *rewriter) isSuiteVar(expr ast.Expr, vars []*ast.Ident) bool {
 func (r *rewriter) assertions(body *ast.BlockStmt, recv *ast.Ident) bool {
 	changed := false
 	ast.Inspect(body, func(n ast.Node) bool {
+		if _, ok := n.(*ast.GoStmt); ok {
+			return false // left for a marker: FailNow there ends only that goroutine
+		}
 		es, ok := n.(*ast.ExprStmt)
 		if !ok {
 			return true
@@ -711,39 +715,26 @@ func (u *unit) rewriteImports(f *ast.File, orig map[*ast.Ident]bool) {
 	})
 
 	hasGotest := false
-	for _, decl := range f.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok || gd.Tok != token.IMPORT {
-			continue
+	type named struct{ name, path string }
+	var drop []named
+	for _, is := range f.Imports {
+		path := strings.Trim(is.Path.Value, `"`)
+		if path == gotestImport {
+			hasGotest = true
 		}
-		filtered := make([]ast.Spec, 0, len(gd.Specs))
-		for _, spec := range gd.Specs {
-			is, ok := spec.(*ast.ImportSpec)
-			if !ok {
-				filtered = append(filtered, spec)
-				continue
+		if removable[path] && !u.importUsed(is, used, dotUsed) {
+			n := named{path: path}
+			if is.Name != nil {
+				n.name = is.Name.Name
 			}
-			path := strings.Trim(is.Path.Value, `"`)
-			if path == gotestImport {
-				hasGotest = true
-			}
-			if removable[path] && !u.importUsed(is, used, dotUsed) {
-				continue
-			}
-			filtered = append(filtered, spec)
+			drop = append(drop, n)
 		}
-		gd.Specs = filtered
 	}
-
-	// An import block left empty goes.
-	decls := f.Decls[:0]
-	for _, decl := range f.Decls {
-		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT && len(gd.Specs) == 0 {
-			continue
-		}
-		decls = append(decls, decl)
+	// astutil merges the lines a deleted import stood on, so no blank line
+	// is left in its place, and drops a block left empty.
+	for _, n := range drop {
+		astutil.DeleteNamedImport(u.fset, f, n.name, n.path)
 	}
-	f.Decls = decls
 
 	if !hasGotest && needGotest {
 		addImport(f, gotestImport)

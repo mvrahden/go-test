@@ -83,6 +83,9 @@ type suiteDecl struct {
 	reserved map[string]string
 	// testifyHooks names the testify hooks the suite declares.
 	testifyHooks map[string]bool
+	// setupStops: its SetupSuite can stop early, on an assertion, a fatal
+	// call or a panic.
+	setupStops bool
 	// st is the struct of a suite that embeds its base; embeds are the
 	// fields it does so through.
 	st     *ast.StructType
@@ -611,6 +614,9 @@ func (u *unit) collectHooks() {
 					s.testifyHooks = map[string]bool{}
 				}
 				s.testifyHooks[name] = true
+				if name == "SetupSuite" && fd.Body != nil {
+					s.setupStops = u.canStop(fd.Body)
+				}
 			} else if strings.HasPrefix(name, "Test") {
 				u.hooks[methodKey(fn)] = name
 			}
@@ -631,6 +637,32 @@ func (u *unit) collectHooks() {
 			}
 		}
 	}
+}
+
+// canStop reports whether body holds a call that ends it early: a testify
+// assertion, which the migration makes fatal, a FailNow, Fatal or Skip,
+// or a panic.
+func (u *unit) canStop(body *ast.BlockStmt) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || found {
+			return !found
+		}
+		switch fun := call.Fun.(type) {
+		case *ast.Ident:
+			b, ok := u.info.Uses[fun].(*types.Builtin)
+			found = ok && b.Name() == "panic"
+		case *ast.SelectorExpr:
+			switch fun.Sel.Name {
+			case "FailNow", "Fatal", "Fatalf", "Skip", "Skipf", "SkipNow":
+				found = true
+			}
+		}
+		found = found || u.assertionName(call) != ""
+		return !found
+	})
+	return found
 }
 
 // reservedName is the marker for a suite method gotest gives a meaning

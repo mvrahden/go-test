@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / TestsInAnotherOrder / when gotest would run the tests of a suite with fields in another order than testify / migrate notes on the suite that the order changed \(
+Clause: when gotest would run the tests of a suite with fields in another order than testify → migrate notes on the suite that the order changed
+--- a/internal/migrate/annotate.go
++++ b/internal/migrate/annotate.go
+@@ -277,7 +277,7 @@
+ 	}
+ 	sorted := slices.Sorted(slices.Values(declared))
+ 	for i := range declared {
+-		if declared[i] != sorted[i] {
++		if declared[i] != declared[i] {
+ 			return "gotest runs " + s.newName + "'s tests in source order, testify ran them in name order: " + declared[i] + " now runs before " + sorted[i] + ", and they share the suite's fields — declare the tests in name order if one depends on another"
+ 		}
+ 	}

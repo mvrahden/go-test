@@ -423,9 +423,9 @@ func isSuiteField(obj types.Object) bool {
 }
 
 // forwardsIn renders the forwarding methods of the suites uf declares, by
-// the suite's new name.
-func (u *unit) forwardsIn(uf *unitFile) map[string]string {
-	out := map[string]string{}
+// the suite's new name, in the order collectForwards gave them.
+func (u *unit) forwardsIn(uf *unitFile) map[string][]renderedForward {
+	out := map[string][]renderedForward{}
 	for _, s := range u.suites {
 		if s.file != uf || !s.migrated() || len(s.forwards) == 0 {
 			continue
@@ -434,13 +434,22 @@ func (u *unit) forwardsIn(uf *unitFile) map[string]string {
 		if recv == t {
 			t = "gt"
 		}
-		var b strings.Builder
 		for _, fw := range s.forwards {
-			fmt.Fprintf(&b, "\n\nfunc (%[1]s *%[2]s) %[3]s(%[5]s *gotest.T) {\n\t%[1]s.%[4]s.%[3]s(%[5]s)\n}", recv, s.newName, fw.name, fw.field, t)
+			out[s.newName] = append(out[s.newName], renderedForward{
+				name: fw.name,
+				test: strings.HasPrefix(fw.name, "Test"),
+				text: fmt.Sprintf("func (%[1]s *%[2]s) %[3]s(%[5]s *gotest.T) {\n\t%[1]s.%[4]s.%[3]s(%[5]s)\n}", recv, s.newName, fw.name, fw.field, t),
+			})
 		}
-		out[s.newName] = b.String()
 	}
 	return out
+}
+
+// renderedForward is one forwarding method's source.
+type renderedForward struct {
+	name string
+	test bool
+	text string
 }
 
 // recvName is the receiver name s's methods use, s when none names one.
@@ -459,9 +468,11 @@ func (u *unit) recvName(s *suiteDecl) string {
 	return "s"
 }
 
-// insertForwards places each type's forwarding methods after the
-// declaration of the type in src.
-func insertForwards(src []byte, forwards map[string]string) ([]byte, error) {
+// insertForwards places each type's forwarding hooks after the declaration
+// of the type in src, and each forwarded test before the first test the
+// type declares in src whose name sorts after it, or after its last: gotest
+// runs tests in source order, testify ran them in name order.
+func insertForwards(src []byte, forwards map[string][]renderedForward) ([]byte, error) {
 	if len(forwards) == 0 {
 		return src, nil
 	}
@@ -470,9 +481,16 @@ func insertForwards(src []byte, forwards map[string]string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	lineEnd := func(pos token.Pos) int {
+		at := fset.Position(pos).Offset
+		if nl := bytes.IndexByte(src[at:], '\n'); nl >= 0 {
+			return at + nl
+		}
+		return len(src)
+	}
 	type insert struct {
-		at   int
-		text string
+		at, seq int
+		text    string
 	}
 	var inserts []insert
 	for _, decl := range f.Decls {
@@ -482,24 +500,66 @@ func insertForwards(src []byte, forwards map[string]string) ([]byte, error) {
 		}
 		for _, spec := range gd.Specs {
 			ts, ok := spec.(*ast.TypeSpec)
-			if !ok || forwards[ts.Name.Name] == "" {
+			if !ok || len(forwards[ts.Name.Name]) == 0 {
 				continue
 			}
-			at := fset.Position(gd.End()).Offset
-			if nl := bytes.IndexByte(src[at:], '\n'); nl >= 0 {
-				at += nl
-			} else {
-				at = len(src)
+			tests := declaredTests(f, ts.Name.Name)
+			after := lineEnd(gd.End())
+			if len(tests) > 0 {
+				after = lineEnd(tests[len(tests)-1].End())
 			}
-			inserts = append(inserts, insert{at: at, text: forwards[ts.Name.Name]})
+			for _, fw := range forwards[ts.Name.Name] {
+				in := insert{at: lineEnd(gd.End()), seq: len(inserts), text: "\n\n" + fw.text}
+				if fw.test {
+					in.at = after
+					for _, fd := range tests {
+						if fd.Name.Name > fw.name {
+							start := fd.Pos()
+							if fd.Doc != nil {
+								start = fd.Doc.Pos()
+							}
+							in.at, in.text = fset.Position(start).Offset, fw.text+"\n\n"
+							break
+						}
+					}
+				}
+				inserts = append(inserts, in)
+			}
 		}
 	}
-	sort.Slice(inserts, func(i, j int) bool { return inserts[i].at > inserts[j].at })
+	// Bottom-up, so earlier offsets stay valid; at one offset the earlier
+	// forward goes in last, which leaves it first.
+	sort.Slice(inserts, func(i, j int) bool {
+		if inserts[i].at != inserts[j].at {
+			return inserts[i].at > inserts[j].at
+		}
+		return inserts[i].seq > inserts[j].seq
+	})
 	out := bytes.Clone(src)
 	for _, in := range inserts {
 		out = append(out[:in.at], append([]byte(in.text), out[in.at:]...)...)
 	}
 	return out, nil
+}
+
+// declaredTests lists the Test methods f declares on the type named name,
+// in source order.
+func declaredTests(f *ast.File, name string) []*ast.FuncDecl {
+	var tests []*ast.FuncDecl
+	for _, decl := range f.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 || !strings.HasPrefix(fd.Name.Name, "Test") {
+			continue
+		}
+		typ := fd.Recv.List[0].Type
+		if star, ok := typ.(*ast.StarExpr); ok {
+			typ = star.X
+		}
+		if id, ok := typ.(*ast.Ident); ok && id.Name == name {
+			tests = append(tests, fd)
+		}
+	}
+	return tests
 }
 
 // hasImport reports whether f's import declarations hold path.

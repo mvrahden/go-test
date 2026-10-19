@@ -669,6 +669,16 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-value-embedding-refused` | a child embedding its base by value is refused as before | conformance: the migrate It for a child of a base finds the embedding marker |
 | `migrate-helper-keeps-suite-embedding` | a helper base keeps its `suite.Suite` embedding | conformance: the migrate It for a child of a base finds a testify lint finding |
 | `migrate-outside-base-ignored` | a base declared outside the migrated test files does not fail the run | conformance: the migrate It for an outside base finds an exit other than 2 |
+| `migrate-goroutine-assertion-translated` | an assertion inside a `go` statement is translated like any other | conformance: the migrate It for an assertion on a goroutine finds no marker |
+| `migrate-elements-compared-by-identity` | `ElementsMatch`/`Subset` over pointer or interface elements are translated | conformance: the migrate It for elements compared deeply finds no marker |
+| `migrate-interface-zero-translated` | `Zero` on an interface-typed value is translated | conformance: the migrate It for Zero or Empty on an interface finds no `Zero` marker |
+| `migrate-untyped-constant-converted` | `Equal` with an untyped constant of another type than the value is translated | conformance: the migrate It for an untyped constant finds no marker |
+| `migrate-teardown-guarantee-unmarked` | a `SetupSuite` that can stop early leaves `AfterAll` unmarked | conformance: the migrate It for TearDownSuite beside such a SetupSuite finds no marker |
+| `migrate-lifecycle-bypass-kept` | `s.T().Parallel()` and `s.T().Cleanup` become `t.T()` calls with no marker | conformance: the migrate It for Parallel and Cleanup finds no marker |
+| `migrate-order-change-unnoted` | a suite whose tests gotest runs in another order gets no note | conformance: the migrate It for tests in another order finds no note |
+| `migrate-forwards-before-own-tests` | a base's forwarded tests all go right after the child's type | conformance: the migrate It for a base's tests among the child's finds them out of name order |
+| `migrate-load-mod-flag-dropped` | the package load runs without `-mod=readonly`, so `GOFLAGS=-mod=mod` lets the go command write go.sum | conformance: the migrate It for `GOFLAGS=-mod=mod` finds go.sum changed |
+| `migrate-import-lines-kept` | removed testify imports leave their lines behind as blank lines | conformance: the migrate It for testify imports between others finds a blank line in the block |
 
 ## Adding a mutant
 

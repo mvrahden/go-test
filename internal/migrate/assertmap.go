@@ -21,23 +21,37 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 		return g, args, ""
 	}
 	if (name == "Equal" || name == "NotEqual") && len(args) >= 2 {
+		if why := u.constMismatch(f, name, g, args); why != "" {
+			return "", nil, why
+		}
 		return u.equalCall(f, g, args), args, ""
 	}
 	t := u.info.TypeOf(args[0])
 	if t == nil {
 		return g, args, "" // the type-check after the migration judges it
 	}
+	spelled := t
 	t = types.Unalias(t)
 	if _, ok := t.(*types.TypeParam); ok && (name == "Zero" || name == "NotZero" || name == "Empty" || name == "NotEmpty" || name == "NotNil") {
 		return "", nil, name + " on a value of type parameter " + t.String() + ": testify judged the dynamic type, gotest's assertion is decided by the type — convert by hand"
 	}
 	under := t.Underlying()
 	_, isIface := under.(*types.Interface)
-	ts := types.TypeString(t, types.RelativeTo(u.pkgOf(f)))
+	ts := types.TypeString(spelled, types.RelativeTo(u.pkgOf(f)))
 
 	switch name {
+	case "ElementsMatch", "Subset":
+		for _, a := range args[:min(len(args), 2)] {
+			if el := elemType(u.info.TypeOf(a)); el != nil && !deepAsEqual(el, map[types.Type]bool{}) {
+				es := types.TypeString(el, types.RelativeTo(u.pkgOf(f)))
+				return "", nil, "testify " + name + " compared the " + es + " elements deeply; gotest." + g + " compares them with ==, so distinct pointers or interfaces holding equal values no longer match — compare the values by hand"
+			}
+		}
+
 	case "Zero", "NotZero":
 		switch {
+		case isIface && name == "Zero":
+			return "", nil, "testify Zero on interface type " + ts + " also passes for a zero value inside it, a typed nil included; gotest.Zero passes only for nil — use gotest.Zero if nil is meant"
 		case isIface && name == "NotZero":
 			return "", nil, "testify NotZero on interface type " + ts + " also fails for a zero value inside it; gotest.NotZero fails only for nil — use gotest.NotZero if non-nil is meant"
 		case types.Comparable(t):
@@ -68,7 +82,7 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 			return pick(name == "Empty", "Nil", "NotNil"), args, ""
 		case *types.Interface:
 			if name == "Empty" {
-				return g, args, ""
+				return "", nil, "testify Empty on interface type " + ts + " judges the value inside it, so a zero number or struct counts as empty; gotest.Empty accepts only collections and pointers — convert by hand"
 			}
 			return "", nil, "testify NotEmpty on interface type " + ts + " counts a zero value inside it as empty; gotest.NotEmpty accepts only collections — convert by hand"
 		}
@@ -147,6 +161,82 @@ func (u *unit) equalCall(f *ast.File, g string, args []ast.Expr) string {
 		return g + "[" + ts + "]"
 	}
 	return g
+}
+
+// constMismatch explains an Equal or NotEqual whose untyped constant
+// testify compared as its default type with a value of another, which it
+// never finds equal, where gotest's Equal[V] converts the constant to
+// that type and compares values. Empty when no constant does.
+func (u *unit) constMismatch(f *ast.File, name, g string, args []ast.Expr) string {
+	qual := types.RelativeTo(u.pkgOf(f))
+	for i := range 2 {
+		c, other := args[i], args[1-i]
+		if !u.untypedConst(c) {
+			continue
+		}
+		ct, ot := u.info.TypeOf(c), u.info.TypeOf(other)
+		if ct == nil || ot == nil {
+			return ""
+		}
+		ct, ot = types.Default(ct), types.Default(ot)
+		if _, ok := ot.Underlying().(*types.Interface); ok || isUntypedNil(ot) || types.Identical(ct, ot) {
+			continue
+		}
+		os := types.TypeString(ot, qual)
+		if id, ok := ast.Unparen(c).(*ast.Ident); ok {
+			if _, ok := u.info.Uses[id].(*types.Nil); ok {
+				return "testify " + name + " compared nil with a value of type " + os + " held in an interface, which is never nil; gotest." + g + " compares that " + os + " itself with nil — convert by hand"
+			}
+		}
+		cs := types.ExprString(c)
+		return "testify " + name + " compared " + cs + " as " + types.TypeString(ct, qual) + " with a value of type " + os + ", types it never finds equal; gotest." + g + " converts " + cs + " to " + os + " and compares the values — convert by hand"
+	}
+	return ""
+}
+
+func isUntypedNil(t types.Type) bool {
+	b, ok := t.(*types.Basic)
+	return ok && b.Kind() == types.UntypedNil
+}
+
+// elemType is the element type of a slice or array type, nil for others.
+func elemType(t types.Type) types.Type {
+	if t == nil {
+		return nil
+	}
+	switch x := t.Underlying().(type) {
+	case *types.Slice:
+		return x.Elem()
+	case *types.Array:
+		return x.Elem()
+	}
+	return nil
+}
+
+// deepAsEqual reports whether == on values of t agrees with
+// reflect.DeepEqual, which testify's ObjectsAreEqual is: no pointer or
+// interface inside, where == compares identity and DeepEqual the values.
+func deepAsEqual(t types.Type, seen map[types.Type]bool) bool {
+	if seen[t] {
+		return true
+	}
+	seen[t] = true
+	switch x := t.Underlying().(type) {
+	case *types.Basic:
+		return x.Kind() != types.UnsafePointer
+	case *types.Chan:
+		return true // DeepEqual compares channels with == too
+	case *types.Array:
+		return deepAsEqual(x.Elem(), seen)
+	case *types.Struct:
+		for i := range x.NumFields() {
+			if !deepAsEqual(x.Field(i).Type(), seen) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // untypedConst reports whether e is an untyped constant, which takes the

@@ -25,7 +25,21 @@ run, and a re-run exits 0 with markers left — grep for the markers and
 every soft form — `s.Assert().X`, the suite's own `s.X` inherited from the
 embedded `*assert.Assertions`, and `assert.X(s.T(), …)` — becomes the fatal
 `gotest.X`, exactly as `s.Require().X` and `require.X(s.T(), …)` do: a soft
-check turns into a hard stop. It does NOT convert bare
+check turns into a hard stop. From v1.34, a translation that would
+change a verdict is left under a marker with its reason instead: an
+assertion inside a `go` statement (start the goroutine with `gotest.Go`),
+`ElementsMatch`/`Subset` over pointer- or interface-holding elements
+(gotest compares with `==`), `Zero`/`Empty` on an interface-typed value,
+`Equal` with an untyped constant of another type than the other value,
+the `AfterAll` from a `TearDownSuite` beside a `SetupSuite` that can stop
+early (gotest runs it anyway, so guard it), and `s.T().Parallel()` /
+`s.T().Cleanup` (use `SuiteConfig.Parallel`, `AfterEach`/`AfterAll`).
+gotest runs tests in source order where testify used name order: v1.34+
+places a base's forwarded tests in name order and notes a suite with
+fields whose order still differs. v1.34+ loads with `-mod=readonly`
+(`-mod=vendor` for a vendored module), so it never writes
+`go.mod`/`go.sum`, and leaves no blank line where testify imports
+stood. It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 

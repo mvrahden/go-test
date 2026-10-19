@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AnUntypedConstantOfAnotherType / when Equal compares an untyped constant with a value of another type / migrate leaves it unconverted under a marker naming both types \(
+Clause: when Equal compares an untyped constant with a value of another type → migrate leaves it unconverted under a marker naming both types
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -21,7 +21,7 @@
+ 		return g, args, ""
+ 	}
+ 	if (name == "Equal" || name == "NotEqual") && len(args) >= 2 {
+-		if why := u.constMismatch(f, name, g, args); why != "" {
++		if why := u.constMismatch(f, name, g, args); false && why != "" {
+ 			return "", nil, why
+ 		}
+ 		return u.equalCall(f, g, args), args, ""

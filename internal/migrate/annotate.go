@@ -8,6 +8,7 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
+	"slices"
 	"sort"
 	"strings"
 
@@ -81,14 +82,26 @@ func (u *unit) unconverted(f *ast.File, m *lineMarks) {
 		if fd.Body == nil {
 			continue
 		}
+		if suite != nil && fd.Name.Name == "AfterAll" && suite.setupStops && suite.testifyHooks["TearDownSuite"] {
+			m.add(pos, "testify skipped TearDownSuite when SetupSuite stopped early, failed, skipped or panicked; gotest runs AfterAll even then, on whatever BeforeAll left half set up — guard what it releases")
+		}
 		tName, kind, _ := tParam(fd, u.info)
 		related := suite != nil || u.takesSuite(fd)
 		calls := map[*ast.SelectorExpr]bool{}
+		var goStmts []*ast.GoStmt
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
 			switch x := n.(type) {
+			case *ast.GoStmt:
+				goStmts = append(goStmts, x)
 			case *ast.CallExpr:
 				if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
 					calls[sel] = true
+				}
+				if name := u.assertionName(x); name != "" && related && inside(goStmts, x) {
+					m.add(x.Pos(), "assertion "+name+" runs on a goroutine a go statement starts: gotest's assertions end that goroutine with FailNow, where testify's assert carried on and require was already unsafe — start it with gotest.Go and wait, or assert on the test's goroutine")
+				}
+				if msg := u.lifecycleBypass(x); msg != "" && related {
+					m.add(x.Pos(), msg)
 				}
 				if msg := u.unconvertedCall(f, x, tName, kind, related, fd.Name.Name); msg != "" {
 					m.add(x.Pos(), msg)
@@ -110,6 +123,70 @@ func (u *unit) unconverted(f *ast.File, m *lineMarks) {
 	}
 }
 
+// inside reports whether n lies in one of the go statements.
+func inside(stmts []*ast.GoStmt, n ast.Node) bool {
+	for _, g := range stmts {
+		if g.Pos() <= n.Pos() && n.End() <= g.End() {
+			return true
+		}
+	}
+	return false
+}
+
+// assertionName is the testify assertion call names, empty for any other
+// call: s.Require().X, s.Assert().X, the suite's own s.X, assert.X and
+// require.X.
+func (u *unit) assertionName(call *ast.CallExpr) string {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || !isTestifyAssertionName(sel.Sel.Name) {
+		return ""
+	}
+	switch x := sel.X.(type) {
+	case *ast.CallExpr:
+		inner, ok := x.Fun.(*ast.SelectorExpr)
+		if ok && u.suiteVar(inner.X) != nil && (inner.Sel.Name == "Require" || inner.Sel.Name == "Assert") {
+			return sel.Sel.Name
+		}
+	case *ast.Ident:
+		if u.isPkg(x, assertPkg, requirePkg) || u.suiteVar(x) != nil {
+			return sel.Sel.Name
+		}
+	}
+	return ""
+}
+
+// lifecycleBypass is the marker for t.T().Parallel() and t.T().Cleanup,
+// which a gotest suite expresses through its config and hooks; empty for
+// any other call.
+func (u *unit) lifecycleBypass(call *ast.CallExpr) string {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "Parallel" && sel.Sel.Name != "Cleanup" {
+		return ""
+	}
+	inner, ok := sel.X.(*ast.CallExpr)
+	if !ok || len(inner.Args) != 0 {
+		return ""
+	}
+	isel, ok := inner.Fun.(*ast.SelectorExpr)
+	if !ok || isel.Sel.Name != "T" || u.suiteVar(isel.X) == nil && !isGotestT(u.info.TypeOf(isel.X)) {
+		return ""
+	}
+	if sel.Sel.Name == "Parallel" {
+		return types.ExprString(call.Fun) + "() in a gotest suite — set Parallel in the suite's SuiteConfig instead, with a BeforeEach returning per-test state, and delete this call"
+	}
+	return types.ExprString(call.Fun) + " in a gotest suite — release the resource in AfterEach, or in AfterAll when BeforeAll acquired it, and delete this call"
+}
+
+// isGotestT reports whether t is *gotest.T.
+func isGotestT(t types.Type) bool {
+	p, ok := t.(*types.Pointer)
+	if !ok {
+		return false
+	}
+	n, ok := p.Elem().(*types.Named)
+	return ok && n.Obj().Name() == "T" && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == gotestImport
+}
+
 // gotestCalls reports whether gotest calls a suite method of this name.
 func gotestCalls(name string) bool {
 	switch name {
@@ -125,12 +202,7 @@ func takesGotestT(obj types.Object) bool {
 	if !ok || sig.Params().Len() == 0 {
 		return false
 	}
-	p, ok := sig.Params().At(0).Type().(*types.Pointer)
-	if !ok {
-		return false
-	}
-	n, ok := p.Elem().(*types.Named)
-	return ok && n.Obj().Name() == "T" && n.Obj().Pkg() != nil && n.Obj().Pkg().Path() == gotestImport
+	return isGotestT(sig.Params().At(0).Type())
 }
 
 // unconvertedTypes marks, on a migrated suite's type, the notes the
@@ -146,10 +218,19 @@ func (u *unit) unconvertedTypes(gd *ast.GenDecl, m *lineMarks) {
 		if s == nil {
 			continue
 		}
-		if s.note != "" {
-			m.add(specPos(gd, ts), s.note)
-		}
 		st, ok := ts.Type.(*ast.StructType)
+		notes := []string{}
+		if s.note != "" {
+			notes = append(notes, s.note)
+		}
+		if ok && !s.helper && st.Fields.NumFields() > 0 {
+			if note := u.orderNote(s); note != "" {
+				notes = append(notes, note)
+			}
+		}
+		if len(notes) > 0 {
+			m.add(specPos(gd, ts), strings.Join(notes, "; "))
+		}
 		obj, _ := u.info.Defs[ts.Name].(*types.TypeName)
 		if !ok || obj == nil {
 			continue
@@ -176,6 +257,31 @@ func (u *unit) unconvertedTypes(gd *ast.GenDecl, m *lineMarks) {
 			index += n
 		}
 	}
+}
+
+// orderNote says that gotest runs s's tests in another order than testify
+// did, empty when the order is the same: testify ran them in name order,
+// gotest runs them as declared, file by file.
+func (u *unit) orderNote(s *suiteDecl) string {
+	var declared []string
+	for _, uf := range u.files {
+		for _, decl := range uf.f.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 || u.suiteOf(fd.Recv.List[0].Type) != s {
+				continue
+			}
+			if name := fd.Name.Name; strings.HasPrefix(name, "Test") && name != "Test" {
+				declared = append(declared, name)
+			}
+		}
+	}
+	sorted := slices.Sorted(slices.Values(declared))
+	for i := range declared {
+		if declared[i] != sorted[i] {
+			return "gotest runs " + s.newName + "'s tests in source order, testify ran them in name order: " + declared[i] + " now runs before " + sorted[i] + ", and they share the suite's fields — declare the tests in name order if one depends on another"
+		}
+	}
+	return ""
 }
 
 // unconvertedCall is the marker message for a call the migration left as

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / GOFLAGSAskingForModMod / when GOFLAGS asks for -mod=mod and go\.sum lacks an entry the load needs / migrate writes neither go\.mod nor go\.sum \(
+Clause: when GOFLAGS asks for -mod=mod and go.sum lacks an entry the load needs → migrate writes neither go.mod nor go.sum
+--- a/internal/migrate/load.go
++++ b/internal/migrate/load.go
+@@ -251,7 +251,7 @@
+ 
+ 	out := map[*dirJob][]loaded{}
+ 	for _, b := range batches {
+-		flags := []string{modFlag(b.modRoot)}
++		var flags []string
+ 		if len(b.tags) > 0 {
+ 			flags = append(flags, "-tags="+b.tags.key())
+ 		}

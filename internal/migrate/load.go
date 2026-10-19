@@ -251,7 +251,7 @@ func loadJobs(jobs []*dirJob, overlay map[string][]byte, fset *token.FileSet, sr
 
 	out := map[*dirJob][]loaded{}
 	for _, b := range batches {
-		var flags []string
+		flags := []string{modFlag(b.modRoot)}
 		if len(b.tags) > 0 {
 			flags = append(flags, "-tags="+b.tags.key())
 		}
@@ -304,6 +304,37 @@ func loadJobs(jobs []*dirJob, overlay map[string][]byte, fset *token.FileSet, sr
 		}
 	}
 	return out, nil
+}
+
+// modFlag keeps the go command from writing go.mod or go.sum, whatever
+// GOFLAGS asks for: a module with a vendor directory loads from it, as the
+// go command would, unless a workspace governs it.
+func modFlag(modRoot string) string {
+	if _, err := os.Stat(filepath.Join(modRoot, "vendor", "modules.txt")); err == nil && workspaceFile(modRoot) == "" {
+		return "-mod=vendor"
+	}
+	return "-mod=readonly"
+}
+
+// workspaceFile is the go.work that governs dir, empty when none does.
+func workspaceFile(dir string) string {
+	switch env := os.Getenv("GOWORK"); env {
+	case "off":
+		return ""
+	case "":
+	default:
+		return env
+	}
+	for d := dir; ; {
+		if _, err := os.Stat(filepath.Join(d, "go.work")); err == nil {
+			return filepath.Join(d, "go.work")
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return ""
+		}
+		d = parent
+	}
 }
 
 // depIDs lists what the roots import; variant reports a dependency

@@ -1,0 +1,28 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / TestifyImportsBetweenImportsThatStay / when testify imports sit between imports that stay / the migrated import block holds no blank line where they stood \(
+Clause: when testify imports sit between imports that stay → the migrated import block holds no blank line where they stood
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -732,8 +732,21 @@
+ 	}
+ 	// astutil merges the lines a deleted import stood on, so no blank line
+ 	// is left in its place, and drops a block left empty.
+-	for _, n := range drop {
+-		astutil.DeleteNamedImport(u.fset, f, n.name, n.path)
++	_ = astutil.DeleteNamedImport
++	for _, decl := range f.Decls {
++		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
++			kept := gd.Specs[:0]
++			for _, spec := range gd.Specs {
++				gone := false
++				for _, n := range drop {
++					gone = gone || strings.Trim(spec.(*ast.ImportSpec).Path.Value, `"`) == n.path
++				}
++				if !gone {
++					kept = append(kept, spec)
++				}
++			}
++			gd.Specs = kept
++		}
+ 	}
+ 
+ 	if !hasGotest && needGotest {

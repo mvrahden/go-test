@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ParallelAndCleanupOnTheSuitesT / when a test calls s\.T\(\)\.Parallel\(\) or s\.T\(\)\.Cleanup / migrate marks each call, naming SuiteConfig\.Parallel, AfterEach and AfterAll \(
+Clause: when a test calls s.T().Parallel() or s.T().Cleanup → migrate marks each call, naming SuiteConfig.Parallel, AfterEach and AfterAll
+--- a/internal/migrate/annotate.go
++++ b/internal/migrate/annotate.go
+@@ -160,7 +160,7 @@
+ // any other call.
+ func (u *unit) lifecycleBypass(call *ast.CallExpr) string {
+ 	sel, ok := call.Fun.(*ast.SelectorExpr)
+-	if !ok || sel.Sel.Name != "Parallel" && sel.Sel.Name != "Cleanup" {
++	if !ok || sel.Sel.Name != "Parallel" && sel.Sel.Name != "Cleanup" || true {
+ 		return ""
+ 	}
+ 	inner, ok := sel.X.(*ast.CallExpr)

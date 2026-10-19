@@ -13,11 +13,11 @@ func (b *BaseTestSuiteHelpers) TestShared(t *gotest.T) { fmt.Println("RAN base T
 
 type ChildTestSuite struct{ base BaseTestSuiteHelpers }
 
+func (s *ChildTestSuite) TestOwn(t *gotest.T) { fmt.Println("RAN child TestOwn") }
+
 func (s *ChildTestSuite) TestShared(t *gotest.T) {
 	s.base.TestShared(t)
 }
-
-func (s *ChildTestSuite) TestOwn(t *gotest.T) { fmt.Println("RAN child TestOwn") }
 
 === SNAP TestBaseShapes/a_base_named_like_a_suite_that_no_runner_ran p/ref_test.go ===
 package p
@@ -89,13 +89,13 @@ func (b *BaseSuite) TestOverridden(t *gotest.T) { fmt.Println("RAN base TestOver
 
 type ChildTestSuite struct{ base BaseSuite }
 
-func (s *ChildTestSuite) TestShared(t *gotest.T) {
-	s.base.TestShared(t)
-}
-
 func (s *ChildTestSuite) TestOverridden(t *gotest.T) {
 	gotest.True(t, true)
 	fmt.Println("RAN child TestOverridden")
+}
+
+func (s *ChildTestSuite) TestShared(t *gotest.T) {
+	s.base.TestShared(t)
 }
 
 === SNAP TestBaseShapes/a_keyed_literal p/a_test.go ===
@@ -180,14 +180,14 @@ func (m *MidSuite) BeforeEach(t *gotest.T) {
 	m.base.BeforeEach(t)
 }
 
-func (m *MidSuite) TestRoot(t *gotest.T) {
-	m.base.TestRoot(t)
-}
-
 func (m *MidSuite) BeforeAll(t *gotest.T) { fmt.Println("RAN mid SetupSuite") }
 func (m *MidSuite) TestMid(t *gotest.T) {
 	gotest.Equal(t, 1, m.base.n)
 	fmt.Println("RAN mid TestMid")
+}
+
+func (m *MidSuite) TestRoot(t *gotest.T) {
+	m.base.TestRoot(t)
 }
 
 type LeafTestSuite struct {
@@ -202,18 +202,18 @@ func (s *LeafTestSuite) BeforeEach(t *gotest.T) {
 	s.base.BeforeEach(t)
 }
 
+func (s *LeafTestSuite) TestLeaf(t *gotest.T) {
+	gotest.Equal(t, 1, s.base.base.n)
+	s.base.base.n = 2
+	fmt.Println("RAN leaf TestLeaf", s.base.base.n)
+}
+
 func (s *LeafTestSuite) TestMid(t *gotest.T) {
 	s.base.TestMid(t)
 }
 
 func (s *LeafTestSuite) TestRoot(t *gotest.T) {
 	s.base.TestRoot(t)
-}
-
-func (s *LeafTestSuite) TestLeaf(t *gotest.T) {
-	gotest.Equal(t, 1, s.base.base.n)
-	s.base.base.n = 2
-	fmt.Println("RAN leaf TestLeaf", s.base.base.n)
 }
 
 === SNAP TestBaseShapes/an_explicit_base_hook_call p/a_test.go ===

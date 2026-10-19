@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / TearDownSuiteAfterASetupSuiteThatCanStop / when a suite declares TearDownSuite and a SetupSuite that can stop early / migrate marks AfterAll, which gotest runs even after BeforeAll stopped \(
+Clause: when a suite declares TearDownSuite and a SetupSuite that can stop early → migrate marks AfterAll, which gotest runs even after BeforeAll stopped
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -615,7 +615,7 @@
+ 				}
+ 				s.testifyHooks[name] = true
+ 				if name == "SetupSuite" && fd.Body != nil {
+-					s.setupStops = u.canStop(fd.Body)
++					s.setupStops = false
+ 				}
+ 			} else if strings.HasPrefix(name, "Test") {
+ 				u.hooks[methodKey(fn)] = name
