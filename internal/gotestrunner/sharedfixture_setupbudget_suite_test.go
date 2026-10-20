@@ -106,6 +106,27 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheFloorIsThirtySeconds(t *gotes
 	})
 }
 
+func (s *SharedFixtureSetupBudgetTestSuite) TestTheFloorIsTimedFromTheSetupsStart(t *gotest.T) {
+	// The bubble's clock: the setup began 10s before the runner starts
+	// waiting, and no budget is ever reported.
+	var err error
+	var took time.Duration
+	synctest.Test(t.T(), func(*testing.T) {
+		proc := gotestrunner.ExportNewSilentProcess()
+		time.Sleep(10 * time.Second)
+		began := time.Now()
+		err = proc.WaitSetup(context.Background(), 0)
+		took = time.Since(began)
+	})
+	t.When("the wait starts after the setup began and no budget is reported", func(w *gotest.T) {
+		w.It("the wait ends 30s after the setup began, not after the wait began", func(it *gotest.T) {
+			timeout := gotest.ErrorAs[*gotestrunner.SetupTimeoutError](it, err)
+			gotest.Equal(it, 30*time.Second, timeout.After)
+			gotest.Equal(it, 20*time.Second, took)
+		})
+	})
+}
+
 func (s *SharedFixtureSetupBudgetTestSuite) TestAFlatTimeoutIsStillTheBudget(t *gotest.T) {
 	_, release, took, err := startSlowSetup(t, 20*time.Second, 5*time.Second, time.Second)
 	defer release()
