@@ -79,3 +79,16 @@ jobs:
           name: drill-${{ matrix.shard }}
           path: ${{ runner.temp }}/drill-logs
           if-no-files-found: ignore
+
+  drill-shards:
+    needs: drill
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: drill-*
+          path: ${{ runner.temp }}/drill-logs
+      - name: Shards agree on one assignment
+        run: python3 tests/drill/driver.py --check-shards "${{ runner.temp }}/drill-logs"

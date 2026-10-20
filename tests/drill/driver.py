@@ -26,15 +26,56 @@ ROOT = HERE.parent.parent
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
 
 
-def schedule(names, modes, weights, shards, jobs):
+# Each shared mutant's share of a shard's wall time. Fixed, so shards whose
+# runners differ in CPUs still compute one plan and split it exactly.
+SHARED_DIVISOR = 2
+
+
+def schedule(names, modes, weights, shards):
     """Longest first, greedy projected wall time; deterministic across shards."""
     buckets = [[] for _ in range(shards)]
     load = [0.0] * shards
     for name in sorted(names, key=lambda n: (-weights.get(n, 30), n)):
         slot = min(range(shards), key=lambda i: (load[i], i))
         buckets[slot].append(name)
-        load[slot] += weights.get(name, 30) / (jobs if modes[name] == 'shared' else 1)
+        load[slot] += weights.get(name, 30) / (SHARED_DIVISOR if modes[name] == 'shared' else 1)
     return buckets
+
+
+def plan(names, modes, weights, shards, environ, cpus):
+    """Every shard's mutants, and this shard's concurrent worker count.
+
+    The assignment reads only what every shard shares; the local CPU count
+    and DRILL_JOBS set the workers alone.
+    """
+    return schedule(names, modes, weights, shards), worker_count(environ, cpus)
+
+
+def worker_count(environ, cpus):
+    return positive(environ.get('DRILL_JOBS', max(1, cpus // 2)), 'DRILL_JOBS')
+
+
+def check_shards(paths):
+    """Problems with the selection files of one sharded run, if any."""
+    try:
+        selections = [json.loads(Path(p).read_text()) for p in paths]
+        for s in selections:
+            s['shard'], s['shards'], s['assignment'], s['mutants']
+    except (OSError, ValueError, TypeError, KeyError):
+        return ['unreadable selection file']
+    if not selections:
+        return ['no selection files']
+    problems = []
+    first = selections[0]
+    if any(s['assignment'] != first['assignment'] or s['shards'] != first['shards'] for s in selections):
+        problems.append('shards computed different assignments')
+    shards = sorted(s['shard'] for s in selections)
+    if shards != list(range(1, first['shards'] + 1)):
+        problems.append('expected one selection per shard 1..%d, got %s' % (first['shards'], shards))
+    for s in selections:
+        if not 1 <= s['shard'] <= len(s['assignment']) or sorted(s['mutants']) != sorted(s['assignment'][s['shard'] - 1]):
+            problems.append('shard %d selected other mutants than its assignment names' % s['shard'])
+    return problems
 
 
 def read_plan(text, names):
@@ -128,7 +169,9 @@ def worker(spec):
     try:
         note_phase('copy')
         began = time.monotonic()
-        for directory in (tree, tmp):
+        # Go validates cache/cli and GOCACHE; gotest's own entries in
+        # cache/children were written by an earlier mutant's CLI.
+        for directory in (tree, tmp, work / 'cache' / 'children'):
             shutil.rmtree(directory, ignore_errors=True)
         shutil.copytree(spec['snapshot'], tree)
         tmp.mkdir()
@@ -206,7 +249,7 @@ def main(names):
         raise ValueError('the drill requires Linux for subreaper process cleanup')
     process_supervisor.enable_subreaper()
     cpus = available_cpus()
-    jobs = positive(os.environ.get('DRILL_JOBS', max(1, cpus // 2)), 'DRILL_JOBS')
+    jobs = worker_count(os.environ, cpus)
     shard_i, shard_n = [positive(v, 'DRILL_SHARD') for v in os.environ.get('DRILL_SHARD', '1/1').split('/')]
     if shard_i > shard_n:
         raise ValueError('DRILL_SHARD must be i/n with 1 <= i <= n')
@@ -303,9 +346,12 @@ def main(names):
                 if code or observed.get('exit') != 0:
                     raise RuntimeError('could not read judge plan; see plan.tsv and bootstrap.log')
             modes, runs = read_plan(plan_path.read_text(), names)
-            names = schedule(names, modes, weights, shard_n, jobs)[shard_i - 1]
-            (logs / f'selection-{shard_i}-of-{shard_n}.json').write_text(json.dumps(
-                {n: dict(mode=modes[n], runs=runs[n], estimated_seconds=weights.get(n, 30)) for n in names},
+            assignment, _ = plan(names, modes, weights, shard_n, os.environ, cpus)
+            names = assignment[shard_i - 1]
+            # The whole assignment, so --check-shards can prove the shards agree.
+            (logs / f'selection-{shard_i}-of-{shard_n}.json').write_text(json.dumps(dict(
+                shard=shard_i, shards=shard_n, assignment=assignment,
+                mutants={n: dict(mode=modes[n], runs=runs[n], estimated_seconds=weights.get(n, 30)) for n in names}),
                 indent=2) + '\n')
             def execute(worker_id, name, budget):
                 work = scratch / ('w' + str(worker_id))
@@ -370,6 +416,14 @@ if __name__ == '__main__':
         if len(sys.argv) == 3 and sys.argv[1] == '--worker':
             worker(json.loads(Path(sys.argv[2]).read_text()))
             sys.exit(0)
+        if len(sys.argv) == 3 and sys.argv[1] == '--check-shards':
+            found = sorted(Path(sys.argv[2]).rglob('selection-*-of-*.json'))
+            problems = check_shards(found)
+            for problem in problems:
+                print('DRILL  ' + problem, flush=True)
+            if not problems:
+                print(f'drill  {len(found)} shards agree on one assignment', flush=True)
+            sys.exit(int(bool(problems)))
         sys.exit(main(sys.argv[1:]))
     except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as error:
         print('DRILL  ' + str(error), file=sys.stderr)

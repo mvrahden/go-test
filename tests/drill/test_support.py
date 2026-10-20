@@ -18,14 +18,44 @@ class PlanningTests(unittest.TestCase):
         names = ['a', 'b', 'c', 'd', 'e']
         modes = dict.fromkeys(names, 'shared')
         weights = dict(a=100, b=80, c=20, d=10, e=10)
-        result = driver.schedule(names, modes, weights, 2, 1)
+        result = driver.schedule(names, modes, weights, 2)
         self.assertEqual(sorted(sum(result, [])), names)
         self.assertEqual([sum(weights[n] for n in shard) for shard in result], [110, 110])
-        self.assertEqual(result, driver.schedule(list(reversed(names)), modes, weights, 2, 1))
+        self.assertEqual(result, driver.schedule(list(reversed(names)), modes, weights, 2))
+
+    def test_shards_with_different_cpu_counts_plan_alike(self):
+        names = ['m%02d' % i for i in range(40)]
+        modes = {n: 'alone' if i % 7 == 0 else 'shared' for i, n in enumerate(names)}
+        weights = {n: 10 + (i * 37) % 90 for i, n in enumerate(names)}
+        for environ, cpus in [({'DRILL_JOBS': '2'}, 8), ({'DRILL_JOBS': '4'}, 8), ({}, 4), ({}, 12)]:
+            with self.subTest(environ=environ, cpus=cpus):
+                two, _ = driver.plan(names, modes, weights, 2, {'DRILL_JOBS': '2'}, 4)
+                other, _ = driver.plan(names, modes, weights, 2, environ, cpus)
+                self.assertEqual(sorted(two[0] + other[1]), names)
+                self.assertEqual(two, other)
 
     def test_isolated_time_is_not_divided_by_worker_count(self):
         self.assertEqual(driver.schedule(['a', 'b', 'c'], dict(a='alone', b='shared', c='shared'),
-                                         dict(a=10, b=10, c=10), 2, 2), [['a'], ['b', 'c']])
+                                         dict(a=10, b=10, c=10), 2), [['a'], ['b', 'c']])
+
+    def test_shards_that_disagree_fail_the_check(self):
+        def selection(shard, assignment, mutants=None):
+            return dict(shard=shard, shards=len(assignment), assignment=assignment,
+                        mutants=dict.fromkeys(assignment[shard - 1] if mutants is None else mutants, {}))
+        agreed = [['a', 'c'], ['b']]
+        cases = {'agree': ([selection(1, agreed), selection(2, agreed)], []),
+                 'different plans': ([selection(1, agreed), selection(2, [['a'], ['b', 'c']])],
+                                     ['shards computed different assignments']),
+                 'missing shard': ([selection(1, agreed)], ['expected one selection per shard 1..2, got [1]']),
+                 'stray selection': ([selection(1, agreed, ['a']), selection(2, agreed)],
+                                     ['shard 1 selected other mutants than its assignment names'])}
+        for label, (selections, problems) in cases.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                paths = []
+                for i, s in enumerate(selections):
+                    paths.append(Path(tmp) / f'{i}.json')
+                    paths[-1].write_text(json.dumps(s))
+                self.assertEqual(driver.check_shards(paths), problems)
 
     def test_incomplete_or_duplicate_plans_are_rejected(self):
         for text in ['mutant\ta\tshared\n', 'mutant\ta\tshared\nmutant\ta\tshared\n',
@@ -70,7 +100,7 @@ class PlanningTests(unittest.TestCase):
 class WorkerTests(unittest.TestCase):
     # Exercise the orchestration with synthetic events, not a real CLI, patch
     # or Go invocation. Only grep actually runs, against the synthetic log.
-    def worker(self, stream, exit_code=1, build_code=0):
+    def worker(self, stream, exit_code=1, build_code=0, kept=None):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             snapshot = root / 'snapshot'
@@ -78,6 +108,10 @@ class WorkerTests(unittest.TestCase):
             patch = root / 'synthetic.patch'
             patch.write_text('Expect: a named failure\n--- a/unused\n')
             result = root / 'result.json'
+            caches = [root / 'worker' / 'cache' / d / 'entry' for d in ('children', 'cli')]
+            for entry in caches:
+                entry.parent.mkdir(parents=True)
+                entry.write_text('from an earlier mutant')
             spec = dict(name='synthetic', work=str(root / 'worker'), snapshot=str(snapshot),
                         patch=str(patch), log=str(root / 'output.log'), result=str(result),
                         runs=[('-', ['./synthetic'])], judge='synthetic-judge', cpus=1)
@@ -95,12 +129,19 @@ class WorkerTests(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0)
             with mock.patch.object(driver.subprocess, 'run', side_effect=run):
                 driver.worker(spec)
+            if kept is not None:
+                kept.extend(e.parent.name for e in caches if e.exists())
             return json.loads(result.read_text())
 
     def test_assertion_failure_matches_the_named_check(self):
         result = self.worker('{"Action":"fail","Test":"TestCheck"}\n')
         self.assertTrue(result['caught'])
         self.assertEqual(set(result['phases']), {'copy', 'patch', 'build', 'judge', 'render'})
+
+    def test_only_the_go_validated_cache_outlives_a_mutant(self):
+        kept = []
+        self.worker('{"Action":"fail","Test":"TestCheck"}\n', kept=kept)
+        self.assertEqual(kept, ['cli'])
 
     def test_build_failure_is_never_a_catch(self):
         result = self.worker('{"Action":"build-fail","ImportPath":"p"}\n', exit_code=2)

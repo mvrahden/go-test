@@ -19,8 +19,8 @@ The orchestrator snapshots the current repository, including uncommitted
 changes, then builds the judge and reads the selection plan from that snapshot.
 For each mutant, a worker:
 
-1. restores the snapshot at its fixed source path and creates fresh temporary
-   state; private build caches outside the source and temp trees survive;
+1. restores the snapshot at its fixed source path, creates fresh temporary
+   state and empties its gotest cache for child runs (see below);
 2. applies the patch with exact context and no fuzz;
 3. runs `go build ./...` to retain the whole-source compilation contract;
 4. runs only its selected checks using the pristine judge's `-json` pipeline,
@@ -29,7 +29,7 @@ For each mutant, a worker:
    empty/malformed event stream, then renders the stream with the pristine
    `summary --input --render-only` command;
 6. requires a nonzero judge result and every `Expect:` expression to match the
-   rendered log, using POSIX ERE matching as before.
+   rendered log, as a POSIX ERE (`grep -E`).
 
 A worker has an independent wall-clock deadline covering copying, compilation,
 execution and rendering. Expiry, missing results, planner failure, cancellation
@@ -37,11 +37,15 @@ and failed cleanup fail the drill; none count as a caught mutant. All selected
 mutants must have exactly one terminal result. Every supervisor cleans its
 remaining descendants before the worker directory is reused.
 
-Build caches contain artifacts, never test verdicts. Go validates stable binary
-outputs against current sources on every build. The testkit copies its cached
-CLI to a caller-private executable under a lock; marker files, snapshots and
-other mutable test state are never reused. The canary does not depend on shared
-fixture machinery to obtain its CLI.
+Only caches Go validates outlive a mutant: Go's build cache (`GOCACHE`) and
+the worker's `cache/cli`, from which the testkit copies its CLI to a
+caller-private executable under a lock after Go has checked it against the
+current sources. The worker's `cache/children` (`GOTEST_TEST_CACHE_DIR`)
+holds the overlay and binary-cache entries of gotest's own child runs. Go does
+not validate those, and a mutated CLI writes them, so each mutant starts with
+it empty. The pristine judge's cache (`cache/judge`) is written only by the
+pristine judge. Marker files, snapshots and other mutable test state are never
+reused. The canary does not depend on shared fixture machinery to obtain its CLI.
 
 Workers run without the host's `CI`, `GITHUB_ACTIONS` and `GOTEST_*`
 settings, so a mutant gets the same verdict on a CI runner as on a laptop
@@ -51,22 +55,30 @@ Go writes a tool there in place, and a run that resolves it meanwhile cannot
 execute it.
 
 The drill exits 0 only when every selected mutant was caught. CI splits it into
-four shards and retains each shard's logs and phase timings even on failure.
+four shards, retains each shard's logs and phase timings even on failure, and
+then checks with `--check-shards` that the shards split the mutants exactly.
 
 `bash tests/drill/drill.sh <name> ...` selects named mutants; no names selects all.
 
 | Variable | Meaning |
 |---|---|
-| `DRILL_JOBS` | Concurrent mutants; defaults to half the available CPUs, at least one. |
+| `DRILL_JOBS` | Concurrent mutants in this invocation; defaults to half the available CPUs, at least one. It never changes which shard a mutant lands in. |
 | `DRILL_SHARD=i/n` | Select one deterministic shard, with `1 <= i <= n`. |
 | `DRILL_TIMEOUT` | Independent deadline per mutant in seconds, default 600. |
 | `DRILL_LOGS` | Parent for a unique log directory per invocation; the actual path is printed. |
-| `DRILL_TIMINGS` | Optional JSON file mapping mutant names to previous elapsed seconds. All shards must read the same file and use the same job count. |
+| `DRILL_TIMINGS` | Optional JSON file mapping mutant names to previous elapsed seconds. All shards must read the same file. |
 
 Historical durations schedule long mutants first and greedily balance projected
-shard wall time, accounting for the serial timing-sensitive tail. Unknown mutants
-get an estimate of 30 seconds. The output `timings-i-of-n.json` files contain
-successful observations; merge their objects to supply the next run's input.
+shard wall time, accounting for the serial timing-sensitive tail: a shared
+mutant counts half its duration, whatever the local CPU count. Unknown mutants
+get an estimate of 30 seconds. The assignment reads only the mutant names,
+their modes and `DRILL_TIMINGS`, so shards on runners with different CPUs
+split one list exactly. Each shard writes the whole assignment to its
+`selection-i-of-n.json`; `python3 tests/drill/driver.py --check-shards <dir>`
+reads every selection file under `<dir>` and fails unless all shards computed
+the same assignment, every shard wrote one selection, and each selected exactly
+its part. The output `timings-i-of-n.json` files contain successful
+observations; merge their objects to supply the next run's input.
 Every result also records copy, patch, build, judge and render durations. A
 `*.phase.json` file identifies the active phase if a worker times out.
 Concurrent workers divide the available CPUs through `GOMAXPROCS`, Go's `-p`,
@@ -137,24 +149,64 @@ tests it declares, and each `Clause:` line a clause `specs/` states.
 
 ## Reading a failure
 
-- `DRILL  <name>: SURVIVED` — the bug went unnoticed. A check has a hole;
-  its retained log shows what the run reported. Fix the check, not the mutant.
-- `DRILL  <name>: patch does not apply, refresh it` — the code the mutant
-  targets has changed. Re-create the patch against the current source.
-- `DRILL  <name>: mutant does not compile, refresh it` — the patch applies
-  but breaks the build; the judge would exit 2 on that and hide whether any
-  check fired. Re-create the patch.
-- `DRILL  <name>: caught by the wrong check` — the run went red, but not
-  through the check the patch's `Expect:` lines name. The mutant may have
-  landed somewhere else, or the named check lost its hold; the unmatched
-  expectations and the first failures follow.
-- `DRILL  <name>: no Expect: line` — the patch does not name its check.
-- `DRILL  <name>: Clause line names no clause of specs/: <clause>` — a
-  `Clause:` line quotes a sentence no scenario states.
-- `DRILL  <name>: ./<dir> declares no <Suite>/<Method>` (or another
-  `Judge:` line complaint) — a `Judge:` line names a test that is not
-  there; a renamed check needs its `Judge:` lines renamed with it.
-- `DRILL  could not build the judge` — the unmodified tree does not compile.
+Each mutant ends in one line, `drill  <name>: caught (<seconds>s)` or
+`DRILL  <name>: <reason> (<seconds>s)`, and the run in
+`drill  <judged>/<selected> mutants judged in <seconds>s`. The reasons:
+
+- `SURVIVED, the guards did not catch it` — the bug went unnoticed. A check
+  has a hole; its retained log shows what the run reported. Fix the check,
+  not the mutant.
+- `patch does not apply, refresh it` — the code the mutant targets has
+  changed. Re-create the patch against the current source.
+- `mutant does not compile, refresh it` — the patch applies but breaks
+  `go build ./...`; the judge would exit 2 on that and hide whether any check
+  fired. Re-create the patch.
+- `generated judge harness does not compile, refresh it` — the judge's event
+  stream carries a `build-fail` event: the patch breaks a test package.
+- `caught by the wrong check; no line matches: <expression>` — the run went
+  red, but not through the check the patch's `Expect:` lines name. Only the
+  first `Expect:` expression that matches no line is named; the rest are not
+  checked. The mutant may have landed somewhere else, or the named check lost
+  its hold; the retained `<name>.log.plain` shows what the run printed.
+- `no Expect: line` — the patch does not name its check.
+- `judge emitted no events`, `judge emitted a non-JSON line`,
+  `judge emitted an invalid event` — the judge's `-json` stream is empty or
+  not a stream of events.
+- `judge terminated abnormally (<code>)` — the judge exited other than 0, 1
+  or 2, for example on a signal.
+- `could not render judge events` — `summary --render-only` failed on the
+  stream.
+- `independent watchdog deadline exceeded` — the worker outlived
+  `DRILL_TIMEOUT`; `<name>.log.phase.json` names the phase it was in.
+- `worker cancelled`, `process cleanup failed: <error>`,
+  `worker or supervisor exited without a valid result`,
+  `worker produced no valid terminal result` — the worker or its supervisor
+  ended without a verdict of its own.
+- `DRILL  <name>: no terminal result` — a selected mutant got no verdict,
+  because the drill was stopped or a worker thread failed first.
+
+A failure before any mutant runs prints one line and exits 1:
+
+- `DRILL  could not build gotest; see bootstrap.log` (or `clauses`,
+  `test2json`) — the unmodified tree does not build.
+- `DRILL  could not read judge plan; see plan.tsv and bootstrap.log` — a
+  patch header cannot be judged as it stands. `plan.tsv` holds a
+  `bad<TAB><name><TAB><reason>` line for each problem, such as
+  `Clause line names no clause of specs/: <clause>` (a `Clause:` line quotes
+  a sentence no scenario states), `./<dir> declares no <Suite>/<Method>` (a
+  `Judge:` line names a test that is not there; a renamed check needs its
+  `Judge:` lines renamed with it), `Alone: line gives no reason` or
+  `no Expect: line, name the check that must catch it`.
+- `DRILL  no mutant named <name>`, `DRILL  a mutant was selected more than once`,
+  or a complaint about `DRILL_JOBS`, `DRILL_SHARD`, `DRILL_TIMEOUT` or
+  `DRILL_TIMINGS` — the command line or environment is wrong.
+
+`--check-shards` prints `drill  <n> shards agree on one assignment`, or
+`DRILL  shards computed different assignments`,
+`DRILL  expected one selection per shard 1..<n>, got <shards>`,
+`DRILL  shard <i> selected other mutants than its assignment names`,
+`DRILL  no selection files` or `DRILL  unreadable selection file` when the
+shards of one run do not add up to every mutant exactly once.
 
 ## The mutants
 
