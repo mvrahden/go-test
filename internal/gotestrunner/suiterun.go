@@ -229,6 +229,9 @@ type startedSuite struct {
 	cutShort       *atomic.Bool
 }
 
+// suiteStart starts a suite process; a variable so tests can count starts.
+var suiteStart = startSuite
+
 func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: stable API
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	s := startedSuite{cmd: cmd, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, cutShort: &atomic.Bool{}}
@@ -258,6 +261,18 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 	return s, mp.Start()
 }
 
+// waitRetry waits d, or returns ctx's error once it ends.
+func waitRetry(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // RunSingleSuite executes a single suite subprocess.
 // When test2json is true, the binary is wrapped with the test2json tool.
 //
@@ -270,13 +285,15 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 // keeps the pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	start := time.Now()
-	s, err := startSuite(ctx, target, env, test2json)
-	for retry := time.Duration(0); errors.Is(err, syscall.ETXTBSY) && retry < startRetryLimit && ctx.Err() == nil; {
+	s, err := suiteStart(ctx, target, env, test2json)
+	for retry := time.Duration(0); errors.Is(err, syscall.ETXTBSY) && retry < startRetryLimit; {
 		// Another process still has the executable open for writing: a go
 		// command writing a tool into the shared build cache in place.
 		retry = max(2*retry, startRetryFirst)
-		time.Sleep(retry)
-		s, err = startSuite(ctx, target, env, test2json)
+		if err = waitRetry(ctx, retry); err != nil {
+			break // a cancelled start, as exec reports one
+		}
+		s, err = suiteStart(ctx, target, env, test2json)
 	}
 	if err != nil {
 		return SuiteResult{
