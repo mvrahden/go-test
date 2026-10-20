@@ -1,6 +1,7 @@
 package lifecycle_test
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -29,15 +30,34 @@ func outputOf(run *testkit.Run, path string) string {
 	return out.String()
 }
 
+// elapsedOf is the time the stream says the test at path took, -1 when it
+// reported none.
+func elapsedOf(run *testkit.Run, path, action string) time.Duration {
+	for line := range strings.SplitSeq(run.Stdout, "\n") {
+		var ev struct {
+			Action  string   `json:"Action"`
+			Test    string   `json:"Test"`
+			Elapsed *float64 `json:"Elapsed"`
+		}
+		if json.Unmarshal([]byte(line), &ev) == nil && ev.Test == path && ev.Action == action && ev.Elapsed != nil {
+			return time.Duration(*ev.Elapsed * float64(time.Second))
+		}
+	}
+	return -1
+}
+
 func (s *AsyncMethodsTestSuite) TestAFatalGoroutine(t *gotest.T) {
-	began := time.Now()
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/asyncmethods/")
 	gotest.NoError(t, err)
+	const method = "TestAsyncTestSuite/TestFatalGoroutineAsync"
 	t.When("the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left", func(w *gotest.T) {
 		w.It("fails the method at once, not at the end of its budget", func(it *gotest.T) {
-			gotest.Equal(it, "fail", run.Verdict("TestAsyncTestSuite/TestFatalGoroutineAsync"), "stdout: %s", run.Stdout)
+			gotest.Equal(it, "fail", run.Verdict(method), "stdout: %s", run.Stdout)
 			gotest.Equal(it, "pass", run.Verdict("TestAsyncTestSuite/TestCallsDoneAsync"))
-			gotest.Less(it, time.Since(began), 10*time.Second)
+			// The method's own time, not the build before it: its budget is 20s.
+			took := elapsedOf(&run, method, "fail")
+			gotest.GreaterOrEqual(it, took, time.Duration(0), "stdout: %s", run.Stdout)
+			gotest.Less(it, took, 10*time.Second)
 		})
 	})
 }

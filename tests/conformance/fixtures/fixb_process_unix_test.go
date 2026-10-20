@@ -25,14 +25,20 @@ func (s *SharedProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *SharedProcessTestSuite) TestAProcessTheSetupStarts(t *gotest.T) {
 	markerDir := t.TempDir()
-	began := time.Now()
 	run, err := testkit.RunPackage(t.Context(), markerDir, "../testdata/fixbdetached/")
-	took := time.Since(began)
+	ended := time.Now()
 	gotest.NoError(t, err)
+	// Timed from the started process's first write, which it outlives by
+	// 30s, so the builds before it are not counted.
+	var took time.Duration
+	if ready, err := os.Stat(filepath.Join(markerDir, "detached-ready")); err == nil {
+		took = ended.Sub(ready.ModTime())
+	}
 	t.When("a shared fixture's setup starts a process that outlives it", func(w *gotest.T) {
 		w.It("the run passes before that process ends", func(it *gotest.T) {
 			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.Equal(it, "pass", run.Verdict("TestDetachTestSuite/TestStateArrived"))
+			gotest.NotZero(it, took, "the started process never wrote")
 			gotest.Less(it, took, 25*time.Second, "the run waited for the 30s process")
 		})
 		w.It("the process sees no protocol variable, and what it writes to descriptor 3 is not read", func(it *gotest.T) {
