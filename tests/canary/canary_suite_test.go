@@ -610,14 +610,44 @@ func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T)
 }
 
 // Without --setup-timeout the wait for a shared fixture is the budget the
-// fixture declared: a 2s Timeout taking 15s fails the run in 2s, not 15.
+// fixture declared: a 2s Timeout taking 15s fails the suite reading it 2s
+// into the setup, not 15. Timed from the setup's start, so the build of the
+// setup program before it is not counted.
 func (s *CanaryTimingTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
 	dir := s.warm(t, "setupbudget")
-	began := time.Now()
 	s.checkIn(t, "setupbudget", dir)
-	if took := time.Since(began); took > 10*time.Second {
-		t.Errorf("setupbudget: the run took %s; the wait outlived the fixture's declared 2s budget", took)
+	markers, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	var began time.Time
+	for _, m := range markers {
+		if v, ok := strings.CutPrefix(m, "began="); ok {
+			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+				began = time.Unix(0, n)
+			}
+		}
 	}
+	failed := verdictTime(s.lastStream(t), "TestSlowTestSuite", "fail")
+	if began.IsZero() || failed.IsZero() {
+		fatalf(t, "setupbudget: no setup start (markers %v) or no fail verdict for TestSlowTestSuite in the stream", markers)
+	}
+	if took := failed.Sub(began); took > 10*time.Second {
+		t.Errorf("setupbudget: the run took %s from the setup's start to the suite's verdict; the wait outlived the fixture's declared 2s budget", took)
+	}
+}
+
+// verdictTime is the time the stream stamped on test's action event, zero
+// when it has none.
+func verdictTime(stream, test, action string) time.Time {
+	for line := range strings.SplitSeq(stream, "\n") {
+		var ev struct {
+			Action string    `json:"Action"`
+			Test   string    `json:"Test"`
+			Time   time.Time `json:"Time"`
+		}
+		if json.Unmarshal([]byte(line), &ev) == nil && ev.Test == test && ev.Action == action {
+			return ev.Time
+		}
+	}
+	return time.Time{}
 }
 
 // A shared fixture bound by one suite alone never starts when -skip names
