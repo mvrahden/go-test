@@ -6,7 +6,7 @@ What `gotest migrate` makes of testify suites: the code it writes, what it leave
 ## Requirements
 
 ### Requirement: Base suites
-Migrate SHALL convert a testify suite that embeds a base suite declared in the test files being migrated: the child SHALL hold the base in a named field and declare the hooks and tests testify ran on it through the base, the base SHALL become a helper type gotest does not run, and no marker SHALL be left for the embedding. A base declared outside those test files SHALL make migrate exit 2, naming the base's package, with nothing written.
+Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets to a fresh base: the child SHALL hold the base by value in a named field and declare the hooks and tests testify ran on it through the base, the base SHALL become a helper type gotest does not run, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
 
 #### Scenario: A child of a base suite
 - **WHEN** a testify suite embeds a base suite of the migrated test files
@@ -15,8 +15,31 @@ Migrate SHALL convert a testify suite that embeds a base suite declared in the t
 - **AND** migrate leaves no marker for the embedding
 - **AND** gotest lint reports no testify finding on the migrated code
 
-#### Scenario: A base outside the migrated test files
-- **WHEN** a testify suite embeds a base suite declared outside the migrated test files
+#### Scenario: A base embedded by pointer
+- **WHEN** a testify suite embeds a base suite of the migrated test files by a pointer its suite.Run sets to a fresh base
+- **THEN** the migrated child holds the base by value and gotest runs the base's hooks and tests on it
+
+#### Scenario: A generic base
+- **WHEN** a testify suite embeds an instance of a generic base suite
+- **THEN** the base stays a generic helper type and gotest runs its hooks and tests on the child
+
+#### Scenario: A child's method calling the base
+- **WHEN** a method of the child without t calls a base method that gains t
+- **THEN** the method gains t, its callers pass it, and the migrated child runs without a marker
+
+### Requirement: Base suites left as they are
+Migrate SHALL leave a suite's file unconverted under a marker giving the reason when its base cannot carry over: an embedding by any other pointer, which gotest's new leaves nil; a local or anonymous struct embedding a base, as gotest runs only package-level suites; a base in a non-test file of the suite's directory, as migrate changes only test files. A base of a package in another directory SHALL make migrate exit 2, naming its package, with nothing written.
+
+#### Scenario: An embedding in a local or anonymous struct
+- **WHEN** a struct declared inside a function, or an anonymous struct, embeds a base suite
+- **THEN** migrate leaves its file unconverted under a marker saying gotest runs only suites declared at package level
+
+#### Scenario: A base in a non-test file
+- **WHEN** a testify suite embeds a base suite declared in a non-test file of its directory
+- **THEN** migrate exits 1 and leaves the child's file unconverted under a marker naming that file
+
+#### Scenario: A base outside the migrated directory
+- **WHEN** a testify suite embeds a base suite of a package in another directory
 - **THEN** migrate exits 2 naming the base's package and writes nothing
 
 ### Requirement: Kept verdicts
@@ -33,6 +56,10 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 #### Scenario: Zero or Empty on an interface
 - **WHEN** Zero or Empty checks a value of an interface type
 - **THEN** migrate leaves it unconverted under a marker saying testify judged the value inside
+
+#### Scenario: NotNil on an interface
+- **WHEN** NotNil checks a value of an interface type
+- **THEN** migrate leaves it unconverted under a marker naming the typed nil and the non-nilable value inside
 
 #### Scenario: An untyped constant of another type
 - **WHEN** Equal compares an untyped constant with a value of another type
@@ -62,8 +89,12 @@ Migrate SHALL load the packages it converts with `-mod=readonly`, or `-mod=vendo
 - **THEN** migrate writes neither go.mod nor go.sum
 
 ### Requirement: Imports
-Migrate SHALL remove the testify imports nothing uses any more and leave no blank line where they stood.
+Migrate SHALL remove the testify imports nothing uses any more, with the comments that stand with them, and leave no blank line where they stood.
 
 #### Scenario: testify imports between imports that stay
 - **WHEN** testify imports sit between imports that stay
 - **THEN** the migrated import block holds no blank line where they stood
+
+#### Scenario: A comment on a removed import
+- **WHEN** an import migrate removes carries a comment on its line or above it
+- **THEN** the comment goes with the import and the file stays as gofmt formats it

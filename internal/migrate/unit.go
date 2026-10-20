@@ -90,6 +90,9 @@ type suiteDecl struct {
 	// fields it does so through.
 	st     *ast.StructType
 	embeds []*embedding
+	// generic: the suite has type parameters; gd declares it.
+	generic bool
+	gd      *ast.GenDecl
 	// helper: a base no suite.Run ran; it is migrated as a helper type
 	// the suites embedding it call, which gotest does not run.
 	helper   bool
@@ -183,6 +186,12 @@ func (u *unit) suiteOf(expr ast.Expr) *suiteDecl {
 		case *ast.ParenExpr:
 			expr = x.X
 			continue
+		case *ast.IndexExpr: // an instance of a generic type
+			expr = x.X
+			continue
+		case *ast.IndexListExpr:
+			expr = x.X
+			continue
 		case *ast.Ident:
 			return u.suiteFor(u.info.Uses[x])
 		case *ast.SelectorExpr:
@@ -234,9 +243,8 @@ func embedsTestifySuite(t types.Type, seen map[types.Type]bool) bool {
 }
 
 // findSuites collects every struct type a test file declares with
-// suite.Suite embedded, directly or through a base. A testify suite it
-// cannot convert is marked and its file refused: a generic one. A suite
-// whose base is declared outside these test files is an error.
+// suite.Suite embedded, directly or through a base. A suite whose base
+// is declared outside these test files is an error.
 func (u *unit) findSuites() (map[*unitFile]bool, error) {
 	u.byKey = map[string]*suiteDecl{}
 	u.embedField = map[*ast.Field]*embedding{}
@@ -269,11 +277,8 @@ func (u *unit) findSuites() (map[*unitFile]bool, error) {
 					direct = direct || u.isSuiteField(field)
 				}
 				switch {
-				case direct && ts.TypeParams != nil:
-					uf.marks = append(uf.marks, mark{pos: specPos(gd, ts), msg: obj.Name() + " is a generic testify suite; gotest instantiates generic suites through type aliases — migrate it by hand"})
-					refused[uf] = true
 				case direct:
-					s := &suiteDecl{obj: obj, spec: ts, file: uf, newName: DeriveNewName(obj.Name())}
+					s := &suiteDecl{obj: obj, spec: ts, file: uf, newName: DeriveNewName(obj.Name()), generic: ts.TypeParams != nil, gd: gd}
 					u.suites = append(u.suites, s)
 					u.byKey[objKey(obj)] = s
 				default:
@@ -297,9 +302,11 @@ func specPos(gd *ast.GenDecl, ts *ast.TypeSpec) token.Pos {
 }
 
 // refuse decides which suites stay as they are. A package-level struct
-// embedding a suite by value migrates with it; one embedding it by pointer,
-// or any other struct embedding one, would strand the child, so the suite
-// is refused with the file declaring it and the file declaring the child.
+// embedding a suite migrates with it; by pointer only when every
+// suite.Run sets that pointer to a fresh base and nothing else does. Any
+// other struct embedding one, local or anonymous, would strand the child,
+// so the suite is refused with the file declaring it and the file
+// declaring the child.
 // So is a suite whose new name is taken, and one a file migrate cannot
 // type-check refers to. A refused file is left whole, so every suite it
 // declares or refers to is refused too, and a child goes with its base,
@@ -323,26 +330,43 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 					continue
 				}
 				e := u.embedField[field]
-				if e != nil && !e.ptr {
+				if e != nil && (!e.ptr || u.ptrRunsFresh(e) && !u.ptrFieldSet(e)) {
 					continue // the migration names the field
 				}
-				child, pos := "a struct", field.Pos()
+				child, pos, local, generic := "", field.Pos(), false, false
 				for i := len(stack) - 1; i >= 0; i-- {
-					if ts, ok := stack[i].(*ast.TypeSpec); ok {
-						child, pos = ts.Name.Name, ts.Pos()
-						if gd, ok := stack[max(i-1, 0)].(*ast.GenDecl); ok {
-							pos = specPos(gd, ts)
+					switch x := stack[i].(type) {
+					case *ast.FuncDecl, *ast.FuncLit:
+						local = true
+					case *ast.TypeSpec:
+						if child == "" && x.Type == st {
+							child, pos, generic = x.Name.Name, x.Pos(), x.TypeParams != nil
+							if gd, ok := stack[max(i-1, 0)].(*ast.GenDecl); ok {
+								pos = specPos(gd, x)
+							}
 						}
-						break
 					}
 				}
-				msg := child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"
-				if e != nil {
-					msg = child + " embeds *" + base.obj.Name() + "; gotest creates a suite with new, which leaves that pointer nil — embed " + base.obj.Name() + " by value, or migrate this file by hand"
+				var msg string
+				switch {
+				case e != nil:
+					msg = child + " embeds *" + base.obj.Name() + ", which not every suite.Run sets to a fresh &" + base.obj.Name() + "{}, or other code sets; gotest creates a suite with new, which leaves that pointer nil — embed " + base.obj.Name() + " by value, or migrate this file by hand"
+				case child == "":
+					msg = "an anonymous struct embeds " + base.obj.Name() + "; gotest runs only suites declared at package level — declare it as a package-level type, or migrate this file by hand"
+				case local:
+					msg = child + " embeds " + base.obj.Name() + " inside a function; gotest runs only suites declared at package level — declare " + child + " at package level, or migrate this file by hand"
+				case !generic: // a generic child carries its own marker
+					msg = child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"
 				}
-				uf.marks = append(uf.marks, mark{pos: pos, msg: msg})
+				if msg != "" {
+					uf.marks = append(uf.marks, mark{pos: pos, msg: msg})
+				}
 				if base.migrated() {
-					base.refusal = base.obj.Name() + " is embedded by " + child + " in " + filepath.Base(uf.path) + " — migrate this file by hand"
+					by := child
+					if by == "" {
+						by = "an anonymous struct"
+					}
+					base.refusal = base.obj.Name() + " is embedded by " + by + " in " + filepath.Base(uf.path) + " — migrate this file by hand"
 					base.marked = true
 				}
 				refused[uf] = true
@@ -353,6 +377,15 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 	}
 
 	u.markHelpers()
+
+	// A generic suite migrates only as a base the suites embedding it call.
+	for _, s := range u.suites {
+		if s.generic && !s.helper && s.migrated() {
+			s.refusal = s.obj.Name() + " is a generic testify suite; gotest instantiates generic suites through type aliases — migrate it by hand"
+			s.file.marks = append(s.file.marks, mark{pos: specPos(s.gd, s.spec), msg: s.refusal})
+			refused[s.file] = true
+		}
+	}
 
 	// A suite keeping its name holds it; one renamed onto a name taken,
 	// or still unexported, is refused.

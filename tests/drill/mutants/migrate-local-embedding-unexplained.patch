@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AnEmbeddingInALocalOrAnonymousStruct / when a struct declared inside a function, or an anonymous struct, embeds a base suite / migrate leaves its file unconverted under a marker saying gotest runs only suites declared at package level \(
+Clause: when a struct declared inside a function, or an anonymous struct, embeds a base suite → migrate leaves its file unconverted under a marker saying gotest runs only suites declared at package level
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -353,7 +353,7 @@
+ 					msg = child + " embeds *" + base.obj.Name() + ", which not every suite.Run sets to a fresh &" + base.obj.Name() + "{}, or other code sets; gotest creates a suite with new, which leaves that pointer nil — embed " + base.obj.Name() + " by value, or migrate this file by hand"
+ 				case child == "":
+ 					msg = "an anonymous struct embeds " + base.obj.Name() + "; gotest runs only suites declared at package level — declare it as a package-level type, or migrate this file by hand"
+-				case local:
++				case local && false:
+ 					msg = child + " embeds " + base.obj.Name() + " inside a function; gotest runs only suites declared at package level — declare " + child + " at package level, or migrate this file by hand"
+ 				case !generic: // a generic child carries its own marker
+ 					msg = child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"

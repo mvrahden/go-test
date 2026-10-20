@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a te
 Clause: when a testify suite embeds a base suite of the migrated test files → migrate leaves no marker for the embedding
 --- a/internal/migrate/unit.go
 +++ b/internal/migrate/unit.go
-@@ -320,7 +320,7 @@
+@@ -330,7 +330,7 @@
  					continue
  				}
  				e := u.embedField[field]
--				if e != nil && !e.ptr {
+-				if e != nil && (!e.ptr || u.ptrRunsFresh(e) && !u.ptrFieldSet(e)) {
 +				if e != nil && e.ptr {
  					continue // the migration names the field
  				}
- 				child, pos := "a struct", field.Pos()
+ 				child, pos, local, generic := "", field.Pos(), false, false

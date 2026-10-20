@@ -1,6 +1,7 @@
 package migrate_test
 
 import (
+	"go/format"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,26 @@ func (s *MigrateVerdictsTestSuite) TestZeroOrEmptyOnAnInterface(t *gotest.T) {
 			gotest.Equal(it, 1, exit, out)
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify Zero on interface type error also passes for a zero value inside it[^\n]*\n\ts\.Zero\(err\)\n`, out)
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify Empty on interface type any judges the value inside it[^\n]*\n\ts\.Empty\(v\)\n`, out)
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestNotNilOnAnInterface(t *gotest.T) {
+	t.When("NotNil checks a value of an interface type", func(w *gotest.T) {
+		w.It("migrate leaves it unconverted under a marker naming the typed nil and the non-nilable value inside", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	var err error
+	s.NotNil(err)
+	var v any = 5
+	s.Require().NotNil(v)
+	p := &item{}
+	s.NotNil(p)
+}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotNil on interface type error fails a typed nil inside it, which gotest\.NotZero passes, and passes a non-nilable value inside it, which gotest\.NotNil fails[^\n]*\n\ts\.NotNil\(err\)\n`, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotNil on interface type any fails a typed nil inside it[^\n]*\n\ts\.Require\(\)\.NotNil\(v\)\n`, out)
+			gotest.Contains(it, out, "\tgotest.NotNil(t, p)\n")
 		})
 	})
 }
@@ -235,6 +256,57 @@ func TestI(t *testing.T) { suite.Run(t, new(ISuite)) }
 			})
 			gotest.Equal(it, 0, exit, out)
 			gotest.Contains(it, out, "import (\n\t\"fmt\"\n\t\"os\"\n\n\t\"example.com/m/x\"\n\t\"example.com/m/y\"\n\t\"github.com/mvrahden/go-test/pkg/gotest\"\n)\n")
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestACommentOnARemovedImport(t *gotest.T) {
+	t.When("an import migrate removes carries a comment on its line or above it", func(w *gotest.T) {
+		w.It("the comment goes with the import and the file stays as gofmt formats it", func(it *gotest.T) {
+			files := map[string]string{
+				"p/a_test.go": `package p
+
+import (
+	"fmt" // printing
+	"testing" // the runner
+
+	// assertions
+	"github.com/stretchr/testify/suite" // suites
+	"strings"
+)
+
+type ASuite struct{ suite.Suite }
+
+func (s *ASuite) TestA() { s.Equal("a", strings.ToLower("A")); fmt.Println() }
+
+func TestA(t *testing.T) { suite.Run(t, new(ASuite)) }
+`,
+				"p/b_test.go": `package p
+
+import "testing" // the runner
+import "github.com/stretchr/testify/suite" // suites
+import "fmt" // printing
+
+type BSuite struct{ suite.Suite }
+
+func (s *BSuite) TestB() { s.Equal(1, 1); fmt.Println() }
+
+func TestB(t *testing.T) { suite.Run(t, new(BSuite)) }
+`,
+			}
+			dir := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(dir, files))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			a, b := readFile(it, dir, "p/a_test.go"), readFile(it, dir, "p/b_test.go")
+			gotest.Contains(it, a, "import (\n\t\"fmt\" // printing\n\n\t\"strings\"\n\n\t\"github.com/mvrahden/go-test/pkg/gotest\"\n)\n\ntype ATestSuite")
+			gotest.Contains(it, b, "package p\n\nimport (\n\t\"fmt\" // printing\n\n\t\"github.com/mvrahden/go-test/pkg/gotest\"\n)\n\ntype BTestSuite")
+			for name, src := range map[string]string{"a": a, "b": b} {
+				formatted, err := format.Source([]byte(src))
+				gotest.NoError(it, err)
+				gotest.Equal(it, string(formatted), src, name)
+			}
 		})
 	})
 }

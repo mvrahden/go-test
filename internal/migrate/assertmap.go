@@ -93,7 +93,11 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 		return u.zeroCompare(f, name, args, t, ts)
 
 	case "NotNil":
-		if isIface || isNilKind(under) || isPointerish(under) {
+		if isIface {
+			// No gotest assertion judges the value inside as testify did.
+			return "", nil, "testify NotNil on interface type " + ts + " fails a typed nil inside it, which gotest.NotZero passes, and passes a non-nilable value inside it, which gotest.NotNil fails — use gotest.NotNil if the value is nilable, gotest.NotZero if only nil is meant"
+		}
+		if isNilKind(under) || isPointerish(under) {
 			return g, args, ""
 		}
 		return "", nil, "NotNil on " + ts + " always passed in testify, as it can never be nil; gotest.NotNil fails on types that cannot be nil — delete it, or assert gotest.NotZero"

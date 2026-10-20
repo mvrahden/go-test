@@ -684,6 +684,13 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-forwards-before-own-tests` | a base's forwarded tests all go right after the child's type | conformance: the migrate It for a base's tests among the child's finds them out of name order |
 | `migrate-load-mod-flag-dropped` | the package load runs without `-mod=readonly`, so `GOFLAGS=-mod=mod` lets the go command write go.sum | conformance: the migrate It for `GOFLAGS=-mod=mod` finds go.sum changed |
 | `migrate-import-lines-kept` | removed testify imports leave their lines behind as blank lines | conformance: the migrate It for testify imports between others finds a blank line in the block |
+| `migrate-pointer-embedding-refused` | a child embedding its base by a pointer its runner sets fresh is refused | conformance: the migrate It for a base embedded by pointer finds the exit 1 of a marker |
+| `migrate-generic-base-refused` | a generic base embedded by a child is refused like a generic suite run directly | conformance: the migrate It for a generic base finds the exit 1 of a marker |
+| `migrate-local-embedding-unexplained` | a local struct embedding a base is marked without the package-level reason | conformance: the migrate It for a local or anonymous embedding finds the old marker |
+| `migrate-nontest-base-exits-2` | a base in a non-test file of the suite's directory fails the run with exit 2 | conformance: the migrate It for a base in a non-test file finds exit 2 |
+| `migrate-child-method-keeps-no-t` | a child's method calling a base method that gains t gets no t | conformance: the migrate It for a child's method calling the base finds a compile marker |
+| `migrate-interface-notnil-guarded` | `NotNil` on an interface becomes `gotest.NotZero`, which passes a typed nil testify failed | conformance: the migrate It for NotNil on an interface finds no marker |
+| `migrate-import-comment-orphaned` | a removed import leaves its comment behind | conformance: the migrate It for a comment on a removed import finds the comment in the import block |
 
 ## Adding a mutant
 

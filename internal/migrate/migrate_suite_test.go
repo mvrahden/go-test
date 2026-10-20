@@ -560,13 +560,13 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 
 		w.It("refuses the file and says why in the result", func(it *gotest.T) {
 			gotest.Len(it, run.results, 1)
-			gotest.Contains(it, run.results[0].Refusal, "OrderSuite embeds *BaseSuite; gotest creates a suite with new, which leaves that pointer nil")
+			gotest.Contains(it, run.results[0].Refusal, "OrderSuite embeds *BaseSuite, which not every suite.Run sets to a fresh &BaseSuite{}, or other code sets; gotest creates a suite with new, which leaves that pointer nil")
 			gotest.Equal(it, 1, run.results[0].Markers)
 		})
 
 		w.It("leaves the source unmigrated apart from the marker", func(it *gotest.T) {
 			gotest.Contains(it, out,
-				"// TODO(gotest-migrate): OrderSuite embeds *BaseSuite; gotest creates a suite with new, which leaves that pointer nil — embed BaseSuite by value, or migrate this file by hand\ntype OrderSuite struct {")
+				"// TODO(gotest-migrate): OrderSuite embeds *BaseSuite, which not every suite.Run sets to a fresh &BaseSuite{}, or other code sets; gotest creates a suite with new, which leaves that pointer nil — embed BaseSuite by value, or migrate this file by hand\ntype OrderSuite struct {")
 			gotest.Contains(it, out, "suite.Run(t, new(OrderSuite))")
 			gotest.NotContains(it, out, "OrderTestSuite")
 		})

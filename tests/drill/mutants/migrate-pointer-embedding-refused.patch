@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ABaseEmbeddedByPointer / when a testify suite embeds a base suite of the migrated test files by a pointer its suite.Run sets to a fresh base / the migrated child holds the base by value and gotest runs the base's hooks and tests on it \(
+Clause: when a testify suite embeds a base suite of the migrated test files by a pointer its suite.Run sets to a fresh base → the migrated child holds the base by value and gotest runs the base's hooks and tests on it
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -330,7 +330,7 @@
+ 					continue
+ 				}
+ 				e := u.embedField[field]
+-				if e != nil && (!e.ptr || u.ptrRunsFresh(e) && !u.ptrFieldSet(e)) {
++				if e != nil && !e.ptr {
+ 					continue // the migration names the field
+ 				}
+ 				child, pos, local, generic := "", field.Pos(), false, false

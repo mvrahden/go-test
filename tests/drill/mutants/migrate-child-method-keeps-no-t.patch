@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AChildsMethodCallingTheBase / when a method of the child without t calls a base method that gains t / the method gains t, its callers pass it, and the migrated child runs without a marker \(
+Clause: when a method of the child without t calls a base method that gains t → the method gains t, its callers pass it, and the migrated child runs without a marker
+--- a/internal/migrate/embed.go
++++ b/internal/migrate/embed.go
+@@ -275,7 +275,7 @@
+ 				}
+ 				fn, _ := u.info.Defs[fd.Name].(*types.Func)
+ 				owner := u.suiteOf(fd.Recv.List[0].Type)
+-				if fn == nil || (!bases[owner] && !children[owner]) {
++				if fn == nil || !bases[owner] {
+ 					continue
+ 				}
+ 				key := methodKey(fn)

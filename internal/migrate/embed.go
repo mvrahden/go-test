@@ -7,11 +7,14 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
+	"golang.org/x/tools/go/ast/astutil"
 )
 
 // embedding is a field through which a package-level struct embeds a
@@ -23,7 +26,8 @@ type embedding struct {
 	orig  string // the field's name while embedded: the base type's name
 	index int    // the field's index in the struct
 	name  string // the named field it becomes
-	ptr   bool
+	ptr   bool   // embedded by pointer; the named field holds the base by value
+	owner *suiteDecl
 }
 
 // forward is a method a child declares to call the one its base gave it by
@@ -114,7 +118,7 @@ func (u *unit) embed(s *suiteDecl, field *ast.Field, index int, refused map[*uni
 		return nil
 	}
 	if base := u.suiteFor(named.Obj()); base != nil {
-		s.embeds = append(s.embeds, &embedding{field: field, base: base, orig: named.Obj().Name(), index: index, ptr: ptr})
+		s.embeds = append(s.embeds, &embedding{field: field, base: base, orig: named.Obj().Name(), index: index, ptr: ptr, owner: s})
 		u.embedField[field] = s.embeds[len(s.embeds)-1]
 		return nil
 	}
@@ -132,6 +136,13 @@ func (u *unit) embed(s *suiteDecl, field *ast.Field, index int, refused map[*uni
 		}
 		return p.Name()
 	}
+	if bp := named.Obj().Pkg().Path(); pkg != nil && (bp == pkg.Path() || bp+"_test" == pkg.Path()) {
+		// A non-test file of this directory, which migrate leaves as it is.
+		s.refusal = s.obj.Name() + " embeds " + types.TypeString(named, qual) + ", declared in " + u.declFile(named.Obj(), filepath.Dir(s.file.path)) + ", which is not a test file; migrate changes only test files — move " + named.Obj().Name() + " into a _test.go file, or migrate this file by hand"
+		s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
+		refused[s.file] = true
+		return nil
+	}
 	pos := u.fset.Position(field.Pos())
 	return &OutsideBaseError{
 		File: pos.Filename,
@@ -139,6 +150,34 @@ func (u *unit) embed(s *suiteDecl, field *ast.Field, index int, refused map[*uni
 		Msg: s.obj.Name() + " embeds " + types.TypeString(named, qual) + ", a testify suite declared outside the test files being migrated, in package " + named.Obj().Pkg().Path() +
 			"; migrate converts a base suite together with the suites that embed it — migrate " + named.Obj().Pkg().Path() + " by hand, or move the base into these test files",
 	}
+}
+
+// declFile is the base name of the non-test file in dir declaring the
+// type obj: an external test package sees it through export data.
+func (u *unit) declFile(obj types.Object, dir string) string {
+	if name := u.fset.Position(obj.Pos()).Filename; name != "" {
+		return filepath.Base(name)
+	}
+	paths, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			continue
+		}
+		for _, decl := range f.Decls {
+			if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.TYPE {
+				for _, spec := range gd.Specs {
+					if ts := spec.(*ast.TypeSpec); ts.Name.Name == obj.Name() {
+						return filepath.Base(path)
+					}
+				}
+			}
+		}
+	}
+	return "a file of package " + obj.Pkg().Path()
 }
 
 // nameEmbeds names the fields s's embeddings become: base, base2, ... the
@@ -209,14 +248,18 @@ func (u *unit) markHelpers() {
 
 // collectNeedsT gives t to each method of a base that uses what suite.Suite
 // provided through its receiver, or calls a method that gains t: once the
-// base is a helper, t is how the method reaches the test.
+// base is a helper, t is how the method reaches the test. A method of a
+// child gains t when it calls one that does.
 func (u *unit) collectNeedsT() {
 	u.needsT = map[string]bool{}
-	bases := map[*suiteDecl]bool{}
+	bases, children := map[*suiteDecl]bool{}, map[*suiteDecl]bool{}
 	for _, s := range u.suites {
 		for _, e := range s.embeds {
 			if e.base.migrated() {
 				bases[e.base] = true
+			}
+			if s.migrated() {
+				children[s] = true
 			}
 		}
 	}
@@ -232,7 +275,8 @@ func (u *unit) collectNeedsT() {
 					continue
 				}
 				fn, _ := u.info.Defs[fd.Name].(*types.Func)
-				if fn == nil || !bases[u.suiteOf(fd.Recv.List[0].Type)] {
+				owner := u.suiteOf(fd.Recv.List[0].Type)
+				if fn == nil || (!bases[owner] && !children[owner]) {
 					continue
 				}
 				key := methodKey(fn)
@@ -243,7 +287,7 @@ func (u *unit) collectNeedsT() {
 					continue // it has a t of its own
 				}
 				var recv types.Object
-				if names := fd.Recv.List[0].Names; len(names) > 0 {
+				if names := fd.Recv.List[0].Names; len(names) > 0 && bases[owner] {
 					recv = u.info.Defs[names[0]]
 				}
 				if u.reachesTest(fd.Body, recv) {
@@ -576,4 +620,212 @@ func hasImport(f *ast.File, path string) bool {
 		}
 	}
 	return false
+}
+
+// ptrEmbedding is the embedding by pointer x selects as a field, nil when
+// x selects anything else.
+func (u *unit) ptrEmbedding(x *ast.SelectorExpr) *embedding {
+	sel := u.info.Selections[x]
+	if sel == nil || sel.Kind() != types.FieldVal {
+		return nil
+	}
+	v, ok := sel.Obj().(*types.Var)
+	if !ok || !v.Embedded() {
+		return nil
+	}
+	s, path := u.suiteOfType(sel.Recv()), sel.Index()
+	for _, idx := range path[:len(path)-1] {
+		if s == nil || s.embedAt(idx) == nil {
+			return nil
+		}
+		s = s.embedAt(idx).base
+	}
+	if s == nil {
+		return nil
+	}
+	if e := s.embedAt(path[len(path)-1]); e != nil && e.ptr {
+		return e
+	}
+	return nil
+}
+
+// freshBase reports whether x is &B{...} or new(B) for the base e embeds:
+// a pointer nothing else holds, which the base held by value replaces.
+func (u *unit) freshBase(x ast.Expr, e *embedding) bool {
+	switch v := ast.Unparen(x).(type) {
+	case *ast.UnaryExpr:
+		lit, ok := v.X.(*ast.CompositeLit)
+		return ok && v.Op == token.AND && u.suiteOf(lit.Type) == e.base
+	case *ast.CallExpr:
+		ident, ok := v.Fun.(*ast.Ident)
+		if !ok || len(v.Args) != 1 {
+			return false
+		}
+		b, ok := u.info.Uses[ident].(*types.Builtin)
+		return ok && b.Name() == "new" && u.suiteOf(v.Args[0]) == e.base
+	}
+	return false
+}
+
+// ptrFieldSet reports whether the unit's code assigns the pointer e
+// embeds, takes its address, or sets it in a literal to anything but a
+// fresh base: the base held by value cannot follow.
+func (u *unit) ptrFieldSet(e *embedding) bool {
+	found := false
+	for _, uf := range u.files {
+		if uf.skipped() || found {
+			continue
+		}
+		ast.PreorderStack(uf.f, nil, func(n ast.Node, stack []ast.Node) bool {
+			switch x := n.(type) {
+			case *ast.SelectorExpr:
+				if u.ptrEmbedding(x) != e || len(stack) == 0 {
+					return !found
+				}
+				switch p := stack[len(stack)-1].(type) {
+				case *ast.AssignStmt:
+					found = found || slices.Contains(p.Lhs, ast.Expr(x))
+				case *ast.UnaryExpr:
+					found = found || p.Op == token.AND
+				case *ast.RangeStmt:
+					found = found || p.Key == ast.Expr(x) || p.Value == ast.Expr(x)
+				}
+			case *ast.CompositeLit:
+				if u.suiteOfType(u.info.TypeOf(x)) != e.owner {
+					return !found
+				}
+				for i, elt := range x.Elts {
+					if kv, ok := elt.(*ast.KeyValueExpr); ok {
+						if key, ok := kv.Key.(*ast.Ident); ok && key.Name == e.orig && !u.freshBase(kv.Value, e) {
+							found = true
+						}
+					} else if i == e.index && !u.freshBase(elt, e) {
+						found = true
+					}
+				}
+			}
+			return !found
+		})
+	}
+	return found
+}
+
+// ptrRunsFresh reports whether a suite.Run runs the suite holding e, and
+// every one gives it a literal setting e's pointer to a fresh base: run
+// with that pointer nil, testify panicked. A run of a suite holding that
+// one through a base fails it.
+func (u *unit) ptrRunsFresh(e *embedding) bool {
+	runs, fresh := 0, true
+	for _, uf := range u.files {
+		if uf.skipped() {
+			continue
+		}
+		ast.Inspect(uf.f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || !u.isSuiteRun(call) {
+				return true
+			}
+			if s := u.suiteOfType(u.info.TypeOf(call.Args[1])); s != e.owner {
+				// Its literal sets the owner's pointer out of sight.
+				fresh = fresh && (s == nil || !holds(s, e.owner, map[*suiteDecl]bool{}))
+				return true
+			}
+			runs++
+			set := false
+			if a, ok := ast.Unparen(call.Args[1]).(*ast.UnaryExpr); ok && a.Op == token.AND {
+				if lit, ok := a.X.(*ast.CompositeLit); ok {
+					for _, elt := range lit.Elts {
+						if kv, ok := elt.(*ast.KeyValueExpr); ok {
+							key, ok := kv.Key.(*ast.Ident)
+							set = set || ok && key.Name == e.orig && u.freshBase(kv.Value, e)
+						}
+					}
+				}
+			}
+			fresh = fresh && set
+			return true
+		})
+	}
+	return runs > 0 && fresh
+}
+
+// holds reports whether s embeds base through its bases, at any depth.
+func holds(s, base *suiteDecl, seen map[*suiteDecl]bool) bool {
+	if seen[s] {
+		return false
+	}
+	seen[s] = true
+	for _, e := range s.embeds {
+		if e.base == base || holds(e.base, base, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+// derefPtrEmbeds rewrites, in f, what the base held by value changes for
+// an embedding by pointer: the field selected as a value takes &, *field
+// is the field, and a literal's fresh base becomes a value.
+func (u *unit) derefPtrEmbeds(f *ast.File) bool {
+	changed := false
+	astutil.Apply(f, nil, func(c *astutil.Cursor) bool {
+		switch x := c.Node().(type) {
+		case *ast.SelectorExpr:
+			e := u.ptrEmbedding(x)
+			if e == nil || !e.owner.migrated() {
+				return true
+			}
+			switch p := c.Parent().(type) {
+			case *ast.SelectorExpr:
+				if p.X == ast.Expr(x) {
+					return true
+				}
+			case *ast.StarExpr:
+				return true // the StarExpr case drops the *
+			}
+			c.Replace(&ast.UnaryExpr{OpPos: x.Pos(), Op: token.AND, X: x})
+			changed = true
+		case *ast.StarExpr:
+			if sx, ok := x.X.(*ast.SelectorExpr); ok {
+				if e := u.ptrEmbedding(sx); e != nil && e.owner.migrated() {
+					c.Replace(sx)
+					changed = true
+				}
+			}
+		case *ast.CompositeLit:
+			s := u.suiteOfType(u.info.TypeOf(x))
+			if s == nil || !s.migrated() {
+				return true
+			}
+			for _, e := range s.embeds {
+				if !e.ptr {
+					continue
+				}
+				for i, elt := range x.Elts {
+					if kv, ok := elt.(*ast.KeyValueExpr); ok {
+						if key, ok := kv.Key.(*ast.Ident); ok && key.Name == e.orig {
+							kv.Value = valueBase(kv.Value)
+							changed = true
+						}
+					} else if i == e.index {
+						x.Elts[i] = valueBase(elt)
+						changed = true
+					}
+				}
+			}
+		}
+		return true
+	})
+	return changed
+}
+
+// valueBase is the value a fresh base &B{...} or new(B) points at.
+func valueBase(x ast.Expr) ast.Expr {
+	switch v := ast.Unparen(x).(type) {
+	case *ast.UnaryExpr:
+		return v.X
+	case *ast.CallExpr:
+		return &ast.CompositeLit{Type: v.Args[0], Lbrace: v.Lparen, Rbrace: v.Rparen}
+	}
+	return x
 }

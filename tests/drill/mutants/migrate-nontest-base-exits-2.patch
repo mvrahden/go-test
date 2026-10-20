@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ABaseInANonTestFile / when a testify suite embeds a base suite declared in a non-test file of its directory / migrate exits 1 and leaves the child's file unconverted under a marker naming that file \(
+Clause: when a testify suite embeds a base suite declared in a non-test file of its directory → migrate exits 1 and leaves the child's file unconverted under a marker naming that file
+--- a/internal/migrate/embed.go
++++ b/internal/migrate/embed.go
+@@ -135,7 +135,7 @@
+ 		}
+ 		return p.Name()
+ 	}
+-	if bp := named.Obj().Pkg().Path(); pkg != nil && (bp == pkg.Path() || bp+"_test" == pkg.Path()) {
++	if bp := named.Obj().Pkg().Path(); pkg == nil && bp == "" {
+ 		// A non-test file of this directory, which migrate leaves as it is.
+ 		s.refusal = s.obj.Name() + " embeds " + types.TypeString(named, qual) + ", declared in " + u.declFile(named.Obj(), filepath.Dir(s.file.path)) + ", which is not a test file; migrate changes only test files — move " + named.Obj().Name() + " into a _test.go file, or migrate this file by hand"
+ 		s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})

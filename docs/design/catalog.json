@@ -16312,25 +16312,225 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when a testify suite embeds a base suite declared outside the migrated test files",
+                  "display": "when a testify suite embeds a base suite of a package in another directory",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
                   "focused": false,
                   "kind": "block",
-                  "name": "a_testify_suite_embeds_a_base_suite_declared_outside_the_migrated_test_files",
+                  "name": "a_testify_suite_embeds_a_base_suite_of_a_package_in_another_directory",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
                 }
               ],
-              "display": "BaseOutsideTheMigratedFiles",
+              "display": "BaseOutsideTheMigratedDirectory",
               "duration": 0,
               "excluded": false,
               "external": false,
               "focused": false,
               "kind": "method",
-              "name": "TestBaseOutsideTheMigratedFiles",
+              "name": "TestBaseOutsideTheMigratedDirectory",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the migrated child holds the base by value and gotest runs the base's hooks and tests on it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_migrated_child_holds_the_base_by_value_and_gotest_runs_the_base's_hooks_and_tests_on_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a testify suite embeds a base suite of the migrated test files by a pointer its suite.Run sets to a fresh base",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_testify_suite_embeds_a_base_suite_of_the_migrated_test_files_by_a_pointer_its_suite.Run_sets_to_a_fresh_base",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABaseEmbeddedByPointer",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABaseEmbeddedByPointer",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the base stays a generic helper type and gotest runs its hooks and tests on the child",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_base_stays_a_generic_helper_type_and_gotest_runs_its_hooks_and_tests_on_the_child",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a testify suite embeds an instance of a generic base suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_testify_suite_embeds_an_instance_of_a_generic_base_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGenericBase",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGenericBase",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the method gains t, its callers pass it, and the migrated child runs without a marker",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_method_gains_t,_its_callers_pass_it,_and_the_migrated_child_runs_without_a_marker",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a method of the child without t calls a base method that gains t",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_method_of_the_child_without_t_calls_a_base_method_that_gains_t",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AChildsMethodCallingTheBase",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAChildsMethodCallingTheBase",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves its file unconverted under a marker saying gotest runs only suites declared at package level",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_its_file_unconverted_under_a_marker_saying_gotest_runs_only_suites_declared_at_package_level",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a struct declared inside a function, or an anonymous struct, embeds a base suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_struct_declared_inside_a_function,_or_an_anonymous_struct,_embeds_a_base_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnEmbeddingInALocalOrAnonymousStruct",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnEmbeddingInALocalOrAnonymousStruct",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate exits 1 and leaves the child's file unconverted under a marker naming that file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_exits_1_and_leaves_the_child's_file_unconverted_under_a_marker_naming_that_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a testify suite embeds a base suite declared in a non-test file of its directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_testify_suite_embeds_a_base_suite_declared_in_a_non-test_file_of_its_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABaseInANonTestFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABaseInANonTestFile",
               "output": [],
               "status": "none"
             }
@@ -16464,6 +16664,46 @@
               "focused": false,
               "kind": "method",
               "name": "TestZeroOrEmptyOnAnInterface",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves it unconverted under a marker naming the typed nil and the non-nilable value inside",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_it_unconverted_under_a_marker_naming_the_typed_nil_and_the_non-nilable_value_inside",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when NotNil checks a value of an interface type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "NotNil_checks_a_value_of_an_interface_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "NotNilOnAnInterface",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestNotNilOnAnInterface",
               "output": [],
               "status": "none"
             },
@@ -16744,6 +16984,46 @@
               "focused": false,
               "kind": "method",
               "name": "TestTestifyImportsBetweenImportsThatStay",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the comment goes with the import and the file stays as gofmt formats it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_comment_goes_with_the_import_and_the_file_stays_as_gofmt_formats_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an import migrate removes carries a comment on its line or above it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_import_migrate_removes_carries_a_comment_on_its_line_or_above_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ACommentOnARemovedImport",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestACommentOnARemovedImport",
               "output": [],
               "status": "none"
             }
@@ -17052,7 +17332,7 @@
     }
   ],
   "stats": {
-    "behaviors": 560,
+    "behaviors": 567,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

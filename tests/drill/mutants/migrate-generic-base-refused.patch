@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AGenericBase / when a testify suite embeds an instance of a generic base suite / the base stays a generic helper type and gotest runs its hooks and tests on the child \(
+Clause: when a testify suite embeds an instance of a generic base suite → the base stays a generic helper type and gotest runs its hooks and tests on the child
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -376,7 +376,7 @@
+ 
+ 	// A generic suite migrates only as a base the suites embedding it call.
+ 	for _, s := range u.suites {
+-		if s.generic && !s.helper && s.migrated() {
++		if s.generic && s.migrated() {
+ 			s.refusal = s.obj.Name() + " is a generic testify suite; gotest instantiates generic suites through type aliases — migrate it by hand"
+ 			s.file.marks = append(s.file.marks, mark{pos: specPos(s.gd, s.spec), msg: s.refusal})
+ 			refused[s.file] = true
