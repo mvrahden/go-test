@@ -271,9 +271,9 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			if strings.HasSuffix(r.PkgPath, "/standalone") {
 				w.It("standalone", func(it *gotest.T) {
 					gotest.Contains(it, code, "gotestruntime.HoldFixtures(tb, ")
-					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
-					gotest.Contains(it, code, "var ƒ_sf_fixtures_BetaSharedFixture = &fixtures.BetaSharedFixture{}")
-					gotest.Contains(it, code, "var ƒ_sf_fixtures_GammaSharedFixture = &fixtures.GammaSharedFixture{}")
+					gotest.Regexp(it, `var ƒ_sf_fixtures_AlphaSharedFixture = &ƒfixtures[0-9]*\.AlphaSharedFixture\{\}`, code)
+					gotest.Regexp(it, `var ƒ_sf_fixtures_BetaSharedFixture = &ƒfixtures[0-9]*\.BetaSharedFixture\{\}`, code)
+					gotest.Regexp(it, `var ƒ_sf_fixtures_GammaSharedFixture = &ƒfixtures[0-9]*\.GammaSharedFixture\{\}`, code)
 					gotest.Contains(it, code, "s.AlphaTestSuite.Alpha = ƒ_sf_fixtures_AlphaSharedFixture\n")
 					gotest.Contains(it, code, "s.MultiTestSuite.Beta = ƒ_sf_fixtures_BetaSharedFixture\n")
 					gotest.Contains(it, code, "s.GammaTestSuite.Gamma = ƒ_sf_fixtures_GammaSharedFixture\n")
@@ -290,7 +290,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 			if strings.HasSuffix(r.PkgPath, "/fixturebound") {
 				w.It("fixturebound", func(it *gotest.T) {
 					gotest.Contains(it, code, "gotestruntime.HoldFixtures(tb, ")
-					gotest.Contains(it, code, "var ƒ_sf_fixtures_AlphaSharedFixture = &fixtures.AlphaSharedFixture{}")
+					gotest.Regexp(it, `var ƒ_sf_fixtures_AlphaSharedFixture = &ƒfixtures[0-9]*\.AlphaSharedFixture\{\}`, code)
 					gotest.Contains(it, code, "Alpha: ƒ_sf_fixtures_AlphaSharedFixture")
 					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Hydrate(ctx)")
 					gotest.Contains(it, code, "ƒ_sf_fixtures_AlphaSharedFixture.Dehydrate(ctx)")
