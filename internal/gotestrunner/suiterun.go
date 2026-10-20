@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -212,32 +214,35 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 	return env
 }
 
-// RunSingleSuite executes a single suite subprocess.
-// When test2json is true, the binary is wrapped with the test2json tool.
-//
-// On context cancellation, cmd.Cancel announces the stop and signals the
-// suite process alone, by the pid it published on Unix and by the stop file
-// itself on Windows, so the converter in front of it relays the stream to its
-// end; a process that published no pid gets the tree's interrupt. A per-process kill timer (from the teardown budget
-// file) then governs when SIGKILL is sent, and nothing else kills. Output is
-// read by the managed process itself, so a grandchild outside the group that
-// keeps the pipes open holds the result for the drain delay at most.
-func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
-	cmd := buildSuiteCmd(ctx, target, env, test2json)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+// startRetryFirst and startRetryLimit bound the retries of a suite process
+// whose executable is busy: 100ms, doubling to 800ms, 1.5s in all.
+const (
+	startRetryFirst = 100 * time.Millisecond
+	startRetryLimit = 800 * time.Millisecond
+)
 
-	start := time.Now()
+// startedSuite is a suite process started under its managed process.
+type startedSuite struct {
+	cmd            *exec.Cmd
+	mp             *ManagedProcess
+	stdout, stderr *bytes.Buffer
+	cutShort       *atomic.Bool
+}
+
+func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: stable API
+	cmd := buildSuiteCmd(ctx, target, env, test2json)
+	s := startedSuite{cmd: cmd, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, cutShort: &atomic.Bool{}}
+	cmd.Stdout = s.stdout
+	cmd.Stderr = s.stderr
 
 	mp := NewManagedProcess(cmd, ProcessConfig{
 		Grace:      GraceBudget,
 		BudgetFile: target.BudgetFile,
 	})
+	s.mp = mp
 	// exec cancels only a process still running when ctx ends.
-	var cutShort atomic.Bool
 	cmd.Cancel = func() error {
-		cutShort.Store(true)
+		s.cutShort.Store(true)
 		// Announced before the signal: the process reads it on the signal,
 		// or polls for it where no signal comes.
 		if target.StopFile != "" {
@@ -250,7 +255,30 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		}
 		return mp.Interrupt()
 	}
-	if err := mp.Start(); err != nil {
+	return s, mp.Start()
+}
+
+// RunSingleSuite executes a single suite subprocess.
+// When test2json is true, the binary is wrapped with the test2json tool.
+//
+// On context cancellation, cmd.Cancel announces the stop and signals the
+// suite process alone, by the pid it published on Unix and by the stop file
+// itself on Windows, so the converter in front of it relays the stream to its
+// end; a process that published no pid gets the tree's interrupt. A per-process kill timer (from the teardown budget
+// file) then governs when SIGKILL is sent, and nothing else kills. Output is
+// read by the managed process itself, so a grandchild outside the group that
+// keeps the pipes open holds the result for the drain delay at most.
+func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
+	start := time.Now()
+	s, err := startSuite(ctx, target, env, test2json)
+	for retry := time.Duration(0); errors.Is(err, syscall.ETXTBSY) && retry < startRetryLimit && ctx.Err() == nil; {
+		// Another process still has the executable open for writing: a go
+		// command writing a tool into the shared build cache in place.
+		retry = max(2*retry, startRetryFirst)
+		time.Sleep(retry)
+		s, err = startSuite(ctx, target, env, test2json)
+	}
+	if err != nil {
 		return SuiteResult{
 			Target:   target,
 			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
@@ -259,6 +287,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 			Duration: time.Since(start),
 		}
 	}
+	cmd, mp, stdout, stderr, cutShort := s.cmd, s.mp, s.stdout, s.stderr, s.cutShort
 
 	_ = mp.WaitWithGrace(ctx)
 	duration := time.Since(start)
