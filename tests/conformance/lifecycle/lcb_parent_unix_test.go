@@ -112,15 +112,35 @@ type strangerCtx struct {
 	exited   chan struct{}
 }
 
-// BeforeEach starts a process in a group of its own that records a SIGTERM.
+// BeforeEach starts a process in a group of its own that records a SIGTERM
+// and answers a SIGWINCH.
 func (s *ForeignPidTestSuite) BeforeEach(t *gotest.T) *strangerCtx {
 	marker := filepath.Join(t.TempDir(), "stranger-got-term")
-	cmd := exec.Command("/bin/sh", "-c", `trap 'touch "$0"; exit 0' TERM; while :; do sleep 0.05; done`, marker)
+	cmd := exec.Command("/bin/sh", "-c", `trap 'touch "$0"; exit 0' TERM; trap 'touch "$0.probe"' WINCH; while :; do sleep 0.05; done`, marker)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	gotest.NoError(t, cmd.Start())
 	exited := make(chan struct{})
 	go func() { _ = cmd.Wait(); close(exited) }()
 	return &strangerCtx{marker: marker, stranger: cmd, exited: exited}
+}
+
+// settled returns once the stranger has acted on every signal sent before
+// the call. The shell runs pending traps in signal order, so a SIGTERM
+// already sent ends it before it answers the later SIGWINCH.
+func (ctx *strangerCtx) settled(within time.Duration) bool {
+	_ = ctx.stranger.Process.Signal(syscall.SIGWINCH)
+	deadline := time.Now().Add(within)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.exited:
+			return true
+		case <-time.After(20 * time.Millisecond):
+		}
+		if _, err := os.Stat(ctx.marker + ".probe"); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ForeignPidTestSuite) AfterEach(t *gotest.T, ctx *strangerCtx) {
@@ -147,6 +167,7 @@ while kill -0 "$child" 2>/dev/null; do wait "$child"; done
 	signalled(t, cmd, tree, testkit.Interrupt(cmd, tree))
 	awaitMarkers(markerDir, 60*time.Second, "fixture.AfterAll")
 	run := ended(cmd, tree, markerDir, 60*time.Second)
+	gotest.True(t, ctx.settled(30*time.Second), "the stranger did not answer its probe")
 
 	t.When("the run is interrupted and the pid the suite published names a process outside its group", func(w *gotest.T) {
 		w.It("sends that process no signal", func(it *gotest.T) {
