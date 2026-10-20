@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIFlagsTestSuite/TestBooleanFlagSpellings/a_boolean_flag_is_spelled_in_each_accepted_form/reads_--x,_--x=true_and_--x=false,_lets_the_last_occurrence_win_and_refuses_any_other_value/--ci=false_lets_a_focused_run_pass
 Expect: ^FAIL .*conformance/cli .* / reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value / --ci=false lets a focused run pass \(
 Clause: when a boolean flag is spelled in each accepted form → reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value
 --- a/cmd/gotest/args.go

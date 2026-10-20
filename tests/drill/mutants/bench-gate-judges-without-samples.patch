@@ -1,4 +1,5 @@
 Expect: gate without -count: exit code [01], want 2
+Judge: ./tests/canary CanaryTestSuite/TestAGateNeedsSamples
 Clause: when --gate is given with -count below 4 → exits 2 naming -count=4 as the requirement
 --- a/cmd/gotest/bench.go
 +++ b/cmd/gotest/bench.go

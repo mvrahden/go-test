@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIFlagsTestSuite/TestValueFlagsAndUnknownFlags/a_value_flag_or_an_unknown_flag_is_given_to_a_command/refuses_a_missing_value,_an_unknown_flag_and_another_command's_flag_with_exit_2/a_flag_another_command_owns_is_refused
 Expect: ^FAIL .*conformance/cli .* / refuses a missing value, an unknown flag and another command's flag with exit 2 / a flag another command owns is refused \(
 Clause: when a value flag or an unknown flag is given to a command → refuses a missing value, an unknown flag and another command's flag with exit 2
 --- a/cmd/gotest/args.go

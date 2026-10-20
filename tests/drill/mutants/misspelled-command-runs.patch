@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLINewcomerTestSuite/TestAMistypedCommandIsSuggested/the_first_word_is_almost_a_subcommand_or_is_a_help_topic/suggests_the_command_meant,_and_runs_any_other_word_as_a_package_pattern/sumary_suggests_summary
 Expect: ^FAIL .*conformance/cli .* / suggests the command meant, and runs any other word as a package pattern / sumary suggests summary \(
 Clause: when the first word is almost a subcommand or is a help topic → suggests the command meant, and runs any other word as a package pattern
 --- a/cmd/gotest/cli.go

@@ -1,4 +1,5 @@
 Expect: pkg/gotest/internal/assert Equal / CheckEqual_
+Judge: ./pkg/gotest/internal/assert
 --- a/pkg/gotest/internal/assert/equal.go
 +++ b/pkg/gotest/internal/assert/equal.go
 @@ -11,7 +11,7 @@

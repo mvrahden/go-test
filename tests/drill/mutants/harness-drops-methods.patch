@@ -1,5 +1,6 @@
 Expect: lifecycle: exit code 2, want 0
 Expect: got +"beforeAll\\nTestSecond\\nafterAll\\n"
+Judge: ./tests/canary CanaryTestSuite/TestLifecycleRunsInOrder
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
 @@ -41,7 +41,10 @@

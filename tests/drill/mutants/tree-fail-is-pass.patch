@@ -1,4 +1,5 @@
 Expect: internal/gotestspec Tree / CollectStats
+Judge: ./internal/gotestspec
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
 @@ -742,7 +742,7 @@

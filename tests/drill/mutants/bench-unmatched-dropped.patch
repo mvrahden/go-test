@@ -1,4 +1,5 @@
 Expect: missing \[\], want \[example.com/elsewhere OtherTestSuite/BenchmarkGone\]
+Judge: ./tests/canary CanaryTestSuite/TestAGateWithNothingToCompareFails
 Clause: when no benchmark is in both the baseline and the run → lists the baseline's benchmarks that did not run and the run's that the baseline lacks
 --- a/cmd/gotest/bench.go
 +++ b/cmd/gotest/bench.go
