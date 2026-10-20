@@ -91,6 +91,22 @@ def read_result(path, name, supervisor, supervisor_exit):
         return {'name': name, 'caught': False, 'reason': 'worker produced no valid terminal result'}
 
 
+# Variables that change what the checks under judgment do: CI=true makes the
+# CLI set GOTEST_CI, under which a missing snapshot baseline fails on its own.
+HOST_ONLY = ('CI', 'GITHUB_ACTIONS', 'GITHUB_STEP_SUMMARY')
+
+
+def worker_env(base, work, tmp, cpus):
+    """The judge's environment, the same on a CI runner as on a laptop."""
+    env = {k: v for k, v in base.items() if k not in HOST_ONLY and not k.startswith('GOTEST_')}
+    env.update(TMPDIR=str(tmp), GOTEST_CACHE_DIR=str(work / 'cache' / 'judge'),
+               GOTEST_TEST_CACHE_DIR=str(work / 'cache' / 'children'),
+               GOTEST_TEST_CLI_CACHE_DIR=str(work / 'cache' / 'cli'),
+               GOMAXPROCS=str(cpus))
+    env['GOFLAGS'] = env.get('GOFLAGS', '') + ' -p=' + str(cpus)
+    return env
+
+
 def worker(spec):
     started = time.monotonic()
     timings = {}
@@ -99,14 +115,7 @@ def worker(spec):
     tree, tmp = work / 'tree', work / 'tmp'
     log_path = Path(spec['log'])
     result = {'name': name, 'caught': False}
-    env = dict(os.environ)
-    env.update(TMPDIR=str(tmp), GOTEST_CACHE_DIR=str(work / 'cache' / 'judge'),
-               GOTEST_TEST_CACHE_DIR=str(work / 'cache' / 'children'),
-               GOTEST_TEST_CLI_CACHE_DIR=str(work / 'cache' / 'cli'),
-               GOMAXPROCS=str(spec['cpus']))
-    env['GOFLAGS'] = env.get('GOFLAGS', '') + ' -p=' + str(spec['cpus'])
-    env.pop('GITHUB_ACTIONS', None)
-    env.pop('GITHUB_STEP_SUMMARY', None)
+    env = worker_env(os.environ, work, tmp, spec['cpus'])
     def note_phase(label):
         Path(spec['log'] + '.phase.json').write_text(json.dumps(dict(phase=label, time=time.time())) + '\n')
     def phase(label, command, stdout=None):
@@ -280,6 +289,12 @@ def main(names):
                                                 binary.name + '-build', output, output, snapshot)
                     if code or observed.get('exit') != 0:
                         raise RuntimeError('could not build ' + binary.name + '; see bootstrap.log')
+                # Go writes a tool into the shared build cache in place; a run
+                # that resolves it meanwhile fails to exec it (text file busy).
+                code, observed = supervised(['go', 'tool', '-n', 'test2json'], 'test2json-build',
+                                            output, output, snapshot)
+                if code or observed.get('exit') != 0:
+                    raise RuntimeError('could not build test2json; see bootstrap.log')
                 plan_path = logs / 'plan.tsv'
                 with plan_path.open('w') as plan_out:
                     code, observed = supervised([str(clauses), '--judge-runs'] +

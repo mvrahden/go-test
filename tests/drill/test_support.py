@@ -44,6 +44,15 @@ class PlanningTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             driver.build_failure('not JSON')
 
+    def test_the_judge_runs_without_the_hosts_ci_settings(self):
+        host = dict(PATH='/bin', CI='true', GOTEST_CI='1', GOTEST_UPDATE_SNAPSHOTS='1',
+                    GOTEST_CACHE_DIR='/shared', GITHUB_ACTIONS='true', GOFLAGS='-mod=mod')
+        env = driver.worker_env(host, Path('/w'), Path('/w/tmp'), 3)
+        for name in ('CI', 'GOTEST_CI', 'GOTEST_UPDATE_SNAPSHOTS', 'GITHUB_ACTIONS'):
+            self.assertNotIn(name, env)
+        self.assertEqual(env['GOTEST_CACHE_DIR'], '/w/cache/judge')
+        self.assertEqual((env['PATH'], env['GOFLAGS'], env['GOMAXPROCS']), ('/bin', '-mod=mod -p=3', '3'))
+
     def test_missing_or_stale_result_and_dead_worker_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'result'

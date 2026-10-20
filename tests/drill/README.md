@@ -43,6 +43,13 @@ CLI to a caller-private executable under a lock; marker files, snapshots and
 other mutable test state are never reused. The canary does not depend on shared
 fixture machinery to obtain its CLI.
 
+Workers run without the host's `CI`, `GITHUB_ACTIONS` and `GOTEST_*`
+settings, so a mutant gets the same verdict on a CI runner as on a laptop
+(under `CI`, for one, a missing snapshot baseline fails by itself). The
+bootstrap builds `test2json` into Go's build cache before any worker starts:
+Go writes a tool there in place, and a run that resolves it meanwhile cannot
+execute it.
+
 The drill exits 0 only when every selected mutant was caught. CI splits it into
 four shards and retains each shard's logs and phase timings even on failure.
 
