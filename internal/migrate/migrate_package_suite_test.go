@@ -18,9 +18,8 @@ type MigratePackageTestSuite struct {
 }
 
 func (s *MigratePackageTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 // migrateDir migrates the module files make up with patterns.

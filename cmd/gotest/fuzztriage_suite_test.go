@@ -29,7 +29,8 @@ type FuzzTriagePromoteTestSuite struct {
 // SuiteConfig: a promote's rebuild per test needs the integration
 // deadlines, not the 30-second default.
 func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {

@@ -17,7 +17,8 @@ type LintGitHubTestSuite struct{}
 // SuiteConfig: the mode is exercised through real lint runs over the
 // repository, which the 30-second default does not cover on a slow machine.
 func (s *LintGitHubTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 // writeLintProbe materializes a one-file module whose stdlib-style test

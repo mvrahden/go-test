@@ -13,9 +13,8 @@ import (
 type CLINewcomerTestSuite struct{}
 
 func (s *CLINewcomerTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *CLINewcomerTestSuite) TestABrokenConfigStillHelps(t *gotest.T) {

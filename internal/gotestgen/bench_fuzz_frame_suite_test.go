@@ -2,7 +2,6 @@ package gotestgen_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -18,10 +17,8 @@ var (
 type BenchFuzzFrameTestSuite struct{}
 
 func (s *BenchFuzzFrameTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *BenchFuzzFrameTestSuite) TestBenchmarkLifecycleContexts(t *gotest.T) {

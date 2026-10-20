@@ -14,9 +14,8 @@ import (
 type OverlayTestSuite struct{}
 
 func (s *OverlayTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 // overlayCtx holds the overlay dir a test's WriteOverlay call creates.

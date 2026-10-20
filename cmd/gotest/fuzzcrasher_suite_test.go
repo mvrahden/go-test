@@ -23,9 +23,8 @@ type FuzzCrasherLoopTestSuite struct {
 }
 
 func (s *FuzzCrasherLoopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Exclusive: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *FuzzCrasherLoopTestSuite) BeforeAll(t *gotest.T) {

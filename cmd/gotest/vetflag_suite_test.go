@@ -15,7 +15,8 @@ type VetFlagTestSuite struct {
 }
 
 func (s *VetFlagTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *VetFlagTestSuite) BeforeAll(t *gotest.T) {

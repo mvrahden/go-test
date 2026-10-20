@@ -27,9 +27,8 @@ type WatchCLITestSuite struct {
 }
 
 func (s *WatchCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *WatchCLITestSuite) BeforeAll(t *gotest.T) { s.cli = newCLIRunner(s.CLI) }

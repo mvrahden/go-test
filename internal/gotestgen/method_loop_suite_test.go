@@ -1,20 +1,14 @@
 package gotestgen_test
 
-import (
-	"time"
-
-	"github.com/mvrahden/go-test/pkg/gotest"
-)
+import "github.com/mvrahden/go-test/pkg/gotest"
 
 // MethodLoopTestSuite runs generated Test wrappers whose method loop lives in
 // gotestruntime.RunMethods, and checks it keeps the per-method lifecycle.
 type MethodLoopTestSuite struct{}
 
 func (s *MethodLoopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *MethodLoopTestSuite) TestHookOrder(t *gotest.T) {

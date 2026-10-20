@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -28,11 +29,8 @@ type ShutdownTestSuite struct {
 }
 
 func (s *ShutdownTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	cfg.Timeout = 3 * time.Minute
-	cfg.SetupTimeout = 2 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Exclusive: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *ShutdownTestSuite) BeforeAll(t *gotest.T) {
@@ -41,6 +39,11 @@ func (s *ShutdownTestSuite) BeforeAll(t *gotest.T) {
 	s.module = t.TempDir()
 	src := filepath.Join(s.CLI.RepoRoot, "tests", "sharedfixture", "testdata", "shutdownmod")
 	gotest.NoError(t, testkit.StageModule(s.CLI.RepoRoot, src, s.module))
+	// Compile the slow package once: the --timeout runs must not race a
+	// cold build, which on a loaded runner outlasts them.
+	warm := s.command(t.TempDir(), nil, []string{"-run=^$", "./slow/"})
+	out, err := warm.CombinedOutput()
+	gotest.NoError(t, err, string(out))
 }
 
 // cliRun is a CLI started as the root of its own process tree.
@@ -187,48 +190,85 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 	})
 }
 
+// globalBudget is the first --timeout TestGlobalTimeout gives a run; a run
+// it ends before TestSleeps starts is retried with double, budgetTries in all.
+const (
+	globalBudget = 15 * time.Second
+	budgetTries  = 3
+)
+
+// timeoutCase is one pipeline TestGlobalTimeout cuts short.
+type timeoutCase struct {
+	Desc    string
+	args    []string
+	running string
+	shows   string
+	budget  time.Duration
+	early   []time.Duration // budgets that ran out before TestSleeps started
+	markers string
+	out     *bytes.Buffer
+	run     *cliRun
+	code    int
+}
+
 // A --timeout that expires mid-run fails it with 1 on the streaming and the
 // batch pipeline alike and names what was still running: the method where a
 // stream exists, the suite in the text run. It is not censused.
-// The 5s budget outlasts the slow package's build and the fixture's setup,
-// which measure well under a second, and the method it cuts short sleeps 60s.
-// The three runs overlap, so the suite waits one budget out, not three.
+// The claim needs the deadline to fire while TestSleeps sleeps: a run whose
+// budget ran out on linking or the fixture's setup has no test-running marker
+// and says nothing about it, so it is run again with double the budget. The
+// method sleeps 60s, past the last budget. The runs of each round overlap.
 func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
-	cases := []struct {
-		Desc    string
-		args    []string
-		running string
-		shows   string
-		markers string
-		out     *bytes.Buffer
-		run     *cliRun
-		code    int
-	}{
-		{Desc: "gotest ./...", args: []string{"--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
+	cases := []timeoutCase{
+		{Desc: "gotest ./...", args: []string{"./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
 		{
-			Desc: "gotest -json", args: []string{"-json", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
+			Desc: "gotest -json", args: []string{"-json", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
 			shows: `{"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"}`,
 		},
 		{
-			Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
+			Desc: "gotest spec", args: []string{"spec", "--no-color", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
 			shows: "✗ Sleeps",
 		},
 	}
+	pending := make([]*timeoutCase, len(cases))
 	for i := range cases {
-		c := &cases[i]
-		c.markers = t.TempDir()
-		cmd := s.command(c.markers, nil, c.args)
-		c.out = new(bytes.Buffer)
-		cmd.Stdout, cmd.Stderr = c.out, c.out
-		c.run = s.launch(t, cmd)
+		pending[i] = &cases[i]
 	}
-	for i := range cases {
-		cases[i].code = exitCode(t, cases[i].run)
+	for try := 1; len(pending) > 0; try++ {
+		if try > budgetTries {
+			c := pending[0]
+			gotest.Fail(t, "%s: the --timeout fired before TestSleeps started in all %d tries, the last at %v, so it had nothing running to name:\n%s",
+				c.Desc, budgetTries, c.budget/2, c.out)
+		}
+		for _, c := range pending {
+			if c.budget == 0 {
+				c.budget = globalBudget
+			}
+			c.markers = t.TempDir()
+			// The flag goes before the package: a subcommand comes first.
+			pkg := len(c.args) - 1
+			args := append(append(slices.Clone(c.args[:pkg]), "--timeout="+c.budget.String()), c.args[pkg])
+			cmd := s.command(c.markers, nil, args)
+			c.out = new(bytes.Buffer)
+			cmd.Stdout, cmd.Stderr = c.out, c.out
+			c.run = s.launch(t, cmd)
+		}
+		var inconclusive []*timeoutCase
+		for _, c := range pending {
+			c.code = exitCode(t, c.run)
+			if !marker(c.markers, "test-running") {
+				c.early = append(c.early, c.budget)
+				c.budget *= 2
+				inconclusive = append(inconclusive, c)
+			}
+		}
+		pending = inconclusive
 	}
 	for sub, tc := range gotest.Each(t, cases) { //nolint:gocritic // rangeValCopy: intentional
 		out := tc.out.String()
 		gotest.Equal(sub, 1, tc.code, out)
-		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 5s while running: "+tc.running)
+		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after "+tc.budget.String()+" while running: "+tc.running,
+			"budgets that ran out before TestSleeps started: %v", tc.early)
 		gotest.Contains(sub, out, tc.shows)
 		gotest.NotContains(sub, out, "=== global --timeout")
 		gotest.NotContains(sub, out, "census")

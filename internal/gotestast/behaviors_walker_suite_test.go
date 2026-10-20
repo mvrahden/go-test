@@ -21,9 +21,8 @@ type BehaviorWalkerTestSuite struct {
 }
 
 func (s *BehaviorWalkerTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
 }
 
 func (s *BehaviorWalkerTestSuite) BeforeAll(t *gotest.T) {

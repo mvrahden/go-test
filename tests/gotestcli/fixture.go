@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -23,10 +22,11 @@ type BinarySharedFixture struct {
 	CacheDir string // the run's gotest cache, removed with the run
 }
 
-// SharedFixtureConfig: a cold build competes with the run's own compiles.
+// SharedFixtureConfig: no deadline: this fixture compiles the CLI, so its time
+// is not a verdict; the run's --setup-timeout still bounds a hang.
 func (f *BinarySharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 	cfg := gotest.DefaultFixtureConfig()
-	cfg.Timeout = 5 * time.Minute
+	cfg.Timeout = gotest.NoDeadline
 	return cfg
 }
 

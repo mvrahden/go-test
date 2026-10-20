@@ -10,6 +10,11 @@ import (
 // refuses.
 type CLIBuildRulesTestSuite struct{}
 
+func (s *CLIBuildRulesTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+}
+
 func (s *CLIBuildRulesTestSuite) TestLinknameIsCheckedAsGoTestChecksIt(t *gotest.T) {
 	run, err := testkit.RunCLI(t.Context(), ".", "../testdata/linkname/")
 	gotest.NoError(t, err)

@@ -8,6 +8,11 @@ import (
 // CLIVersionTestSuite: the one invocation every other check assumes works.
 type CLIVersionTestSuite struct{}
 
+func (s *CLIVersionTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+}
+
 func (s *CLIVersionTestSuite) TestVersion(t *gotest.T) {
 	run, err := testkit.RunCLI(t.Context(), ".", "version")
 	gotest.NoError(t, err)

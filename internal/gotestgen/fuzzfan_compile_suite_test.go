@@ -22,10 +22,8 @@ import (
 type FuzzFanCompileTestSuite struct{}
 
 func (s *FuzzFanCompileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	cfg.Timeout = gotest.NoDeadline
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 type fanCompileCtx struct {

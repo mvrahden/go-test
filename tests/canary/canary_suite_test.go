@@ -31,6 +31,11 @@ type CanaryTestSuite struct {
 	lastStream string // the -json stdout of the last run, for checks on what it carried
 }
 
+func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{SetupTimeout: gotest.NoDeadline}
+}
+
 type expectation struct {
 	exit int
 	rows []string

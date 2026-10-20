@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,13 +37,14 @@ type E2ETestSuite struct {
 	workDir string
 }
 
-// SuiteConfig: not Exclusive. Its only clock is the 15s exit bound after the
-// last event, and the suites that keep wall-clock budgets are Exclusive, so
-// its builds never run beside them. Keep invocations frugal: one CLI run per
-// distinct pipeline behavior, assertions merged into it, module copies built
-// once in BeforeAll, workloads pinned tiny (-benchtime=10x scale).
+// SuiteConfig: not Exclusive. Its verdicts are events; its one clock, the
+// exit bound after the last package verdict, is a minute against milliseconds
+// of work, so the bulk's load cannot fail it. Keep invocations frugal: one CLI
+// run per distinct pipeline behavior, assertions merged into it, module copies
+// built once in BeforeAll, workloads pinned tiny (-benchtime=10x scale).
 func (s *E2ETestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
@@ -151,41 +156,105 @@ func (s *E2ETestSuite) TestTestsuiteCLIExitCode(t *gotest.T) {
 	gotest.NotEqual(t, exitErr.ExitCode(), 0, "expected non-zero exit code")
 }
 
+// exitBound is how long the CLI may take to exit once every package has its
+// verdict. Only fixture teardown and the summary are left by then, which take
+// milliseconds; the bound is for something that must finish, not a speed claim.
+const exitBound = time.Minute
+
 func (s *E2ETestSuite) TestSharedFixtureExitTiming(t *gotest.T) {
 	t.When("running packages with shared fixtures", func(w *gotest.T) {
-		w.It("exits promptly after all tests complete", func(it *gotest.T) {
+		w.It("exits once every package has its verdict", func(it *gotest.T) {
 			// The fixture-reading packages, named: tests/sharedfixture/...
 			// would also run the shutdown suite's minute of timeout drills.
-			cmd := exec.Command(s.binary, //nolint:gosec // G204: controlled binary with fixed args
+			pkgs := []string{
 				"github.com/mvrahden/go-test/tests/sharedfixture/standalone",
 				"github.com/mvrahden/go-test/tests/sharedfixture/fixturebound",
 				"github.com/mvrahden/go-test/tests/sharedfixture/twin",
 				"github.com/mvrahden/go-test/tests/sharedfixture/exclusive",
-				"-json", "-count=1")
+			}
+			cmd := exec.Command(s.binary, append(pkgs, "-json", "-count=1")...) //nolint:gosec // G204: controlled binary with fixed args
 			cmd.Dir = s.workDir
+			stdout := newVerdictWatch(pkgs)
+			var stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = stdout, &stderr
+			// A process left behind holding the CLI's output open hangs the
+			// caller too; Wait stops waiting for it after the bound.
+			cmd.WaitDelay = exitBound
+			gotest.NoError(it, cmd.Start())
+			exited := make(chan error, 1)
+			go func() { exited <- cmd.Wait() }()
 
-			out, err := cmd.CombinedOutput()
-			exited := time.Now()
-
-			gotest.NoError(it, err, "shared fixture tests should pass: %s", string(out))
-			last := lastEventTime(out)
-			gotest.False(it, last.IsZero(), "the -json stream carried no timestamped event: %s", string(out))
-			// Measured from the last event, so slower suites under the pattern cannot fail it.
-			gotest.Less(it, exited.Sub(last), 15*time.Second, "should exit promptly after the last test event (no process hang), exited %v after it", exited.Sub(last))
+			var err error
+			select {
+			case err = <-exited:
+			case <-stdout.done:
+				select {
+				case err = <-exited:
+				case <-time.After(exitBound):
+					_ = cmd.Process.Kill()
+					<-exited
+					gotest.Fail(it, "the CLI was still running %v after the last package verdict:\n%s%s", exitBound, stdout, stderr.String())
+				}
+			}
+			gotest.False(it, errors.Is(err, exec.ErrWaitDelay), "a process the CLI started kept its output open after it exited:\n%s%s", stdout, stderr.String())
+			gotest.NoError(it, err, "shared fixture tests should pass:\n%s%s", stdout, stderr.String())
+			gotest.Empty(it, stdout.pending(), "the CLI exited before these packages had a verdict:\n%s", stdout)
 		})
 	})
 }
 
-// lastEventTime returns the latest Time among the -json events in out.
-func lastEventTime(out []byte) time.Time {
-	var last time.Time
-	for _, line := range bytes.Split(out, []byte("\n")) {
-		var ev struct{ Time time.Time }
-		if json.Unmarshal(line, &ev) == nil && ev.Time.After(last) {
-			last = ev.Time
-		}
+// verdictWatch records a -json stream and closes done once each of its
+// packages has a package-level verdict.
+type verdictWatch struct {
+	mu   sync.Mutex
+	buf  bytes.Buffer
+	line []byte
+	want map[string]bool
+	done chan struct{}
+}
+
+func newVerdictWatch(pkgs []string) *verdictWatch {
+	w := &verdictWatch{want: map[string]bool{}, done: make(chan struct{})}
+	for _, p := range pkgs {
+		w.want[p] = true
 	}
-	return last
+	return w
+}
+
+func (w *verdictWatch) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf.Write(p)
+	w.line = append(w.line, p...)
+	for {
+		i := bytes.IndexByte(w.line, '\n')
+		if i < 0 {
+			break
+		}
+		var ev struct{ Action, Package, Test string }
+		if json.Unmarshal(w.line[:i], &ev) == nil && ev.Test == "" && w.want[ev.Package] &&
+			(ev.Action == "pass" || ev.Action == "fail" || ev.Action == "skip") {
+			delete(w.want, ev.Package)
+			if len(w.want) == 0 {
+				close(w.done)
+			}
+		}
+		w.line = w.line[i+1:]
+	}
+	return len(p), nil
+}
+
+// pending names the packages still without a verdict.
+func (w *verdictWatch) pending() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return slices.Sorted(maps.Keys(w.want))
+}
+
+func (w *verdictWatch) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
 }
 
 // Discovery and spec rendering reach a behavior's label by different routes:

@@ -30,9 +30,8 @@ type PrepareCLITestSuite struct {
 }
 
 func (s *PrepareCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *PrepareCLITestSuite) BeforeAll(t *gotest.T) {

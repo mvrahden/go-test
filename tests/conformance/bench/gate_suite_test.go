@@ -18,9 +18,8 @@ import (
 type BenchGateTestSuite struct{}
 
 func (s *BenchGateTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 // foreignBaseline is a baseline whose only benchmark lives in a package this

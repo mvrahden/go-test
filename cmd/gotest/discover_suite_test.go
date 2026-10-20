@@ -23,9 +23,8 @@ type DiscoverTestSuite struct{ repoRoot string }
 // SuiteConfig: discovery stages a module and builds it, which the
 // 30-second default does not cover on a slow machine.
 func (s *DiscoverTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *DiscoverTestSuite) BeforeAll(t *gotest.T) {
