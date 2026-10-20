@@ -31,6 +31,7 @@ func (s *StoppingTestSuite) BeforeAll(t *gotest.T) {
 	cli, err := testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	gotest.NoError(t, testkit.PrivateCache(t.TempDir()))
 	staged := stageTestdata(t, root)
 	s.bin = map[string]string{}
 	for _, pkg := range []string{"setup", "hold", "quick"} {

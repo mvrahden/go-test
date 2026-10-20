@@ -10,14 +10,17 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// BinarySharedFixture is the CLI built from the checkout under test.
+// BinarySharedFixture is the CLI built from the checkout under test, and the
+// gotest cache every suite binding it runs that CLI with.
 type BinarySharedFixture struct {
 	Binary   string // the built CLI
 	RepoRoot string // the checkout it was built from
+	CacheDir string // the run's gotest cache, removed with the run
 }
 
 // SharedFixtureConfig: a cold build competes with the run's own compiles.
@@ -32,7 +35,8 @@ func (f *BinarySharedFixture) BeforeAll(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	dir, err := os.MkdirTemp("", "gotest-cli-*")
+	// Stamped, so a run that kills this process leaves a dir the next sweep takes.
+	dir, err := testkit.NewCLIDir()
 	if err != nil {
 		return err
 	}
@@ -41,7 +45,7 @@ func (f *BinarySharedFixture) BeforeAll(ctx context.Context) error {
 		_ = os.RemoveAll(dir)
 		return err
 	}
-	f.Binary, f.RepoRoot = binary, root
+	f.Binary, f.RepoRoot, f.CacheDir = binary, root, filepath.Join(dir, "cache")
 	return nil
 }
 
@@ -52,6 +56,12 @@ func (f *BinarySharedFixture) AfterAll(ctx context.Context) error {
 	return os.RemoveAll(filepath.Dir(f.Binary))
 }
 
+// Hydrate gives every CLI the suite starts the run's cache, not the user's:
+// the suites run it from temp dirs, whose entries no later run hits.
+func (f *BinarySharedFixture) Hydrate(ctx context.Context) error {
+	return testkit.PrivateCache(f.CacheDir)
+}
+
 // repoRoot is the checkout this file was compiled from, so a copied tree
 // (the mutation drill) builds its own CLI.
 func repoRoot() (string, error) {
@@ -60,4 +70,9 @@ func repoRoot() (string, error) {
 		return "", errors.New("gotestcli: cannot locate the checkout (source paths trimmed?)")
 	}
 	return filepath.Dir(filepath.Dir(filepath.Dir(file))), nil
+}
+
+// Dehydrate drops the cache Hydrate set; the run removes the directory.
+func (f *BinarySharedFixture) Dehydrate(ctx context.Context) error {
+	return os.Unsetenv(protocol.EnvCacheDir)
 }

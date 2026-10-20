@@ -21,9 +21,13 @@ type cliRunner struct {
 }
 
 // newCLIRunner wraps the shared binary and scrubs this process's Actions
-// env, which every child CLI inherits. Call it from BeforeAll.
+// env and CI switches, which every child CLI inherits; a case sets what it
+// needs on top. Call it from BeforeAll.
 func newCLIRunner(cli *gotestcli.BinarySharedFixture) cliRunner {
 	testkit.ScrubActionsEnv()
+	for _, name := range []string{"CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS"} {
+		os.Unsetenv(name)
+	}
 	return cliRunner{binary: cli.Binary, repoRoot: cli.RepoRoot}
 }
 
