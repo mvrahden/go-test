@@ -162,6 +162,32 @@
         }
       }
     },
+    "labels": {
+      "gating": {
+        "direct": {
+          "exitCode": 0,
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/labels\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestPathsTestSuite\",\"display\":\"Paths\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestRead\",\"display\":\"Read\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reading\",\"display\":\"reading\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reads_a/b_paths\",\"display\":\"reads a/b paths\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"keeps_\\u003cb\\u003e\\u0026\\\"_text\",\"display\":\"keeps \\u003cb\\u003e\\u0026\\\" text\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]},{\"name\":\"TestX_ParkedTestSuite\",\"display\":\"Parked\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[],\"children\":[]}],\"output\":[]}],\"stats\":{\"suites\":2,\"behaviors\":3,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":2,\"failed\":0,\"skipped\":1}}\n",
+          "stderr": ""
+        },
+        "goRun": {
+          "exitCode": 0,
+          "stderr": "",
+          "stdoutMatchesDirect": true
+        }
+      },
+      "renderOnly": {
+        "direct": {
+          "exitCode": 0,
+          "stdout": "{\"version\":\"dev (source checkout)\",\"packages\":[{\"path\":\"example.com/labels\",\"status\":\"pass\",\"duration\":0.02,\"nodes\":[{\"name\":\"TestPathsTestSuite\",\"display\":\"Paths\",\"kind\":\"suite\",\"status\":\"pass\",\"duration\":0.01,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"TestRead\",\"display\":\"Read\",\"kind\":\"method\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reading\",\"display\":\"reading\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[{\"name\":\"reads_a/b_paths\",\"display\":\"reads a/b paths\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]},{\"name\":\"keeps_\\u003cb\\u003e\\u0026\\\"_text\",\"display\":\"keeps \\u003cb\\u003e\\u0026\\\" text\",\"kind\":\"block\",\"status\":\"pass\",\"duration\":0,\"focused\":false,\"excluded\":false,\"external\":false,\"output\":[],\"children\":[]}]}]}]},{\"name\":\"TestX_ParkedTestSuite\",\"display\":\"Parked\",\"kind\":\"suite\",\"status\":\"skip\",\"duration\":0,\"focused\":false,\"excluded\":true,\"external\":false,\"output\":[],\"children\":[]}],\"output\":[]}],\"stats\":{\"suites\":2,\"behaviors\":3,\"tests\":0,\"benchmarks\":0,\"fuzzers\":0,\"passed\":2,\"failed\":0,\"skipped\":1}}\n",
+          "stderr": ""
+        },
+        "goRun": {
+          "exitCode": 0,
+          "stderr": "",
+          "stdoutMatchesDirect": true
+        }
+      }
+    },
     "mixed": {
       "gating": {
         "direct": {

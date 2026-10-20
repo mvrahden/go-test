@@ -281,6 +281,28 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     expect(html).toContain("1 failed packages");
   });
 
+  // The tree is the CLI's: a slash in an It is one subtest, so one row; a
+  // label reaches the webview raw and is escaped once, here.
+  it("renders labels as the CLI's spec does: one row per slash, escaped once", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+    await panel.refresh(stream("labels"), "run");
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).toContain(
+      '<div class="leaf block pass" data-display="reads a/b paths">',
+    );
+    expect(html).not.toContain('data-display="reads a"');
+    expect(html).toContain('data-display="keeps &lt;b&gt;&amp;&quot; text">');
+    expect(html).toContain(' keeps &lt;b&gt;&amp;" text <span class="dur">');
+    expect(html).not.toContain("&amp;lt;");
+    expect(html).not.toContain("&amp;amp;");
+    // A run skips an excluded suite, and the CLI's run spec says so.
+    expect(html).toContain(" Parked — SKIPPED ");
+    expect(html).toContain("2 passed");
+  });
+
   it("renders an empty stream as an empty spec, not as an error", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
