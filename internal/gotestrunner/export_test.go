@@ -221,6 +221,7 @@ func ExportNewSilentProcess() *SharedFixtureProcess {
 		state:      map[string]json.RawMessage{},
 		allDone:    make(chan struct{}),
 		budgetSeen: make(chan struct{}, 1),
+		setupBegan: time.Now(),
 	}
 }
 

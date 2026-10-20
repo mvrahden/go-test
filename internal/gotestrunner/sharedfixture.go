@@ -68,6 +68,10 @@ type SharedFixtureProcess struct {
 	// timeout: the deadline moves to the latest one, and an unbounded
 	// fixture lifts it. budgetSeen wakes the waiter. A command starting
 	// fixtures resets them: its wait follows only the setups it started.
+	// setupBegan is when those setups began: the process starting, or the
+	// command being sent. A budget's wait is timed from it, since a report
+	// can arrive before the waiter starts.
+	setupBegan     time.Time
 	setupDeadline  time.Time // the latest reported budget's end; zero until one was reported
 	setupUnbounded bool
 	budgetSeen     chan struct{}
@@ -202,6 +206,13 @@ type setupClock struct {
 func (p *SharedFixtureProcess) startSetupClock(flat time.Duration) *setupClock {
 	c := &setupClock{p: p, flat: flat, began: time.Now(), timer: time.NewTimer(time.Hour)}
 	c.timer.Stop()
+	if flat == 0 {
+		p.mu.Lock()
+		if !p.setupBegan.IsZero() {
+			c.began = p.setupBegan
+		}
+		p.mu.Unlock()
+	}
 	switch {
 	case flat > 0:
 		c.arm(c.began.Add(flat))
@@ -456,7 +467,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	}
 	if verb == "start" {
 		p.mu.Lock()
-		p.setupDeadline, p.setupUnbounded = time.Time{}, false
+		p.setupBegan, p.setupDeadline, p.setupUnbounded = time.Now(), time.Time{}, false
 		p.mu.Unlock()
 	}
 	if _, err := p.stdin.Write(append(line, '\n')); err != nil {
@@ -684,6 +695,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 		return nil, err
 	}
 
+	began := time.Now()
 	if err := tree.Start(); err != nil {
 		closePipes()
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
@@ -707,6 +719,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 		sharedDir:       sharedDir,
 		done:            waitDone,
 		teardownTimeout: setupTimeout,
+		setupBegan:      began,
 		ready:           ready,
 		state:           state,
 		allDone:         allDone,
