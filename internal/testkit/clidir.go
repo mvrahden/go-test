@@ -146,7 +146,7 @@ func lockDir(dir string, try bool) (unlock func(), ok bool) {
 		if err != nil {
 			return nil, false
 		}
-		if lockFD(f, try) != nil {
+		if lockDirFD(f, try) != nil {
 			_ = f.Close()
 			return nil, false
 		}
@@ -169,6 +169,9 @@ func lockDir(dir string, try bool) (unlock func(), ok bool) {
 	}
 	return nil, false
 }
+
+// lockDirFD takes the lock lockDir opened; tests swap it.
+var lockDirFD = lockFD
 
 // cliKey names a build of root's ./cmd/gotest by what goes into it: the
 // compile's build ID, which hashes every source and embedded file of the

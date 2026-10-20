@@ -144,6 +144,30 @@ func (s *CLIDirTestSuite) TestTheKeyFollowsTheSources(t *gotest.T) {
 }
 
 func (s *CLIDirTestSuite) TestASweepNeverTakesAClaimedBuild(t *gotest.T) {
+	for t, row := range gotest.Each(t, []struct {
+		Desc    string
+		handOff bool
+	}{
+		{"with this platform's locks", false},
+		{"with locks a release hands to a waiter, as on Windows", true},
+	}) {
+		claimed, published, vanished := raceClaimsAndSweeps(t, row.handOff)
+		t.When("sweeps race claims of the same build", func(w *gotest.T) {
+			w.It("claims the build, and sweeps take it between claims", func(it *gotest.T) {
+				gotest.Greater(it, claimed, int64(0))
+				gotest.Greater(it, published, int64(1))
+			})
+			w.It("never takes a build from a live claimer", func(it *gotest.T) {
+				gotest.Zero(it, vanished, "%d of %d claims lost their binary", vanished, claimed)
+			})
+		})
+	}
+}
+
+// raceClaimsAndSweeps runs claimers, sweepers and a publisher of one build
+// for two seconds, and counts claims, publishes and claims whose binary
+// vanished.
+func raceClaimsAndSweeps(t *gotest.T, handOff bool) (claimed, published, vanished int64) {
 	tmp := privateTempDir(t)
 	keyed := filepath.Join(tmp, testkit.ExportKeyedPrefix+"stress")
 	// Fake pids, far above any real one, live while their goroutine says so.
@@ -153,8 +177,11 @@ func (s *CLIDirTestSuite) TestASweepNeverTakesAClaimedBuild(t *gotest.T) {
 	nextPID.Store(2_000_000_000)
 	pid := func() int { p := int(nextPID.Add(1)); live.Store(p, true); return p }
 
+	if handOff {
+		defer testkit.ExportHandOffLocks()()
+	}
 	var stop atomic.Bool
-	var published, claimed, vanished atomic.Int64
+	var nPublished, nClaimed, nVanished atomic.Int64
 	var wg sync.WaitGroup
 	// The publisher puts a build back whenever a sweep took it; its stamp
 	// dies once it is published, as a builder's does when it exits.
@@ -167,7 +194,7 @@ func (s *CLIDirTestSuite) TestASweepNeverTakesAClaimedBuild(t *gotest.T) {
 			dir, err := testkit.ExportNewStampedDir(builder)
 			if err == nil && os.WriteFile(filepath.Join(dir, testkit.ExportCLIName()), []byte("cli"), 0o600) == nil {
 				if testkit.ExportPublish(dir, keyed) {
-					published.Add(1)
+					nPublished.Add(1)
 				} else {
 					_ = os.RemoveAll(dir)
 				}
@@ -187,31 +214,26 @@ func (s *CLIDirTestSuite) TestASweepNeverTakesAClaimedBuild(t *gotest.T) {
 			for !stop.Load() {
 				me := pid()
 				if binary, ok := testkit.ExportClaimAs(keyed, me, alive); ok {
-					claimed.Add(1)
-					for range 20 {
+					nClaimed.Add(1)
+					for range 50 {
 						if !exists(binary) {
-							vanished.Add(1)
+							nVanished.Add(1)
 							break
 						}
 					}
 				}
 				live.Delete(me)
+				// The next process takes a while to start. Without the
+				// gap, claimers always queue for the lock, and where a
+				// release hands it to a waiter no sweep ever gets it.
+				time.Sleep(10 * time.Millisecond)
 			}
 		})
 	}
 	time.Sleep(2 * time.Second)
 	stop.Store(true)
 	wg.Wait()
-
-	t.When("sweeps race claims of the same build", func(w *gotest.T) {
-		w.It("claims the build, and sweeps take it between claims", func(it *gotest.T) {
-			gotest.Greater(it, claimed.Load(), int64(0))
-			gotest.Greater(it, published.Load(), int64(1))
-		})
-		w.It("never takes a build from a live claimer", func(it *gotest.T) {
-			gotest.Zero(it, vanished.Load(), "%d of %d claims lost their binary", vanished.Load(), claimed.Load())
-		})
-	})
+	return nClaimed.Load(), nPublished.Load(), nVanished.Load()
 }
 
 // privateTempDir points the process's temp dir at a fresh one for the test.

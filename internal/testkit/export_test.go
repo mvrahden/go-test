@@ -1,6 +1,11 @@
 package testkit
 
-import "time"
+import (
+	"errors"
+	"os"
+	"sync"
+	"time"
+)
 
 // ExportIsRepoModule exposes the go.mod check RepoRoot walks with.
 var ExportIsRepoModule = isRepoModule
@@ -37,3 +42,30 @@ var ExportNewStampedDir = newStampedDir
 
 // ExportPublish moves a build to its keyed path the way a builder does.
 var ExportPublish = publish
+
+// ExportHandOffLocks makes dir locks behave as LockFileEx does until restore:
+// a release hands the lock to a waiter, so a try fails while one waits.
+func ExportHandOffLocks() (restore func()) {
+	var mu sync.Mutex
+	waiting := map[string]int{}
+	lockDirFD = func(f *os.File, try bool) error {
+		mu.Lock()
+		queued := waiting[f.Name()]
+		if !try {
+			waiting[f.Name()]++
+		}
+		mu.Unlock()
+		if try {
+			if queued > 0 {
+				return errors.New("lock held for a waiter")
+			}
+			return lockFD(f, true)
+		}
+		err := lockFD(f, false)
+		mu.Lock()
+		waiting[f.Name()]--
+		mu.Unlock()
+		return err
+	}
+	return func() { lockDirFD = lockFD }
+}
