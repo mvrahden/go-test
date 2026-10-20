@@ -236,9 +236,9 @@ Two types, same contract, full parallel execution. The `SuiteConfig` method enab
 
 Generic suites are not universally applicable. The pattern has real constraints that are worth understanding before adopting it.
 
-### Same-package only
+### Methods live with the generic suite
 
-Generic aliases must live in the same package as the generic suite. Go only allows methods to be declared in the package that defines the type, and the generator discovers a suite's methods in the package where its aliases are declared — so the contract methods and the aliases that instantiate them have to travel together. gotest additionally requires generic aliases to live in the internal (white-box) test package: declaring one in an external `_test` package fails at generation time with *"generic alias suite … must not be in an external test package (pxtest); move it to the internal test file."* If the contract suite and the implementations are in different packages, the aliases must live alongside the generic suite definition.
+Go only allows methods to be declared in the package that defines the type, so the contract methods have to live with the generic suite. The aliases that instantiate it do not: they may sit in the same package, in another package, or in an external `_test` package, and the generator reads the suite's methods from the package that declares the generic suite. A contract suite can therefore ship in one package and be instantiated by each implementation's own tests.
 
 ### Factory pattern
 

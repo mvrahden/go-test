@@ -142,10 +142,6 @@ func bind(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestas
 	}
 
 	for _, suite := range suites {
-		if suite.IsGenericAlias() && suite.IsPxTestSuite() {
-			return nil, gotestast.At(suite.Pos(), fmt.Errorf("generic alias suite %q must not be in an external test package (pxtest); move it to the internal test file", suite.Identifier()))
-		}
-
 		fixtures, err := r.resolveFixturesForSuite(suite)
 		if err != nil {
 			return nil, gotestast.At(suite.Pos(), err)

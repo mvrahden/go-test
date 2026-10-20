@@ -598,6 +598,8 @@ shards of one run do not add up to every mutant exactly once.
 | `focus-decided-per-package` | the generator decides focus for each package on its own, not for the whole run | canary: the `shapes/focusacross` unfocused suite is not skipped and its fixtures start |
 | `focus-decided-per-variant` | the external test package decides its focus on its own | canary: the `shapes/focusvariants` external suite is not skipped |
 | `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
+| `external-generic-alias-dropped` | an alias of a generic suite in the external test package is read as a suite without cases | canary: none of the `shapes/pxgenericalias` aliases' methods passes |
+| `focus-method-not-run-wide` | only a focused suite, never a focused method, focuses the whole run | canary: the `shapes/focusmethod` unfocused suite in the other package is not skipped |
 
 ## Adding a mutant
 

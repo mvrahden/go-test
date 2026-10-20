@@ -285,6 +285,7 @@ Each test method receives its own context instance, enabling safe method-level p
 `AfterEach` is `defer`-ed, ensuring it runs even when `t.Fatal()` triggers `runtime.Goexit()`.
 
 Hooks accept either `*gotest.T` or `*testing.T`.
+Under a benchmark every hook's `t.T()` is nil, and under a fuzz target `BeforeAll`'s and `AfterAll`'s, so a hook there must not call it ([Hooks that call t.T() where it is nil](../../specs/cli/spec.md#requirement-hooks-that-call-tt-where-it-is-nil)).
 
 A per-method fixture hook that fails is the method's failure, located where the hook produced it ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
@@ -431,7 +432,8 @@ type IntTestSuite    = GenericTestSuite[int]
 ```
 
 Each alias produces an independent test suite.
-Generic aliases only work in same-package tests (`ptest`), not `pxtest`.
+An alias of an alias counts too ([Aliases and signatures](../../specs/discovery/spec.md#requirement-aliases-and-signatures)), and the generic suite may be declared in another package ([Declarations from other packages](../../specs/discovery/spec.md#requirement-declarations-from-other-packages)).
+The alias may also be declared in the external test package ([Declarations from other packages](../../specs/discovery/spec.md#requirement-declarations-from-other-packages)).
 
 ### Fixtures
 
@@ -1774,16 +1776,13 @@ If a feature can't be implemented as (a) generated code, (b) a method on `gotest
 
 ## Known Limitations
 
-1. **Generic aliases in `pxtest`:** Go does not allow defining methods on aliases of types from other packages.
-   Generic suite aliases only work in same-package tests.
+1. **`go.work` required for cross-module tests:** The generator golden tests require `go.work` (`go work init . && go work use ./examples`) and fail without it.
 
-2. **`go.work` required for cross-module tests:** The generator golden tests require `go.work` (`go work init . && go work use ./examples`) and fail without it.
-
-3. **No incremental generation:** The tool regenerates all suite files on every run.
+2. **No incremental generation:** The tool regenerates all suite files on every run.
    There is no staleness detection.
    (Each run writes its overlay into its own work dir; nothing generated is cached.
    The test binary cache — `--no-cache`, `GOTEST_CACHE_DIR` — keeps each package's linked binary at a path keyed by working directory, build flags, platform and Go version, so a run over unchanged code skips the link; each run copies the binary into its own work dir before executing it.)
 
-4. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields.
+3. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields.
    Assignments hidden behind two or more levels of indirection are not detected.
    Opaque types (zero exported fields) are unaffected — they serialize harmlessly as `{}` and `Hydrate` overwrites the value.

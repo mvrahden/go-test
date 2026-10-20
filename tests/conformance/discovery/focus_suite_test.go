@@ -7,8 +7,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// DiscoveryFocusTestSuite: focus is decided over the whole run, not per
-// package or test package variant.
+// DiscoveryFocusTestSuite: focus, by a suite or a method, is decided over the
+// whole run, not per package or test package variant.
 type DiscoveryFocusTestSuite struct{}
 
 func (s *DiscoveryFocusTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -47,6 +47,17 @@ func (s *DiscoveryFocusTestSuite) TestRunWide(t *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.Regexp(it, `FAIL: focus prefix detected — remove F_ before merging:\n\s*\S*a_suite_test\.go:\d+\s+type F_OnlyTestSuite`, run.Stderr)
 			gotest.Empty(it, run.Verdict("TestF_OnlyTestSuite/TestRuns"))
+		})
+	})
+	t.When("a run holds a focused method", func(w *gotest.T) {
+		w.It("a focused method in one package skips every unfocused suite in the others", func(it *gotest.T) {
+			run, err := testkit.RunPackage(it.Context(), it.TempDir(), "../testdata/shapes/focusmethod/...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "pass", run.Verdict("TestMethodTestSuite/F_TestFocused"), "stdout: %s", run.Stdout)
+			gotest.Empty(it, run.Verdict("TestMethodTestSuite/TestPlain"))
+			gotest.Equal(it, "skip", run.Verdict("TestOtherTestSuite"), "stdout: %s", run.Stdout)
+			gotest.Empty(it, run.Verdict("TestOtherTestSuite/TestRuns"))
 		})
 	})
 }

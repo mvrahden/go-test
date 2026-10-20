@@ -6171,6 +6171,72 @@
               "name": "TestAcrossPackages",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "an alias of a generic suite the package under test declares runs that suite's methods",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_alias_of_a_generic_suite_the_package_under_test_declares_runs_that_suite's_methods",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an alias of a generic suite the external test package declares runs that suite's methods",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_alias_of_a_generic_suite_the_external_test_package_declares_runs_that_suite's_methods",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an alias of a generic suite from a third package runs that suite's methods",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_alias_of_a_generic_suite_from_a_third_package_runs_that_suite's_methods",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the external test package declares an alias of a generic suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_external_test_package_declares_an_alias_of_a_generic_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GenericAliasesInTheExternalTestPackage",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGenericAliasesInTheExternalTestPackage",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CrossPackage",
@@ -6459,6 +6525,33 @@
                   "focused": false,
                   "kind": "block",
                   "name": "a_run_holds_a_focused_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a focused method in one package skips every unfocused suite in the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_focused_method_in_one_package_skips_every_unfocused_suite_in_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run holds a focused method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_holds_a_focused_method",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
@@ -13782,7 +13875,7 @@
     }
   ],
   "stats": {
-    "behaviors": 459,
+    "behaviors": 463,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

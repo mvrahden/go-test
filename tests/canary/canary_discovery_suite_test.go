@@ -70,9 +70,10 @@ func (s *CanaryDiscoveryTestSuite) TestDiscoveryShapesAreRejectedWhereWritten(t 
 	})
 }
 
-// An alias names the suite it stands for, also across packages; a defined
-// type, a case with results, a shared fixture in a test file and a mis-signed
-// hook from another package are rejected where they are written.
+// An alias names the suite it stands for, also across packages and from the
+// external test package; a defined type, a case with results, a shared
+// fixture in a test file and a mis-signed hook from another package are
+// rejected where they are written.
 func (s *CanaryDiscoveryTestSuite) TestAliasesAndCrossPackageShapes(t *gotest.T) {
 	s.checkShapes(t, []shapeRow{
 		{name: "aliasrecv", passes: "TestRealTestSuite/TestViaAlias"},
@@ -83,6 +84,9 @@ func (s *CanaryDiscoveryTestSuite) TestAliasesAndCrossPackageShapes(t *gotest.T)
 		{name: "sigresult", exit: 2, shows: `sigresult_suite_test\.go:9:22: TestBad on XTestSuite returns a value; a Test method returns nothing`},
 		{name: "sharedintest", exit: 2, shows: `sharedintest_suite_test\.go:10:6: shared fixture PGSharedFixture is declared in a _test\.go file; the setup program cannot import it, move it to a non-test file`},
 		{name: "xpkgfixture", exit: 2, shows: `fix\.go:11:\d+: package fixture "BadFixture": BeforeEach must have signature \(ctx context\.Context\) error`},
+		{name: "pxgenericalias", passes: "TestIntContractTestSuite/TestRuns"},
+		{name: "pxgenericalias", passes: "TestIntLocalTestSuite/TestLocal"},
+		{name: "pxgenericalias", passes: "TestIntIndexTestSuite/TestZeroValue"},
 	})
 }
 
@@ -189,9 +193,9 @@ func (s *CanaryDiscoveryTestSuite) TestGeneratedFilesStayValid(t *gotest.T) {
 	}
 }
 
-// Focus is decided once for the whole run: a focused suite in one package or
-// test package variant skips the unfocused suites of every other, and a suite
-// skipped that way starts none of its fixtures.
+// Focus is decided once for the whole run: a focused suite or method in one
+// package or test package variant skips the unfocused suites of every other,
+// and a suite skipped that way starts none of its fixtures.
 func (s *CanaryDiscoveryTestSuite) TestFocusIsRunWide(t *gotest.T) {
 	verdicts := func(stdout []byte) map[string]string {
 		out := map[string]string{}
@@ -241,5 +245,20 @@ func (s *CanaryDiscoveryTestSuite) TestFocusIsRunWide(t *gotest.T) {
 	}
 	if got["TestExtTestSuite"] != "skip" {
 		t.Errorf("shapes focusvariants: TestExtTestSuite is %q, want skip: %v", got["TestExtTestSuite"], got)
+	}
+
+	code, stdout, stderr = s.invoke(t, t.TempDir(), "-json", "./testdata/shapes/focusmethod/...")
+	got = verdicts(stdout)
+	if code != 0 {
+		t.Errorf("shapes focusmethod: exit code %d, want 0\n%s", code, stderr)
+	}
+	if got["TestMethodTestSuite/F_TestFocused"] != "pass" {
+		t.Errorf("shapes focusmethod: TestMethodTestSuite/F_TestFocused did not pass: %v\n%s", got, stderr)
+	}
+	if v, ok := got["TestMethodTestSuite/TestPlain"]; ok {
+		t.Errorf("shapes focusmethod: TestMethodTestSuite/TestPlain has verdict %q, want none", v)
+	}
+	if got["TestOtherTestSuite"] != "skip" {
+		t.Errorf("shapes focusmethod: TestOtherTestSuite is %q, want skip: %v", got["TestOtherTestSuite"], got)
 	}
 }

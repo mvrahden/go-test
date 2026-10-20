@@ -634,12 +634,12 @@ func (s *BindingTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 
 func (s *BindingTestSuite) TestGenericAlias(t *gotest.T) {
 	t.When("generic alias in pxtest package", func(w *gotest.T) {
-		w.It("rejects generic alias", func(it *gotest.T) {
+		w.It("allows generic alias", func(it *gotest.T) {
 			suite := gotestast.NewTestSuiteSpecForTest("FooTestSuite", "mypkg_test", true)
 			pkg := &packages.Package{Name: "mypkg_test", PkgPath: "example.com/mypkg_test"}
 
 			_, err := gotestgen.Bind(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
-			gotest.ErrorContains(it, err, "must not be in an external test package")
+			gotest.NoError(it, err)
 		})
 	})
 
