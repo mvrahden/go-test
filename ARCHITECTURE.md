@@ -1171,13 +1171,17 @@ guard:
    spot: `discover` and the generator both read `gotestast`, so a bug that
    broke both identically would make the census agree on the wrong set; the
    golden list would still disagree.
-4. **Drill** (`make drill`, `tests/drill`, ten mutants) turns the argument
-   into evidence. Each patch in `tests/drill/mutants/` plants one bug in a
-   core component in a scratch copy of the tree; a `gotest` built from the
-   unmodified tree then runs the copy's ring-0 packages and canary and must
-   report them red. The judge is built pristine because the first drill
-   showed the alternative: the mutant that zeroes the exit code graded the
-   very run that was judging it. Which check catches which mutant is in
+4. **Drill** (`make drill`, `tests/drill`) turns the argument into
+   evidence. Each patch in `tests/drill/mutants/` plants one bug in a core
+   component in a scratch copy of the tree; a `gotest` built from the
+   unmodified tree then runs, against the copy, only the checks the patch's
+   header selects, and must report them red. An `Expect:` line anchored to a
+   conformance package's `FAIL` line runs that package, under a `-run` for
+   the suites and methods stating the patch's `Clause:` lines; every other
+   `Expect:` line is judged by the packages and tests the `Judge:` lines
+   name, or without any by the ring-0 packages and the canary. The judge is
+   built pristine because the first drill showed the alternative: the mutant
+   that zeroes the exit code graded the very run that was judging it. Which check catches which mutant is in
    `tests/drill/README.md`. A patch that no longer applies exactly, does not
    compile, or is caught by any check but the one its row names fails the
    drill, so mutants cannot silently stop testing anything. The drill runs in CI on
