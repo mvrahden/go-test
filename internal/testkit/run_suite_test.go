@@ -144,7 +144,7 @@ func (s *UserCacheTestSuite) TestTheUserCacheStaysUntouched(t *gotest.T) {
 			gotest.Empty(it, files(it, filepath.Join(s.home, ".cache", "gotest")))
 		})
 		w.It("keeps the test binaries in the run's own cache", func(it *gotest.T) {
-			gotest.NotEmpty(it, files(it, filepath.Join(testkit.ExportCacheDir(s.markers), "bin")))
+			gotest.NotEmpty(it, files(it, filepath.Join(testkit.ChildCacheDir(s.markers), "bin")))
 		})
 	})
 }

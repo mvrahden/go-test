@@ -1,9 +1,14 @@
 package testkit_test
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -45,4 +50,74 @@ func (s *BuildCacheTestSuite) TestChildBuildCachesAreSeparateFromMarkers(t *gote
 	t.Setenv("GOTEST_TEST_CACHE_DIR", "private-worker-cache")
 	gotest.Equal(t, "private-worker-cache", testkit.ChildCacheDir("first-markers"))
 	gotest.Equal(t, "private-worker-cache", testkit.ChildCacheDir("second-markers"))
+}
+
+// Sequential: it swaps the build cache's lock and build for the process.
+type InProcessCacheLockTestSuite struct {
+	full            []byte
+	active, overlap atomic.Int32
+	restore         func()
+}
+
+func (s *InProcessCacheLockTestSuite) BeforeEach(t *gotest.T) {
+	s.full = bytes.Repeat([]byte("x"), 64)
+	s.active.Store(0)
+	s.overlap.Store(0)
+	s.restore = testkit.ExportFcntlLocks(s.slowBuild)
+}
+
+func (s *InProcessCacheLockTestSuite) AfterEach(t *gotest.T) { s.restore() }
+
+// slowBuild writes the output a byte at a time and counts overlapping builds.
+func (s *InProcessCacheLockTestSuite) slowBuild(_ context.Context, _, dir string) (string, error) {
+	if s.active.Add(1) > 1 {
+		s.overlap.Add(1)
+	}
+	defer s.active.Add(-1)
+	binary := filepath.Join(dir, testkit.ExportCLIName())
+	f, err := os.Create(binary) //nolint:gosec // G304: the test's own cache dir
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	for i := range s.full {
+		if _, err := f.Write(s.full[i : i+1]); err != nil {
+			return "", err
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return binary, nil
+}
+
+func (s *InProcessCacheLockTestSuite) TestConcurrentCallersBuildOneAtATime(t *gotest.T) {
+	t.Setenv("GOTEST_TEST_CLI_CACHE_DIR", t.TempDir())
+	root := t.TempDir()
+	var mu sync.Mutex
+	var copies [][]byte
+	var errs []error
+	waits := make([]func(), 4)
+	for i := range waits {
+		dir := t.TempDir()
+		waits[i] = gotest.Go(t, func() {
+			binary, err := testkit.BuildCLI(t.Context(), root, dir)
+			var data []byte
+			if err == nil {
+				data, err = os.ReadFile(binary) //nolint:gosec // G304: the private copy BuildCLI returned
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			errs = append(errs, err)
+			copies = append(copies, data)
+		})
+	}
+	for _, wait := range waits {
+		wait()
+	}
+	for _, err := range errs {
+		gotest.NoError(t, err)
+	}
+	gotest.Zero(t, s.overlap.Load(), "a build started while another was writing the same output")
+	for _, data := range copies {
+		gotest.Equal(t, s.full, data, "a caller copied a half-written output")
+	}
 }

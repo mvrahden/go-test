@@ -183,8 +183,6 @@ func MarkerOrderOf(got []string, markers ...string) bool {
 	return true
 }
 
-// cacheDir is the gotest cache of the runs whose markers go to markerDir.
-
 // childEnv is the CLI's environment: the caller's, minus the GitHub Actions
 // variables, the CI switches and the snapshot update switch, plus the marker
 // directory, so a run under test sees only the flags it was given. Its gotest

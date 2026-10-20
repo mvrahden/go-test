@@ -1,6 +1,7 @@
 package testkit
 
 import (
+	"context"
 	"errors"
 	"os"
 	"sync"
@@ -9,9 +10,6 @@ import (
 
 // ExportIsRepoModule exposes the go.mod check RepoRoot walks with.
 var ExportIsRepoModule = isRepoModule
-
-// ExportCacheDir exposes where a run's gotest cache goes.
-var ExportCacheDir = ChildCacheDir
 
 // ExportResolveCLI exposes the build-or-reuse step cli runs once per process.
 var ExportResolveCLI = resolveCLI
@@ -68,4 +66,12 @@ func ExportHandOffLocks() (restore func()) {
 		return err
 	}
 	return func() { lockDirFD = lockFD }
+}
+
+// ExportFcntlLocks makes the build cache's lock behave as fcntl does until
+// restore: it never excludes the same process. build replaces the go build.
+func ExportFcntlLocks(build func(ctx context.Context, root, dir string) (string, error)) (restore func()) {
+	lockCacheFD = func(*os.File, bool) error { return nil }
+	buildCachedCLI = build
+	return func() { lockCacheFD, buildCachedCLI = lockFD, buildCLI }
 }
