@@ -176,21 +176,28 @@ func (s *canary) runEnv(t *gotest.T, pkg, canaryDir string, env []string, extra 
 	return code, rows
 }
 
-// childEnv is the fixture process's environment: the canary dir, and never
-// the snapshot update switch. A refresh of the repository's own snapshots
-// must not rewrite the snapshotting fixture's deliberately stale baseline.
-// Build artifacts use the drill's private worker cache when supplied;
-// otherwise the cache lives beside this run's markers, never in the user's.
+// childEnv is the fixture process's environment: the canary dir, and none
+// of the host's CI or GOTEST_* settings, so a run checks the same on a CI
+// runner as on a laptop. Under CI snapshots are read-only, and a refresh of
+// the repository's own snapshots must not rewrite the snapshotting fixture's
+// deliberately stale baseline. A case sets what it needs on top. Build
+// artifacts use the drill's private worker cache when supplied; otherwise
+// the cache lives beside this run's markers, never in the user's.
 func childEnv(canaryDir string) []string {
 	env := make([]string, 0, len(os.Environ())+2)
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS=") || strings.HasPrefix(kv, "GOTEST_CACHE_DIR=") {
+		name, _, _ := strings.Cut(kv, "=")
+		if strings.HasPrefix(name, "GOTEST_") || slices.Contains(hostOnlyEnv, name) {
 			continue
 		}
 		env = append(env, kv)
 	}
 	return append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+testkit.ChildCacheDir(canaryDir))
 }
+
+// hostOnlyEnv are the variables that put the CLI in CI mode or point it at
+// the job's step summary.
+var hostOnlyEnv = []string{"CI", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"}
 
 // check runs a fixture and compares exit code and rows with the golden.
 func (s *canary) check(t *gotest.T, pkg string, extra ...string) string {
@@ -220,7 +227,7 @@ func (s *CanaryTestSuite) TestPassingSuiteIsGreen(t *gotest.T) {
 // The same fixture checks verdicts and diagnostic content in one run.
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	s.check(t, "failing")
-	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive", "@@ -1,5 +1,5 @@"} {
+	for _, want := range []string{"is not a *fs.PathError", "a []int cannot hold a string", "42 retries left", "delta is NaN", "poll still running after 100ms", "must be positive", "@@ -1,5 +1,5 @@", "must be one line"} {
 		if !strings.Contains(s.lastStream(t), want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}
