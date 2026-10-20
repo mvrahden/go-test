@@ -36,6 +36,20 @@ jobs:
         with:
           version: ${{ steps.golangci.outputs.version }}
           args: --allow-parallel-runners ./... ./examples/...
+      - name: Lint (windows)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        env:
+          GOOS: windows
+        with:
+          version: ${{ steps.golangci.outputs.version }}
+          args: --allow-parallel-runners ./... ./examples/...
+      - name: Lint (darwin)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        env:
+          GOOS: darwin
+        with:
+          version: ${{ steps.golangci.outputs.version }}
+          args: --allow-parallel-runners ./... ./examples/...
       - name: Vet and lint (gotest)
         run: make lint
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
