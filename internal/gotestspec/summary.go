@@ -2,6 +2,7 @@ package gotestspec
 
 import (
 	"fmt"
+	"html"
 	"io"
 	"strings"
 	"time"
@@ -200,7 +201,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	for _, d := range diags {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "<details>\n<summary><b>%s</b> — package-level failure</summary>\n\n",
-			d.Package)
+			html.EscapeString(d.Package))
 		lines := filterOutput(d.Output)
 		for _, line := range lines {
 			fmt.Fprintf(w, "    %s\n", line)
@@ -238,12 +239,14 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	fmt.Fprintf(w, "%s: %s\n", strings.Join(parts, ", "), trailer)
 }
 
+// renderMarkdownFailures writes each failure as a <details> block. Names sit
+// inside HTML, where Markdown is not parsed, so they are HTML-escaped.
 func renderMarkdownFailures(w io.Writer, failures []failure) {
 	for _, f := range failures {
 		displayPath := strings.Join(f.Display, " / ")
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "<details>\n<summary><b>%s</b> — %s (%s)</summary>\n\n",
-			f.Package, displayPath, formatDuration(f.Duration))
+			html.EscapeString(f.Package), html.EscapeString(displayPath), formatDuration(f.Duration))
 
 		lines := filterOutput(f.Output)
 		if len(lines) == 0 {
@@ -308,7 +311,7 @@ func RenderMarkdownBenchSummary(w io.Writer, packages []*Package, opts ...Render
 	}
 	if g := cfg.benchGate; g != nil {
 		if g.Breached {
-			fmt.Fprintf(w, "**Bench gate breached:** %s +%.1f%% exceeds the %g%% gate\n", g.WorstKey, g.WorstPct, g.ThresholdPct)
+			fmt.Fprintf(w, "**Bench gate breached:** %s +%.1f%% exceeds the %g%% gate\n", EscapeMarkdown(g.WorstKey), g.WorstPct, g.ThresholdPct)
 		} else {
 			fmt.Fprintf(w, "**Bench gate passed:** no regression above %g%%\n", g.ThresholdPct)
 		}

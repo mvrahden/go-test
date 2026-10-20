@@ -154,6 +154,16 @@ func (s *BenchSummaryTestSuite) TestComparison(t *gotest.T) {
 		})
 	})
 
+	t.When("the gate is breached by a benchmark whose name holds HTML characters", func(w *gotest.T) {
+		gate := &gotestspec.BenchGate{ThresholdPct: 5, Breached: true, WorstKey: `CacheTestSuite/BenchmarkGet/<b>&"`, WorstPct: 42.9}
+		out := renderBench(benchPackages(), gotestspec.WithBenchGate(gate))
+
+		w.It("escapes the name as the delta table does", func(it *gotest.T) {
+			gotest.Contains(it, out, `**Bench gate breached:** CacheTestSuite/BenchmarkGet/&lt;b&gt;&"`)
+			gotest.NotContains(it, out, "<b>")
+		})
+	})
+
 	t.When("the gate holds", func(w *gotest.T) {
 		gate := &gotestspec.BenchGate{ThresholdPct: 5, WorstKey: "example.com/cache CacheTestSuite/BenchmarkGetHit", WorstPct: 1.2}
 		out := renderBench(benchPackages(), gotestspec.WithBenchDeltas(deltas), gotestspec.WithBenchGate(gate))
