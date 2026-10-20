@@ -78,7 +78,7 @@ func helperFinding(line string) string {
 func (s *LintFixTestSuite) runLintIn(t *gotest.T, dir string, env []string, args ...string) (stdout, stderr string, code int) {
 	cmd := exec.Command(s.cli.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
-	cmd.Env = append(append(os.Environ(), "PWD="+dir), env...)
+	cmd.Env = cliEnv(dir, env...)
 	var out, errs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errs
 	err := cmd.Run()
@@ -733,7 +733,7 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 
 		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "PWD="+dir, path, "TMPDIR="+tmpdir)
+		cmd.Env = append(cliEnviron(), "PWD="+dir, path, "TMPDIR="+tmpdir)
 		var errs bytes.Buffer
 		cmd.Stderr = &errs
 		gotest.NoError(w, cmd.Start())
@@ -769,7 +769,7 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 
 		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "PWD="+dir, path, "TMPDIR="+tmpdir)
+		cmd.Env = append(cliEnviron(), "PWD="+dir, path, "TMPDIR="+tmpdir)
 		var errs bytes.Buffer
 		cmd.Stderr = &errs
 		gotest.NoError(w, cmd.Start())
@@ -815,7 +815,7 @@ func (s *LintFixTestSuite) TestInterrupt(t *gotest.T) {
 		tmpdir := w.TempDir()
 		cmd := exec.Command(s.cli.binary, "lint", "-fix", "./...") //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "PWD="+dir, "TMPDIR="+tmpdir, "GOCACHE="+w.TempDir(), "GOFLAGS=-p=1")
+		cmd.Env = append(cliEnviron(), "PWD="+dir, "TMPDIR="+tmpdir, "GOCACHE="+w.TempDir(), "GOFLAGS=-p=1")
 		var errs bytes.Buffer
 		cmd.Stderr = &errs
 		gotest.NoError(w, cmd.Start())

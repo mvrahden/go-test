@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -38,7 +37,7 @@ func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {
 	gotest.NoError(t, err)
 	cmd := exec.Command(s.cli.binary, "watch", "-json", pkg) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
-	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
+	cmd.Env = append(cliEnviron(), "GOTEST_CI=0")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()

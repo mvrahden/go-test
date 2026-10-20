@@ -132,6 +132,7 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 func (s *NoPackagesTestSuite) TestWatchKeepsWatching(t *gotest.T) {
 	cmd := exec.Command(s.cli.binary, "watch", "--", "-json", nogo) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
+	cmd.Env = cliEnv(cmd.Dir)
 	stdout, err := cmd.StdoutPipe()
 	gotest.NoError(t, err)
 	gotest.NoError(t, cmd.Start())

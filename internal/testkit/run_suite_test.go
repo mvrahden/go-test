@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -16,6 +17,11 @@ import (
 // Sequential: both methods share one built CLI and each spawns a full run.
 type RunOraclesTestSuite struct {
 	run testkit.Run
+}
+
+func (s *RunOraclesTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
 }
 
 func (s *RunOraclesTestSuite) BeforeAll(t *gotest.T) {
@@ -110,26 +116,39 @@ func (s *RepoRootTestSuite) TestTheModuleLineIsRecognised(t *gotest.T) {
 
 // UserCacheTestSuite: a run started through the helpers keeps its gotest
 // cache beside its markers, never in the user's cache. The CLI resolves that
-// one from XDG_CACHE_HOME, else HOME/.cache, so the run gets both fake.
+// one as os.UserCacheDir()/gotest, so the run gets every variable it reads on
+// any platform pointed into a fake home.
+// Sequential: it moves the process's home for the run.
 type UserCacheTestSuite struct {
-	home    string
-	markers string
-	run     testkit.Run
+	userCache string
+	markers   string
+	run       testkit.Run
+}
+
+func (s *UserCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{SetupTimeout: gotest.NoDeadline}
 }
 
 func (s *UserCacheTestSuite) BeforeAll(t *gotest.T) {
-	s.home, s.markers = t.TempDir(), t.TempDir()
-	// The go caches stay the real ones, so the fake HOME costs no rebuild.
+	home := t.TempDir()
+	s.markers = t.TempDir()
+	// The go caches stay the real ones, so the fake home costs no rebuild.
 	out, err := exec.CommandContext(t.Context(), "go", "env", "GOCACHE", "GOMODCACHE", "GOPATH", "GOENV").Output()
 	gotest.NoError(t, err)
 	goEnv := strings.Split(strings.TrimSpace(string(out)), "\n")
 	gotest.Len(t, goEnv, 4)
-	env := []string{
-		"HOME=" + s.home,
-		"XDG_CACHE_HOME=" + filepath.Join(s.home, ".cache"),
-		"GOCACHE=" + goEnv[0], "GOMODCACHE=" + goEnv[1], "GOPATH=" + goEnv[2], "GOENV=" + goEnv[3],
+	for i, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOENV"} {
+		t.Setenv(key, goEnv[i])
 	}
-	s.run, err = testkit.RunPackageWithEnv(t.Context(), s.markers, env, "./testdata/markers/")
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, "xdg-cache"))
+	t.Setenv("LocalAppData", filepath.Join(home, "AppData", "Local"))
+	base, err := os.UserCacheDir()
+	gotest.NoError(t, err)
+	s.userCache = filepath.Join(base, "gotest")
+	gotest.Regexp(t, "^"+regexp.QuoteMeta(home), s.userCache, "the user cache is not in the fake home")
+	s.run, err = testkit.RunPackage(t.Context(), s.markers, "./testdata/markers/")
 	gotest.NoError(t, err)
 }
 
@@ -141,7 +160,7 @@ func (s *UserCacheTestSuite) TestTheUserCacheStaysUntouched(t *gotest.T) {
 			gotest.Equal(it, "pass", s.run.Verdict("TestMarkerTestSuite/TestOne"), s.run.Stderr)
 		})
 		w.It("leaves nothing in the user's gotest cache", func(it *gotest.T) {
-			gotest.Empty(it, files(it, filepath.Join(s.home, ".cache", "gotest")))
+			gotest.Empty(it, files(it, s.userCache))
 		})
 		w.It("keeps the test binaries in the run's own cache", func(it *gotest.T) {
 			gotest.NotEmpty(it, files(it, filepath.Join(testkit.ChildCacheDir(s.markers), "bin")))
