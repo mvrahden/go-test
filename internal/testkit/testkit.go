@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/proctree"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // goLine is the go directive of every staged go.mod and go.work.
@@ -19,17 +20,28 @@ const goLine = "go 1.26.0"
 
 // BuildCLI builds repoRoot's ./cmd/gotest into dir and returns the binary's path.
 func BuildCLI(ctx context.Context, repoRoot, dir string) (string, error) {
-	name := "gotest"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
+	if cache := os.Getenv("GOTEST_TEST_CLI_CACHE_DIR"); cache != "" {
+		return cachedCLI(ctx, repoRoot, dir, cache)
 	}
-	binary := filepath.Join(dir, name)
+	return buildCLI(ctx, repoRoot, dir)
+}
+
+func buildCLI(ctx context.Context, repoRoot, dir string) (string, error) {
+	binary := filepath.Join(dir, cliName())
 	cmd := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("build gotest: %w\n%s", err, out)
 	}
 	return binary, nil
+}
+
+// cliName is the CLI binary's file name.
+func cliName() string {
+	if runtime.GOOS == "windows" {
+		return "gotest.exe"
+	}
+	return "gotest"
 }
 
 // StageModule copies the module tree at src into dir, points its go.mod's
@@ -83,6 +95,13 @@ func writeGoWork(repoRoot, dir string) error {
 func ScrubActionsEnv() {
 	os.Unsetenv("GITHUB_ACTIONS")
 	os.Unsetenv("GITHUB_STEP_SUMMARY")
+}
+
+// PrivateCache points this process's gotest cache at dir, for every child
+// CLI that inherits the environment. A run from a fresh directory never hits
+// a cache entry, so it must not fill the user's; dir should go with the run.
+func PrivateCache(dir string) error {
+	return os.Setenv(protocol.EnvCacheDir, dir)
 }
 
 // StartCLI starts cmd as the root of its own process tree, so Interrupt can
