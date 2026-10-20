@@ -74,16 +74,6 @@ func (s *ShutdownTestSuite) launch(t *gotest.T, cmd *exec.Cmd) *cliRun {
 	return &cliRun{cmd: cmd, tree: tree}
 }
 
-// runWith runs the CLI to completion and returns its combined output and
-// exit code.
-func (s *ShutdownTestSuite) runWith(t *gotest.T, markers string, args ...string) (string, int) {
-	cmd := s.command(markers, nil, args)
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-	code := exitCode(t, s.launch(t, cmd))
-	return out.String(), code
-}
-
 // interruptWhen interrupts the run once the marker file appears.
 func interruptWhen(t *gotest.T, run *cliRun, markers, name string) {
 	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
@@ -202,12 +192,17 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 // stream exists, the suite in the text run. It is not censused.
 // The 5s budget outlasts the slow package's build and the fixture's setup,
 // which measure well under a second, and the method it cuts short sleeps 60s.
+// The three runs overlap, so the suite waits one budget out, not three.
 func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
-	for sub, tc := range gotest.Each(t, []struct { //nolint:gocritic // rangeValCopy: intentional
+	cases := []struct {
 		Desc    string
 		args    []string
 		running string
 		shows   string
+		markers string
+		out     *bytes.Buffer
+		run     *cliRun
+		code    int
 	}{
 		{Desc: "gotest ./...", args: []string{"--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
 		{
@@ -218,14 +213,25 @@ func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 			Desc: "gotest spec", args: []string{"spec", "--no-color", "--timeout=5s", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
 			shows: "✗ Sleeps",
 		},
-	}) {
-		markers := sub.TempDir()
-		out, code := s.runWith(sub, markers, tc.args...)
-		gotest.Equal(sub, 1, code, out)
+	}
+	for i := range cases {
+		c := &cases[i]
+		c.markers = t.TempDir()
+		cmd := s.command(c.markers, nil, c.args)
+		c.out = new(bytes.Buffer)
+		cmd.Stdout, cmd.Stderr = c.out, c.out
+		c.run = s.launch(t, cmd)
+	}
+	for i := range cases {
+		cases[i].code = exitCode(t, cases[i].run)
+	}
+	for sub, tc := range gotest.Each(t, cases) { //nolint:gocritic // rangeValCopy: intentional
+		out := tc.out.String()
+		gotest.Equal(sub, 1, tc.code, out)
 		gotest.Contains(sub, out, "FAIL: global --timeout exceeded after 5s while running: "+tc.running)
 		gotest.Contains(sub, out, tc.shows)
 		gotest.NotContains(sub, out, "=== global --timeout")
 		gotest.NotContains(sub, out, "census")
-		gotest.True(sub, marker(markers, "fixture-down"), "AfterAll did not run")
+		gotest.True(sub, marker(tc.markers, "fixture-down"), "AfterAll did not run")
 	}
 }
