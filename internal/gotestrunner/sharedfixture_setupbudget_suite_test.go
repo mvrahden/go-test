@@ -128,10 +128,35 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheTimeoutIsTimedFromTheSetupsSt
 		upFront = proc.WaitSetup(context.Background(), 0)
 	})
 	synctest.Test(t.T(), func(*testing.T) {
-		proc := gotestrunner.ExportNewReportingProcess(2*time.Second, 500*time.Millisecond)
+		proc := gotestrunner.ExportNewReportingProcess(2*time.Second, 0, 500*time.Millisecond)
 		window = proc.StartKeys(context.Background(), []string{"k"}, 0)
 	})
 	t.When("a fixture's budget is reported before the wait for it begins", func(w *gotest.T) {
+		w.It("the up-front wait says it timed out after the declared budget", func(it *gotest.T) {
+			timeout := gotest.ErrorAs[*gotestrunner.SetupTimeoutError](it, upFront)
+			gotest.Equal(it, 2*time.Second, timeout.After)
+		})
+		w.It("a window's wait says it timed out after the declared budget", func(it *gotest.T) {
+			gotest.ErrorContains(it, window, "timed out after 2s")
+		})
+	})
+}
+
+func (s *SharedFixtureSetupBudgetTestSuite) TestTheTimeoutNamesTheBudgetHeldTo(t *gotest.T) {
+	// The bubble's clock: the fixture reports its 2s budget 1.5s after its
+	// setup began, as a loaded machine delays it.
+	var upFront, window error
+	synctest.Test(t.T(), func(*testing.T) {
+		proc := gotestrunner.ExportNewSilentProcess()
+		time.Sleep(1500 * time.Millisecond)
+		gotestrunner.ExportNoteSetupBudget(proc, 2*time.Second)
+		upFront = proc.WaitSetup(context.Background(), 0)
+	})
+	synctest.Test(t.T(), func(*testing.T) {
+		proc := gotestrunner.ExportNewReportingProcess(2*time.Second, 1500*time.Millisecond, 0)
+		window = proc.StartKeys(context.Background(), []string{"k"}, 0)
+	})
+	t.When("a fixture's budget is reported late", func(w *gotest.T) {
 		w.It("the up-front wait says it timed out after the declared budget", func(it *gotest.T) {
 			timeout := gotest.ErrorAs[*gotestrunner.SetupTimeoutError](it, upFront)
 			gotest.Equal(it, 2*time.Second, timeout.After)

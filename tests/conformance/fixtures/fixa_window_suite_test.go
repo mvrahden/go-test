@@ -27,7 +27,7 @@ func (s *FixtureWindowTestSuite) TestTheExclusiveTail(t *gotest.T) {
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget and the run fails", func(it *gotest.T) {
-			gotest.Regexp(it, `shared fixture start timed out after 2(\.[0-9]+)?s\b`, run.Stderr)
+			gotest.Regexp(it, `shared fixture start timed out after 2s\b`, run.Stderr)
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 		w.It("never runs the suite reading it", func(it *gotest.T) {
@@ -43,7 +43,7 @@ func (s *FixtureWindowTestSuite) TestABenchSlot(t *gotest.T) {
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget and the run fails", func(it *gotest.T) {
-			gotest.Regexp(it, `shared fixture start timed out after 2(\.[0-9]+)?s\b`, run.Stderr)
+			gotest.Regexp(it, `shared fixture start timed out after 2s\b`, run.Stderr)
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 		w.It("never runs the benchmark reading it", func(it *gotest.T) {

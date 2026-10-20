@@ -33,7 +33,8 @@ type fixtureStateEntry struct {
 	Error          string          `json:"error,omitempty"`
 }
 
-// SetupTimeoutError is the wait for shared fixtures giving up.
+// SetupTimeoutError is the wait for shared fixtures giving up. After is the
+// budget the wait was held to, not the wall clock it read.
 type SetupTimeoutError struct{ After time.Duration }
 
 func (e *SetupTimeoutError) Error() string {
@@ -69,10 +70,11 @@ type SharedFixtureProcess struct {
 	// fixture lifts it. budgetSeen wakes the waiter. A command starting
 	// fixtures resets them: its wait follows only the setups it started.
 	// setupBegan is when those setups began: the process starting, or the
-	// command being sent. A budget's wait is timed from it, since a report
-	// can arrive before the waiter starts.
+	// command being sent. The floor is timed from it, since a report can
+	// arrive before the waiter starts.
 	setupBegan     time.Time
-	setupDeadline  time.Time // the latest reported budget's end; zero until one was reported
+	setupDeadline  time.Time     // the latest reported budget's end; zero until one was reported
+	setupBudget    time.Duration // the budget that ends at setupDeadline
 	setupUnbounded bool
 	budgetSeen     chan struct{}
 	// teardownSeen wakes a waiting teardown when a command's acknowledgement
@@ -199,6 +201,7 @@ type setupClock struct {
 	p     *SharedFixtureProcess
 	flat  time.Duration
 	began time.Time
+	after time.Duration // the budget the armed deadline ends
 	timer *time.Timer
 	C     <-chan time.Time // nil while the wait has no deadline
 }
@@ -215,14 +218,15 @@ func (p *SharedFixtureProcess) startSetupClock(flat time.Duration) *setupClock {
 	}
 	switch {
 	case flat > 0:
-		c.arm(c.began.Add(flat))
+		c.arm(c.began.Add(flat), flat)
 	case flat == 0:
 		c.follow()
 	}
 	return c
 }
 
-func (c *setupClock) arm(at time.Time) {
+func (c *setupClock) arm(at time.Time, budget time.Duration) {
+	c.after = budget
 	c.timer.Stop()
 	c.timer.Reset(time.Until(at))
 	c.C = c.timer.C
@@ -235,26 +239,25 @@ func (c *setupClock) follow() {
 		return
 	}
 	c.p.mu.Lock()
-	unbounded, at := c.p.setupUnbounded, c.p.setupDeadline
+	unbounded, at, budget := c.p.setupUnbounded, c.p.setupDeadline, c.p.setupBudget
 	c.p.mu.Unlock()
 	switch {
 	case unbounded:
 		c.timer.Stop()
 		c.C = nil
 	case at.IsZero():
-		c.arm(c.began.Add(setupReportFloor))
+		c.arm(c.began.Add(setupReportFloor), setupReportFloor)
 	default:
-		c.arm(at)
+		c.arm(at, budget)
 	}
 }
 
 func (c *setupClock) stop() { c.timer.Stop() }
 
+// expired names the budget the wait was held to: a report read late, or a
+// timer fired late, does not show as an overrun the fixture never declared.
 func (c *setupClock) expired() *SetupTimeoutError {
-	if c.flat > 0 {
-		return &SetupTimeoutError{After: c.flat}
-	}
-	return &SetupTimeoutError{After: time.Since(c.began).Round(time.Millisecond)}
+	return &SetupTimeoutError{After: c.after}
 }
 
 // noteSetupBudget moves the budget-driven setup deadline for a fixture whose
@@ -264,7 +267,7 @@ func (p *SharedFixtureProcess) noteSetupBudget(budget time.Duration) {
 	if budget <= 0 {
 		p.setupUnbounded = true
 	} else if at := time.Now().Add(budget); at.After(p.setupDeadline) {
-		p.setupDeadline = at
+		p.setupDeadline, p.setupBudget = at, budget
 	}
 	p.mu.Unlock()
 	select {
@@ -467,7 +470,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	}
 	if verb == "start" {
 		p.mu.Lock()
-		p.setupBegan, p.setupDeadline, p.setupUnbounded = time.Now(), time.Time{}, false
+		p.setupBegan, p.setupDeadline, p.setupBudget, p.setupUnbounded = time.Now(), time.Time{}, 0, false
 		p.mu.Unlock()
 	}
 	if _, err := p.stdin.Write(append(line, '\n')); err != nil {
