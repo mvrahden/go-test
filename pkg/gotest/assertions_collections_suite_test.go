@@ -502,10 +502,10 @@ func (s *CollectionAssertionsTestSuite) TestContains(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not a string, slice, array, or map")
 		})
-		w.It("fails with type error for map with mismatched key type", func(it *gotest.T) {
+		w.It("fails with a type guard for a map with a mismatched key type", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Contains(r, map[string]int{"a": 1}, 42) })
 			gotest.True(it, m.Failed())
-			gotest.Contains(it, m.Message(), "does not contain")
+			gotest.Contains(it, m.Message(), "map[string]int cannot hold a key of type int")
 		})
 	})
 }
@@ -572,9 +572,26 @@ func (s *CollectionAssertionsTestSuite) TestNotContains(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "not a string, slice, array, or map")
 		})
-		w.It("passes without panic for map with mismatched key type", func(it *gotest.T) {
+		w.It("fails with a type guard for a map with a mismatched key type", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, map[string]int{"a": 1}, 42) })
-			gotest.False(it, m.Failed())
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "map[string]int cannot hold a key of type int")
+		})
+		w.It("fails for a rune needle in a string, naming the conversion", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, "hello", 'z') })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "string cannot hold a value of type int32 (convert it to string)")
+		})
+		w.It("fails for a nil needle in a string", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, "hello", nil) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "string cannot hold a nil substring")
+		})
+		w.It("fails for a lossy number without a conversion hint", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.NotContains(r, []int{3}, 3.7) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "[]int cannot hold a value of type float64")
+			gotest.NotContains(it, m.Message(), "convert it")
 		})
 	})
 }

@@ -117,29 +117,85 @@ func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestIncludesElement(t *gotest.T, _ *predicatesCtx) {
+	type named string
 	for _, c := range []struct {
 		what       string
 		s, element any
 		found      bool
-		valid      bool
+		guarded    bool // the pair is one the question cannot be asked of
 	}{
-		{"substring present", "abc", "b", true, true},
-		{"substring absent", "abc", "z", false, true},
+		{"substring present", "abc", "b", true, false},
+		{"substring absent", "abc", "z", false, false},
+		{"substring of a named kind", named("abc"), named("b"), true, false},
 		{"non-string needle in a string", "abc", 1, false, true},
-		{"slice element present", []int{1, 2}, 2, true, true},
-		{"slice element absent", []int{1, 2}, 3, false, true},
-		{"array element present", [2]string{"a", "b"}, "a", true, true},
-		{"deep-equal element", []struct{ N int }{{1}}, struct{ N int }{1}, true, true},
-		{"map key present", map[string]int{"k": 1}, "k", true, true},
-		{"map key absent", map[string]int{"k": 1}, "z", false, true},
+		{"slice element present", []int{1, 2}, 2, true, false},
+		{"slice element absent", []int{1, 2}, 3, false, false},
+		{"slice element of a type it cannot hold", []int{1, 2}, "x", false, true},
+		{"any-slice holds every type", []any{1, "x"}, "x", true, false},
+		{"array element present", [2]string{"a", "b"}, "a", true, false},
+		{"deep-equal element", []struct{ N int }{{1}}, struct{ N int }{1}, true, false},
+		{"map key present", map[string]int{"k": 1}, "k", true, false},
+		{"map key absent", map[string]int{"k": 1}, "z", false, false},
 		{"map key of the wrong type", map[string]int{"k": 1}, 1, false, true},
-		{"nil haystack", nil, "a", false, true},
-		{"int haystack is invalid", 42, 4, false, false},
-		{"struct haystack is invalid", struct{}{}, "a", false, false},
+		{"nil key in an any-keyed map", map[any]int{nil: 1}, nil, true, false},
+		{"nil key absent from an any-keyed map", map[any]int{"k": 1}, nil, false, false},
+		{"nil key in a pointer-keyed map", map[*int]int{nil: 1}, nil, true, false},
+		{"nil key in a string-keyed map", map[string]int{"": 1}, nil, false, true},
+		{"an interface element type the needle does not implement", []error{io.EOF}, "EOF", false, true},
+		{"an interface element type the needle implements", []error{io.EOF}, io.EOF, true, false},
+		{"nil element in a pointer slice", []*int{nil}, nil, true, false},
+		{"nil element absent from a pointer slice", []*int{new(int)}, nil, false, false},
+		{"nil element in an any-slice", []any{1, nil}, nil, true, false},
+		{"nil element in a slice of slices", [][]int{nil}, nil, true, false},
+		{"nil element in an int slice", []int{1}, nil, false, true},
+		{"nil element in an int array", [1]int{}, nil, false, true},
+		{"unhashable key in an any-keyed map", map[any]int{1: 1}, []int{1}, false, true},
+		{"key holding an unhashable value in an any-keyed map", map[any]int{1: 1}, struct{ V any }{[]int{1}}, false, true},
+		{"nil haystack", nil, "a", false, false},
+		{"int haystack is invalid", 42, 4, false, true},
+		{"struct haystack is invalid", struct{}{}, "a", false, true},
 	} {
-		found, valid := assert.IncludesElement(c.s, c.element)
-		if found != c.found || valid != c.valid {
-			t.Errorf("IncludesElement(%s): got (%v, %v), want (%v, %v)", c.what, found, valid, c.found, c.valid)
+		found, guard := assert.IncludesElement(c.s, c.element)
+		if found != c.found || (guard != "") != c.guarded {
+			t.Errorf("IncludesElement(%s): got (%v, %q), want (%v, guarded=%v)", c.what, found, guard, c.found, c.guarded)
+		}
+	}
+}
+
+func (s *PredicatesTestSuite) TestIncludesElementGuards(t *gotest.T, _ *predicatesCtx) {
+	type named string
+	for _, c := range []struct {
+		s, element any
+		guard      string
+	}{
+		{[]int64{1}, 3, "[]int64 cannot hold a value of type int (convert it to int64)"},
+		{[]int{1}, "x", "[]int cannot hold a value of type string"},
+		{[]named{"a"}, "a", "[]assert_test.named cannot hold a value of type string (convert it to assert_test.named)"},
+		{[]error{io.EOF}, "EOF", "[]error cannot hold a value of type string"},
+		{[]int{1}, nil, "[]int cannot hold a nil element"},
+		{"abc", 1, "string cannot hold a value of type int"},
+		{"abc", 'b', "string cannot hold a value of type int32 (convert it to string)"},
+		{"abc", byte('b'), "string cannot hold a value of type uint8 (convert it to string)"},
+		{"abc", []byte("b"), "string cannot hold a value of type []uint8 (convert it to string)"},
+		{named("abc"), 'b', "assert_test.named cannot hold a value of type int32 (convert it to assert_test.named)"},
+		{"abc", nil, "string cannot hold a nil substring"},
+		{[]int{3}, 3.0, "[]int cannot hold a value of type float64 (convert it to int)"},
+		{[]int{3}, 3.7, "[]int cannot hold a value of type float64"},
+		{[]int8{1}, 7, "[]int8 cannot hold a value of type int (convert it to int8)"},
+		{[]int8{1}, 300, "[]int8 cannot hold a value of type int"},
+		{[]uint{1}, -1, "[]uint cannot hold a value of type int"},
+		{[]float64{1}, 1<<53 + 1, "[]float64 cannot hold a value of type int"},
+		{[]float64{1}, 2, "[]float64 cannot hold a value of type int (convert it to float64)"},
+		{[]int64{1}, uint64(1 << 63), "[]int64 cannot hold a value of type uint64"},
+		{map[int8]int{1: 1}, 300, "map[int8]int cannot hold a key of type int"},
+		{map[int64]int{1: 1}, 7, "map[int64]int cannot hold a key of type int (convert it to int64)"},
+		{map[string]int{"a": 1}, 7, "map[string]int cannot hold a key of type int"},
+		{map[string]int{"": 1}, nil, "map[string]int cannot hold a nil key"},
+		{map[any]int{1: 1}, []int{1}, "map[interface {}]int cannot hold a key of type []int: it is not comparable"},
+	} {
+		_, guard := assert.IncludesElement(c.s, c.element)
+		if guard != c.guard {
+			t.Errorf("IncludesElement(%T, %T): guard %q, want %q", c.s, c.element, guard, c.guard)
 		}
 	}
 }
@@ -156,7 +212,7 @@ func (s *PredicatesTestSuite) TestDidPanic(t *gotest.T, _ *predicatesCtx) {
 }
 
 func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
-	want := map[string]any{"a": float64(1)}
+	want := map[string]any{"a": json.Number("1")} // numbers stay as written
 	for _, c := range []struct {
 		what string
 		in   any
@@ -182,6 +238,14 @@ func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
 	}
 	if _, err := assert.NormalizeJSON(func() {}); err == nil {
 		t.Errorf("NormalizeJSON(unmarshalable): expected an error")
+	}
+	for _, in := range []string{`{"a":1}}`, `[1]]`, `{"a":1} 2`, `1 ]`} {
+		if _, err := assert.NormalizeJSON(in); err == nil {
+			t.Errorf("NormalizeJSON(%s): trailing data must be an error", in)
+		}
+	}
+	if _, err := assert.NormalizeJSON("{\"a\":1}\n \t"); err != nil {
+		t.Errorf("NormalizeJSON(trailing whitespace): %v", err)
 	}
 }
 
@@ -259,6 +323,16 @@ func (s *PredicatesTestSuite) TestJSONEqual(t *gotest.T, _ *predicatesCtx) {
 		{"different keys", `{"a":1}`, `{"b":1}`, false},
 		{"null is not an empty object", `null`, `{}`, false},
 		{"array order matters", `[1,2,3]`, `[3,2,1]`, false},
+		{"an exponent past a rational's reach", `1e10000000`, `10e9999999`, true},
+		{"exponents past a rational's reach differ", `1e10000000`, `1e10000001`, false},
+		{"an exponent past int64", `5e99999999999999999999`, `50e99999999999999999998`, true},
+		{"a fraction and its exponent form", `0.1`, `1e-1`, true},
+		{"an exponent in capitals with a sign", `1E+2`, `100`, true},
+		{"trailing zeros of a fraction", `2.50`, `2.5`, true},
+		{"negative zero is zero", `-0`, `0`, true},
+		{"negative zero with exponent is zero", `-0.0e5`, `0`, true},
+		{"sign matters", `-1`, `1`, false},
+		{"close values differ", `1.0000000000000000000001`, `1`, false},
 	} {
 		if got := assert.JSONEqual(norm(c.expected), norm(c.actual)); got != c.want {
 			t.Errorf("JSONEqual(%s): got %v, want %v", c.what, got, c.want)

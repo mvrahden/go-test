@@ -307,3 +307,11 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    reports `PASS` with exit 0 (a Go race, about 1 run in 200 under load):
    on an older pin, never take one green benchmark run as proof that the
    code under it does not panic.
+3. **`NotContains` fails on a needle of another type** — `NotContains(t,
+   []int64{1}, 3)` (an untyped `3` is an `int`) fails, naming the type to
+   convert it to; below v1.34 it passed without comparing anything. Write
+   `int64(3)`. The same holds for a map key, and for a string: a rune,
+   byte, `[]byte` or nil needle fails, and `NotContains(t, s, 'x')` asks
+   for `string('x')`. `Contains` with such a needle never matched before
+   either. A number gets the hint only when it converts without loss:
+   `3.7` for an `[]int` fails with none.

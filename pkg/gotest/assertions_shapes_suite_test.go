@@ -20,6 +20,25 @@ func (s *ShapeAssertionsTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
+func (s *ShapeAssertionsTestSuite) TestRegexpCompilesOnce(t *gotest.T) {
+	t.When("the same pattern is asserted twice", func(w *gotest.T) {
+		// A pattern of this run alone: the cache is shared by the methods
+		// running beside this one and by the runs before it under -count.
+		run := time.Now().UnixNano()
+		pattern := fmt.Sprintf(`^cached-%d-[a-z]+$`, run)
+		_, before := gotest.ExportCompiledPattern(pattern)
+		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, pattern, fmt.Sprintf("cached-%d-once", run)) })
+		first, kept := gotest.ExportCompiledPattern(pattern)
+		gotest.Record(func(r *gotest.R) { gotest.Regexp(r, pattern, fmt.Sprintf("cached-%d-twice", run)) })
+		second, _ := gotest.ExportCompiledPattern(pattern)
+		w.It("compiles it once and keeps it", func(it *gotest.T) {
+			gotest.False(it, before)
+			gotest.True(it, kept)
+			gotest.Same(it, first, second)
+		})
+	})
+}
+
 func (s *ShapeAssertionsTestSuite) TestRegexp(t *gotest.T) {
 	t.When("string matches pattern", func(w *gotest.T) {
 		w.It("passes for string pattern", func(it *gotest.T) {
@@ -245,6 +264,29 @@ func (s *ShapeAssertionsTestSuite) TestPanics(t *gotest.T) {
 		w.It("fails", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Panics(r, func() {}) })
 			gotest.True(it, m.Failed())
+		})
+	})
+}
+
+// RegexpCacheTestSuite fills Regexp's compiled-pattern cache; a suite of
+// its own, so no other method shares the process whose cache it fills.
+type RegexpCacheTestSuite struct{}
+
+func (s *RegexpCacheTestSuite) TestEvictsPastItsBound(t *gotest.T) {
+	t.When("more distinct patterns are asserted than the cache keeps", func(w *gotest.T) {
+		run := time.Now().UnixNano()
+		for i := range gotest.ExportMaxCompiledPatterns + 100 {
+			pattern := fmt.Sprintf(`^bounded-%d-%d$`, run, i)
+			gotest.Record(func(r *gotest.R) { gotest.Regexp(r, pattern, pattern) })
+		}
+		w.It("keeps no more than its bound", func(it *gotest.T) {
+			gotest.LessOrEqual(it, gotest.ExportCompiledPatternCount(), gotest.ExportMaxCompiledPatterns)
+		})
+		w.It("still matches a pattern it did not keep", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Regexp(r, fmt.Sprintf(`^unkept-%d$`, run), "nope") })
+			gotest.True(it, m.Failed())
+			ok := gotest.Record(func(r *gotest.R) { gotest.Regexp(r, fmt.Sprintf(`^unkept-%d$`, run), fmt.Sprintf("unkept-%d", run)) })
+			gotest.False(it, ok.Failed(), ok.Message())
 		})
 	})
 }
