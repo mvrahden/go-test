@@ -81,11 +81,14 @@ export function extractTestMessages(
       file = path.join(pkgDir, file);
     }
 
+    // go test indents a message's continuation lines deeper than its
+    // first, so a deeper line belongs to it even when it reads like file:line:.
+    const header = indentOf(lines[i]);
     while (i + 1 < lines.length) {
       const next = lines[i + 1];
       const trimmed = next.trim();
-      if (!trimmed || pattern.test(next) || /^(===\s|---\s)/.test(trimmed))
-        break;
+      if (!trimmed || /^(===\s|---\s)/.test(trimmed)) break;
+      if (indentOf(next) <= header && pattern.test(next)) break;
       if (!/^\s/.test(next)) break;
       message += "\n" + next;
       i++;
@@ -135,11 +138,82 @@ export function isPackageSummaryLine(s: string): boolean {
   );
 }
 
+export interface ExpectedActual {
+  expected: string;
+  actual: string;
+  // The message is only its first line and the two single-line values.
+  compact: boolean;
+}
+
+const sideLabel = /^(\s*)(expected|actual):( +)(.*)$/;
+// The heading of a long string shown only around its first difference.
+const windowHeading = /differ at byte \d+ \(expected \d+ bytes, actual \d+\)$/;
+
+/**
+ * Read the expected and actual values from an assertion message: each
+ * value's whole rendering, its continuation lines (indented deeper than its
+ * label) shifted back by the value column. Undefined when the message shows
+ * no complete pair, or only an excerpt of a value.
+ */
 export function parseExpectedActual(
   message: string,
-): { expected: string; actual: string } | undefined {
-  const expectedMatch = /^\s*expected:\s*(.+)$/m.exec(message);
-  const actualMatch = /^\s*actual:\s*(.+)$/m.exec(message);
-  if (!expectedMatch || !actualMatch) return undefined;
-  return { expected: expectedMatch[1], actual: actualMatch[1] };
+): ExpectedActual | undefined {
+  const lines = message.split("\n");
+  const body = Math.min(
+    ...lines
+      .slice(1)
+      .filter((l) => l.trim())
+      .map(indentOf),
+  );
+  let oneLine = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Labels sit at the message's top level, never inside a value or diff.
+    if (i > 0 && indentOf(line) !== body) continue;
+    // After this heading each value is one line, and a caret line follows.
+    if (windowHeading.test(line)) {
+      oneLine = true;
+      continue;
+    }
+    const expected = readSide(lines, i, "expected", oneLine);
+    if (!expected) continue;
+    const actual = readSide(lines, expected.next, "actual", oneLine);
+    if (!actual) return undefined;
+    const excerpt = (v: string) => /^…"/.test(v) || /"…$/.test(v);
+    if (excerpt(expected.value) || excerpt(actual.value)) return undefined;
+    // Only a single-line pair is the whole message: a longer one is
+    // followed by its diff.
+    const compact = i === 1 && actual.next === lines.length;
+    return { expected: expected.value, actual: actual.value, compact };
+  }
+  return undefined;
+}
+
+function readSide(
+  lines: string[],
+  at: number,
+  label: string,
+  oneLine: boolean,
+): { value: string; next: number } | undefined {
+  const m = at < lines.length ? sideLabel.exec(lines[at]) : null;
+  if (!m || m[2] !== label) return undefined;
+  const indent = m[1].length;
+  const column = indent + label.length + 1 + m[3].length;
+  const value = [m[4]];
+  let next = at + 1;
+  while (
+    !oneLine &&
+    next < lines.length &&
+    lines[next].trim() &&
+    indentOf(lines[next]) > indent
+  ) {
+    const l = lines[next];
+    value.push(l.slice(Math.min(column, indentOf(l))));
+    next++;
+  }
+  return { value: value.join("\n"), next };
+}
+
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
 }

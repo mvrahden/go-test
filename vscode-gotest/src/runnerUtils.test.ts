@@ -745,6 +745,107 @@ describe("applyResults", () => {
       "Equal failed: expected 720000000000, actual 120000000000",
     );
   });
+
+  // The fail events for one test whose output is these go test lines.
+  function failingOutput(lines: string[]) {
+    const test = "MySuite/TestFail";
+    const pkg = "example.com/pkg";
+    return [
+      {
+        Action: "output" as const,
+        Test: test,
+        Package: pkg,
+        Output: `=== RUN   ${test}\n`,
+      },
+      ...lines.map((l) => ({
+        Action: "output" as const,
+        Test: test,
+        Package: pkg,
+        Output: l + "\n",
+      })),
+      {
+        Action: "output" as const,
+        Test: test,
+        Package: pkg,
+        Output: `--- FAIL: ${test} (0.00s)\n`,
+      },
+      { Action: "fail" as const, Test: test, Package: pkg, Elapsed: 0 },
+    ];
+  }
+
+  function failedMessages(lines: string[]) {
+    const { controller, run } = makeApplyResultsFixture();
+    applyResults(
+      controller as any,
+      run as any,
+      failingOutput(lines) as any,
+      "example.com/pkg",
+      "/some/dir",
+    );
+    expect(run.failed).toHaveBeenCalledTimes(1);
+    return run.failed.mock.calls[0][1];
+  }
+
+  it("keeps the whole message and both whole renderings for a struct mismatch", () => {
+    const lines = [
+      "    fail_test.go:50: Equal failed:",
+      "          expected: eqprobe.wide{",
+      '                      Customer: "alice smith",',
+      '                      Address: "1 main street springfield",',
+      "                    }",
+      "          actual:   eqprobe.wide{",
+      '                      Customer: "alice smith",',
+      '                      Address: "2 main street springfield",',
+      "                    }",
+      "          diff (-expected +actual):",
+      "            at .Address:",
+      "             eqprobe.wide{",
+      '               Customer: "alice smith",',
+      '            -  Address: "1 main street springfield",',
+      '            +  Address: "2 main street springfield",',
+      "             }",
+    ];
+    const messages = failedMessages(lines);
+    expect(messages).toHaveLength(1);
+    expect(messages[0].message).toBe(
+      [lines[0].replace("    fail_test.go:50: ", ""), ...lines.slice(1)].join(
+        "\n",
+      ),
+    );
+    expect(messages[0].expectedOutput).toBe(
+      'eqprobe.wide{\n  Customer: "alice smith",\n  Address: "1 main street springfield",\n}',
+    );
+    expect(messages[0].actualOutput).toBe(
+      'eqprobe.wide{\n  Customer: "alice smith",\n  Address: "2 main street springfield",\n}',
+    );
+  });
+
+  it("offers no diff for a windowed excerpt of a long string", () => {
+    const lines = [
+      "    fail_test.go:26: Equal failed:",
+      "          strings differ at byte 50 (expected 101 bytes, actual 101)",
+      '          expected: …"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaXbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"…',
+      '          actual:   …"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaYbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"…',
+      "                                                    ^",
+    ];
+    const messages = failedMessages(lines);
+    expect(messages[0].message).toContain("strings differ at byte 50");
+    expect(messages[0].message).toContain(lines[4]);
+    expect(messages[0].expectedOutput).toBeUndefined();
+    expect(messages[0].actualOutput).toBeUndefined();
+  });
+
+  it("keeps the types line when the types differ", () => {
+    const messages = failedMessages([
+      "    fail_test.go:28: Equal failed:",
+      "          types differ: int vs float64",
+      "          expected: int(1)",
+      "          actual:   float64(1)",
+    ]);
+    expect(messages[0].message).toContain("types differ: int vs float64");
+    expect(messages[0].expectedOutput).toBe("int(1)");
+    expect(messages[0].actualOutput).toBe("float64(1)");
+  });
 });
 
 describe("applyEvent", () => {

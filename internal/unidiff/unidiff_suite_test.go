@@ -33,6 +33,75 @@ func lines(n int, replace map[int]string) string {
 	return b.String()
 }
 
+func (s *UnidiffTestSuite) TestHunks(t *gotest.T) {
+	hunks := func(before, after string) []unidiff.Hunk {
+		return unidiff.Hunks([]byte(before), []byte(after))
+	}
+
+	t.When("nothing changed", func(w *gotest.T) {
+		w.It("has no hunks", func(it *gotest.T) {
+			gotest.Empty(it, hunks("a\nb\n", "a\nb\n"))
+		})
+	})
+
+	t.When("changes are more than six lines apart", func(w *gotest.T) {
+		w.It("returns the hunks Diff prints, without their headers, each with where it starts on both sides", func(it *gotest.T) {
+			kept := func(n int) unidiff.Line { return unidiff.Line{Op: ' ', Text: strconv.Itoa(n) + "\n"} }
+			gotest.Equal(it, []unidiff.Hunk{
+				{A: 0, B: 0, Lines: []unidiff.Line{kept(1), kept(2), {Op: '-', Text: "3\n"}, {Op: '+', Text: "three\n"}, kept(4), kept(5), kept(6)}},
+				{A: 7, B: 7, Lines: []unidiff.Line{kept(8), kept(9), kept(10), {Op: '-', Text: "11\n"}, {Op: '+', Text: "eleven\n"}, kept(12), kept(13), kept(14)}},
+			}, hunks(lines(14, nil), lines(14, map[int]string{3: "three", 11: "eleven"})))
+		})
+	})
+
+	t.When("lines were inserted before a hunk", func(w *gotest.T) {
+		w.It("starts the hunk at its own line on each side", func(it *gotest.T) {
+			before := lines(20, nil)
+			after := "new 1\nnew 2\n" + lines(20, map[int]string{15: "fifteen"})
+			got := hunks(before, after)
+			gotest.Len(it, got, 2)
+			gotest.Equal(it, 11, got[1].A)
+			gotest.Equal(it, 13, got[1].B)
+		})
+	})
+
+	t.When("one of many repeated lines is replaced", func(w *gotest.T) {
+		before := strings.Repeat("0\n", 20)
+		after := strings.Repeat("0\n", 10) + "1\n" + strings.Repeat("0\n", 9)
+		w.It("shows the replacement in one place, deletion first", func(it *gotest.T) {
+			kept := unidiff.Line{Op: ' ', Text: "0\n"}
+			gotest.Equal(it, []unidiff.Hunk{{A: 7, B: 7, Lines: []unidiff.Line{kept, kept, kept, {Op: '-', Text: "0\n"}, {Op: '+', Text: "1\n"}, kept, kept, kept}}},
+				hunks(before, after))
+		})
+		w.It("leaves Diff's patch as it was", func(it *gotest.T) {
+			gotest.Equal(it, "--- a/f\n+++ b/f\n@@ -8,6 +8,7 @@\n 0\n 0\n 0\n+1\n 0\n 0\n 0\n@@ -17,4 +18,3 @@\n 0\n 0\n 0\n-0\n",
+				unidiff.Diff("a/f", "b/f", []byte(before), []byte(after)))
+		})
+	})
+
+	t.When("a deleted block could be placed at several lines", func(w *gotest.T) {
+		before := "[\n  {\n    1\n  }\n  {\n    2\n  }\n  {\n    3\n  }\n]\n"
+		after := "[\n  {\n    1\n  }\n  {\n    3\n  }\n]\n"
+		w.It("places it where its first and last lines are least indented", func(it *gotest.T) {
+			got := hunks(before, after)
+			gotest.Len(it, got, 1)
+			var marked []string
+			for _, l := range got[0].Lines {
+				if l.Op != ' ' {
+					marked = append(marked, string(l.Op)+l.Text)
+				}
+			}
+			gotest.Equal(it, []string{"-  {\n", "-    2\n", "-  }\n"}, marked)
+		})
+	})
+
+	t.When("the last line has no newline", func(w *gotest.T) {
+		w.It("keeps it without one", func(it *gotest.T) {
+			gotest.Equal(it, []unidiff.Hunk{{Lines: []unidiff.Line{{Op: ' ', Text: "a\n"}, {Op: '-', Text: "b"}, {Op: '+', Text: "c"}}}}, hunks("a\nb", "a\nc"))
+		})
+	})
+}
+
 func (s *UnidiffTestSuite) TestDiff(t *gotest.T) {
 	diff := func(before, after string) string {
 		return unidiff.Diff("a/f", "b/f", []byte(before), []byte(after))

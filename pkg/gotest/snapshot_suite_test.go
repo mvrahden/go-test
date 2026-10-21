@@ -229,6 +229,16 @@ func (s *SnapshotTestSuite) TestMatchSnapshot(t *gotest.T) {
 		})
 	})
 
+	t.When("the value differs from its snapshot", func(w *gotest.T) {
+		w.It("fails with the changed lines under a diff heading, without file headers", func(it *gotest.T) {
+			gotest.Record(func(r *gotest.R) { gotest.MatchSnapshot(r, "a\nb\nc\nd\ne", "lines") })
+			m := gotest.Record(func(r *gotest.R) { gotest.MatchSnapshot(r, "a\nb\nC\nd\ne", "lines") })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "]:\n  diff (-expected +actual):\n     a\n     b\n    -c\n    +C\n     d\n     e\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update")
+			gotest.NotContains(it, m.Message(), "@@")
+		})
+	})
+
 	t.When("update mode is enabled", func(w *gotest.T) {
 		w.It("overwrites the existing snapshot", func(it *gotest.T) {
 			gotest.MatchSnapshot(it, "original")
