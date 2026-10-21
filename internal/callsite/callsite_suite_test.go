@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
+	"strconv"
 
 	"github.com/mvrahden/go-test/internal/callsite"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -71,4 +73,50 @@ func (s *CallsiteTestSuite) TestIsStd(t *gotest.T) {
 			gotest.Equal(it, c.std, callsite.ExportStdPath(c.fn))
 		})
 	}
+	for _, c := range []struct {
+		fn   string
+		main string
+		std  bool
+	}{
+		{"plainmod/helpers.expectAnswer", "plainmod", false},
+		{"plainmod.F", "plainmod", false},
+		{"plainmodule/x.F", "plainmod", true},
+		{"fmt.Fprintln", "plainmod", true},
+		{"plainmod/helpers.expectAnswer", "", true},
+		{"corp/tools.v2/helpers.Check", "corp/tools.v2", false},
+		{"corp/tools%2ev2.F", "corp/tools.v2", false},
+	} {
+		t.It("judges "+c.fn+" knowing the main module is "+strconv.Quote(c.main), func(it *gotest.T) {
+			gotest.Equal(it, c.std, callsite.ExportStdPathIn(c.fn, c.main))
+		})
+	}
+	info := &debug.BuildInfo{
+		Main: debug.Module{Path: "plainmod"},
+		Deps: []*debug.Module{
+			{Path: "plainhelpers", Version: "v0.0.0", Replace: &debug.Module{Path: "../plainhelpers"}},
+			{Path: "plaindep", Version: "v1.0.0"},
+			{Path: "example.com/dotted", Version: "v1.0.0"},
+			{Path: "corp/tools.v2", Version: "v2.0.0"},
+		},
+	}
+	for _, c := range []struct {
+		fn  string
+		std bool
+	}{
+		{"plainmod/helpers.expectAnswer", false},
+		{"plainhelpers/check.ExpectAnswer", false},
+		{"plaindep.F", false},
+		{"example.com/dotted.F", false},
+		{"corp/tools.v2/helpers.Check", false},
+		{"corp/toolsx.F", true},
+		{"plainhelpersx.F", true},
+		{"fmt.Fprintln", true},
+	} {
+		t.It("judges "+c.fn+" knowing the modules the build required", func(it *gotest.T) {
+			gotest.Equal(it, c.std, callsite.ExportStdPathInBuild(c.fn, info))
+		})
+	}
+	t.It("judges by import path alone when the build recorded nothing", func(it *gotest.T) {
+		gotest.True(it, callsite.ExportStdPathInBuild("plainmod/helpers.expectAnswer", nil))
+	})
 }
