@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -51,25 +53,113 @@ type regexpPattern interface {
 
 // Consistently asserts that fn passes on every poll for the entire waitFor duration.
 func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
+	if !pollArgs(t, "Consistently", waitFor, tick) {
+		return
+	}
+	tick = min(tick, waitFor)
+	deadline := time.Now().Add(waitFor)
 	polls := 0
 	for {
 		polls++
-		rec := Record(fn)
+		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
+		if !ok {
+			failf(t, "Consistently failed on poll %d:\n    %s", polls, abandonedPoll(waitFor))
+			return
+		}
 		if rec.Failed() {
 			failf(t, "Consistently failed on poll %d:\n    %s", polls, rec.Message())
 			return
 		}
-
-		select {
-		case <-timer.C:
-			return
-		case <-ticker.C:
+		if !time.Now().Before(deadline) {
+			return // this poll reached the deadline
 		}
+		sleepUntil(earliest(time.Now().Add(tick), deadline))
+	}
+}
+
+// pollArgs fails t when waitFor or tick could not pace a poll, and reports
+// whether polling may start.
+func pollArgs(t testingT, name string, waitFor, tick time.Duration) bool {
+	if waitFor <= 0 || tick <= 0 {
+		failf(t, "%s: waitFor and tick must be positive, got %v and %v", name, waitFor, tick)
+		return false
+	}
+	return true
+}
+
+// pollLimit is how long a poll may run: until grace past the deadline, or
+// past its own start when it began after the deadline. Polls get waitFor as
+// grace, max(tick, waitFor) with tick clamped to waitFor, so a poll slower
+// than tick is still judged by its result; one running past that has hung.
+func pollLimit(deadline time.Time, grace time.Duration) time.Time {
+	if now := time.Now(); now.After(deadline) {
+		return now.Add(grace)
+	}
+	return deadline.Add(grace)
+}
+
+// abandonedPoll says why a poll that ran past its limit failed.
+func abandonedPoll(grace time.Duration) string {
+	return fmt.Sprintf("poll still running past its deadline, abandoned %v after it", grace)
+}
+
+// The states of a poll: pollUntil and the poll's goroutine each try to move
+// it out of pollRunning, and only one of them wins.
+const (
+	pollRunning int32 = iota
+	pollReturned
+	pollAbandoned
+)
+
+// pollUntil runs fn on a goroutine of its own, as Record does, and gives it
+// until limit; ok is false when fn is still running then. A poll given up on
+// keeps running, since Go cannot stop it; a panic it raises later is written
+// to stderr with its stack, since the test has moved on.
+func pollUntil(fn func(*R), limit time.Time) (rec *R, ok bool) {
+	r := &R{}
+	var state atomic.Int32
+	done := make(chan *capturedPanic, 1) // buffered: a poll given up on still exits
+	go func() {
+		var captured *capturedPanic
+		defer func() {
+			if state.CompareAndSwap(pollRunning, pollReturned) {
+				done <- captured
+			} else if captured != nil {
+				fmt.Fprintf(os.Stderr, "gotest: a poll abandoned past its deadline panicked: %v\n%s\n", captured.value, captured.stack)
+			}
+		}()
+		defer func() { captured = capturedFrom(recover(), "poll function") }()
+		fn(r)
+	}()
+	timer := time.NewTimer(time.Until(limit))
+	defer timer.Stop()
+	var captured *capturedPanic
+	select {
+	case captured = <-done:
+	case <-timer.C:
+		if state.CompareAndSwap(pollRunning, pollAbandoned) {
+			return nil, false
+		}
+		captured = <-done // it returned as the limit passed
+	}
+	if captured != nil {
+		panic(captured)
+	}
+	return r, true
+}
+
+// earliest is the earlier of two instants.
+func earliest(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
+}
+
+// sleepUntil waits for the clock to reach at, if it has not.
+func sleepUntil(at time.Time) {
+	if d := time.Until(at); d > 0 {
+		time.Sleep(d)
 	}
 }
 
@@ -170,27 +260,27 @@ func ErrorIs(t testingT, err, target error, msgAndArgs ...any) {
 
 // Eventually asserts that fn passes without assertion failures within waitFor, polling every tick.
 func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	var lastMsg string
+	if !pollArgs(t, "Eventually", waitFor, tick) {
+		return
+	}
+	tick = min(tick, waitFor)
+	deadline := time.Now().Add(waitFor)
 	polls := 0
 	for {
 		polls++
-		rec := Record(fn)
+		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
+		if !ok {
+			failf(t, "Eventually failed after %v (%d polls):\n  %s", waitFor, polls, abandonedPoll(waitFor))
+			return
+		}
 		if !rec.Failed() {
 			return
 		}
-		lastMsg = rec.Message()
-
-		select {
-		case <-timer.C:
-			failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, lastMsg)
+		if !time.Now().Before(deadline) { // this poll reached the deadline
+			failf(t, "Eventually failed after %v (%d polls):\n  last failure:\n    %s", waitFor, polls, rec.Message())
 			return
-		case <-ticker.C:
 		}
+		sleepUntil(earliest(time.Now().Add(tick), deadline))
 	}
 }
 
