@@ -1,0 +1,15 @@
+Expect: failing: no failure message says "poll still running past its deadline, abandoned 100ms after it"
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when an Eventually poll runs past waitFor → fails no later than waitFor past the deadline and says the poll is still running past its deadline
+Clause: when a Consistently poll runs past waitFor → fails no later than waitFor past the deadline and says the poll is still running past its deadline
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -141,7 +141,7 @@
+ 	select {
+ 	case captured = <-done:
+ 	case <-timer.C:
+-		if state.CompareAndSwap(pollRunning, pollAbandoned) {
++		if false && state.CompareAndSwap(pollRunning, pollAbandoned) {
+ 			return nil, false
+ 		}
+ 		captured = <-done // it returned as the limit passed

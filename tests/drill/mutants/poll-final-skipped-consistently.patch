@@ -1,0 +1,15 @@
+Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
+Clause: when tick is longer than waitFor and every Consistently poll passes → a final poll runs at the deadline
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -78,6 +78,9 @@
+ 			return // this poll reached the deadline
+ 		}
+ 		sleepUntil(earliest(time.Now().Add(tick), deadline))
++		if !time.Now().Before(deadline) {
++			return
++		}
+ 	}
+ }
+ 

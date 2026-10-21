@@ -2,10 +2,10 @@ Expect: snapshotting: verdicts differ from the golden list
 Judge: ./tests/canary CanaryTestSuite/TestASnapshotMismatchFails
 --- a/pkg/gotest/snapshot.go
 +++ b/pkg/gotest/snapshot.go
-@@ -212,7 +212,7 @@
- 
- 	want := sections[idx].Content
- 	got := content + "\n"
+@@ -249,7 +249,7 @@
+ 		}
+ 		return
+ 	}
 -	if got != want {
 +	if got != want && false {
  		if d := assert.DiffSection(want, got); d != "" {

@@ -3,7 +3,7 @@ Expect: ^ *failing pass TestFailingTestSuite$
 Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go
-@@ -20,6 +20,9 @@
+@@ -23,6 +23,9 @@
  }
  
  func fail(t testingT, msg string, msgAndArgs []any) {

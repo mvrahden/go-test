@@ -1,0 +1,14 @@
+Expect: snapshotting: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestASnapshotMismatchFails
+Clause: when a value ends lines with runs of carriage returns, or ends in one → matches the baseline written with plain newlines
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -150,7 +150,7 @@
+ 		return
+ 	}
+ 	// CRs end lines like CRLF, the last line's too: a newline is appended below.
+-	content = strings.TrimSuffix(lineEnd.ReplaceAllString(content+"\n", "\n"), "\n")
++	content = strings.ReplaceAll(content, "\r\n", "\n")
+ 	if err := snapfile.ValidateContent(content); err != nil {
+ 		failf(t, "MatchSnapshot: %v", err)
+ 		return

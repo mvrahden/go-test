@@ -1,0 +1,14 @@
+Expect: snapshotting with GOTEST_UPDATE_SNAPSHOTS=0: verdicts differ
+Judge: ./tests/canary CanaryTestSuite/TestSnapshotsKeyOnTheExactName
+Clause: when GOTEST_UPDATE_SNAPSHOTS is 0 → a stale baseline still fails and is left as it was
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -283,7 +283,7 @@
+ 
+ // updateSnapshots reports whether baselines are rewritten: GOTEST_UPDATE_SNAPSHOTS
+ // switched on, read as protocol.SwitchOn reads it.
+-func updateSnapshots() bool { return protocol.SwitchOn(os.Getenv(protocol.EnvUpdateSnapshots)) }
++func updateSnapshots() bool { return os.Getenv(protocol.EnvUpdateSnapshots) != "" }
+ 
+ // snapshotReadonly returns true when MatchSnapshot should refuse to generate
+ // new baseline snapshots. Activated by GOTEST_CI=1 (set by the --ci flag).

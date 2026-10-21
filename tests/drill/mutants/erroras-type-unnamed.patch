@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 Clause: when ErrorAs is given an error of another type → names the type it expected
 --- a/pkg/gotest/assertions.go
 +++ b/pkg/gotest/assertions.go
-@@ -139,7 +139,7 @@
+@@ -229,7 +229,7 @@
  func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
  	var target E
  	if !errors.As(err, &target) {
