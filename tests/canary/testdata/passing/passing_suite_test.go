@@ -2,6 +2,8 @@ package passing_test
 
 import (
 	"math"
+	"sync/atomic"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -29,3 +31,20 @@ func (s *PassingTestSuite) TestTypedArguments(t *gotest.T) {
 
 // TestJSONNumbers: an integer and its decimal spelling are the same JSON.
 func (s *PassingTestSuite) TestJSONNumbers(t *gotest.T) { gotest.JSONEq(t, `{"n":1}`, `{"n":1.0}`) }
+
+// TestEventuallyFinalPoll: a tick longer than waitFor still gets a last
+// poll at the deadline.
+func (s *PassingTestSuite) TestEventuallyFinalPoll(t *gotest.T) {
+	var polls atomic.Int32
+	gotest.Eventually(t, 200*time.Millisecond, 10*time.Second, func(poll *gotest.R) {
+		gotest.Greater(poll, polls.Add(1), int32(1))
+	})
+}
+
+// TestConsistentlyFinalPoll: Consistently, too, polls once more at the
+// deadline when tick is longer than waitFor.
+func (s *PassingTestSuite) TestConsistentlyFinalPoll(t *gotest.T) {
+	var polls atomic.Int32
+	gotest.Consistently(t, 200*time.Millisecond, 10*time.Second, func(*gotest.R) { polls.Add(1) })
+	gotest.Equal(t, int32(2), polls.Load())
+}

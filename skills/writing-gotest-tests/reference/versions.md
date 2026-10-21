@@ -315,3 +315,18 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    for `string('x')`. `Contains` with such a needle never matched before
    either. A number gets the hint only when it converts without loss:
    `3.7` for an `[]int` fails with none.
+4. **Snapshot sections keep testing's `#` suffixes** — `t.Run("issue #42")`
+   is keyed `issue_#42`, an unnamed `Each` row `#0`, a second same-named
+   subtest `x#01`; below v1.34 the trailing `#<digits>` was stripped, so
+   twins and unnamed rows shared one section. A baseline under the old key
+   is still compared: under `--ci`/`GOTEST_CI` read-only, otherwise renamed
+   to the new key once it matches. A section another test's exact key
+   already holds is not reused, so the second twin (`x#01`) has no baseline
+   until one run outside CI records it. Benchmark and fuzz snapshots, which
+   below v1.34 all went to `unknown.snap` (`unknown_ext.snap`) as `_`, are
+   not migrated: run once with `--update-snapshots` and delete the
+   `unknown*.snap` files.
+5. **`GOTEST_CI` and `GOTEST_UPDATE_SNAPSHOTS` read like `strconv.ParseBool`**
+   — off when unset or `0`, `f`, `F`, `false`, `FALSE`, `False`; any other
+   value is on. Below v1.34 only `0` and `false` were off, so
+   `GOTEST_UPDATE_SNAPSHOTS=FALSE` rewrote baselines.

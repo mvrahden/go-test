@@ -1,7 +1,7 @@
 # Assertions Specification
 
 ## Purpose
-What gotest's assertions accept, where their failures point, and what their failure messages say.
+What gotest's assertions, polls and snapshots accept, where their failures point, and what their failure messages say.
 
 ## Requirements
 
@@ -267,3 +267,101 @@ When Equal fails on values of different dynamic types, its message SHALL name bo
 #### Scenario: NotEqual on values holding pointers
 - **WHEN** NotEqual fails on values holding pointers
 - **THEN** the message shows the value they share without addresses
+
+### Requirement: Polls and their deadline
+Eventually and Consistently SHALL judge a poll that started before waitFor by its result, even when it returns after waitFor and after many ticks; SHALL give a poll in flight at the deadline until waitFor past it, and fail, saying the poll is still running past its deadline, when it has not returned by then; and SHALL run a final poll at the deadline when no poll is in flight as it passes.
+
+#### Scenario: An Eventually poll that hangs
+- **WHEN** an Eventually poll runs past waitFor
+- **THEN** fails no later than waitFor past the deadline and says the poll is still running past its deadline
+
+#### Scenario: A Consistently poll that hangs
+- **WHEN** a Consistently poll runs past waitFor
+- **THEN** fails no later than waitFor past the deadline and says the poll is still running past its deadline
+
+#### Scenario: A passing Consistently poll that ends after waitFor
+- **WHEN** every Consistently poll passes but one runs past waitFor
+- **THEN** passes
+
+#### Scenario: An Eventually poll that passes after waitFor
+- **WHEN** an Eventually poll started before waitFor passes after it
+- **THEN** passes
+
+#### Scenario: A Consistently poll slower than tick
+- **WHEN** a passing Consistently poll in flight at the deadline takes many ticks
+- **THEN** passes
+
+#### Scenario: An Eventually final poll slower than tick
+- **WHEN** the final Eventually poll passes after many ticks
+- **THEN** passes
+
+#### Scenario: A tick longer than waitFor
+- **WHEN** tick is longer than waitFor and the first poll fails
+- **THEN** a final poll runs at the deadline and can still pass
+
+#### Scenario: A tick longer than waitFor for Consistently
+- **WHEN** tick is longer than waitFor and every Consistently poll passes
+- **THEN** a final poll runs at the deadline
+
+### Requirement: Abandoned polls
+A poll abandoned past its deadline SHALL keep running, since Go cannot stop it, and a panic it raises later SHALL be written to stderr with its stack instead of failing the test, which has already failed.
+
+#### Scenario: A late panic
+- **WHEN** a poll abandoned past its deadline panics later
+- **THEN** the panic is written to stderr with its stack
+
+### Requirement: Polling arguments
+Eventually and Consistently SHALL fail without polling when waitFor or tick is not positive.
+
+#### Scenario: A zero or negative duration
+- **WHEN** waitFor or tick is not positive
+- **THEN** fails saying both must be positive and polls nothing
+
+### Requirement: Snapshot sections
+MatchSnapshot SHALL key each section by the exact subtest name and SHALL find the baselines beside the test, also when the package is built with -trimpath. Under -trimpath the caller's file cannot be opened and the package directory go test runs in stands in for it, so a snapshot taken in a helper of another package is found beside the package under test, not beside the helper.
+
+#### Scenario: Each rows and twin subtests
+- **WHEN** Each rows and same-named subtests match snapshots
+- **THEN** #0, #1, x and x#01 each read their own section
+
+#### Scenario: A build under -trimpath
+- **WHEN** the package is built with -trimpath
+- **THEN** the baselines are still found beside the test, _ext suffix included
+
+### Requirement: Baselines keyed by the release before exact names
+When a section's exact key is missing, MatchSnapshot SHALL compare against the section under the key the release before exact names derived (a trailing #<digits> stripped), unless another test's exact key or another migration claimed it this run. Under GOTEST_CI it SHALL leave the file as it was; otherwise it SHALL rename a matching section to the exact key. Benchmark and fuzz snapshots, which that release filed under unknown.snap as _, SHALL NOT be migrated.
+
+#### Scenario: An old-keyed baseline
+- **WHEN** a baseline is keyed the way the release before exact names keyed it
+- **THEN** its content is compared under the new key
+- **AND** under GOTEST_CI the file is left as it was
+- **AND** otherwise a matching section is renamed to the new key
+
+#### Scenario: An old key another test holds
+- **WHEN** the old key of a section is the exact key of another test
+- **THEN** the section is not reused for a second key
+
+### Requirement: Snapshot updates switched off
+GOTEST_UPDATE_SNAPSHOTS and GOTEST_CI SHALL each be off when unset, empty or set to a false spelling of strconv.ParseBool (0, f, F, false, FALSE, False), and on for any other value, a mistyped one included. With GOTEST_UPDATE_SNAPSHOTS off, a stale snapshot SHALL fail and its baseline file SHALL stay unchanged.
+
+#### Scenario: Updates disabled
+- **WHEN** GOTEST_UPDATE_SNAPSHOTS is 0
+- **THEN** a stale baseline still fails and is left as it was
+
+#### Scenario: Other false spellings
+- **WHEN** GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are spelled FALSE and f
+- **THEN** both are off: a missing baseline is written and a stale one still fails
+
+### Requirement: Snapshot line endings
+MatchSnapshot SHALL read every carriage return before a newline, and those at the end of the value, as part of the line ending, so a baseline written for such a value matches it again.
+
+#### Scenario: Carriage returns at line ends
+- **WHEN** a value ends lines with runs of carriage returns, or ends in one
+- **THEN** matches the baseline written with plain newlines
+
+### Requirement: Snapshot names
+MatchSnapshot SHALL refuse a name that spans lines or spells a section header, before it writes anything.
+
+#### Scenario: A name that could forge a section
+- **WHEN** a snapshot name spans lines or spells a section header
+- **THEN** is refused before anything is written

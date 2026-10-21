@@ -105,8 +105,22 @@ type event struct {
 // run executes the CLI in -json mode over one fixture package and returns
 // its exit code and the verdict rows it produced, in golden form.
 func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string) {
-	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Env = childEnv(canaryDir)
+	return s.runWith(t, pkg, canaryDir, nil)
+}
+
+// runWith is run with env on top of the child's environment and flags
+// before the package.
+func (s *CanaryTestSuite) runWith(t *gotest.T, pkg, canaryDir string, env []string, flags ...string) (int, []string) {
+	return s.runIn(t, "", "./testdata/"+pkg+"/", pkg, canaryDir, env, flags...)
+}
+
+// runIn is runWith over the package at path, run from dir ("" for this
+// one); its rows are named pkg.
+func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []string, flags ...string) (int, []string) {
+	args := append(append([]string{"-json"}, flags...), path)
+	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = dir
+	cmd.Env = childEnv(canaryDir, env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	code := 0
@@ -217,7 +231,7 @@ func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
 // The same fixture checks verdicts and diagnostic content in one run.
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	s.check(t, "failing")
-	for _, want := range []string{"is of type *fs.PathError", "[]int cannot hold a value of type string", "42 retries left", "delta is NaN", "diff (-expected +actual):", `    -c\n`, `    +C\n`} {
+	for _, want := range []string{"is of type *fs.PathError", "[]int cannot hold a value of type string", "42 retries left", "delta is NaN", "diff (-expected +actual):", `    -c\n`, `    +C\n`, "poll still running past its deadline, abandoned 100ms after it", "must be positive", "must be one line"} {
 		if !strings.Contains(s.lastStream, want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}
@@ -249,6 +263,110 @@ func (s *CanaryTestSuite) TestAHelperFailureNamesBothLinesUnderTrimpath(t *gotes
 // nothing would leave every golden check in the repository silent.
 func (s *CanaryTestSuite) TestASnapshotMismatchFails(t *gotest.T) {
 	s.check(t, "snapshotting")
+}
+
+// stage copies fixture pkg into a module of its own under a temp dir and
+// returns that dir, where a run that writes baselines leaves the source
+// tree alone.
+func stage(t *gotest.T, pkg string) string {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	dir := t.TempDir()
+	if _, err := testkit.StagePackage(root, filepath.Join("testdata", pkg), dir, "canary"+pkg); err != nil {
+		fatalf(t, "stage %s: %v", pkg, err)
+	}
+	return dir
+}
+
+// A snapshot section is the exact name testing gave the subtest, found
+// beside the test under -trimpath too; an update switch spelled off is off.
+// GOTEST_CI=1 keeps a baseline that is not found from being written.
+func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
+	want := s.expected["snapshotting"]
+	for _, c := range []struct {
+		how   string
+		env   []string
+		flags []string
+	}{
+		{"built with -trimpath", nil, []string{"-trimpath"}},
+		{"with GOTEST_UPDATE_SNAPSHOTS=0", []string{"GOTEST_UPDATE_SNAPSHOTS=0"}, nil},
+		{"with GOTEST_UPDATE_SNAPSHOTS=false", []string{"GOTEST_UPDATE_SNAPSHOTS=false"}, nil},
+		{"with GOTEST_UPDATE_SNAPSHOTS=FALSE", []string{"GOTEST_UPDATE_SNAPSHOTS=FALSE"}, nil},
+		{"with GOTEST_UPDATE_SNAPSHOTS=f", []string{"GOTEST_UPDATE_SNAPSHOTS=f"}, nil},
+	} {
+		dir := stage(t, "snapshotting")
+		baseline := filepath.Join(dir, "snapshotting", "testdata", "__snapshots__", "TestSnapshottingTestSuite_ext.snap")
+		before, err := os.ReadFile(baseline) //nolint:gosec // G304: the staged copy of the canary's own fixture
+		if err != nil {
+			fatalf(t, "baseline: %v", err)
+		}
+		code, rows := s.runIn(t, dir, "./snapshotting/", "snapshotting", t.TempDir(), append([]string{"GOTEST_CI=1"}, c.env...), c.flags...)
+		if code != want.exit || strings.Join(rows, "\n") != strings.Join(want.rows, "\n") {
+			t.Errorf("snapshotting %s: verdicts differ (exit %d)\n got:\n  %s", c.how, code, strings.Join(rows, "\n  "))
+		}
+		if after, _ := os.ReadFile(baseline); !bytes.Equal(after, before) { //nolint:gosec // G304: as above
+			t.Errorf("snapshotting %s: the baseline was rewritten", c.how)
+		}
+	}
+}
+
+// legacyRows are the verdicts of the snapshotlegacy fixture's tests, each
+// keyed by its path below the suite.
+func legacyRows(rows []string) map[string]string {
+	out := map[string]string{}
+	for _, r := range rows {
+		f := strings.Fields(r)
+		if len(f) == 3 {
+			out[strings.TrimPrefix(f[2], "TestSnapLegacyTestSuite/")] = f[1]
+		}
+	}
+	return out
+}
+
+// A baseline keyed the way the release before exact names keyed it is
+// compared under the new key: read-only under GOTEST_CI, renamed to the new
+// key otherwise. A section the exact key of another test holds serves only
+// that test, and GOTEST_CI spelled FALSE is off.
+func (s *CanaryTestSuite) TestOldSnapshotKeysAreMigrated(t *gotest.T) {
+	dir := stage(t, "snapshotlegacy")
+	baseline := filepath.Join(dir, "snapshotlegacy", "testdata", "__snapshots__", "TestSnapLegacyTestSuite_ext.snap")
+	read := func() string {
+		data, err := os.ReadFile(baseline) //nolint:gosec // G304: the staged copy of the canary's own fixture
+		if err != nil {
+			fatalf(t, "baseline: %v", err)
+		}
+		return string(data)
+	}
+	before := read()
+	for _, c := range []struct {
+		how  string
+		env  string
+		want map[string]string
+		file string
+	}{
+		{"under GOTEST_CI=1", "GOTEST_CI=1",
+			map[string]string{"TestIssue/issue_#42": "pass", "TestRows/#0": "pass", "TestTwins/x": "pass", "TestTwins/x#01": "fail", "TestStale/issue_#7": "fail"},
+			before},
+		{"under GOTEST_CI=FALSE", "GOTEST_CI=FALSE",
+			map[string]string{"TestIssue/issue_#42": "pass", "TestRows/#0": "pass", "TestTwins/x": "pass", "TestTwins/x#01": "pass", "TestStale/issue_#7": "fail"},
+			"=== SNAP TestIssue/issue_#42 ===\nforty-two\n=== SNAP TestRows/#0 n ===\nrow zero\n=== SNAP TestStale/issue_ ===\nold\n=== SNAP TestTwins/x ===\nfirst twin\n=== SNAP TestTwins/x#01 ===\nsecond twin\n"},
+		{"under GOTEST_CI=1 once renamed", "GOTEST_CI=1",
+			map[string]string{"TestIssue/issue_#42": "pass", "TestRows/#0": "pass", "TestTwins/x": "pass", "TestTwins/x#01": "pass", "TestStale/issue_#7": "fail"},
+			""},
+	} {
+		_, rows := s.runIn(t, dir, "./snapshotlegacy/", "snapshotlegacy", t.TempDir(), []string{c.env})
+		got := legacyRows(rows)
+		for name, verdict := range c.want {
+			if got[name] != verdict {
+				t.Errorf("snapshotlegacy %s: %s got %q, want %q", c.how, name, got[name], verdict)
+			}
+		}
+		if after := read(); c.file != "" && after != c.file {
+			t.Errorf("snapshotlegacy %s: baseline file\n got:\n%s\n want:\n%s", c.how, after, c.file)
+		}
+	}
 }
 
 // An Exclusive suite is dispatched strictly alone, after every non-exclusive

@@ -11,3 +11,20 @@ func (s *SnapshottingTestSuite) TestMatchesBaseline(t *gotest.T) { gotest.MatchS
 func (s *SnapshottingTestSuite) TestDiffersFromBaseline(t *gotest.T) {
 	gotest.MatchSnapshot(t, "changed")
 }
+
+// TestRows and TestTwins read baselines keyed by the names testing gives
+// unnamed rows and same-named subtests.
+func (s *SnapshottingTestSuite) TestRows(t *gotest.T) {
+	for it, v := range gotest.Each(t, []string{"row zero", "row one"}) {
+		gotest.MatchSnapshot(it, v)
+	}
+}
+
+func (s *SnapshottingTestSuite) TestTwins(t *gotest.T) {
+	t.It("x", func(it *gotest.T) { gotest.MatchSnapshot(it, "first twin") })
+	t.It("x", func(it *gotest.T) { gotest.MatchSnapshot(it, "second twin") })
+}
+
+// TestCarriageReturns: CRs before a newline and at the end are line endings,
+// so the value matches a baseline written with plain newlines.
+func (s *SnapshottingTestSuite) TestCarriageReturns(t *gotest.T) { gotest.MatchSnapshot(t, "a\r\r\nb\r") }

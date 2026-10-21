@@ -89,6 +89,24 @@ func (s *FailingTestSuite) TestJSONEqBigInts(t *gotest.T) {
 	gotest.JSONEq(t, `{"n":9007199254740993}`, `{"n":9007199254740992}`)
 }
 
+func (s *FailingTestSuite) TestSnapshotBadName(t *gotest.T) {
+	gotest.MatchSnapshot(t, "v", "two\nlines")
+}
+
+// The hanging polls outlast the run's deadlines tenfold; a poll that is
+// waited out instead of failed passes when its sleep ends.
+func (s *FailingTestSuite) TestEventuallyHangingPoll(t *gotest.T) {
+	gotest.Eventually(t, 100*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) { time.Sleep(10 * time.Second) })
+}
+
+func (s *FailingTestSuite) TestConsistentlyHangingPoll(t *gotest.T) {
+	gotest.Consistently(t, 100*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) { time.Sleep(10 * time.Second) })
+}
+
+func (s *FailingTestSuite) TestEventuallyZeroTick(t *gotest.T) {
+	gotest.Eventually(t, time.Second, 0, func(poll *gotest.R) {})
+}
+
 type lines []string
 
 func (v lines) GoString() string { return strings.Join(v, "\n") }

@@ -14,8 +14,8 @@ Each directory under `testdata/` is one package with one suite:
 
 | Fixture | Behavior it pins |
 |---|---|
-| `passing` | a green suite exits 0 and every method and behavior gets `pass`, named string types, equal infinities and `1` against `1.0` in `JSONEq` included |
-| `failing` | one failing call per assertion function, all 36, each reported as `fail`, and the failures whose message the canary reads back: a wrong-typed needle, a NaN delta, a non-string message argument, a named pattern, big JSON integers and a multi-line diff |
+| `passing` | a green suite exits 0 and every method and behavior gets `pass`, named string types, equal infinities, `1` against `1.0` in `JSONEq` and a final poll at the deadline for `Eventually` and `Consistently` included |
+| `failing` | one failing call per assertion function, all 36, each reported as `fail`, and the failures whose message the canary reads back: a wrong-typed needle, a NaN delta, a non-string message argument, a named pattern, big JSON integers, a multi-line diff, a poll still running at its deadline, a tick that is not positive and a snapshot name that spans lines |
 | `failnow` | a failed assertion halts the method; the statement after it never runs |
 | `aftereach` | `AfterEach` runs even when the test failed |
 | `lifecycle` | `BeforeAll`, the methods and `AfterAll` run in that order |
@@ -32,8 +32,10 @@ Each directory under `testdata/` is one package with one suite:
 | `setupfailing` | a shared fixture that fails to come up fails only the suites that read it, in the `-json` stream and in a bench run |
 | `teardownaftersetup` | a shared fixture whose `AfterAll` fails beside a sibling that never came up: the stream carries both failures |
 | `guardskip` | a suite its guard skips sets up none of its fixtures: one that would fail leaves the run green |
-| `snapshotting` | a value that differs from its committed baseline fails; one that matches passes |
+| `snapshotting` | a value that differs from its committed baseline fails; one that matches passes, carriage returns at line ends included; unnamed `Each` rows and same-named subtests read sections of their own, also under `-trimpath`, and `GOTEST_UPDATE_SNAPSHOTS` spelled `0`, `false`, `FALSE` or `f` rewrites nothing; runs that may write use a staged copy |
+| `snapshotlegacy` | baselines keyed the way the release before exact names keyed them are compared under the new key, left alone under `GOTEST_CI=1` and renamed otherwise; a section its exact key read serves no second key, and `GOTEST_CI=FALSE` is off |
 | `exclusive` | an Exclusive suite starts only after every non-exclusive suite in the run ended |
+| `latepolls` | a poll that starts before waitFor is judged by its result, for `Eventually` and `Consistently`, however many ticks it takes; a poll abandoned past its deadline that panics later is written to stderr |
 | `helpers` | an assertion failing inside a helper names the helper's line and the caller's, under `-trimpath` in a module without a dot |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line

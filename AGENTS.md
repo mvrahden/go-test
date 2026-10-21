@@ -176,6 +176,13 @@ On subsequent runs, the value is compared against the stored snapshot.
 The optional `name` disambiguates multiple snapshots within the same test case.
 Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
 
+A section is keyed by the exact subtest name, testing's `#0` and `#01` suffixes included ([Snapshot sections](specs/assertions/spec.md#requirement-snapshot-sections)).
+A baseline saved under the older key, without such a suffix, is still compared, and renamed to the exact key outside CI ([Baselines keyed by the release before exact names](specs/assertions/spec.md#requirement-baselines-keyed-by-the-release-before-exact-names)).
+`B` and `F` carry `Name()`, so benchmark and fuzz snapshots are keyed by name too.
+Under `-trimpath` the baselines are looked up in the package directory go test runs in, so a snapshot taken in a helper of another package lands beside the package under test.
+A name that spans lines or spells a section header is refused ([Snapshot names](specs/assertions/spec.md#requirement-snapshot-names)).
+`GOTEST_UPDATE_SNAPSHOTS` and `GOTEST_CI` are off when unset or set to `0`, `f`, `F`, `false`, `FALSE` or `False`, and on for any other value; with updates off a stale baseline fails and stays untouched ([Snapshot updates switched off](specs/assertions/spec.md#requirement-snapshot-updates-switched-off)).
+
 ### Typing
 
 Assertions take the types they are given at face value and say what they cannot work with:
@@ -201,6 +208,8 @@ gotest.Consistently(t, 2*time.Second, 100*time.Millisecond, func(poll *gotest.R)
 
 There are no method forms on `*T`. Only package-level `gotest.Eventually()` and `gotest.Consistently()` exist.
 
+A poll that started before the deadline is judged by its result, however many ticks it takes; one still running `waitFor` past the deadline fails as still running ([Polls and their deadline](specs/assertions/spec.md#requirement-polls-and-their-deadline)), and a `waitFor` or `tick` that is not positive fails before the first poll ([Polling arguments](specs/assertions/spec.md#requirement-polling-arguments)).
+
 **Critical constraint:** Inside the callback, `poll` is a `*gotest.R`, not a `*gotest.T`.
 `poll` has no `T()` method. All code in the callback must use gotest assertions only.
 A helper that takes `*gotest.T` cannot be called with `poll`.
@@ -209,7 +218,9 @@ This is by design — the recorder intercepts failures without aborting, enablin
 A panic in the callback fails the test and is reported with the stack from where it
 happened. The callback runs on its own goroutine, so the panic is carried back to the
 test's goroutine before being re-raised — `AfterEach`, `AfterAll` and fixture teardown all
-still run.
+still run. A poll abandoned as still running keeps running, since Go cannot stop it; a
+panic it raises later is written to stderr with its stack, not reported as a failure
+([Abandoned polls](specs/assertions/spec.md#requirement-abandoned-polls)).
 
 ## Goroutines Started by Tests
 

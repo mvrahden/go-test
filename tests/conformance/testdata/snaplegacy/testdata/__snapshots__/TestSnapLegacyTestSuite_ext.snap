@@ -1,0 +1,8 @@
+=== SNAP TestIssue/issue_ ===
+forty-two
+=== SNAP TestRows/ n ===
+row zero
+=== SNAP TestStale/issue_ ===
+old
+=== SNAP TestTwins/x ===
+first twin
