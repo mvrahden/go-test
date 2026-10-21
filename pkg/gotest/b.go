@@ -18,6 +18,7 @@ type B struct {
 func NewB(b *testing.B) *B { return &B{b: b} }
 
 func (b *B) B() *testing.B                       { return b.b }
+func (b *B) Name() string                        { return b.b.Name() }
 func (b *B) Loop() bool                          { return b.b.Loop() }
 func (b *B) ReportAllocs()                       { b.b.ReportAllocs() }
 func (b *B) SetBytes(n int64)                    { b.b.SetBytes(n) }

@@ -48,6 +48,14 @@ func (f *F) Context() context.Context { return f.f.Context() }
 // Errorf and Skipf name the caller's line, not gotest's.
 func (f *F) Errorf(format string, args ...any) { report(f.f, fmt.Sprintf(format, args...)) }
 func (f *F) FailNow()                          { f.f.FailNow() }
+
+// Name is the fuzz target's name, as testing gave it.
+func (f *F) Name() string {
+	if f.f == nil {
+		return ""
+	}
+	return f.f.Name()
+}
 func (f *F) Skipf(format string, args ...any) {
 	assert.SkipInternalFrames(f.f)
 	f.f.Skipf(format, args...)

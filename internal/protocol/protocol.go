@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -90,4 +91,15 @@ func SplitFuzzWrapper(name string) (suite, method string, ok bool) {
 		return "", "", false
 	}
 	return m[1], m[2], true
+}
+
+// SwitchOn reads the value of an on/off variable such as GOTEST_CI: empty is
+// off, and so are the false spellings of strconv.ParseBool (0, f, F, false,
+// FALSE, False). Any other value is on, so a mistyped opt-in stays on.
+func SwitchOn(v string) bool {
+	if v == "" {
+		return false
+	}
+	on, err := strconv.ParseBool(v)
+	return on || err != nil
 }

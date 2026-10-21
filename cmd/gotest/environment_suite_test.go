@@ -36,6 +36,9 @@ func (s *CmdEnvTestSuite) TestDetectCIEnv(t *gotest.T) {
 		{Desc: "CI set", gotestCI: "", ci: "true", expect: true},
 		{Desc: "CI=false is not CI", gotestCI: "", ci: "false", expect: false},
 		{Desc: "CI=0 is not CI", gotestCI: "", ci: "0", expect: false},
+		{Desc: "GOTEST_CI=FALSE opts out", gotestCI: "FALSE", ci: "true", expect: false},
+		{Desc: "GOTEST_CI=f opts out", gotestCI: "f", ci: "true", expect: false},
+		{Desc: "CI=False is not CI", gotestCI: "", ci: "False", expect: false},
 	}) {
 		sub.Setenv("GOTEST_CI", tc.gotestCI)
 		sub.Setenv("CI", tc.ci)

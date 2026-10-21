@@ -307,7 +307,7 @@ func runFailureEvents(pkg, msg string, details ...string) []byte {
 
 func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult) (PipelineResult, error) { //nolint:gocritic // hugeParam: stable API
 	if !cfg.CI && os.Getenv(protocol.EnvCI) == "" {
-		if v := os.Getenv("CI"); v != "" && v != "0" && v != "false" {
+		if protocol.SwitchOn(os.Getenv("CI")) {
 			cfg.CI = true
 		}
 	}
