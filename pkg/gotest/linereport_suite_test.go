@@ -151,7 +151,7 @@ func (s *LineReportingTestSuite) TestEventually(t *gotest.T) {
 			gotest.True(it, spy.failed)
 			masked, polls := maskPollCount(spy.msg)
 			gotest.MatchSnapshot(it, masked)
-			gotest.InDelta(it, 10, polls, 5)
+			assertPolled(it, polls)
 		})
 	})
 
@@ -165,7 +165,7 @@ func (s *LineReportingTestSuite) TestEventually(t *gotest.T) {
 			gotest.True(it, spy.failed)
 			masked, polls := maskPollCount(spy.msg)
 			gotest.MatchSnapshot(it, masked)
-			gotest.InDelta(it, 10, polls, 5)
+			assertPolled(it, polls)
 		})
 	})
 }
@@ -181,7 +181,7 @@ func (s *LineReportingTestSuite) TestHelperCallingEventually(t *gotest.T) {
 			gotest.True(it, spy.failed)
 			masked, polls := maskPollCount(spy.msg)
 			gotest.MatchSnapshot(it, masked)
-			gotest.InDelta(it, 10, polls, 5)
+			assertPolled(it, polls)
 		})
 	})
 }
@@ -204,4 +204,12 @@ func (s *LineReportingTestSuite) TestConsistently(t *gotest.T) {
 			gotest.MatchSnapshot(it, spy.msg)
 		})
 	})
+}
+
+// assertPolled bounds the poll count of a 200ms/20ms Eventually: at least one,
+// and nowhere near what a loop that never waits for its tick would reach.
+// Retrying itself is pinned in the async assertion suite.
+func assertPolled(t *gotest.T, polls int) {
+	gotest.GreaterOrEqual(t, polls, 1)
+	gotest.LessOrEqual(t, polls, 20)
 }

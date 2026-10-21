@@ -16,7 +16,8 @@ type LintPlainTestSuite struct{}
 
 // SuiteConfig: every case loads and type-checks a module.
 func (s *LintPlainTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {

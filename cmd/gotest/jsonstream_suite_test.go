@@ -22,9 +22,8 @@ type JSONStreamTestSuite struct {
 }
 
 func (s *JSONStreamTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *JSONStreamTestSuite) BeforeAll(t *gotest.T) {
@@ -59,6 +58,7 @@ func (s *JSONStreamTestSuite) TestEveryLineIsAGoTestEvent(t *gotest.T) {
 	}) {
 		cmd := exec.Command(s.cli.binary, "-json", "./tests/canary/testdata/"+tc.pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Dir = s.cli.repoRoot
+		cmd.Env = cliEnv(cmd.Dir)
 		var stdout bytes.Buffer
 		cmd.Stdout = &stdout
 		_ = cmd.Run()
@@ -93,6 +93,7 @@ func (s *JSONStreamTestSuite) TestEveryLineIsAGoTestEvent(t *gotest.T) {
 func (s *JSONStreamTestSuite) TestABuildFailureTakesGoTestsShape(t *gotest.T) {
 	cmd := exec.Command(s.cli.binary, "-json", "./tests/canary/testdata/broken/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
+	cmd.Env = cliEnv(cmd.Dir)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	_ = cmd.Run()

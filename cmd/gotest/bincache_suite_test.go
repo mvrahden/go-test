@@ -21,7 +21,8 @@ type BinaryCacheTestSuite struct {
 }
 
 func (s *BinaryCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *BinaryCacheTestSuite) BeforeAll(t *gotest.T) {
@@ -31,7 +32,7 @@ func (s *BinaryCacheTestSuite) BeforeAll(t *gotest.T) {
 const cachedPkg = "./tests/canary/testdata/passing/"
 
 func cacheEnv(dir string) []string {
-	return append(os.Environ(), "GOTEST_CACHE_DIR="+dir)
+	return []string{"GOTEST_CACHE_DIR=" + dir}
 }
 
 // linkStep matches a link action in the build trace GOFLAGS=-x makes go

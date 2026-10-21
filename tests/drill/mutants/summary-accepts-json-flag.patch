@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestTwoOutputModesAreRefused/two_output_modes_are_asked_for_at_once/refuses_them,_and_an_unknown_--format,_with_exit_2/summary_with_-json
 Expect: ^FAIL .*conformance/cli .* / refuses them, and an unknown --format, with exit 2 / summary with -json \(
 Clause: when two output modes are asked for at once → refuses them, and an unknown --format, with exit 2
 --- a/cmd/gotest/summary.go

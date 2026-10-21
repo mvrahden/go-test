@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // Run is what one CLI invocation left behind: its exit code, both streams,
@@ -42,6 +44,13 @@ const MarkersFile = "markers"
 // run that could not start or be read is.
 func RunPackage(ctx context.Context, markerDir, pkg string, args ...string) (Run, error) {
 	return runCLI(ctx, ".", markerDir, nil, append([]string{"-json", pkg}, args...)...)
+}
+
+// RunPackageWithEnv is RunPackage with extra KEY=VALUE pairs appended to the
+// child's environment after the scrub, so a fixture package under test can be
+// told how to behave. A GOTEST_CACHE_DIR among them replaces the run's own.
+func RunPackageWithEnv(ctx context.Context, markerDir string, env []string, pkg string, args ...string) (Run, error) {
+	return runCLI(ctx, ".", markerDir, env, append([]string{"-json", pkg}, args...)...)
 }
 
 // RunCLI runs the built CLI in dir with args and returns its exit code and
@@ -131,9 +140,11 @@ func (r *Run) MarkerOrder(markers ...string) bool {
 
 // childEnv is the CLI's environment: the caller's, minus the GitHub Actions
 // variables, the CI switches and the snapshot update switch, plus the marker
-// directory, so a run under test sees only the flags it was given.
+// directory, so a run under test sees only the flags it was given. Its gotest
+// cache uses the drill's private worker root when supplied, otherwise the
+// marker directory; neither fills the user's cache.
 func childEnv(markerDir string) []string {
-	env := make([]string, 0, len(os.Environ())+1)
+	env := make([]string, 0, len(os.Environ())+2)
 	for _, kv := range os.Environ() {
 		switch {
 		case strings.HasPrefix(kv, "GITHUB_ACTIONS="),
@@ -141,12 +152,20 @@ func childEnv(markerDir string) []string {
 			strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS="),
 			strings.HasPrefix(kv, "GOTEST_CI="),
 			strings.HasPrefix(kv, "CI="),
-			strings.HasPrefix(kv, "GOTEST_CANARY_DIR="):
+			strings.HasPrefix(kv, "GOTEST_CANARY_DIR="),
+			strings.HasPrefix(kv, protocol.EnvCacheDir+"="):
 			continue
 		}
 		env = append(env, kv)
 	}
-	return append(env, "GOTEST_CANARY_DIR="+markerDir)
+	return append(env, "GOTEST_CANARY_DIR="+markerDir, protocol.EnvCacheDir+"="+ChildCacheDir(markerDir))
+}
+
+// ChildEnv is the environment runCLI gives the CLI, for a check that starts
+// the CLI itself: the scrub, the marker directory and the cache inside it,
+// then extra pairs, which may name another cache.
+func ChildEnv(markerDir string, extra ...string) []string {
+	return append(childEnv(markerDir), extra...)
 }
 
 func parseEvents(stdout []byte) []Event {
@@ -193,12 +212,7 @@ func cli(ctx context.Context) (string, error) {
 			cliErr = err
 			return
 		}
-		dir, err := os.MkdirTemp("", "gotest-cli-")
-		if err != nil {
-			cliErr = err
-			return
-		}
-		cliBinary, cliErr = BuildCLI(ctx, root, dir)
+		cliBinary, cliErr = resolveCLI(ctx, root)
 	})
 	return cliBinary, cliErr
 }

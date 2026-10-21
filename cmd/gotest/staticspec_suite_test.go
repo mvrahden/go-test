@@ -28,9 +28,8 @@ type StaticSpecTestSuite struct {
 // SuiteConfig: the rendered corpus comes from a real run, which the
 // 30-second default does not cover on a slow machine.
 func (s *StaticSpecTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
 }
 
 // staticCtx is one test's work dir and the overlay a run of the corpus writes.

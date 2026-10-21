@@ -15,9 +15,8 @@ type GeneratorTestSuite struct{}
 // SuiteConfig: the end-to-end fixtures are generated and built, which
 // the 30-second default does not cover on a slow machine.
 func (s *GeneratorTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *GeneratorTestSuite) TestStdlibPackageHasNoSuites(t *gotest.T) {

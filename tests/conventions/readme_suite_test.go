@@ -17,9 +17,8 @@ import (
 type ReadmeExampleTestSuite struct{}
 
 func (s *ReadmeExampleTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 // durations replaces every "(12ms)", "(<1ms)" or "(0.01s)" so two runs compare.

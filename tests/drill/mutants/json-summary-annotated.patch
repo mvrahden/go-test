@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestJSONOutputsStayPure/a_JSON_document_is_asked_for/prints_one_JSON_document_with_no_color_codes_or_annotations,_inside_GitHub_Actions_too/summary_--format_json_inside_GitHub_Actions_carries_no_annotations
 Expect: ^FAIL .*conformance/cli .* / prints one JSON document with no color codes or annotations, inside GitHub Actions too / summary --format json inside GitHub Actions carries no annotations \(
 Clause: when a JSON document is asked for → prints one JSON document with no color codes or annotations, inside GitHub Actions too
 --- a/cmd/gotest/summary.go

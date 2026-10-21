@@ -15,9 +15,8 @@ type ExitZeroTestSuite struct {
 }
 
 func (s *ExitZeroTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *ExitZeroTestSuite) BeforeAll(t *gotest.T) {

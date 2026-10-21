@@ -16,9 +16,8 @@ import (
 type HoldsTestSuite struct{ root string }
 
 func (s *HoldsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
 }
 
 var plainPackages = []string{"./testdata/holds/", "./testdata/panics/"}
@@ -29,6 +28,7 @@ func (s *HoldsTestSuite) BeforeAll(t *gotest.T) {
 	binary, err := testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	gotest.NoError(t, testkit.PrivateCache(t.TempDir()))
 	s.root = stageTestdata(t, root)
 	for _, dir := range plainPackages {
 		cmd := exec.Command(binary, "generate", dir) //nolint:gosec // G204: controlled binary with fixed args

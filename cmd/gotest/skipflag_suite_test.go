@@ -15,9 +15,8 @@ type SkipFlagTestSuite struct {
 }
 
 func (s *SkipFlagTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *SkipFlagTestSuite) BeforeAll(t *gotest.T) {

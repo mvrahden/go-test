@@ -29,9 +29,8 @@ type InterruptTestSuite struct {
 }
 
 func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
@@ -41,6 +40,7 @@ func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
 	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	gotest.NoError(t, testkit.PrivateCache(t.TempDir()))
 	s.root = stageTestdata(t, root)
 	gen := exec.Command(s.cli, "generate", "./testdata/interrupt/") //nolint:gosec // G204: controlled binary with fixed args
 	gen.Dir = s.root
@@ -96,6 +96,10 @@ func startTree(t *gotest.T, cmd *exec.Cmd) (tree *proctree.Tree, log string) {
 	return startTreeUntil(t, cmd, "INTERRUPT_LOG", "running")
 }
 
+// startBound bounds a run that never logs its marker. The CLI compiles the
+// package first, cold on a loaded runner, so the bound is generous.
+const startBound = 5 * time.Minute
+
 // startTreeUntil is startTree for a package that logs through logEnv and is
 // ready once it logged marker.
 func startTreeUntil(t *gotest.T, cmd *exec.Cmd, logEnv, marker string) (tree *proctree.Tree, log string) {
@@ -105,7 +109,7 @@ func startTreeUntil(t *gotest.T, cmd *exec.Cmd, logEnv, marker string) (tree *pr
 	cmd.WaitDelay = 15 * time.Second
 	tree = proctree.New(cmd)
 	gotest.NoError(t, tree.Start())
-	for deadline := time.Now().Add(30 * time.Second); !slices.Contains(readEvents(log), marker); time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(startBound); !slices.Contains(readEvents(log), marker); time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			_ = tree.Kill()
 			_ = wait(tree, cmd)

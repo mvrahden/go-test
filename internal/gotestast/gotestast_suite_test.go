@@ -139,9 +139,8 @@ func buildFixtureSpec(t *testing.T, src string) *gotestast.FixtureSpec {
 type GotestastTestSuite struct{}
 
 func (s *GotestastTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *GotestastTestSuite) TestDetermineFixture(t *gotest.T) {
@@ -1090,9 +1089,8 @@ func (f *PGSharedFixture) setupB(ctx context.Context) error {
 type SpecTestSuite struct{}
 
 func (s *SpecTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *SpecTestSuite) TestReduceToEffectiveSet(t *gotest.T) {

@@ -22,9 +22,8 @@ type NoPackagesTestSuite struct {
 }
 
 func (s *NoPackagesTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *NoPackagesTestSuite) BeforeAll(t *gotest.T) {
@@ -133,6 +132,7 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 func (s *NoPackagesTestSuite) TestWatchKeepsWatching(t *gotest.T) {
 	cmd := exec.Command(s.cli.binary, "watch", "--", "-json", nogo) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
+	cmd.Env = cliEnv(cmd.Dir)
 	stdout, err := cmd.StdoutPipe()
 	gotest.NoError(t, err)
 	gotest.NoError(t, cmd.Start())

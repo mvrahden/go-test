@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -15,10 +14,8 @@ import (
 type LocationTestSuite struct{}
 
 func (s *LocationTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *LocationTestSuite) TestInlinedHook(t *gotest.T) {

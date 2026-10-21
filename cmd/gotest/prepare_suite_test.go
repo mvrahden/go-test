@@ -30,9 +30,8 @@ type PrepareCLITestSuite struct {
 }
 
 func (s *PrepareCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *PrepareCLITestSuite) BeforeAll(t *gotest.T) {
@@ -48,7 +47,7 @@ type prepareOutput struct {
 func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 	cmd := exec.Command(s.cli.binary, "prepare", "./tests/sharedfixture/standalone/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
-	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
+	cmd.Env = append(cliEnviron(), "GOTEST_CI=0")
 	stdout, err := cmd.StdoutPipe()
 	gotest.NoError(t, err)
 	tree, err := testkit.StartCLI(cmd)
@@ -105,7 +104,7 @@ func (s *PrepareCLITestSuite) TestPrepare(t *gotest.T) {
 func (s *PrepareCLITestSuite) TestPrepareReportsATeardownFailure(t *gotest.T) {
 	cmd := exec.Command(s.cli.binary, "prepare", "./tests/canary/testdata/teardownfailing/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
-	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
+	cmd.Env = append(cliEnviron(), "GOTEST_CI=0")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()

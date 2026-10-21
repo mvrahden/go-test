@@ -1,5 +1,6 @@
 Expect: benching: exit code 2, want 0
 Expect: benching: results \[BenchmarkContext BenchmarkMetric BenchmarkSecond BenchmarkSplit/long BenchmarkSplit/short\]
+Judge: ./tests/canary CanaryTestSuite/TestEveryBenchmarkReportsAResult
 --- a/internal/gotestgen/static/gotest.bench.tpl
 +++ b/internal/gotestgen/static/gotest.bench.tpl
 @@ -3,7 +3,7 @@

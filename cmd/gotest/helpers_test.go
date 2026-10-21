@@ -21,10 +21,32 @@ type cliRunner struct {
 }
 
 // newCLIRunner wraps the shared binary and scrubs this process's Actions
-// env, which every child CLI inherits. Call it from BeforeAll.
+// env, which every child CLI inherits. Call it from BeforeAll. The CI and
+// snapshot switches stay: this process's snapshots read them, and cliEnv
+// keeps them from the children.
 func newCLIRunner(cli *gotestcli.BinarySharedFixture) cliRunner {
 	testkit.ScrubActionsEnv()
 	return cliRunner{binary: cli.Binary, repoRoot: cli.RepoRoot}
+}
+
+// cliEnviron is this process's environment minus the CI and snapshot
+// switches, so a child CLI sees only the flags its case gives it.
+func cliEnviron() []string {
+	env := make([]string, 0, len(os.Environ()))
+	for _, kv := range os.Environ() {
+		switch name, _, _ := strings.Cut(kv, "="); name {
+		case "CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS":
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
+}
+
+// cliEnv is cliEnviron for a CLI started in dir, then extra. It carries PWD
+// itself: exec sets it from cmd.Dir only for a nil cmd.Env.
+func cliEnv(dir string, extra ...string) []string {
+	return append(append(cliEnviron(), "PWD="+dir), extra...)
 }
 
 // run returns the binary's combined stdout+stderr output.
@@ -38,9 +60,7 @@ func (r cliRunner) runExit(t *gotest.T, args ...string) (string, int) {
 	return r.runEnv(t, nil, args...)
 }
 
-// runEnv is runExit with extra environment entries. A nil env keeps
-// cmd.Env nil, which is when exec sets the child's PWD from cmd.Dir; an
-// explicit env has to carry that itself.
+// runEnv is runExit with extra environment entries.
 func (r cliRunner) runEnv(t *gotest.T, env []string, args ...string) (string, int) {
 	return runGotestIn(t, r.binary, r.repoRoot, env, args...)
 }
@@ -55,6 +75,7 @@ func (r cliRunner) runSplit(t *gotest.T, args ...string) (stdout, stderr string,
 func (r cliRunner) runSplitIn(t *gotest.T, dir string, args ...string) (stdout, stderr string, code int) {
 	cmd := exec.Command(r.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
+	cmd.Env = cliEnv(dir)
 	var out, errs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errs
 	err := cmd.Run()

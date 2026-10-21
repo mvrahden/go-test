@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +29,11 @@ type CanaryTestSuite struct {
 	binary     string
 	expected   map[string]expectation
 	lastStream string // the -json stdout of the last run, for checks on what it carried
+}
+
+func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{SetupTimeout: gotest.NoDeadline}
 }
 
 type expectation struct {
@@ -138,19 +144,28 @@ func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string
 	return code, rows
 }
 
-// childEnv is the fixture process's environment: the canary dir, and never
-// the snapshot update switch. A refresh of the repository's own snapshots
-// must not rewrite the snapshotting fixture's deliberately stale baseline.
-func childEnv(canaryDir string) []string {
-	env := make([]string, 0, len(os.Environ())+1)
+// childEnv is the fixture process's environment: the canary dir, its own
+// gotest cache, and none of the host's CI or GOTEST_* settings, so a run
+// checks the same on a CI runner as on a laptop. Under CI snapshots are
+// read-only, and a refresh of the repository's own snapshots must not
+// rewrite the snapshotting fixture's deliberately stale baseline. extra
+// pairs are what a case sets on purpose; they go on top.
+func childEnv(canaryDir string, extra ...string) []string {
+	env := make([]string, 0, len(os.Environ())+2+len(extra))
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS=") {
+		name, _, _ := strings.Cut(kv, "=")
+		if strings.HasPrefix(name, "GOTEST_") || slices.Contains(hostOnlyEnv, name) {
 			continue
 		}
 		env = append(env, kv)
 	}
-	return append(env, "GOTEST_CANARY_DIR="+canaryDir)
+	env = append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+testkit.ChildCacheDir(canaryDir))
+	return append(env, extra...)
 }
+
+// hostOnlyEnv are the variables that put the CLI in CI mode or point it at
+// the job's step summary.
+var hostOnlyEnv = []string{"CI", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"}
 
 // check runs a fixture and compares exit code and rows with the golden.
 func (s *CanaryTestSuite) check(t *gotest.T, pkg string) string {
@@ -172,6 +187,31 @@ func (s *CanaryTestSuite) check(t *gotest.T, pkg string) string {
 
 func (s *CanaryTestSuite) TestPassingSuiteIsGreen(t *gotest.T) {
 	s.check(t, "passing")
+}
+
+// A fixture run leaves the host's gotest cache and CI settings alone: its
+// entries land in its own cache, and only what a case sets reaches it.
+func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
+	host := t.TempDir()
+	t.Setenv("GOTEST_CACHE_DIR", host)
+	t.Setenv("CI", "true")
+	t.Setenv("GOTEST_CI", "1")
+	dir := s.check(t, "passing")
+	if entries, err := os.ReadDir(host); err != nil || len(entries) != 0 {
+		t.Errorf("host gotest cache: %d entries (err %v), want none", len(entries), err)
+	}
+	if entries, err := os.ReadDir(testkit.ChildCacheDir(dir)); err != nil || len(entries) == 0 {
+		t.Errorf("child gotest cache: %d entries (err %v), want some", len(entries), err)
+	}
+	env := childEnv(dir, "GOTEST_CI=0")
+	for _, kv := range env {
+		if kv == "CI=true" || kv == "GOTEST_CI=1" || kv == "GOTEST_CACHE_DIR="+host {
+			t.Errorf("child env inherits the host's %s", kv)
+		}
+	}
+	if env[len(env)-1] != "GOTEST_CI=0" {
+		t.Errorf("child env drops what the case set: ends with %q", env[len(env)-1])
+	}
 }
 
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {

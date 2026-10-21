@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestColorFollowsTheTerminal/stdout_is_a_pipe/prints_no_color_codes,_even_with_--no-color=false/summary_prints_no_color_codes
 Expect: ^FAIL .*conformance/cli .* / prints no color codes, even with --no-color=false / summary prints no color codes \(
 Clause: when stdout is a pipe → prints no color codes, even with --no-color=false
 --- a/cmd/gotest/color.go

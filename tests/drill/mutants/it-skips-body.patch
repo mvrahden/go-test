@@ -1,4 +1,5 @@
 Expect: ^ *failing pass TestFailingTestSuite/TestBehavior$
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
 --- a/pkg/gotest/t.go
 +++ b/pkg/gotest/t.go
 @@ -110,7 +110,7 @@

@@ -18,7 +18,8 @@ type ContractScaffoldTestSuite struct{}
 // SuiteConfig: each case builds a scratch module, which the 30-second default
 // does not cover on a slow machine.
 func (s *ContractScaffoldTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 // contractDriver instantiates the scaffold via an alias and runs its BeforeEach.

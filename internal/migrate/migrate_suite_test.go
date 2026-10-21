@@ -64,9 +64,8 @@ type MigrateTestSuite struct {
 }
 
 func (s *MigrateTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 // migrateSource migrates src as the only test file of a package and

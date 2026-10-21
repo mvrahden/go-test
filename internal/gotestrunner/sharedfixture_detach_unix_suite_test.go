@@ -26,9 +26,8 @@ type SharedFixtureDetachedGrandchildTestSuite struct {
 const drain = time.Second
 
 func (s *SharedFixtureDetachedGrandchildTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Exclusive: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *SharedFixtureDetachedGrandchildTestSuite) BeforeEach(t *gotest.T) {

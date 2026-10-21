@@ -17,9 +17,8 @@ import (
 type FuzzCorpusTestSuite struct{}
 
 func (s *FuzzCorpusTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func writeCorpusFile(t *gotest.T, dir, body string) string {

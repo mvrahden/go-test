@@ -18,9 +18,8 @@ type MigrateFileTestSuite struct {
 }
 
 func (s *MigrateFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 type migrateFileCtx struct{}

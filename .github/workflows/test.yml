@@ -23,6 +23,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GORACE: atexit_sleep_ms=0
+
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -34,16 +37,58 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
+        shard: [cli, core]
+        include:
+          - os: windows-latest
+            parallel: 16
+          - os: macos-latest
+            parallel: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: "1.27"
+          cache: false
+      - name: Locate the Go build cache
+        id: gocache
+        shell: bash
+        run: |
+          echo "dir=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - name: Restore the Go build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ${{ steps.gocache.outputs.dir }}
+            !${{ steps.gocache.outputs.dir }}/fuzz
+            ${{ steps.gocache.outputs.mod }}
+          key: gobuild-${{ github.job }}-${{ runner.os }}-go1.27-${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: gobuild-${{ github.job }}-${{ runner.os }}-go1.27-${{ matrix.shard }}-
+      - name: Select the shard's packages
+        id: shard
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          cli='^github\.com/mvrahden/go-test/(cmd|tests)(/|$)'
+          if [ "$SHARD" = cli ]; then sel=(grep -E); else sel=(grep -vE); fi
+          pkgs=$(go list ./... ./examples/... | "${sel[@]}" "$cli" | tr '\n' ' ')
+          echo "packages=$pkgs" >> "$GITHUB_OUTPUT"
       - name: Test (suites)
         uses: ./
         with:
-          packages: "./... ./examples/..."
+          packages: ${{ steps.shard.outputs.packages }}
           race: true
+          flags: "--parallel=${{ matrix.parallel }}"
+      - name: Save the Go build cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ${{ steps.gocache.outputs.dir }}
+            !${{ steps.gocache.outputs.dir }}/fuzz
+            ${{ steps.gocache.outputs.mod }}
+          key: gobuild-${{ github.job }}-${{ runner.os }}-go1.27-${{ matrix.shard }}-${{ github.sha }}
 
   bench-smoke:
     runs-on: ubuntu-latest
@@ -88,6 +133,22 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ matrix.go-version }}
+          cache: false
+      - name: Locate the Go build cache
+        id: gocache
+        shell: bash
+        run: |
+          echo "dir=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - name: Restore the Go build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ${{ steps.gocache.outputs.dir }}
+            !${{ steps.gocache.outputs.dir }}/fuzz
+            ${{ steps.gocache.outputs.mod }}
+          key: gobuild-${{ github.job }}-${{ runner.os }}-go${{ matrix.go-version }}-${{ github.sha }}
+          restore-keys: gobuild-${{ github.job }}-${{ runner.os }}-go${{ matrix.go-version }}-
       # gotest tests itself with one runner. The census, the ring-0 suites,
       # the canary and the drill (quality.yml) replace the stdlib step; see
       # ARCHITECTURE.md, "Testing gotest".
@@ -100,3 +161,13 @@ jobs:
           # One matrix cell publishes the badge; the others would only race
           # it for the same number.
           badge: ${{ matrix.go-version == '1.27' }}
+          flags: "--parallel=16"
+      - name: Save the Go build cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ${{ steps.gocache.outputs.dir }}
+            !${{ steps.gocache.outputs.dir }}/fuzz
+            ${{ steps.gocache.outputs.mod }}
+          key: gobuild-${{ github.job }}-${{ runner.os }}-go${{ matrix.go-version }}-${{ github.sha }}

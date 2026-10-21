@@ -1,4 +1,5 @@
 Expect: teardownaftersetup: the stream carries no word of the teardown failure
+Judge: ./tests/canary CanaryTestSuite/TestATeardownFailureBesideASetupFailureReachesTheStream
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
 @@ -158,7 +158,7 @@

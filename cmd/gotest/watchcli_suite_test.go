@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -27,9 +26,8 @@ type WatchCLITestSuite struct {
 }
 
 func (s *WatchCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Timeout = 3 * time.Minute
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *WatchCLITestSuite) BeforeAll(t *gotest.T) { s.cli = newCLIRunner(s.CLI) }
@@ -39,7 +37,7 @@ func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {
 	gotest.NoError(t, err)
 	cmd := exec.Command(s.cli.binary, "watch", "-json", pkg) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
-	cmd.Env = append(os.Environ(), "GOTEST_CI=0")
+	cmd.Env = append(cliEnviron(), "GOTEST_CI=0")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()

@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"errors"
-	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -24,9 +23,7 @@ func stageFuzzModule(t *gotest.T, repoRoot, dir string) string {
 func runGotestIn(t *gotest.T, binary, dir string, env []string, args ...string) (string, int) {
 	cmd := exec.Command(binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
-	if env != nil {
-		cmd.Env = append(append(os.Environ(), "PWD="+dir), env...)
-	}
+	cmd.Env = cliEnv(dir, env...)
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
 	gotest.True(t, err == nil || errors.As(err, &exitErr), "running gotest binary: %v\n%s", err, out)

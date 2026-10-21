@@ -29,9 +29,8 @@ type SharedFixtureTeardownTestSuite struct{}
 // subprocesses against configured budgets — the one workload that must not
 // share the machine with concurrent compiles.
 func (s *SharedFixtureTeardownTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Exclusive = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Exclusive: true, Timeout: gotest.NoDeadline}
 }
 
 // slowTeardownFixture is the fixture description the generator would produce for

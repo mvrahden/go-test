@@ -24,9 +24,8 @@ type MigrateCompileTestSuite struct {
 }
 
 func (s *MigrateCompileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *MigrateCompileTestSuite) migrate(t *gotest.T, files map[string]string, patterns ...string) pkgRun {
@@ -85,10 +84,9 @@ func compiles(t *gotest.T, dir string, flags ...string) string {
 
 // runSuites runs gotest on patterns in dir.
 func (s *MigrateCompileTestSuite) runSuites(t *gotest.T, dir string, args ...string) (stdout, stderr string, code int) {
-	testkit.ScrubActionsEnv()
 	cmd := exec.CommandContext(t.Context(), s.CLI.Binary, append([]string{"-v"}, args...)...) //nolint:gosec // G204: the CLI under test
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "PWD="+dir)
+	cmd.Env = testkit.ChildEnv(t.TempDir(), "GOWORK=off", "GOFLAGS=", "PWD="+dir)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	_ = cmd.Run()
@@ -666,10 +664,9 @@ func (s *MigrateCompileTestSuite) TestTagOnlyDirectory(t *gotest.T) {
 		t.When("the pattern is "+pattern, func(w *gotest.T) {
 			root := w.TempDir()
 			gotest.NoError(w, s.Mod.Write(root, map[string]string{"tagonly/a_test.go": src}))
-			testkit.ScrubActionsEnv()
 			cmd := exec.CommandContext(w.Context(), s.CLI.Binary, "migrate", "--dry-run", pattern) //nolint:gosec // G204: the CLI under test
 			cmd.Dir = root
-			cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "PWD="+root)
+			cmd.Env = testkit.ChildEnv(w.TempDir(), "GOWORK=off", "GOFLAGS=", "PWD="+root)
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			_ = cmd.Run()

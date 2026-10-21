@@ -1,3 +1,4 @@
+Judge: ./tests/conformance/cli CLIScaffoldPathsTestSuite/TestFilePaths/a_source_file_is_named_by_path/scaffolds_beside_the_file,_by_a_relative_or_an_absolute_path/an_absolute_path_scaffolds_beside_the_file
 Expect: ^FAIL .*conformance/cli .* / scaffolds beside the file, by a relative or an absolute path / an absolute path scaffolds beside the file \(
 Clause: when a source file is named by path → scaffolds beside the file, by a relative or an absolute path
 --- a/cmd/gotest/scaffold.go

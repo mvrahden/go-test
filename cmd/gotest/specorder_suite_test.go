@@ -19,7 +19,8 @@ type SpecOrderTestSuite struct {
 }
 
 func (s *SpecOrderTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.IntegrationSuiteConfig()
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *SpecOrderTestSuite) BeforeAll(t *gotest.T) {

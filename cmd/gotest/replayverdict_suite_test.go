@@ -23,9 +23,8 @@ type ReplayVerdictTestSuite struct {
 }
 
 func (s *ReplayVerdictTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	// No deadline: this suite compiles code, so its time is not a verdict.
+	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
 func (s *ReplayVerdictTestSuite) BeforeAll(t *gotest.T) {
@@ -36,6 +35,7 @@ func (s *ReplayVerdictTestSuite) BeforeAll(t *gotest.T) {
 func (s *ReplayVerdictTestSuite) replay(t *gotest.T, stream string, args ...string) (stdout, stderr string, code int) {
 	cmd := exec.Command(s.cli.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = t.TempDir()
+	cmd.Env = cliEnv(cmd.Dir)
 	cmd.Stdin = strings.NewReader(stream)
 	var out, errs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errs
