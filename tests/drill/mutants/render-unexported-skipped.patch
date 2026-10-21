@@ -1,0 +1,15 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_UnexportedFieldChange_IsShown
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on structs that differ only in an unexported field → the diff marks that field's line
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -223,6 +223,9 @@
+ 		}
+ 		r.emit(depth, at, prefix+t.String()+"{")
+ 		for i := range rv.NumField() {
++			if !t.Field(i).IsExported() {
++				continue
++			}
+ 			name := t.Field(i).Name
+ 			r.tree(rv.Field(i), depth+1, &step{up: at, field: name}, name+": ", ",", false)
+ 		}

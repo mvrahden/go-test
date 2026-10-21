@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_TextBytes_AreDiffedByLine
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on byte slices of UTF-8 text that span lines → they render as []byte("…") split at their newlines and the diff marks the changed lines
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -323,7 +323,7 @@
+ // split at its newlines, and any other bytes as rows of hex.
+ func (r *renderer) bytesTree(rv reflect.Value, depth int, at *step, prefix, suffix string) {
+ 	t := rv.Type()
+-	if rv.Kind() == reflect.Slice && utf8.Valid(rv.Bytes()) {
++	if false && rv.Kind() == reflect.Slice && utf8.Valid(rv.Bytes()) {
+ 		if rv.Len() > renderMaxBytes-r.bytes {
+ 			r.out.cut = "4 MiB"
+ 			return

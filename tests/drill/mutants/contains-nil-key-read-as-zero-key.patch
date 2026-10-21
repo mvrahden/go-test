@@ -1,0 +1,15 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is asked for a nil key in a map whose key type cannot be nil → fails naming the map's type
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -55,6 +55,9 @@
+ 		}
+ 		return false, ""
+ 	case reflect.Map:
++		if element == nil {
++			return rv.MapIndex(reflect.Zero(rv.Type().Key())).IsValid(), ""
++		}
+ 		key, guard := asType(element, rv.Type().Key(), nilableKey, "key", "key")
+ 		if guard != "" {
+ 			return false, fmt.Sprintf("%T cannot hold %s", s, guard)

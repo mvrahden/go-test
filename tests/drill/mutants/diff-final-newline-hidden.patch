@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_FinalNewlineOnOneSide_IsMarked
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on multi-line values that differ only in a final newline → the diff marks the side that does not end in one
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -251,7 +251,7 @@
+ // line keeping its newline. Neither ending in a newline is no difference:
+ // both are ended in one, so a changed last line is not marked twice.
+ func lineHunks(expected, actual []string) []unidiff.Hunk {
+-	if ended(expected) != ended(actual) {
++	if false && ended(expected) != ended(actual) {
+ 		return unidiff.LineHunks(withNewlines(expected), withNewlines(actual))
+ 	}
+ 	// Every line ends in a newline: diff them without it, sparing a copy.

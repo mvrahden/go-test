@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_SliceOfStructs_MarksOnlyTheChangedElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values that differ in a field of an element → the hunk is led by the path of its first changed line, such as at [1].Name:
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -181,7 +181,7 @@
+ 		if k > 0 {
+ 			out = append(out, diffIndent+"…")
+ 		}
+-		if p := pathText(hunkPath(h, re, ra)); p != "" {
++		if p := pathText(hunkPath(h, re, ra)); p != "" && false {
+ 			out = append(out, diffIndent+"at "+p+":")
+ 		}
+ 		ls := h.Lines

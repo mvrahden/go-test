@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_BinaryBytes_RenderAsHexRows
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on byte slices that are not UTF-8 and differ inside a row → the hunk names the first differing byte, such as at [12]:, not the start of its row
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -226,7 +226,7 @@
+ 			}
+ 			if m.Op == '+' {
+ 				if o := ra.paths[j]; s != nil && o != nil && s.row && o.row && s.index == o.index {
+-					return firstByte(s, l.Text, m.Text)
++					return s
+ 				}
+ 				break
+ 			}

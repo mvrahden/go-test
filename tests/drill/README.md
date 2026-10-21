@@ -232,12 +232,20 @@ shards of one run do not add up to every mutant exactly once.
 | Patch | Bug it plants | Check that must catch it |
 |---|---|---|
 | `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
+| `callsite-drops-dotted-element-modules` | under `-trimpath` a module whose path has a dot only after its first element is not counted among the build's modules, so it reads as the standard library | conformance: a helper's failure in `corp/tools.v2` does not name both lines |
+| `callsite-reads-escaped-root-package` | under `-trimpath` the `%2e` the linker writes for a dot in the last path element is not read back, so a module's root package reads as the standard library | conformance: a helper's failure in `corp/tools.v2` does not name both lines |
+| `contains-lossy-number-hinted` | a number that the element type cannot hold exactly (`3.7` for an `[]int`, `300` for an `[]int8`) is told to convert, which would truncate or wrap it | ring-0 predicates suite |
+| `contains-text-needle-unhinted` | a rune, byte or `[]byte` needle for a string is refused without naming the string type to convert it to | ring-0 predicates suite |
+| `contains-wrapped-sign-hinted` | a number whose conversion wraps its sign both ways (`-1` for a `[]uint`) is told to convert | ring-0 predicates suite |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
 | `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
+| `hex-row-start-named` | a hunk in a hex rendering names the start of its row, not the byte that differs | ring-0 equal suite |
+| `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
+| `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
 | `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
@@ -265,6 +273,58 @@ shards of one run do not add up to every mutant exactly once.
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
+| `bytes-one-per-line` | a byte slice that is not text renders one byte per line | ring-0 equal suite |
+| `bytes-text-as-hex` | a byte slice of text renders as hex, so its lines are not diffed as text | ring-0 equal suite |
+| `callsite-ignores-required-modules` | under `-trimpath` a dotless module the build requires is judged by import path alone, so it reads as the standard library | conformance: a behavior another dotless module declares does not name both lines |
+| `callsite-ignores-the-main-module` | under `-trimpath` the main module's packages are judged by import path alone, so a dotless module reads as the standard library | canary: a helper's failure in a dotless module does not name both lines |
+| `contains-convert-hint-dropped` | a number of another numeric type is refused without naming the type to convert it to | ring-0 predicates suite |
+| `contains-interface-needle-unchecked` | any needle is taken for a slice of an interface type, one that does not implement it included | ring-0 predicates suite |
+| `contains-named-kinds-refused` | `Contains` refuses a haystack of a named string type | canary: the passing fixture's typed-arguments method fails |
+| `contains-nil-element-accepted` | a nil needle is looked up as the zero element of an `int` slice | ring-0 predicates suite |
+| `contains-nil-element-never-found` | a nil needle is never found in a slice whose elements can be nil | ring-0 predicates suite |
+| `contains-nil-substring-unguarded` | a nil needle for a string is reported absent, not refused, so `NotContains` passes | ring-0 predicates suite |
+| `contains-nil-key-never-found` | a nil needle is never found in a map whose keys can be nil | ring-0 predicates suite |
+| `contains-nil-key-read-as-zero-key` | a nil needle is looked up as the zero key of a map whose keys cannot be nil | ring-0 predicates suite |
+| `contains-type-guard-silent` | a slice needle of a type the slice cannot hold is reported absent, not refused | canary: no failure message names both types |
+| `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
+| `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
+| `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
+| `depth-unnamed` | lines deeper than the indented levels do not name their depth | ring-0 format suite |
+| `diff-dropped` | `Equal` on multi-line values shows no diff | canary: no failure message carries the diff heading |
+| `diff-file-headers-kept` | the diff keeps a file diff's `---`/`+++` headers above its hunks | ring-0 equal suite |
+| `diff-final-newline-hidden` | the diff ends both sides in a newline, so a final newline only one side has shows no change | ring-0 equal suite |
+| `erroras-type-unnamed` | `ErrorAs` does not name the type it expected | canary: no failure message names `*fs.PathError` |
+| `hidden-difference-shown-twice` | values that render alike are printed twice instead of named as such | ring-0 equal suite |
+| `hunk-location-dropped` | a hunk does not name the path of its first change | ring-0 equal suite |
+| `hunks-replacement-scattered` | a line replaced among repeated ones shows as an insertion and a deletion far apart | ring-0 equal suite |
+| `indelta-difference-overflows` | `InDelta` subtracts integers in their own type, so the distance between the int64 extremes wraps to 1 | ring-0 compare suite |
+| `indelta-infinities-differ` | `InDelta` fails two equal infinities | canary: the passing fixture's typed-arguments method fails |
+| `indelta-integers-as-float64` | `InDelta` measures signed integers through float64 | ring-0 compare suite |
+| `indelta-nan-delta-passes` | `InDelta` with a NaN delta passes | canary: the failing fixture's NaN-delta method passes |
+| `jsoneq-exponent-zeros-kept` | `JSONEq` keeps a number's trailing zeros in its digits, so `100` and `1e2` differ | ring-0 predicates suite |
+| `jsoneq-negative-zero-signed` | `JSONEq` keeps the sign of zero, so `-0` and `0` differ | ring-0 predicates suite |
+| `jsoneq-numbers-as-float64` | `JSONEq` decodes numbers into float64 | canary: the failing fixture's big-integer method passes |
+| `jsoneq-numbers-by-spelling` | `JSONEq` compares numbers by spelling | canary: the passing fixture's `1` against `1.0` fails |
+| `jsoneq-trailing-data-accepted` | `JSONEq` ignores what follows the value | ring-0 predicates suite |
+| `long-bytes-unpointed` | two long single-line byte slices of text show no offset of their first difference | ring-0 equal suite |
+| `long-line-unpointed` | a long changed line is shown cut instead of around its first difference | ring-0 equal suite |
+| `long-string-unpointed` | two long single-line strings that differ show no offset of their first difference | ring-0 equal suite |
+| `map-key-ties-unordered` | map entries whose keys render alike keep the map's random order | ring-0 equal suite |
+| `message-drops-trailing-args` | a message whose first argument is not a string keeps only that argument | canary: no failure message carries every argument |
+| `message-named-format-ignored` | a message whose first argument is of a named string type is not used as its format | ring-0 format suite |
+| `notequal-addresses` | `NotEqual` shows the shared value with `%#v`, addresses included | ring-0 equal suite |
+| `raw-fields-unshown` | values whose GoString methods render alike are not shown field by field | ring-0 equal suite |
+| `regexp-named-pattern-is-empty` | `Regexp` reads a pattern of a named string type as empty | canary: the failing fixture's named-pattern method passes |
+| `render-nested-collapsed` | nested structs render on one line, so one changed field marks the whole line | ring-0 equal suite |
+| `render-pointer-addresses` | pointers render as addresses, so equal elements behind distinct pointers are marked changed | ring-0 equal suite |
+| `render-text-unsplit` | a string that spans lines renders on one line, so its text is not diffed by line | ring-0 equal suite |
+| `render-unexported-skipped` | the rendering leaves unexported fields out, so a change to one is not marked | ring-0 equal suite |
+| `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
+| `sync-internals-shown` | values of package sync render their bookkeeping fields | ring-0 equal suite |
+| `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
+| `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |
+| `unsigned-as-hex` | unsigned integers render in hex | ring-0 format suite |
+| `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |
 
 ## Adding a mutant
 

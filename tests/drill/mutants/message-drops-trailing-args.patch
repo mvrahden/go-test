@@ -1,0 +1,12 @@
+Expect: failing: no failure message says
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when an assertion's first extra argument is not a string → every extra argument is in the message
+--- a/pkg/gotest/internal/assert/format.go
++++ b/pkg/gotest/internal/assert/format.go
+@@ -90,5 +90,5 @@
+ 		return fmt.Sprintf(format.String(), msgAndArgs[1:]...)
+ 	}
+ 	// No format to place them by: every argument, in order.
+-	return strings.TrimSuffix(fmt.Sprintln(msgAndArgs...), "\n")
++	return strings.TrimSuffix(fmt.Sprintln(msgAndArgs[0]), "\n")
+ }

@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / JSONEqual
+Judge: ./pkg/gotest/internal/assert
+Clause: when JSONEq compares numbers whose exponents are spelled differently, however large → 1e10000000 equals 10e9999999
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -311,7 +311,7 @@
+ 	}
+ 	digits := strings.TrimLeft(intPart+frac, "0")
+ 	exp.Sub(exp, big.NewInt(int64(len(frac))))
+-	trimmed := strings.TrimRight(digits, "0")
++	trimmed := digits
+ 	exp.Add(exp, big.NewInt(int64(len(digits)-len(trimmed))))
+ 	if trimmed == "" {
+ 		return decimal{exp: new(big.Int)}, true

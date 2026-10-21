@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElementGuards
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is given a number the slice's numeric elements cannot hold exactly → the failure names no type to convert it to
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -107,7 +107,7 @@
+ 	keeps := from.Kind() == reflect.String && to.Kind() == reflect.String
+ 	if isNumber(from.Kind()) && isNumber(to.Kind()) {
+ 		cv := ev.Convert(to)
+-		keeps = cv.Convert(from).Equal(ev) && negative(cv) == negative(ev) // NaN never does
++		keeps = negative(cv) == negative(ev) // NaN never does
+ 	}
+ 	if keeps {
+ 		return " (convert it to " + to.String() + ")"

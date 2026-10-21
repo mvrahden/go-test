@@ -1,0 +1,18 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_GoStringsAlike_ShowsTheRawFields
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values whose GoString methods render them alike → the message shows the difference of their raw fields
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -77,10 +77,10 @@
+ 	// sync values opened, which may show what they hid.
+ 	const rawHeading = "  the values render alike; their raw fields differ:\n"
+ 	var raw strings.Builder
+-	if sideBySide(&raw, expected, actual, true, typed) {
++	if sideBySide(&raw, expected, actual, true, typed) && false {
+ 		return sb.String() + rawHeading + raw.String()
+ 	}
+-	if xe, xa := render(expected, true, typed), render(actual, true, typed); !xe.equal(xa) {
++	if xe, xa := render(expected, true, typed), render(actual, true, typed); !xe.equal(xa) && false {
+ 		writeDiff(&raw, xe, xa)
+ 		return sb.String() + rawHeading + raw.String()
+ 	}

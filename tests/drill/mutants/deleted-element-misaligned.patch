@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_DeletedElement_IsMarkedWhole
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on slices of structs one of which lacks an element → the diff marks that element from its opening line to its closing one
+--- a/internal/unidiff/unidiff.go
++++ b/internal/unidiff/unidiff.go
+@@ -478,7 +478,7 @@
+ 			by = -up
+ 		case reachesDown:
+ 			by = down
+-		default:
++		case false:
+ 			best := indent(ls[s].Text) + indent(ls[e-1].Text)
+ 			for p := -up; p <= down; p++ {
+ 				score := indent(ls[s+p].Text) + indent(ls[e-1+p].Text)

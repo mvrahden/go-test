@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / JSONEqual
+Judge: ./pkg/gotest/internal/assert
+Clause: when JSONEq compares -0 with 0 → they are equal
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -314,7 +314,7 @@
+ 	trimmed := strings.TrimRight(digits, "0")
+ 	exp.Add(exp, big.NewInt(int64(len(digits)-len(trimmed))))
+ 	if trimmed == "" {
+-		return decimal{exp: new(big.Int)}, true
++		return decimal{neg: d.neg, exp: new(big.Int)}, true
+ 	}
+ 	d.digits, d.exp = trimmed, exp
+ 	return d, true

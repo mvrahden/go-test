@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_BinaryBytes_RenderAsHexRows
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on byte slices that are not UTF-8 → they render as rows of eight hex bytes
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -24,7 +24,7 @@
+ 	// keyMax is the most of a map key rendered, to sort by and to show.
+ 	keyMax = 4 << 10
+ 	// bytesPerRow is how many bytes a line of hex holds.
+-	bytesPerRow = 8
++	bytesPerRow = 1
+ )
+ 
+ var (

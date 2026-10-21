@@ -1,0 +1,20 @@
+Expect: pkg/gotest/internal/assert Compare / CheckInDelta_DifferenceDoesNotOverflow
+Judge: ./pkg/gotest/internal/assert
+Clause: when InDelta compares the smallest and the largest int64 → measures their full distance, not one that wrapped around
+--- a/pkg/gotest/internal/assert/compare.go
++++ b/pkg/gotest/internal/assert/compare.go
+@@ -82,10 +82,11 @@
+ 
+ // intDistance is |a - b|, which always fits in a uint64.
+ func intDistance(a, b int64) uint64 {
+-	if a < b {
+-		a, b = b, a
++	d := a - b
++	if d < 0 {
++		d = -d
+ 	}
+-	return uint64(a) - uint64(b) //nolint:gosec // G115: wraps on purpose; the difference of the wrapped values is exact
++	return uint64(d)
+ }
+ 
+ func uintDistance(a, b uint64) uint64 {

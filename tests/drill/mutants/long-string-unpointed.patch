@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongSingleLineString_PointsAtTheFirstDifference
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on two long single-line strings → the message names the byte offset of the first difference and shows both strings around it
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -52,7 +52,7 @@
+ 	if sideBySide(&sb, expected, actual, false, typed) {
+ 		return sb.String()
+ 	}
+-	if m, ok := textMismatch(expected, actual); ok {
++	if m, ok := textMismatch(expected, actual); ok && false {
+ 		sb.WriteString(m)
+ 		return sb.String()
+ 	}

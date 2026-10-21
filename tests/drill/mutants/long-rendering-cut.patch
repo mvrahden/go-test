@@ -1,0 +1,16 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongSingleLineRenderings_PointAtTheFirstDifference
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values that each render on one line, one longer than 160 bytes, that first differ past byte 160 → the message shows both around their first difference with a caret under it
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -143,8 +143,8 @@
+ func writeDiff(sb *strings.Builder, re, ra *rendering) {
+ 	if len(re.lines) == 1 && len(ra.lines) == 1 {
+ 		e, a := re.lines[0], ra.lines[0]
+-		if len(e) <= lineMax && len(a) <= lineMax {
+-			writeValues(sb, e, a)
++		if true {
++			writeValues(sb, cutLine(e), cutLine(a))
+ 			return
+ 		}
+ 		we, wa, caret, _ := window(e, a, true, false)

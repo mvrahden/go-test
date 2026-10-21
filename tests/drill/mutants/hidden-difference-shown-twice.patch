@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_NaN_SaysTheRenderingHidesTheDifference
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values that render alike, such as two NaNs beside distinct pointers to equal values → the message names where they differ, says the rendering does not show it and shows the value once, without addresses
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -88,6 +88,8 @@
+ 	if p := pathText(firstDifference(expected, actual)); p != "" {
+ 		at = " at " + p
+ 	}
++	writeValues(&sb, valueBlock(expected, re), valueBlock(actual, nil))
++	return sb.String()
+ 	fmt.Fprintf(&sb, "  values differ%s in ways their rendering does not show (NaN, a func, or state the rendering omits)\n", at)
+ 	sb.WriteString("  both:     " + valueBlock(expected, re))
+ 	return sb.String()

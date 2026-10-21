@@ -1,0 +1,16 @@
+Expect: pkg/gotest/internal/assert Format / .*FormatMessage_NamedStringFormat
+Judge: ./pkg/gotest/internal/assert
+Clause: when an assertion's first extra argument is of a named string type → formats the arguments after it
+--- a/pkg/gotest/internal/assert/format.go
++++ b/pkg/gotest/internal/assert/format.go
+@@ -86,8 +86,8 @@
+ 		return fmt.Sprintf("%v", msgAndArgs[0])
+ 	}
+ 	// Any string kind is a format, named ones included.
+-	if format := reflect.ValueOf(msgAndArgs[0]); format.Kind() == reflect.String {
+-		return fmt.Sprintf(format.String(), msgAndArgs[1:]...)
++	if format, ok := msgAndArgs[0].(string); ok {
++		return fmt.Sprintf(format, msgAndArgs[1:]...)
+ 	}
+ 	// No format to place them by: every argument, in order.
+ 	return strings.TrimSuffix(fmt.Sprintln(msgAndArgs...), "\n")

@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Format / .*Render_DeepNesting_KeepsTheIndentOfDepth32AndMarksTheLevel
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values nested more than 32 levels deep → lines deeper than 32 levels keep that level's indent and name their depth
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -134,7 +134,7 @@
+ 		return
+ 	}
+ 	mark := ""
+-	if depth > maxIndent && depth != r.depth {
++	if false && depth > maxIndent && depth != r.depth {
+ 		mark = "‹depth " + strconv.Itoa(depth) + "› "
+ 	}
+ 	line := indentation(min(depth, maxIndent)) + mark + s

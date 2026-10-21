@@ -1,0 +1,12 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongSlice_DiffsPastAnyEntryCap
+Judge: ./pkg/gotest/internal/assert
+--- a/internal/unidiff/unidiff.go
++++ b/internal/unidiff/unidiff.go
+@@ -419,7 +419,6 @@
+ 			lines[k] = Line{Op: o.kind, Text: b[o.j]}
+ 		}
+ 	}
+-	slide(lines)
+ 	var out []Hunk
+ 	i, j, at := 0, 0, 0 // the line indexes on each side at lines[at]
+ 	for _, r := range groups(len(lines), func(i int) bool { return lines[i].Op != ' ' }) {

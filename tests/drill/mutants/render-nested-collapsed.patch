@@ -1,0 +1,17 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_NestedFieldChange_MarksOnlyThatField
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on structs that differ in one nested field → the diff marks that field's line and no other
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -221,6 +221,11 @@
+ 			r.emit(depth, at, prefix+t.String()+"{}"+suffix)
+ 			return
+ 		}
++		if depth > 0 {
++			s, _ := r.flatString(rv, 1<<20)
++			r.emit(depth, at, prefix+s+suffix)
++			return
++		}
+ 		r.emit(depth, at, prefix+t.String()+"{")
+ 		for i := range rv.NumField() {
+ 			name := t.Field(i).Name

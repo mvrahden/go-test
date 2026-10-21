@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is given a needle that is not comparable for a map keyed by an interface type → fails naming the needle's type
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -59,7 +59,7 @@
+ 		if guard != "" {
+ 			return false, fmt.Sprintf("%T cannot hold %s", s, guard)
+ 		}
+-		if !key.Comparable() {
++		if false {
+ 			return false, fmt.Sprintf("%T cannot hold a key of type %T: it is not comparable", s, element)
+ 		}
+ 		return rv.MapIndex(key).IsValid(), ""

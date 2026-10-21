@@ -1,0 +1,15 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongLastLineWithoutNewline_IsWindowedAndMarked
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on multi-line values whose changed last line is longer than 80 bytes and ends in a newline on one side only → the diff shows that line around its first difference and marks the side without the newline
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -193,8 +193,7 @@
+ 			if end == n+2 && ls[n].Op == '-' && ls[n+1].Op == '+' && max(len(chomp(ls[n].Text)), len(chomp(ls[n+1].Text))) > compactMax {
+ 				e, a := ls[n], ls[n+1]
+ 				we, wa, caret, _ := window(chomp(e.Text), chomp(a.Text), true, false)
+-				out = append(out, markLine(diffIndent, '-', we, e.Text)...)
+-				out = append(out, markLine(diffIndent, '+', wa, a.Text)...)
++				out = append(out, diffIndent+"-"+we, diffIndent+"+"+wa)
+ 				out = append(out, diffIndent+" "+strings.Repeat(" ", caret)+"^")
+ 				n = end
+ 				continue

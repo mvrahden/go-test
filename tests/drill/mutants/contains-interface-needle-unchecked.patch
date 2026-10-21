@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when NotContains is given a needle that does not implement the interface the slice's elements are → fails naming the slice's type and the needle's
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -89,7 +89,7 @@
+ 		}
+ 		return ev, "a nil " + nilNoun
+ 	}
+-	if ev.Type().AssignableTo(typ) {
++	if ev.Type().AssignableTo(typ) || typ.Kind() == reflect.Interface {
+ 		return ev, ""
+ 	}
+ 	return ev, fmt.Sprintf("a %s of type %s%s", typedNoun, ev.Type(), convertHint(ev, typ))

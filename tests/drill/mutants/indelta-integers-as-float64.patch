@@ -1,0 +1,16 @@
+Expect: pkg/gotest/internal/assert Compare / CheckInDelta_IntegersCompareExactly
+Judge: ./pkg/gotest/internal/assert
+Clause: when InDelta compares integers beyond float64's exact range → 9007199254740993 is not within a delta of 0 of 9007199254740992
+--- a/pkg/gotest/internal/assert/compare.go
++++ b/pkg/gotest/internal/assert/compare.go
+@@ -61,8 +61,8 @@
+ 	within := false
+ 	switch e := reflect.ValueOf(expected); {
+ 	case e.CanInt():
+-		d := intDistance(e.Int(), reflect.ValueOf(actual).Int())
+-		diff, within = d, uintWithin(d, delta)
++		d := math.Abs(float64(e.Int()) - float64(reflect.ValueOf(actual).Int()))
++		diff, within = d, d <= delta
+ 	case e.CanUint():
+ 		d := uintDistance(e.Uint(), reflect.ValueOf(actual).Uint())
+ 		diff, within = d, uintWithin(d, delta)

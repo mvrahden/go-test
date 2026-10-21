@@ -1,0 +1,14 @@
+Expect: failing: no failure message says
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when ErrorAs is given an error of another type → names the type it expected
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -139,7 +139,7 @@
+ func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
+ 	var target E
+ 	if !errors.As(err, &target) {
+-		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v: nothing in its chain is of type %s", err, reflect.TypeFor[E]()), msgAndArgs)
++		fail(t, fmt.Sprintf("ErrorAs failed:\n  error %v does not match expected type", err), msgAndArgs)
+ 	}
+ 	return target
+ }
