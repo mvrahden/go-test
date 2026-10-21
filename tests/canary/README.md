@@ -3,8 +3,8 @@
 The canary checks gotest's verdicts from outside gotest. Every other test in
 this repository reports its result through gotest's own runner, so a bug in
 that runner could turn a failure into a pass without any test noticing. The
-canary closes that gap: it builds the `gotest` binary, runs it over nineteen
-small fixture packages written to fail in specific ways, and compares what
+canary closes that gap: it builds the `gotest` binary, runs it over small
+fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
 
@@ -14,8 +14,8 @@ Each directory under `testdata/` is one package with one suite:
 
 | Fixture | Behavior it pins |
 |---|---|
-| `passing` | a green suite exits 0 and every method and behavior gets `pass` |
-| `failing` | one failing call per assertion function, all 36, each reported as `fail` |
+| `passing` | a green suite exits 0 and every method and behavior gets `pass`, named string types, equal infinities and `1` against `1.0` in `JSONEq` included |
+| `failing` | one failing call per assertion function, all 36, each reported as `fail`, and the failures whose message the canary reads back: a wrong-typed needle, a NaN delta, a non-string message argument, a named pattern, big JSON integers and a multi-line diff |
 | `failnow` | a failed assertion halts the method; the statement after it never runs |
 | `aftereach` | `AfterEach` runs even when the test failed |
 | `lifecycle` | `BeforeAll`, the methods and `AfterAll` run in that order |
@@ -34,6 +34,7 @@ Each directory under `testdata/` is one package with one suite:
 | `guardskip` | a suite its guard skips sets up none of its fixtures: one that would fail leaves the run green |
 | `snapshotting` | a value that differs from its committed baseline fails; one that matches passes |
 | `exclusive` | an Exclusive suite starts only after every non-exclusive suite in the run ended |
+| `helpers` | an assertion failing inside a helper names the helper's line and the caller's, under `-trimpath` in a module without a dot |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

@@ -2,7 +2,9 @@ package failing_test
 
 import (
 	"errors"
+	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -70,4 +72,27 @@ func (s *FailingTestSuite) TestBehavior(t *gotest.T) {
 	t.When("a behavior fails", func(w *gotest.T) {
 		w.It("is reported at the leaf", func(it *gotest.T) { gotest.Equal(it, "a", "b") })
 	})
+}
+
+// The failures below carry the message the canary reads back.
+func (s *FailingTestSuite) TestInDeltaNaN(t *gotest.T)    { gotest.InDelta(t, 1.0, 1.0, math.NaN()) }
+func (s *FailingTestSuite) TestContainsAnInt(t *gotest.T) { gotest.Contains(t, []int{1, 2}, "x") }
+func (s *FailingTestSuite) TestNonStringArgs(t *gotest.T) { gotest.True(t, false, 42, "retries left") }
+
+type route string
+
+func (s *FailingTestSuite) TestRegexpNamed(t *gotest.T) {
+	gotest.Regexp(t, route(`^/api/`), "/web/users")
+}
+
+func (s *FailingTestSuite) TestJSONEqBigInts(t *gotest.T) {
+	gotest.JSONEq(t, `{"n":9007199254740993}`, `{"n":9007199254740992}`)
+}
+
+type lines []string
+
+func (v lines) GoString() string { return strings.Join(v, "\n") }
+
+func (s *FailingTestSuite) TestEqualMultiline(t *gotest.T) {
+	gotest.Equal(t, lines{"a", "b", "c", "d", "e"}, lines{"a", "b", "C", "d", "e"})
 }
