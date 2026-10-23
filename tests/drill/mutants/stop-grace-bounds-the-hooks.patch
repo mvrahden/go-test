@@ -1,0 +1,14 @@
+Expect: stopgrace: markers .*, want AfterEach to its end, then AfterAll, then the fixture released
+Judge: ./tests/canary CanaryTestSuite/TestASlowAfterEachRunsToItsEndAfterAStop
+Clause: when the run is stopped and a method's AfterEach outlasts the 5s grace its body gets → runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -179,7 +179,7 @@
+ 	stopAt := time.Now()
+ 	releaseEnd = stopAt.Add(releaseBound())
+ 	// The fixtures' teardown keeps its share of the bound for a forced release.
+-	runEnd := releaseEnd.Add(-releaseReserve())
++	runEnd := stopAt.Add(grace)
+ 	tick := time.NewTicker(20 * time.Millisecond)
+ 	defer tick.Stop()
+ 	for {

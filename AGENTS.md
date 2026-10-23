@@ -295,6 +295,8 @@ For parallel test cases, AfterAll waits for all parallel tests to complete.
 
 `FailFast` is judged per method: the methods not yet started are skipped, naming the first that failed, and a failure `BeforeAll` records without stopping skips nothing ([FailFast](specs/lifecycle/spec.md#requirement-failfast)).
 
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through `t.Context()` and the suite through `AfterAll`: the methods not yet started are skipped with the reason `run stopping`, `AfterAll` runs, then the fixtures are released ([Stopping a run](specs/lifecycle/spec.md#requirement-stopping-a-run)). A method body or `BeforeAll` that ignores its context for five seconds is cut short, its fixtures released without `AfterAll`, and the process ends by the signal; the five seconds bound only the body and `BeforeAll`, and `AfterEach`'s context does not end at the stop, so a slow `AfterEach` still runs to its end before `AfterAll` ([The grace a stopped method gets](specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)). Benchmarks and fuzz seeds not started are skipped the same way ([Stopping benchmarks and fuzz seeds](specs/lifecycle/spec.md#requirement-stopping-benchmarks-and-fuzz-seeds)). A second stop signal to the suite process — under plain `go test`, a second Ctrl-C — skips what is left of the grace: the fixtures are released at once and the process ends by the signal; a third has the signal's default action ([A forced stop](specs/lifecycle/spec.md#requirement-a-forced-stop)).
+
 **On failure and panic.**
 `AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
 initialised state — guard it if `BeforeAll` can fail midway. Write `AfterAll` to release

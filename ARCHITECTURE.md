@@ -300,8 +300,9 @@ unwinds, and the run may print PASS and exit 0 first). So each generated
 `b.Run` defers `gotestruntime.ReleaseOnPanic(b)`, and `OpenSuite` guards a
 benchmark's guard-to-`BeforeAll` frame and its `AfterAll` cleanup the same
 way: the panic is recovered, printed with its stack, and fails the benchmark.
-While a hold lasts, a stop watcher turns an announced stop (or Ctrl-C
-under plain `go test`) into teardown; see `docs/design/fixtures.md`.
+While a suite runs, a stop watcher turns an announced stop (or Ctrl-C
+under plain `go test`) into an orderly end of the suite and its teardown;
+see `docs/design/fixtures.md`.
 
 For suites with `Benchmark*` methods, one `Benchmark<Suite>` wrapper is
 generated (standalone or fixture-bound, same shape as above), with one

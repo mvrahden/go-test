@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAnAfterEachOnlyFixtureRunsWhenItsTurnC
 Clause: when a fixture with only an AfterEach comes before a fixture whose BeforeEach fails → runs its AfterEach, as every BeforeEach before it returned
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -98,7 +98,7 @@
+@@ -105,7 +105,7 @@
  						it.FailNow()
  					}
  				}

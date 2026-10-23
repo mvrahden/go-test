@@ -1,0 +1,14 @@
+Expect: stopgrace: markers .*, want the forced release to run to its end
+Judge: ./tests/canary CanaryTestSuite/TestAForcedStopLeavesTheReleaseItsTime
+Clause: when the run is stopped and an AfterEach ignores its context until only the fixtures' teardown time is left of the release bound → forces the stop, saying so, and runs the fixture teardown to its end
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -179,7 +179,7 @@
+ 	stopAt := time.Now()
+ 	releaseEnd = stopAt.Add(releaseBound())
+ 	// The fixtures' teardown keeps its share of the bound for a forced release.
+-	runEnd := releaseEnd.Add(-releaseReserve())
++	runEnd := releaseEnd
+ 	tick := time.NewTicker(20 * time.Millisecond)
+ 	defer tick.Stop()
+ 	for {

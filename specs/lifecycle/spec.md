@@ -138,3 +138,60 @@ An expired --timeout SHALL name the test method that was running, and the suite 
 #### Scenario: A hook that hangs
 - **WHEN** one suite hangs in its BeforeAll and another in a test method until --timeout
 - **THEN** names the first suite itself and the second suite's method
+
+### Requirement: The grace a stopped method gets
+When a run is stopped, a method body or a suite's BeforeAll that has not returned 5s after its context ended, counted from its own start when it began after the stop, SHALL be cut short with a message saying so, its fixture released and its AfterAll not run; the 5s SHALL bound only the body and BeforeAll, and the stop SHALL NOT end AfterEach's context, so an AfterEach SHALL run to its end, followed by AfterAll and the fixture release.
+
+#### Scenario: A body that ignores its context
+- **WHEN** the run is stopped and a method body ignores its context
+- **THEN** cuts the body short after 5s, saying so
+- **AND** releases the fixture without running AfterAll
+
+#### Scenario: A body that starts after the stop
+- **WHEN** the run is stopped while a method's BeforeEach runs and its body then ignores its context
+- **THEN** cuts the body short 5s after it began, saying so
+
+#### Scenario: A BeforeAll that ignores its context
+- **WHEN** the run is stopped while a suite's BeforeAll ignores its context
+- **THEN** cuts BeforeAll short after 5s, saying so, and releases the fixture without running AfterAll
+
+#### Scenario: A slow AfterEach
+- **WHEN** the run is stopped and a method's AfterEach outlasts the 5s grace its body gets
+- **THEN** runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body
+
+#### Scenario: An AfterEach that waits on its context
+- **WHEN** the run is stopped and a method's AfterEach waits on its context
+- **THEN** leaves that context alone, so AfterEach runs to its end before AfterAll and the release
+
+### Requirement: A forced stop
+A stopped run still going when only its fixtures' teardown time is left of the release bound SHALL be forced, saying so, and the fixture teardown SHALL still get that time; a second stop signal reaching the suite SHALL force the stop at once, saying so, releasing the fixtures before the process ends by the signal.
+
+#### Scenario: A run that outlasts its release bound
+- **WHEN** the run is stopped and an AfterEach ignores its context until only the fixtures' teardown time is left of the release bound
+- **THEN** forces the stop, saying so, and runs the fixture teardown to its end
+
+#### Scenario: A second stop signal
+- **WHEN** a second stop signal reaches the suite while a stopped method body ignores its context
+- **THEN** releases the fixture at once, saying so, and the process ends by the signal
+
+### Requirement: Stopping benchmarks and fuzz seeds
+A run stopped while a benchmark or a fuzz seed runs SHALL skip the benchmarks or seeds not started with the reason run stopping and run AfterAll before the fixture is released; a benchmark that ignores the stop SHALL be cut short after 5s, saying so, and its fixture released.
+
+#### Scenario: Stopped during a benchmark
+- **WHEN** the run is stopped while a benchmark runs
+- **THEN** skips the benchmarks not started with the reason run stopping, then runs AfterAll before the fixture is released
+- **AND** cuts a benchmark that ignores the stop short after 5s, saying so, and releases the fixture
+
+#### Scenario: Stopped during a fuzz seed
+- **WHEN** the run is stopped while a fuzz seed replays
+- **THEN** skips the seeds not started with the reason run stopping, then runs AfterAll before the fixture is released
+
+### Requirement: Stopping a run
+A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status; under plain go test it ends by the signal.
+
+#### Scenario: Interrupted while a method holds
+- **WHEN** the run is interrupted while a method holds
+- **THEN** exits 130 when gotest runs directly
+- **AND** ends the holding method's context
+- **AND** skips the methods that have not started with the reason run stopping
+- **AND** runs AfterAll before the fixture is released

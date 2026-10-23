@@ -1,0 +1,13 @@
+Expect: stopbench: the benchmark was not cut short after 5s, saying so
+Judge: ./tests/canary CanaryTestSuite/TestABenchmarkIgnoringTheStopIsCutShort
+Clause: when the run is stopped while a benchmark runs → cuts a benchmark that ignores the stop short after 5s, saying so, and releases the fixture
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -173,7 +173,6 @@
+ 
+ // RunBody runs a benchmark's body as one a stop gives grace to.
+ func RunBody(b *testing.B, body func()) {
+-	defer runstate.EnterBody(b, "a benchmark")()
+ 	body()
+ }
+ 

@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAPanicAheadOfAFailingAfterEachIsReport
 Clause: when a fuzz execution's BeforeEach panics and its AfterEach fails a fatal assertion → the execution fails with the panic reported, and its AfterEach still runs
 --- a/pkg/gotest/f.go
 +++ b/pkg/gotest/f.go
-@@ -122,9 +122,6 @@
+@@ -128,9 +128,6 @@
  	tt := NewT(t)
  	if f.afterEach != nil {
  		defer func() {

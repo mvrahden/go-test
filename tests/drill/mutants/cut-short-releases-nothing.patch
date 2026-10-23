@@ -1,0 +1,14 @@
+Expect: stopgrace: markers .*, want the fixture released without AfterAll and the body cut short
+Judge: ./tests/canary CanaryTestSuite/TestABodyIgnoringItsContextIsCutShort
+Alone: its check bounds how long the stopped run takes
+Clause: when the run is stopped and a method body ignores its context → releases the fixture without running AfterAll
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -163,7 +163,6 @@
+ // force tears the held fixtures down, until releaseEnd, and ends the process
+ // by sig.
+ func (w *watcher) force(sig os.Signal, releaseEnd time.Time) {
+-	w.release(releaseEnd)
+ 	reraise(sig)
+ }
+ 

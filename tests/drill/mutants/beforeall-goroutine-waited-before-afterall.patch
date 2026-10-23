@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAGoroutineFromBeforeAllIsWaitedForAfte
 Clause: when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops → the suite passes: the wait comes after AfterAll
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -72,7 +72,7 @@
+@@ -86,7 +86,7 @@
  		}
  		// The waits on goroutines BeforeAll started come after AfterAll, which
  		// is what stops them; as cleanups of tb they would run first.

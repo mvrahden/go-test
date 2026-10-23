@@ -1,0 +1,14 @@
+Expect: stopgrace: BeforeAll was not cut short after 5s, saying so
+Judge: ./tests/canary CanaryTestSuite/TestABeforeAllIgnoringItsContextIsCutShort
+Alone: its check bounds how long the stopped run takes
+Clause: when the run is stopped while a suite's BeforeAll ignores its context → cuts BeforeAll short after 5s, saying so, and releases the fixture without running AfterAll
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -203,7 +203,6 @@
+ 	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() {
+ 		// A stop gives BeforeAll the grace a method body gets: AfterAll
+ 		// cannot run before it returns.
+-		defer runstate.EnterBody(t, "BeforeAll")()
+ 		beforeAll(tt)
+ 	})
+ }

@@ -285,6 +285,8 @@ Hooks accept either `*gotest.T` or `*testing.T`.
 
 A per-method fixture hook that fails is the method's failure, located where the hook produced it ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through its context and the suite through its teardown; a method body or `BeforeAll` that has not returned five seconds after its context ended is cut short, the fixtures torn down and the process ended by the signal; the five seconds bound only the body and `BeforeAll`, so a slow `AfterEach` runs to its end and `AfterAll` after it (see fixtures.md, Execution Model, [Stopping a run](../../specs/lifecycle/spec.md#requirement-stopping-a-run) and [The grace a stopped method gets](../../specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)).
+
 #### Context Consistency Rules
 
 When `BeforeEach` returns a value, the following rules are enforced at generation time:

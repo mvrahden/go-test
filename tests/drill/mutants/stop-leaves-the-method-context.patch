@@ -1,0 +1,14 @@
+Expect: stop: markers \[[^]]*\], want \[context ended \.\.\.\]: the holding method's context did not end
+Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted
+Clause: when the run is interrupted while a method holds → ends the holding method's context
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -352,7 +352,7 @@
+ 	if runstate.StopContext().Err() != nil {
+ 		cancel()
+ 	}
+-	stop := context.AfterFunc(runstate.StopContext(), cancel)
++	stop := func() bool { return false }
+ 	t.Cleanup(func() {
+ 		stop()
+ 		cancel()

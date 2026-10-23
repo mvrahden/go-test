@@ -418,6 +418,21 @@ shards of one run do not add up to every mutant exactly once.
 | `failed-hydrate-not-dehydrated` | a shared fixture whose Hydrate failed gets no Dehydrate | canary: the failed Hydrate's Dehydrate marker is missing |
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
+| `stop-keeps-running-methods` | a stopped run still starts the methods that had not started | canary: the stopped fixture's later methods have no skip verdict |
+| `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
+| `stop-releases-before-afterall` | a stop releases the fixtures before the suite's AfterAll runs | canary: the stopped fixture's markers show the release ahead of AfterAll |
+| `stop-grace-past-5s` | a stopped method body that ignores its context gets 15s instead of 5s | canary: the stopgrace run does not say the body was cut short after 5s |
+| `stop-grace-bounds-the-hooks` | the 5s grace a stopped body gets also bounds the AfterEach and AfterAll after it | canary: the stopgrace slow AfterEach is cut off before AfterAll and the release |
+| `stop-grace-skips-beforeall` | a stop gives a `BeforeAll` that ignores its context no grace, so the run waits out the release bound | canary: the stopgrace hung `BeforeAll` is not cut short after 5s |
+| `stop-grace-skips-late-bodies` | a body that starts after the stop gets no grace and is never cut short | canary: the stopgrace late body is not cut short 5s after it began |
+| `stop-ends-the-aftereach-context` | a method's AfterEach gets the method's context, which the stop has ended | canary: the stopgrace AfterEach sees its context end instead of running to its end |
+| `forced-release-gets-no-time` | a forced stop leaves the release none of the bound, so the fixtures are cut off mid-teardown | canary: the stopgrace slow release never ends |
+| `second-signal-waits-out-the-grace` | a second stop signal is ignored while the grace runs | canary: the stopgrace fixture is not released at once on the second signal |
+| `stop-runs-the-benchmarks-not-started` | a stopped benchmark run still starts the benchmarks not started | canary: the stopbench second benchmark runs |
+| `stop-grace-skips-benchmarks` | a running benchmark body gets no grace and is never cut short | canary: the stopbench benchmark that ignores the stop is not cut short after 5s |
+| `stop-runs-the-seeds-not-started` | a stopped run still replays the fuzz seeds not started | canary: the stopbench second seed runs |
+| `cut-short-releases-nothing` | a stop that cuts a body short ends the process without releasing the fixtures | canary: the stopgrace fixture's release marker is missing |
+| `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' verdict instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
 
 ## Adding a mutant
 

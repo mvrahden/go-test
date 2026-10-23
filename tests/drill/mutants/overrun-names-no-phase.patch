@@ -3,12 +3,12 @@ Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 --- a/pkg/gotestruntime/methodbudget.go
 +++ b/pkg/gotestruntime/methodbudget.go
-@@ -53,7 +53,7 @@
+@@ -61,7 +61,7 @@
  	done, stopped := make(chan struct{}), make(chan struct{})
  	go func() {
  		defer close(stopped)
 -		if watchDeadline(it, gid, budget, m.phaseName, "Timeout", m.due, done) {
 +		if watchDeadline(it, gid, budget, func() string { return "" }, "Timeout", m.due, done) {
  			m.ctx.end(context.DeadlineExceeded)
+ 			m.after.end(context.DeadlineExceeded)
  		}
- 	}()

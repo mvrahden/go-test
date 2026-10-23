@@ -4,7 +4,7 @@ Judge: ./tests/canary CanaryTestSuite/TestEveryGoroutineBeforeAllStartedIsWaited
 Clause: when the last of several goroutines BeforeAll started with gotest.Go fails or panics → fails the suite and waits for every other one before the fixture is released
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -108,8 +108,8 @@
+@@ -122,8 +122,8 @@
  		return
  	}
  	defer drain(set)
