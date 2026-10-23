@@ -443,7 +443,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// Bench runs dispatch bench targets, not test suites, and match -run and
 	// -bench against Benchmark<Suite>: their residency plan must come from
 	// the same selection, or fixtures would follow the wrong schedule.
-	win := planBenchFixtureWindows(overlay, pf.UserRunFilter, ExtractBenchFilter(pf.RunFlags))
+	win := planBenchFixtureWindows(overlay, pf.UserRunFilter, ExtractBenchFilter(pf.RunFlags), pf.UserSkipFilter)
 	win.reportSkipped()
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
@@ -497,7 +497,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// filters by benchmark name.
 	userBenchFilter := ExtractBenchFilter(runFlags)
 	runFlags = StripBenchFilter(runFlags)
-	targets := BuildBenchTargets(prep.compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter)
+	targets := BuildBenchTargets(prep.compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter, pf.UserSkipFilter)
 	withExec(targets, pf.Exec)
 
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
@@ -663,7 +663,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	baseEnv := buildBaseEnv(cfg)
 
-	win := planFixtureWindows(overlay, pf.UserRunFilter)
+	win := planFixtureWindows(overlay, pf.UserRunFilter, pf.UserSkipFilter)
 	win.reportSkipped()
 
 	// Exclusive suites collected during the stream, run serially after it.
@@ -793,7 +793,7 @@ loop:
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter)
+		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter, pf.UserSkipFilter)
 		withExec(targets, pf.Exec)
 
 		if len(targets) == 0 {

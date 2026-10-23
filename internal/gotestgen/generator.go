@@ -27,6 +27,7 @@ type GenerateResult struct {
 	PTest                          []byte              // generated internal test source
 	PXTest                         []byte              // generated external test source
 	SuiteNames                     []string            // suites with a test run: test methods or fuzz seeds (e.g. "FooTestSuite")
+	TestlessSuiteNames             []string            // suites in SuiteNames without a Test<Suite> function: they run for their fuzz seeds alone
 	BenchSuiteNames                []string            // suite struct identifiers with >=1 effective benchmark method
 	FuzzFuncsBySuite               map[string][]string // suite identifier → generated Fuzz<Suite>_<Method> func names
 	FuzzParamsByFunc               map[string][]string // generated fuzz func name → corpus type of each value the engine feeds it
@@ -540,6 +541,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		seen := map[string]bool{}
 		var suiteNames []string
 		var exclusiveNames []string
+		var testlessNames []string
 		var caselessSkipped []string
 		exclusiveSeen := map[string]bool{}
 		for _, effective := range []gotestast.TestSuiteSpecSet{ptestSpec.EffectiveTestSuites, pxtestSpec.EffectiveTestSuites} {
@@ -558,6 +560,9 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 					continue
 				}
 				suiteNames = append(suiteNames, id)
+				if len(s.TestCases()) == 0 && !s.DeclaresTests() {
+					testlessNames = append(testlessNames, id)
+				}
 				if s.IsExclusive() && !exclusiveSeen[id] {
 					exclusiveSeen[id] = true
 					exclusiveNames = append(exclusiveNames, id)
@@ -663,6 +668,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			PTest:                          ptestBuf,
 			PXTest:                         pxtestBuf,
 			SuiteNames:                     suiteNames,
+			TestlessSuiteNames:             testlessNames,
 			BenchSuiteNames:                benchNames,
 			FuzzFuncsBySuite:               fuzzFuncsBySuiteResult,
 			FuzzParamsByFunc:               fuzzParamsResult,

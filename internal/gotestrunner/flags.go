@@ -1,9 +1,12 @@
 package gotestrunner
 
 type ParsedFlags struct {
-	BuildFlags       []string
-	RunFlags         []string
-	UserRunFilter    string
+	BuildFlags    []string
+	RunFlags      []string
+	UserRunFilter string
+	// UserSkipFilter is go test's -skip, read for planning; the flag itself
+	// stays in RunFlags for the suite binaries.
+	UserSkipFilter   string
 	UserCoverProfile string
 	Verbose          bool
 	// Exec is go test's -exec: the command every suite binary runs under.
@@ -18,6 +21,7 @@ func ParseExecFlags(goTestArgs []string) ParsedFlags {
 	classified.BuildFlags = buildFlags
 	verbose := HasVerboseFlag(classified.RunFlags)
 	userRunFilter := ExtractRunFilter(classified.RunFlags)
+	userSkipFilter := ExtractSkipFilter(classified.RunFlags)
 	runFlags := StripRunFilter(classified.RunFlags)
 	userCoverProfile := ExtractCoverProfile(runFlags)
 	runFlags = StripCoverProfile(runFlags)
@@ -26,6 +30,7 @@ func ParseExecFlags(goTestArgs []string) ParsedFlags {
 		BuildFlags:       classified.BuildFlags,
 		RunFlags:         runFlags,
 		UserRunFilter:    userRunFilter,
+		UserSkipFilter:   userSkipFilter,
 		UserCoverProfile: userCoverProfile,
 		Verbose:          verbose,
 		Exec:             execPrefix,

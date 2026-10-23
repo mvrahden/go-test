@@ -428,7 +428,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 			fuzzFuncsByPkg := map[string]map[string][]string{
 				"example.com/pkg": {"FooSuite": {"FuzzFooSuite_A", "FuzzFooSuite_B"}},
 			}
-			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "")
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, nil, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "TestFooSuite", targets[0].SuiteName)
 			gotest.Equal(it, []string{"FuzzFooSuite_A", "FuzzFooSuite_B"}, targets[0].FuzzFuncs)
@@ -439,16 +439,115 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 			fuzzFuncsByPkg := map[string]map[string][]string{
 				"example.com/pkg": {"OtherSuite": {"FuzzOtherSuite_A"}},
 			}
-			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, "")
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, nil, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Empty(it, targets[0].FuzzFuncs)
 		})
 
 		w.It("tolerates a nil fuzzFuncsByPkg map", func(it *gotest.T) {
 			suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
-			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, "")
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Empty(it, targets[0].FuzzFuncs)
+		})
+	})
+
+	t.When("-skip names the suite's Test function", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+		fuzzFuncsByPkg := map[string]map[string][]string{
+			"example.com/pkg": {"FooSuite": {"FuzzFooSuite_A", "FuzzFooSuite_B"}},
+		}
+
+		w.It("keeps the suite while a seed replay is not skipped, as go test runs it", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, nil, "", "^TestFooSuite$")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, []string{"FuzzFooSuite_A", "FuzzFooSuite_B"}, targets[0].FuzzFuncs)
+		})
+
+		w.It("drops the suite when every Test and Fuzz function is skipped", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, nil, nil, nil, "", "^TestFooSuite$|^FuzzFooSuite_")
+			gotest.Empty(it, targets)
+		})
+
+		w.It("drops a suite without fuzz methods", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "^TestFooSuite$")
+			gotest.Empty(it, targets)
+		})
+	})
+
+	t.When("-skip has several alternatives matching the Test function", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+
+		w.It("keeps the suite when the first is a subtest pattern, which go test enters the function for", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "TestFooSuite/One|TestFooSuite")
+			gotest.Len(it, targets, 1)
+		})
+
+		w.It("drops the suite when the first names the function alone", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "TestFooSuite|TestFooSuite/One")
+			gotest.Empty(it, targets)
+		})
+
+		w.It("cuts levels only outside brackets, as go test does", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "TestFoo[/]Suite|TestFooSuite")
+			gotest.Empty(it, targets, "[/] is no level cut, so the first alternative is TestFoo[/]Suite, which does not match, and the second skips the function")
+		})
+	})
+
+	t.When("-skip spells an underscore of the suite name as a space", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"Foo_Suite"}}
+		w.It("drops the suite, as go test reads white space as an underscore", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "^TestFoo Suite$")
+			gotest.Empty(it, targets)
+		})
+	})
+
+	t.When("-skip does not compile as go test splits it", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+		w.It("drops nothing", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "", "[]|TestFooSuite]")
+			gotest.Len(it, targets, 1)
+		})
+	})
+
+	t.When("a suite has fuzz methods and no Test function", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite"}}
+		fuzzFuncsByPkg := map[string]map[string][]string{
+			"example.com/pkg": {"FooSuite": {"FuzzFooSuite_A", "FuzzFooSuite_B"}},
+		}
+		testless := map[string]map[string]bool{"example.com/pkg": {"FooSuite": true}}
+
+		w.It("drops it when -skip names every fuzz wrapper", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testless, nil, nil, "", "^FuzzFooSuite_A$|^FuzzFooSuite_B$")
+			gotest.Empty(it, targets)
+		})
+
+		w.It("keeps it when -skip leaves a wrapper", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testless, nil, nil, "", "^FuzzFooSuite_A$")
+			gotest.Len(it, targets, 1)
+		})
+
+		w.It("is not selected by a -run naming only its missing Test function", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testless, nil, nil, "^TestFooSuite$", "")
+			gotest.Empty(it, targets)
+		})
+
+		w.It("runs only the wrappers a -run selects", func(it *gotest.T) {
+			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testless, nil, nil, "^TestFooSuite$|^FuzzFooSuite_A$", "")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "^TestFooSuite$|^FuzzFooSuite_A$", targets[0].RunFilter)
+		})
+	})
+
+	t.When("-run has an alternative with a subtest level ahead of another suite's", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite", "BarSuite"}}
+		targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "TestFooSuite/One|TestBarSuite", "")
+		w.It("selects both suites, as go test enters both functions", func(it *gotest.T) {
+			names := []string{}
+			for i := range targets {
+				names = append(names, targets[i].SuiteName)
+			}
+			gotest.ElementsMatch(it, []string{"TestFooSuite", "TestBarSuite"}, names)
 		})
 	})
 }
@@ -462,7 +561,7 @@ func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {
 	t.When("building targets from benchesByPkg", func(w *gotest.T) {
 		w.It("builds a Bench target per suite with the bare suite name", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "", "")
 			gotest.Len(it, targets, 1)
 			gotest.True(it, targets[0].Bench)
 			gotest.Equal(it, "BenchTestSuite", targets[0].SuiteName)
@@ -473,40 +572,53 @@ func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {
 
 		w.It("skips packages with no compiled binary", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/other": {"BenchTestSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "", "")
 			gotest.Empty(it, targets)
 		})
 
 		w.It("filters by userRunFilter (-run) matching Benchmark<Suite>", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite", "OtherSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "^BenchmarkBenchTestSuite$", "")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "^BenchmarkBenchTestSuite$", "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "BenchTestSuite", targets[0].SuiteName)
 		})
 
 		w.It("filters by userBenchFilter (-bench) matching Benchmark<Suite>", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite", "OtherSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "OtherSuite")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "OtherSuite", "")
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "OtherSuite", targets[0].SuiteName)
 		})
 
 		w.It("AND-composes -run and -bench when both are set", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo", "Bar", "Baz"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "^Benchmark(Foo|Bar)$", "Foo")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "^Benchmark(Foo|Bar)$", "Foo", "")
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "Foo", targets[0].SuiteName)
 		})
 
+		w.It("drops a suite whose wrapper -skip skips whole", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite", "OtherSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "", "^BenchmarkBenchTestSuite$")
+			gotest.Len(it, targets, 1)
+			gotest.Equal(it, "OtherSuite", targets[0].SuiteName)
+		})
+
+		w.It("keeps a suite -skip skips only sub-benchmarks of", func(it *gotest.T) {
+			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite"}}
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "", "^BenchmarkBenchTestSuite$/^BenchmarkA$")
+			gotest.Len(it, targets, 1)
+		})
+
 		w.It("includes all targets when neither filter is set", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo", "Bar", "Baz"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "", "")
 			gotest.Len(it, targets, 3)
 		})
 
 		w.It("translates run flags to -test. prefixed form", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"BenchTestSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, []string{"-benchtime=2x"}, "", "")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, []string{"-benchtime=2x"}, "", "", "")
 			gotest.Len(it, targets, 1)
 			gotest.Contains(it, targets[0].RunFlags, "-test.benchtime=2x")
 		})
@@ -515,7 +627,7 @@ func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {
 	t.When("the -bench pattern carries sub-benchmark segments", func(w *gotest.T) {
 		w.It("selects the suite by the first segment and carries the full pattern as BenchFilter", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"CacheTestSuite", "OtherSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$/^BenchmarkGetHit$")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$/^BenchmarkGetHit$", "")
 			gotest.Len(it, targets, 1)
 			gotest.Equal(it, "CacheTestSuite", targets[0].SuiteName)
 			gotest.Equal(it, "^BenchmarkCacheTestSuite$/^BenchmarkGetHit$", targets[0].BenchFilter)
@@ -523,7 +635,7 @@ func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {
 
 		w.It("keeps only the alternation branches that match each suite's wrapper", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo", "Bar"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkFoo$/^BenchmarkA$|^BenchmarkBar$/^BenchmarkB$")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkFoo$/^BenchmarkA$|^BenchmarkBar$/^BenchmarkB$", "")
 			gotest.Len(it, targets, 2)
 			byName := map[string]string{}
 			for i := range targets {
@@ -535,7 +647,7 @@ func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {
 
 		w.It("leaves BenchFilter empty for a suite-only pattern", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"CacheTestSuite"}}
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$")
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$", "")
 			gotest.Len(it, targets, 1)
 			gotest.Zero(it, targets[0].BenchFilter)
 		})
@@ -584,7 +696,7 @@ func (s *SuiteCommandTestSuite) TestBenchFilterNeverReachesTargetRunFlags(t *got
 			benchesByPkg := map[string][]string{"example.com/pkg": {"Foo"}}
 			dirsByPkg := map[string]string{"example.com/pkg": "/src/pkg"}
 
-			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, runFlags, "", userBenchFilter)
+			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, runFlags, "", userBenchFilter, "")
 			gotest.Len(it, targets, 1)
 			for _, f := range targets[0].RunFlags {
 				leaked := f == "-test.bench" || strings.HasPrefix(f, "-test.bench=")

@@ -58,6 +58,12 @@ func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
 			}))
 		})
 	})
+	t.When("a flag is repeated", func(w *gotest.T) {
+		w.It("checks only the last value, the one the test binary keeps", func(it *gotest.T) {
+			gotest.NoError(it, gotestrunner.ValidateTestFlags([]string{"-run=[", "-run=TestB", "-skip", "(", "-skip", "TestA", "-shuffle=xyz", "-shuffle=on"}))
+			gotest.ErrorContains(it, gotestrunner.ValidateTestFlags([]string{"-run=TestB", "-run=["}), "invalid regexp for element 0 of -run")
+		})
+	})
 	for t, tc := range gotest.Each(t, []struct {
 		Desc string
 		args []string
@@ -68,8 +74,12 @@ func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
 		{"a timeout that is no duration", []string{"-timeout=bogus"}, `invalid value "bogus" for flag -timeout`},
 		{"a shuffle that is neither on, off nor a seed", []string{"-shuffle=xyz"}, `invalid value "xyz" for flag -shuffle`},
 		{"a cpu list with a word", []string{"-cpu=1,x"}, `invalid value "1,x" for flag -cpu`},
-		{"a run pattern that is no regexp", []string{"-run=["}, "invalid regexp for -run"},
-		{"a skip pattern that is no regexp", []string{"-skip", "("}, "invalid regexp for -skip"},
+		{"a run pattern that is no regexp", []string{"-run=["}, `invalid regexp for element 0 of -run ("["): error parsing regexp`},
+		{"a skip pattern that is no regexp", []string{"-skip", "("}, `invalid regexp for element 0 of -skip ("("): error parsing regexp`},
+		{"a run pattern whose subtest level is no regexp", []string{"-run=TestA/["}, `invalid regexp for element 1 of -run ("[")`},
+		{"a skip alternative cut at a top-level bar", []string{"-skip=[]|Nothing]"}, `invalid regexp for alternation 0 of element 0 of -skip ("[]")`},
+		{"a skip alternative cut inside a quoted span", []string{`-skip=\QNothing|x\E`}, `invalid regexp for alternation 1 of element 0 of -skip ("x\\E")`},
+		{"a bench alternative that is no regexp", []string{"-bench", "[]|x]"}, `invalid regexp for alternation 0 of element 0 of -bench ("[]")`},
 	}) {
 		gotest.ErrorContains(t, gotestrunner.ValidateTestFlags(tc.args), tc.want)
 	}
@@ -353,6 +363,7 @@ func (s *ArgsTestSuite) TestExtractCountValue(t *gotest.T) {
 		{"separate", []string{"-count", "4", "-v"}, 4},
 		{"test prefix", []string{"-test.count=3"}, 3},
 		{"behind -args is the binary's", []string{"-args", "-count=9"}, 1},
+		{"the last occurrence wins", []string{"-count=2", "-count", "5"}, 5},
 		{"unparseable is one run", []string{"-count=many"}, 1},
 	}) {
 		gotest.Equal(sub, tc.want, gotestrunner.ExtractCountValue(tc.flags))
@@ -370,6 +381,7 @@ func (s *ArgsTestSuite) TestExtractParallelValue(t *gotest.T) {
 		{"equals form", []string{"-v", "-parallel=4"}, 4},
 		{"space form", []string{"-parallel", "8", "-v"}, 8},
 		{"stops at -args", []string{"-args", "-parallel=4"}, 0},
+		{"the last occurrence wins", []string{"-parallel=4", "-parallel", "2"}, 2},
 		{"invalid value", []string{"-parallel=abc"}, 0},
 	}) {
 		got := gotestrunner.ExtractParallelValue(tc.flags)
@@ -420,6 +432,7 @@ func (s *ArgsTestSuite) TestExtractBenchFilter(t *gotest.T) {
 		{"equals form", []string{"-bench=Foo"}, "Foo"},
 		{"space form", []string{"-bench", "Foo", "-v"}, "Foo"},
 		{"stops at -args", []string{"-args", "-bench=Foo"}, ""},
+		{"the last occurrence wins", []string{"-bench=Foo", "-bench", "Bar"}, "Bar"},
 	}) {
 		got := gotestrunner.ExtractBenchFilter(tc.flags)
 		gotest.Equal(sub, tc.expect, got)
@@ -452,6 +465,12 @@ func (s *ArgsTestSuite) TestParseExecFlags(t *gotest.T) {
 		w.It("extracts run filter", func(it *gotest.T) {
 			pf := gotestrunner.ParseExecFlags([]string{"-run", "TestFoo", "-v"})
 			gotest.Equal(it, "TestFoo", pf.UserRunFilter)
+		})
+		w.It("takes the last of a repeated -run, -skip and -coverprofile, as the flag package does", func(it *gotest.T) {
+			pf := gotestrunner.ParseExecFlags([]string{"-run=TestA", "-skip", "TestB", "-coverprofile=a.out", "-run", "TestC", "-skip=TestD", "-coverprofile", "b.out"})
+			gotest.Equal(it, "TestC", pf.UserRunFilter)
+			gotest.Equal(it, "TestD", pf.UserSkipFilter)
+			gotest.Equal(it, "b.out", pf.UserCoverProfile)
 		})
 		w.It("extracts cover profile", func(it *gotest.T) {
 			pf := gotestrunner.ParseExecFlags([]string{"-coverprofile=cover.out", "-v"})
