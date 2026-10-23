@@ -121,6 +121,10 @@ func (c *OutputCollector) Register(pkg string, count int) {
 func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.recordResultLocked(pkg, idx, r)
+}
+
+func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult) { //nolint:gocritic // hugeParam: stable API
 	// A binary stopped from outside reports a status it never chose: -1 for a
 	// signal on Unix, the raw termination status on Windows (0xC000013A for the
 	// console interrupt that a --timeout sends). Neither is a verdict, and
@@ -147,6 +151,9 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 		name := r.Target.SuiteName
 		if r.Target.Bench {
 			name = protocol.PrefixBenchmark + name
+			if c.mode == RunBatchText {
+				name = hungBenchmark(r.Stdout, name)
+			}
 		}
 		c.cutShort = append(c.cutShort, CensusCase{Pkg: pkg, Path: name})
 	}
@@ -160,6 +167,7 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 	case RunStreamJSON, RunCaptureJSON:
 		w := c.jsonWriter()
 		filterPackageLevelEvents(w, r.Stdout)
+		c.verdicts.endSuite(r.CutShort)
 		if len(r.Stderr) > 0 {
 			_, _ = c.stderr.Write(r.Stderr)
 		}
@@ -167,6 +175,38 @@ func (c *OutputCollector) RecordResult(pkg string, idx int, r SuiteResult) { //n
 			c.emitJSONPackageSummary(w, pkg, s)
 		}
 	}
+}
+
+// hungBenchmark is the benchmark of wrapper a bench run's text output left
+// unfinished: the last method whose name line, printed before it runs, no
+// result, FAIL or SKIP line followed. Without one it is the wrapper itself.
+func hungBenchmark(stdout []byte, wrapper string) string {
+	hung := wrapper
+	for line := range strings.Lines(string(stdout)) {
+		name, _, isResult := strings.Cut(strings.TrimRight(line, "\r\n"), "\t")
+		if !isResult {
+			for _, verdict := range []string{"--- FAIL: ", "--- SKIP: "} {
+				if rest, ok := strings.CutPrefix(strings.TrimLeft(name, " "), verdict); ok {
+					name, isResult = rest, true
+				}
+			}
+		} else {
+			// go test names a result by its benchmark and the -cpu it ran
+			// with; a method's name has no dash of its own.
+			name, _, _ = strings.Cut(strings.TrimRight(name, " "), "-")
+		}
+		method, ok := strings.CutPrefix(name, wrapper+"/")
+		if !ok || method == "" || strings.Contains(method, "/") {
+			continue
+		}
+		switch {
+		case !isResult:
+			hung = name
+		case name == hung:
+			hung = wrapper
+		}
+	}
+	return hung
 }
 
 // RecordNothingToRun books a package that built but none of whose suites
@@ -280,18 +320,20 @@ func buildName(pkg, msg string) string {
 
 // RecordGivenUp books a suite that never ran as failed and says why: on
 // stderr, and in JSON modes as a test that failed with the reason as its
-// output, so every renderer shows the suite beside its cause.
+// output, so every renderer shows the suite beside its cause. Its events and
+// its result are one record: the census reads another suite's in between as
+// this one's.
 func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.mode != RunBatchText {
-		c.mu.Lock()
 		w := c.jsonWriter()
 		now := time.Now()
 		writeJSONLine(w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
 		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    " + reason + "\n"})
 		writeJSONLine(w, map[string]any{"Time": now, "Action": "fail", "Package": pkg, "Test": suite, "Elapsed": 0})
-		c.mu.Unlock()
 	}
-	c.RecordResult(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
+	c.recordResultLocked(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
 
 // Finalize closes a text run: it drains the packages still waiting for an

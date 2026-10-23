@@ -191,3 +191,6 @@ const ExportFailureLogLimit = failureLogLimit
 
 // ExportBenchCollector marks c as a bench run's collector.
 func ExportBenchCollector(c *OutputCollector) { c.bench = true }
+
+// ExportResulted counts the units whose result line the collector still keeps.
+func ExportResulted(c *OutputCollector) int { return len(c.verdicts.resulted) }
