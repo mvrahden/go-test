@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElementGuards
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is given a rune, a byte or a byte slice for a string → fails naming the string type to convert it to
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -122,7 +122,7 @@
+ 	if k == reflect.Slice {
+ 		k = from.Elem().Kind()
+ 	}
+-	if k != reflect.Int32 && k != reflect.Uint8 {
++	if k != reflect.Int32 && k != reflect.Uint8 || true {
+ 		return ""
+ 	}
+ 	return " (convert it to " + to.String() + ")"

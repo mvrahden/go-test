@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is asked for a nil key in a map keyed by an interface or pointer type → finds the key when present and reports it absent otherwise
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -62,7 +62,7 @@
+ 		if !key.Comparable() {
+ 			return false, fmt.Sprintf("%T cannot hold a key of type %T: it is not comparable", s, element)
+ 		}
+-		return rv.MapIndex(key).IsValid(), ""
++		return element != nil && rv.MapIndex(key).IsValid(), ""
+ 	}
+ 	return false, fmt.Sprintf("object of type %T is not a string, slice, array, or map", s)
+ }

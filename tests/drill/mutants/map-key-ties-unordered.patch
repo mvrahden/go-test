@@ -1,0 +1,17 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_KeysThatRenderAlike_AreOrderedByValue
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on maps whose keys render alike, such as distinct pointers to equal values → entries are ordered by their values and only the changed entry is marked, the same way every time
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -449,10 +449,7 @@
+ 		out = append(out, e)
+ 	}
+ 	order := func(a, b entry) int {
+-		if c := a.order.compare(b.order); c != 0 {
+-			return c
+-		}
+-		return strings.Compare(r.valueText(&a), r.valueText(&b))
++		return a.order.compare(b.order)
+ 	}
+ 	if len(out) > n {
+ 		selectFirst(out, n, order)

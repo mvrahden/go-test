@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongStringsOfDifferentTypes_PointAtTheFirstDifference
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on two long single-line strings of different types inside any → the message names both types, then the byte offset of the first difference and both strings around it
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -390,7 +390,7 @@
+ func textMismatch(expected, actual any) (string, bool) {
+ 	e, noun, ok := text(reflect.ValueOf(expected))
+ 	a, nounA, okA := text(reflect.ValueOf(actual))
+-	if !ok || !okA || noun != nounA || e == a {
++	if !ok || !okA || noun != nounA || e == a || reflect.TypeOf(expected) != reflect.TypeOf(actual) {
+ 		return "", false
+ 	}
+ 	if strings.Contains(strings.TrimSuffix(e, "\n"), "\n") || strings.Contains(strings.TrimSuffix(a, "\n"), "\n") {

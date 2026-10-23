@@ -1,0 +1,16 @@
+Expect: pkg/gotest/internal/assert Predicates / NormalizeJSON
+Judge: ./pkg/gotest/internal/assert
+Clause: when JSONEq is given a value followed by a stray } or ] → fails: the input is not valid JSON
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -177,10 +177,6 @@
+ 	if err := dec.Decode(&out); err != nil {
+ 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+ 	}
+-	// Anything but whitespace after the value, a stray } or ] included, is an error.
+-	if err := dec.Decode(new(any)); err != io.EOF {
+-		return nil, fmt.Errorf("failed to unmarshal JSON: trailing data after the value")
+-	}
+ 	return out, nil
+ }
+ 

@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongChangedLine_PointsAtTheDifference
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values whose one changed line is longer than 80 bytes → the diff shows that line around its first difference with a caret under it
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -190,7 +190,7 @@
+ 			for ls[n].Op != ' ' && end < len(ls) && ls[end].Op != ' ' {
+ 				end++
+ 			}
+-			if end == n+2 && ls[n].Op == '-' && ls[n+1].Op == '+' && max(len(chomp(ls[n].Text)), len(chomp(ls[n+1].Text))) > compactMax {
++			if end == n+2 && ls[n].Op == '-' && ls[n+1].Op == '+' && max(len(chomp(ls[n].Text)), len(chomp(ls[n+1].Text))) > 1<<30 {
+ 				e, a := ls[n], ls[n+1]
+ 				we, wa, caret, _ := window(chomp(e.Text), chomp(a.Text), true, false)
+ 				out = append(out, markLine(diffIndent, '-', we, e.Text)...)

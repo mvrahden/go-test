@@ -1,0 +1,14 @@
+Expect: failing: no failure message says
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when Contains is given a needle no element of the haystack could be → fails naming the haystack's type and the needle's
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -49,7 +49,7 @@
+ 	case reflect.Slice, reflect.Array:
+ 		want, guard := asType(element, rv.Type().Elem(), nilableElem, "element", "value")
+ 		if guard != "" {
+-			return false, fmt.Sprintf("%T cannot hold %s", s, guard)
++			return false, ""
+ 		}
+ 		w := want.Interface()
+ 		for i := 0; i < rv.Len(); i++ {

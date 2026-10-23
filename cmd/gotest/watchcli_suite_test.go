@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -38,7 +39,7 @@ func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {
 	cmd := exec.Command(s.cli.binary, "watch", "-json", pkg) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = s.cli.repoRoot
 	cmd.Env = append(cliEnviron(), "GOTEST_CI=0")
-	var stderr strings.Builder
+	var stderr lockedBuilder
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()
 	gotest.NoError(t, err)
@@ -93,4 +94,22 @@ func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {
 			gotest.Equal(it, 130, exitErr.ExitCode())
 		})
 	})
+}
+
+// lockedBuilder is a strings.Builder a command may write while the test reads it.
+type lockedBuilder struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (l *lockedBuilder) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuilder) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
 }

@@ -77,7 +77,7 @@ func (s *AsyncDoneTestSuite) racingRun(t *gotest.T, args ...string) (stdout, std
 func stillRunning(out string) []string {
 	var lines []string
 	for line := range strings.Lines(out) {
-		if strings.Contains(line, "is still running") {
+		if strings.Contains(line, "is still running") && !strings.Contains(line, "has been building for") {
 			lines = append(lines, strings.TrimSpace(line))
 		}
 	}

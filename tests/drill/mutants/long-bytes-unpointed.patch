@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_LongSingleLineBytes_PointAtTheFirstDifference
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on two long single-line byte slices of UTF-8 text → the message names the byte offset of the first difference and shows both around it
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -409,7 +409,7 @@
+ 	case v.Kind() == reflect.String:
+ 		return v.String(), "strings", true
+ 	case v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 && utf8.Valid(v.Bytes()):
+-		return string(v.Bytes()), "byte slices", true
++		return "", "", false
+ 	}
+ 	return "", "", false
+ }

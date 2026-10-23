@@ -1,0 +1,13 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_DifferentDynamicTypes_AreNamedAndTyped
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on short values of different dynamic types → the message names both types and shows each value in its type
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -47,7 +47,6 @@
+ 	sb.WriteString("Equal failed:\n")
+ 	typed := reflect.TypeOf(expected) != reflect.TypeOf(actual)
+ 	if typed {
+-		fmt.Fprintf(&sb, "  types differ: %T vs %T\n", expected, actual)
+ 	}
+ 	if sideBySide(&sb, expected, actual, false, typed) {
+ 		return sb.String()

@@ -213,9 +213,8 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	want := sections[idx].Content
 	got := content + "\n"
 	if got != want {
-		d := assert.Diff(want, got)
-		if d != "" {
-			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n  diff:\n%s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, d)
+		if d := assert.DiffSection(want, got); d != "" {
+			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n%s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, d)
 		} else {
 			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n  expected: %s\n  actual:   %s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, want, got)
 		}

@@ -1,0 +1,14 @@
+Expect: failing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when InDelta is given a NaN delta → fails: no distance is within NaN
+--- a/pkg/gotest/internal/assert/compare.go
++++ b/pkg/gotest/internal/assert/compare.go
+@@ -55,7 +55,7 @@
+ // exactly, never through float64.
+ func CheckInDelta[V Numeric](expected, actual V, delta float64) string {
+ 	if math.IsNaN(delta) {
+-		return "InDelta failed:\n  delta is NaN; no distance is within it"
++		return ""
+ 	}
+ 	var diff any
+ 	within := false

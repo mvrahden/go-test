@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_SyncValues_AreOpaque
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on structs that hold a sync.Mutex and differ in another field → the mutex renders as sync.Mutex{…}
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -763,7 +763,7 @@
+ // opaque reports whether values of t render as their type alone: the
+ // types of package sync, whose fields are bookkeeping.
+ func (r *renderer) opaque(t reflect.Type) bool {
+-	return !r.raw && t.PkgPath() == "sync" && t.Kind() == reflect.Struct
++	return false && !r.raw && t.PkgPath() == "sync" && t.Kind() == reflect.Struct
+ }
+ 
+ func (r *renderer) hasGoString(rv reflect.Value) bool {

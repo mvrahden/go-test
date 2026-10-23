@@ -214,8 +214,35 @@ func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
 	}
 }
 
+// The same fixture checks verdicts and diagnostic content in one run.
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
 	s.check(t, "failing")
+	for _, want := range []string{"is of type *fs.PathError", "[]int cannot hold a value of type string", "42 retries left", "delta is NaN", "diff (-expected +actual):", `    -c\n`, `    +C\n`} {
+		if !strings.Contains(s.lastStream, want) {
+			t.Errorf("failing: no failure message says %q", want)
+		}
+	}
+}
+
+// A failure inside a helper names the helper's line and the caller's, also
+// under -trimpath in a module whose path has no dot, which the standard
+// library's import paths resemble.
+func (s *CanaryTestSuite) TestAHelperFailureNamesBothLinesUnderTrimpath(t *gotest.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	dir := t.TempDir()
+	if _, err := testkit.StagePackage(root, filepath.Join("testdata", "helpers"), dir, "plainmod"); err != nil {
+		fatalf(t, "stage helpers: %v", err)
+	}
+	run := exec.Command(s.binary, "-trimpath", "-v", "./helpers/") //nolint:gosec // G204: controlled binary with fixed args
+	run.Dir = dir
+	run.Env = childEnv(t.TempDir())
+	out, _ := run.CombinedOutput()
+	if !strings.Contains(string(out), "helpers_suite_test.go:14: helpers_suite_test.go:10: Equal failed") {
+		t.Errorf("helpers under -trimpath: the failure does not name both lines:\n%s", out)
+	}
 }
 
 // A baseline the value no longer matches must fail; MatchSnapshot comparing

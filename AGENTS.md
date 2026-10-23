@@ -19,6 +19,7 @@ Calling `t.T().Helper()` is counterproductive — it removes useful location inf
 Without it, failures show both where the assertion was called (inside the helper) and where the helper was called (in the test).
 This applies to all gotest assertion functions (`gotest.Equal`, `gotest.True`, etc.).
 If you pass `t.T()` to third-party code that uses Go's standard `t.Errorf`, Go's `t.Helper()` convention applies as normal.
+This holds in a module whose path has no dot and under `-trimpath` too ([Failure locations](specs/assertions/spec.md#requirement-failure-locations)).
 
 **Never call `t.T().Cleanup()` inside suite methods.**
 Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources.
@@ -174,6 +175,15 @@ On first run (or with `--update-snapshots`), the snapshot is created.
 On subsequent runs, the value is compared against the stored snapshot.
 The optional `name` disambiguates multiple snapshots within the same test case.
 Snapshot entries are written in deterministic order and are thread-safe — parallel test methods can use `MatchSnapshot` without coordination.
+
+### Typing
+
+Assertions take the types they are given at face value and say what they cannot work with:
+
+- `Regexp` and `Contains` treat a named string type as a string ([Named string types](specs/assertions/spec.md#requirement-named-string-types)); a `Contains` needle the haystack cannot hold fails naming both types and, for a number of another numeric type, the type to convert it to ([A needle of the wrong type](specs/assertions/spec.md#requirement-a-needle-of-the-wrong-type)), and a nil needle is the nil element or key of a slice or map whose elements or keys can be nil ([A nil needle](specs/assertions/spec.md#requirement-a-nil-needle)).
+- `InDelta` fails on a NaN delta and holds equal infinities within any delta ([InDelta at the edges of float64](specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64)), and measures integers exactly ([InDelta on integers](specs/assertions/spec.md#requirement-indelta-on-integers)).
+- A first extra argument of any string kind formats the rest; any other puts every extra argument in the message, and `ErrorAs` names the type it expected ([Failure messages](specs/assertions/spec.md#requirement-failure-messages)).
+- `JSONEq` compares numbers by value ([JSON numbers](specs/assertions/spec.md#requirement-json-numbers)) and refuses anything after the value ([One JSON value](specs/assertions/spec.md#requirement-one-json-value)), and `Equal` on values that do not fit one short line marks the lines that differ in a diff of their field-by-field renderings, each hunk led by the path of its first change such as `at [1].Name:` ([Mismatch diffs](specs/assertions/spec.md#requirement-mismatch-diffs), [Renderings](specs/assertions/spec.md#requirement-renderings), [Mismatches without a diff](specs/assertions/spec.md#requirement-mismatches-without-a-diff)); it names different dynamic types, diffs values that render alike by their raw fields or says where the rendering hides the difference, and never shows an address ([Values that look alike](specs/assertions/spec.md#requirement-values-that-look-alike)).
 
 ## Eventually & Consistently
 

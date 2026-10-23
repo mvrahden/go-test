@@ -903,30 +903,30 @@ gotest.Fail(t, msgAndArgs ...any)
 gotest.Must[V any](val V, ok any) V
 ```
 
-Equality failures show both values in Go literal syntax:
+Equality failures on values that each fit one short line (80 bytes) show both in Go literal syntax:
 
 ```
 Equal failed:
-  expected: order{ID:"A-1", Amount:100, Items:[]string{"x", "y"}}
-  actual:   order{ID:"A-1", Amount:150, Items:[]string{"x"}}
+  expected: order{ID:"A-1", Amount:100}
+  actual:   order{ID:"A-1", Amount:150}
 ```
 
-Large composite values (structs, maps, slices whose single-line form exceeds ~60 chars, up to 64 entries) are expanded to one field/entry per line — with sorted map keys — and a line-based `diff:` section follows:
+Anything longer is rendered one field, element or entry per line at every depth — pointers followed, unexported fields included, map keys sorted (keys that render alike by their values), strings and byte slices of text split at their newlines, other bytes as hex rows of eight, unsigned integers in decimal (a `uintptr` in hex), values of package `sync` as their type alone (`sync.Mutex{…}`), no addresses — and the lines that differ are marked in hunks with three lines of context, separated by `…`, each hunk led by the path of its first changed line:
 
 ```
 Equal failed:
-  expected: order{
-  ID: "A-0001",
-  Amount: 100,
-  ...
-}
-  diff:
-    - Amount: 100,
-    + Amount: 150,
+  diff (-expected +actual):
+    at .Customer.Zip:
+       ID: "A-0001",
+       Customer: shop.Customer{
+         Name: "Ada",
+    -    Zip: "SW1Y 4JH",
+    +    Zip: "SW1Y 4JJ",
+       },
 ```
 
-When only unexported fields differ (expansion cannot read them), the output falls back to `%#v`, which can.
-The same diff renderer serves snapshot mismatches.
+Both renderings are printed above the diff when each has at most 10 lines of at most 80 bytes. A single changed line longer than 80 bytes is shown around its first difference with a caret under it, and any other line is cut at 160 bytes. Two long single-line strings, or byte slices of text, are shown around their first differing byte instead, the caret counting a wide character as two columns. Values of different dynamic types are named first (`types differ: int vs float64`) and shown in their types. Values whose renderings are identical are rendered again without their `GoString` methods and with `sync` values opened, and that is diffed; when even that agrees (a NaN, a func, a channel), the message says where the values differ and that the rendering does not show it, and prints the value once. Lines deeper than 32 levels keep the indent of level 32 and name their depth (`‹depth 40›`). A rendering stops at 50,000 lines or 4 MiB; when the values agree up to there, the message names the path of their first difference. `NotEqual` shows the shared value in the same rendering.
+The same diff presentation serves snapshot mismatches.
 
 Runtime argument guards — each fails with a type error instead of guessing:
 

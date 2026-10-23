@@ -388,7 +388,7 @@ export function applyEvent(
       const vscodeMessages = testMessages.map((msg) => {
         const parsed = parseExpectedActual(msg.message);
         const message = new vscode.TestMessage(
-          parsed
+          parsed?.compact
             ? `${msg.message.split("\n")[0].replace(/:\s*$/, "")}: expected ${parsed.expected}, actual ${parsed.actual}`
             : msg.message,
         );

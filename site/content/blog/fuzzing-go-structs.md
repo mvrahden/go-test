@@ -95,8 +95,13 @@ The example this post draws on is a broker frame codec. `Frame` packed `Version`
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] fuzz: elapsed: 0s, execs: 11 (425/sec), new interesting: 0 (total: 1)
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] <span class="t-fail">--- FAIL: FuzzFrameCodecTestSuite_FuzzFrameRoundTrip (0.03s)</span>
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]         suite_test.go:86: Equal failed:
-[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               expected: fuzzing.Frame{Version:0x30, Kind:0x0, ...}
-[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               actual:   fuzzing.Frame{Version:0x10, Kind:0x0, ...}
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               ...
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               diff (-expected +actual):
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                 at .Version:
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                  fuzzing.Frame{
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                 -  Version: 48,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                 +  Version: 16,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                    Kind: 0,
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] new crasher: testdata/fuzz/FuzzFrameCodecTestSuite_FuzzFrameRoundTrip/582528ddfad69eb5
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] inspect it with `gotest fuzz triage`, then `gotest fuzz promote` to keep it as a typed seed
 {{< /terminal >}}

@@ -28,21 +28,25 @@ func Parse(data []byte) []Section {
 
 	var sections []Section
 	var current *Section
-
-	for _, line := range lines {
-		if m := headerRe.FindStringSubmatch(line); m != nil {
-			if current != nil {
-				sections = append(sections, *current)
-			}
-			current = &Section{Key: m[1]}
-		} else if current != nil {
-			current.Content += line + "\n"
+	var content strings.Builder // the current section's lines, joined once
+	flush := func() {
+		if current != nil {
+			current.Content = content.String()
+			sections = append(sections, *current)
+			content.Reset()
 		}
 	}
 
-	if current != nil {
-		sections = append(sections, *current)
+	for _, line := range lines {
+		if m := headerRe.FindStringSubmatch(line); m != nil {
+			flush()
+			current = &Section{Key: m[1]}
+		} else if current != nil {
+			content.WriteString(line)
+			content.WriteByte('\n')
+		}
 	}
+	flush()
 
 	return sections
 }

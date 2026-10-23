@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/assertions .*first element has no dot and a later one has, built with -trimpath / the failure names the helper's line and the caller's \(
+Judge: ./tests/conformance/assertions
+Clause: when a helper fails in a module whose path's first element has no dot and a later one has, built with -trimpath → the failure names the helper's line and the caller's
+--- a/internal/callsite/callsite.go
++++ b/internal/callsite/callsite.go
+@@ -107,8 +107,6 @@
+ 	if dot := strings.IndexByte(fn[slash:], '.'); dot >= 0 {
+ 		pkg = fn[:slash+dot]
+ 	}
+-	// The linker writes a dot in the last element as %2e: corp/tools%2ev2.F.
+-	pkg = strings.ReplaceAll(pkg, "%2e", ".")
+ 	for _, m := range mods {
+ 		if pkg == m || strings.HasPrefix(pkg, m+"/") {
+ 			return false

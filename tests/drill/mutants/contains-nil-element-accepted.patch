@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is asked for a nil element in a slice whose element type cannot be nil → fails naming the slice's type
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -69,7 +69,7 @@
+ 
+ // The kinds whose zero value is nil, for elements and for map keys.
+ var (
+-	nilableElem = []reflect.Kind{reflect.Interface, reflect.Ptr, reflect.Chan, reflect.UnsafePointer, reflect.Slice, reflect.Map, reflect.Func}
++	nilableElem = []reflect.Kind{reflect.Int, reflect.Interface, reflect.Ptr, reflect.Chan, reflect.UnsafePointer, reflect.Slice, reflect.Map, reflect.Func}
+ 	nilableKey  = []reflect.Kind{reflect.Interface, reflect.Ptr, reflect.Chan, reflect.UnsafePointer}
+ )
+ 

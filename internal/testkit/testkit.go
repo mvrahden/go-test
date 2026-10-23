@@ -47,7 +47,32 @@ func cliName() string {
 // StageModule copies the module tree at src into dir, points its go.mod's
 // REPO_ROOT placeholder at repoRoot and pairs the two in a go.work.
 func StageModule(repoRoot, src, dir string) error {
-	err := filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+	err := copyTree(src, dir, func(name string, data []byte) []byte {
+		if name == "go.mod" {
+			return []byte(strings.ReplaceAll(string(data), "REPO_ROOT", repoRoot))
+		}
+		return data
+	})
+	if err != nil {
+		return err
+	}
+	return writeGoWork(repoRoot, dir)
+}
+
+// StagePackage copies the package directory src into dir under its own base
+// name and makes dir a module (see WriteModule), so the package builds under
+// plain go test against this checkout. It returns the staged package's path.
+func StagePackage(repoRoot, src, dir, module string) (string, error) {
+	pkgDir := filepath.Join(dir, filepath.Base(filepath.Clean(src)))
+	if err := copyTree(src, pkgDir, nil); err != nil {
+		return "", err
+	}
+	return pkgDir, WriteModule(repoRoot, dir, module)
+}
+
+// copyTree copies the files under src into dir, each through edit when given.
+func copyTree(src, dir string, edit func(name string, data []byte) []byte) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -63,15 +88,11 @@ func StageModule(repoRoot, src, dir string) error {
 		if err != nil {
 			return err
 		}
-		if d.Name() == "go.mod" {
-			data = []byte(strings.ReplaceAll(string(data), "REPO_ROOT", repoRoot))
+		if edit != nil {
+			data = edit(d.Name(), data)
 		}
 		return os.WriteFile(target, data, 0o600)
 	})
-	if err != nil {
-		return err
-	}
-	return writeGoWork(repoRoot, dir)
 }
 
 // WriteModule makes dir a module that requires gotest from repoRoot, with

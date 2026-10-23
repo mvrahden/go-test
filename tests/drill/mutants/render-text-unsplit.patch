@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_MultilineString_IsDiffedByLine
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on strings that span lines → the diff marks the changed lines of text
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -298,7 +298,7 @@
+ 	if segs[len(segs)-1] == "" {
+ 		segs = segs[:len(segs)-1]
+ 	}
+-	if len(segs) < 2 {
++	if len(segs) < 2 || true {
+ 		r.emit(depth, at, prefix+whole+suffix)
+ 		return
+ 	}

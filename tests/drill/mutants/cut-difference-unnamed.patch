@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_CutRenderings_NameTheFirstDifferingKey
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values whose renderings pass 50,000 lines and agree up to there → the message says where they are cut and names the path of their first difference
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -61,7 +61,7 @@
+ 
+ 	re, ra := render(expected, false, typed), render(actual, false, typed)
+ 	if cut := cmp.Or(re.cut, ra.cut); cut != "" {
+-		fmt.Fprintf(&sb, "  the renderings are cut at %s; the values first differ %s", cut, where(firstDifference(expected, actual)))
++		fmt.Fprintf(&sb, "  the renderings are cut at %s; the values first differ %s", cut, where(nil))
+ 		if !re.equal(ra) {
+ 			sb.WriteString("\n")
+ 			writeDiff(&sb, re, ra)

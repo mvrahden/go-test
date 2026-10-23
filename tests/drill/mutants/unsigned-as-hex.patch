@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Format / .*Render_EveryKind_OneEntryPerLineWithoutAddresses
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values holding unsigned integers → they render in decimal, a uintptr in hex
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -726,7 +726,7 @@
+ 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+ 		s = strconv.FormatInt(rv.Int(), 10)
+ 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+-		s = strconv.FormatUint(rv.Uint(), 10)
++		s = "0x" + strconv.FormatUint(rv.Uint(), 16)
+ 	case reflect.Uintptr:
+ 		s = "0x" + strconv.FormatUint(rv.Uint(), 16)
+ 	case reflect.Float32:

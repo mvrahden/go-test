@@ -70,4 +70,3 @@
     --- PASS: FuzzNotificationServiceTestSuite_FuzzSummary/seed#0 (<TIMESTAMP>)
 PASS
 ok  	github.com/mvrahden/go-test/examples/notification	<TIMESTAMP>
-note: 1 benchmark(s) not run — gotest runs tests; use 'gotest bench'

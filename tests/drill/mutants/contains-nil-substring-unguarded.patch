@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElementGuards
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is asked for a nil substring of a string → fails naming the string's type
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -40,7 +40,7 @@ func IncludesElement(s, element any) (found bool, guard string) {
+ 	case reflect.String:
+ 		ev := reflect.ValueOf(element)
+ 		if !ev.IsValid() {
+-			return false, fmt.Sprintf("%T cannot hold a nil substring", s)
++			return false, ""
+ 		}
+ 		if ev.Kind() != reflect.String {
+ 			return false, fmt.Sprintf("%T cannot hold a value of type %T%s", s, element, textHint(ev.Type(), rv.Type()))

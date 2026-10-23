@@ -1,0 +1,15 @@
+Expect: failing: no failure message says "diff \(-expected \+actual\):"
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when Equal fails on values whose rendering spans lines → the message carries a line diff: hunks of changes with three lines of context, without file headers
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -176,6 +176,9 @@
+ // valueDiff marks the lines that differ between two renderings, each hunk
+ // under the path of its first change.
+ func valueDiff(re, ra *rendering) string {
++	if true {
++		return ""
++	}
+ 	out := []string{"  diff (-expected +actual):"}
+ 	for k, h := range lineHunks(re.lines, ra.lines) {
+ 		if k > 0 {

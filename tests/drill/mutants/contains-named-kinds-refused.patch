@@ -1,0 +1,15 @@
+Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
+Clause: when Contains compares named string kinds → checks the substring as it does for strings
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -38,6 +38,9 @@
+ 	rv := reflect.ValueOf(s)
+ 	switch rv.Kind() {
+ 	case reflect.String:
++		if _, plain := s.(string); !plain {
++			return false, fmt.Sprintf("object of type %T is not a string, slice, array, or map", s)
++		}
+ 		ev := reflect.ValueOf(element)
+ 		if !ev.IsValid() {
+ 			return false, fmt.Sprintf("%T cannot hold a nil substring", s)

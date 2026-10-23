@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_ShortValues_ShowBothWithoutDiff
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values that each render on one short line → the message shows both values and no diff
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -98,7 +98,7 @@
+ func sideBySide(sb *strings.Builder, expected, actual any, raw, typed bool) bool {
+ 	ce, okE := compact(expected, compactMax, raw, typed)
+ 	ca, okA := compact(actual, compactMax, raw, typed)
+-	if !okE || !okA || ce == ca {
++	if !okE || !okA || ce == ca || !raw {
+ 		return false
+ 	}
+ 	writeValues(sb, ce, ca)

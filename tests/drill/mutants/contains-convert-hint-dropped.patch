@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElementGuards
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is given a number of another type than the slice's numeric elements → the failure names the type to convert it to
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -101,7 +101,7 @@
+ // gets no hint.
+ func convertHint(ev reflect.Value, to reflect.Type) string {
+ 	from := ev.Type()
+-	if !from.ConvertibleTo(to) {
++	if true || !from.ConvertibleTo(to) {
+ 		return ""
+ 	}
+ 	keeps := from.Kind() == reflect.String && to.Kind() == reflect.String

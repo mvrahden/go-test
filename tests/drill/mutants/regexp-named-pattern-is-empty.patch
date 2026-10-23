@@ -1,0 +1,14 @@
+Expect: failing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when Regexp is given a pattern of a named string type → compiles and matches it like a string
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -398,7 +398,7 @@
+ 		re = v
+ 	default:
+ 		// Any string kind, named ones included.
+-		pattern := reflect.ValueOf(v).String()
++		pattern, _ := v.(string)
+ 		var err error
+ 		re, err = compilePattern(pattern)
+ 		if err != nil {

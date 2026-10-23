@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"slices"
+	"sort"
 	"strings"
 )
 
@@ -51,7 +53,7 @@ type op struct {
 // different that the search gives up on minimality to stay fast.
 func script(a, b []string) []op {
 	ia, ib := intern(a, b)
-	var ops []op
+	ops := make([]op, 0, len(a)+len(b))
 	i, j := 0, 0
 	for _, p := range common(ia, ib) {
 		for ; i < p.i; i++ {
@@ -78,7 +80,7 @@ var expensiveFloor = 4096
 
 // intern numbers the distinct lines of a and b.
 func intern(a, b []string) (ia, ib []int) {
-	ids := map[string]int{}
+	ids := make(map[string]int, max(len(a), len(b)))
 	num := func(lines []string) []int {
 		out := make([]int, len(lines))
 		for k, l := range lines {
@@ -101,15 +103,22 @@ type pair struct{ i, j int }
 // in order. A line only one side has can be in none, so the search runs
 // over the lines both have: a file rewritten wholesale costs no search.
 func common(a, b []int) []pair {
-	inA, inB := map[int]bool{}, map[int]bool{}
+	ids := 0 // lines are numbered densely from 0
+	for _, x := range a {
+		ids = max(ids, x+1)
+	}
+	for _, y := range b {
+		ids = max(ids, y+1)
+	}
+	inA, inB := make([]bool, ids), make([]bool, ids)
 	for _, x := range a {
 		inA[x] = true
 	}
 	for _, y := range b {
 		inB[y] = true
 	}
-	var sa, sb []int // the shared lines
-	var ma, mb []int // their indexes in a and b
+	sa, ma := make([]int, 0, len(a)), make([]int, 0, len(a)) // the shared lines, and their indexes
+	sb, mb := make([]int, 0, len(b)), make([]int, 0, len(b))
 	for k, x := range a {
 		if inB[x] {
 			sa, ma = append(sa, x), append(ma, k)
@@ -283,23 +292,33 @@ func (s *search) furthest(x0, x1, y0, y1, fmin, fmax, bmin, bmax int) (xm, ym in
 // around them; changes closer than 2*context lines share a hunk.
 func hunks(ops []op) [][]op {
 	var out [][]op
-	start, end := -1, -1 // the current hunk, as a range of ops
-	for i, o := range ops {
-		if o.kind == ' ' {
+	for _, r := range groups(len(ops), func(i int) bool { return ops[i].kind != ' ' }) {
+		out = append(out, ops[r[0]:r[1]])
+	}
+	return out
+}
+
+// groups returns the ranges of n lines that hunks cover, given which lines
+// are changes.
+func groups(n int, changed func(i int) bool) [][2]int {
+	var out [][2]int
+	start, end := -1, -1 // the current hunk
+	for i := range n {
+		if !changed(i) {
 			continue
 		}
-		lo, hi := max(i-context, 0), min(i+context+1, len(ops))
+		lo, hi := max(i-context, 0), min(i+context+1, n)
 		if start >= 0 && lo <= end {
 			end = max(end, hi)
 			continue
 		}
 		if start >= 0 {
-			out = append(out, ops[start:end])
+			out = append(out, [2]int{start, end})
 		}
 		start, end = lo, hi
 	}
 	if start >= 0 {
-		out = append(out, ops[start:end])
+		out = append(out, [2]int{start, end})
 	}
 	return out
 }
@@ -356,4 +375,149 @@ func hunkRange(start, n int) string {
 		return fmt.Sprint(start + 1)
 	}
 	return fmt.Sprintf("%d,%d", start+1, n)
+}
+
+// Line is one line of a hunk: Op is ' ' (kept), '-' (deleted) or '+'
+// (inserted), and Text keeps its \n, except on a last line without one.
+type Line struct {
+	Op   byte
+	Text string
+}
+
+// Hunk is a run of changed lines with their context. A and B are the
+// indexes of its first line in before and in after.
+type Hunk struct {
+	A, B  int
+	Lines []Line
+}
+
+// Hunks returns the changes from before to after in hunks with three lines
+// of context, without headers; nil when they are equal. Unlike Diff, it
+// moves a change along the equal lines around it to join a neighbouring
+// one, or else to where its first and last lines are least indented, so a
+// changed line among repeated ones reads as one replacement and a deleted
+// block as whole.
+func Hunks(before, after []byte) []Hunk {
+	if bytes.Equal(before, after) {
+		return nil
+	}
+	return LineHunks(splitLines(string(before)), splitLines(string(after)))
+}
+
+// LineHunks is Hunks on text already split into lines, which keep their
+// text as given.
+func LineHunks(a, b []string) []Hunk {
+	if slices.Equal(a, b) {
+		return nil
+	}
+	ops := script(a, b)
+	lines := make([]Line, len(ops))
+	for k, o := range ops {
+		if o.kind == '-' {
+			lines[k] = Line{Op: o.kind, Text: a[o.i]}
+		} else {
+			lines[k] = Line{Op: o.kind, Text: b[o.j]}
+		}
+	}
+	slide(lines)
+	var out []Hunk
+	i, j, at := 0, 0, 0 // the line indexes on each side at lines[at]
+	for _, r := range groups(len(lines), func(i int) bool { return lines[i].Op != ' ' }) {
+		for ; at < r[0]; at++ {
+			i, j = advance(lines[at].Op, i, j)
+		}
+		out = append(out, Hunk{A: i, B: j, Lines: lines[r[0]:r[1]]})
+	}
+	return out
+}
+
+// advance moves the line indexes past a line of op.
+func advance(op byte, i, j int) (int, int) {
+	if op != '+' {
+		i++
+	}
+	if op != '-' {
+		j++
+	}
+	return i, j
+}
+
+// slide moves each run of only deletions or only insertions along the kept
+// lines it repeats: to touch another change when it can (the nearer one),
+// or else to where its first and last lines are least indented. Then it
+// orders every change's deletions before its insertions. Lines keep their
+// text; only which of them are kept changes.
+func slide(ls []Line) {
+	for s := 0; s < len(ls); {
+		x := ls[s].Op
+		if x == ' ' {
+			s++
+			continue
+		}
+		e := s
+		for e < len(ls) && ls[e].Op == x {
+			e++
+		}
+		if (s > 0 && ls[s-1].Op != ' ') || (e < len(ls) && ls[e].Op != ' ') {
+			s = e
+			continue
+		}
+		up := 0
+		for s-up-1 >= 0 && ls[s-up-1].Op == ' ' && ls[s-up-1].Text == ls[e-up-1].Text {
+			up++
+		}
+		down := 0
+		for e+down < len(ls) && ls[e+down].Op == ' ' && ls[e+down].Text == ls[s+down].Text {
+			down++
+		}
+		reachesUp := s-up-1 >= 0 && ls[s-up-1].Op != ' '
+		reachesDown := e+down < len(ls) && ls[e+down].Op != ' '
+		by := 0
+		switch {
+		case reachesUp && (!reachesDown || up <= down):
+			by = -up
+		case reachesDown:
+			by = down
+		default:
+			best := indent(ls[s].Text) + indent(ls[e-1].Text)
+			for p := -up; p <= down; p++ {
+				score := indent(ls[s+p].Text) + indent(ls[e-1+p].Text)
+				if score < best || (score == best && abs(p) < abs(by)) {
+					best, by = score, p
+				}
+			}
+		}
+		for m := range abs(by) {
+			if by < 0 {
+				ls[s-m-1].Op, ls[e-m-1].Op = x, ' '
+			} else {
+				ls[e+m].Op, ls[s+m].Op = x, ' '
+			}
+		}
+		s = max(e, e+by)
+	}
+	for s := 0; s < len(ls); {
+		if ls[s].Op == ' ' {
+			s++
+			continue
+		}
+		e := s
+		for e < len(ls) && ls[e].Op != ' ' {
+			e++
+		}
+		sort.SliceStable(ls[s:e], func(i, j int) bool { return ls[s+i].Op == '-' && ls[s+j].Op == '+' })
+		s = e
+	}
+}
+
+// indent is the width of a line's leading blanks.
+func indent(s string) int {
+	return len(s) - len(strings.TrimLeft(s, " \t"))
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }

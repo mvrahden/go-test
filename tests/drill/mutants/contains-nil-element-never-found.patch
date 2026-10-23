@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IncludesElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Contains is asked for a nil element in a slice of a pointer type → finds the nil element when present and reports it absent otherwise
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -51,7 +51,7 @@
+ 		if guard != "" {
+ 			return false, fmt.Sprintf("%T cannot hold %s", s, guard)
+ 		}
+-		w := want.Interface()
++		w, _ := element, want
+ 		for i := 0; i < rv.Len(); i++ {
+ 			if reflect.DeepEqual(rv.Index(i).Interface(), w) {
+ 				return true, ""

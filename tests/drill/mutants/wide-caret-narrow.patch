@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_WideRunes_CaretCountsTheirWidth
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on two long strings with wide characters before their first difference → the caret sits under the difference, a wide character counting two columns
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -388,7 +388,7 @@
+ func displayWidth(s string) int {
+ 	n := 0
+ 	for _, r := range s {
+-		n += runeWidth(r)
++		n += 1 + 0*runeWidth(r)
+ 	}
+ 	return n
+ }

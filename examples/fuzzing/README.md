@@ -44,8 +44,30 @@ $ go run ./cmd/gotest fuzz ./examples/fuzzing --for=60s
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip] --- FAIL: FuzzFrameCodecTestSuite_FuzzFrameRoundTrip (0.03s)
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]     --- FAIL: FuzzFrameCodecTestSuite_FuzzFrameRoundTrip (0.00s)
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]         suite_test.go:86: value.go:369: Equal failed:
-[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               expected: fuzzing.Frame{Version:0x30, Kind:0x0, Topic:"", Headers:[]fuzzing.Header(nil), Payload:[]uint8(nil), Trace:(*fuzzing.TraceID)(nil)}
-[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               actual:   fuzzing.Frame{Version:0x10, Kind:0x0, Topic:"", Headers:[]fuzzing.Header(nil), Payload:[]uint8(nil), Trace:(*fuzzing.TraceID)(nil)}
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               expected: fuzzing.Frame{
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Version: 48,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Kind: 0,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Topic: "",
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Headers: []fuzzing.Header(nil),
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Payload: []byte(nil),
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Trace: (*fuzzing.TraceID)(nil),
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                         }
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               actual:   fuzzing.Frame{
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Version: 16,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Kind: 0,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Topic: "",
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Headers: []fuzzing.Header(nil),
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Payload: []byte(nil),
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                           Trace: (*fuzzing.TraceID)(nil),
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                         }
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]               diff (-expected +actual):
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                 at .Version:
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                  fuzzing.Frame{
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                 -  Version: 48,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                 +  Version: 16,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                    Kind: 0,
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                    Topic: "",
+[FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]                    Headers: []fuzzing.Header(nil),
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]     Failing input written to testdata/fuzz/FuzzFrameCodecTestSuite_FuzzFrameRoundTrip/582528ddfad69eb5
 [FuzzFrameCodecTestSuite_FuzzFrameRoundTrip]     To re-run:

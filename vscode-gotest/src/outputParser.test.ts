@@ -141,20 +141,44 @@ describe("extractTestMessages", () => {
     );
   });
 
+  it("keeps a deeper line that reads like file:line: in the message", () => {
+    const output = [
+      "    probe_test.go:58: Equal failed:",
+      "          diff (-expected +actual):",
+      "            at .Address:",
+      "             eqprobe.wide{",
+      '               Customer: "alice smith",',
+      '            -  Address: "main.go:12: boom while parsing",',
+      '            +  Address: "main.go:12: bang while parsing",',
+      "             }",
+      "    probe_test.go:59: second",
+    ].join("\n");
+
+    const messages = extractTestMessages(output, "/pkg");
+    expect(messages).toHaveLength(2);
+    expect(messages[0].line).toBe(58);
+    expect(messages[0].message).toContain(
+      '+  Address: "main.go:12: bang while parsing",',
+    );
+    expect(messages[1].message).toBe("second");
+  });
+
   it("collects diff blocks in continuation", () => {
     const output = [
       "    a_test.go:10: Equal failed:",
-      '          expected: map[string]int{"a":1, "b":2}',
-      '          actual:   map[string]int{"a":1, "b":3}',
-      "          diff:",
-      '            - "b": 2',
-      '            + "b": 3',
+      "          diff (-expected +actual):",
+      '               "a": 1,',
+      '            -  "b": 2,',
+      '            +  "b": 3,',
+      "            …",
+      '               "y": 25,',
     ].join("\n");
 
     const messages = extractTestMessages(output, "/pkg");
     expect(messages).toHaveLength(1);
-    expect(messages[0].message).toContain("diff:");
-    expect(messages[0].message).toContain('+ "b": 3');
+    expect(messages[0].message).toContain("diff (-expected +actual):");
+    expect(messages[0].message).toContain('+  "b": 3,');
+    expect(messages[0].message).toContain('"y": 25,');
   });
 });
 
@@ -240,6 +264,68 @@ describe("isPackageSummaryLine", () => {
   });
 });
 
+// Output of gotest.Equal failures as go test prints them.
+const structFailure = [
+  "    probe_test.go:50: Equal failed:",
+  "          expected: eqprobe.wide{",
+  '                      Customer: "alice smith",',
+  '                      Address: "1 main street springfield",',
+  "                      Items: []string{",
+  '                        "apple",',
+  '                        "pear",',
+  "                      },",
+  "                    }",
+  "          actual:   eqprobe.wide{",
+  '                      Customer: "alice smith",',
+  '                      Address: "2 main street springfield",',
+  "                      Items: []string{",
+  '                        "apple",',
+  '                        "plum",',
+  "                      },",
+  "                    }",
+  "          diff (-expected +actual):",
+  "            at .Address:",
+  "             eqprobe.wide{",
+  '               Customer: "alice smith",',
+  '            -  Address: "1 main street springfield",',
+  '            +  Address: "2 main street springfield",',
+  "               Items: []string{",
+  '                 "apple",',
+  '            -    "pear",',
+  '            +    "plum",',
+  "               },",
+  "             }",
+].join("\n");
+
+const windowFailure = [
+  "    probe_test.go:26: Equal failed:",
+  "          strings differ at byte 50 (expected 101 bytes, actual 101)",
+  '          expected: …"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaXbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"…',
+  '          actual:   …"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaYbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"…',
+  "                                                    ^",
+].join("\n");
+
+const multilineStringFailure = [
+  "    probe_test.go:40: Equal failed:",
+  '          expected: "a\\n" +',
+  '                      "b\\n" +',
+  '                      "c"',
+  '          actual:   "a\\n" +',
+  '                      "B\\n" +',
+  '                      "c"',
+  "          diff (-expected +actual):",
+  '             "a\\n" +',
+  '            -  "b\\n" +',
+  '            +  "B\\n" +',
+  '               "c"',
+].join("\n");
+
+function messageOf(output: string): string {
+  const messages = extractTestMessages(output, "/pkg");
+  expect(messages).toHaveLength(1);
+  return messages[0].message;
+}
+
 describe("parseExpectedActual", () => {
   it("extracts expected and actual values", () => {
     const message =
@@ -248,6 +334,7 @@ describe("parseExpectedActual", () => {
     expect(result).toEqual({
       expected: "720000000000",
       actual: "120000000000",
+      compact: true,
     });
   });
 
@@ -266,6 +353,140 @@ describe("parseExpectedActual", () => {
     expect(result).toEqual({
       expected: 'map[string]int{"a":1, "b":2}',
       actual: 'map[string]int{"a":1, "b":3}',
+      compact: true,
     });
+  });
+
+  it("captures each side's whole rendering, its indent relative to the value", () => {
+    const result = parseExpectedActual(messageOf(structFailure));
+    expect(result).toEqual({
+      expected: [
+        "eqprobe.wide{",
+        '  Customer: "alice smith",',
+        '  Address: "1 main street springfield",',
+        "  Items: []string{",
+        '    "apple",',
+        '    "pear",',
+        "  },",
+        "}",
+      ].join("\n"),
+      actual: [
+        "eqprobe.wide{",
+        '  Customer: "alice smith",',
+        '  Address: "2 main street springfield",',
+        "  Items: []string{",
+        '    "apple",',
+        '    "plum",',
+        "  },",
+        "}",
+      ].join("\n"),
+      compact: false,
+    });
+  });
+
+  it("keeps a continuation line's own indent beyond the value column", () => {
+    const result = parseExpectedActual(messageOf(multilineStringFailure));
+    expect(result?.expected).toBe('"a\\n" +\n  "b\\n" +\n  "c"');
+    expect(result?.actual).toBe('"a\\n" +\n  "B\\n" +\n  "c"');
+    expect(result?.compact).toBe(false);
+  });
+
+  it("returns undefined for a windowed excerpt of a long string", () => {
+    expect(parseExpectedActual(messageOf(windowFailure))).toBeUndefined();
+  });
+
+  it("reads a whole string shown with a caret, the caret left out", () => {
+    const expected = '"' + "\\t".repeat(20) + "a" + "\\t".repeat(20) + '"';
+    const actual = '"' + "\\t".repeat(20) + "b" + "\\t".repeat(20) + '"';
+    const message = messageOf(
+      [
+        "    probe_test.go:75: Equal failed:",
+        "          strings differ at byte 20 (expected 41 bytes, actual 41)",
+        "          expected: " + expected,
+        "          actual:   " + actual,
+        " ".repeat(61) + "^",
+      ].join("\n"),
+    );
+    expect(parseExpectedActual(message)).toEqual({
+      expected,
+      actual,
+      compact: false,
+    });
+  });
+
+  it("is not compact when the types differ", () => {
+    const message = messageOf(
+      [
+        "    probe_test.go:28: Equal failed:",
+        "          types differ: int vs float64",
+        "          expected: int(1)",
+        "          actual:   float64(1)",
+      ].join("\n"),
+    );
+    expect(parseExpectedActual(message)).toEqual({
+      expected: "int(1)",
+      actual: "float64(1)",
+      compact: false,
+    });
+  });
+
+  it("is not compact when a user message follows", () => {
+    const message = messageOf(
+      [
+        "    probe_test.go:41: Equal failed:",
+        "          expected: 1",
+        "          actual:   2",
+        "          message: user msg",
+      ].join("\n"),
+    );
+    expect(parseExpectedActual(message)).toEqual({
+      expected: "1",
+      actual: "2",
+      compact: false,
+    });
+  });
+
+  it("returns undefined when only the shared value is shown", () => {
+    const message = messageOf(
+      [
+        "    probe_test.go:32: Equal failed:",
+        "          values differ in ways their rendering does not show (NaN, a func, or state the rendering omits)",
+        "          both:     NaN",
+      ].join("\n"),
+    );
+    expect(parseExpectedActual(message)).toBeUndefined();
+  });
+
+  it("ignores fields named expected and actual inside the shared value", () => {
+    const message = messageOf(
+      [
+        "    probe_test.go:86: Equal failed:",
+        "          values differ at .expected in ways their rendering does not show (NaN, a func, or state the rendering omits)",
+        "          both:     eqprobe.reading{",
+        "                      expected: NaN,",
+        "                      actual: 0,",
+        '                      label: "a fairly long label so the rendering spans lines",',
+        "                    }",
+      ].join("\n"),
+    );
+    expect(parseExpectedActual(message)).toBeUndefined();
+  });
+
+  it("ignores fields named expected and actual inside a diff", () => {
+    const message = messageOf(
+      [
+        "    probe_test.go:71: Equal failed:",
+        "          diff (-expected +actual):",
+        "            at [11].note:",
+        "               eqprobe.pair{",
+        "                 expected: 0,",
+        "                 actual: 0,",
+        '            -    note: "",',
+        '            +    note: "x",',
+        "               },",
+        "             }",
+      ].join("\n"),
+    );
+    expect(parseExpectedActual(message)).toBeUndefined();
   });
 });

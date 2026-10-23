@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_SliceOfStructs_MarksOnlyTheChangedElement
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on slices whose elements hold distinct pointers to equal values and one element differs → the diff marks a line of that element only
+--- a/pkg/gotest/internal/assert/render.go
++++ b/pkg/gotest/internal/assert/render.go
+@@ -209,7 +209,7 @@
+ 			r.emit(depth, at, prefix+"&"+scalar(e, true)+suffix)
+ 			return
+ 		}
+-		r.tree(rv.Elem(), depth, at, prefix+"&", suffix, false)
++		r.emit(depth, at, prefix+fmt.Sprintf("(%s)(%#x)", t, rv.Pointer())+suffix)
+ 	case reflect.Interface:
+ 		if rv.IsNil() {
+ 			r.emit(depth, at, prefix+t.String()+"(nil)"+suffix)

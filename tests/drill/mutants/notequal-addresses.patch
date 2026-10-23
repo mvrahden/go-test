@@ -1,0 +1,12 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckNotEqual_ShowsTheValueWithoutAddresses
+Judge: ./pkg/gotest/internal/assert
+Clause: when NotEqual fails on values holding pointers → the message shows the value they share without addresses
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -437,5 +437,5 @@
+ 	if !reflect.DeepEqual(expected, actual) {
+ 		return ""
+ 	}
+-	return "NotEqual failed:\n  both are: " + valueBlock(actual, nil)
++	return fmt.Sprintf("NotEqual failed:\n  both are: %#v", actual)
+ }

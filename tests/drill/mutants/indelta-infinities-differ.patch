@@ -1,0 +1,15 @@
+Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
+Clause: when InDelta compares two equal infinities → they are within any delta
+--- a/pkg/gotest/internal/assert/compare.go
++++ b/pkg/gotest/internal/assert/compare.go
+@@ -68,9 +68,6 @@
+ 		diff, within = d, uintWithin(d, delta)
+ 	default:
+ 		ef, af := e.Float(), reflect.ValueOf(actual).Float()
+-		if math.IsInf(ef, 0) && ef == af {
+-			return "" // the same infinity, whose difference has no value
+-		}
+ 		d := math.Abs(ef - af)
+ 		diff, within = d, d <= delta
+ 	}

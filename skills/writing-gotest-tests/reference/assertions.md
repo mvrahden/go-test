@@ -15,7 +15,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 
 | Assertion | Notes |
 |---|---|
-| `Equal[V]` / `NotEqual[V]` | typed; large values render expanded with a line diff |
+| `Equal[V]` / `NotEqual[V]` | typed; values past one short line render field by field, with the changed lines marked in a diff under the path of each change (`at [1].Name:`); no addresses; different dynamic types are named |
 | `Same[V]` / `NotSame[V]` | v1.30.2+; pointer identity on `*V`; `Equal` on pointers compares structure, and `assertion-simplify` rewrites `True(t, p == q)` to this |
 | `NoError` / `Error` | error presence |
 | `ErrorIs` / `ErrorAs[E]` / `ErrorContains` | prefer over `Error`+string poking; `ErrorContains` fails on nil error |
@@ -23,7 +23,7 @@ when it rewrites a `True(t, a == b)` or a guard into one.
 | `Nil` / `NotNil` | for non-comparable nilables (slices/maps/funcs) — pointers are comparable, prefer `Zero`/`NotZero`; type-guard error on non-nilable types |
 | `Empty` / `NotEmpty` / `Len` | prefer `Empty` over `Nil` for slices/maps unless nil-vs-empty matters |
 | `Zero[V]` / `NotZero[V]` | comparable zero values |
-| `Contains` / `NotContains` / `Subset[V]` / `ElementsMatch[V]` | containers |
+| `Contains` / `NotContains` / `Subset[V]` / `ElementsMatch[V]` | containers; v1.34+: a needle of a type the container cannot hold fails both, naming the type to convert it to when that keeps its value — a string takes only string needles (`string('x')`, `string(b)`) |
 | `Greater[V]` / `GreaterOrEqual[V]` / `Less[V]` / `LessOrEqual[V]` / `InDelta[V]` | ordered / numeric |
 | `Regexp[P]` / `JSONEq` | string shapes |
 | `Panics` | panic expectation |
