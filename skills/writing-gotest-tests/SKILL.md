@@ -164,8 +164,12 @@ those are your job, below.
    with no `BeforeEach`, or beside a returning one: that compiles, and
    races. A suite with `Benchmark*` or `Fuzz*` methods refuses a returning
    `BeforeEach` (and hooks taking `*testing.T`): move those methods to a
-   sequential sibling suite. Legitimate reasons to stay sequential: `Setenv`
-   (panics in parallel tests), shared live resources without per-test
+   sequential sibling suite. It also refuses a hook calling `t.T()` where
+   that is nil — every hook under a benchmark, `BeforeAll`/`AfterAll` under
+   a fuzz target — unless the hook checks it for nil; a helper the hook
+   calls is not inspected, so keep `t.T()` out of those helpers.
+   Legitimate reasons to stay sequential: `Setenv` (panics in parallel
+   tests), shared live resources without per-test
    keys/schemas (`-race` is process-local and cannot see datastore
    contention — it is necessary, not sufficient).
 5. **Poll, never sleep.** `gotest.Eventually(t, waitFor, tick, func(poll

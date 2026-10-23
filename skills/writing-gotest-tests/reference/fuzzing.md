@@ -5,7 +5,10 @@ struct and `BeforeEach`/`AfterEach` (interposed around every execution,
 seeds included). It takes `*gotest.F` only; `*testing.F` is rejected.
 Its suite cannot have a returning `BeforeEach`, hooks taking
 `*testing.T`, or fixtures with per-test hooks — those are generation
-errors; keep such tests in a sibling suite.
+errors; keep such tests in a sibling suite. `t.T()` is nil in its
+`BeforeAll`/`AfterAll` (not in `BeforeEach`/`AfterEach`, which get each
+execution's `*testing.T`): a call there that is not checked for nil is
+refused too.
 
 ```go
 func (s *ParserTestSuite) FuzzParse(f *gotest.F) {

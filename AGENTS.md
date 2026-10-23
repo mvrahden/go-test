@@ -29,7 +29,7 @@ Calling `t.T().Cleanup()` inside suite methods breaks the predictable lifecycle.
 **Never call `t.T().Fatalf()` in reusable test helpers.**
 Use gotest assertions instead.
 Inside `Eventually`/`Consistently` the callback gets a `*gotest.R`, which has no `T()` method, so a helper that needs `t.T()` cannot be used there at all.
-In a benchmark's or fuzz target's `BeforeEach`/`AfterEach`, `t.T()` returns nil: the hook runs under a `*testing.B` or `*testing.F`, and the generator rejects a hook that would call it.
+Under a benchmark every hook's `t.T()` is nil, under a fuzz target `BeforeAll`'s and `AfterAll`'s (its `BeforeEach`/`AfterEach` run per input with a real `*testing.T`); the generator refuses a hook whose own body calls it there unchecked, but cannot see a helper the hook calls ([Hooks that call t.T() where it is nil](specs/cli/spec.md#requirement-hooks-that-call-tt-where-it-is-nil)).
 Helpers built on gotest assertions work in every position.
 
 **Never use `t.T().Skip()` for environment gating.**
@@ -539,7 +539,7 @@ Use a returning `BeforeEach` to give each method its own isolated state.
 ## Other T Methods
 
 ```go
-t.T() *testing.T                                    // access underlying testing.T (nil in a benchmark's or fuzz target's BeforeEach/AfterEach)
+t.T() *testing.T                                    // access underlying testing.T (nil in every hook under a benchmark, in BeforeAll/AfterAll under a fuzz target)
 t.Context() context.Context                          // test context (respects deadline from SuiteConfig)
 t.Skipf(format, args...)                             // skip the test with a formatted reason
 t.Setenv(key, value)                                 // set env var, restored after test
