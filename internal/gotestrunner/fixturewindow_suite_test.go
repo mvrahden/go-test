@@ -86,7 +86,7 @@ func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T, _ *windowCtx) {
 	overlay := windowOverlay()
 
 	t.When("no run filter is set", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "", "")
 
 		w.It("keeps every required fixture alive in its phase, DAG-closed", func(it *gotest.T) {
 			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true, winKey("Chain"): true}, win.Bulk)
@@ -100,7 +100,7 @@ func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T, _ *windowCtx) {
 	})
 
 	t.When("the run filter selects one bulk suite", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestAlphaSuite")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestAlphaSuite", "")
 
 		w.It("keeps only that suite's fixtures", func(it *gotest.T) {
 			gotest.Equal(it, map[string]bool{winKey("Alpha"): true}, win.Bulk)
@@ -111,7 +111,7 @@ func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T, _ *windowCtx) {
 	})
 
 	t.When("the run filter selects only the exclusive suite", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestTimingSuite")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestTimingSuite", "")
 
 		w.It("plans its fixture for the tail phase only", func(it *gotest.T) {
 			gotest.Empty(it, win.Bulk)
@@ -120,8 +120,38 @@ func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T, _ *windowCtx) {
 		})
 	})
 
+	t.When("the skip filter names every bulk suite", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "", "TestAlphaSuite|TestChainSuite|TestMultiSuite")
+
+		w.It("starts no fixture for the bulk and keeps the tail's", func(it *gotest.T) {
+			gotest.Empty(it, win.Bulk)
+			gotest.Equal(it, map[string]bool{winKey("Beta"): true}, win.Tail)
+			gotest.Equal(it, []string{"Beta"}, fixtureIdentifiers(win.Fixtures))
+			gotest.Equal(it, 3, win.Skipped)
+		})
+	})
+
+	t.When("the skip filter names every fuzz wrapper of a suite without a Test function", func(w *gotest.T) {
+		fuzzOnly := windowOverlay()
+		fuzzOnly.FuzzFuncsByPkg = map[string]map[string][]string{"pkg/b": {"ChainSuite": {"FuzzChainSuite_X"}}}
+		fuzzOnly.TestlessSuitesByPkg = map[string]map[string]bool{"pkg/b": {"ChainSuite": true}}
+		win := gotestrunner.ExportPlanFixtureWindows(fuzzOnly, "", "^FuzzChainSuite_X$")
+
+		w.It("drops that suite, so its fixture does not start", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true}, win.Bulk)
+		})
+	})
+
+	t.When("the skip filter names methods only", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "", "TestAlphaSuite/TestOne|TestChainSuite/TestTwo")
+
+		w.It("drops no suite, so their fixtures start", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true, winKey("Chain"): true}, win.Bulk)
+		})
+	})
+
 	t.When("the run filter carries a subtest segment", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestChainSuite/TestSomething")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestChainSuite/TestSomething", "")
 
 		w.It("matches the suite on the first segment and closes over the DAG", func(it *gotest.T) {
 			gotest.Equal(it, map[string]bool{winKey("Chain"): true, winKey("Alpha"): true}, win.Bulk, "Alpha claimed through Chain's dependency edge")
@@ -133,7 +163,7 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	overlay := windowOverlay()
 
 	t.When("splitting the dispatch plan into phases", func(w *gotest.T) {
-		bulk, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, "")
+		bulk, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, nil, "", "")
 
 		w.It("routes exclusive suites to the tail and the rest to the bulk", func(it *gotest.T) {
 			gotest.ElementsMatch(it, []string{"TestAlphaSuite", "TestMultiSuite"}, bulk["pkg/a"])
@@ -143,7 +173,7 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	})
 
 	t.When("a phase has no suites", func(w *gotest.T) {
-		_, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, "TestAlphaSuite")
+		_, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, nil, "TestAlphaSuite", "")
 
 		w.It("yields an empty alive set", func(it *gotest.T) {
 			gotest.Empty(it, gotestrunner.ExportAliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures))
@@ -167,7 +197,7 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T, ctx *wind
 	ctx.cleanup = cleanup
 
 	t.When("the run filter matches only the fixture-free suite", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestPlainTestSuite")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestPlainTestSuite", "")
 
 		w.It("starts no shared fixture at all", func(it *gotest.T) {
 			gotest.Empty(it, win.Fixtures)
@@ -176,7 +206,7 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T, ctx *wind
 	})
 
 	t.When("the run filter matches the Gamma suite", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestGammaTestSuite")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "TestGammaTestSuite", "")
 
 		w.It("keeps Gamma plus its Alpha dependency, drops Beta", func(it *gotest.T) {
 			gotest.ElementsMatch(it, []string{"AlphaSharedFixture", "GammaSharedFixture"}, fixtureIdentifiers(win.Fixtures))
@@ -185,7 +215,7 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T, ctx *wind
 	})
 
 	t.When("no run filter is set", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanFixtureWindows(overlay, "")
+		win := gotestrunner.ExportPlanFixtureWindows(overlay, "", "")
 
 		w.It("keeps every fixture some suite requires", func(it *gotest.T) {
 			gotest.Len(it, win.Fixtures, 3)
@@ -213,7 +243,7 @@ func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T, _ *windowC
 	overlay := benchOverlay()
 
 	t.When("no filters are set", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "")
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "", "")
 
 		w.It("starts only the first slot's fixtures up-front and defers the rest", func(it *gotest.T) {
 			// Dispatch order: pkg/a AlphaSuite, pkg/a MultiSuite, pkg/b ChainSuite.
@@ -231,7 +261,7 @@ func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T, _ *windowC
 	})
 
 	t.When("-bench selects only the chain suite", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "BenchmarkChainSuite")
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "BenchmarkChainSuite", "")
 
 		w.It("keeps its DAG-closed needs and nothing else, all up-front", func(it *gotest.T) {
 			gotest.Equal(it, map[string]bool{winKey("Chain"): true, winKey("Alpha"): true}, win.Bulk,
@@ -241,8 +271,17 @@ func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T, _ *windowC
 		})
 	})
 
+	t.When("-skip names a bench suite's wrapper", func(w *gotest.T) {
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "", "", "^BenchmarkAlphaSuite$|^BenchmarkChainSuite$")
+
+		w.It("plans no fixture for it", func(it *gotest.T) {
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true}, win.Bulk, "MultiSuite's needs only")
+			gotest.Equal(it, 2, win.Skipped)
+		})
+	})
+
 	t.When("-run matches Benchmark names, not test names", func(w *gotest.T) {
-		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "^BenchmarkMultiSuite$", "")
+		win := gotestrunner.ExportPlanBenchFixtureWindows(overlay, "^BenchmarkMultiSuite$", "", "")
 
 		w.It("plans for the bench suites the filter selects", func(it *gotest.T) {
 			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true}, win.Bulk)

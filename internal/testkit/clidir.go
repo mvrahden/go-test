@@ -21,8 +21,10 @@ import (
 //     a complete file and is never written again; every user copies it into
 //     a dir of its own and runs the copy.
 //   - gotest-cli-use-<key>-<pid>: pid's last use of that build.
-//   - gotest-cli-wip-<key>: holds the pid of the process building it, so
-//     others wait for that build instead of making their own.
+//   - gotest-cli-hold-<key>: a dir holding a stamp named <pid>-<n> for the
+//     process building key, so others wait for that build instead of making
+//     their own. It appears by a rename of a dir already holding the stamp.
+//   - gotest-cli-mark-<n>: such a dir being made.
 //   - gotest-cli-<n>: a dir that a build or a private copy sits in, stamped
 //     with its owner's pid in .pid.
 //
@@ -33,7 +35,8 @@ const (
 	cliDirPrefix   = "gotest-cli-"
 	buildPrefix    = cliDirPrefix + "build-"
 	usePrefix      = cliDirPrefix + "use-"
-	buildingPrefix = cliDirPrefix + "wip-"
+	buildingPrefix = cliDirPrefix + "hold-"
+	markPrefix     = cliDirPrefix + "mark-"
 )
 
 // keyedLinger is how long a published build outlives its last use, so the
@@ -49,11 +52,6 @@ const cliDirGrace = 24 * time.Hour
 // buildWait is how long a build marker holds others off; past it the
 // builder is taken to be hung, and another process builds.
 const buildWait = 10 * time.Minute
-
-// pidlessHold is how long a build marker with no pid in it holds others off:
-// a live builder writes its pid right after creating it, so one still empty
-// past this belongs to a builder that died in between.
-const pidlessHold = 3 * time.Second
 
 // pollEvery is how often a process waiting for another's build looks again.
 const pollEvery = 25 * time.Millisecond
@@ -83,11 +81,14 @@ func newStampedDir(parent string, pid int) (string, error) {
 
 // keyOf and buildOf are how a reuse keys and builds a CLI; tests swap them.
 // beforeMark runs before each try to create a build marker, so a test can
-// contend for it.
+// contend for it; beforeTake just before a dead marker is removed;
+// renameMarker moves a staged marker into place.
 var (
-	keyOf      = cliKey
-	buildOf    = buildCLI
-	beforeMark = func(marker string) {}
+	keyOf        = cliKey
+	buildOf      = buildCLI
+	beforeMark   = func(marker string) {}
+	beforeTake   = func(marker string) {}
+	renameMarker = os.Rename
 )
 
 // resolveCLI returns a private copy of a CLI built from root's sources:
@@ -195,58 +196,81 @@ func (s store) claim(key, private string) (string, bool) {
 
 // markBuild creates key's build marker and returns its release, or busy
 // while another live process builds key. A marker no longer live is taken
-// over; it tries until one of the two holds, or ctx ends.
+// over; it tries until one of the two holds, ctx ends, or creating the
+// marker fails a few times over for another reason.
 func (s store) markBuild(ctx context.Context, key string) (release func(), busy bool, err error) {
 	marker := filepath.Join(s.dir, buildingPrefix+key)
+	failed := 0
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, false, err
 		}
 		beforeMark(marker)
-		f, err := os.OpenFile(marker, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // G304: a marker in a CLI store
+		stamp, err := s.createMarker(marker)
 		if err == nil {
-			_, err = f.WriteString(strconv.Itoa(s.pid))
-			_ = f.Close()
-			if err != nil {
-				_ = os.Remove(marker)
-				return nil, false, err
-			}
-			return func() { s.unmarkBuild(marker) }, false, nil
+			return func() { unmarkBuild(marker, stamp) }, false, nil
 		}
 		if !errors.Is(err, fs.ErrExist) {
-			return nil, false, err
+			// A scanner may hold the fresh stamp open for a moment.
+			if failed++; failed >= 5 {
+				return nil, false, err
+			}
+			select {
+			case <-ctx.Done():
+			case <-time.After(20 * time.Millisecond):
+			}
+			continue
 		}
-		switch {
-		case !exists(marker):
-			// Removed since; try again.
-		case s.rules.markerLive(marker):
+		if s.rules.markerLive(marker) {
 			return nil, true, nil
-		default:
-			// The builder died or hung; take its place.
-			s.rules.removeDeadMarker(marker)
-			if exists(marker) {
-				// Refused for now, or another builder's since; look again shortly.
-				select {
-				case <-ctx.Done():
-				case <-time.After(pollEvery):
-				}
+		}
+		// The builder died, hung or is releasing; take its place.
+		s.rules.removeDeadMarker(marker)
+		if exists(marker) {
+			// Refused for now, or another builder's since; look again shortly.
+			select {
+			case <-ctx.Done():
+			case <-time.After(pollEvery):
 			}
 		}
 	}
 }
 
-// unmarkBuild removes this process's build marker. A reader may hold it
-// open for a moment, which some systems refuse a removal for.
-func (s store) unmarkBuild(marker string) {
-	for range 10 {
-		if pid, ok := readPID(marker); ok && pid != s.pid {
-			return // taken over
+// createMarker creates the build marker with this process's stamp already
+// in it, and returns the stamp. The rename fails while any marker is there,
+// even an empty one being released.
+func (s store) createMarker(marker string) (string, error) {
+	staged, err := os.MkdirTemp(s.dir, markPrefix)
+	if err != nil {
+		return "", err
+	}
+	f, err := os.CreateTemp(staged, strconv.Itoa(s.pid)+"-")
+	if err == nil {
+		err = f.Close()
+	}
+	if err == nil {
+		if err = renameMarker(staged, marker); err == nil {
+			return filepath.Join(marker, filepath.Base(f.Name())), nil
 		}
-		if err := os.Remove(marker); err == nil || errors.Is(err, fs.ErrNotExist) {
-			return
+		if exists(marker) {
+			err = fs.ErrExist
+		}
+	}
+	_ = os.RemoveAll(staged)
+	return "", err
+}
+
+// unmarkBuild removes a build marker's stamp, then the marker once empty.
+// The marker stays while another builder's stamp is in it, or a reader holds
+// it open; empty, it holds nobody off.
+func unmarkBuild(marker, stamp string) {
+	for range 10 {
+		if err := os.Remove(stamp); err == nil || errors.Is(err, fs.ErrNotExist) {
+			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	_ = os.Remove(marker)
 }
 
 // waitForBuild returns once key is published, or its build marker is gone
@@ -313,43 +337,46 @@ type sweepRules struct {
 
 var defaultSweep = sweepRules{alive: processAlive, linger: keyedLinger, grace: cliDirGrace, wait: buildWait}
 
-// markerLive reports whether the build marker exists and holds others off:
-// younger than the wait, and not written by a dead pid. A marker whose pid
-// is not written yet holds others off for pidlessHold only.
+// markerLive reports whether the build marker holds others off: it holds
+// the stamp of a live pid, younger than the wait.
 func (r sweepRules) markerLive(marker string) bool {
 	live, _ := r.judgeMarker(marker)
 	return live
 }
 
-// judgeMarker is markerLive, and the content it judged.
-func (r sweepRules) judgeMarker(marker string) (live bool, content string) {
-	info, err := os.Stat(marker)
+// judgeMarker is markerLive, and the stamps that hold nobody off.
+func (r sweepRules) judgeMarker(marker string) (live bool, dead []string) {
+	entries, err := os.ReadDir(marker)
 	if err != nil {
-		return false, ""
+		return false, nil
 	}
-	data, _ := os.ReadFile(marker) //nolint:gosec // G304: a marker in a CLI store
-	age := time.Since(info.ModTime())
-	if age >= r.wait {
-		return false, string(data)
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil {
+			continue // removed since
+		}
+		pid, err := strconv.Atoi(strings.SplitN(e.Name(), "-", 2)[0])
+		if err == nil && r.alive(pid) && time.Since(info.ModTime()) < r.wait {
+			return true, nil
+		}
+		dead = append(dead, filepath.Join(marker, e.Name()))
 	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil {
-		return age < pidlessHold, string(data)
-	}
-	return r.alive(pid), string(data)
+	return false, dead
 }
 
-// removeDeadMarker removes the marker when it holds nobody off. It reads it
-// again just before the removal: a marker a new builder put in its place
-// since holds another pid, and stays.
+// removeDeadMarker removes the marker when it holds nobody off: each stamp
+// by its own name, never given another, and then the marker only if empty.
+// A marker put in its place since holds a stamp, so it stays.
 func (r sweepRules) removeDeadMarker(marker string) {
-	live, judged := r.judgeMarker(marker)
+	live, dead := r.judgeMarker(marker)
 	if live {
 		return
 	}
-	if data, err := os.ReadFile(marker); err == nil && string(data) == judged { //nolint:gosec // G304: a marker in a CLI store
-		_ = os.Remove(marker)
+	beforeTake(marker)
+	for _, stamp := range dead {
+		_ = os.Remove(stamp)
 	}
+	_ = os.Remove(marker)
 }
 
 // sweep removes what in s no live process needs any more: a dir stamped
@@ -374,6 +401,8 @@ func (s store) sweepOne(path string) {
 	}
 	name, age := info.Name(), time.Since(info.ModTime())
 	switch {
+	case strings.HasPrefix(name, buildingPrefix):
+		s.rules.removeDeadMarker(path)
 	case info.IsDir():
 		// Read once: a dir stamped after a first look is not dead. A stamp
 		// being written holds no pid yet, so it counts as none.
@@ -389,8 +418,6 @@ func (s store) sweepOne(path string) {
 		if age >= s.rules.linger {
 			_ = os.Remove(path)
 		}
-	case strings.HasPrefix(name, buildingPrefix):
-		s.rules.removeDeadMarker(path)
 	case age >= s.rules.grace:
 		_ = os.Remove(path)
 	}
@@ -415,7 +442,7 @@ func cliDirAlive(dir string) bool {
 	return ok && processAlive(pid)
 }
 
-// readPID reads the pid a stamp or marker holds.
+// readPID reads the pid a CLI dir's stamp holds.
 func readPID(path string) (int, bool) {
 	data, err := os.ReadFile(path) //nolint:gosec // G304: a pid file in a CLI store
 	if err != nil {

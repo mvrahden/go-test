@@ -277,6 +277,7 @@ shards of one run do not add up to every mutant exactly once.
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
+| `bench-skip-ignored` | a bench run plans and dispatches the benchmark suites `-skip` names | fixtures conformance: the fixture of the benchmark suite `-skip` names still starts |
 | `bytes-one-per-line` | a byte slice that is not text renders one byte per line | ring-0 equal suite |
 | `bytes-text-as-hex` | a byte slice of text renders as hex, so its lines are not diffed as text | ring-0 equal suite |
 | `callsite-ignores-required-modules` | under `-trimpath` a dotless module the build requires is judged by import path alone, so it reads as the standard library | conformance: a behavior another dotless module declares does not name both lines |
@@ -298,6 +299,8 @@ shards of one run do not add up to every mutant exactly once.
 | `diff-file-headers-kept` | the diff keeps a file diff's `---`/`+++` headers above its hunks | ring-0 equal suite |
 | `diff-final-newline-hidden` | the diff ends both sides in a newline, so a final newline only one side has shows no change | ring-0 equal suite |
 | `erroras-type-unnamed` | `ErrorAs` does not name the type it expected | canary: no failure message names `*fs.PathError` |
+| `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | fixtures conformance: the guarded suite gets no fail verdict |
+| `flag-first-occurrence-wins` | a repeated `-run`, `-skip`, `-bench` or `-count` counts by its first value, where the flag package keeps the last | fixtures conformance: the suite the last `-skip` leaves runs without its fixture |
 | `hidden-difference-shown-twice` | values that render alike are printed twice instead of named as such | ring-0 equal suite |
 | `hunk-location-dropped` | a hunk does not name the path of its first change | ring-0 equal suite |
 | `hunks-replacement-scattered` | a line replaced among repeated ones shows as an insertion and a deletion far apart | ring-0 equal suite |
@@ -323,7 +326,17 @@ shards of one run do not add up to every mutant exactly once.
 | `render-pointer-addresses` | pointers render as addresses, so equal elements behind distinct pointers are marked changed | ring-0 equal suite |
 | `render-text-unsplit` | a string that spans lines renders on one line, so its text is not diffed by line | ring-0 equal suite |
 | `render-unexported-skipped` | the rendering leaves unexported fields out, so a change to one is not marked | ring-0 equal suite |
+| `run-cut-at-its-first-slash` | `-run` is matched by its text up to the first `/`, so a later alternative's suite is dropped | fixtures conformance: the suite the second alternative names does not run |
+| `run-of-a-missing-test-function-replays-seeds` | a `-run` naming the Test function of a suite without test methods replays its seeds | fuzz conformance: the seeds replay and the shared fixture starts |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
+| `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | fixtures conformance: the fixture of a suite -skip names whole still starts |
+| `skip-kept-from-the-binary` | `-skip` is applied when suites are planned and never reaches the test binary | fuzz conformance: the skipped test method runs |
+| `skip-last-alternative-decides` | the last `-skip` alternative matching a function decides instead of the first | fixtures conformance: the suite go test enters is dropped with its fixture |
+| `skip-of-a-method-drops-the-suite` | a -skip naming one method drops the whole suite from the plan | fixtures conformance: the suite's other method runs without its fixture |
+| `skip-of-every-function-keeps-a-fuzz-suite` | a `-skip` naming every Test and Fuzz function never drops a suite with fuzz methods | fuzz conformance: the suite's shared fixture starts |
+| `skip-of-every-wrapper-keeps-a-testless-suite` | a `-skip` naming every fuzz wrapper never drops a suite without test methods, judged by a Test function it lacks | fuzz conformance: the suite's shared fixture starts |
+| `skip-of-the-test-function-drops-the-seeds` | a `-skip` naming a suite's Test function drops the suite, fuzz seeds included | fuzz conformance: the seed replay has no pass verdict |
+| `skip-pattern-left-unchecked` | a `-skip` pattern is not checked before the run, so one go test rejects runs nothing and passes | cli conformance: the pattern is not refused with exit 2 |
 | `sync-internals-shown` | values of package sync render their bookkeeping fields | ring-0 equal suite |
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
 | `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |

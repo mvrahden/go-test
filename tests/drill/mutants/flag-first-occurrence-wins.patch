@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / the last one counts: the fixture starts, its suite passes and the other suite does not run \(
+Clause: when -skip is given twice, naming the fixture-free suite last → the last one counts: the fixture starts, its suite passes and the other suite does not run
+--- a/internal/gotestrunner/args.go
++++ b/internal/gotestrunner/args.go
+@@ -242,7 +242,7 @@
+ 			break
+ 		}
+ 		for _, name := range names {
+-			if v, ok := strings.CutPrefix(f, name+"="); ok {
++			if v, ok := strings.CutPrefix(f, name+"="); ok && val == "" {
+ 				val = v
+ 			} else if f == name && i+1 < len(flags) {
+ 				i++

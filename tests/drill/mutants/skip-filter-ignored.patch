@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / the fixture is never started and the other suite passes \(
+Clause: when -skip names the only suite binding a shared fixture → the fixture is never started and the other suite passes
+--- a/internal/gotestrunner/namefilter.go
++++ b/internal/gotestrunner/namefilter.go
+@@ -151,7 +151,7 @@
+ // left over. A partial match only skips subtests inside it, and a filter that
+ // does not compile skips nothing: the binary reports it.
+ func skipsFunc(userSkipFilter, funcName string) bool {
+-	if userSkipFilter == "" {
++	if true || userSkipFilter == "" {
+ 		return false
+ 	}
+ 	f, err := parseNameFilter(userSkipFilter, "-skip")

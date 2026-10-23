@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / is refused with exit 2 before anything runs, naming that alternative as go test does \(
+Clause: when a -skip pattern compiles whole but one of its alternatives does not → is refused with exit 2 before anything runs, naming that alternative as go test does
+--- a/internal/gotestrunner/testflags.go
++++ b/internal/gotestrunner/testflags.go
+@@ -87,7 +87,7 @@
+ 	for _, name := range order {
+ 		val := last[name]
+ 		switch name {
+-		case "run", "skip", "bench", "fuzz":
++		case "run", "bench", "fuzz":
+ 			if val == "" {
+ 				continue
+ 			}

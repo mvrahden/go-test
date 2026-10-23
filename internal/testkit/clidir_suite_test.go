@@ -3,9 +3,11 @@ package testkit_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,9 +36,9 @@ func (s *CLIDirTestSuite) TestStaleCLIDirsAreSwept(t *gotest.T) {
 	staleUse := agedPath(t, file(t, tmp, testkit.ExportUsePrefix+"stale-"+deadPID, deadPID), aged)
 	usedBuild := agedPath(t, file(t, tmp, testkit.ExportBuildPrefix+"used", "cli"), aged)
 	freshUse := file(t, tmp, testkit.ExportUsePrefix+"used-"+deadPID, deadPID)
-	deadMarker := file(t, tmp, testkit.ExportBuildingPrefix+"dead", deadPID)
-	liveMarker := file(t, tmp, testkit.ExportBuildingPrefix+"live", strconv.Itoa(os.Getpid()))
-	hungMarker := agedPath(t, file(t, tmp, testkit.ExportBuildingPrefix+"hung", strconv.Itoa(os.Getpid())), aged)
+	deadMarker := filepath.Dir(plantMarker(t, tmp, "dead", deadPID))
+	liveMarker := filepath.Dir(plantMarker(t, tmp, "live", strconv.Itoa(os.Getpid())))
+	hungMarker := filepath.Dir(agedPath(t, plantMarker(t, tmp, "hung", strconv.Itoa(os.Getpid())), aged))
 	oldUnknown := agedPath(t, file(t, tmp, "gotest-cli-unknown", ""), aged)
 
 	root, err := testkit.RepoRoot()
@@ -85,7 +87,7 @@ func (s *CLIDirTestSuite) TestStaleCLIDirsAreSwept(t *gotest.T) {
 		})
 		w.It("publishes the build and leaves no dir it built in", func(it *gotest.T) {
 			gotest.Len(it, glob(it, tmp, testkit.ExportBuildPrefix+"*"), 3)
-			gotest.ElementsMatch(it, []string{live, fresh, filepath.Dir(binary)}, cliSubdirs(it, tmp))
+			gotest.ElementsMatch(it, []string{live, fresh, liveMarker, filepath.Dir(binary)}, cliSubdirs(it, tmp))
 		})
 	})
 }
@@ -199,16 +201,21 @@ func (s *CLIDirTestSuite) TestABuildMarkerHoldsOthersOffOnlyWhileLive(t *gotest.
 		{"a live builder's marker", "live", 0, 0},
 		{"a dead builder's marker", deadPID, 0, 1},
 		{"a live builder's marker past the wait", "live", 48 * time.Hour, 1},
-		{"a marker whose builder died before writing its pid", "", 0, 1},
+		{"an empty marker, left by a release", "", 0, 1},
 	}) {
 		tmp := t.TempDir()
 		pid := row.pid
 		if pid == "live" {
 			pid = strconv.Itoa(os.Getpid())
 		}
-		marker := file(t, tmp, testkit.ExportBuildingPrefix+"k", pid)
+		stamp := filepath.Join(tmp, testkit.ExportBuildingPrefix+"k")
+		if pid == "" {
+			gotest.NoError(t, os.Mkdir(stamp, 0o750))
+		} else {
+			stamp = plantMarker(t, tmp, "k", pid)
+		}
 		if row.age > 0 {
-			agedPath(t, marker, time.Now().Add(-row.age))
+			agedPath(t, stamp, time.Now().Add(-row.age))
 		}
 		var builds atomic.Int32
 		build := func(_ context.Context, dir string) (string, error) {
@@ -220,7 +227,7 @@ func (s *CLIDirTestSuite) TestABuildMarkerHoldsOthersOffOnlyWhileLive(t *gotest.
 		store := testkit.NewExportStore(tmp, 1, func(p int) bool { return p == os.Getpid() }, time.Hour)
 		var binary string
 		var err error
-		// Far past the brief hold of a marker with no pid, far short of the wait.
+		// Far short of the wait.
 		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 		defer cancel()
 		wait := gotest.Go(t, func() { binary, err = store.Get(ctx, "k", private, build) })
@@ -251,12 +258,12 @@ func (s *CLIDirTestSuite) TestABuilderHoldsTheMarkerHoweverOftenItIsContended(t 
 	var tries int
 	defer testkit.ExportBeforeMark(func(marker string) {
 		if tries++; tries <= contended {
-			_ = os.WriteFile(marker, []byte(deadPID), 0o600)
+			_, _ = testkit.ExportPlantMarker(filepath.Dir(marker), "k", deadPID)
 		}
 	})()
 	var held []string
 	build := func(_ context.Context, dir string) (string, error) {
-		held = append(held, string(readOrNil(filepath.Join(tmp, testkit.ExportBuildingPrefix+"k"))))
+		held = append(held, markerPIDs(filepath.Join(tmp, testkit.ExportBuildingPrefix+"k"))...)
 		binary := filepath.Join(dir, testkit.ExportCLIName())
 		return binary, os.WriteFile(binary, []byte("built"), 0o600)
 	}
@@ -272,6 +279,195 @@ func (s *CLIDirTestSuite) TestABuilderHoldsTheMarkerHoweverOftenItIsContended(t 
 			gotest.Greater(it, tries, contended)
 		})
 	})
+}
+
+func (s *CLIDirTestSuite) TestABuildMarkerNeverShowsWithoutItsPid(t *gotest.T) {
+	tmp := t.TempDir()
+	marker := filepath.Join(tmp, testkit.ExportBuildingPrefix+"k")
+	published := filepath.Join(tmp, testkit.ExportBuildPrefix+"k")
+	// Counts up through each round: 0 mod 3 while a builder marks, 1 once it
+	// builds, 2 once it is done.
+	var phase atomic.Int32
+	phase.Store(2)
+	build := func(_ context.Context, dir string) (string, error) {
+		phase.Add(1)
+		binary := filepath.Join(dir, testkit.ExportCLIName())
+		return binary, os.WriteFile(binary, []byte("built"), 0o600)
+	}
+	store := testkit.NewExportStore(tmp, 7, func(p int) bool { return p == 7 }, time.Hour)
+	// An empty marker holds nobody off, so one must never show before its
+	// builder's stamp is in it.
+	var done atomic.Bool
+	var reads, empty atomic.Int64
+	wait := gotest.Go(t, func() {
+		for !done.Load() {
+			before := phase.Load()
+			entries, err := os.ReadDir(marker)
+			if err == nil && before%3 == 0 && phase.Load() == before {
+				reads.Add(1)
+				if len(entries) == 0 {
+					empty.Add(1)
+				}
+			}
+		}
+	})
+	var err error
+	for range 300 {
+		phase.Add(1)
+		if _, err = store.Get(t.Context(), "k", t.TempDir(), build); err != nil {
+			break
+		}
+		phase.Add(1)
+		_ = os.Remove(published)
+		// Windows refuses a release while the reader holds the marker open.
+		for exists(marker) {
+			_ = os.RemoveAll(marker)
+		}
+	}
+	done.Store(true)
+	wait()
+
+	t.When("a builder marks its build while another process reads the marker", func(w *gotest.T) {
+		w.It("shows the marker only with the builder's stamp in it", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Greater(it, reads.Load(), int64(0))
+			gotest.Zero(it, empty.Load(), "%d of %d reads found the marker empty", empty.Load(), reads.Load())
+		})
+	})
+}
+
+func (s *CLIDirTestSuite) TestAReleaseHeldUpByAReaderStillFreesTheMarker(t *gotest.T) {
+	tmp := t.TempDir()
+	marker := filepath.Join(tmp, testkit.ExportBuildingPrefix+"k")
+	var builds int
+	var reader *os.File
+	var opened error
+	build := func(_ context.Context, dir string) (string, error) {
+		if builds++; builds == 1 {
+			// Held open through the release, which Windows refuses a removal for.
+			reader, opened = os.Open(marker)
+		}
+		binary := filepath.Join(dir, testkit.ExportCLIName())
+		return binary, os.WriteFile(binary, []byte("built"), 0o600)
+	}
+	store := testkit.NewExportStore(tmp, 7, func(p int) bool { return p == 7 }, time.Hour)
+	_, first := store.Get(t.Context(), "k", t.TempDir(), build)
+	gotest.NoError(t, opened)
+	gotest.NoError(t, reader.Close())
+	gotest.NoError(t, os.Remove(filepath.Join(tmp, testkit.ExportBuildPrefix+"k")))
+	// Far short of the wait a marker of its own would hold it off for.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	_, second := store.Get(ctx, "k", t.TempDir(), build)
+
+	t.When("a reader held the marker open while its builder released it", func(w *gotest.T) {
+		w.It("builds again at once when nothing is published", func(it *gotest.T) {
+			gotest.NoError(it, first)
+			gotest.NoError(it, second)
+			gotest.Equal(it, 2, builds)
+		})
+	})
+}
+
+func (s *CLIDirTestSuite) TestATakeOverNeverRemovesAMarkerPutInItsPlace(t *gotest.T) {
+	tmp := t.TempDir()
+	_, err := testkit.ExportPlantMarker(tmp, "k", deadPID)
+	gotest.NoError(t, err)
+	var fresh string
+	var takes int
+	defer testkit.ExportBeforeTake(func(marker string) {
+		if takes++; takes == 1 {
+			// Another taker clears the dead builder's marker, and a new
+			// builder marks.
+			gotest.NoError(t, os.RemoveAll(marker))
+			fresh, err = testkit.ExportPlantMarker(tmp, "k", strconv.Itoa(os.Getpid()))
+		}
+	})()
+	testkit.NewExportStore(tmp, 9, func(p int) bool { return p == os.Getpid() }, time.Hour).Sweep()
+
+	t.When("a new builder marks between a take-over's look at a dead marker and its removal", func(w *gotest.T) {
+		w.It("keeps the new builder's marker", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, takes)
+			gotest.True(it, exists(fresh))
+		})
+	})
+}
+
+func (s *CLIDirTestSuite) TestAReleaseNeverRemovesAMarkerTakenOverFromIt(t *gotest.T) {
+	tmp := t.TempDir()
+	marker := filepath.Join(tmp, testkit.ExportBuildingPrefix+"k")
+	alive := func(p int) bool { return p == 7 || p == 8 }
+	var fresh string
+	var planted error
+	var builds atomic.Int32
+	build := func(_ context.Context, dir string) (string, error) {
+		if builds.Add(1) == 1 {
+			// Taken for hung, its marker goes to builder 8.
+			planted = os.RemoveAll(marker)
+			if planted == nil {
+				fresh, planted = testkit.ExportPlantMarker(tmp, "k", "8")
+			}
+		}
+		binary := filepath.Join(dir, testkit.ExportCLIName())
+		return binary, os.WriteFile(binary, []byte("built"), 0o600)
+	}
+	_, first := testkit.NewExportStore(tmp, 7, alive, time.Hour).Get(t.Context(), "k", t.TempDir(), build)
+	gotest.NoError(t, os.Remove(filepath.Join(tmp, testkit.ExportBuildPrefix+"k")))
+	// Long enough to build at once when nothing holds it off.
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+	_, second := testkit.NewExportStore(tmp, 9, alive, time.Hour).Get(ctx, "k", t.TempDir(), build)
+
+	t.When("a builder releases a marker another builder took over from it", func(w *gotest.T) {
+		w.It("keeps the new builder's marker", func(it *gotest.T) {
+			gotest.NoError(it, first)
+			gotest.NoError(it, planted)
+			gotest.True(it, exists(fresh))
+		})
+		w.It("still holds others off with it", func(it *gotest.T) {
+			gotest.ErrorIs(it, second, context.DeadlineExceeded)
+			gotest.Equal(it, int32(1), builds.Load())
+		})
+	})
+}
+
+func (s *CLIDirTestSuite) TestAMarkerRenameRefusedForAMomentIsTriedAgain(t *gotest.T) {
+	held := errors.New("held open")
+	for t, row := range gotest.Each(t, []struct {
+		Desc    string
+		refused int
+		builds  int32
+	}{
+		{"refused a few times", 3, 1},
+		{"refused every time", 1 << 30, 0},
+	}) {
+		var renames int
+		restore := testkit.ExportRenameMarker(func(from, to string) error {
+			if renames++; renames <= row.refused {
+				return held
+			}
+			return os.Rename(from, to)
+		})
+		var builds atomic.Int32
+		build := func(_ context.Context, dir string) (string, error) {
+			builds.Add(1)
+			binary := filepath.Join(dir, testkit.ExportCLIName())
+			return binary, os.WriteFile(binary, []byte("built"), 0o600)
+		}
+		_, err := testkit.NewExportStore(t.TempDir(), 7, func(p int) bool { return p == 7 }, time.Hour).Get(t.Context(), "k", t.TempDir(), build)
+		restore()
+		t.It("builds once the rename goes through, and gives up after a few tries", func(it *gotest.T) {
+			gotest.Equal(it, row.builds, builds.Load())
+			if row.builds > 0 {
+				gotest.NoError(it, err)
+				gotest.Greater(it, renames, row.refused)
+			} else {
+				gotest.ErrorIs(it, err, held)
+				gotest.Less(it, renames, 10)
+			}
+		})
+	}
 }
 
 type raceCounts struct {
@@ -381,6 +577,24 @@ func cliDir(t *gotest.T, tmp, name, pidFile, pid string) string {
 		write(t, filepath.Join(dir, pidFile), pid)
 	}
 	return dir
+}
+
+// plantMarker puts key's build marker in dir, held by pid, and returns its
+// stamp.
+func plantMarker(t *gotest.T, dir, key, pid string) string {
+	stamp, err := testkit.ExportPlantMarker(dir, key, pid)
+	gotest.NoError(t, err)
+	return stamp
+}
+
+// markerPIDs lists the pids whose stamps the marker holds.
+func markerPIDs(marker string) []string {
+	entries, _ := os.ReadDir(marker)
+	var pids []string
+	for _, e := range entries {
+		pids = append(pids, strings.SplitN(e.Name(), "-", 2)[0])
+	}
+	return pids
 }
 
 // file writes data to dir/name and returns its path.

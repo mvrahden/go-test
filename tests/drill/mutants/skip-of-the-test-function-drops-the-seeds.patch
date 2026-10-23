@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / its fuzz seeds still replay and pass \(
+Clause: when -skip names a suite's Test function and the suite has fuzz methods → its fuzz seeds still replay and pass
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -394,7 +394,7 @@
+ 	if testless {
+ 		return fuzzFuncs
+ 	}
+-	return append([]string{"Test" + suiteName}, fuzzFuncs...)
++	return []string{"Test" + suiteName}
+ }
+ 
+ // selectsSuite reports whether the user's -run filter enters one of funcs.

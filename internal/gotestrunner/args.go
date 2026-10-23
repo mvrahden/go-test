@@ -232,20 +232,25 @@ func TranslateToTestBinaryFlags(flags []string) []string {
 	return out
 }
 
-// extractFlag returns the value of a named flag from flags, stopping at -args.
-func extractFlag(flags []string, name string) string {
-	for i, f := range flags {
+// extractFlag returns the value of the last of the named flags in flags,
+// stopping at -args: the flag package keeps the last occurrence.
+func extractFlag(flags []string, names ...string) string {
+	val := ""
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
 		if f == "-args" {
-			return ""
+			break
 		}
-		if v, ok := strings.CutPrefix(f, name+"="); ok {
-			return v
-		}
-		if f == name && i+1 < len(flags) {
-			return flags[i+1]
+		for _, name := range names {
+			if v, ok := strings.CutPrefix(f, name+"="); ok {
+				val = v
+			} else if f == name && i+1 < len(flags) {
+				i++
+				val = flags[i]
+			}
 		}
 	}
-	return ""
+	return val
 }
 
 // stripFlag removes a named flag and its value from flags, stopping at -args.
@@ -271,6 +276,9 @@ func stripFlag(flags []string, name string) []string {
 
 // ExtractRunFilter returns the value of -run from run flags, if present.
 func ExtractRunFilter(runFlags []string) string { return extractFlag(runFlags, "-run") }
+
+// ExtractSkipFilter returns the value of -skip from run flags, if present.
+func ExtractSkipFilter(runFlags []string) string { return extractFlag(runFlags, "-skip") }
 
 // StripRunFilter removes -run and its value from run flags.
 func StripRunFilter(runFlags []string) []string { return stripFlag(runFlags, "-run") }
@@ -381,10 +389,8 @@ func ExtractParallelValue(runFlags []string) int {
 // test to run: its value when given and parseable, otherwise 1. Stops
 // scanning at -args.
 func ExtractCountValue(flags []string) int {
-	for _, name := range []string{"-count", "-test.count"} {
-		if v, err := strconv.Atoi(extractFlag(flags, name)); err == nil && v > 0 {
-			return v
-		}
+	if v, err := strconv.Atoi(extractFlag(flags, "-count", "-test.count")); err == nil && v > 0 {
+		return v
 	}
 	return 1
 }
@@ -446,17 +452,8 @@ func PatternIndices(args []string, own func(name string) (isValue, known bool)) 
 // programs it would run at once, which caps gotest's suite processes and its
 // compile parallelism alike. 0 means the flag is absent or not a number.
 func ExtractProcessCap(buildFlags []string) int {
-	for i, f := range buildFlags {
-		if v, ok := strings.CutPrefix(f, "-p="); ok {
-			n, _ := strconv.Atoi(v)
-			return max(0, n)
-		}
-		if f == "-p" && i+1 < len(buildFlags) {
-			n, _ := strconv.Atoi(buildFlags[i+1])
-			return max(0, n)
-		}
-	}
-	return 0
+	n, _ := strconv.Atoi(extractFlag(buildFlags, "-p"))
+	return max(0, n)
 }
 
 // ExtractExecPrefix lifts go test's -exec out of the build flags: the command

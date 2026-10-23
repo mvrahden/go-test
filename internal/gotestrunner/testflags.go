@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,10 +41,14 @@ func testFlagSet() *flag.FlagSet {
 
 // ValidateTestFlags checks the values of the test binary's flags in args
 // before anything is built, as go test does: a bad value is a usage error,
-// not a failing test. -run and -skip must be regular expressions.
+// not a failing test. -run, -skip, -bench and -fuzz must be patterns the
+// testing package compiles, split as it splits them. A repeated flag is
+// judged by its last value, the one the binary keeps.
 func ValidateTestFlags(args []string) error {
 	fs := testFlagSet()
 	var known []string
+	last := map[string]string{}
+	var order []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "-args" || arg == "--" {
@@ -72,11 +75,24 @@ func ValidateTestFlags(args []string) error {
 		} else {
 			known = append(known, "-"+name)
 		}
-		// The testing package reads these strings only once tests run.
+		if _, seen := last[name]; !seen {
+			order = append(order, name)
+		}
+		last[name] = val
+	}
+	if err := fs.Parse(known); err != nil {
+		return err
+	}
+	// The testing package reads these strings only once tests run.
+	for _, name := range order {
+		val := last[name]
 		switch name {
-		case "run", "skip":
-			if _, err := regexp.Compile(val); err != nil {
-				return fmt.Errorf("invalid regexp for -%s: %v", name, err)
+		case "run", "skip", "bench", "fuzz":
+			if val == "" {
+				continue
+			}
+			if _, err := parseNameFilter(val, "-"+name); err != nil {
+				return fmt.Errorf("invalid regexp for %v", err)
 			}
 		case "shuffle":
 			if _, err := strconv.ParseInt(val, 10, 64); err != nil && val != "on" && val != "off" {
@@ -90,7 +106,7 @@ func ValidateTestFlags(args []string) error {
 			}
 		}
 	}
-	return fs.Parse(known)
+	return nil
 }
 
 func isBoolFlag(f *flag.Flag) bool {

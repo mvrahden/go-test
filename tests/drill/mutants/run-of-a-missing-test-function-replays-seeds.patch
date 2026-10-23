@@ -1,0 +1,22 @@
+Expect: ^FAIL .*conformance/fuzz .* / no seed replays and its shared fixture never starts, as the suite has no such function \(
+Clause: when -run names only the Test function of a suite with no test method → no seed replays and its shared fixture never starts, as the suite has no such function
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -376,7 +376,7 @@
+ 			}
+ 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
+ 				target.RunFilter = rf
+-			} else if userRunFilter != "" && (testless || !selectsFunc(userRunFilter, testFuncName)) {
++			} else if userRunFilter != "" && !selectsFunc(userRunFilter, testFuncName) {
+ 				// Selected through a fuzz wrapper's name alone: the user's
+ 				// filter is the whole -test.run, so only that wrapper runs.
+ 				target.RunFilter = userRunFilter
+@@ -391,7 +391,7 @@
+ // function unless it has none, and its generated fuzz wrappers, the names -v
+ // prints for seed replays.
+ func suiteFuncs(suiteName string, testless bool, fuzzFuncs []string) []string {
+-	if testless {
++	if false {
+ 		return fuzzFuncs
+ 	}
+ 	return append([]string{"Test" + suiteName}, fuzzFuncs...)

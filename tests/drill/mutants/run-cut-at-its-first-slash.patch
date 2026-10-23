@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / both suites run, the one binding the fixture against it \(
+Clause: when -run's first alternative names a method of one suite and a later one names the other suite → both suites run, the one binding the fixture against it
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -402,7 +402,7 @@
+ 	if userRunFilter == "" {
+ 		return true
+ 	}
+-	return slices.ContainsFunc(funcs, func(f string) bool { return selectsFunc(userRunFilter, f) })
++	return slices.ContainsFunc(funcs, func(f string) bool { return selectsFunc(strings.SplitN(userRunFilter, "/", 2)[0], f) })
+ }
+ 
+ // skipsSuite reports whether the user's -skip filter drops a suite whole: go

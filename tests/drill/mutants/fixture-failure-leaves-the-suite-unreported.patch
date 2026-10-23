@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/fixtures .* / the fixture is started for it and its failure fails the run and the suite, whose guard never runs \(
+Clause: when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -835,7 +835,6 @@
+ 					switch {
+ 					case recorded:
+ 					case missing != "":
+-						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
+ 					default:
+ 						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+ 					}

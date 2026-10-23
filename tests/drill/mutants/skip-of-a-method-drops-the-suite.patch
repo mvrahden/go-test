@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / the fixture starts and the suite's other method passes against it \(
+Clause: when -skip names one method of the suite binding a shared fixture → the fixture starts and the suite's other method passes against it
+--- a/internal/gotestrunner/namefilter.go
++++ b/internal/gotestrunner/namefilter.go
+@@ -159,7 +159,7 @@
+ 		return false
+ 	}
+ 	ok, partial := f.matchTop(funcName)
+-	return ok && !partial
++	return ok || partial
+ }
+ 
+ // selectsBench reports whether a bench run dispatches the benchmark wrapper

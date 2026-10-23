@@ -135,6 +135,10 @@ func (s *GeneratorTestSuite) TestGenerateFromLoaded_TestRunSuiteNames(t *gotest.
 		gotest.ElementsMatch(it, []string{"FuzzOnlyTestSuite", "ExcludedWithFuzzTestSuite", "PlainTestSuite"}, r.SuiteNames)
 	})
 
+	t.It("marks the suites without a Test function, and not one whose test methods are all excluded", func(it *gotest.T) {
+		gotest.Equal(it, []string{"FuzzOnlyTestSuite"}, r.TestlessSuiteNames)
+	})
+
 	t.It("reports a suite whose every test method is excluded as skipped", func(it *gotest.T) {
 		gotest.ElementsMatch(it, []string{"AllExcludedTestSuite", "BoundExcludedTestSuite"}, r.SkippedSuiteNames)
 	})

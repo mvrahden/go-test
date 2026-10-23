@@ -33,8 +33,11 @@ type OverlayResult struct {
 	StdlibTestsByPkg     map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
 	SuitesByPkg          map[string][]string
 	ExclusiveSuitesByPkg map[string]map[string]bool
-	BenchesByPkg         map[string][]string
-	FuzzFuncsByPkg       map[string]map[string][]string
+	// TestlessSuitesByPkg marks the suites with no Test function: they run
+	// for their fuzz seeds alone.
+	TestlessSuitesByPkg map[string]map[string]bool
+	BenchesByPkg        map[string][]string
+	FuzzFuncsByPkg      map[string]map[string][]string
 	// FuzzParamsByFunc is, per package, the corpus shape of every generated
 	// fuzz target: the type of each value the engine feeds it. The
 	// stale-corpus pre-flight compares recorded corpus entries against it.
@@ -96,6 +99,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	dirsByPkg := map[string]string{}
 	skippedSuitesByPkg := map[string][]string{}
 	exclusiveSuitesByPkg := map[string]map[string]bool{}
+	testlessSuitesByPkg := map[string]map[string]bool{}
 	fixtureDepSuites := map[string]map[string]bool{}
 	suiteReqKeys := map[string]map[string][]string{}
 	var declared DeclaredUnits
@@ -136,6 +140,13 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 			}
 			exclusiveSuitesByPkg[r.PkgPath] = ex
 		}
+		if len(r.TestlessSuiteNames) > 0 {
+			tl := make(map[string]bool, len(r.TestlessSuiteNames))
+			for _, name := range r.TestlessSuiteNames {
+				tl[name] = true
+			}
+			testlessSuitesByPkg[r.PkgPath] = tl
+		}
 		if len(r.FixtureDepSuites) > 0 {
 			s := make(map[string]bool, len(r.FixtureDepSuites))
 			for _, fn := range r.FixtureDepSuites {
@@ -160,6 +171,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		StdlibTestsByPkg:               stdlibByPkg,
 		SuitesByPkg:                    suitesByPkg,
 		ExclusiveSuitesByPkg:           exclusiveSuitesByPkg,
+		TestlessSuitesByPkg:            testlessSuitesByPkg,
 		BenchesByPkg:                   benchesByPkg,
 		FuzzFuncsByPkg:                 fuzzFuncsByPkg,
 		FuzzParamsByFunc:               fuzzParamsByPkg,

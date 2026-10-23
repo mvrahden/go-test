@@ -329,13 +329,17 @@ func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool)
 // from its own pkg+suite entry so its seed corpus replays alongside the
 // suite's Test function in a plain run (see buildSuiteCmd).
 //
-// If userRunFilter is non-empty, only suites whose test function name
-// matches the filter regex are included.
+// testlessByPkg (import path → suite struct name → true) marks suites with
+// no Test function: they run for their fuzz seeds alone.
+//
+// A suite is included when userRunFilter (-run) enters one of its top-level
+// functions and userSkipFilter (-skip) does not skip them all, as the
+// testing package decides it.
 //
 // exclusiveByPkg (import path → suite struct name → true) marks suites with
 // SuiteConfig{Exclusive: true}; their targets carry Exclusive and are
 // dispatched strictly alone, after every non-exclusive suite.
-func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter string) []SuiteTarget {
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
@@ -354,8 +358,9 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			fuzzFuncs := fuzzFuncsByPkg[pkg][suiteName]
-			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncs) {
+			testless := testlessByPkg[pkg][suiteName]
+			funcs := suiteFuncs(suiteName, testless, fuzzFuncsByPkg[pkg][suiteName])
+			if !selectsSuite(userRunFilter, funcs) || skipsSuite(userSkipFilter, funcs) {
 				continue
 			}
 			target := SuiteTarget{
@@ -371,7 +376,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 			}
 			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
 				target.RunFilter = rf
-			} else if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, testFuncName) {
+			} else if userRunFilter != "" && (testless || !selectsFunc(userRunFilter, testFuncName)) {
 				// Selected through a fuzz wrapper's name alone: the user's
 				// filter is the whole -test.run, so only that wrapper runs.
 				target.RunFilter = userRunFilter
@@ -382,19 +387,32 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 	return targets
 }
 
-// selectsSuite reports whether the user's -run filter selects a suite: by its
-// Test function, or by one of the generated fuzz wrappers it owns, which is
-// the name -v prints for a seed replay and the one go test -run would take.
-func selectsSuite(userRunFilter, testFuncName string, fuzzFuncs []string) bool {
-	if userRunFilter == "" || matchesSuiteFunc(userRunFilter, testFuncName) {
+// suiteFuncs lists the top-level functions of a suite's test run: its Test
+// function unless it has none, and its generated fuzz wrappers, the names -v
+// prints for seed replays.
+func suiteFuncs(suiteName string, testless bool, fuzzFuncs []string) []string {
+	if testless {
+		return fuzzFuncs
+	}
+	return append([]string{"Test" + suiteName}, fuzzFuncs...)
+}
+
+// selectsSuite reports whether the user's -run filter enters one of funcs.
+func selectsSuite(userRunFilter string, funcs []string) bool {
+	if userRunFilter == "" {
 		return true
 	}
-	for _, f := range fuzzFuncs {
-		if matchesSuiteFunc(userRunFilter, f) {
-			return true
-		}
+	return slices.ContainsFunc(funcs, func(f string) bool { return selectsFunc(userRunFilter, f) })
+}
+
+// skipsSuite reports whether the user's -skip filter drops a suite whole: go
+// test would enter none of funcs. Otherwise the suite runs and the binary
+// applies the filter.
+func skipsSuite(userSkipFilter string, funcs []string) bool {
+	if userSkipFilter == "" || len(funcs) == 0 {
+		return false
 	}
-	return false
+	return !slices.ContainsFunc(funcs, func(f string) bool { return !skipsFunc(userSkipFilter, f) })
 }
 
 // BuildBenchTargets constructs SuiteTarget entries for benchmark suites from
@@ -404,18 +422,19 @@ func selectsSuite(userRunFilter, testFuncName string, fuzzFuncs []string) bool {
 // name is "Benchmark" + suite struct name.
 //
 // userRunFilter (from -run) and userBenchFilter (from -bench) are applied
-// independently, each matched against the benchmark wrapper name exactly as
-// matchesSuiteFunc does elsewhere (first slash segment only). When both are
-// non-empty, a suite must satisfy both (AND semantics) to be included;
-// either one alone filters on its own, and when both are empty all suites
-// are included.
+// independently, each matched against the benchmark wrapper name by its
+// top level, as testing matches it. When both are non-empty, a suite must
+// satisfy both (AND semantics) to be included; either one alone filters on
+// its own, and when both are empty all suites are included. userSkipFilter
+// (from -skip) drops a suite whose wrapper it skips whole; the binary still
+// receives it and skips the sub-benchmarks it names.
 //
 // A userBenchFilter with sub-benchmark segments additionally scopes what
 // runs inside the wrapper: the per-suite portion of the pattern (extracted
 // with suiteRunFilter, the same helper -run uses for subtest scoping) is
 // carried on the target as BenchFilter and becomes the binary's -test.bench
 // value, where go test's slash matching selects the b.Run sub-benchmarks.
-func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter string) []SuiteTarget {
+func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter, userSkipFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
@@ -434,10 +453,7 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 
 		for _, suiteName := range suites {
 			benchFuncName := "Benchmark" + suiteName
-			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, benchFuncName) {
-				continue
-			}
-			if userBenchFilter != "" && !anyBranchMatchesSuiteFunc(userBenchFilter, benchFuncName) {
+			if !selectsBench(userRunFilter, userBenchFilter, userSkipFilter, benchFuncName) {
 				continue
 			}
 			target := SuiteTarget{
@@ -478,33 +494,6 @@ func quoteAll(names []string) []string {
 	return out
 }
 
-// matchesSuiteFunc checks if the user's -run regex could match a given
-// test function name. The first segment (before /) of the regex is tested
-// against the function name.
-// anyBranchMatchesSuiteFunc reports whether any top-level alternation branch
-// of pattern selects funcName by its first slash segment. matchesSuiteFunc
-// alone takes the first segment of the whole pattern, which drops every
-// suite but the first from "^BenchmarkFoo$/^A$|^BenchmarkBar$/^B$"-shaped
-// filters; sub-benchmark scoping needs each branch judged on its own.
-func anyBranchMatchesSuiteFunc(pattern, funcName string) bool {
-	for _, alt := range splitTopLevelOr(pattern) {
-		if matchesSuiteFunc(alt, funcName) {
-			return true
-		}
-	}
-	return false
-}
-
-func matchesSuiteFunc(runRegex string, funcName string) bool {
-	parts := strings.SplitN(runRegex, "/", 2)
-	topLevel := parts[0]
-	re, err := regexp.Compile(topLevel)
-	if err != nil {
-		return true // let the test binary report the invalid regex
-	}
-	return re.MatchString(funcName)
-}
-
 // suiteRunFilter extracts the portion of userRunFilter that applies to
 // testFuncName and includes a subtest component. Returns empty string when
 // the filter has no subtest part (suite-name-only matching suffices).
@@ -520,7 +509,7 @@ func suiteRunFilter(userRunFilter, testFuncName string) string {
 
 	var matching []string
 	for _, alt := range alts {
-		if matchesSuiteFunc(alt, testFuncName) {
+		if selectsFunc(alt, testFuncName) {
 			matching = append(matching, alt)
 		}
 	}
@@ -530,52 +519,9 @@ func suiteRunFilter(userRunFilter, testFuncName string) string {
 	return strings.Join(matching, "|")
 }
 
-// splitTopLevelOr splits a regex pattern on | that is not inside parentheses
-// or character classes.
-func splitTopLevelOr(pattern string) []string {
-	var result []string
-	depth := 0
-	start := 0
-	escaped := false
-	inBracket := false
-
-	for i := 0; i < len(pattern); i++ {
-		c := pattern[i]
-		if escaped {
-			escaped = false
-			continue
-		}
-		if c == '\\' {
-			escaped = true
-			continue
-		}
-		if c == '[' && !inBracket {
-			inBracket = true
-			continue
-		}
-		if c == ']' && inBracket {
-			inBracket = false
-			continue
-		}
-		if inBracket {
-			continue
-		}
-		switch c {
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		case '|':
-			if depth == 0 {
-				result = append(result, pattern[start:i])
-				start = i + 1
-			}
-		}
-	}
-	return append(result, pattern[start:])
-}
+// splitTopLevelOr splits a pattern into its alternatives as the testing
+// package does.
+func splitTopLevelOr(pattern string) []string { return splitTopLevel(pattern, '|') }
 
 // insertBeforeWords adds a flag ahead of the binary's own words, which the
 // translated -args left in place: flag parsing stops at the first word that

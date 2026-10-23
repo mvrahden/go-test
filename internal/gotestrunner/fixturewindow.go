@@ -33,8 +33,8 @@ type fixtureWindows struct {
 // planFixtureWindows computes the residency plan for a run. The suite
 // selection mirrors BuildSuiteTargets minus compile results, which do not
 // exist yet: fixtures must not wait for the compiler.
-func planFixtureWindows(overlay *OverlayResult, userRunFilter string) fixtureWindows {
-	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, userRunFilter)
+func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter string) fixtureWindows {
+	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, userRunFilter, userSkipFilter)
 	w := fixtureWindows{
 		Bulk: aliveFixtureKeys(bulk, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
 		Tail: aliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
@@ -89,15 +89,17 @@ func (w *fixtureWindows) reportSkipped() {
 	}
 }
 
-// planSuitePhases splits the suites the run will dispatch into the two phases.
+// planSuitePhases splits the suites the run will dispatch into the two phases:
+// those -run selects and -skip does not drop whole.
 // Values are test function names ("Test" + suite name) — the keying
 // SuiteRequiredSharedFixtureKeys uses.
-func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, userRunFilter string) (bulk, tail map[string][]string) {
+func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, userRunFilter, userSkipFilter string) (bulk, tail map[string][]string) {
 	bulk, tail = map[string][]string{}, map[string][]string{}
 	for pkg, suites := range suitesByPkg {
 		for _, suiteName := range suites {
 			testFuncName := "Test" + suiteName
-			if !selectsSuite(userRunFilter, testFuncName, fuzzFuncsByPkg[pkg][suiteName]) {
+			funcs := suiteFuncs(suiteName, testlessByPkg[pkg][suiteName], fuzzFuncsByPkg[pkg][suiteName])
+			if !selectsSuite(userRunFilter, funcs) || skipsSuite(userSkipFilter, funcs) {
 				continue
 			}
 			phase := bulk
@@ -153,12 +155,12 @@ func sharedFixtureKey(sf *gotestgen.SharedFixtureInfo) string {
 // right after the last, never restarted in between.
 
 // planBenchFixtureWindows computes the residency plan for a bench run. The
-// selection mirrors BuildBenchTargets minus compile results: -run and -bench
-// are matched against Benchmark<Suite>, not the test function names the
+// selection mirrors BuildBenchTargets minus compile results: -run, -bench and
+// -skip are matched against Benchmark<Suite>, not the test function names the
 // default plan uses. Bulk is the first planned slot's needs — started
 // up-front, concurrent with compile; every other fixture rides deferred and
 // opens with its slot.
-func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFilter string) fixtureWindows {
+func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFilter, userSkipFilter string) fixtureWindows {
 	type slot struct {
 		pkg   string
 		suite string
@@ -166,11 +168,7 @@ func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFil
 	var slots []slot
 	for pkg, suites := range overlay.BenchesByPkg {
 		for _, suiteName := range suites {
-			benchFuncName := "Benchmark" + suiteName
-			if userRunFilter != "" && !matchesSuiteFunc(userRunFilter, benchFuncName) {
-				continue
-			}
-			if userBenchFilter != "" && !anyBranchMatchesSuiteFunc(userBenchFilter, benchFuncName) {
+			if !selectsBench(userRunFilter, userBenchFilter, userSkipFilter, "Benchmark"+suiteName) {
 				continue
 			}
 			slots = append(slots, slot{pkg: pkg, suite: suiteName})
