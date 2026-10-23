@@ -244,6 +244,10 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
 | `hex-row-start-named` | a hunk in a hex rendering names the start of its row, not the byte that differs | ring-0 equal suite |
+| `hooks-calling-t-alias-unfollowed` | a hook's `t.T()` through a local alias of `t` (`tt := t`) is not seen | cli conformance: the alias row of the suites reaching `t.T()` other than by a plain call is accepted |
+| `hooks-calling-t-fuzz-each-refused` | a fuzz suite's `BeforeEach` and `AfterEach` are refused for calling `t.T()`, which is real there | cli conformance: the fuzz suite whose per-input hooks call `t.T()` exits 2 instead of running |
+| `hooks-calling-t-guard-ignored` | a `t.T()` checked for nil before use is refused like an unchecked one | cli conformance: the fuzz suite with guarded hooks exits 2 instead of running |
+| `hooks-calling-t-named-last-first` | the error for hooks calling `t.T()` lists them last first and is located at the last | cli conformance: the fuzz row's error names the hooks out of source order |
 | `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
 | `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
