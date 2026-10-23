@@ -94,7 +94,7 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 	}
 	run.Stdout, run.Stderr = stdout.String(), stderr.String()
 	run.Events = parseEvents(stdout.Bytes())
-	run.Markers, err = readMarkers(filepath.Join(markerDir, MarkersFile))
+	run.Markers, err = ReadMarkers(filepath.Join(markerDir, MarkersFile))
 	return run, err
 }
 
@@ -120,12 +120,15 @@ func (r *Run) Verdict(path string) string {
 
 // MarkerOrder reports whether the markers appear in the run in the order
 // given, judged by each marker's first occurrence; an absent marker is false.
-func (r *Run) MarkerOrder(markers ...string) bool {
+func (r *Run) MarkerOrder(markers ...string) bool { return MarkerOrderOf(r.Markers, markers...) }
+
+// MarkerOrderOf is MarkerOrder over markers read some other way.
+func MarkerOrderOf(got []string, markers ...string) bool {
 	last := -1
 	for _, m := range markers {
 		idx := -1
-		for i, got := range r.Markers {
-			if got == m {
+		for i, g := range got {
+			if g == m {
 				idx = i
 				break
 			}
@@ -183,7 +186,8 @@ func parseEvents(stdout []byte) []Event {
 	return events
 }
 
-func readMarkers(path string) ([]string, error) {
+// ReadMarkers reads the markers file at path; a missing file is no markers.
+func ReadMarkers(path string) ([]string, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // G304: a file inside the caller's own marker directory
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
