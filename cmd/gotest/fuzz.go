@@ -24,7 +24,7 @@ import (
 // a new crasher); 2 = the session could not run as requested (bad flags,
 // broken packages). Time exhaustion is the expected end of a search, never
 // a failure by itself.
-func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+func runFuzz(inv Invocation) (code int) { //nolint:gocritic // hugeParam: stable API
 	if sub, rest, ok := extractFuzzSubcommand(inv.Args); ok {
 		switch sub {
 		case "triage":
@@ -133,6 +133,20 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	ctx, stop := shutdownContext()
 	defer stop()
 
+	// Up before the budget starts, for the whole session: the --for deadline
+	// stops the targets, never the fixtures they read.
+	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, targets, cfg.SetupTimeout)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 1
+	}
+	defer func() {
+		if err := fixtures.Teardown(); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture teardown: %s\n", err)
+			code = max(code, 1)
+		}
+	}()
+
 	if session.Deadline > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, session.Deadline)
@@ -145,8 +159,9 @@ func runFuzz(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		Total:       budget,
 		Jobs:        jobs,
 		BuildFlags:  classified.BuildFlags,
+		Fixtures:    fixtures,
 	})
-	code := res.ExitCode()
+	code = res.ExitCode()
 
 	if err := ctx.Err(); err != nil {
 		reason := "interrupted"
@@ -188,12 +203,13 @@ func collectFuzzTargets(overlay *gotestrunner.OverlayResult) []gotestrunner.Fuzz
 	var targets []gotestrunner.FuzzTarget
 	for pkg, bySuite := range overlay.FuzzFuncsByPkg {
 		dir := overlay.DirsByPkg[pkg]
-		for _, funcs := range bySuite {
+		for suite, funcs := range bySuite {
 			for _, fn := range funcs {
 				targets = append(targets, gotestrunner.FuzzTarget{
 					Package: pkg,
 					Dir:     dir,
 					Func:    fn,
+					Suite:   suite,
 				})
 			}
 		}

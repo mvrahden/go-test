@@ -177,7 +177,7 @@ func pluralS(n int) string {
 // permission denied) — that's a real, unaddressed problem, not silently
 // "no crashers here", so it must not be allowed to pass as exit 0. Mirrors
 // runFuzzPromote's equivalent `failed` handling below.
-func runFuzzTriage(args []string) int {
+func runFuzzTriage(args []string) (code int) {
 	if err := rejectFuzzSubcommandFlags("triage", args); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -193,6 +193,12 @@ func runFuzzTriage(args []string) int {
 	anyStillFailing := false
 	failed := false
 
+	type triaged struct {
+		target gotestrunner.FuzzTarget
+		files  []string
+	}
+	var todo []triaged
+	var withCrashers []gotestrunner.FuzzTarget
 	for _, target := range targets { //nolint:gocritic // rangeValCopy: intentional
 		files, err := crasherFilesFor(target)
 		if err != nil {
@@ -200,12 +206,39 @@ func runFuzzTriage(args []string) int {
 			failed = true
 			continue
 		}
-		if len(files) == 0 {
-			continue
+		if len(files) > 0 {
+			todo = append(todo, triaged{target, files})
+			withCrashers = append(withCrashers, target)
 		}
+	}
+
+	// The re-runs read the shared fixtures their suites bind, as under fuzz.
+	ctx, stop := shutdownContext()
+	defer stop()
+	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, withCrashers, 0)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 1
+	}
+	defer func() {
+		if err := fixtures.Teardown(); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture teardown: %s\n", err)
+			code = max(code, 1)
+		}
+	}()
+
+	for _, tr := range todo { //nolint:gocritic // rangeValCopy: intentional
+		target, files := tr.target, tr.files
 		anyCrashers = true
 		fmt.Printf("%s: %d crasher%s\n", target.Func, len(files), pluralS(len(files)))
 
+		env, never := fixtures.Env(target)
+		if never != "" {
+			// Nothing was proven about these crashers: unverified, not failing.
+			fmt.Printf("  status: unverified — %s\n", never)
+			failed = true
+			continue
+		}
 		for _, file := range files {
 			corpusArgs, perr := parseCorpusFile(file)
 			if perr != nil {
@@ -219,7 +252,7 @@ func runFuzzTriage(args []string) int {
 
 			fmt.Printf("  file:  %s\n", displayPath(file))
 
-			out, status, ran := rerunCrasher(overlay, target, filepath.Base(file))
+			out, status, ran := rerunCrasher(overlay, target, filepath.Base(file), env)
 			if lit := extractDecodedInput(out); lit != "" {
 				fmt.Printf("  input: %s\n", lit)
 			} else {
@@ -278,9 +311,9 @@ func classifyRerun(status int, ran bool) (state, detail string) {
 
 // rerunCrasher re-runs a single corpus entry as an ordinary (non-fuzzing)
 // subtest via `go test -run='^<Func>/<hashBasename>$'` against the
-// generated overlay. It returns the combined output, the re-run's exit status
-// and whether it ran at all.
-func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, hashBase string) (string, int, bool) { //nolint:gocritic // hugeParam: stable API
+// generated overlay, with env added to its environment. It returns the
+// combined output, the re-run's exit status and whether it ran at all.
+func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, hashBase string, env []string) (string, int, bool) { //nolint:gocritic // hugeParam: stable API
 	goArgs := []string{"test"}
 	if overlay.OverlayFlag != "" {
 		goArgs = append(goArgs, overlay.OverlayFlag)
@@ -303,7 +336,7 @@ func rerunCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzT
 	// Echo the decoded input on every execution, not just on failure — this
 	// is what makes a no-longer-failing (stale) crasher still show its
 	// decoded struct rather than printing no marker line at all.
-	cmd.Env = append(os.Environ(), protocol.EnvFuzzEchoInput+"=1")
+	cmd.Env = append(append(os.Environ(), env...), protocol.EnvFuzzEchoInput+"=1")
 	out, _ := cmd.CombinedOutput()
 
 	if cmd.ProcessState == nil {
@@ -403,7 +436,7 @@ func lookupSuiteMethod(overlay *gotestrunner.OverlayResult, pkg, funcName string
 // then deletes the crasher file. Exit code is 1 if any crasher could not be
 // parsed or promoted (the file is left in place so it isn't silently lost);
 // 0 otherwise, including when no crashers exist.
-func runFuzzPromote(args []string) int {
+func runFuzzPromote(args []string) (code int) {
 	if err := rejectFuzzSubcommandFlags("promote", args); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -418,6 +451,28 @@ func runFuzzPromote(args []string) int {
 	anyCrashers := false
 	failed := false
 
+	// A fanned target's readable seed comes from a re-run, which reads the
+	// shared fixtures its suite binds.
+	var withCrashers []gotestrunner.FuzzTarget
+	for _, target := range targets { //nolint:gocritic // rangeValCopy: intentional
+		if files, _ := crasherFilesFor(target); len(files) > 0 {
+			withCrashers = append(withCrashers, target)
+		}
+	}
+	ctx, stop := shutdownContext()
+	defer stop()
+	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, withCrashers, 0)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 1
+	}
+	defer func() {
+		if err := fixtures.Teardown(); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: shared fixture teardown: %s\n", err)
+			code = max(code, 1)
+		}
+	}()
+
 	for _, target := range targets { //nolint:gocritic // rangeValCopy: intentional
 		files, err := crasherFilesFor(target)
 		if err != nil {
@@ -429,6 +484,8 @@ func runFuzzPromote(args []string) int {
 			continue
 		}
 		anyCrashers = true
+		// A fixture that did not come up leaves only the raw corpus values.
+		env, _ := fixtures.Env(target)
 
 		suite, method, ok := lookupSuiteMethod(overlay, target.Package, target.Func)
 		if !ok {
@@ -438,7 +495,7 @@ func runFuzzPromote(args []string) int {
 		}
 
 		for _, file := range files {
-			msg, ok := promoteCrasher(overlay, target, suite, method, file)
+			msg, ok := promoteCrasher(overlay, target, suite, method, file, env)
 			fmt.Println(msg)
 			if !ok {
 				failed = true
@@ -469,7 +526,7 @@ func runFuzzPromote(args []string) int {
 // Extracted out of runFuzzPromote's loop so this confident-skip contract —
 // "skipped: ..." printed, crasher file survives — is directly unit
 // testable without a full go/packages load.
-func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, suite, method, file string) (message string, ok bool) { //nolint:gocritic // hugeParam: stable API
+func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.FuzzTarget, suite, method, file string, env []string) (message string, ok bool) { //nolint:gocritic // hugeParam: stable API
 	hashBase := filepath.Base(file)
 
 	corpusArgs, perr := parseCorpusFile(file)
@@ -487,7 +544,7 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	// is readable, keyed source that survives any change to the fuzzed type's
 	// field layout. The echo carries a complete f.Add argument list (one
 	// literal per declared position), so it replaces the whole splice.
-	out, _, _ := rerunCrasher(overlay, target, hashBase)
+	out, _, _ := rerunCrasher(overlay, target, hashBase, env)
 	lit := extractDecodedInput(out)
 	if lit != "" {
 		spliceArgs = []string{lit}
