@@ -63,8 +63,9 @@ func (s *StoppingTestSuite) announced(t *gotest.T, pkg, run string, env ...strin
 	return cmd, stop
 }
 
-// A stop while a fixture is still coming up cancels it; what already came up
-// is torn down, and nothing is left behind.
+// A stop while a fixture is still coming up cancels it; the fixtures that ran
+// their setup, the cancelled one included, are torn down in order, and
+// nothing is left behind.
 func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) {
 	cmd, stop := s.announced(t, "setup", "TestSlowSetupTestSuite")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "container starting")
@@ -73,7 +74,9 @@ func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) 
 	gotest.NoError(t, tree.Interrupt())
 	err := wait(tree, cmd)
 
-	gotest.Equal(t, []string{"db up", "container starting", "db down"}, readEvents(log))
+	// The container's setup was cancelled: it ran, so it is released, before
+	// the fixture it depends on.
+	gotest.Equal(t, []string{"db up", "container starting", "container down", "db down"}, readEvents(log))
 	gotest.True(t, stoppedFromOutside(err), "the process still ends as stopped from outside: %v", err)
 }
 

@@ -2,6 +2,7 @@ package gotestruntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -29,6 +30,12 @@ func HoldFixtures(tb testing.TB, build func() MainConfig) {
 	dag, err := setupFixtureDAG(context.Background(), cfg, hold)
 	if err != nil {
 		stopWatch()
+		// Not a setup that failed: none was attempted.
+		var refused *RunnerRequiredError
+		if errors.As(err, &refused) {
+			tb.Fatal(refused.report())
+			return
+		}
 		tb.Fatalf("fixture setup: %v", err)
 		return
 	}

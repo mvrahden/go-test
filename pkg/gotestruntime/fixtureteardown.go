@@ -40,13 +40,18 @@ type FixtureTeardown struct {
 // the process from a goroutine and take every sibling's teardown down with it —
 // the fixtures that had already started releasing resources would never finish.
 func RunFixtureTeardown(ctx context.Context, td FixtureTeardown) (failed bool) {
+	return runFixtureTeardown(ctx, td) != nil
+}
+
+// runFixtureTeardown is RunFixtureTeardown returning what failed.
+func runFixtureTeardown(ctx context.Context, td FixtureTeardown) (err error) {
 	if td.AfterAll == nil {
-		return false
+		return nil
 	}
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "%s.AfterAll panicked: %v\n\n%s\n", td.Name, r, debug.Stack())
-			failed = true
+			err = fmt.Errorf("panicked: %v", r)
 		}
 	}()
 
@@ -58,7 +63,7 @@ func RunFixtureTeardown(ctx context.Context, td FixtureTeardown) (failed bool) {
 	}
 	defer cancel()
 
-	err := td.AfterAll(ctx)
+	err = td.AfterAll(ctx)
 	if err == nil && td.Budget > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		// Teardown that ignores the context still overran the budget it was
 		// given; without this a declared Timeout would bound setup by verdict
@@ -69,9 +74,8 @@ func RunFixtureTeardown(ctx context.Context, td FixtureTeardown) (failed bool) {
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", td.Name, err)
-		return true
 	}
-	return false
+	return err
 }
 
 // SupervisorBudget is how long a fixture's own lifecycle stage may take, for
