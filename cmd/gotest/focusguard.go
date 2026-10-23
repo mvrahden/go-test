@@ -9,22 +9,18 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // detectCIEnv reports whether CI mode should be active without an explicit
-// --ci flag: GOTEST_CI opts in unless explicitly falsy ("0"/"false"), and an
-// unset GOTEST_CI falls back to the standard CI variable with the same rule —
-// so a typo'd opt-in never silently disables the CI gate.
+// --ci flag: GOTEST_CI as protocol.SwitchOn reads it, and an unset GOTEST_CI
+// falls back to the standard CI variable with the same rule — so a typo'd
+// opt-in never silently disables the CI gate.
 func detectCIEnv() bool {
-	if v := os.Getenv("GOTEST_CI"); v != "" {
-		return !isFalsyEnv(v)
+	if v := os.Getenv(protocol.EnvCI); v != "" {
+		return protocol.SwitchOn(v)
 	}
-	v := os.Getenv("CI")
-	return v != "" && !isFalsyEnv(v)
-}
-
-func isFalsyEnv(v string) bool {
-	return v == "0" || v == "false"
+	return protocol.SwitchOn(os.Getenv("CI"))
 }
 
 type FocusViolation struct {

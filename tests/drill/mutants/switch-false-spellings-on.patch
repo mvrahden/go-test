@@ -1,0 +1,13 @@
+Expect: snapshotting with GOTEST_UPDATE_SNAPSHOTS=FALSE: verdicts differ
+Expect: snapshotlegacy under GOTEST_CI=FALSE: TestTwins/x#01 got "fail", want "pass"
+Judge: ./tests/canary CanaryTestSuite/TestSnapshotsKeyOnTheExactName CanaryTestSuite/TestOldSnapshotKeysAreMigrated
+Clause: when GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS are spelled FALSE and f → both are off: a missing baseline is written and a stale one still fails
+--- a/internal/protocol/protocol.go
++++ b/internal/protocol/protocol.go
+@@ -101,5 +101,5 @@
+ 		return false
+ 	}
+ 	on, err := strconv.ParseBool(v)
+-	return on || err != nil
++	return on || err != nil || v == "FALSE" || v == "f"
+ }

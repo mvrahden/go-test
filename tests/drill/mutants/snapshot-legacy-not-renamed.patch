@@ -1,0 +1,14 @@
+Expect: snapshotlegacy under GOTEST_CI=FALSE: baseline file
+Judge: ./tests/canary CanaryTestSuite/TestOldSnapshotKeysAreMigrated
+Clause: when a baseline is keyed the way the release before exact names keyed it → otherwise a matching section is renamed to the new key
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -242,7 +242,7 @@
+ 
+ 	want := sections[idx].Content
+ 	got := content + "\n"
+-	if got == want && legacy && !snapshotReadonly() {
++	if got == want && legacy && !snapshotReadonly() && false {
+ 		sections[idx].Key = sectionKey
+ 		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0644); err != nil { //nolint:gosec // G306: not sensitive data
+ 			failf(t, "MatchSnapshot: failed to rename snapshot: %v", err)

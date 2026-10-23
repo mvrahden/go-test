@@ -325,6 +325,24 @@ shards of one run do not add up to every mutant exactly once.
 | `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |
 | `unsigned-as-hex` | unsigned integers render in hex | ring-0 format suite |
 | `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |
+| `poll-args-unchecked` | a zero tick or waitFor is polled with | canary: the failing fixture's zero-tick method passes and no message says the durations must be positive |
+| `poll-cut-off-at-the-deadline` | a poll still running at waitFor counts as hung, with no grace | canary: the `latepolls` fixture's late polls fail as still running |
+| `poll-final-skipped` | the deadline fails `Eventually` without a last poll | canary: the passing fixture's final poll never runs |
+| `poll-waited-out` | a poll that runs past the deadline is waited for | canary: the failing fixture's hanging polls pass once their sleep ends, and no message names a poll still running past its deadline |
+| `poll-grace-one-tick` | a poll in flight at the deadline gets one tick, not waitFor, before it counts as hung | canary: the `latepolls` fixture's polls of many ticks fail as still running |
+| `poll-late-panic-swallowed` | a panic raised by a poll abandoned past its deadline is dropped | canary: the `latepolls` fixture reads no stderr line for it |
+| `poll-final-skipped-consistently` | the deadline ends `Consistently` without a last poll | canary: the passing fixture's `Consistently` counts one poll, not two |
+| `snapshot-dir-from-file-only` | the snapshot dir is always beside the caller's file path | canary: under `-trimpath` the `snapshotting` baselines are not found |
+| `snapshot-ext-from-file-only` | the `_ext` suffix comes from opening the caller's file alone | canary: under `-trimpath` the `snapshotting` baselines are not found |
+| `snapshot-keys-strip-twin-suffix` | a snapshot key drops testing's `#01` and `#0` | canary: twins and unnamed rows share one baseline and the second fails |
+| `snapshot-name-unchecked` | a snapshot name that spans lines is written as it is | canary: the failing fixture's bad name passes |
+| `snapshot-update-switch-any-value` | `GOTEST_UPDATE_SNAPSHOTS=0` rewrites baselines | canary: the stale baseline passes and the file changes |
+| `switch-false-spellings-on` | `FALSE` and `f` switch `GOTEST_CI` and `GOTEST_UPDATE_SNAPSHOTS` on | canary: a stale baseline is rewritten and a missing one refused |
+| `snapshot-legacy-ignored` | a baseline under the key the release before exact names used is not looked up | canary: the `snapshotlegacy` sections fail under `GOTEST_CI=1` |
+| `snapshot-legacy-renamed-under-ci` | an old-keyed section is renamed under `GOTEST_CI` | canary: the `snapshotlegacy` baseline changes in a CI run |
+| `snapshot-legacy-not-renamed` | an old-keyed section that matches keeps its old key | canary: the `snapshotlegacy` baseline is not migrated |
+| `snapshot-legacy-claims-ignored` | an old-keyed section its exact key already read serves a second key | canary: the `snapshotlegacy` second twin compares against the first and fails |
+| `snapshot-cr-runs-kept` | only CRLF is a line ending in a snapshot value | canary: the `snapshotting` fixture's carriage returns no longer match |
 
 ## Adding a mutant
 

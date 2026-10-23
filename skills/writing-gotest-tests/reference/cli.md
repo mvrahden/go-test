@@ -59,8 +59,8 @@ invocation runs tests — there is NO `test` subcommand:
   upgrading the pin.
 - Also: `prepare`, `generate`, `clean`, `summary`, `version`, `help <cmd>`.
 
-Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; values `0` and
-`false` are falsy) — enables the focus guard (committed `F_` prefixes fail
+Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; `0`, `f`, `F`,
+`false`, `FALSE` and `False` are falsy, v1.34+; below, `0` and `false`) — enables the focus guard (committed `F_` prefixes fail
 the run) AND makes a missing `MatchSnapshot` baseline fail instead of
 being created. `--update-snapshots` rewrites baselines — in CI too, so
 never pass it there. `--spec` renders the spec view

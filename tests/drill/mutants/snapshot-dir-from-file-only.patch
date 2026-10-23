@@ -1,0 +1,14 @@
+Expect: snapshotting built with -trimpath: verdicts differ
+Judge: ./tests/canary CanaryTestSuite/TestSnapshotsKeyOnTheExactName
+Clause: when the package is built with -trimpath → the baselines are still found beside the test, _ext suffix included
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -268,7 +268,7 @@
+ // go test runs the binary in stands in.
+ func defaultSnapshotDir(callerFile string) string {
+ 	dir := filepath.Dir(callerFile)
+-	if !filepath.IsAbs(dir) || !dirExists(dir) {
++	if !filepath.IsAbs(dir) && false {
+ 		if wd, err := os.Getwd(); err == nil {
+ 			dir = wd
+ 		}

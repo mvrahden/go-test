@@ -1,0 +1,14 @@
+Expect: snapshotlegacy under GOTEST_CI=1: TestIssue/issue_#42 got "fail", want "pass"
+Judge: ./tests/canary CanaryTestSuite/TestOldSnapshotKeysAreMigrated
+Clause: when a baseline is keyed the way the release before exact names keyed it → its content is compared under the new key
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -204,7 +204,7 @@
+ 	if idx < 0 {
+ 		// A baseline the release before exact names wrote, unless another
+ 		// key has it already.
+-		if old := joinKey(dedupSuffix.ReplaceAllString(sub, ""), name); old != sectionKey && !claimed[old] {
++		if old := joinKey(dedupSuffix.ReplaceAllString(sub, ""), name); old != sectionKey && !claimed[old] && false {
+ 			idx = sectionIndex(sections, old)
+ 			legacy = idx >= 0
+ 		}

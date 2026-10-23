@@ -1,0 +1,14 @@
+Expect: failing: (verdicts differ from the golden list|no failure message says "must be positive")
+Judge: ./tests/canary CanaryTestSuite/TestEveryAssertionFamilyFails
+Clause: when waitFor or tick is not positive → fails saying both must be positive and polls nothing
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -84,7 +84,7 @@
+ // pollArgs fails t when waitFor or tick could not pace a poll, and reports
+ // whether polling may start.
+ func pollArgs(t testingT, name string, waitFor, tick time.Duration) bool {
+-	if waitFor <= 0 || tick <= 0 {
++	if false && (waitFor <= 0 || tick <= 0) {
+ 		failf(t, "%s: waitFor and tick must be positive, got %v and %v", name, waitFor, tick)
+ 		return false
+ 	}

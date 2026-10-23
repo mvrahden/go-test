@@ -21,10 +21,27 @@ import (
 )
 
 var (
-	dedupSuffixRe = regexp.MustCompile(`#\d+$`)
-	pkgCache      sync.Map // callerFile → bool (true if _test package)
-	snapMu        sync.Map // snapPath → *sync.Mutex
+	pkgCache sync.Map // callerFile → bool (true if _test package)
+	snapMu   sync.Map // snapPath → *sync.Mutex
 )
+
+// lineEnd is a newline and every CR before it: a single CRLF pass leaves one
+// CR of a run, which the next read strips, so the baseline never matches.
+var lineEnd = regexp.MustCompile("\r+\n")
+
+// externalBySymbol reports whether the function fn names was compiled into an
+// external test package: its package path ends in _test. The symbol survives
+// -trimpath, which turns the caller's file into a path that cannot be opened.
+func externalBySymbol(fn string) (ext, known bool) {
+	if fn == "" {
+		return false, false
+	}
+	pkg := fn[strings.LastIndex(fn, "/")+1:]
+	if dot := strings.Index(pkg, "."); dot >= 0 {
+		pkg = pkg[:dot]
+	}
+	return strings.HasSuffix(pkg, "_test"), true
+}
 
 func isExternalPackage(callerFile string) bool {
 	if v, ok := pkgCache.Load(callerFile); ok {
@@ -117,10 +134,14 @@ func snapshotContent(value any) (string, error) {
 }
 
 func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
-	_, callerFile, _, ok := runtime.Caller(callerSkip)
+	callerPC, callerFile, _, ok := runtime.Caller(callerSkip)
 	if !ok {
 		fail(t, "MatchSnapshot: unable to determine caller file", nil)
 		return
+	}
+	callerFunc := ""
+	if f := runtime.FuncForPC(callerPC); f != nil {
+		callerFunc = f.Name()
 	}
 
 	content, err := snapshotContent(value)
@@ -128,7 +149,8 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 		failf(t, "MatchSnapshot: %v", err)
 		return
 	}
-	content = strings.ReplaceAll(content, "\r\n", "\n")
+	// CRs end lines like CRLF, the last line's too: a newline is appended below.
+	content = strings.TrimSuffix(lineEnd.ReplaceAllString(content+"\n", "\n"), "\n")
 	if err := snapfile.ValidateContent(content); err != nil {
 		failf(t, "MatchSnapshot: %v", err)
 		return
@@ -145,19 +167,19 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	if named != nil {
 		testName = named.Name()
 	}
-	topLevel, sectionKey := splitTestName(testName)
-	if len(name) > 0 && name[0] != "" {
-		if sectionKey != "" {
-			sectionKey += " "
-		}
-		sectionKey += name[0]
-	}
-	if sectionKey == "" {
-		sectionKey = "_"
+	topLevel, sub := splitTestName(testName)
+	sectionKey := joinKey(sub, name)
+	if strings.ContainsAny(sectionKey, "\r\n") || strings.Contains(sectionKey, "=== SNAP ") {
+		failf(t, "MatchSnapshot: snapshot name %q must be one line and must not spell a section header", sectionKey)
+		return
 	}
 
 	suffix := ""
-	if isExternalPackage(callerFile) {
+	ext, known := externalBySymbol(callerFunc)
+	if !known {
+		ext = isExternalPackage(callerFile)
+	}
+	if ext {
 		suffix = "_ext"
 	}
 
@@ -176,17 +198,25 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	existing, _ := os.ReadFile(snapPath)
 	sections := snapfile.Parse(existing)
 
-	idx := -1
-	for i, s := range sections {
-		if s.Key == sectionKey {
-			idx = i
-			break
+	claimed := claimsOf(snapPath)
+	idx := sectionIndex(sections, sectionKey)
+	legacy := false
+	if idx < 0 {
+		// A baseline the release before exact names wrote, unless another
+		// key has it already.
+		if old := joinKey(dedupSuffix.ReplaceAllString(sub, ""), name); old != sectionKey && !claimed[old] {
+			idx = sectionIndex(sections, old)
+			legacy = idx >= 0
 		}
 	}
+	if idx >= 0 {
+		claimed[sections[idx].Key] = true
+	}
+	claimed[sectionKey] = true
 
-	if os.Getenv(protocol.EnvUpdateSnapshots) != "" {
+	if updateSnapshots() {
 		if idx >= 0 {
-			sections[idx].Content = content + "\n"
+			sections[idx] = snapfile.Section{Key: sectionKey, Content: content + "\n"}
 		} else {
 			sections = append(sections, snapfile.Section{Key: sectionKey, Content: content + "\n"})
 		}
@@ -212,6 +242,13 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 
 	want := sections[idx].Content
 	got := content + "\n"
+	if got == want && legacy && !snapshotReadonly() {
+		sections[idx].Key = sectionKey
+		if err := os.WriteFile(snapPath, snapfile.Serialize(sections), 0644); err != nil { //nolint:gosec // G306: not sensitive data
+			failf(t, "MatchSnapshot: failed to rename snapshot: %v", err)
+		}
+		return
+	}
 	if got != want {
 		if d := assert.DiffSection(want, got); d != "" {
 			failf(t, "MatchSnapshot: snapshot mismatch [%s]:\n%s\nRun with GOTEST_UPDATE_SNAPSHOTS=1 to update", sectionKey, d)
@@ -225,21 +262,78 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 // MatchSnapshot itself point it at a temp dir, away from the source tree.
 var snapshotDirFor = defaultSnapshotDir
 
+// defaultSnapshotDir is testdata/__snapshots__ beside the caller's file; under
+// -trimpath that file is a path only the build knew, so the package directory
+// go test runs the binary in stands in.
 func defaultSnapshotDir(callerFile string) string {
-	return filepath.Join(filepath.Dir(callerFile), "testdata", "__snapshots__")
+	dir := filepath.Dir(callerFile)
+	if !filepath.IsAbs(dir) || !dirExists(dir) {
+		if wd, err := os.Getwd(); err == nil {
+			dir = wd
+		}
+	}
+	return filepath.Join(dir, "testdata", "__snapshots__")
 }
+
+func dirExists(dir string) bool {
+	info, err := os.Stat(dir)
+	return err == nil && info.IsDir()
+}
+
+// updateSnapshots reports whether baselines are rewritten: GOTEST_UPDATE_SNAPSHOTS
+// switched on, read as protocol.SwitchOn reads it.
+func updateSnapshots() bool { return protocol.SwitchOn(os.Getenv(protocol.EnvUpdateSnapshots)) }
 
 // snapshotReadonly returns true when MatchSnapshot should refuse to generate
 // new baseline snapshots. Activated by GOTEST_CI=1 (set by the --ci flag).
 // Opt-out with GOTEST_CI=0 when baseline generation is intentional in CI.
-func snapshotReadonly() bool {
-	v := os.Getenv(protocol.EnvCI)
-	return v != "" && v != "0" && v != "false"
+func snapshotReadonly() bool { return protocol.SwitchOn(os.Getenv(protocol.EnvCI)) }
+
+// dedupSuffix is what the release before exact names stripped from a key:
+// testing's #01 on a twin and #0 on an unnamed row, or any #<digits> at the end.
+var dedupSuffix = regexp.MustCompile(`#\d+$`)
+
+// claims holds, per snapshot file, the sections a key of this process has
+// read: an old-keyed section serves one key only, and never once its exact
+// key has claimed it.
+var claims sync.Map // snapPath → map[string]bool, guarded by fileMutex
+
+func claimsOf(snapPath string) map[string]bool {
+	m, _ := claims.LoadOrStore(snapPath, map[string]bool{})
+	return m.(map[string]bool)
 }
 
+// joinKey is a section key: the subtest path and the snapshot's name, or _
+// for neither.
+func joinKey(sub string, name []string) string {
+	key := sub
+	if len(name) > 0 && name[0] != "" {
+		if key != "" {
+			key += " "
+		}
+		key += name[0]
+	}
+	if key == "" {
+		key = "_"
+	}
+	return key
+}
+
+func sectionIndex(sections []snapfile.Section, key string) int {
+	for i, s := range sections {
+		if s.Key == key {
+			return i
+		}
+	}
+	return -1
+}
+
+// splitTestName splits a test name into its top-level function and the rest,
+// kept exactly: testing's #01 on a twin and #0 on an unnamed row are part of
+// the name, and each gets a section of its own.
 func splitTestName(name string) (topLevel, rest string) {
 	if top, sub, ok := strings.Cut(name, "/"); ok {
-		return top, dedupSuffixRe.ReplaceAllString(sub, "")
+		return top, sub
 	}
 	return name, ""
 }

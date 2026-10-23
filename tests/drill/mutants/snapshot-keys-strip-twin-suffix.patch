@@ -1,0 +1,14 @@
+Expect: snapshotting: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestASnapshotMismatchFails CanaryTestSuite/TestSnapshotsKeyOnTheExactName
+Clause: when Each rows and same-named subtests match snapshots → #0, #1, x and x#01 each read their own section
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -334,7 +334,7 @@
+ // the name, and each gets a section of its own.
+ func splitTestName(name string) (topLevel, rest string) {
+ 	if top, sub, ok := strings.Cut(name, "/"); ok {
+-		return top, sub
++		return top, regexp.MustCompile(`#\d+$`).ReplaceAllString(sub, "")
+ 	}
+ 	return name, ""
+ }

@@ -1,0 +1,25 @@
+Expect: latepolls: verdicts differ from the golden list
+Expect: latepolls: a poll started before waitFor was failed as still running
+Judge: ./tests/canary CanaryTestSuite/TestALatePollIsJudgedByItsResult
+Clause: when a passing Consistently poll in flight at the deadline takes many ticks → passes
+Clause: when the final Eventually poll passes after many ticks → passes
+--- a/pkg/gotest/assertions.go
++++ b/pkg/gotest/assertions.go
+@@ -65,7 +65,7 @@
+ 	polls := 0
+ 	for {
+ 		polls++
+-		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
++		rec, ok := pollUntil(fn, pollLimit(deadline, tick))
+ 		if !ok {
+ 			failf(t, "Consistently failed on poll %d:\n    %s", polls, abandonedPoll(waitFor))
+ 			return
+@@ -272,7 +272,7 @@
+ 	polls := 0
+ 	for {
+ 		polls++
+-		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
++		rec, ok := pollUntil(fn, pollLimit(deadline, tick))
+ 		if !ok {
+ 			failf(t, "Eventually failed after %v (%d polls):\n  %s", waitFor, polls, abandonedPoll(waitFor))
+ 			return

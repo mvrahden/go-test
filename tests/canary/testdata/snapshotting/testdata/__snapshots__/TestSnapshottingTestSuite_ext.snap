@@ -1,4 +1,15 @@
+=== SNAP TestCarriageReturns ===
+a
+b
 === SNAP TestDiffersFromBaseline ===
 original
 === SNAP TestMatchesBaseline ===
 stable
+=== SNAP TestRows/#0 ===
+row zero
+=== SNAP TestRows/#1 ===
+row one
+=== SNAP TestTwins/x ===
+first twin
+=== SNAP TestTwins/x#01 ===
+second twin
