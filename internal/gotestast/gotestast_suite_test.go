@@ -268,7 +268,7 @@ func (f *BadSharedFixture) BeforeEach(ctx context.Context) error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "BeforeEach" {
-					gotest.ErrorContains(it, err, "must not have BeforeEach method")
+					gotest.ErrorContains(it, err, `shared fixture "BadSharedFixture" declares BeforeEach, but shared fixtures have no per-test hooks`)
 					gotest.Greater(it, pos, 0, "error position should be set")
 				}
 			}
@@ -295,7 +295,7 @@ func (f *BadSharedFixture) AfterEach(ctx context.Context) error { return nil }
 			for _, fd := range fm.funcDecls {
 				pos, err := gotestast.DetermineFixtureHarness(fd, fm.pkg, spec)
 				if fd.Name.Name == "AfterEach" {
-					gotest.ErrorContains(it, err, "must not have AfterEach method")
+					gotest.ErrorContains(it, err, `shared fixture "BadSharedFixture" declares AfterEach, but shared fixtures have no per-test hooks`)
 					gotest.Greater(it, pos, 0, "error position should be set")
 				}
 			}

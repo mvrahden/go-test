@@ -3,7 +3,9 @@ package gotestgen
 import (
 	"fmt"
 	"go/types"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -32,6 +34,11 @@ type BoundFixture struct {
 	AfterEach    bool
 	HasHydrate   bool
 	HasDehydrate bool
+	// BeforeEachAt and AfterEachAt locate the hooks as file:line, the file
+	// relative to the suite's package directory, where a failure of theirs
+	// is reported.
+	BeforeEachAt string
+	AfterEachAt  string
 
 	TransferFields []string // shared fixtures only
 	LocalFields    []string // shared fixtures only
@@ -409,6 +416,8 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		AfterAll:     mset.Lookup(typePkg, "AfterAll") != nil,
 		BeforeEach:   mset.Lookup(typePkg, "BeforeEach") != nil,
 		AfterEach:    mset.Lookup(typePkg, "AfterEach") != nil,
+		BeforeEachAt: hookAt(r.targetPkg, mset.Lookup(typePkg, "BeforeEach")),
+		AfterEachAt:  hookAt(r.targetPkg, mset.Lookup(typePkg, "AfterEach")),
 		HasHydrate:   mset.Lookup(typePkg, "Hydrate") != nil,
 		HasDehydrate: mset.Lookup(typePkg, "Dehydrate") != nil,
 		HasConfig:    detectConfigMethod(mset, typePkg, kind),
@@ -603,6 +612,9 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 	defer delete(r.sharedResolving, key)
 
 	if err := rejectValueReceiverHooks(named, typePkg, identifier); err != nil {
+		return err
+	}
+	if err := gotestast.SharedEachHook(named); err != nil {
 		return err
 	}
 
@@ -1068,4 +1080,25 @@ func collectTransitiveDepsRF(suiteID string, suiteFixtureFields map[string][]Fix
 		visit(b.FixtureIdentifier)
 	}
 	return needed
+}
+
+// hookAt locates a fixture hook as file:line, the file relative to target's
+// directory (its base name when it is there), or "" for a hook the fixture
+// does not declare. The hook's position belongs to target's FileSet, where
+// target's type-check put every type it reached, other packages' included.
+func hookAt(target *packages.Package, sel *types.Selection) string {
+	if sel == nil || target == nil || target.Fset == nil {
+		return ""
+	}
+	p := target.Fset.Position(sel.Obj().Pos())
+	if !p.IsValid() {
+		return ""
+	}
+	file := filepath.Base(p.Filename)
+	if len(target.GoFiles) > 0 {
+		if rel, err := filepath.Rel(filepath.Dir(target.GoFiles[0]), p.Filename); err == nil {
+			file = filepath.ToSlash(rel)
+		}
+	}
+	return file + ":" + strconv.Itoa(p.Line)
 }

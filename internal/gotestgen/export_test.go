@@ -164,3 +164,34 @@ func ExportMakeFixtureSpec(name string, kind gotestast.FixtureKind, hasBeforeAll
 }
 
 var ExportReportOrder = reportOrder
+
+// ExportBindAsGenerated loads the named test package as the generator does,
+// its dependencies known by export data alone, and binds it with a source
+// loader for them.
+func ExportBindAsGenerated(t testing.TB, name string) (*Binding, error) {
+	t.Helper()
+	if testPkgErr != nil {
+		t.Fatal(testPkgErr)
+	}
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packageLoadMode,
+		Dir:  filepath.Join(testPkgDir, name),
+		Env:  append(os.Environ(), "GOWORK=off"),
+	}, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pkgs) != 1 || len(pkgs[0].Errors) > 0 {
+		t.Fatalf("load %s: %v", name, pkgs)
+	}
+	c := NewCollector()
+	result := c.CollectSuiteSpecs(pkgs[0])
+	if len(result.Errs) > 0 {
+		t.Fatalf("collect %s: %v", name, result.Errs)
+	}
+	spec, err := c.ApplyTestSuiteSpecs(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bind(pkgs[0], newSourceLoader(nil), spec.EffectiveTestSuites, result.Fixtures)
+}

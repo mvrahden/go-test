@@ -39,6 +39,15 @@ func (s *CallsiteTestSuite) TestDeclared(t *gotest.T) {
 		dir := gotest.Must(os.Getwd())
 		gotest.Equal(it, filepath.ToSlash(filepath.Join(dir, "x_test.go"))+":7", callsite.Declared("x_test.go:7"))
 	})
+	t.It("names a file in another directory by its base name by default", func(it *gotest.T) {
+		gotest.NoError(it, flag.Set("test.fullpath", "false"))
+		gotest.Equal(it, "y.go:7", callsite.Declared("../other/y.go:7"))
+	})
+	t.It("resolves a file in another directory from the package directory under -test.fullpath", func(it *gotest.T) {
+		gotest.NoError(it, flag.Set("test.fullpath", "true"))
+		dir := gotest.Must(os.Getwd())
+		gotest.Equal(it, filepath.ToSlash(filepath.Join(filepath.Dir(dir), "other", "y.go"))+":7", callsite.Declared("../other/y.go:7"))
+	})
 	t.It("leaves no location empty", func(it *gotest.T) {
 		gotest.NoError(it, flag.Set("test.fullpath", "true"))
 		gotest.Empty(it, callsite.Declared(""))

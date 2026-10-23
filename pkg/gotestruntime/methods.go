@@ -27,6 +27,12 @@ type EachHooks struct {
 	Name   string
 	Before func(context.Context) error
 	After  func(context.Context) error
+	// BeforeAt and AfterAt locate the hooks (file:line, the file relative
+	// to the package directory); a failure is reported there, never inside
+	// the runtime's own file. Empty, as from a harness generated before
+	// them, reports it unlocated.
+	BeforeAt string
+	AfterAt  string
 }
 
 // Method is one test method. Run calls the suite's BeforeEach, the method
@@ -37,9 +43,13 @@ type Method struct {
 }
 
 // RunMethods runs each method as a subtest of t: fixture BeforeEach hooks,
-// then the method's Run, then fixture AfterEach hooks in reverse. cfg bounds
-// each method's context and budget is the Timeout it is held to, as returned
-// by [OpenSuite]; the budget covers the hooks and the body alike, and once a
+// then the method's Run, then fixture AfterEach hooks in reverse. A fixture's
+// turn comes once every BeforeEach before it returned without an error inside
+// the budget; its AfterEach runs exactly when its turn came and its own
+// BeforeEach, if any, returned without an error, so a hook never releases
+// what was never acquired. cfg
+// bounds each method's context and budget is the Timeout it is held to, as
+// returned by [OpenSuite]; the budget covers the hooks and the body alike, and once a
 // hook overran it nothing after that hook starts but the AfterEach hooks.
 // With cfg.FailFast, the first method that fails stops the ones that have
 // not started: each is skipped with the reason "FailFast: <that method>".
@@ -78,23 +88,26 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
 			defer end()
 			for _, f := range m.Fixtures {
+				// After a BeforeEach that overran no later fixture's turn comes.
+				if mt.overran() {
+					return
+				}
+				if f.Before != nil {
+					mt.enter(f.Name + ".BeforeEach ")
+					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook
+						reportAt(it, callsite.Declared(f.BeforeAt), fmt.Sprintf("%s.BeforeEach failed: %v", f.Name, err))
+						it.FailNow()
+					}
+				}
 				if f.After != nil {
 					defer func() {
 						mt.enter(f.Name + ".AfterEach ")
 						// Releases what BeforeEach acquired, so neither the
 						// deadline nor a stop ends its context.
 						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on
-							it.Errorf("%s.AfterEach failed: %v", f.Name, err)
+							reportAt(it, callsite.Declared(f.AfterAt), fmt.Sprintf("%s.AfterEach failed: %v", f.Name, err))
 						}
 					}()
-				}
-			}
-			for _, f := range m.Fixtures {
-				if f.Before != nil {
-					mt.enter(f.Name + ".BeforeEach ")
-					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook
-						it.Fatalf("%s.BeforeEach failed: %v", f.Name, err)
-					}
 				}
 			}
 			if mt.overran() {

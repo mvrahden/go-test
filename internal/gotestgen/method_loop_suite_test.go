@@ -23,11 +23,20 @@ func (s *MethodLoopTestSuite) TestHookOrder(t *gotest.T) {
 func (s *MethodLoopTestSuite) TestFixtureBeforeEachFails(t *gotest.T) {
 	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestBrokenHookTestSuite$")
 
-	t.It("fails the method without running it and still runs the fixture's AfterEach", func(it *gotest.T) {
+	t.It("fails the method without running it, and the fixture's AfterEach, paired with nothing, does not run", func(it *gotest.T) {
 		gotest.False(it, run.passed, run.output)
 		gotest.Contains(it, run.output, "BrokenHookFixture.BeforeEach failed: boom")
 		gotest.NotContains(it, run.output, "MARK:never")
-		gotest.Contains(it, run.output, "MARK:broken after")
+		gotest.NotContains(it, run.output, "MARK:broken after")
+	})
+	t.It("still runs the AfterEach of the dependency whose BeforeEach returned", func(it *gotest.T) {
+		gotest.Contains(it, run.output, "MARK:fixture before")
+		gotest.Contains(it, run.output, "MARK:fixture after")
+	})
+	t.It("locates the failure at the hook's declaration, not inside gotest", func(it *gotest.T) {
+		// test.go:28 declares BrokenHookFixture.BeforeEach in the fixture source.
+		gotest.Regexp(it, `(?m)^\s+test\.go:28: BrokenHookFixture\.BeforeEach failed: boom`, run.output)
+		gotest.NotContains(it, run.output, "methods.go:", run.output)
 	})
 }
 

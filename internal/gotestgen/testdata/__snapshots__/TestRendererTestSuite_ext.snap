@@ -760,9 +760,11 @@ func TestEachTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Fixtures: []gotestruntime.EachHooks{
 			{
-				Name:   "EachFixture",
-				Before: func(ctx context.Context) error { return ƒ_EachFixture.BeforeEach(ctx) },
-				After:  func(ctx context.Context) error { return ƒ_EachFixture.AfterEach(ctx) },
+				Name:     "EachFixture",
+				Before:   func(ctx context.Context) error { return ƒ_EachFixture.BeforeEach(ctx) },
+				BeforeAt: "test.go:13",
+				After:    func(ctx context.Context) error { return ƒ_EachFixture.AfterEach(ctx) },
+				AfterAt:  "test.go:14",
 			},
 		},
 		Cases: []gotestruntime.Method{
@@ -1212,14 +1214,18 @@ func TestHandlerTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Fixtures: []gotestruntime.EachHooks{
 			{
-				Name:   "InfraFixture",
-				Before: func(ctx context.Context) error { return ƒ_InfraFixture.BeforeEach(ctx) },
-				After:  func(ctx context.Context) error { return ƒ_InfraFixture.AfterEach(ctx) },
+				Name:     "InfraFixture",
+				Before:   func(ctx context.Context) error { return ƒ_InfraFixture.BeforeEach(ctx) },
+				BeforeAt: "test.go:12",
+				After:    func(ctx context.Context) error { return ƒ_InfraFixture.AfterEach(ctx) },
+				AfterAt:  "test.go:13",
 			},
 			{
-				Name:   "APIFixture",
-				Before: func(ctx context.Context) error { return ƒ_APIFixture.BeforeEach(ctx) },
-				After:  func(ctx context.Context) error { return ƒ_APIFixture.AfterEach(ctx) },
+				Name:     "APIFixture",
+				Before:   func(ctx context.Context) error { return ƒ_APIFixture.BeforeEach(ctx) },
+				BeforeAt: "test.go:20",
+				After:    func(ctx context.Context) error { return ƒ_APIFixture.AfterEach(ctx) },
+				AfterAt:  "test.go:21",
 			},
 		},
 		Cases: []gotestruntime.Method{

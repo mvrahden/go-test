@@ -1,6 +1,8 @@
 package gotestgen_test
 
 import (
+	"path/filepath"
+
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -317,6 +319,25 @@ func (s *BindingTestSuite) TestResolutionErrors(t *gotest.T) {
 		})
 	})
 
+	t.When("a shared fixture another package declares has a BeforeEach", func(w *gotest.T) {
+		w.It("refuses it at the hook, saying where the per-test work goes instead", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_EachHookElsewhere")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, `shared fixture "QueueSharedFixture" declares BeforeEach, but shared fixtures have no per-test hooks, so it would never run; do that work in the BeforeEach of a package fixture that binds QueueSharedFixture, or in the suite's BeforeEach`)
+			at := pkg.Fset.Position(gotestast.PosOf(err))
+			// extfixtures/test.go:30 declares QueueSharedFixture.BeforeEach.
+			gotest.Regexp(it, `extfixtures/test\.go$`, filepath.ToSlash(at.Filename))
+			gotest.Equal(it, 30, at.Line)
+		})
+	})
+
 	t.When("a shared fixture depends on a package fixture", func(w *gotest.T) {
 		w.It("returns an error instead of serializing a zero-value field", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_SharedFixture_PackageFixtureDep")
@@ -553,6 +574,30 @@ func (s *BindingTestSuite) TestLifecycleMethodsDetection(t *gotest.T) {
 			gotest.True(it, rf.BeforeEach, "BeforeEach detected")
 			gotest.True(it, rf.AfterEach, "AfterEach detected")
 		})
+	})
+}
+
+func (s *BindingTestSuite) TestHookLocations(t *gotest.T) {
+	// The generator knows another package by export data alone.
+	resolved, err := gotestgen.ExportBindAsGenerated(t.T(), "TestResolve_HookLocations")
+	gotest.NoError(t, err)
+	byName := map[string]*gotestgen.BoundFixture{}
+	for _, rf := range resolved.AllFixtures {
+		byName[rf.Named.Obj().Name()] = rf
+	}
+	gotest.Len(t, byName, 2)
+
+	t.It("names a hook in the suite's own directory by its base name", func(it *gotest.T) {
+		// test.go:17 declares LocalFixture.BeforeEach.
+		gotest.Equal(it, "test.go:17", byName["LocalFixture"].BeforeEachAt)
+	})
+	t.It("locates a hook of a fixture another package declares, relative to the suite's directory", func(it *gotest.T) {
+		// extfixtures/test.go:16 declares RemoteFixture.BeforeEach.
+		gotest.Equal(it, "../extfixtures/test.go:16", byName["RemoteFixture"].BeforeEachAt)
+	})
+	t.It("locates a hook promoted from another package's type, relative to the suite's directory", func(it *gotest.T) {
+		// extfixtures/test.go:21 declares Hooks.AfterEach.
+		gotest.Equal(it, "../extfixtures/test.go:21", byName["LocalFixture"].AfterEachAt)
 	})
 }
 

@@ -23,16 +23,21 @@ func Format(file string, line int) string {
 	return file + ":" + strconv.Itoa(line)
 }
 
-// Declared turns a declaration the generator recorded as base:line into the
-// form [Format] gives. go test runs the binary in the package directory, so
-// that is where the file is; slashes as in a frame's file, on Windows too.
+// Declared turns a declaration the generator recorded as file:line, the
+// file relative to the package directory, into the form [Format] gives: the
+// base name, or the full path under -test.fullpath. go test runs the binary
+// in the package directory, so the file is found from there; slashes as in a
+// frame's file, on Windows too.
 func Declared(at string) string {
-	if at == "" || !fullPath() {
+	if at == "" {
 		return at
 	}
 	file, line, ok := strings.Cut(at, ":")
 	if !ok || filepath.IsAbs(file) {
 		return at
+	}
+	if !fullPath() {
+		return filepath.Base(file) + ":" + line
 	}
 	dir, err := os.Getwd()
 	if err != nil {
