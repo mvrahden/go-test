@@ -21,6 +21,7 @@ import (
 var (
 	timestampRegex     = regexp.MustCompile(`(\d+\.\d+s|\(cached\))`)
 	assertionLineRegex = regexp.MustCompile(`assertions\.go:\d+:`)
+	slowBuildRegex     = regexp.MustCompile(`(?m)^gotest: .* (has been building for \S+ and is still running|finished building after \S+)\r?\n`)
 
 	DefaultExcludePaths = []string{
 		".git",
@@ -31,6 +32,12 @@ var (
 		".worktrees",
 	}
 )
+
+// WithoutSlowBuildNotices drops the notices a long build prints on stderr:
+// how fast a runner compiles is no part of a run's output.
+func WithoutSlowBuildNotices(stderr string) string {
+	return strings.ReplaceAll(slowBuildRegex.ReplaceAllString(stderr, ""), "\r\n", "\n")
+}
 
 func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer, testFS embed.FS, goldenName string) {
 	expected := openGolden(t, testFS, goldenName)

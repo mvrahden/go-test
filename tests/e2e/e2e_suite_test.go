@@ -90,8 +90,11 @@ func (s *E2ETestSuite) TestT(t *gotest.T) {
 
 	cmd := exec.Command(s.binary, filepath.Join(tmp, "pkg/gotest"), "-v") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = tmp
-	out, _ := cmd.CombinedOutput()
-	testutils.CompareTestOutputWithGolden(t.T(), tmp, bytes.NewBuffer(out), testdataFS, "t.golden")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	_ = cmd.Run()
+	testutils.CompareTestOutputWithGolden(t.T(), tmp, &stdout, testdataFS, "t.golden")
+	gotest.Empty(t, testutils.WithoutSlowBuildNotices(stderr.String()))
 }
 
 func (s *E2ETestSuite) TestTestsuiteCLI(t *gotest.T) {
@@ -101,13 +104,14 @@ func (s *E2ETestSuite) TestTestsuiteCLI(t *gotest.T) {
 		pkgPath    string
 		pkgName    string
 		goldenName string
+		stderr     string
 	}{
 		{Desc: "auth by relative path", basedir: "examples", pkgPath: "auth", goldenName: "auth_output.txt"},
-		{Desc: "notification by relative path", basedir: "examples", pkgPath: "notification", goldenName: "notification_output.txt"},
+		{Desc: "notification by relative path", basedir: "examples", pkgPath: "notification", goldenName: "notification_output.txt", stderr: "note: 1 benchmark(s) not run — gotest runs tests; use 'gotest bench'\n"},
 		{Desc: "auth by package name", basedir: "examples", pkgName: "github.com/mvrahden/go-test/examples/auth", goldenName: "auth_output.txt"},
 		{Desc: "fixture-bound suites in both test packages", basedir: "tests/sharedfixture", pkgPath: "fixturebound", goldenName: "fixturebound_output.txt"},
 	}) {
-		s.performTest(sub.T(), tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName)
+		s.performTest(sub.T(), tc.basedir, tc.pkgPath, tc.pkgName, tc.goldenName, tc.stderr)
 	}
 }
 
@@ -562,8 +566,7 @@ func (s *E2ETestSuite) TestBenchJSONReport(t *gotest.T) {
 }
 
 func normalizeOutput(raw string, workDir string) string {
-	s := strings.ReplaceAll(raw, workDir, "<REPLACED>")
-	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s := testutils.WithoutSlowBuildNotices(strings.ReplaceAll(raw, workDir, "<REPLACED>"))
 	re := regexp.MustCompile(`\d+\.\d+s`)
 	return re.ReplaceAllString(s, "<TIMESTAMP>")
 }
@@ -571,7 +574,7 @@ func normalizeOutput(raw string, workDir string) string {
 func normalizeJSONOutput(raw string) string {
 	re := regexp.MustCompile(`\d+\.\d+s`)
 	var lines []string
-	for line := range strings.SplitSeq(strings.TrimRight(raw, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(testutils.WithoutSlowBuildNotices(raw), "\n"), "\n") {
 		if line == "" {
 			continue
 		}
@@ -610,7 +613,7 @@ func placeFixture(t *testing.T, tmpDir, srcName, dstRel string) {
 	gotest.NoError(t, err, "copy fixture")
 }
 
-func (s *E2ETestSuite) performTest(t *testing.T, basedir, pkgPath, pkgName, goldenName string) {
+func (s *E2ETestSuite) performTest(t *testing.T, basedir, pkgPath, pkgName, goldenName, wantStderr string) {
 	t.Helper()
 	unifiedPkgDescriptor := pkgName
 	if unifiedPkgDescriptor == "" {
@@ -619,9 +622,12 @@ func (s *E2ETestSuite) performTest(t *testing.T, basedir, pkgPath, pkgName, gold
 
 	cmd := exec.Command(s.binary, unifiedPkgDescriptor, "-v", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = filepath.Join(s.workDir, basedir)
-	out, _ := cmd.CombinedOutput()
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	_ = cmd.Run()
 
-	testutils.CompareTestOutputWithGolden(t, s.workDir, bytes.NewBuffer(out), testdataFS, goldenName)
+	testutils.CompareTestOutputWithGolden(t, s.workDir, &stdout, testdataFS, goldenName)
+	gotest.Equal(t, wantStderr, testutils.WithoutSlowBuildNotices(stderr.String()))
 
 	_ = fs.WalkDir(os.DirFS(s.workDir), basedir, func(path string, d fs.DirEntry, err error) error {
 		gotest.False(t, about.PSuiteRegex.MatchString(path), "found test suite after execution")
