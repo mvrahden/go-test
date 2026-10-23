@@ -14,8 +14,8 @@ Each directory under `testdata/` is one package with one suite:
 
 | Fixture | Behavior it pins |
 |---|---|
-| `passing` | a green suite exits 0 and every method and behavior gets `pass`, named string types, equal infinities, `1` against `1.0` in `JSONEq` and a final poll at the deadline for `Eventually` and `Consistently` included |
-| `failing` | one failing call per assertion function, all 36, each reported as `fail`, and the failures whose message the canary reads back: a wrong-typed needle, a NaN delta, a non-string message argument, a named pattern, big JSON integers, a multi-line diff, a poll still running at its deadline, a tick that is not positive and a snapshot name that spans lines |
+| `passing` | a green suite exits 0 and every method and behavior gets `pass`, named string types, equal infinities, `1` against `1.0` in `JSONEq` and a final poll at the deadline for `Eventually` and `Consistently` and a `NewTWithDeadline` T that keeps the suite's deadline included |
+| `failing` | one failing call per assertion function, all 36, each reported as `fail`, and the failures whose message the canary reads back: a wrong-typed needle, a NaN delta, a non-string message argument, a named pattern, big JSON integers, a multi-line diff, a poll still running at its deadline, a tick that is not positive and a snapshot name that spans lines; a failing `Each` row fails itself and its method, the rows before it pass |
 | `failnow` | a failed assertion halts the method; the statement after it never runs |
 | `aftereach` | `AfterEach` runs even when the test failed |
 | `lifecycle` | `BeforeAll`, the methods and `AfterAll` run in that order |
@@ -37,6 +37,13 @@ Each directory under `testdata/` is one package with one suite:
 | `exclusive` | an Exclusive suite starts only after every non-exclusive suite in the run ended |
 | `latepolls` | a poll that starts before waitFor is judged by its result, for `Eventually` and `Consistently`, however many ticks it takes; a poll abandoned past its deadline that panics later is written to stderr |
 | `helpers` | an assertion failing inside a helper names the helper's line and the caller's, under `-trimpath` in a module without a dot |
+| `goroutines` | a `gotest.Go` goroutine started in `BeforeAll` is waited for after `AfterAll`; one that fails fatally fails its method at the wait, one that skips skips it there, and one that leaves through `runtime.Goexit` with no verdict fails it, saying so |
+| `setupwaits` | `gotest.Go` goroutines BeforeAll starts on Ts derived from the hook's (`NewTWithDeadline`, `When`, `It`, `Each`), or on `gotest.NewT(t)` in a hook taking `*testing.T`, are waited for after `AfterAll`, as is one started while that wait runs; the wait is held to a declared `SetupTimeout`; when the last of several fails or panics, the suite fails and every other one is waited for before the fixture is released |
+| `fuzzhooks` | a fuzz execution whose `BeforeEach` fails or panics still runs its `AfterEach` |
+| `eachbreak` | a loop that breaks out of an `Each` table stops at the break: no later row runs and the method goes on after the loop |
+| `eachskip` | a skipping `Each` row skips itself and the method, the rows before it pass; a row that skips or fails the method's own `T` ends the method with that verdict alone |
+| `hookpanics` | a panic in `BeforeEach` is reported even when `AfterEach` then fails a fatal assertion, for a test method and a fuzz execution |
+| `fuzzskiphook` | a fuzz execution whose `BeforeEach` skips is skipped, its body never runs and its `AfterEach` still runs |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

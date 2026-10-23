@@ -205,7 +205,7 @@ func TestFooTestSuite(t *testing.T) {
         Fixtures: []gotestruntime.EachHooks{...}, // fixtures' BeforeEach/AfterEach
         Cases: []gotestruntime.Method{
             {Name: "TestCreateUser", Run: func(ttt *gotest.T, run func(func())) {
-                defer s.AfterEach(ttt)
+                defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
                 s.BeforeEach(ttt)
                 run(func() { ƒƒ_GOTEST_exec(s.TestCreateUser, ttt) })
             }},

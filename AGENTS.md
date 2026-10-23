@@ -242,8 +242,8 @@ defer wait()
 
 For a goroutine that runs until something stops it — a server, a poller — do **not**
 wait inside the test. `gotest.Go` registers the wait as test cleanup, which runs after
-`AfterEach`, so whatever stops the goroutine has already run by the time anything waits
-for it:
+`AfterEach` (for a goroutine started in `BeforeAll`, after `AfterAll`), so whatever stops
+the goroutine has already run by the time anything waits for it:
 
 ```go
 gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
@@ -251,6 +251,9 @@ gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
 
 A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
 so it waits for a goroutine nothing has stopped yet.
+A fatal assertion on the goroutine fails the method at the wait, and a skip there skips it ([Goroutines started by gotest.Go](specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+In `BeforeAll` this holds for the hook's `t` and every `T` derived from it (`When`, `It`, `Each` rows, `gotest.NewTWithDeadline`), and in a hook taking `*testing.T` for `gotest.NewT(t)`, `NewTWithDeadline(t)` and `NewTWithContext(t, ctx)`: each goroutine started on one is waited for after `AfterAll`, before the fixtures are released, even when another fails ([Goroutines BeforeAll starts](specs/lifecycle/spec.md#requirement-goroutines-beforeall-starts)).
+A subtest such a hook starts itself with `t.Run` is not one: a goroutine started on it is waited for when that subtest ends, before `AfterAll`.
 
 ## Suite Conventions
 
@@ -361,8 +364,8 @@ A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, i
 to a budget: being failed against a number you did not choose is not a verdict you can act on. Bounding the process remains
 `go test -timeout`'s job either way.
 
-`SetupTimeout` works the same way for `BeforeAll` and `AfterAll`, including for a setup
-that hangs and never returns. A declared fixture `Timeout` is judged when the hook
+`SetupTimeout` works the same way for `BeforeAll`, `AfterAll` and the wait on the goroutines
+`BeforeAll` started with `gotest.Go`, including for a setup that hangs and never returns. A declared fixture `Timeout` is judged when the hook
 returns: a `BeforeAll` that succeeds only after it fails the fixture without a retry
 (the work is done; a retry would build it twice), and its `AfterAll` still runs. A
 fixture hook that never returns is not failed by its `Timeout`; the run's other deadlines end
@@ -370,7 +373,7 @@ it (go test's `-timeout`, `--setup-timeout`, or a shared fixture's teardown forc
 
 `Timeout` reaches `t.Context()` inside nested `When`, `It` and `Each` bodies too — a
 nested behavior inherits the enclosing deadline, and its context is canceled when that
-nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline`.
+nested subtest ends. For a tighter budget in one place, use `gotest.NewTWithDeadline(t, d)`: on a `*gotest.T` it derives from the suite's context, deadline and stop included; on a `*testing.T` from the testing package's, which carries neither.
 
 ### SuiteGuard (optional)
 
@@ -557,6 +560,9 @@ for t, entry := range gotest.Each(t, entries) {
 }
 ```
 Subtest names are derived from the entry struct's `Desc` or `Name` string field (if present), otherwise `#0`, `#1`, etc.
+Every row is its own subtest with its own verdict. A row that leaves early ends the method
+there — Go's range-over-func cannot resume a loop whose body left through `FailNow` or
+`Skipf` — so a row that should merely be passed over uses `continue` ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)).
 
 ## Utilities
 

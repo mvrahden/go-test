@@ -4797,6 +4797,166 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the execution skips, its body never runs and its AfterEach still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_execution_skips,_its_body_never_runs_and_its_AfterEach_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fuzz execution's BeforeEach skips",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fuzz_execution's_BeforeEach_skips",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BeforeEachSkips",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBeforeEachSkips",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FuzzHookSkip",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFuzzHookSkipTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the execution fails and its AfterEach still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_execution_fails_and_its_AfterEach_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fuzz execution's BeforeEach fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fuzz_execution's_BeforeEach_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the execution fails and its AfterEach still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_execution_fails_and_its_AfterEach_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fuzz execution's BeforeEach panics",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fuzz_execution's_BeforeEach_panics",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the execution fails with the panic reported, and its AfterEach still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_execution_fails_with_the_panic_reported,_and_its_AfterEach_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fuzz execution's BeforeEach panics and its AfterEach fails a fatal assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fuzz_execution's_BeforeEach_panics_and_its_AfterEach_fails_a_fatal_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BeforeEachLeaves",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBeforeEachLeaves",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FuzzHooks",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFuzzHooksTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "its fuzz seeds still replay and pass",
                       "duration": 0,
                       "excluded": false,
@@ -5102,6 +5262,502 @@
           "name": "TestDeadlineNamingTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails that row and the method, and the rows after it never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_that_row_and_the_method,_and_the_rows_after_it_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one row of an Each table fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_row_of_an_Each_table_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "skips that row and the method from there, and the rows after it never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "skips_that_row_and_the_method_from_there,_and_the_rows_after_it_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one row of an Each table skips",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_row_of_an_Each_table_skips",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the method skips or fails there, with no failure of its own",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_method_skips_or_fails_there,_with_no_failure_of_its_own",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a row of an Each table skips or fatally fails the method's own T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_row_of_an_Each_table_skips_or_fatally_fails_the_method's_own_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "stops at the break and the method goes on",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "stops_at_the_break_and_the_method_goes_on",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the loop over an Each table breaks",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_loop_over_an_Each_table_breaks",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RowsAreSubtests",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestRowsAreSubtests",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "EachRows",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestEachRowsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite passes: the wait comes after AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_suite_passes:_the_wait_comes_after_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll starts a goroutine with gotest.Go that only AfterAll stops",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "BeforeAll_starts_a_goroutine_with_gotest.Go_that_only_AfterAll_stops",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait on it fails the method there, and nothing after the wait runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_on_it_fails_the_method_there,_and_nothing_after_the_wait_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine started by gotest.Go fails a fatal assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_started_by_gotest.Go_fails_a_fatal_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait on it skips the method there, without failing it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_on_it_skips_the_method_there,_without_failing_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine started by gotest.Go skips the test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_started_by_gotest.Go_skips_the_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait on it fails the method, saying the goroutine exited via runtime.Goexit",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_on_it_fails_the_method,_saying_the_goroutine_exited_via_runtime.Goexit",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine started by gotest.Go leaves through runtime.Goexit without a verdict",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_started_by_gotest.Go_leaves_through_runtime.Goexit_without_a_verdict",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Waits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestWaits",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite passes: the waits come after AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_suite_passes:_the_waits_come_after_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll starts goroutines with gotest.Go on When, It, Each row and NewTWithDeadline Ts that only AfterAll stops",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "BeforeAll_starts_goroutines_with_gotest.Go_on_When,_It,_Each_row_and_NewTWithDeadline_Ts_that_only_AfterAll_stops",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite passes: the waits come after AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_suite_passes:_the_waits_come_after_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a BeforeAll taking a *testing.T starts goroutines with gotest.Go on gotest.NewT(t) and NewTWithDeadline(t) that only AfterAll stops",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_BeforeAll_taking_a_*testing.T_starts_goroutines_with_gotest.Go_on_gotest.NewT(t)_and_NewTWithDeadline(t)_that_only_AfterAll_stops",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "that one is waited for too, and its panic fails the suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "that_one_is_waited_for_too,_and_its_panic_fails_the_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine BeforeAll started starts another with gotest.Go once AfterAll stopped it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_BeforeAll_started_starts_another_with_gotest.Go_once_AfterAll_stopped_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the suite with a verdict naming the wait and its SetupTimeout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_suite_with_a_verdict_naming_the_wait_and_its_SetupTimeout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_goroutine_BeforeAll_started_runs_past_the_suite's_declared_SetupTimeout_after_AfterAll",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "the last goroutine fails",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_last_goroutine_fails",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the last goroutine panics",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_last_goroutine_panics",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails the suite and waits for every other one before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_suite_and_waits_for_every_other_one_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the last of several goroutines BeforeAll started with gotest.Go fails or panics",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_last_of_several_goroutines_BeforeAll_started_with_gotest.Go_fails_or_panics",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SetupWaits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSetupWaits",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "Goroutines",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestGoroutinesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the test fails with the panic reported, and its AfterEach still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_test_fails_with_the_panic_reported,_and_its_AfterEach_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test method's BeforeEach panics and its AfterEach fails a fatal assertion",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_test_method's_BeforeEach_panics_and_its_AfterEach_fails_a_fatal_assertion",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "PanicAheadOfAFailingAfterEach",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestPanicAheadOfAFailingAfterEach",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "PanicAhead",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestPanicAheadTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -5110,13 +5766,13 @@
     }
   ],
   "stats": {
-    "behaviors": 166,
+    "behaviors": 185,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 20,
+    "suites": 25,
     "tests": 0
   }
 }

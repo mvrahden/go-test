@@ -1,0 +1,15 @@
+Expect: hookpanics: the fuzz execution's panic was not reported
+Judge: ./tests/canary CanaryTestSuite/TestAPanicAheadOfAFailingAfterEachIsReported
+Clause: when a fuzz execution's BeforeEach panics and its AfterEach fails a fatal assertion → the execution fails with the panic reported, and its AfterEach still runs
+--- a/pkg/gotest/f.go
++++ b/pkg/gotest/f.go
+@@ -122,9 +122,6 @@
+ 	tt := NewT(t)
+ 	if f.afterEach != nil {
+ 		defer func() {
+-			if p := capturedFrom(recover(), "the fuzz execution, ahead of its AfterEach"); p != nil {
+-				defer panic(p)
+-			}
+ 			f.afterEach(tt)
+ 		}()
+ 	}

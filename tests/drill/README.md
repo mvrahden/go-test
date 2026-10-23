@@ -237,8 +237,12 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-lossy-number-hinted` | a number that the element type cannot hold exactly (`3.7` for an `[]int`, `300` for an `[]int8`) is told to convert, which would truncate or wrap it | ring-0 predicates suite |
 | `contains-text-needle-unhinted` | a rune, byte or `[]byte` needle for a string is refused without naming the string type to convert it to | ring-0 predicates suite |
 | `contains-wrapped-sign-hinted` | a number whose conversion wraps its sign both ways (`-1` for a `[]uint`) is told to convert | ring-0 predicates suite |
+| `each-method-t-reported-as-a-goexit` | a row that skips or fails the method's own T is reported as leaving through Goexit without a verdict | canary: the eachskip method that skips in a row fails, saying its row left without a verdict |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
+| `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
+| `go-goexit-unexplained` | a goroutine that left through `runtime.Goexit` with no verdict fails the method without saying why | canary: no failure of the goroutines fixture names the Goexit |
+| `go-skip-reported-as-a-failure` | a goroutine that skipped the test fails the method at the wait | canary: the goroutines fixture's skipping method fails |
 | `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
@@ -248,8 +252,12 @@ shards of one run do not add up to every mutant exactly once.
 | `hooks-calling-t-fuzz-each-refused` | a fuzz suite's `BeforeEach` and `AfterEach` are refused for calling `t.T()`, which is real there | cli conformance: the fuzz suite whose per-input hooks call `t.T()` exits 2 instead of running |
 | `hooks-calling-t-guard-ignored` | a `t.T()` checked for nil before use is refused like an unchecked one | cli conformance: the fuzz suite with guarded hooks exits 2 instead of running |
 | `hooks-calling-t-named-last-first` | the error for hooks calling `t.T()` lists them last first and is located at the last | cli conformance: the fuzz row's error names the hooks out of source order |
+| `late-goroutine-left-unwaited` | the drain waits once for what BeforeAll registered, so a goroutine started meanwhile is never waited for | canary: the setupwaits late suite passes and its panic is lost |
 | `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
 | `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
+| `method-panic-discarded-by-aftereach` | `gotestruntime.AfterEach` runs AfterEach in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics test method's panic is never reported |
+| `setup-waits-unwatched` | the wait on BeforeAll's goroutines is not held to the SetupTimeout | canary: the setupwaits slow suite gets no SetupTimeout verdict |
+| `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a cleanup before AfterAll | canary: the setupwaits `*testing.T` suite does not pass |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
 | `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
@@ -277,6 +285,7 @@ shards of one run do not add up to every mutant exactly once.
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
+| `beforeall-goroutine-waited-before-afterall` | the waits of goroutines BeforeAll started run before AfterAll | canary: the server suite deadlocks until go test's alarm instead of passing |
 | `bench-skip-ignored` | a bench run plans and dispatches the benchmark suites `-skip` names | fixtures conformance: the fixture of the benchmark suite `-skip` names still starts |
 | `bytes-one-per-line` | a byte slice that is not text renders one byte per line | ring-0 equal suite |
 | `bytes-text-as-hex` | a byte slice of text renders as hex, so its lines are not diffed as text | ring-0 equal suite |
@@ -294,14 +303,20 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
 | `crashed-suite-named-by-the-timeout` | a test whose suite process crashed on its own stays counted as cut short | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
+| `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
 | `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
 | `depth-unnamed` | lines deeper than the indented levels do not name their depth | ring-0 format suite |
+| `derived-t-drops-the-setup-waits` | `gotest.Go` looks the suite's waits up by the T's `testing.TB` alone, so a `When`, `It` or `Each` T of BeforeAll's waits as a cleanup before AfterAll | canary: the setupwaits fixture's derived-T suite does not pass |
 | `diff-dropped` | `Equal` on multi-line values shows no diff | canary: no failure message carries the diff heading |
 | `diff-file-headers-kept` | the diff keeps a file diff's `---`/`+++` headers above its hunks | ring-0 equal suite |
 | `diff-final-newline-hidden` | the diff ends both sides in a newline, so a final newline only one side has shows no change | ring-0 equal suite |
+| `each-break-ignored` | `Each` goes on to the next row after the loop body broke, so Go panics on the next yield | canary: the each-break fixture's method fails and never reaches the marker after the loop |
+| `each-rows-share-the-method-verdict` | an Each row's assertions report on the method, not the row's subtest | canary: the failing and the skipping rows pass on their own, and the row verdicts of the golden list are off |
 | `erroras-type-unnamed` | `ErrorAs` does not name the type it expected | canary: no failure message names `*fs.PathError` |
 | `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | fixtures conformance: the guarded suite gets no fail verdict |
 | `flag-first-occurrence-wins` | a repeated `-run`, `-skip`, `-bench` or `-count` counts by its first value, where the flag package keeps the last | fixtures conformance: the suite the last `-skip` leaves runs without its fixture |
+| `fuzz-aftereach-skipped-when-beforeeach-leaves` | a fuzz execution registers AfterEach only once BeforeEach returned | canary: the AfterEach markers of the fuzz-only suites, the `fuzzskiphook` one included, are missing |
+| `go-wait-ignores-goexit` | a goroutine that left through FailNow counts as finished | canary: the method goes on after the wait on its failed goroutine |
 | `hidden-difference-shown-twice` | values that render alike are printed twice instead of named as such | ring-0 equal suite |
 | `hung-benchmark-named-as-its-suite` | a text bench run names the suite of a hung benchmark, not the benchmark | bench conformance: the `--timeout` names the suite instead of the hung benchmark |
 | `hung-hook-suite-unnamed` | a suite that hangs before any method starts is never named | lifecycle conformance: the `--timeout` names the hung method but not the suite hung in its `BeforeAll` |
@@ -331,6 +346,7 @@ shards of one run do not add up to every mutant exactly once.
 | `render-unexported-skipped` | the rendering leaves unexported fields out, so a change to one is not marked | ring-0 equal suite |
 | `run-cut-at-its-first-slash` | `-run` is matched by its text up to the first `/`, so a later alternative's suite is dropped | fixtures conformance: the suite the second alternative names does not run |
 | `run-of-a-missing-test-function-replays-seeds` | a `-run` naming the Test function of a suite without test methods replays its seeds | fuzz conformance: the seeds replay and the shared fixture starts |
+| `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | fixtures conformance: the fixture of a suite -skip names whole still starts |
 | `skip-kept-from-the-binary` | `-skip` is applied when suites are planned and never reaches the test binary | fuzz conformance: the skipped test method runs |

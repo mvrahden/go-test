@@ -10,6 +10,6 @@ Clause: when a poll abandoned past its deadline panics later → the panic is wr
  				done <- captured
 -			} else if captured != nil {
 +			} else if captured != nil && false {
- 				fmt.Fprintf(os.Stderr, "gotest: a poll abandoned past its deadline panicked: %v\n%s\n", captured.value, captured.stack)
+ 				fmt.Fprintf(os.Stderr, "gotest: a poll abandoned past its deadline panicked: %v\n%s\n", captured.Unwrap(), captured.Stack())
  			}
  		}()

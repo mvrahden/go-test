@@ -1,0 +1,17 @@
+Expect: eachskip: verdicts differ from the golden list
+Expect: eachskip: a row that ended the method's own T was reported as leaving without a verdict
+Judge: ./tests/canary CanaryTestSuite/TestEachRowsEndTheMethodWithTheirVerdict
+Clause: when a row of an Each table skips or fatally fails the method's own T → the method skips or fails there, with no failure of its own
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -83,10 +83,6 @@
+ 		case tt.Skipped():
+ 			logAtUser(parent.t, "skipped at row "+name)
+ 			parent.t.SkipNow()
+-		case parent.t.Failed():
+-			parent.t.FailNow() // the row ended the method on the method's own T
+-		case parent.t.Skipped():
+-			parent.t.SkipNow()
+ 		default:
+ 			logAtUser(parent.t, "row "+name+" left through runtime.Goexit without a verdict")
+ 			parent.t.FailNow()
