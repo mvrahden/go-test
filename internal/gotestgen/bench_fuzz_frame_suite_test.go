@@ -63,7 +63,7 @@ func (s *BenchFuzzFrameTestSuite) TestSetupOverrun(t *gotest.T) {
 			run := runGeneratedSuiteArgs(it, "TestLifecycle_BenchFuzzSetupOverrun", childTimeout, c.args...)
 			assertNoDeadlock(it, run)
 			gotest.False(it, run.passed, run.output)
-			gotest.Contains(it, run.output, "gotest: "+c.wrapper+" BeforeAll exceeded its configured SetupTimeout", run.output)
+			gotest.Regexp(it, `(?m)^gotest: test\.go:\d+: `+c.wrapper+` BeforeAll exceeded its configured SetupTimeout`, run.output)
 		})
 	}
 }

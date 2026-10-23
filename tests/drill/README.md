@@ -232,6 +232,10 @@ shards of one run do not add up to every mutant exactly once.
 | Patch | Bug it plants | Check that must catch it |
 |---|---|---|
 | `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
+| `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture reports no result for the benchmark after it, and neither AfterAll runs |
+| `bench-panic-taken-for-skip` | a benchmark's recovered panic skips the benchmark instead of failing it | canary: the panicking benchmark fixture's run exits 0 instead of 1 |
+| `bench-stderr-dropped` | a plain bench run never prints a benchmark suite's stderr | lifecycle conformance: the panic and its stack are missing from stderr |
+| `body-starts-after-a-hook-overran` | a method's body starts after its `BeforeEach` overran the `Timeout` | canary: the body of the suite whose `BeforeEach` waits on its context runs |
 | `callsite-drops-dotted-element-modules` | under `-trimpath` a module whose path has a dot only after its first element is not counted among the build's modules, so it reads as the standard library | conformance: a helper's failure in `corp/tools.v2` does not name both lines |
 | `callsite-reads-escaped-root-package` | under `-trimpath` the `%2e` the linker writes for a dot in the last path element is not read back, so a module's root package reads as the standard library | conformance: a helper's failure in `corp/tools.v2` does not name both lines |
 | `contains-lossy-number-hinted` | a number that the element type cannot hold exactly (`3.7` for an `[]int`, `300` for an `[]int8`) is told to convert, which would truncate or wrap it | ring-0 predicates suite |
@@ -240,6 +244,12 @@ shards of one run do not add up to every mutant exactly once.
 | `each-method-t-reported-as-a-goexit` | a row that skips or fails the method's own T is reported as leaving through Goexit without a verdict | canary: the eachskip method that skips in a row fails, saying its row left without a verdict |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
+| `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
+| `failfast-reads-before-cleanup` | a parallel FailFast method's verdict is read before its cleanups ran | canary: both methods of the cleanup-failing FailFast fixture run under `-parallel=1` |
+| `failfast-skip-located-in-runtime` | a FailFast skip is located in the runtime's `methods.go` | canary: the FailFast fixture's skips name a runtime file |
+| `failfast-trips-before-a-failure` | a FailFast suite trips before any method failed, so its first method is skipped | canary: the FailFast fixture's run exits 0 and its first method has no fail verdict |
+| `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
+| `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
 | `go-goexit-unexplained` | a goroutine that left through `runtime.Goexit` with no verdict fails the method without saying why | canary: no failure of the goroutines fixture names the Goexit |
 | `go-skip-reported-as-a-failure` | a goroutine that skipped the test fails the method at the wait | canary: the goroutines fixture's skipping method fails |
@@ -256,8 +266,12 @@ shards of one run do not add up to every mutant exactly once.
 | `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
 | `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
 | `method-panic-discarded-by-aftereach` | `gotestruntime.AfterEach` runs AfterEach in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics test method's panic is never reported |
+| `method-panic-recovered` | the method loop swallows a method's panic | canary: the panicking method passes and its sibling runs to the end |
+| `overrun-names-no-phase` | an overrun's verdict does not name the hook that overran | canary: the slow fixture's verdict does not name its `BeforeEach` |
 | `setup-waits-unwatched` | the wait on BeforeAll's goroutines is not held to the SetupTimeout | canary: the setupwaits slow suite gets no SetupTimeout verdict |
+| `suite-beforeeach-after-a-fixture-overran` | the suite's `BeforeEach` runs after a fixture's `BeforeEach` overran the `Timeout` | canary: the slow fixture's suite marks its `BeforeEach` |
 | `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a cleanup before AfterAll | canary: the setupwaits `*testing.T` suite does not pass |
+| `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixtures' methods pass instead of failing their budget |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
 | `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
@@ -362,6 +376,7 @@ shards of one run do not add up to every mutant exactly once.
 | `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |
 | `unsigned-as-hex` | unsigned integers render in hex | ring-0 format suite |
 | `waiting-test-named-by-the-timeout` | a parallel test still waiting for a slot counts as running | lifecycle conformance: the `--timeout` names the queued methods besides the one holding the slot |
+| `watch-ends-before-fixture-aftereach` | a method's budget watch ends before its fixtures' `AfterEach` hooks run | canary: the method whose fixture `AfterEach` sleeps past the `Timeout` passes |
 | `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |
 | `poll-args-unchecked` | a zero tick or waitFor is polled with | canary: the failing fixture's zero-tick method passes and no message says the durations must be positive |
 | `poll-cut-off-at-the-deadline` | a poll still running at waitFor counts as hung, with no grace | canary: the `latepolls` fixture's late polls fail as still running |

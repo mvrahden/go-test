@@ -325,6 +325,7 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 ```
 
 The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`, the full path under `-fullpath`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest. It is the only verdict: once the method's body returns it is waiting for `done()`, not running, so a declared `Timeout` never also reports it as still running.
+An async method's budget ends when `done()` is called; its `AfterEach`, its own and the fixtures', is not budgeted.
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
 With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
 For polling-style asynchrony, prefer `Eventually`.
@@ -423,7 +424,7 @@ method loop must never wait on the parallel subtests itself (a `sync.WaitGroup`,
 channel): on panic, `testing` runs ancestor cleanups from the panicking goroutine while
 the subtest that would release such a wait is still parked inside `t.Run`, so any
 wait deadlocks against the panic unwind.
-With `FailFast`, the parallel subtests of a suite additionally share a failure flag: a failed subtest sets it, and subtests that start afterwards skip themselves.
+With `FailFast`, the parallel subtests of a suite additionally share a failure flag: a failed subtest sets it from its last cleanup, so a failure the others record counts too, and subtests that start afterwards skip themselves, naming it ([FailFast](../../specs/lifecycle/spec.md#requirement-failfast)).
 
 On Windows, suite subprocesses run on a hidden console of their own and under a job object, so that a shutdown request and a force-kill reach the whole process tree and nothing outside it.
 
@@ -742,8 +743,8 @@ After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysi
 The subprocess is shutdown-capable from birth and never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed.
 In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
 
-**Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and breaks the test case loop on first failure when `FailFast` is set.
-Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunTest` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses — located where the phase is running, and also written to stderr, unbuffered, unless test2json streams the verdict (`-json`), where a raw line would be attributed to whichever test printed last — but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
+**Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and, when `FailFast` is set, skips every method not yet started once one has failed, naming that method ([FailFast](../../specs/lifecycle/spec.md#requirement-failfast)).
+Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunMethods` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses — located where the phase is running, and also written to stderr, unbuffered, with that location, unless test2json streams the verdict (`-json`), where a raw line would be attributed to whichever test printed last — but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
 
 **`NewTWithDeadline(t, d)`:** Creates a `*gotest.T` with a context deadline derived from `t.Context()`: for a `*gotest.T` the suite's context, its deadline and stop included; for a `*testing.T` the testing package's, which carries neither.
 `gotest.Go` on the derived `T` is waited for where it would be on `t`, so a goroutine started on it in `BeforeAll` is waited for after `AfterAll` ([Goroutines BeforeAll starts](../../specs/lifecycle/spec.md#requirement-goroutines-beforeall-starts)).
@@ -756,7 +757,7 @@ This is what lets `AfterAll` run under a context that survives the cancellation 
 
 #### Feature Interactions
 
-- **Parallel suites:** in sequential suites, `FailFast` is checked between subtests.
+- **Parallel suites:** in sequential suites, `FailFast` is checked between subtests: each method after the first failed one is reported as skipped with the reason `FailFast: <that method>`. Only a method's own verdict trips it, never a failure `BeforeAll` recorded without stopping.
   In method-parallel suites, a failed subtest sets a shared failure flag; parallel subtests that start afterwards skip themselves (best-effort — already-running subtests complete).
   Suite-level parallelism does not affect `FailFast` (each suite's subtests are independent).
 - **Focus/Exclude:** Config applies after focus/exclude filtering.
@@ -1395,14 +1396,14 @@ passes a `Fixtures` closure that holds its fixtures and wires its fields after t
 config — the declared one, or `DefaultSuiteConfig()` when there is no `SuiteConfig()`
 method — and its `Timeout`/`SetupTimeout` bound the context that `gotestruntime.TestT`
 and `OpenSuite` hand to each phase. `ƒbudget` is different: it is the
-config `RunTest`, `RunSetup` and `RunTeardown` are told to *enforce by verdict*, and it
+config `RunMethods`, `RunSetup` and `RunTeardown` are told to *enforce by verdict*, and it
 stays a zero-value `gotest.SuiteConfig{}` unless the suite declared one. With a
 `SuiteConfig()` marker, `ƒbudget` holds the values the author wrote as the enforced
 budget, and `ƒcfg` is `gotestruntime.WithSuiteDefaults(ƒbudget)` for the
 contexts: a duration left at zero gets the default and no verdict, exactly as without a marker,
 and a negative one (`gotest.NoDeadline`) gets neither. Fixture markers are normalized the same
 way through `WithFixtureDefaults`, with the declared `Timeout` as their `Budget`.
-`RunMethods` owns the loop: the subtests, `it.Parallel()` and `FailFast`, the method's `*gotest.T` from `TestT`, the fixtures' per-method hooks, and `run`, which holds the method to `ƒbudget.Timeout` through `RunTest`. A case's `Run` keeps only what needs the suite's static types.
+`RunMethods` owns the loop: the subtests, `it.Parallel()` and `FailFast`, the method's `*gotest.T`, the fixtures' per-method hooks, and the watch that holds the whole method — the fixtures' and the suite's per-method hooks and the body — to `ƒbudget.Timeout`. Under a declared `Timeout` the method's context ends only once that watch has judged an overrun, so a hook waiting on it is still waiting, and located, when the verdict is written; the verdict names the phase that overran. Once a hook overran, nothing after it starts but the `AfterEach` hooks: `run` never starts the body, and after a fixture's `BeforeEach` the case's `Run` is not called at all. A case's `Run` keeps only what needs the suite's static types.
 Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* the deferred `AfterEach` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
 In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally. `gotestruntime.AfterEach` recovers a panic of `BeforeEach` or the method first and re-raises it once `AfterEach` returns, so a fatal assertion in `AfterEach` cannot discard it.
 Method-parallel suites pass `Parallel: true`; `RunMethods` then coordinates `FailFast` as described under Parallel Execution.

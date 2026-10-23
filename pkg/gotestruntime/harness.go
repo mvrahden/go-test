@@ -121,34 +121,24 @@ func AfterEach(after func()) {
 	if p := carry.From(recover(), "the test method, ahead of its AfterEach"); p != nil {
 		defer panic(p)
 	}
+	enterPhase("AfterEach ")
 	after()
 }
 
 // TestT builds the *gotest.T handed to a single test method. The timeout only
-// bounds the context here; holding the method to it is [RunTest]'s job, because
+// bounds the context here; holding the method to it is [RunMethods]' job, because
 // code that ignores its context runs to completion either way.
 func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// RunTest runs one test method, held to budget when the suite declared one.
-// A zero budget means no verdict is enforced; the context handed to the method
-// is bounded separately by [TestT].
-func RunTest(t *gotest.T, budget time.Duration, run func()) {
-	end := watchPhase(t.T(), budget, "", "Timeout")
-	bodies.Store(t.T(), end)
-	defer bodies.Delete(t.T())
-	defer end()
-	run()
-}
-
-// bodies holds, per running test method, the end of its budget watch: an
-// async method's body ends before the method does (see [AwaitDoneAt]).
-var bodies sync.Map // *testing.T -> func()
+// methodWatches holds, per running test method, the end of its budget watch:
+// an async method's body ends before the method does (see [AwaitDoneAt]).
+var methodWatches sync.Map // *testing.T -> func()
 
 // endBody ends the budget watch of t's method, whose body has returned.
 func endBody(t *testing.T) {
-	if end, ok := bodies.Load(t); ok {
+	if end, ok := methodWatches.Load(t); ok {
 		end.(func())()
 	}
 }
@@ -202,39 +192,44 @@ func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end 
 	if timeout <= 0 {
 		return func() {}
 	}
-	done := make(chan struct{})
-	stopped := make(chan struct{})
-	go watchDeadline(tb, goroutineID(), timeout, what, budget, done, stopped)
+	due, done, stopped := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	timer := time.AfterFunc(timeout, func() { close(due) })
+	gid := goroutineID()
+	go func() {
+		defer close(stopped)
+		watchDeadline(tb, gid, timeout, func() string { return what }, budget, due, done)
+	}()
 	return sync.OnceFunc(func() {
+		timer.Stop()
 		close(done)
 		<-stopped
 	})
 }
 
 // watchDeadline fails tb if the phase, running on goroutine gid, has not
-// finished within timeout. Reporting is safe from another goroutine while the
+// finished (done) once due is closed, and reports whether it did. what names
+// the phase running then. Reporting is safe from another goroutine while the
 // test is still running, which ending the watch (see [watchPhase]) guarantees.
-func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budget string, done <-chan struct{}, stopped chan<- struct{}) {
-	defer close(stopped)
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
+func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what func() string, budget string, due, done <-chan struct{}) (reported bool) {
 	select {
 	case <-done:
-		return
-	case <-timer.C:
+		return false
+	case <-due:
 	}
 
 	// A select picks at random among the cases that are ready, so arriving here
 	// does not prove the phase is still running — it may have finished in the
-	// same instant the timer fired. Re-check without blocking: finishing on the
-	// deadline is not an overrun, and reporting one would be a coin flip.
+	// same instant the deadline passed. Re-check without blocking: finishing on
+	// the deadline is not an overrun, and reporting one would be a coin flip.
 	select {
 	case <-done:
-		return
+		return false
 	default:
 	}
 
+	// The verdict belongs where the phase is running now.
+	at := phaseFrame(gid)
+	phase := what()
 	// Written unbuffered as well as recorded on the test. A phase that never
 	// returns never completes, and the testing package only flushes a test's
 	// output when it does — so if the process is later killed by go test
@@ -251,11 +246,15 @@ func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what, budge
 	// test2json streams the verdict as it is written, attributed to its
 	// test; a raw line there lands on whichever test printed last.
 	if !test2json() {
-		fmt.Fprintf(os.Stderr, "gotest: %s %sexceeded its configured %s of %s and is still running %s\n",
-			tb.Name(), what, budget, timeout, sched)
+		loc := ""
+		if at != "" {
+			loc = at + ": "
+		}
+		fmt.Fprintf(os.Stderr, "gotest: %s%s %sexceeded its configured %s of %s and is still running %s\n",
+			loc, tb.Name(), phase, budget, timeout, sched)
 	}
-	// The verdict belongs where the phase is running now.
-	reportAt(tb, phaseFrame(gid), fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", what, budget, timeout, suffix))
+	reportAt(tb, at, fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", phase, budget, timeout, suffix))
+	return true
 }
 
 // test2json reports whether the binary runs under -test.v=test2json.

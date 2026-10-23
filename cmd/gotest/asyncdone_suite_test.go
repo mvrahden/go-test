@@ -97,7 +97,7 @@ func (s *AsyncDoneTestSuite) TestTextRace(t *gotest.T) {
 	t.It("writes only its overrun unbuffered to stderr", func(it *gotest.T) {
 		lines := stillRunning(stderr)
 		gotest.Len(it, lines, 1, stderr)
-		gotest.Regexp(it, `^gotest: TestRacingTestSuite/TestOverruns exceeded`, lines[0])
+		gotest.Regexp(it, `^gotest: asyncdone_suite_test\.go:30: TestRacingTestSuite/TestOverruns exceeded`, lines[0])
 	})
 }
 

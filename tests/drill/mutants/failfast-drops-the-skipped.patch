@@ -1,0 +1,13 @@
+Expect: failfast: missing "failfast skip TestFailFastTestSuite/TestSecond"
+Judge: ./tests/canary CanaryTestSuite/TestFailFastReportsWhatItSkipped
+Clause: when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -56,7 +56,6 @@
+ 	}
+ 	for _, c := range m.Cases {
+ 		if first := tripped(); first != "" {
+-			t.Run(c.Name, func(it *testing.T) { skipFailFast(it, first) })
+ 			continue
+ 		}
+ 		passed := t.Run(c.Name, func(it *testing.T) {

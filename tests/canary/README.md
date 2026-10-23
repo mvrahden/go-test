@@ -44,6 +44,12 @@ Each directory under `testdata/` is one package with one suite:
 | `eachskip` | a skipping `Each` row skips itself and the method, the rows before it pass; a row that skips or fails the method's own `T` ends the method with that verdict alone |
 | `hookpanics` | a panic in `BeforeEach` is reported even when `AfterEach` then fails a fatal assertion, for a test method and a fuzz execution |
 | `fuzzskiphook` | a fuzz execution whose `BeforeEach` skips is skipped, its body never runs and its `AfterEach` still runs |
+| `hookoverrun` | a fixture `BeforeEach` or `AfterEach`, or a suite `BeforeEach`, that sleeps or waits on its context past the suite's `Timeout` fails the method, located at the hook and naming it; after a `BeforeEach` that overran, neither the suite's `BeforeEach` nor the body runs, and a hook waiting on its context sees it end |
+| `benchpanic` | a panicking benchmark turns the run red, the next benchmark still reports, and `AfterAll` runs before the fixture is released |
+| `failfast` | a FailFast suite skips the methods after its first failure, each naming the method that stopped it |
+| `failfastsoft` | a failure `BeforeAll` records without stopping does not stop a FailFast suite's methods |
+| `failfastcleanup` | a parallel FailFast method that fails only in a cleanup, run one at a time, still stops the method that has not started |
+| `parallelpanic` | a panic in a parallel method runs `AfterAll` and the fixture teardown while a sibling is mid-flight, and skips that sibling's `AfterEach` |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

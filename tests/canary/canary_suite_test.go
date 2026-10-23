@@ -715,6 +715,134 @@ func (s *CanaryTestSuite) TestAPanicAheadOfAFailingAfterEachIsReported(t *gotest
 	}
 }
 
+// The suite's Timeout is the whole method's budget: a fixture BeforeEach or
+// AfterEach, or a suite BeforeEach, that overruns it fails the method,
+// located at the hook and naming it, and nothing after a BeforeEach that
+// overran starts but the AfterEach hooks. A hook waiting on its context sees
+// it end, after the verdict.
+func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "hookoverrun", dir)
+	if code != 1 {
+		t.Errorf("hookoverrun: exit code %d, want 1", code)
+	}
+	for _, method := range []string{"TestOverrunTestSuite/TestSlow", "TestReleaseOverrunTestSuite/TestSlowRelease", "TestWaitingTestSuite/TestWaitedFor", "TestWaitingBeforeEachTestSuite/TestAfterTheWait"} {
+		if !slices.Contains(rows, "hookoverrun fail "+method) {
+			t.Errorf("hookoverrun: %s did not fail: %v", method, rows)
+		}
+	}
+	// fixture.go:30 and :41 are time.Sleep lines, fixture.go:53 and
+	// hookoverrun_suite_test.go:55 the waitOn calls.
+	for _, want := range []string{
+		"fixture.go:30: SlowFixture.BeforeEach exceeded its configured Timeout",
+		"fixture.go:41: SlowReleaseFixture.AfterEach exceeded its configured Timeout",
+		"fixture.go:53: WaitingFixture.BeforeEach exceeded its configured Timeout",
+		"hookoverrun_suite_test.go:55: BeforeEach exceeded its configured Timeout",
+	} {
+		if !strings.Contains(s.lastStream, want) {
+			t.Errorf("hookoverrun: no %q in the stream", want)
+		}
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	for _, never := range []string{"body", "suite BeforeEach", "body after the wait", "fixture gave up", "suite gave up"} {
+		if slices.Contains(got, never) {
+			t.Errorf("hookoverrun: %q ran after the budget was blown: %v", never, got)
+		}
+	}
+	for _, want := range []string{"fixture saw its context end", "suite saw its context end"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("hookoverrun: no %q in the markers: %v", want, got)
+		}
+	}
+}
+
+// A benchmark that panics fails instead of being lost: the run is red, the
+// benchmark after it still reports, and AfterAll runs before the fixture is
+// released.
+func (s *CanaryTestSuite) TestAPanickingBenchmarkStillTearsDown(t *gotest.T) {
+	dir := t.TempDir()
+	code, names := s.bench(t, "benchpanic", dir)
+	if code != 1 {
+		t.Errorf("benchpanic: exit code %d, want 1", code)
+	}
+	if want := "BenchmarkStillRuns"; strings.Join(names, ",") != want {
+		t.Errorf("benchpanic: results %v, want [%s]", names, want)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if !testkit.MarkerOrderOf(got, "panics", "suite.AfterAll", "fixture.AfterAll") {
+		t.Errorf("benchpanic: markers %v, want panics, suite.AfterAll, fixture.AfterAll in order", got)
+	}
+}
+
+// After the first failure a FailFast suite reports the methods it did not
+// run: each is skipped, naming the method that stopped the suite.
+func (s *CanaryTestSuite) TestFailFastReportsWhatItSkipped(t *gotest.T) {
+	code, rows := s.run(t, "failfast", t.TempDir())
+	if code != 1 {
+		t.Errorf("failfast: exit code %d, want 1", code)
+	}
+	for _, want := range []string{"failfast fail TestFailFastTestSuite/TestFirst", "failfast skip TestFailFastTestSuite/TestSecond", "failfast skip TestFailFastTestSuite/TestThird"} {
+		if !slices.Contains(rows, want) {
+			t.Errorf("failfast: missing %q in %v", want, rows)
+		}
+	}
+	if !strings.Contains(s.lastStream, "FailFast: TestFirst") {
+		t.Errorf("failfast: the skipped methods do not name TestFirst as the reason")
+	}
+	if strings.Contains(s.lastStream, "methods.go:") {
+		t.Errorf("failfast: a skip names a runtime file")
+	}
+}
+
+// A parallel method that fails only in its cleanup still stops the methods
+// of a FailFast suite that have not started.
+func (s *CanaryTestSuite) TestFailFastSeesACleanupFailure(t *gotest.T) {
+	_, rows := s.runWith(t, "failfastcleanup", t.TempDir(), nil, "-parallel=1")
+	var failed, skipped int
+	for _, row := range rows {
+		switch {
+		case strings.HasPrefix(row, "failfastcleanup fail TestCleanupFailFastTestSuite/"):
+			failed++
+		case strings.HasPrefix(row, "failfastcleanup skip TestCleanupFailFastTestSuite/"):
+			skipped++
+		}
+	}
+	if failed != 1 || skipped != 1 {
+		t.Errorf("failfastcleanup: %d methods failed and %d were skipped, want 1 and 1: %v", failed, skipped, rows)
+	}
+}
+
+// FailFast reads each method's own verdict: a failure BeforeAll recorded
+// without stopping does not stop the methods.
+func (s *CanaryTestSuite) TestFailFastIgnoresASoftSuiteFailure(t *gotest.T) {
+	_, rows := s.run(t, "failfastsoft", t.TempDir())
+	for _, want := range []string{"failfastsoft pass TestSoftFailFastTestSuite/TestFirst", "failfastsoft pass TestSoftFailFastTestSuite/TestSecond"} {
+		if !slices.Contains(rows, want) {
+			t.Errorf("failfastsoft: missing %q in %v", want, rows)
+		}
+	}
+}
+
+// A panic in a parallel method ends the suite as go test would: AfterAll and
+// the fixture teardown run while a sibling is still mid-flight, and that
+// sibling's AfterEach never runs.
+func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "parallelpanic", dir)
+	if code != 1 || !slices.Contains(rows, "parallelpanic fail TestParallelPanicTestSuite/TestPanics") {
+		t.Errorf("parallelpanic: the panicking method did not fail the run (exit %d): %v", code, rows)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	for _, want := range []string{"slow started", "afterall", "fixture down"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("parallelpanic: %q missing from the markers: %v", want, got)
+		}
+	}
+	if slices.Contains(got, "aftereach TestParallelPanicTestSuite/TestSlow") || slices.Contains(got, "slow finished") {
+		t.Errorf("parallelpanic: the sibling of a panicking method ran to its end or its AfterEach ran: %v", got)
+	}
+}
+
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {

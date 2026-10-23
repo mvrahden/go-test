@@ -1,9 +1,54 @@
 # Lifecycle Specification
 
 ## Purpose
-How a suite's tests end, the rows of an Each table, the goroutines gotest.Go starts and a panic ahead of AfterEach included, and what the run reports about them when they do.
+How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts and a panic ahead of AfterEach included, and what the run reports about them when they do.
 
 ## Requirements
+
+### Requirement: A hook or body going wrong
+A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, locating an overrun or a panic at that hook, and SHALL still run the later hooks that release what ran; after an overrun only AfterEach hooks start, after a panic in a method no further method. An async method's budget ends when done() is called; its AfterEach is not budgeted. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
+
+#### Scenario: Each hook and each way it goes wrong
+- **WHEN** a suite hook or the body fails an assertion, panics or overruns the Timeout
+- **THEN** fails the run with exit 1 and the method or suite whose hook went wrong, located at that hook when it panics or overruns, running the later hooks the row lists and, after a panic in a method's hooks or body, no further method
+
+#### Scenario: Each fixture per-method hook and each way it goes wrong
+- **WHEN** a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout
+- **THEN** fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method
+
+### Requirement: A panic among parallel methods
+A panic in one parallel method SHALL fail the run, cut its running siblings short and still run AfterAll and the fixture teardown.
+
+#### Scenario: A parallel method panics
+- **WHEN** a parallel method panics while a sibling is still running
+- **THEN** AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
+
+### Requirement: A benchmark that panics
+A benchmark that panics SHALL fail the run and print the panic with its stack, SHALL report no result for itself while the benchmarks after it still run, and SHALL run AfterAll before the fixture is released.
+
+#### Scenario: A benchmark panics
+- **WHEN** a benchmark panics
+- **THEN** fails the run
+- **AND** prints the panic with its stack on stderr
+- **AND** reports no result for it and a result for the benchmark after it
+- **AND** runs AfterAll before the fixture is released
+
+### Requirement: FailFast
+A FailFast suite SHALL stop at the first failing method, failing it and the run and skipping every method not yet started with that method as the reason, a failure recorded in the method's cleanups included; a failure BeforeAll records without stopping SHALL NOT stop it.
+
+#### Scenario: The first method fails
+- **WHEN** the first method of a FailFast suite fails
+- **THEN** fails the method
+- **AND** fails the run
+- **AND** skips every method that has not started, with the failing method as the reason
+
+#### Scenario: A parallel method fails in a cleanup
+- **WHEN** a parallel method of a FailFast suite fails only in a cleanup, the methods running one at a time
+- **THEN** skips the method that has not started, with the failing method as the reason
+
+#### Scenario: BeforeAll records a failure and goes on
+- **WHEN** BeforeAll of a FailFast suite records a failure without stopping and no method fails
+- **THEN** runs every method
 
 ### Requirement: Each rows
 Every row of an Each table SHALL be its own subtest with its own verdict; a row that fails or skips SHALL end the method there, a row that ends the method's own T SHALL end the method with that verdict alone, and a loop that breaks SHALL leave the method running.

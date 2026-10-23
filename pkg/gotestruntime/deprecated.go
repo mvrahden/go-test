@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -39,6 +40,18 @@ func (f *FixtureOnce) Do(fn func() error) error {
 // Deprecated: regenerate the harness.
 func AwaitDone(t *gotest.T, name string, start func(done func())) {
 	AwaitDoneAt(t, name, "", start)
+}
+
+// RunTest is what harnesses before [RunMethods] called to hold a test
+// method's body to budget.
+//
+// Deprecated: regenerate the harness.
+func RunTest(t *gotest.T, budget time.Duration, run func()) {
+	end := watchPhase(t.T(), budget, "", "Timeout")
+	methodWatches.Store(t.T(), end)
+	defer methodWatches.Delete(t.T())
+	defer end()
+	run()
 }
 
 // Deprecated: regenerate the harness.

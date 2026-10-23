@@ -1,0 +1,13 @@
+Expect: parallelpanic: the (panicking method did not fail the run|sibling of a panicking method ran to its end or its AfterEach ran)
+Judge: ./tests/canary CanaryTestSuite/TestAParallelPanicEndsTheSuiteAroundItsSiblings
+Clause: when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -60,6 +60,7 @@
+ 			continue
+ 		}
+ 		passed := t.Run(c.Name, func(it *testing.T) {
++			defer func() { _ = recover() }()
+ 			if m.Parallel {
+ 				it.Parallel()
+ 				// The first cleanup runs last: it sees the failures the others

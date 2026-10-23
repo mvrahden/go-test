@@ -1,0 +1,21 @@
+Expect: hookoverrun: TestReleaseOverrunTestSuite/TestSlowRelease did not fail
+Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
+Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -76,7 +76,6 @@
+ 			// The budget covers the fixture hooks, the suite hooks and the body:
+ 			// ended last, after every AfterEach registered below.
+ 			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
+-			defer end()
+ 			for _, f := range m.Fixtures {
+ 				if f.After != nil {
+ 					defer func() {
+@@ -89,6 +88,7 @@
+ 					}()
+ 				}
+ 			}
++			defer end()
+ 			for _, f := range m.Fixtures {
+ 				if f.Before != nil {
+ 					mt.enter(f.Name + ".BeforeEach ")

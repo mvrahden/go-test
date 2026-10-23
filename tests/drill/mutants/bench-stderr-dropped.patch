@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / prints the panic with its stack on stderr \(
+Clause: when a benchmark panics → prints the panic with its stack on stderr
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -449,7 +449,7 @@
+ 		for i := range s.results {
+ 			r := &s.results[i]
+ 			_, _ = c.stdout.Write(StripTrailingStatus(r.Stdout))
+-			if len(r.Stderr) > 0 {
++			if len(r.Stderr) > 0 && !r.Target.Bench {
+ 				_, _ = c.stderr.Write(r.Stderr)
+ 			}
+ 		}

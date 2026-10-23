@@ -293,6 +293,8 @@ All are optional.
 Execution order: BeforeAll -> (BeforeEach -> Test -> AfterEach)* -> AfterAll.
 For parallel test cases, AfterAll waits for all parallel tests to complete.
 
+`FailFast` is judged per method: the methods not yet started are skipped, naming the first that failed, and a failure `BeforeAll` records without stopping skips nothing ([FailFast](specs/lifecycle/spec.md#requirement-failfast)).
+
 **On failure and panic.**
 `AfterAll` runs even when `BeforeAll` failed or panicked, so teardown may see partly
 initialised state — guard it if `BeforeAll` can fail midway. Write `AfterAll` to release
@@ -300,6 +302,9 @@ whatever `BeforeAll` had reached, not to assume it finished.
 The void `AfterEach` likewise runs even when `BeforeEach` panicked. The returning form
 does not: with nothing returned there is no context to release, and the per-test state it
 would clean up was never created.
+A panic in a method ends the suite as it would under `go test`: the method's own
+teardown and `AfterAll` run, and in a parallel suite the siblings still running are cut
+short with it ([A panic among parallel methods](specs/lifecycle/spec.md#requirement-a-panic-among-parallel-methods)).
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
@@ -359,6 +364,12 @@ running test, because Go has no way to stop another goroutine, so a method that 
 moment the deadline passes, while the method is still running, located at the line it is
 running, and is also written unbuffered to stderr so it survives a test that never returns
 at all (under `-json` it streams with its test instead).
+A method's `Timeout` covers its `BeforeEach`, body and `AfterEach`, the fixtures' per-method
+hooks included, and the context they get ends at it: a hook that overruns it fails the method,
+located at the hook and naming it, and nothing after that hook starts but the `AfterEach` hooks
+([A hook or body going wrong](specs/lifecycle/spec.md#requirement-a-hook-or-body-going-wrong)).
+An async method's budget ends when `done()` is called; its `AfterEach`, its own and the
+fixtures', is not budgeted.
 
 A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, is not held
 to a budget: being failed against a number you did not choose is not a verdict you can act on. Bounding the process remains
