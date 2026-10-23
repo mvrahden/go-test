@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -843,6 +844,13 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 		}
 	}
 
+	// A benchmark wrapper hands every hook a T whose T() is nil; a fuzz
+	// wrapper does so for BeforeAll and AfterAll only, its per-input hooks get
+	// a real *testing.T.
+	if err := hooksCallingT(ts); err != nil {
+		return err
+	}
+
 	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
 	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {
 		return At(be.NamePos(), fmt.Errorf("%s: SuiteConfig has Parallel: true, but BeforeEach has no return value. Parallel methods require per-test isolation — move per-test fields to a context struct and return it from BeforeEach", suiteName))
@@ -891,4 +899,330 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 	}
 
 	return nil
+}
+
+// hooksCallingT refuses the hooks that call t.T() where a wrapper of the
+// suite hands them a nil one, naming them in source order at the first call.
+func hooksCallingT(ts *TestSuiteSpec) error {
+	bench, fuzz := len(ts.th.Benchmarks) > 0, len(ts.th.Fuzzers) > 0
+	if !bench && !fuzz {
+		return nil
+	}
+	type offender struct {
+		name string
+		pos  token.Pos
+	}
+	var found []offender
+	perInput := false
+	for _, h := range []struct {
+		name     string
+		m        *TestSuiteMethod
+		perInput bool
+	}{{"BeforeAll", ts.th.BeforeAll, false}, {"AfterAll", ts.th.AfterAll, false}, {"BeforeEach", ts.th.BeforeEach, true}, {"AfterEach", ts.th.AfterEach, true}} {
+		// The fuzz wrapper runs the per-input hooks with a real *testing.T.
+		if h.perInput && !bench {
+			continue
+		}
+		if pos := h.m.callsT(ts.pkg); pos.IsValid() {
+			found = append(found, offender{h.name, pos})
+			perInput = perInput || h.perInput
+		}
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	sort.Slice(found, func(i, j int) bool { return found[i].pos < found[j].pos })
+	names := make([]string, len(found))
+	for i, o := range found {
+		names[i] = o.name
+	}
+	verb, list, hook := "calls", names[0], "hook"
+	if len(names) > 1 {
+		verb, list, hook = "call", strings.Join(names[:len(names)-1], ", ")+" and "+names[len(names)-1], "hooks"
+	}
+	// Name only the wrappers under which every named hook's T() is nil.
+	kind := "fuzz"
+	switch {
+	case perInput || !fuzz:
+		kind = "benchmark"
+	case bench:
+		kind = "fuzz and benchmark"
+	}
+	return At(found[0].pos, fmt.Errorf("suite %s has %s methods but %s %s t.T(), which is nil under them — check it for nil or move that work out of the %s", ts.ts.Name.Name, kind, list, verb, hook))
+}
+
+// callsT returns the position of the first T on the method's own *gotest.T
+// parameter, or an alias of it, that is not proven non-nil where it is used;
+// or token.NoPos. It reads the method's body, closures included, not the
+// helpers it calls. A nil method has none.
+func (m *TestSuiteMethod) callsT(pkg *packages.Package) token.Pos {
+	decl, ok := m.node().(*ast.FuncDecl)
+	if !ok || decl.Body == nil || m.sig.Params().Len() == 0 || m.usesStdlibT {
+		return token.NoPos
+	}
+	w := &hookWalk{info: pkg.TypesInfo, parents: parentsOf(decl.Body), self: map[types.Object]bool{m.sig.Params().At(0): true}}
+	w.followAliases(decl.Body)
+	found := token.NoPos
+	ast.Inspect(decl.Body, func(n ast.Node) bool {
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "T" || w.selfOf(sel.X) == nil || w.guarded(sel) {
+			return true
+		}
+		if !found.IsValid() || sel.Sel.Pos() < found {
+			found = sel.Sel.Pos()
+		}
+		return true
+	})
+	return found
+}
+
+// hookWalk reads one hook body: self holds its *gotest.T parameter and the
+// local variables assigned from it.
+type hookWalk struct {
+	info    *types.Info
+	parents map[ast.Node]ast.Node
+	self    map[types.Object]bool
+}
+
+func parentsOf(root ast.Node) map[ast.Node]ast.Node {
+	parents := map[ast.Node]ast.Node{}
+	var stack []ast.Node
+	ast.Inspect(root, func(n ast.Node) bool {
+		if n == nil {
+			stack = stack[:len(stack)-1]
+			return false
+		}
+		if len(stack) > 0 {
+			parents[n] = stack[len(stack)-1]
+		}
+		stack = append(stack, n)
+		return true
+	})
+	return parents
+}
+
+// followAliases adds every variable assigned from self (tt := t, var tt = t,
+// tt = t) until no more are found.
+func (w *hookWalk) followAliases(body ast.Node) {
+	for grown := true; grown; {
+		grown = false
+		add := func(id *ast.Ident, value ast.Expr) {
+			if w.selfOf(value) == nil {
+				return
+			}
+			obj := w.info.Defs[id]
+			if obj == nil {
+				obj = w.info.Uses[id]
+			}
+			if obj != nil && !w.self[obj] {
+				w.self[obj], grown = true, true
+			}
+		}
+		ast.Inspect(body, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.AssignStmt:
+				if len(n.Lhs) == len(n.Rhs) {
+					for i, l := range n.Lhs {
+						if id, ok := l.(*ast.Ident); ok {
+							add(id, n.Rhs[i])
+						}
+					}
+				}
+			case *ast.ValueSpec:
+				if len(n.Names) == len(n.Values) {
+					for i, id := range n.Names {
+						add(id, n.Values[i])
+					}
+				}
+			}
+			return true
+		})
+	}
+}
+
+// selfOf returns the self variable e names, or nil.
+func (w *hookWalk) selfOf(e ast.Expr) types.Object {
+	if id, ok := ast.Unparen(e).(*ast.Ident); ok {
+		if obj := w.info.Uses[id]; obj != nil && w.self[obj] {
+			return obj
+		}
+	}
+	return nil
+}
+
+// tCallOn returns the self variable e calls T() on, or nil.
+func (w *hookWalk) tCallOn(e ast.Expr) types.Object {
+	call, ok := ast.Unparen(e).(*ast.CallExpr)
+	if !ok || len(call.Args) != 0 {
+		return nil
+	}
+	sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "T" {
+		return nil
+	}
+	return w.selfOf(sel.X)
+}
+
+// up returns n's parent, skipping parentheses.
+func (w *hookWalk) up(n ast.Node) ast.Node {
+	p := w.parents[n]
+	for {
+		if _, ok := p.(*ast.ParenExpr); !ok {
+			return p
+		}
+		p = w.parents[p]
+	}
+}
+
+// guarded reports whether the selector sel (x.T) is called and its result
+// proven non-nil wherever it is used: compared with nil, under a nil check of
+// the same call, or bound in an if-init and used only where it was checked.
+func (w *hookWalk) guarded(sel *ast.SelectorExpr) bool {
+	call, ok := w.up(sel).(*ast.CallExpr)
+	if !ok || ast.Unparen(call.Fun) != sel {
+		return false // a method value: T escapes unchecked
+	}
+	recv := w.selfOf(sel.X)
+	if w.comparedWithNil(call) || w.checked(call, func(e ast.Expr) bool { return w.tCallOn(e) == recv }) {
+		return true
+	}
+	return w.boundInIfInit(call)
+}
+
+func (w *hookWalk) isNil(e ast.Expr) bool {
+	id, ok := ast.Unparen(e).(*ast.Ident)
+	if !ok {
+		return false
+	}
+	_, ok = w.info.Uses[id].(*types.Nil)
+	return ok
+}
+
+// comparedWithNil reports whether e is an operand of == or != against nil.
+func (w *hookWalk) comparedWithNil(e ast.Node) bool {
+	b, ok := w.up(e).(*ast.BinaryExpr)
+	if !ok || (b.Op != token.EQL && b.Op != token.NEQ) {
+		return false
+	}
+	if ast.Unparen(b.X) == e {
+		return w.isNil(b.Y)
+	}
+	return w.isNil(b.X)
+}
+
+// nilCheck reports whether cond is subject == nil (op EQL) or != nil (NEQ).
+func (w *hookWalk) nilCheck(cond ast.Expr, op token.Token, subject func(ast.Expr) bool) bool {
+	b, ok := ast.Unparen(cond).(*ast.BinaryExpr)
+	if !ok || b.Op != op {
+		return false
+	}
+	return (subject(b.X) && w.isNil(b.Y)) || (subject(b.Y) && w.isNil(b.X))
+}
+
+// nonNilIf reports whether cond being true proves subject non-nil.
+func (w *hookWalk) nonNilIf(cond ast.Expr, subject func(ast.Expr) bool) bool {
+	if b, ok := ast.Unparen(cond).(*ast.BinaryExpr); ok && b.Op == token.LAND {
+		return w.nonNilIf(b.X, subject) || w.nonNilIf(b.Y, subject)
+	}
+	return w.nilCheck(cond, token.NEQ, subject)
+}
+
+// nonNilUnless reports whether cond being false proves subject non-nil.
+func (w *hookWalk) nonNilUnless(cond ast.Expr, subject func(ast.Expr) bool) bool {
+	if b, ok := ast.Unparen(cond).(*ast.BinaryExpr); ok && b.Op == token.LOR {
+		return w.nonNilUnless(b.X, subject) || w.nonNilUnless(b.Y, subject)
+	}
+	return w.nilCheck(cond, token.EQL, subject)
+}
+
+// checked reports whether n sits where subject was proven non-nil: an if
+// body or else branch, the right operand of && or ||, or after an
+// `if subject == nil { …; return }` in the same block.
+func (w *hookWalk) checked(n ast.Node, subject func(ast.Expr) bool) bool {
+	for child, p := n, w.parents[n]; p != nil; child, p = p, w.parents[p] {
+		switch p := p.(type) {
+		case *ast.IfStmt:
+			if (child == p.Body && w.nonNilIf(p.Cond, subject)) || (child == p.Else && w.nonNilUnless(p.Cond, subject)) {
+				return true
+			}
+		case *ast.BinaryExpr:
+			if child == p.Y && ((p.Op == token.LAND && w.nonNilIf(p.X, subject)) || (p.Op == token.LOR && w.nonNilUnless(p.X, subject))) {
+				return true
+			}
+		case *ast.BlockStmt:
+			for _, st := range p.List {
+				if st == child {
+					break
+				}
+				if is, ok := st.(*ast.IfStmt); ok && is.Else == nil && w.nonNilUnless(is.Cond, subject) && endsInReturn(is.Body) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func endsInReturn(b *ast.BlockStmt) bool {
+	if len(b.List) == 0 {
+		return false
+	}
+	_, ok := b.List[len(b.List)-1].(*ast.ReturnStmt)
+	return ok
+}
+
+// boundInIfInit reports whether call is bound in an if-init (if tt := t.T();
+// …) and tt is used only in nil comparisons or where it was checked non-nil.
+func (w *hookWalk) boundInIfInit(call *ast.CallExpr) bool {
+	as, ok := w.up(call).(*ast.AssignStmt)
+	if !ok || as.Tok != token.DEFINE || len(as.Lhs) != 1 || len(as.Rhs) != 1 {
+		return false
+	}
+	is, ok := w.parents[as].(*ast.IfStmt)
+	if !ok || is.Init != as {
+		return false
+	}
+	id, _ := as.Lhs[0].(*ast.Ident)
+	obj := w.info.Defs[id]
+	if obj == nil {
+		return false
+	}
+	isTT := func(e ast.Expr) bool {
+		u, ok := ast.Unparen(e).(*ast.Ident)
+		return ok && w.info.Uses[u] == obj
+	}
+	safe := true
+	ast.Inspect(is, func(n ast.Node) bool {
+		u, ok := n.(*ast.Ident)
+		if !ok || w.info.Uses[u] != obj {
+			return safe
+		}
+		safe = !w.mutable(u) && (w.comparedWithNil(u) || w.checked(u, isTT))
+		return safe
+	})
+	return safe
+}
+
+// mutable reports whether id is assigned to or has its address taken, after
+// which a nil check of it no longer holds.
+func (w *hookWalk) mutable(id *ast.Ident) bool {
+	switch p := w.up(id).(type) {
+	case *ast.AssignStmt:
+		for _, l := range p.Lhs {
+			if ast.Unparen(l) == id {
+				return true
+			}
+		}
+	case *ast.UnaryExpr:
+		return p.Op == token.AND
+	}
+	return false
+}
+
+// node returns the method's declaration, or nil for a nil method.
+func (m *TestSuiteMethod) node() ast.Node {
+	if m == nil {
+		return nil
+	}
+	return m.n
 }

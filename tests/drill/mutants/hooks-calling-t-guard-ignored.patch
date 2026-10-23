@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIRejectionsTestSuite/TestHooksCallingT/a_hook_checks_t.T()_for_nil_before_it_uses_it/runs_the_suite
+Expect: ^FAIL .*conformance/cli .*a hook checks t\.T\(\) for nil before it uses it / runs the suite \(
+Clause: when a hook checks t.T() for nil before it uses it → runs the suite
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -965,7 +965,7 @@
+ 	found := token.NoPos
+ 	ast.Inspect(decl.Body, func(n ast.Node) bool {
+ 		sel, ok := n.(*ast.SelectorExpr)
+-		if !ok || sel.Sel.Name != "T" || w.selfOf(sel.X) == nil || w.guarded(sel) {
++		if !ok || sel.Sel.Name != "T" || w.selfOf(sel.X) == nil {
+ 			return true
+ 		}
+ 		if !found.IsValid() || sel.Sel.Pos() < found {

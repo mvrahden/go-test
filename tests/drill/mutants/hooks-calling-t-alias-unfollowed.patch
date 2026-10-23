@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIRejectionsTestSuite/TestHooksCallingT/a_hook_reaches_t.T()_through_parentheses,_an_alias_of_t_or_a_method_value/refuses_it_with_exit_2_like_a_direct_call/alias
+Expect: ^FAIL .*conformance/cli .* / refuses it with exit 2 like a direct call / alias \(
+Clause: when a hook reaches t.T() through parentheses, an alias of t or a method value → refuses it with exit 2 like a direct call
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -1007,7 +1007,7 @@
+ 	for grown := true; grown; {
+ 		grown = false
+ 		add := func(id *ast.Ident, value ast.Expr) {
+-			if w.selfOf(value) == nil {
++			if w.selfOf(value) == nil || value != nil {
+ 				return
+ 			}
+ 			obj := w.info.Defs[id]

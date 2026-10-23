@@ -120,3 +120,22 @@ The version subcommand SHALL exit 0 and print the version on stdout.
 #### Scenario: Asking for the version
 - **WHEN** the version subcommand runs
 - **THEN** exits 0 and prints the version on stdout
+
+### Requirement: Hooks that call t.T() where it is nil
+gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
+
+#### Scenario: Several hooks call t.T()
+- **WHEN** several hooks call t.T() where their wrapper makes it nil
+- **THEN** fails with exit 2 and one error on stderr that names every such hook in source order, located at the first
+
+#### Scenario: t.T() reached other than by a plain call
+- **WHEN** a hook reaches t.T() through parentheses, an alias of t or a method value
+- **THEN** refuses it with exit 2 like a direct call
+
+#### Scenario: A fuzz suite's per-input hooks
+- **WHEN** a fuzz suite's BeforeEach and AfterEach call t.T()
+- **THEN** runs the suite, each input with a real *testing.T
+
+#### Scenario: A guarded call
+- **WHEN** a hook checks t.T() for nil before it uses it
+- **THEN** runs the suite

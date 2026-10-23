@@ -86,7 +86,8 @@ nothing is measured; `bench-wait` — `time.Sleep`/`Eventually`/
 `Consistently` inside the loop times the wait; `bench-fixture-io` — a
 fixture field read inside the loop times whatever backs the fixture, so
 hoist it above. A suite with benchmarks refuses a returning
-`BeforeEach` and hooks taking `*testing.T`. Flags:
+`BeforeEach`, hooks taking `*testing.T`, and a hook calling `t.T()`
+(nil in every hook under a benchmark) without checking it for nil. Flags:
 
 - `--spec` — render the spec view; under GitHub Actions the markdown
   (with delta table) lands in the step summary automatically.

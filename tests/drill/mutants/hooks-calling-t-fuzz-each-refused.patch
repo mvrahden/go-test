@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIRejectionsTestSuite/TestHooksCallingT/a_fuzz_suite's_BeforeEach_and_AfterEach_call_t.T()/runs_the_suite,_each_input_with_a_real_*testing.T
+Expect: ^FAIL .*conformance/cli .*a fuzz suite's BeforeEach and AfterEach call t\.T\(\) / runs the suite, each input with a real \*testing\.T \(
+Clause: when a fuzz suite's BeforeEach and AfterEach call t.T() → runs the suite, each input with a real *testing.T
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -920,7 +920,7 @@
+ 		perInput bool
+ 	}{{"BeforeAll", ts.th.BeforeAll, false}, {"AfterAll", ts.th.AfterAll, false}, {"BeforeEach", ts.th.BeforeEach, true}, {"AfterEach", ts.th.AfterEach, true}} {
+ 		// The fuzz wrapper runs the per-input hooks with a real *testing.T.
+-		if h.perInput && !bench {
++		if h.perInput && !bench && !fuzz {
+ 			continue
+ 		}
+ 		if pos := h.m.callsT(ts.pkg); pos.IsValid() {

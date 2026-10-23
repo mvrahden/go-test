@@ -893,3 +893,28 @@ func (s *CollectorTestSuite) TestApplyTestSuiteSpecs(t *gotest.T) {
 		})
 	})
 }
+
+// A benchmark wrapper hands every hook a T whose T() is nil, a fuzz wrapper
+// BeforeAll and AfterAll: the collector rejects such a call where it is.
+func (s *CollectorTestSuite) TestHookCallsTUnderBenchOrFuzz(t *gotest.T) {
+	for _, c := range []struct {
+		kind, source, hook, suite string
+	}{
+		{"benchmark", "TestCollector_BenchHook_CallsT", "BeforeEach", "TimedTestSuite"},
+		{"fuzz", "TestCollector_FuzzHook_CallsT", "AfterAll", "SeededTestSuite"},
+	} {
+		t.It("rejects a hook calling t.T() in a suite with "+c.kind+" methods, at the call", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), c.source)
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs, "the hook's t.T() call was accepted")
+			gotest.ErrorContains(it, result.Errs[0].Err, "suite "+c.suite+" has "+c.kind+" methods but "+c.hook+" calls t.T(), which is nil under them")
+			gotest.Equal(it, 10, pkg.Fset.Position(result.Errs[0].Pos).Line)
+		})
+	}
+	t.It("accepts t.T() in a fuzz suite's BeforeEach and AfterEach, which run per input with a real *testing.T", func(it *gotest.T) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzEachHook_CallsT")
+		result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+		gotest.Empty(it, result.Errs)
+		gotest.Len(it, result.Suites, 1)
+	})
+}
