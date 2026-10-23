@@ -2,6 +2,7 @@ package gotestruntime
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
 
@@ -38,27 +39,50 @@ type Method struct {
 // RunMethods runs each method as a subtest of t: fixture BeforeEach hooks,
 // then the method's Run, then fixture AfterEach hooks in reverse. cfg bounds
 // each method's context and budget is the Timeout it is held to, as returned
-// by [OpenSuite]. With cfg.FailFast, a failure stops the methods that have
-// not started yet.
+// by [OpenSuite]; the budget covers the hooks and the body alike, and once a
+// hook overran it nothing after that hook starts but the AfterEach hooks.
+// With cfg.FailFast, the first method that fails stops the ones that have
+// not started: each is skipped with the reason "FailFast: <that method>".
+// The decision reads each method's own verdict, so a failure the suite's
+// BeforeAll recorded without stopping does not trip it. Among parallel
+// methods the stop is best effort: methods already running finish.
 func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
-	var failed atomic.Bool
+	var failedFirst atomic.Pointer[string]
+	tripped := func() string {
+		if first := failedFirst.Load(); cfg.FailFast && first != nil {
+			return *first
+		}
+		return ""
+	}
 	for _, c := range m.Cases {
-		t.Run(c.Name, func(it *testing.T) {
+		if first := tripped(); first != "" {
+			t.Run(c.Name, func(it *testing.T) { skipFailFast(it, first) })
+			continue
+		}
+		passed := t.Run(c.Name, func(it *testing.T) {
 			if m.Parallel {
 				it.Parallel()
-				if cfg.FailFast && failed.Load() {
-					it.Skip("FailFast: earlier test failed")
-				}
-				defer func() {
+				// The first cleanup runs last: it sees the failures the others
+				// record, the wait on a gotest.Go goroutine's among them.
+				it.Cleanup(func() {
 					if it.Failed() {
-						failed.Store(true)
+						failedFirst.CompareAndSwap(nil, &c.Name)
 					}
-				}()
+				})
+				if first := tripped(); first != "" {
+					skipFailFast(it, first)
+				}
 			}
-			tt := TestT(it, cfg.Timeout)
+			// The budget covers the fixture hooks, the suite hooks and the body:
+			// ended last, after every AfterEach registered below.
+			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
+			defer end()
 			for _, f := range m.Fixtures {
 				if f.After != nil {
 					defer func() {
+						mt.enter(f.Name + ".AfterEach ")
+						// Releases what BeforeEach acquired, so neither the
+						// deadline nor a stop ends its context.
 						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on
 							it.Errorf("%s.AfterEach failed: %v", f.Name, err)
 						}
@@ -67,17 +91,35 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			}
 			for _, f := range m.Fixtures {
 				if f.Before != nil {
-					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook
+					mt.enter(f.Name + ".BeforeEach ")
+					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook
 						it.Fatalf("%s.BeforeEach failed: %v", f.Name, err)
 					}
 				}
 			}
-			c.Run(tt, func(method func()) { RunTest(tt, budget.Timeout, method) })
+			if mt.overran() {
+				return
+			}
+			mt.enter("BeforeEach ")
+			c.Run(mt.t, func(method func()) {
+				if mt.overran() {
+					return
+				}
+				mt.enter("")
+				method()
+			})
 		})
-		if !m.Parallel && cfg.FailFast && t.Failed() {
-			return
+		if !passed {
+			failedFirst.CompareAndSwap(nil, &c.Name)
 		}
 	}
+}
+
+// skipFailFast skips t, naming the method that stopped the suite, with no
+// location: a runtime file is nothing the user can open.
+func skipFailFast(t *testing.T, first string) {
+	fmt.Fprintln(t.Output(), "FailFast: "+first)
+	t.SkipNow()
 }
 
 // AwaitDoneAt runs an async method through start and returns once it calls
