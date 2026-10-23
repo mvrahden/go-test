@@ -2,6 +2,8 @@ package testkit
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -62,4 +64,29 @@ func ExportFakeBuilds(key func(ctx context.Context, root string) (string, error)
 func ExportBeforeMark(hook func(marker string)) (restore func()) {
 	beforeMark = hook
 	return func() { beforeMark = func(string) {} }
+}
+
+// ExportBeforeTake runs hook just before a marker judged dead is removed,
+// until restore.
+func ExportBeforeTake(hook func(marker string)) (restore func()) {
+	beforeTake = hook
+	return func() { beforeTake = func(string) {} }
+}
+
+// ExportPlantMarker puts key's build marker in dir, held by pid, and returns
+// its stamp.
+func ExportPlantMarker(dir, key, pid string) (string, error) {
+	marker := filepath.Join(dir, buildingPrefix+key)
+	if err := os.MkdirAll(marker, 0o750); err != nil {
+		return "", err
+	}
+	stamp := filepath.Join(marker, pid+"-planted")
+	return stamp, os.WriteFile(stamp, nil, 0o600)
+}
+
+// ExportRenameMarker moves staged build markers into place with rename until
+// restore.
+func ExportRenameMarker(rename func(from, to string) error) (restore func()) {
+	renameMarker = rename
+	return func() { renameMarker = os.Rename }
 }
