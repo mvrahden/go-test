@@ -1,6 +1,6 @@
-// Package hookoverrun is a fixture-bound suite whose fixture's BeforeEach
-// sleeps past the suite's Timeout, and one whose fixture's AfterEach does;
-// the canary reads what that does to the method and where it is reported.
+// Package hookoverrun has suites whose fixture's BeforeEach (ahead of
+// another fixture's) or AfterEach sleeps past the Timeout; the canary reads
+// what that does to the method and where it is reported.
 package hookoverrun
 
 import (
@@ -63,4 +63,18 @@ func waitOn(ctx context.Context, who string) {
 	case <-time.After(3 * time.Second):
 		mark(who + " gave up")
 	}
+}
+
+// LaterFixture comes after SlowFixture; its BeforeEach marks that it
+// started and fails once the method's context has ended.
+type LaterFixture struct {
+	Slow *SlowFixture
+}
+
+func (f *LaterFixture) BeforeAll(ctx context.Context) error { return nil }
+func (f *LaterFixture) AfterAll(ctx context.Context) error  { return nil }
+
+func (f *LaterFixture) BeforeEach(ctx context.Context) error {
+	mark("later fixture BeforeEach")
+	return ctx.Err()
 }

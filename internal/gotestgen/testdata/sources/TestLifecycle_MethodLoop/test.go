@@ -22,7 +22,7 @@ func (s *OrderTestSuite) BeforeEach(t *gotest.T) { fmt.Println("MARK:suite befor
 func (s *OrderTestSuite) AfterEach(t *gotest.T)  { fmt.Println("MARK:suite after") }
 func (s *OrderTestSuite) TestOne(t *gotest.T)    { fmt.Println("MARK:method") }
 
-type BrokenHookFixture struct{}
+type BrokenHookFixture struct{ Hook *HookFixture }
 
 func (f *BrokenHookFixture) BeforeAll(ctx context.Context) error  { return nil }
 func (f *BrokenHookFixture) BeforeEach(ctx context.Context) error { return errors.New("boom") }

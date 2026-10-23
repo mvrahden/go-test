@@ -1,0 +1,16 @@
+Expect: hookoverrun: "later fixture BeforeEach" ran after the budget was blown
+Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
+Clause: when a fixture's BeforeEach overruns the Timeout ahead of another fixture's → starts no later fixture's BeforeEach, fails the method once, at the hook that overran, and runs that fixture's AfterEach
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -87,10 +87,6 @@
+ 			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
+ 			defer end()
+ 			for _, f := range m.Fixtures {
+-				// After a BeforeEach that overran no later fixture's turn comes.
+-				if mt.overran() {
+-					return
+-				}
+ 				if f.Before != nil {
+ 					mt.enter(f.Name + ".BeforeEach ")
+ 					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook

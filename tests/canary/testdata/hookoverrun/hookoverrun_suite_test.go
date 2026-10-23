@@ -56,3 +56,16 @@ func (s *WaitingBeforeEachTestSuite) BeforeEach(t *gotest.T) { waitOn(t.Context(
 func (s *WaitingBeforeEachTestSuite) TestAfterTheWait(t *gotest.T) {
 	mark("body after the wait")
 }
+
+// LaterOverrunTestSuite's SlowFixture overruns ahead of its LaterFixture.
+type LaterOverrunTestSuite struct {
+	Later *LaterFixture
+}
+
+func (s *LaterOverrunTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Timeout = 300 * time.Millisecond
+	return cfg
+}
+
+func (s *LaterOverrunTestSuite) TestAfterTheSlowOne(t *gotest.T) {}

@@ -1,0 +1,15 @@
+Expect: fixturehookfail: the failure is (not reported at the hook's file|reported inside the runtime's file)
+Judge: ./tests/canary CanaryTestSuite/TestAFailedFixtureBeforeEachPairsWithNothing
+Clause: when a fixture BeforeEach returns an error → is reported at the hook's declaration, not in the runtime's file
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -94,8 +94,7 @@
+ 				if f.Before != nil {
+ 					mt.enter(f.Name + ".BeforeEach ")
+ 					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook
+-						reportAt(it, callsite.Declared(f.BeforeAt), fmt.Sprintf("%s.BeforeEach failed: %v", f.Name, err))
+-						it.FailNow()
++						it.Fatalf("%s.BeforeEach failed: %v", f.Name, err)
+ 					}
+ 				}
+ 				if f.After != nil {

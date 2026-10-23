@@ -241,7 +241,7 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
   Shared fixtures may freely import and depend on `internal/` packages — only the fixture type's own package path is restricted.
 - `BeforeAll(ctx context.Context) error` and `AfterAll(ctx context.Context) error` — runs in the subprocess.
 - `Hydrate(ctx context.Context) error` and `Dehydrate(ctx context.Context) error` — runs in the test process, optional.
-- `BeforeEach`/`AfterEach` are not allowed on shared fixtures.
+- `BeforeEach`/`AfterEach` are not allowed on shared fixtures: the generator refuses one that declares them, its own or promoted, at the hook ([A shared fixture with per-test hooks](../../specs/cli/spec.md#requirement-a-shared-fixture-with-per-test-hooks)). Per-test work goes in a package fixture that binds the shared one, or in the suite's hooks.
 - Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 - Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
 
@@ -421,6 +421,8 @@ A `bench` run waits for its first window of shared fixtures instead, and for eve
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
 - Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the function that held it (`fixture teardown failed`).
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
+
+A per-method hook's error is the method's failure, located at the hook's declaration ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)). The fixtures take their turns in dependency order, a turn coming only once every `BeforeEach` before it returned without an error inside the `Timeout`; a fixture's `AfterEach` runs exactly when its turn came and its own `BeforeEach`, if it has one, returned without an error ([Fixture per-method hooks in dependency order](../../specs/fixtures/spec.md#requirement-fixture-per-method-hooks-in-dependency-order)). A `BeforeEach` that returns an error or panics gets no `AfterEach`, so it releases what it acquired before returning.
 
 ### Config markers
 

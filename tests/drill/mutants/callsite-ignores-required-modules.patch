@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/assertions .* required through a replace and built w
 Clause: when a behavior another module declares fails in its helper, the module's path having no dot, required through a replace and built with -trimpath → the failure names the helper's line and the caller's
 --- a/internal/callsite/callsite.go
 +++ b/internal/callsite/callsite.go
-@@ -73,7 +73,7 @@
+@@ -80,7 +80,7 @@
  		return nil
  	}
  	paths := []string{info.Main.Path}

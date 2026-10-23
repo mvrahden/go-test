@@ -44,7 +44,11 @@ Each directory under `testdata/` is one package with one suite:
 | `eachskip` | a skipping `Each` row skips itself and the method, the rows before it pass; a row that skips or fails the method's own `T` ends the method with that verdict alone |
 | `hookpanics` | a panic in `BeforeEach` is reported even when `AfterEach` then fails a fatal assertion, for a test method and a fuzz execution |
 | `fuzzskiphook` | a fuzz execution whose `BeforeEach` skips is skipped, its body never runs and its `AfterEach` still runs |
-| `hookoverrun` | a fixture `BeforeEach` or `AfterEach`, or a suite `BeforeEach`, that sleeps or waits on its context past the suite's `Timeout` fails the method, located at the hook and naming it; after a `BeforeEach` that overran, neither the suite's `BeforeEach` nor the body runs, and a hook waiting on its context sees it end |
+| `hookoverrun` | a fixture `BeforeEach` or `AfterEach`, or a suite `BeforeEach`, that sleeps or waits on its context past the suite's `Timeout` fails the method, located at the hook and naming it; after a `BeforeEach` that overran, neither a later fixture's `BeforeEach`, the suite's `BeforeEach` nor the body runs, and a hook waiting on its context sees it end |
+| `fixturehookfail` | a package fixture whose `BeforeEach` fails for one method runs no `AfterEach` for it, and the failure is reported at the hook's file |
+| `fixtureafterfail` | a package fixture whose `AfterEach` returns an error is reported at the hook's file, not inside the runtime's |
+| `fixtureorder` | a fixture with only an `AfterEach` runs it when it comes before a fixture whose `BeforeEach` fails, and not when it comes after |
+| `fixtureelsewhere` | a failing fixture hook another package declares, a fixture's of that package or one promoted from its type, is located at its declaration: by base name, and by full path under `-fullpath` |
 | `benchpanic` | a panicking benchmark turns the run red, the next benchmark still reports, and `AfterAll` runs before the fixture is released |
 | `failfast` | a FailFast suite skips the methods after its first failure, each naming the method that stopped it |
 | `failfastsoft` | a failure `BeforeAll` records without stopping does not stop a FailFast suite's methods |

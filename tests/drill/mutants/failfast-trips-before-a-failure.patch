@@ -5,7 +5,7 @@ Clause: when the first method of a FailFast suite fails → fails the method
 Clause: when the first method of a FailFast suite fails → fails the run
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -47,8 +47,8 @@
+@@ -58,8 +58,8 @@
  func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
  	var failedFirst atomic.Pointer[string]
  	tripped := func() string {

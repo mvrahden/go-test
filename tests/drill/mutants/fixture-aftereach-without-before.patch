@@ -1,0 +1,33 @@
+Expect: fixturehookfail: hooks ran \[fixture.BeforeAll fixture.BeforeEach fixture.AfterEach
+Judge: ./tests/canary CanaryTestSuite/TestAFailedFixtureBeforeEachPairsWithNothing
+Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -91,13 +91,6 @@
+ 				if mt.overran() {
+ 					return
+ 				}
+-				if f.Before != nil {
+-					mt.enter(f.Name + ".BeforeEach ")
+-					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook
+-						reportAt(it, callsite.Declared(f.BeforeAt), fmt.Sprintf("%s.BeforeEach failed: %v", f.Name, err))
+-						it.FailNow()
+-					}
+-				}
+ 				if f.After != nil {
+ 					defer func() {
+ 						mt.enter(f.Name + ".AfterEach ")
+@@ -108,6 +101,13 @@
+ 						}
+ 					}()
+ 				}
++				if f.Before != nil {
++					mt.enter(f.Name + ".BeforeEach ")
++					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook, at the hook
++						reportAt(it, callsite.Declared(f.BeforeAt), fmt.Sprintf("%s.BeforeEach failed: %v", f.Name, err))
++						it.FailNow()
++					}
++				}
+ 			}
+ 			if mt.overran() {
+ 				return

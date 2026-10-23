@@ -726,7 +726,7 @@ func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 	if code != 1 {
 		t.Errorf("hookoverrun: exit code %d, want 1", code)
 	}
-	for _, method := range []string{"TestOverrunTestSuite/TestSlow", "TestReleaseOverrunTestSuite/TestSlowRelease", "TestWaitingTestSuite/TestWaitedFor", "TestWaitingBeforeEachTestSuite/TestAfterTheWait"} {
+	for _, method := range []string{"TestOverrunTestSuite/TestSlow", "TestReleaseOverrunTestSuite/TestSlowRelease", "TestWaitingTestSuite/TestWaitedFor", "TestWaitingBeforeEachTestSuite/TestAfterTheWait", "TestLaterOverrunTestSuite/TestAfterTheSlowOne"} {
 		if !slices.Contains(rows, "hookoverrun fail "+method) {
 			t.Errorf("hookoverrun: %s did not fail: %v", method, rows)
 		}
@@ -744,7 +744,10 @@ func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 		}
 	}
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
-	for _, never := range []string{"body", "suite BeforeEach", "body after the wait", "fixture gave up", "suite gave up"} {
+	if strings.Contains(s.lastStream, "LaterFixture.BeforeEach failed") {
+		t.Errorf("hookoverrun: the fixture after the one that overran was blamed too")
+	}
+	for _, never := range []string{"later fixture BeforeEach", "body", "suite BeforeEach", "body after the wait", "fixture gave up", "suite gave up"} {
 		if slices.Contains(got, never) {
 			t.Errorf("hookoverrun: %q ran after the budget was blown: %v", never, got)
 		}
@@ -752,6 +755,94 @@ func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 	for _, want := range []string{"fixture saw its context end", "suite saw its context end"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("hookoverrun: no %q in the markers: %v", want, got)
+		}
+	}
+}
+
+// A fixture BeforeEach that fails runs no AfterEach for that method: the
+// hooks a method runs are the ones that paired with what ran. The failure is
+// reported at the hook's own file, not inside the runtime's.
+func (s *CanaryTestSuite) TestAFailedFixtureBeforeEachPairsWithNothing(t *gotest.T) {
+	dir := t.TempDir()
+	code, _ := s.run(t, "fixturehookfail", dir)
+	if code != 1 {
+		t.Errorf("fixturehookfail: exit code %d, want 1", code)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	want := []string{"fixture.BeforeAll", "fixture.BeforeEach", "fixture.BeforeEach", "second", "fixture.AfterEach", "fixture.AfterAll"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("fixturehookfail: hooks ran %v, want %v", got, want)
+	}
+	if !strings.Contains(s.lastStream, "fixture.go:") {
+		t.Errorf("fixturehookfail: the failure is not reported at the hook's file")
+	}
+	if strings.Contains(s.lastStream, "methods.go:") {
+		t.Errorf("fixturehookfail: the failure is reported inside the runtime's file")
+	}
+}
+
+// An error a fixture AfterEach returns is reported at the hook's own file,
+// not inside the runtime's.
+func (s *CanaryTestSuite) TestAFixtureAfterEachErrorIsReportedAtTheHook(t *gotest.T) {
+	s.check(t, "fixtureafterfail")
+	if !strings.Contains(s.lastStream, "fixture.go:") {
+		t.Errorf("fixtureafterfail: the failure is not reported at the hook's file")
+	}
+	if strings.Contains(s.lastStream, "methods.go:") {
+		t.Errorf("fixtureafterfail: the failure is reported inside the runtime's file")
+	}
+}
+
+// A fixture with only an AfterEach runs it exactly when every fixture
+// BeforeEach before it returned: ahead of the one that failed it runs,
+// behind it it does not.
+func (s *CanaryTestSuite) TestAnAfterEachOnlyFixtureRunsWhenItsTurnCame(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "fixtureorder", dir)
+	if code != 1 {
+		t.Errorf("fixtureorder: exit code %d, want 1", code)
+	}
+	for _, method := range []string{"TestAheadTestSuite/TestBody", "TestBehindTestSuite/TestBody"} {
+		if !slices.Contains(rows, "fixtureorder fail "+method) {
+			t.Errorf("fixtureorder: %s did not fail: %v", method, rows)
+		}
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if !slices.Contains(got, "ahead AfterEach") {
+		t.Errorf("fixtureorder: the AfterEach ahead of the failed BeforeEach did not run: %v", got)
+	}
+	for _, never := range []string{"behind AfterEach", "ahead body", "behind body"} {
+		if slices.Contains(got, never) {
+			t.Errorf("fixtureorder: %q ran: %v", never, got)
+		}
+	}
+}
+
+// A failing fixture hook another package declares, a fixture's of that
+// package or one promoted from its type, is located at its declaration:
+// the base name by default, the full path under -fullpath.
+func (s *CanaryTestSuite) TestAFixtureHookElsewhereIsLocatedAtIt(t *gotest.T) {
+	full, err := filepath.Abs(filepath.Join("testdata", "fixtureelsewhere", "elsewhere", "elsewhere.go"))
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	full = filepath.ToSlash(full)
+	for _, c := range []struct {
+		flags []string
+		file  string
+	}{{nil, "elsewhere.go"}, {[]string{"-fullpath"}, full}} {
+		code, _ := s.runWith(t, "fixtureelsewhere", t.TempDir(), nil, c.flags...)
+		if code != 1 {
+			t.Errorf("fixtureelsewhere %v: exit code %d, want 1", c.flags, code)
+		}
+		// elsewhere.go:15 declares RemoteFixture.BeforeEach, :22 Hooks.AfterEach.
+		for _, want := range []string{
+			c.file + ":15: elsewhere_RemoteFixture.BeforeEach failed: the remote fixture is not ready",
+			c.file + ":22: PromotedFixture.AfterEach failed: the embedded hook did not let go",
+		} {
+			if !strings.Contains(s.lastStream, " "+want+"\\n") {
+				t.Errorf("fixtureelsewhere %v: no %q in the stream", c.flags, want)
+			}
 		}
 	}
 }

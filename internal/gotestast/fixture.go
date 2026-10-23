@@ -231,7 +231,7 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 		}
 	case SharedFixture:
 		if name == "BeforeEach" || name == "AfterEach" {
-			return m.Pos(), fmt.Errorf("shared fixture %q must not have %s method", f.ts.Name.Name, name)
+			return m.Pos(), sharedEachHookError(f.ts.Name.Name, name)
 		}
 		if err := validateContextErrorSig(sig, methodID); err != nil {
 			return m.Pos(), err
@@ -252,6 +252,23 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 	}
 
 	return -1, nil
+}
+
+// SharedEachHook refuses a shared fixture that declares BeforeEach or
+// AfterEach, its own or promoted, located at the hook: nothing would call it.
+func SharedEachHook(named *types.Named) error {
+	mset := types.NewMethodSet(types.NewPointer(named))
+	for _, hook := range []string{"BeforeEach", "AfterEach"} {
+		if sel := mset.Lookup(named.Obj().Pkg(), hook); sel != nil {
+			return At(sel.Obj().Pos(), sharedEachHookError(named.Obj().Name(), hook))
+		}
+	}
+	return nil
+}
+
+func sharedEachHookError(fixture, hook string) error {
+	return fmt.Errorf("shared fixture %q declares %s, but shared fixtures have no per-test hooks, so it would never run; "+
+		"do that work in the %s of a package fixture that binds %s, or in the suite's %s", fixture, hook, hook, fixture, hook)
 }
 
 // NewFixtureSpecForTest creates a minimal FixtureSpec for use in unit tests.

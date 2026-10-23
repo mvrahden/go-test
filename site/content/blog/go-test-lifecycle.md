@@ -235,7 +235,7 @@ Here is the full lifecycle of a test run, from start to finish, with a composed 
 
 The per-test steps repeat for every test method. If the suite uses `SuiteConfig{Parallel: true}` with a returning `BeforeEach`, the test methods run concurrently, each with their own `ctx` from the suite's `BeforeEach` and their own fixture `BeforeEach`/`AfterEach` wrapping.
 
-> The cleanup guarantee applies at every level. Fixture `AfterAll` runs even if the suite's `BeforeAll` panics. Suite `AfterEach` runs even if the test method calls `t.Fatal`. The generated code registers teardown before calling setup, so the cleanup path is always in place before anything can go wrong.
+> The cleanup guarantee applies at every level. Fixture `AfterAll` runs even if the suite's `BeforeAll` panics. Suite `AfterEach` runs even if the test method calls `t.Fatal`. The generated code registers every teardown before anything it releases can go wrong: a suite's `AfterAll` and void `AfterEach` before their setup runs, a fixture's hooks and a returning `AfterEach` the moment their setup returns. A fixture hook that fails midway gets no teardown call, so it releases what it acquired before returning its error.
 
 ## When to use which hook
 
@@ -252,6 +252,6 @@ A common pattern combines these levels: a fixture's `BeforeAll` starts a databas
 
 The lifecycle is designed so that each layer can be reasoned about independently. Fixtures do not need to know about suite hooks. Suites do not need to know about fixture composition. The generator wires them together in the correct order, and the cleanup guarantee ensures that teardown happens regardless of how tests terminate.
 
-If you remember one thing from this post, make it this: **teardown is registered before setup runs.** That single property is what makes the entire lifecycle reliable. Everything else follows from it.
+If you remember one thing from this post, make it this: **teardown is in place before anything it releases can go wrong.** A suite's void hooks register it before setup runs; a fixture, and a returning `BeforeEach`, register it as soon as setup returns, so nothing releases what was never acquired. That single property is what makes the entire lifecycle reliable. Everything else follows from it.
 
 For the fixture patterns that this lifecycle supports, see [Test Fixtures in Go]({{< ref "/blog/test-fixtures-in-go" >}}). For sharing fixtures across package boundaries, see [Shared Fixtures]({{< ref "/blog/shared-fixtures" >}}). For the full API surface, see the [reference documentation]({{< ref "/reference" >}}).

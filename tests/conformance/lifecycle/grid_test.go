@@ -89,6 +89,11 @@ func overrunAt(t *gotest.T, file, text, phase string) string {
 	return `(?m)^\s+` + regexp.QuoteMeta(file) + `:` + lineOf(t, file, text) + `: ` + regexp.QuoteMeta(phase) + `exceeded its configured Timeout of 300ms`
 }
 
+// failedAt matches msg, located at the line of file that contains text.
+func failedAt(t *gotest.T, file, text, msg string) string {
+	return `(?m)^\s+` + regexp.QuoteMeta(file) + `:` + lineOf(t, file, text) + `: ` + regexp.QuoteMeta(msg)
+}
+
 // panicAt matches a panic's message and its stack's frame at the line of
 // file that contains text.
 func panicAt(t *gotest.T, file, text, msg string) string {
@@ -102,14 +107,17 @@ var (
 	next        = suite + "/TestNext"
 	cleanRun    = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "body", "suite.AfterEach", "fixture.AfterEach", "fixture.BeforeEach", "suite.BeforeEach", "next", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
 	bodySkipped = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "suite.AfterEach", "fixture.AfterEach", "fixture.BeforeEach", "suite.BeforeEach", "next", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
-	// After a fixture BeforeEach that went wrong only the fixture's AfterEach
+	// After a fixture BeforeEach that overran only the fixture's AfterEach
 	// runs of that method.
 	suiteHooksSkipped = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "fixture.AfterEach", "fixture.BeforeEach", "suite.BeforeEach", "next", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
 	// A panic ends the suite after the method's own teardown, as under go
 	// test: the next method never starts and has no verdict.
 	suiteEndsAfterBody    = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "body", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
 	suiteEndsBeforeBody   = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
-	suiteEndsAtBeforeEach = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
+	suiteEndsAtBeforeEach = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.AfterAll", "fixture.AfterAll"}
+	// A fixture BeforeEach that failed opened nothing to release: no hook of
+	// that method runs after it.
+	methodNeverOpened = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "fixture.BeforeEach", "suite.BeforeEach", "next", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
 )
 
 // withMarkerAfter is markers with marker inserted after the first after.

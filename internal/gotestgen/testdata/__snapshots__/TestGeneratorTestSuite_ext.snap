@@ -71,9 +71,11 @@ func TestAppTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Fixtures: []gotestruntime.EachHooks{
 			{
-				Name:   "AppFixture",
-				Before: func(ctx context.Context) error { return ƒ_AppFixture.BeforeEach(ctx) },
-				After:  func(ctx context.Context) error { return ƒ_AppFixture.AfterEach(ctx) },
+				Name:     "AppFixture",
+				Before:   func(ctx context.Context) error { return ƒ_AppFixture.BeforeEach(ctx) },
+				BeforeAt: "fixture.go:17",
+				After:    func(ctx context.Context) error { return ƒ_AppFixture.AfterEach(ctx) },
+				AfterAt:  "fixture.go:18",
 			},
 		},
 		Cases: []gotestruntime.Method{

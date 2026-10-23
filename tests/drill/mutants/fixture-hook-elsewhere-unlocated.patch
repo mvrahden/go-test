@@ -1,0 +1,14 @@
+Expect: fixtureelsewhere \[\]: no "elsewhere\.go:15: elsewhere_RemoteFixture\.BeforeEach failed
+Judge: ./tests/canary CanaryTestSuite/TestAFixtureHookElsewhereIsLocatedAtIt
+Clause: when a hook another package declares returns an error, a fixture's of that package or one promoted from its type → is reported at the hook's declaration, named by its file's base name
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -416,7 +416,7 @@
+ 		AfterAll:     mset.Lookup(typePkg, "AfterAll") != nil,
+ 		BeforeEach:   mset.Lookup(typePkg, "BeforeEach") != nil,
+ 		AfterEach:    mset.Lookup(typePkg, "AfterEach") != nil,
+-		BeforeEachAt: hookAt(r.targetPkg, mset.Lookup(typePkg, "BeforeEach")),
++		BeforeEachAt: hookAt(pkg, mset.Lookup(typePkg, "BeforeEach")),
+ 		AfterEachAt:  hookAt(r.targetPkg, mset.Lookup(typePkg, "AfterEach")),
+ 		HasHydrate:   mset.Lookup(typePkg, "Hydrate") != nil,
+ 		HasDehydrate: mset.Lookup(typePkg, "Dehydrate") != nil,

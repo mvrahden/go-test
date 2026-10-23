@@ -121,7 +121,7 @@ func (s *CollectorTestSuite) TestSharedFixture(t *gotest.T) {
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.NotEmpty(it, result.Errs, "expected error for BeforeEach on shared fixture")
-			gotest.ErrorContains(it, result.Errs[0].Err, "must not have BeforeEach")
+			gotest.ErrorContains(it, result.Errs[0].Err, `shared fixture "RedisSharedFixture" declares BeforeEach, but shared fixtures have no per-test hooks`)
 		})
 	})
 
@@ -131,7 +131,7 @@ func (s *CollectorTestSuite) TestSharedFixture(t *gotest.T) {
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.NotEmpty(it, result.Errs, "expected error for AfterEach on shared fixture")
-			gotest.ErrorContains(it, result.Errs[0].Err, "must not have AfterEach")
+			gotest.ErrorContains(it, result.Errs[0].Err, `shared fixture "RedisSharedFixture" declares AfterEach, but shared fixtures have no per-test hooks`)
 		})
 	})
 

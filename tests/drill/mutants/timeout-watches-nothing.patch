@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a suite hook or the body fails an assertion, panics or overruns the Timeout → fails the run with exit 1 and the method or suite whose hook went wrong, located at that hook when it panics or overruns, running the later hooks the row lists and, after a panic in a method's hooks or body, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -75,7 +75,7 @@
+@@ -84,7 +84,7 @@
  			}
  			// The budget covers the fixture hooks, the suite hooks and the body:
  			// ended last, after every AfterEach registered below.
@@ -11,4 +11,4 @@ Clause: when a suite hook or the body fails an assertion, panics or overruns the
 +			mt, end := openMethod(it, cfg.Timeout, 0)
  			defer end()
  			for _, f := range m.Fixtures {
- 				if f.After != nil {
+ 				// After a BeforeEach that overran no later fixture's turn comes.
