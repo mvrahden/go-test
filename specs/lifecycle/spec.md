@@ -6,7 +6,7 @@ How a suite's tests end, the hooks and the body going wrong, FailFast, panics am
 ## Requirements
 
 ### Requirement: A hook or body going wrong
-A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, locating an overrun or a panic at that hook, and SHALL still run the later hooks that release what ran; after an overrun only AfterEach hooks start, after a panic in a method no further method. An async method's budget ends when done() is called; its AfterEach is not budgeted. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
+A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, located at that hook, and SHALL run the later hooks that release what ran, a fixture's AfterEach only after its BeforeEach returned: after an overrun only AfterEach hooks, after a panic in a method no further method. An async method's budget ends at done(), before its AfterEach. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
 
 #### Scenario: Each hook and each way it goes wrong
 - **WHEN** a suite hook or the body fails an assertion, panics or overruns the Timeout
@@ -14,7 +14,7 @@ A suite hook, a fixture's per-method hook or the body that fails, panics or over
 
 #### Scenario: Each fixture per-method hook and each way it goes wrong
 - **WHEN** a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout
-- **THEN** fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method
+- **THEN** fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 
 ### Requirement: A panic among parallel methods
 A panic in one parallel method SHALL fail the run, cut its running siblings short and still run AfterAll and the fixture teardown.

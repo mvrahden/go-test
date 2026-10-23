@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAHelperFailureNamesBothLinesUnderTrimp
 Clause: when a helper fails in a module whose path has no dot, built with -trimpath → the failure names the helper's line and the caller's
 --- a/internal/callsite/callsite.go
 +++ b/internal/callsite/callsite.go
-@@ -72,7 +72,7 @@
+@@ -79,7 +79,7 @@
  	if info == nil {
  		return nil
  	}

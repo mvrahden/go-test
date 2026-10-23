@@ -1,0 +1,20 @@
+Expect: fixtureorder: "behind AfterEach" ran
+Judge: ./tests/canary CanaryTestSuite/TestAnAfterEachOnlyFixtureRunsWhenItsTurnCame
+Clause: when a fixture with only an AfterEach comes after a fixture whose BeforeEach fails → does not run its AfterEach, as its turn never came
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -87,6 +87,14 @@
+ 			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
+ 			defer end()
+ 			for _, f := range m.Fixtures {
++				if f.Before == nil && f.After != nil {
++					defer func() { _ = f.After(context.Background()) }()
++				}
++			}
++			for _, f := range m.Fixtures {
++				if f.Before == nil {
++					continue
++				}
+ 				// After a BeforeEach that overran no later fixture's turn comes.
+ 				if mt.overran() {
+ 					return

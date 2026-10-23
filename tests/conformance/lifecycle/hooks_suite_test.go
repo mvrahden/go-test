@@ -69,15 +69,17 @@ func (s *SuiteHooksTestSuite) TestAHookOrBodyGoesWrong(t *gotest.T) {
 }
 
 func (s *SuiteHooksTestSuite) TestAFixtureEachHookGoesWrong(t *gotest.T) {
-	// As above for a package fixture's BeforeEach and AfterEach. Of the method
-	// whose fixture BeforeEach went wrong, only the fixture's AfterEach runs.
+	// As above for a package fixture's BeforeEach and AfterEach. A fixture's
+	// AfterEach pairs with a BeforeEach that returned: after one that failed
+	// or panicked no hook of that method runs, after one that overran only the
+	// AfterEach hooks.
 	t.When("a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout", func(w *gotest.T) {
-		w.It("fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method", func(it *gotest.T) {
+		w.It("fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method", func(it *gotest.T) {
 			const file = "fixture.go"
 			for sub, row := range gotest.Each(it, []gridRow{
-				{Desc: "fixture BeforeEach returns an error and its AfterEach still runs", run: startRow(it, "fixture.BeforeEach", "error"),
-					ran: suiteHooksSkipped, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1,
-					said: `GridFixture\.BeforeEach failed: fixture\.BeforeEach failed`},
+				{Desc: "fixture BeforeEach returns an error and its AfterEach does not run", run: startRow(it, "fixture.BeforeEach", "error"),
+					ran: methodNeverOpened, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1,
+					said: failedAt(it, file, `func (f *GridFixture) BeforeEach`, "GridFixture.BeforeEach failed: fixture.BeforeEach failed")},
 				{Desc: "fixture BeforeEach panics", run: startRow(it, "fixture.BeforeEach", "panic"),
 					ran: suiteEndsAtBeforeEach, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1,
 					said: panicAt(it, file, `panic(hook + " panicked")`, "fixture.BeforeEach panicked")},
@@ -89,7 +91,7 @@ func (s *SuiteHooksTestSuite) TestAFixtureEachHookGoesWrong(t *gotest.T) {
 					said: overrunAt(it, file, `fixtureHook(ctx, "fixture.BeforeEach")`, "GridFixture.BeforeEach ")},
 				{Desc: "fixture AfterEach returns an error", run: startRow(it, "fixture.AfterEach", "error"),
 					ran: cleanRun, verdicts: map[string]string{body: "fail", next: "pass"}, exit: 1,
-					said: `GridFixture\.AfterEach failed: fixture\.AfterEach failed`},
+					said: failedAt(it, file, `func (f *GridFixture) AfterEach`, "GridFixture.AfterEach failed: fixture.AfterEach failed")},
 				{Desc: "fixture AfterEach panics", run: startRow(it, "fixture.AfterEach", "panic"),
 					ran: suiteEndsAfterBody, verdicts: map[string]string{body: "fail", next: "", suite: "fail"}, exit: 1,
 					said: panicAt(it, file, `panic(hook + " panicked")`, "fixture.AfterEach panicked")},

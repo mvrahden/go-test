@@ -185,3 +185,7 @@ eachskip pass TestEachSkipTestSuite/TestMethodSkipsInARow/first
 eachskip skip TestEachSkipTestSuite/TestASkippingRow
 eachskip skip TestEachSkipTestSuite/TestASkippingRow/second
 eachskip skip TestEachSkipTestSuite/TestMethodSkipsInARow
+fixtureafterfail exit 1
+fixtureafterfail fail -
+fixtureafterfail fail TestAfterFailTestSuite
+fixtureafterfail fail TestAfterFailTestSuite/TestBody

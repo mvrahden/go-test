@@ -1,10 +1,10 @@
 Expect: hookoverrun: "suite BeforeEach" ran after the budget was blown
 Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
-Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method
+Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -97,9 +97,6 @@
- 					}
+@@ -109,9 +109,6 @@
+ 					}()
  				}
  			}
 -			if mt.overran() {

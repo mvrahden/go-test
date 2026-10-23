@@ -1,0 +1,14 @@
+Expect: fixtureafterfail: the failure is (not reported at the hook's file|reported inside the runtime's file)
+Judge: ./tests/canary CanaryTestSuite/TestAFixtureAfterEachErrorIsReportedAtTheHook
+Clause: when a fixture AfterEach returns an error → is reported at the hook's declaration, not in the runtime's file
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -104,7 +104,7 @@
+ 						// Releases what BeforeEach acquired, so neither the
+ 						// deadline nor a stop ends its context.
+ 						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on
+-							reportAt(it, callsite.Declared(f.AfterAt), fmt.Sprintf("%s.AfterEach failed: %v", f.Name, err))
++							it.Errorf("%s.AfterEach failed: %v", f.Name, err)
+ 						}
+ 					}()
+ 				}

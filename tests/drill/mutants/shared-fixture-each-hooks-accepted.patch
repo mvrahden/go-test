@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .*a shared fixture declares BeforeEach or AfterEach, in the suite's package or another / fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead / in another package \(
+Clause: when a shared fixture declares BeforeEach or AfterEach, in the suite's package or another → fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead
+--- a/internal/gotestast/fixture.go
++++ b/internal/gotestast/fixture.go
+@@ -257,6 +257,9 @@
+ // SharedEachHook refuses a shared fixture that declares BeforeEach or
+ // AfterEach, its own or promoted, located at the hook: nothing would call it.
+ func SharedEachHook(named *types.Named) error {
++	if named != nil {
++		return nil
++	}
+ 	mset := types.NewMethodSet(types.NewPointer(named))
+ 	for _, hook := range []string{"BeforeEach", "AfterEach"} {
+ 		if sel := mset.Lookup(named.Obj().Pkg(), hook); sel != nil {

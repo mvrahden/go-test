@@ -370,12 +370,15 @@ CacheFixture.AfterEach  ──┘
 
 **Failure reporting.**
 Fixture hook failures are reported with automatic attribution.
-`BeforeEach`/`AfterEach` failures appear in test output — attributed to the fixture and the failing hook:
+`BeforeEach`/`AfterEach` failures appear in test output — attributed to the fixture and the failing hook, and located at the hook's declaration:
 
 ```
 --- FAIL: TestBatchTestSuite/TestDispatch
-    E2ESetupFixture.BeforeEach failed: connection refused
+    fixture.go:23: E2ESetupFixture.BeforeEach failed: connection refused
 ```
+
+A fixture's `AfterEach` runs only when every fixture `BeforeEach` up to its own in dependency order returned without an error.
+A `BeforeEach` that returns an error gets no `AfterEach`, so it releases what it acquired before returning.
 
 `BeforeAll`/`AfterAll` failures are fatal — they fail all fixture-bound tests with automatic attribution:
 

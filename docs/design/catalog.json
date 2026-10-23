@@ -4015,6 +4015,73 @@
               "name": "TestHooksCallingT",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "in the suite's package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "in_the_suite's_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "in another package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "in_another_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_with_exit_2_and_one_error_on_stderr,_located_at_the_hook,_that_says_shared_fixtures_have_no_per-test_hooks_and_where_the_work_goes_instead",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture declares BeforeEach or AfterEach, in the suite's package or another",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_declares_BeforeEach_or_AfterEach,_in_the_suite's_package_or_another",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SharedFixtureEachHooks",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSharedFixtureEachHooks",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIRejections",
@@ -4514,6 +4581,247 @@
     {
       "duration": 0,
       "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, not in the runtime's file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_reported_at_the_hook's_declaration,_not_in_the_runtime's_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture BeforeEach returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fixture_BeforeEach_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, not in the runtime's file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_reported_at_the_hook's_declaration,_not_in_the_runtime's_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture AfterEach returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fixture_AfterEach_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, named by its file's base name",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_reported_at_the_hook's_declaration,_named_by_its_file's_base_name",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a hook another package declares returns an error, a fixture's of that package or one promoted from its type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_hook_another_package_declares_returns_an_error,_a_fixture's_of_that_package_or_one_promoted_from_its_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names the hook's file by its full path, as go test -fullpath does",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_the_hook's_file_by_its_full_path,_as_go_test_-fullpath_does",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a hook another package declares returns an error under -fullpath",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_hook_another_package_declares_returns_an_error_under_-fullpath",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhereAFixtureHookErrorIsReported",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestWhereAFixtureHookErrorIsReported",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureHooks",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureHooksTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "starts no later fixture's BeforeEach, fails the method once, at the hook that overran, and runs that fixture's AfterEach",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_no_later_fixture's_BeforeEach,_fails_the_method_once,_at_the_hook_that_overran,_and_runs_that_fixture's_AfterEach",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture's BeforeEach overruns the Timeout ahead of another fixture's",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fixture's_BeforeEach_overruns_the_Timeout_ahead_of_another_fixture's",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs its AfterEach, as every BeforeEach before it returned",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_its_AfterEach,_as_every_BeforeEach_before_it_returned",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture with only an AfterEach comes before a fixture whose BeforeEach fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fixture_with_only_an_AfterEach_comes_before_a_fixture_whose_BeforeEach_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "does not run its AfterEach, as its turn never came",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "does_not_run_its_AfterEach,_as_its_turn_never_came",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture with only an AfterEach comes after a fixture whose BeforeEach fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_fixture_with_only_an_AfterEach_comes_after_a_fixture_whose_BeforeEach_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HooksInDependencyOrder",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestHooksInDependencyOrder",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureOrder",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureOrderTestSuite",
+          "output": [],
+          "status": "none"
+        },
         {
           "children": [
             {
@@ -6296,13 +6604,13 @@
                       "children": [
                         {
                           "children": [],
-                          "display": "fixture BeforeEach returns an error and its AfterEach still runs",
+                          "display": "fixture BeforeEach returns an error and its AfterEach does not run",
                           "duration": 0,
                           "excluded": false,
                           "external": false,
                           "focused": false,
                           "kind": "block",
-                          "name": "fixture_BeforeEach_returns_an_error_and_its_AfterEach_still_runs",
+                          "name": "fixture_BeforeEach_returns_an_error_and_its_AfterEach_does_not_run",
                           "output": [],
                           "status": "none",
                           "vocab": "each"
@@ -6386,13 +6694,13 @@
                           "vocab": "each"
                         }
                       ],
-                      "display": "fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method",
+                      "display": "fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "fails_the_run_with_exit_1_and_the_method,_naming_the_hook,_located_at_it_when_it_panics_or_overruns,_running_the_later_hooks_the_row_lists_and,_after_a_panic,_no_further_method",
+                      "name": "fails_the_run_with_exit_1_and_the_method,_naming_the_hook_and_located_at_it,_running_the_later_hooks_the_row_lists_and,_after_a_panic,_no_further_method",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -6438,13 +6746,13 @@
     }
   ],
   "stats": {
-    "behaviors": 216,
+    "behaviors": 225,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 29,
+    "suites": 31,
     "tests": 0
   }
 }

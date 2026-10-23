@@ -26,12 +26,18 @@ Package fixtures may also define per-test hooks — `BeforeEach(ctx
 context.Context) error` / `AfterEach(ctx context.Context) error` — with the
 same signatures as the All hooks. They wrap the suite's: fixture
 `BeforeEach` → suite `BeforeEach` → test → suite `AfterEach` → fixture
-`AfterEach`. A suite with `Fuzz*` methods refuses fixtures that have them.
+`AfterEach`. A fixture's `AfterEach` runs only when every fixture
+`BeforeEach` up to its own in dependency order returned without an error
+(v1.34+; see `versions.md`), so a `BeforeEach` that returns an error must
+release what it acquired before returning. A suite with `Fuzz*` methods
+refuses fixtures that have them.
 
 Shared fixtures (`*SharedFixture`) span packages: gotest sets them up once
 and transfers state by JSON-serializing the fixture's EXPORTED FIELDS into
 a state file each test process reads, so those fields must survive
-`encoding/json`. A shared fixture has no `BeforeEach`/`AfterEach`. Inside
+`encoding/json`. A shared fixture has no `BeforeEach`/`AfterEach`: the
+generator refuses one that declares them; put per-test work in a package
+fixture that binds the shared one, or in the suite's hooks. Inside
 a shared fixture, one pointer field per parent shared fixture TYPE: only
 one instance of a parent ever exists, so a second field of the same type
 is a generation error — keep one wired field and derive the other

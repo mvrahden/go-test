@@ -1,7 +1,7 @@
 # Fixtures Specification
 
 ## Purpose
-Which shared fixtures a run starts for the suites it selects, guarded suites included.
+Which shared fixtures a run starts for the suites it selects, guarded suites included, and how a package fixture's per-method hooks run and where their failures are reported.
 
 ## Requirements
 
@@ -41,3 +41,37 @@ A shared fixture bound by a guard-skipped suite SHALL still be started, and its 
 #### Scenario: A guarded suite whose shared fixture fails
 - **WHEN** a guard-skipped suite binds a shared fixture whose setup fails
 - **THEN** the fixture is started for it and its failure fails the run and the suite, whose guard never runs
+
+### Requirement: Where a fixture hook failure is reported
+An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook's declaration, not inside the runtime, wherever it is declared: in the suite's package, in another package, or promoted from another package's type. The file is named by its base name, or by its full path under -fullpath.
+
+#### Scenario: A fixture BeforeEach error
+- **WHEN** a fixture BeforeEach returns an error
+- **THEN** is reported at the hook's declaration, not in the runtime's file
+
+#### Scenario: A fixture AfterEach error
+- **WHEN** a fixture AfterEach returns an error
+- **THEN** is reported at the hook's declaration, not in the runtime's file
+
+#### Scenario: A hook declared in another package
+- **WHEN** a hook another package declares returns an error, a fixture's of that package or one promoted from its type
+- **THEN** is reported at the hook's declaration, named by its file's base name
+
+#### Scenario: A hook declared in another package, under -fullpath
+- **WHEN** a hook another package declares returns an error under -fullpath
+- **THEN** names the hook's file by its full path, as go test -fullpath does
+
+### Requirement: Fixture per-method hooks in dependency order
+A suite's package fixtures SHALL take their per-method turns in dependency order, a fixture's turn coming only once every BeforeEach before it returned without an error inside the Timeout. In its turn a fixture runs its BeforeEach, if it has one; its AfterEach SHALL run, in reverse, exactly when its turn came and that BeforeEach returned without an error.
+
+#### Scenario: A BeforeEach overruns ahead of another fixture's
+- **WHEN** a fixture's BeforeEach overruns the Timeout ahead of another fixture's
+- **THEN** starts no later fixture's BeforeEach, fails the method once, at the hook that overran, and runs that fixture's AfterEach
+
+#### Scenario: An AfterEach-only fixture before the one that fails
+- **WHEN** a fixture with only an AfterEach comes before a fixture whose BeforeEach fails
+- **THEN** runs its AfterEach, as every BeforeEach before it returned
+
+#### Scenario: An AfterEach-only fixture after the one that fails
+- **WHEN** a fixture with only an AfterEach comes after a fixture whose BeforeEach fails
+- **THEN** does not run its AfterEach, as its turn never came

@@ -128,6 +128,13 @@ The version subcommand SHALL exit 0 and print the version on stdout.
 - **WHEN** the version subcommand runs
 - **THEN** exits 0 and prints the version on stdout
 
+### Requirement: A shared fixture with per-test hooks
+gotest SHALL refuse with exit 2 a shared fixture that declares BeforeEach or AfterEach, in the suite's package or another: shared fixtures have no per-test hooks, so the hook would never run. The error is located at the hook and says where the per-test work goes instead.
+
+#### Scenario: A shared fixture declares a per-test hook
+- **WHEN** a shared fixture declares BeforeEach or AfterEach, in the suite's package or another
+- **THEN** fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

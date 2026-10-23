@@ -378,3 +378,20 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     `FailFast` left out of a sequential suite had no verdict, and a soft
     `BeforeAll` failure stopped every method after the first, in
     sequential suites.
+11. **A fixture's `AfterEach` pairs with its `BeforeEach`**: it runs only
+    when every fixture `BeforeEach` up to its own in dependency order
+    returned without an error, and an error either hook returns is
+    reported at the hook's declaration
+    ([order](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-fixture-per-method-hooks-in-dependency-order),
+    [where reported](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
+    Below v1.34 the `AfterEach` ran after a `BeforeEach` that failed or
+    panicked too, so it had to tolerate what was never set up, and the
+    error was located inside gotest's runtime. To migrate, make a
+    `BeforeEach` that can fail midway release what it acquired before it
+    returns the error: its `AfterEach` no longer runs for it.
+12. **A shared fixture with `BeforeEach` or `AfterEach` is refused**:
+    generation fails at the hook
+    ([refusal](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-a-shared-fixture-with-per-test-hooks)).
+    Below v1.34 one from another package passed generation and the hooks
+    never ran. To migrate, move the per-test work into a package fixture
+    that binds the shared one, or into the suite's hooks.

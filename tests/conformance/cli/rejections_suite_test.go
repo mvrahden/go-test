@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -73,6 +74,26 @@ func (s *CLIRejectionsTestSuite) TestHooksCallingT(t *gotest.T) {
 	t.When("a hook checks t.T() for nil before it uses it", func(w *gotest.T) {
 		w.It("runs the suite", func(it *gotest.T) {
 			passes(it, acceptedRow{pkg: "../testdata/clihookguard/", test: "FuzzHookGuardTestSuite_FuzzOne"})
+		})
+	})
+}
+
+func (s *CLIRejectionsTestSuite) TestSharedFixtureEachHooks(t *gotest.T) {
+	t.When("a shared fixture declares BeforeEach or AfterEach, in the suite's package or another", func(w *gotest.T) {
+		w.It("fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []struct {
+				Desc, pkg, at, fixture, hook string
+			}{
+				{Desc: "in the suite's package", pkg: "../testdata/clisharedlocal/", at: "sharedlocal_suite_test.go:16:", fixture: "QueueSharedFixture", hook: "AfterEach"},
+				{Desc: "in another package", pkg: "../testdata/clisharedeach/", at: "shared/shared.go:17:", fixture: "CacheSharedFixture", hook: "BeforeEach"},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.pkg)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Equal(sub, 1, strings.Count(run.Stderr, "shared fixtures have no per-test hooks"), "stderr: %s", run.Stderr)
+				msg := `shared fixture "` + row.fixture + `" declares ` + row.hook + `, but shared fixtures have no per-test hooks, so it would never run; do that work in the ` + row.hook + ` of a package fixture that binds ` + row.fixture + `, or in the suite's ` + row.hook
+				gotest.Regexp(sub, regexp.QuoteMeta(row.at)+`\d+: `+regexp.QuoteMeta(msg), run.Stderr)
+			}
 		})
 	})
 }

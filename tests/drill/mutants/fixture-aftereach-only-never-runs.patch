@@ -1,0 +1,14 @@
+Expect: fixtureorder: the AfterEach ahead of the failed BeforeEach did not run
+Judge: ./tests/canary CanaryTestSuite/TestAnAfterEachOnlyFixtureRunsWhenItsTurnCame
+Clause: when a fixture with only an AfterEach comes before a fixture whose BeforeEach fails → runs its AfterEach, as every BeforeEach before it returned
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -98,7 +98,7 @@
+ 						it.FailNow()
+ 					}
+ 				}
+-				if f.After != nil {
++				if f.After != nil && f.Before != nil {
+ 					defer func() {
+ 						mt.enter(f.Name + ".AfterEach ")
+ 						// Releases what BeforeEach acquired, so neither the

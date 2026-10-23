@@ -283,6 +283,8 @@ Each test method receives its own context instance, enabling safe method-level p
 
 Hooks accept either `*gotest.T` or `*testing.T`.
 
+A per-method fixture hook that fails is the method's failure, located where the hook produced it ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
+
 #### Context Consistency Rules
 
 When `BeforeEach` returns a value, the following rules are enforced at generation time:

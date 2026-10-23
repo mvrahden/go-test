@@ -449,6 +449,9 @@ type UserTestSuite struct {
 
 When both fixture and suite define `BeforeEach`/`AfterEach`, the fixture's hooks wrap the suite's:
 fixture.BeforeEach -> suite.BeforeEach -> test -> suite.AfterEach -> fixture.AfterEach.
+A fixture's `AfterEach` runs only when every fixture `BeforeEach` up to its own in dependency order returned without an error, a fixture with no `BeforeEach` included ([Fixture per-method hooks in dependency order](specs/fixtures/spec.md#requirement-fixture-per-method-hooks-in-dependency-order)).
+So a `BeforeEach` that returns an error or panics gets no `AfterEach`: it releases what it acquired before returning.
+An error a fixture's `BeforeEach` or `AfterEach` returns is reported at the hook's declaration ([Where a fixture hook failure is reported](specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
 Fixtures compose via pointer fields (DAG — dependencies set up first):
 
@@ -514,6 +517,7 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 ```
 
 Suites reference shared fixtures via pointer fields (same as package fixtures).
+Shared fixtures have no per-test hooks: the generator refuses one that declares `BeforeEach` or `AfterEach` ([A shared fixture with per-test hooks](specs/cli/spec.md#requirement-a-shared-fixture-with-per-test-hooks)). Put per-test work in a package fixture that binds the shared one, or in the suite's `BeforeEach`/`AfterEach`.
 Shared fixtures must not live in `internal/` packages.
 Shared fixtures are window-scheduled: each is resident exactly while a scheduled suite needs it — never started when no dispatched suite requires it, and released or started at the bulk→exclusive-tail barrier as the phases' needs differ.
 `-skip` counts: a fixture no selected suite binds never starts ([Selection decides which shared fixtures start](specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start)).
