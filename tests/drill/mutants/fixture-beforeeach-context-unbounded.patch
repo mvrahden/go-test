@@ -1,0 +1,14 @@
+Expect: hookoverrun: no "fixture saw its context end" in the markers
+Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
+Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook, located at it when it panics or overruns, running the later hooks the row lists and, after a panic, no further method
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -92,7 +92,7 @@
+ 			for _, f := range m.Fixtures {
+ 				if f.Before != nil {
+ 					mt.enter(f.Name + ".BeforeEach ")
+-					if err := f.Before(mt.t.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook
++					if err := f.Before(it.Context()); err != nil { //nolint:fail-guard // names the fixture and its hook
+ 						it.Fatalf("%s.BeforeEach failed: %v", f.Name, err)
+ 					}
+ 				}

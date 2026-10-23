@@ -225,7 +225,7 @@ performs before cleanups.
 `RunMethods` (`pkg/gotestruntime/methods.go`) is the method loop: one
 subtest per method, `it.Parallel()` and the `FailFast` stop, the method's
 `*gotest.T`, the fixtures' per-method hooks around each method, and the
-`Timeout` budget. Each case's `Run` is the only part left in generated code,
+`Timeout` budget, which covers those hooks, the suite's and the body. Each case's `Run` is the only part left in generated code,
 because it needs the suite's static types: the suite's `BeforeEach` and
 `AfterEach`, with a returned context, and the method call. Every method call
 goes through the `ƒƒ_GOTEST_exec` trampoline, where an assertion's call-site

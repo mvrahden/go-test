@@ -1,0 +1,18 @@
+Expect: failfast: exit code 0, want 1
+Expect: failfast: missing "failfast fail TestFailFastTestSuite/TestFirst"
+Judge: ./tests/canary CanaryTestSuite/TestFailFastReportsWhatItSkipped
+Clause: when the first method of a FailFast suite fails → fails the method
+Clause: when the first method of a FailFast suite fails → fails the run
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -47,8 +47,8 @@
+ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
+ 	var failedFirst atomic.Pointer[string]
+ 	tripped := func() string {
+-		if first := failedFirst.Load(); cfg.FailFast && first != nil {
+-			return *first
++		if cfg.FailFast {
++			return m.Cases[0].Name
+ 		}
+ 		return ""
+ 	}

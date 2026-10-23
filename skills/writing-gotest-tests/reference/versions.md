@@ -364,3 +364,17 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    ([goroutines](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
    Below v1.34 the method went on after such a wait as if the goroutine
    had finished.
+10. **A method's `Timeout` covers its hooks**: a `BeforeEach` or
+    `AfterEach`, the suite's or a fixture's, that overruns it fails the
+    method, located at the hook and naming it, and nothing after that
+    hook starts but the `AfterEach` hooks; a fixture's `BeforeEach` gets
+    the method's context, which ends at the `Timeout`
+    ([hooks](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-hook-or-body-going-wrong)).
+    **`FailFast` reports what it skipped**: each method after the first
+    failed one is skipped with the reason `FailFast: <method>`, and a
+    failure `BeforeAll` records without stopping no longer trips it
+    ([FailFast](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-failfast)).
+    Below v1.34 only the body was held to the `Timeout`, the methods
+    `FailFast` left out of a sequential suite had no verdict, and a soft
+    `BeforeAll` failure stopped every method after the first, in
+    sequential suites.
