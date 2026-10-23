@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / fails without running the target, naming the fixture \(
+Clause: when gotest fuzz runs a target whose suite binds a shared fixture that does not come up → fails without running the target, naming the fixture
+--- a/internal/gotestrunner/fuzzfixtures.go
++++ b/internal/gotestrunner/fuzzfixtures.go
+@@ -59,7 +59,7 @@
+ 		return nil, ""
+ 	}
+ 	if missing := missingFixture(f.proc, keys); missing != "" {
+-		return nil, neverRan(t.Func, missing)
++		return nil, ""
+ 	}
+ 	path, err := f.proc.WriteSuiteStateFile(t.Package, t.Func, keys)
+ 	if err != nil {

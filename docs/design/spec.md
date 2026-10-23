@@ -495,6 +495,7 @@ type BatchTestSuite struct {
 ```
 
 Both paths produce the same lifecycle: deserialize from state file, call `Hydrate`, run tests, call `Dehydrate`.
+The state file is the runner's to write, so a suite binding a shared fixture is not plain `go test`'s to run ([Shared fixtures need the gotest runner](../../specs/fixtures/spec.md#requirement-shared-fixtures-need-the-gotest-runner)).
 
 Fixtures may be defined in a different package from the suite.
 Binding walks the type graph from targeted suites to discover all required fixtures, including cross-package dependencies.
@@ -561,7 +562,9 @@ func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
 }
 
 func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error {
-    f.Pool.Close()
+    if f.Pool != nil { // nil when the setup failed before connecting
+        f.Pool.Close()
+    }
     return nil
 }
 
@@ -570,7 +573,9 @@ func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error {
 }
 
 func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error {
-    f.Pool.Close()
+    if f.Pool != nil { // nil when the setup failed before connecting
+        f.Pool.Close()
+    }
     return nil
 }
 

@@ -1,7 +1,7 @@
 # Fuzz Specification
 
 ## Purpose
-How each fuzz execution's BeforeEach and AfterEach pair when BeforeEach fails, skips or panics, and which fuzz seed replays a run keeps when -run or -skip names some of a suite's Test and Fuzz functions.
+How each fuzz execution's BeforeEach and AfterEach pair when BeforeEach fails, skips or panics, which fuzz seed replays a run keeps when -run or -skip names some of a suite's Test and Fuzz functions, and how gotest fuzz and its triage give a target the shared fixtures its suite binds.
 
 ## Requirements
 
@@ -46,3 +46,18 @@ A suite with fuzz methods and no test method SHALL have no Test function to sele
 #### Scenario: Running the missing Test function of a suite without test methods
 - **WHEN** -run names only the Test function of a suite with no test method
 - **THEN** no seed replays and its shared fixture never starts, as the suite has no such function
+
+### Requirement: Fuzzing with shared fixtures
+`gotest fuzz` and `gotest fuzz triage` SHALL start the shared fixtures a target's suite binds once, before its processes run, hand their state to every one of them, fuzz workers included, and tear the fixtures down after the last; a target whose fixture does not come up SHALL fail without running.
+
+#### Scenario: Fuzzing a target whose suite binds a shared fixture
+- **WHEN** gotest fuzz runs a target whose suite binds a shared fixture
+- **THEN** starts the fixture once, its fuzz workers see its state, and it is torn down after
+
+#### Scenario: Fuzzing against a shared fixture that does not come up
+- **WHEN** gotest fuzz runs a target whose suite binds a shared fixture that does not come up
+- **THEN** fails without running the target, naming the fixture
+
+#### Scenario: Triaging a crasher of a target whose suite binds a shared fixture
+- **WHEN** gotest fuzz triage re-runs a crasher of a target whose suite binds a shared fixture
+- **THEN** reports the crasher's own failure, seen with the fixture's state, and tears the fixture down

@@ -395,3 +395,29 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     Below v1.34 one from another package passed generation and the hooks
     never ran. To migrate, move the per-test work into a package fixture
     that binds the shared one, or into the suite's hooks.
+13. **A fixture whose `BeforeAll` ran is released however it came out**
+    ([package](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-package-fixtures-beforeall-or-afterall-going-wrong),
+    [shared](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-failed-shared-setup-is-released)):
+    its `AfterAll` runs after a `BeforeAll` that failed, panicked or was
+    cancelled, and before each retry, not after a setup that ended before
+    `BeforeAll` ran. Below v1.34 a failed setup was never released and a
+    retry built on top of the failed attempt. To migrate, write `AfterAll`
+    to release whatever `BeforeAll` reached, not to assume it finished.
+14. **A failed release between setup attempts fails the run**
+    ([release](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-failed-release-between-attempts)).
+15. **A suite binding a shared fixture fails under plain `go test`**,
+    naming the fixture and `go tool gotest`, before any method runs
+    ([runner](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-shared-fixtures-need-the-gotest-runner)).
+    Below v1.34 it ran with the fixture's fields empty. `gotest fuzz` and
+    `gotest fuzz triage` start the suite's shared fixtures and every fuzz
+    worker hydrates them
+    ([fuzz](https://github.com/mvrahden/go-test/blob/main/specs/fuzz/spec.md#requirement-fuzzing-with-shared-fixtures)).
+16. **The release between setup attempts runs like the final teardown**
+    ([stop](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-stop-during-the-release-between-attempts)):
+    under the fixture's `Timeout`, failing the run when it overruns a
+    declared one, and not cut short by a stop, after which no further
+    attempt starts and `AfterAll` does not run again.
+17. **A failed `Hydrate` is dehydrated**
+    ([hydrate](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-failed-hydrate-is-dehydrated)):
+    `Dehydrate` runs after a `Hydrate` that failed or panicked. To migrate,
+    guard in `Dehydrate` what `Hydrate` may not have set.

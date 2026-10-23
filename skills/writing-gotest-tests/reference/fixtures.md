@@ -54,7 +54,16 @@ setup subprocess cannot import `internal/` paths.
 Timeouts: `FixtureConfig()` marker; a zero `Timeout` means the default
 (see `config.md`). All shared fixture setup together is also capped by
 `--setup-timeout` (default 2m), so a 5m `ContainerFixtureConfig()` needs
-a larger one.
+a larger one. A fixture whose `BeforeAll` ran gets its `AfterAll` however
+it came out, and before each retry (v1.34+): write `AfterAll` to release
+what `BeforeAll` reached, guarding fields it may not have set
+(`if f.Pool != nil { f.Pool.Close() }`). An `AfterAll` that fails or
+overruns a declared `Timeout` between attempts fails the run even when a
+later attempt comes up; a stop lets it finish and starts no further attempt
+(v1.34+). `Dehydrate` likewise runs after a `Hydrate` that failed partway
+(v1.34+). Under plain `go test` a suite binding a shared fixture fails
+before any method runs (v1.34+); `gotest fuzz` and `fuzz triage` start its
+shared fixtures and every fuzz worker hydrates them.
 A DECLARED `Timeout` is a verdict, not advice: it bounds the hook's
 context AND fails the fixture when `BeforeAll` or `AfterAll` returns after
 it — even when the hook ignores its context. A hook that never returns is

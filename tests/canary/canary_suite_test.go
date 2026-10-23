@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -844,6 +845,185 @@ func (s *CanaryTestSuite) TestAFixtureHookElsewhereIsLocatedAtIt(t *gotest.T) {
 				t.Errorf("fixtureelsewhere %v: no %q in the stream", c.flags, want)
 			}
 		}
+	}
+}
+
+// A fixture whose BeforeAll failed still gets its AfterAll: whatever the setup
+// reached is released, and the suite that binds it never opens.
+func (s *CanaryTestSuite) TestAFixtureThatFailedToStartIsReleased(t *gotest.T) {
+	dir := t.TempDir()
+	code, rows := s.run(t, "fixturesetupfail", dir)
+	if code != 1 {
+		t.Errorf("fixturesetupfail: exit code %d, want 1", code)
+	}
+	if slices.Contains(rows, "fixturesetupfail pass TestNeverOpensTestSuite/TestNever") {
+		t.Errorf("fixturesetupfail: the suite ran without its fixture: %v", rows)
+	}
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if want := []string{"fixture.BeforeAll", "fixture.AfterAll"}; !slices.Equal(got, want) {
+		t.Errorf("fixturesetupfail: hooks ran %v, want %v", got, want)
+	}
+}
+
+// A shared fixture whose setup failed is still released: what the attempt
+// reached would otherwise leak, as it would not for a package fixture.
+func (s *CanaryTestSuite) TestAFailedSharedSetupIsReleased(t *gotest.T) {
+	dir := s.check(t, "failingshared")
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if !testkit.MarkerOrderOf(got, "leak.BeforeAll", "leak.AfterAll") {
+		t.Errorf("failingshared: markers %v, want leak.BeforeAll then leak.AfterAll", got)
+	}
+}
+
+// A fixture whose AfterAll fails between two setup attempts fails the run and
+// reports that AfterAll's error, though its second attempt comes up: a package
+// fixture and a shared one alike.
+func (s *CanaryTestSuite) TestAFailedReleaseBetweenAttemptsFailsTheRun(t *gotest.T) {
+	for _, c := range []struct{ pkg, says string }{
+		{"packagerelease", "the package release leaked"},
+		{"sharedrelease", "the shared release leaked"},
+	} {
+		s.check(t, c.pkg)
+		if !strings.Contains(s.lastStream, c.says) {
+			t.Errorf("%s: the run does not report the release's error %q", c.pkg, c.says)
+		}
+	}
+}
+
+// A shared fixture that fails its last attempt fails the run, though the suite
+// binding it would pass without it.
+func (s *CanaryTestSuite) TestAFailedLastAttemptFailsTheRun(t *gotest.T) {
+	s.check(t, "lastattempt")
+}
+
+// A run stopped while a shared fixture's dependency sets up runs no AfterAll
+// for the fixture, whose BeforeAll never ran, and the dependency's AfterAll.
+func (s *CanaryTestSuite) TestASetupCancelledBeforeBeforeAllReleasesNothing(t *gotest.T) {
+	got, out := s.interruptAt(t, "cancelbeforesetup", "hold.BeforeAll")
+	if want := []string{"hold.BeforeAll", "hold.AfterAll"}; !slices.Equal(got, want) {
+		t.Errorf("cancelbeforesetup: markers %v, want %v\n%s", got, want, out)
+	}
+}
+
+// A run stopped while a shared fixture's AfterAll releases a failed attempt
+// lets that AfterAll finish, starts no further attempt and releases once.
+func (s *CanaryTestSuite) TestAStopDuringTheReleaseBetweenAttemptsLetsItFinish(t *gotest.T) {
+	got, out := s.interruptAt(t, "releasestop", "retry.AfterAll")
+	if !slices.Contains(got, "retry.AfterAll finished") {
+		t.Errorf("releasestop: the stop cut the release short: markers %v\n%s", got, out)
+	}
+	if n := countOf(got, "retry.BeforeAll"); n != 1 {
+		t.Errorf("releasestop: %d attempts, want 1: markers %v", n, got)
+	}
+	if n := countOf(got, "retry.AfterAll"); n != 1 {
+		t.Errorf("releasestop: released %d times, want once: markers %v", n, got)
+	}
+}
+
+// A package fixture whose release between attempts outlives its declared
+// Timeout fails the run, though its second attempt comes up.
+func (s *CanaryTestSuite) TestAReleaseThatOutlivesItsTimeoutFailsTheRun(t *gotest.T) {
+	s.check(t, "releaseslow")
+	if !strings.Contains(s.lastStream, "exceeded its configured Timeout of 200ms") {
+		t.Errorf("releaseslow: the run does not report the release's overrun")
+	}
+}
+
+// A shared fixture whose Hydrate fails partway still gets its Dehydrate.
+func (s *CanaryTestSuite) TestAFailedHydrateIsDehydrated(t *gotest.T) {
+	dir := s.check(t, "hydratefail")
+	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if want := []string{"pool.Hydrate", "pool.Dehydrate"}; !slices.Equal(got, want) {
+		t.Errorf("hydratefail: markers %v, want %v", got, want)
+	}
+}
+
+// interruptAt runs pkg, interrupts the run once marker is stamped and returns
+// the markers and output the run left.
+func (s *CanaryTestSuite) interruptAt(t *gotest.T, pkg, marker string) ([]string, string) {
+	dir := t.TempDir()
+	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Env = childEnv(dir)
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	cmd.WaitDelay = 15 * time.Second
+	tree, err := testkit.StartCLI(cmd)
+	if err != nil {
+		fatalf(t, "start: %v", err)
+	}
+	markers := filepath.Join(dir, testkit.MarkersFile)
+	for deadline := time.Now().Add(90 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		got, _ := testkit.ReadMarkers(markers)
+		if slices.Contains(got, marker) {
+			break
+		}
+		if time.Now().After(deadline) {
+			_ = tree.Kill()
+			_ = cmd.Wait()
+			tree.Release()
+			fatalf(t, "%s: the run never reached %s:\n%s", pkg, marker, out.String())
+		}
+	}
+	if err := testkit.Interrupt(cmd, tree); err != nil {
+		_ = tree.Kill()
+		_ = cmd.Wait()
+		tree.Release()
+		fatalf(t, "%s: signal: %v", pkg, err)
+	}
+	_ = cmd.Wait()
+	tree.Release()
+	got, _ := testkit.ReadMarkers(markers)
+	return got, out.String()
+}
+
+func countOf(events []string, event string) int {
+	n := 0
+	for _, e := range events {
+		if e == event {
+			n++
+		}
+	}
+	return n
+}
+
+// A suite binding a shared fixture has no state under plain go test: it fails
+// naming the fixture and the runner, before any method runs.
+func (s *CanaryTestSuite) TestASharedFixtureSuiteRefusesPlainGoTest(t *gotest.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		fatalf(t, "abs: %v", err)
+	}
+	dir := t.TempDir()
+	if _, err := testkit.StagePackage(root, filepath.Join("testdata", "fixturechain"), dir, "example.com/plain"); err != nil {
+		fatalf(t, "stage fixturechain: %v", err)
+	}
+	generate := exec.Command(s.binary, "generate", "./fixturechain/") //nolint:gosec // G204: controlled binary with fixed args
+	generate.Dir = dir
+	generate.Env = childEnv(t.TempDir())
+	if out, err := generate.CombinedOutput(); err != nil {
+		fatalf(t, "generate fixturechain: %v\n%s", err, out)
+	}
+	run := exec.Command("go", "test", "-count=1", "-v", "./fixturechain/")
+	run.Dir = dir
+	run.Env = childEnv(t.TempDir())
+	raw, err := run.CombinedOutput()
+	out := string(raw)
+	code := 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			fatalf(t, "go test fixturechain: %v", err)
+		}
+		code = exitErr.ExitCode()
+	}
+	if code != 1 {
+		t.Errorf("plain go test on a shared-fixture suite: exit code %d, want 1\n%s", code, out)
+	}
+	if !strings.Contains(out, "suite binds shared fixture TokenSharedFixture, whose state only the gotest runner provides; run via go tool gotest") {
+		t.Errorf("plain go test on a shared-fixture suite: the suite did not name the fixture it binds\n%s", out)
+	}
+	if strings.Contains(out, "=== RUN   TestChainTestSuite/") {
+		t.Errorf("plain go test on a shared-fixture suite: a method ran without the fixture's state\n%s", out)
 	}
 }
 

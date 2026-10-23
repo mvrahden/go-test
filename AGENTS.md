@@ -431,7 +431,12 @@ type DBFixture struct {
 }
 
 func (f *DBFixture) BeforeAll(ctx context.Context) error  { /* start db, set f.Pool */ return nil }
-func (f *DBFixture) AfterAll(ctx context.Context) error   { f.Pool.Close(); return nil }
+func (f *DBFixture) AfterAll(ctx context.Context) error {
+    if f.Pool != nil { // AfterAll also runs after a BeforeAll that failed early
+        f.Pool.Close()
+    }
+    return nil
+}
 func (f *DBFixture) BeforeEach(ctx context.Context) error { /* truncate tables */ return nil }
 func (f *DBFixture) AfterEach(ctx context.Context) error  { return nil }
 ```
@@ -475,6 +480,19 @@ Presets: `DefaultFixtureConfig()` (2m timeout), `ContainerFixtureConfig()` (5m, 
 **Teardown failures are real failures.** A fixture `AfterAll` that returns an error or
 panics fails the run — for package and shared fixtures alike. A panic in one fixture's
 teardown is contained, so every other fixture still finishes releasing its resources.
+That includes the release between two setup attempts: it fails the run even when a later
+attempt comes up ([A failed release between attempts](specs/fixtures/spec.md#requirement-a-failed-release-between-attempts)).
+
+A fixture whose `BeforeAll` ran gets its `AfterAll` however it came out — failed,
+panicked or cancelled, and before each retry — so write it to release whatever
+`BeforeAll` had reached; one whose setup ended before its `BeforeAll` ran gets none
+([A package fixture's BeforeAll or AfterAll going wrong](specs/fixtures/spec.md#requirement-a-package-fixtures-beforeall-or-afterall-going-wrong), [A failed shared setup is released](specs/fixtures/spec.md#requirement-a-failed-shared-setup-is-released)).
+The release before a retry runs like the final teardown: under the fixture's `Timeout`,
+held to a declared one, and not cut short by a stop, after which no further attempt starts
+([A stop during the release between attempts](specs/fixtures/spec.md#requirement-a-stop-during-the-release-between-attempts));
+an `AfterAll` that never returns is ended by `--setup-timeout` or `go test -timeout`.
+Likewise a shared fixture whose `Hydrate` ran gets its `Dehydrate` however it came out
+([A failed Hydrate is dehydrated](specs/fixtures/spec.md#requirement-a-failed-hydrate-is-dehydrated)).
 
 `Retries` covers panics as well as returned errors — a `BeforeAll` that panics is
 retried like one that fails. If a shared fixture's process dies before teardown, the
@@ -497,7 +515,12 @@ func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
 }
 func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error   { return stopPostgres() }
 func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error    { return f.connect(ctx) }
-func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error  { f.Pool.Close(); return nil }
+func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error {
+    if f.Pool != nil { // Dehydrate also runs after a Hydrate that failed
+        f.Pool.Close()
+    }
+    return nil
+}
 
 func (f *PostgresSharedFixture) connect(ctx context.Context) error {
     var err error
@@ -507,6 +530,8 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 ```
 
 Fields assigned in `Hydrate` are automatically classified as local and excluded from serialization.
+Only the runner provides that state: under plain `go test` a suite binding a shared fixture fails before any method runs ([Shared fixtures need the gotest runner](specs/fixtures/spec.md#requirement-shared-fixtures-need-the-gotest-runner)).
+`gotest fuzz` and `gotest fuzz triage` start the shared fixtures a target's suite binds once for the session, and every fuzz worker hydrates them ([Fuzzing with shared fixtures](specs/fuzz/spec.md#requirement-fuzzing-with-shared-fixtures)).
 
 Shared fixture configuration uses a method named `SharedFixtureConfig()` (not `FixtureConfig()`) but returns the same `gotest.FixtureConfig` type:
 

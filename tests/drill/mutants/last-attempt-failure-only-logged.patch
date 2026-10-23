@@ -1,0 +1,14 @@
+Expect: lastattempt: exit code 0, want 1
+Judge: ./tests/canary CanaryTestSuite/TestAFailedLastAttemptFailsTheRun
+Clause: when a shared fixture's setup fails on its last attempt → fails the run
+--- a/pkg/gotestruntime/fixturesetup.go
++++ b/pkg/gotestruntime/fixturesetup.go
+@@ -143,7 +143,7 @@
+ 	if releaseErr != nil {
+ 		return errors.Join(lastErr, releaseErr)
+ 	}
+-	return lastErr
++	return nil
+ }
+ 
+ // release runs AfterAll between attempts and returns ErrReleaseFailed, with

@@ -306,7 +306,9 @@ func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
 }
 
 func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
-    f.Pool.Close()
+    if f.Pool != nil { // AfterAll also runs after a BeforeAll that failed
+        f.Pool.Close()
+    }
     return nil
 }
 ```
