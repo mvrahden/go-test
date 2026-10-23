@@ -267,7 +267,9 @@ func runDehydrate(node *FixtureNode) (failed bool) {
 // fixtures: the largest over every DAG it set up, so the DAG of the other test
 // package does not shrink it.
 func writeBudgetFile(cfg MainConfig) {
-	budget := recordBudget(computeMaxDAGPath(cfg.Fixtures) + cfg.MaxSuiteSetupTimeout + 30*time.Second)
+	path := computeMaxDAGPath(cfg.Fixtures)
+	recordReserve(path)
+	budget := recordBudget(path + cfg.MaxSuiteSetupTimeout + 30*time.Second)
 	if budgetFile == "" {
 		return
 	}

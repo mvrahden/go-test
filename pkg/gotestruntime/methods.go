@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/callsite"
+	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -55,7 +56,9 @@ type Method struct {
 // not started: each is skipped with the reason "FailFast: <that method>".
 // The decision reads each method's own verdict, so a failure the suite's
 // BeforeAll recorded without stopping does not trip it. Among parallel
-// methods the stop is best effort: methods already running finish.
+// methods the stop is best effort: methods already running finish. Once the
+// run is asked to stop, a method that has not started is skipped with the
+// reason "run stopping".
 func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 	var failedFirst atomic.Pointer[string]
 	tripped := func() string {
@@ -82,6 +85,9 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				if first := tripped(); first != "" {
 					skipFailFast(it, first)
 				}
+			}
+			if runstate.StopContext().Err() != nil {
+				skipStopping(it)
 			}
 			// The budget covers the fixture hooks, the suite hooks and the body:
 			// ended last, after every AfterEach registered below.
@@ -119,6 +125,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 					return
 				}
 				mt.enter("")
+				defer runstate.EnterBody(it, "a method")()
 				method()
 			})
 		})
@@ -132,6 +139,13 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 // location: a runtime file is nothing the user can open.
 func skipFailFast(t *testing.T, first string) {
 	fmt.Fprintln(t.Output(), "FailFast: "+first)
+	t.SkipNow()
+}
+
+// skipStopping skips t, a method a stopped run never started, with no
+// location either.
+func skipStopping(t *testing.T) {
+	fmt.Fprintln(t.Output(), "run stopping")
 	t.SkipNow()
 }
 

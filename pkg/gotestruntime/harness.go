@@ -51,11 +51,25 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		// from the guard to BeforeAll, fails the benchmark instead.
 		defer ReleaseOnPanic(b)
 	}
+	// A suite opening after the run was stopped — another top-level function
+	// of a stopped process — has nothing to set up.
+	if runstate.StopContext().Err() != nil {
+		tb.Skip("run stopping")
+	}
 	if s.Guard != nil {
 		if reason := s.Guard(); reason != "" {
 			tb.Skipf("suite guard: %s", reason)
 		}
 	}
+	// A stop skips the methods not started and runs AfterAll, with or without
+	// fixtures to hold, and waits for the suite to end; registered first, the
+	// watch ends after every other cleanup of tb.
+	startWatch()
+	openSuites.Add(1)
+	tb.Cleanup(func() {
+		openSuites.Add(-1)
+		stopWatch()
+	})
 	if s.Fixtures != nil {
 		s.Fixtures(tb)
 	}
@@ -125,6 +139,44 @@ func AfterEach(after func()) {
 	after()
 }
 
+// AfterEachT builds the *gotest.T handed to a test method's AfterEach from
+// t, the method's: a stop does not end its context, so cleanup that honours
+// its context runs to its end, but the method's deadline still does. Under a
+// declared Timeout it ends as the method's own context does, once the budget
+// watch has judged an overrun.
+func AfterEachT(t *gotest.T) *gotest.T {
+	if after, ok := afterTs.Load(t); ok {
+		return after.(*gotest.T)
+	}
+	tb := t.T()
+	if tb == nil {
+		return t
+	}
+	parent := t.Context()
+	ctx := context.WithoutCancel(parent)
+	if deadline, ok := parent.Deadline(); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, deadline)
+		tb.Cleanup(cancel)
+	}
+	return gotest.NewTWithContext(tb, ctx)
+}
+
+// SkipIfStopped skips b, a benchmark the generated code is about to start,
+// once the run is stopped, with the reason "run stopping" and no location.
+func SkipIfStopped(b *testing.B) {
+	if runstate.StopContext().Err() != nil {
+		fmt.Fprintln(b.Output(), "run stopping")
+		b.SkipNow()
+	}
+}
+
+// RunBody runs a benchmark's body as one a stop gives grace to.
+func RunBody(b *testing.B, body func()) {
+	defer runstate.EnterBody(b, "a benchmark")()
+	body()
+}
+
 // TestT builds the *gotest.T handed to a single test method. The timeout only
 // bounds the context here; holding the method to it is [RunMethods]' job, because
 // code that ignores its context runs to completion either way.
@@ -148,7 +200,12 @@ func endBody(t *testing.T) {
 // declared no config of its own.
 func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
 	tt := SetupT(t, timeout)
-	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() { beforeAll(tt) })
+	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() {
+		// A stop gives BeforeAll the grace a method body gets: AfterAll
+		// cannot run before it returns.
+		defer runstate.EnterBody(t, "BeforeAll")()
+		beforeAll(tt)
+	})
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
@@ -289,6 +346,11 @@ func testScopedT(t testing.TB, timeout time.Duration) *gotest.T {
 	if timeout > 0 {
 		cancel()
 		ctx, cancel = context.WithTimeout(t.Context(), timeout)
+	}
+	// AfterFunc runs cancel on its own goroutine; a stop already in effect
+	// must be seen by the first read, so it is applied here as well.
+	if runstate.StopContext().Err() != nil {
+		cancel()
 	}
 	stop := context.AfterFunc(runstate.StopContext(), cancel)
 	t.Cleanup(func() {

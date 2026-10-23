@@ -18,8 +18,9 @@ import (
 // The testing package runs that cleanup when a test or subtest below tb
 // panics, too. A panicking sub-benchmark ends as a failure instead: see
 // ReleaseOnPanic.
-// While the hold lasts, a stop (Ctrl-C, or one the runner announces) releases
-// the fixtures and ends the process by its signal.
+// While the hold lasts, a stop (Ctrl-C, or one the runner announces) ends the
+// tests' contexts, skips the methods not started, and lets the suite finish:
+// AfterAll runs, then this cleanup releases the fixtures.
 func HoldFixtures(tb testing.TB, build func() MainConfig) {
 	cfg, err := buildConfig(build)
 	if err != nil {

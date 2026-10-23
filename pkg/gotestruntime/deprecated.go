@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -51,6 +52,7 @@ func RunTest(t *gotest.T, budget time.Duration, run func()) {
 	methodWatches.Store(t.T(), end)
 	defer methodWatches.Delete(t.T())
 	defer end()
+	defer runstate.EnterBody(t.T(), "a method")()
 	run()
 }
 

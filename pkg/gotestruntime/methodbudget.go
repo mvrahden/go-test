@@ -19,6 +19,7 @@ type method struct {
 	t      *gotest.T
 	budget time.Duration
 	ctx    *budgetContext // nil without a budget
+	after  *budgetContext // AfterEach's: the budget's, which a stop does not end
 	phase  atomic.Pointer[string]
 	due    chan struct{} // closed at the deadline
 
@@ -37,10 +38,17 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 		return &method{it: it, t: TestT(it, timeout)}, func() {}
 	}
 	parent, cancel := context.WithCancel(it.Context())
+	// As in [testScopedT]: a stop already in effect is seen at once.
+	if runstate.StopContext().Err() != nil {
+		cancel()
+	}
 	stop := context.AfterFunc(runstate.StopContext(), cancel)
 	m = &method{it: it, budget: budget, due: make(chan struct{}), watching: true}
-	m.ctx = newBudgetContext(parent, time.Now().Add(budget))
+	deadline := time.Now().Add(budget)
+	m.ctx = newBudgetContext(parent, deadline)
+	m.after = newBudgetContext(context.WithoutCancel(it.Context()), deadline)
 	m.t = gotest.NewTWithContext(it, m.ctx)
+	afterTs.Store(m.t, gotest.NewTWithContext(it, m.after))
 	m.enter("")
 	timer := time.AfterFunc(budget, m.deadlinePassed)
 	it.Cleanup(func() {
@@ -55,6 +63,7 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 		defer close(stopped)
 		if watchDeadline(it, gid, budget, m.phaseName, "Timeout", m.due, done) {
 			m.ctx.end(context.DeadlineExceeded)
+			m.after.end(context.DeadlineExceeded)
 		}
 	}()
 	methodsByGoroutine.Store(gid, m)
@@ -70,10 +79,12 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 		m.mu.Unlock()
 		if expired {
 			m.ctx.end(context.DeadlineExceeded)
+			m.after.end(context.DeadlineExceeded)
 		}
 	})
 	methodWatches.Store(it, stopWatch)
 	return m, func() {
+		afterTs.Delete(m.t)
 		methodWatches.Delete(it)
 		stopWatch()
 	}
@@ -89,8 +100,12 @@ func (m *method) deadlinePassed() {
 	m.mu.Unlock()
 	if !watching {
 		m.ctx.end(context.DeadlineExceeded)
+		m.after.end(context.DeadlineExceeded)
 	}
 }
+
+// afterTs holds, per running budgeted method's T, the T its AfterEach gets.
+var afterTs sync.Map // *gotest.T -> *gotest.T
 
 // enter names the phase the method runs next, for an overrun's verdict:
 // "BeforeEach ", "AfterEach ", "<Fixture>.BeforeEach " and the like, or

@@ -45,6 +45,7 @@ func ExportUseBudgetFile(path string) {
 	budgetMu.Lock()
 	budgetFile = path
 	maxBudget = 0
+	maxReserve = 0
 	budgetMu.Unlock()
 }
 

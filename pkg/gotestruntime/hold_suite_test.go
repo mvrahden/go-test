@@ -2,6 +2,8 @@ package gotestruntime_test
 
 import (
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,14 +44,16 @@ type HoldWatchTestSuite struct{}
 
 func (s *HoldWatchTestSuite) TestWatcher(t *gotest.T) {
 	t.When("a function holds fixtures", func(w *gotest.T) {
-		w.It("watches for a stop exactly while the hold lasts", func(it *gotest.T) {
-			var during bool
+		w.It("is served by the stop watcher exactly while the hold lasts", func(it *gotest.T) {
+			before := gotestruntime.ExportWatchCount()
+			var during int
 			it.T().Run("holder", func(tt *testing.T) { //nolint:suite-lifecycle // the hold must end with a test
 				gotestruntime.HoldFixtures(tt, func() gotestruntime.MainConfig { return gotestruntime.MainConfig{} })
-				during = gotestruntime.ExportWatching()
+				during = gotestruntime.ExportWatchCount()
 			})
-			gotest.True(it, during, "no watcher while the fixtures were held")
-			gotest.False(it, gotestruntime.ExportWatching(), "the watcher outlived the hold: goleak would see it")
+			gotest.True(it, gotestruntime.ExportWatching(), "the suite's own run is watched")
+			gotest.Equal(it, before+1, during, "the hold is not served while it lasts")
+			gotest.Equal(it, before, gotestruntime.ExportWatchCount(), "the hold's watch outlived it")
 		})
 	})
 }
@@ -83,6 +87,20 @@ func (s *HoldWatchTestSuite) TestRunnerRequired(t *gotest.T) {
 				"suite binds shared fixture OnceSharedFixture, whose state only the gotest runner provides; run via go tool gotest",
 				"suite binds shared fixture OnceSharedFixture; run via go tool gotest",
 			}, rec.fatals)
+		})
+	})
+}
+
+// watcherFunc is the function the stop watcher's goroutine runs, as
+// goleak.IgnoreAnyFunction must name it to leave it out of VerifyNone.
+const watcherFunc = "github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).loop"
+
+func (s *HoldWatchTestSuite) TestWatcherGoroutine(t *gotest.T) {
+	buf := make([]byte, 1<<20)
+	stacks := string(buf[:runtime.Stack(buf, true)])
+	t.When("a suite runs", func(w *gotest.T) {
+		w.It("has one goroutine of the stop watcher's, in the function the docs name for goleak", func(it *gotest.T) {
+			gotest.Equal(it, 1, strings.Count(stacks, watcherFunc+"("), stacks)
 		})
 	})
 }
