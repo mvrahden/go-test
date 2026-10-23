@@ -85,6 +85,18 @@ type verdictIndex struct {
 	benchOrder []CensusCase
 	running    map[CensusCase]bool
 	started    []CensusCase
+	// resulted holds the units that printed a result line of their own
+	// (--- PASS/FAIL/SKIP); cut holds those the converter failed without one,
+	// because the binary ended under them. A cut unit is what a deadline cut
+	// short, and is named as such.
+	resulted map[CensusCase]bool
+	cut      map[CensusCase]bool
+	// waiting holds the parallel units paused for a slot and not yet
+	// continued: started, but not running.
+	waiting map[CensusCase]bool
+	// ranNow and cutNow hold the units started and cut in the suite output
+	// being indexed.
+	ranNow, cutNow []CensusCase
 }
 
 func (x *verdictIndex) Write(p []byte) (int, error) {
@@ -104,6 +116,8 @@ func (x *verdictIndex) Write(p []byte) (int, error) {
 var verdictMarkers = [][]byte{
 	[]byte(`"Action":"pass"`), []byte(`"Action":"fail"`), []byte(`"Action":"skip"`),
 	[]byte(`"Action":"bench"`), []byte("/op"), []byte(`"Action":"run"`),
+	[]byte("--- PASS: "), []byte("--- FAIL: "), []byte("--- SKIP: "),
+	[]byte(`"Action":"pause"`), []byte(`"Action":"cont"`),
 }
 
 var (
@@ -160,6 +174,25 @@ func (x *verdictIndex) observe(line []byte) {
 				x.started = append(x.started, key)
 			}
 			x.running[key] = true
+			x.ranNow = append(x.ranNow, key)
+			delete(x.resulted, key)
+			delete(x.waiting, key)
+		}
+	case "pause":
+		if ev.Test != "" {
+			if x.waiting == nil {
+				x.waiting = map[CensusCase]bool{}
+			}
+			x.waiting[key] = true
+		}
+	case "cont":
+		delete(x.waiting, key)
+	case "output":
+		if ev.Test != "" && isResultLine(ev.Output, ev.Test) {
+			if x.resulted == nil {
+				x.resulted = map[CensusCase]bool{}
+			}
+			x.resulted[key] = true
 		}
 	case "pass", "fail", "skip":
 		if x.last == nil {
@@ -168,6 +201,14 @@ func (x *verdictIndex) observe(line []byte) {
 		if _, seen := x.last[key]; !seen {
 			x.order = append(x.order, key)
 		}
+		// A benchmark's fail is booked as its verdict, so it is never counted as cut.
+		if ev.Action == "fail" && ev.Test != "" && x.running[key] && !x.waiting[key] && !x.resulted[key] && !strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) {
+			if x.cut == nil {
+				x.cut = map[CensusCase]bool{}
+			}
+			x.cut[key] = true
+			x.cutNow = append(x.cutNow, key)
+		}
 		ev.Output = ""
 		x.last[key] = ev
 		x.settle(key)
@@ -175,6 +216,39 @@ func (x *verdictIndex) observe(line []byte) {
 	if depth == 1 && strings.HasPrefix(ev.Test, protocol.PrefixBenchmark) && benchVerdict(ev) {
 		x.creditBenchmark(key)
 	}
+}
+
+// isResultLine reports whether output is test's own result line, as go test
+// prints it: "--- PASS: <test> (0.00s)", indented by its depth.
+func isResultLine(output, test string) bool {
+	output = strings.TrimLeft(output, " ")
+	for _, verdict := range []string{"PASS", "FAIL", "SKIP"} {
+		if strings.HasPrefix(output, "--- "+verdict+": "+test+" (") {
+			return true
+		}
+	}
+	return false
+}
+
+// endSuite closes the output of one suite process. What its binary ended
+// under counts as running or cut only when the run's context stopped it; a
+// binary that ended on its own was cut short by no deadline.
+func (x *verdictIndex) endSuite(cutShort bool) {
+	if !cutShort {
+		for _, k := range x.ranNow {
+			x.settle(k)
+			delete(x.waiting, k)
+		}
+		for _, k := range x.cutNow {
+			delete(x.cut, k)
+		}
+	}
+	// Result lines only tell a cut unit from a finished one while its
+	// suite's output is being read.
+	for _, k := range x.ranNow {
+		delete(x.resulted, k)
+	}
+	x.ranNow, x.cutNow = nil, nil
 }
 
 // creditBenchmark books a benchmark's verdict, once.
@@ -195,6 +269,13 @@ func methodPath(path string) string {
 	return parts[0] + "/" + parts[1]
 }
 
+// active reports whether key is still running, or was cut short: failed by
+// the converter when the binary ended under it, with no result of its own. A
+// unit waiting for a parallel slot is neither.
+func (x *verdictIndex) active(key CensusCase) bool {
+	return (x.running[key] || x.cut[key]) && !x.waiting[key]
+}
+
 func (x *verdictIndex) settle(key CensusCase) {
 	if x.running[key] {
 		x.running[key] = false
@@ -208,13 +289,13 @@ func (x *verdictIndex) settle(key CensusCase) {
 func (x *verdictIndex) runningUnits() []CensusCase {
 	busy := map[CensusCase]bool{}
 	for _, k := range x.started {
-		if suite, _, nested := strings.Cut(k.Path, "/"); nested && x.running[k] && !strings.HasPrefix(suite, protocol.PrefixFuzz) {
+		if suite, _, nested := strings.Cut(k.Path, "/"); nested && x.active(k) && !strings.HasPrefix(suite, protocol.PrefixFuzz) {
 			busy[CensusCase{Pkg: k.Pkg, Path: suite}] = true
 		}
 	}
 	var out []CensusCase
 	for _, k := range x.started {
-		if !x.running[k] || busy[k] {
+		if !x.active(k) || busy[k] {
 			continue
 		}
 		suite, _, nested := strings.Cut(k.Path, "/")
@@ -392,10 +473,11 @@ func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
 	running := c.verdicts.runningUnits()
 	booked := make([]streamEvent, 0, 2*len(running))
 	for _, r := range running {
-		booked = append(booked,
-			streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n"},
-			streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path},
-		)
+		booked = append(booked, streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n"})
+		// A unit the converter already failed keeps that verdict.
+		if c.verdicts.running[r] {
+			booked = append(booked, streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path})
+		}
 	}
 	booked = append(booked, c.verdicts.suiteFailures(running)...)
 	booked = append(booked, c.verdicts.packageFailures(booked)...)

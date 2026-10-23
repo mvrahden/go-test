@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/bench BenchDeadline .* / names the benchmark as running when the timeout expired \(
+Clause: when a benchmark hangs until --timeout in a text bench run → names the benchmark as running when the timeout expired
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -151,9 +151,6 @@
+ 		name := r.Target.SuiteName
+ 		if r.Target.Bench {
+ 			name = protocol.PrefixBenchmark + name
+-			if c.mode == RunBatchText {
+-				name = hungBenchmark(r.Stdout, name)
+-			}
+ 		}
+ 		c.cutShort = append(c.cutShort, CensusCase{Pkg: pkg, Path: name})
+ 	}

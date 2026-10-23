@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle DeadlineNaming .* / names the first suite itself and the second suite's method \(
+Clause: when one suite hangs in its BeforeAll and another in a test method until --timeout → names the first suite itself and the second suite's method
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -302,7 +302,7 @@
+ 		switch {
+ 		case nested && strings.HasPrefix(suite, protocol.PrefixFuzz):
+ 			continue // a seed; its wrapper is named
+-		case !nested && strings.HasPrefix(k.Path, protocol.PrefixBenchmark):
++		case !nested:
+ 			continue
+ 		}
+ 		out = append(out, k)

@@ -84,6 +84,192 @@ const deadlineBooked = `{"Action":"output","Package":"example.com/pkg","Test":"T
 {"Action":"fail","Package":"example.com/other"}
 `
 
+// cutShortStream is a method the converter failed when the binary ended under
+// it: a fail with an elapsed time, but no result line of its own.
+const cutShortStream = `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"=== RUN   TestCartTestSuite/TestAdd\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}
+`
+
+func (s *DeadlineAttributionTestSuite) TestAMethodTheConverterFailedIsStillNamed(t *gotest.T) {
+	t.When("the stream fails a method without a result line of its own", func(w *gotest.T) {
+		w.It("names the method, not its suite, as what the deadline cut short", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite/TestAdd"}}, gotestrunner.ExportRunning(cutShortStream))
+		})
+		w.It("books the timeout as the method's output and fails its suite, without a second fail for the method", func(it *gotest.T) {
+			running, booked := gotestrunner.ExportBookDeadline(gotestrunner.RunStreamJSON, cutShortStream, context.DeadlineExceeded)
+			gotest.Len(it, running, 1)
+			gotest.Contains(it, booked, `"Test":"TestCartTestSuite/TestAdd","Output":"    gotest: --timeout expired while this test was running`)
+			gotest.NotContains(it, booked, `{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}`)
+			gotest.Contains(it, booked, `{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite"}`)
+		})
+		w.It("treats a method with its own result line as settled", func(it *gotest.T) {
+			settled := cutShortStream[:len(cutShortStream)-len(`{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}`+"\n")] +
+				`{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- FAIL: TestCartTestSuite/TestAdd (9.70s)\n"}` + "\n" +
+				`{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}` + "\n"
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite"}}, gotestrunner.ExportRunning(settled))
+		})
+	})
+}
+
+func (s *DeadlineAttributionTestSuite) TestACrashBeforeTheDeadlineIsNotBlamedOnIt(t *gotest.T) {
+	target := func(name string) gotestrunner.SuiteTarget {
+		return gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: censusPkg, SuiteName: name}}
+	}
+	hang := `{"Action":"run","Package":"example.com/pkg","Test":"TestHangTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestHangTestSuite/TestWait"}
+`
+	t.When("one suite crashed on its own and another was still running at the deadline", func(w *gotest.T) {
+		var stdout, stderr bytes.Buffer
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+		c.Register(censusPkg, 2)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{Target: target("TestCartTestSuite"), Stdout: []byte(cutShortStream), ExitCode: 2})
+		c.RecordResult(censusPkg, 1, gotestrunner.SuiteResult{Target: target("TestHangTestSuite"), Stdout: []byte(hang), ExitCode: 1, CutShort: true})
+		before := stdout.Len()
+		running := gotestrunner.ExportBookDeadlineOn(c, context.DeadlineExceeded)
+		booked := stdout.String()[before:]
+
+		w.It("names only what the deadline cut short", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestHangTestSuite/TestWait"}}, running)
+			gotest.NotContains(it, booked, `"Test":"TestCartTestSuite/TestAdd","Output":"    gotest: --timeout expired`)
+		})
+	})
+
+	t.When("a method's output starts with dashes that are not a result line", func(w *gotest.T) {
+		stream := `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- 5 allocs/op\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":9.7}
+`
+		w.It("still names the method the binary ended under", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite/TestAdd"}}, gotestrunner.ExportRunning(stream))
+		})
+	})
+}
+
+// ev is one stream line for a test of the example package.
+func ev(action, test string, output ...string) string {
+	line := `{"Action":"` + action + `","Package":"example.com/pkg","Test":"` + test + `"`
+	if len(output) > 0 {
+		line += `,"Output":"` + output[0] + `\n"`
+	}
+	return line + "}\n"
+}
+
+func (s *DeadlineAttributionTestSuite) TestWhatCountsAsAResultLine(t *gotest.T) {
+	const add = "TestCartTestSuite/TestAdd"
+	failedUnder := func(output string) string {
+		return ev("run", "TestCartTestSuite") + ev("run", add) + ev("output", add, output) + ev("fail", add)
+	}
+	t.When("a method prints its own result line before the stream fails it", func(w *gotest.T) {
+		for sub, line := range gotest.Each(w, []string{
+			"--- PASS: " + add + " (0.00s)",
+			"--- FAIL: " + add + " (9.70s)",
+			"--- SKIP: " + add + " (0.00s)",
+			"    --- FAIL: " + add + " (9.70s)",
+		}) {
+			gotest.Equal(sub, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite"}}, gotestrunner.ExportRunning(failedUnder(line)))
+		}
+	})
+	t.When("a method prints a line shaped like another test's result", func(w *gotest.T) {
+		for sub, line := range gotest.Each(w, []string{
+			"--- PASS: TestCartTestSuite/TestAddMore (0.00s)",
+			"--- FAIL: " + add + "/it_adds (0.00s)",
+			"--- PASS: " + add,
+			"--- PASS: in the log",
+		}) {
+			gotest.Equal(sub, []unit{{Pkg: censusPkg, Path: add}}, gotestrunner.ExportRunning(failedUnder(line)))
+		}
+	})
+}
+
+func (s *DeadlineAttributionTestSuite) TestARunAgainStartsWithoutAResult(t *gotest.T) {
+	const add = "TestCartTestSuite/TestAdd"
+	stream := ev("run", "TestCartTestSuite") + ev("run", add) + ev("output", add, "--- PASS: "+add+" (0.00s)") + ev("pass", add) +
+		ev("output", "TestCartTestSuite", "--- PASS: TestCartTestSuite (0.00s)") + ev("pass", "TestCartTestSuite") +
+		ev("run", "TestCartTestSuite") + ev("run", add) + ev("fail", add)
+	t.When("the stream fails a method's second run without a result line of its own", func(w *gotest.T) {
+		w.It("names the method, whose first run's result does not settle the second", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: add}}, gotestrunner.ExportRunning(stream))
+		})
+	})
+	t.When("a suite's output has been recorded", func(w *gotest.T) {
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+		c.Register(censusPkg, 1)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{Stdout: []byte(stream[:strings.LastIndex(stream, ev("run", "TestCartTestSuite"))])})
+		w.It("keeps none of its result lines", func(it *gotest.T) {
+			gotest.Zero(it, gotestrunner.ExportResulted(c))
+		})
+	})
+}
+
+func (s *DeadlineAttributionTestSuite) TestATestWaitingForAParallelSlotIsNotRunning(t *gotest.T) {
+	queued := ev("run", "TestParTestSuite") +
+		ev("run", "TestParTestSuite/TestA") + ev("pause", "TestParTestSuite/TestA") +
+		ev("run", "TestParTestSuite/TestB") + ev("pause", "TestParTestSuite/TestB") +
+		ev("run", "TestParTestSuite/TestC") + ev("pause", "TestParTestSuite/TestC") +
+		ev("cont", "TestParTestSuite/TestA")
+	t.When("parallel methods paused and only one continued", func(w *gotest.T) {
+		w.It("names only the method that continued", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestParTestSuite/TestA"}}, gotestrunner.ExportRunning(queued))
+		})
+		w.It("names only that method when the stream fails every method without a result", func(it *gotest.T) {
+			failed := queued + ev("fail", "TestParTestSuite/TestA") + ev("fail", "TestParTestSuite/TestB") + ev("fail", "TestParTestSuite/TestC")
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestParTestSuite/TestA"}}, gotestrunner.ExportRunning(failed))
+		})
+	})
+	t.When("every method paused and none continued", func(w *gotest.T) {
+		w.It("names the suite, whose own body is what runs", func(it *gotest.T) {
+			gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestParTestSuite"}}, gotestrunner.ExportRunning(queued[:strings.LastIndex(queued, `{"Action":"cont"`)]))
+		})
+	})
+}
+
+func (s *DeadlineAttributionTestSuite) TestATextBenchRunNamesTheHungBenchmark(t *gotest.T) {
+	const header = "goos: linux\ngoarch: amd64\npkg: example.com/pkg\ncpu: Some CPU\n"
+	name := func(stdout string) []unit {
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+		c.Register(censusPkg, 1)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{
+			Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: censusPkg, SuiteName: "CacheTestSuite"}, Bench: true},
+			Stdout: []byte(header + stdout), ExitCode: 1, CutShort: true,
+		})
+		return gotestrunner.ExportBookDeadlineOn(c, context.DeadlineExceeded)
+	}
+	const (
+		suite  = "BenchmarkCacheTestSuite\n"
+		fast   = "BenchmarkCacheTestSuite/BenchmarkFast\n"
+		result = "BenchmarkCacheTestSuite/BenchmarkFast-16         \t     100\t         1.600 ns/op\t       0 B/op\t       0 allocs/op\n"
+		hang   = "BenchmarkCacheTestSuite/BenchmarkHang\n"
+	)
+	method := []unit{{Pkg: censusPkg, Path: "BenchmarkCacheTestSuite/BenchmarkHang"}}
+	whole := []unit{{Pkg: censusPkg, Path: "BenchmarkCacheTestSuite"}}
+	t.When("the deadline ends a benchmark that printed its name and no result", func(w *gotest.T) {
+		for sub, stdout := range gotest.Each(w, []string{
+			suite + fast + result + hang,
+			suite + hang,
+			suite + fast + strings.Replace(result, "-16 ", "    ", 1) + hang,
+			suite + fast + result + result + hang,
+			suite + hang + "BenchmarkCacheTestSuite/BenchmarkHang/one\nBenchmarkCacheTestSuite/BenchmarkHang/one-16 \t 100\t 1.5 ns/op\nBenchmarkCacheTestSuite/BenchmarkHang/two\n",
+			suite + hang + "    cache_test.go:12: --- PASS: noise\n",
+		}) {
+			gotest.Equal(sub, method, name(stdout))
+		}
+	})
+	t.When("every benchmark that printed its name has a result", func(w *gotest.T) {
+		for sub, stdout := range gotest.Each(w, []string{
+			suite + fast + result,
+			suite,
+			"",
+			suite + hang + "--- FAIL: BenchmarkCacheTestSuite/BenchmarkHang\n",
+			suite + hang + "--- SKIP: BenchmarkCacheTestSuite/BenchmarkHang\n",
+		}) {
+			gotest.Equal(sub, whole, name(stdout))
+		}
+	})
+}
+
 func (s *DeadlineAttributionTestSuite) TestRunningUnitsAreBookedIntoTheStream(t *gotest.T) {
 	t.When("the deadline cut the run short", func(w *gotest.T) {
 		for sub, mode := range gotest.Each(w, []gotestrunner.RunMode{gotestrunner.RunCaptureJSON, gotestrunner.RunStreamJSON}) {

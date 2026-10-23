@@ -2420,6 +2420,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "names the benchmark as running when the timeout expired",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_the_benchmark_as_running_when_the_timeout_expired",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a benchmark hangs until --timeout in a text bench run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_benchmark_hangs_until_--timeout_in_a_text_bench_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AHungBenchmark",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAHungBenchmark",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "BenchDeadline",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestBenchDeadlineTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "is refused before anything runs, since the run would be compared against itself",
                       "duration": 0,
                       "excluded": false,
@@ -4913,16 +4966,157 @@
       "output": [],
       "path": "github.com/mvrahden/go-test/tests/conformance/fuzz",
       "status": "none"
+    },
+    {
+      "duration": 0,
+      "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names only the hung test as running when the timeout expired",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_only_the_hung_test_as_running_when_the_timeout_expired",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one suite's process crashed on its own and another suite hangs until --timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_suite's_process_crashed_on_its_own_and_another_suite_hangs_until_--timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ACrashBeforeTheTimeout",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestACrashBeforeTheTimeout",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names only the method holding the slot, not those still waiting for it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_only_the_method_holding_the_slot,_not_those_still_waiting_for_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when parallel methods wait for the one slot -parallel=1 leaves and the method holding it hangs until --timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "parallel_methods_wait_for_the_one_slot_-parallel=1_leaves_and_the_method_holding_it_hangs_until_--timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATestWaitingForAParallelSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATestWaitingForAParallelSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names the first suite itself and the second suite's method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_the_first_suite_itself_and_the_second_suite's_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when one suite hangs in its BeforeAll and another in a test method until --timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_suite_hangs_in_its_BeforeAll_and_another_in_a_test_method_until_--timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AHookThatHangs",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAHookThatHangs",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DeadlineNaming",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDeadlineNamingTestSuite",
+          "output": [],
+          "status": "none"
+        }
+      ],
+      "output": [],
+      "path": "github.com/mvrahden/go-test/tests/conformance/lifecycle",
+      "status": "none"
     }
   ],
   "stats": {
-    "behaviors": 162,
+    "behaviors": 166,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 18,
+    "suites": 20,
     "tests": 0
   }
 }

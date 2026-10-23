@@ -197,8 +197,12 @@ method that vanished instead of seeing "all passed" beside exit 2. A run cut
 short is not censused: an interrupt exits 130, and a `--timeout` that expires
 before the last verdict exits 1 on every command. It prints `FAIL: global
 --timeout exceeded after <d> while running: <pkg> <test>` (up to five, then
-`… N more`), naming the hung method, or only its suite in the plain text run.
-Each one is booked into the stream as failed with `gotest: --timeout expired
-while this test was running` as its output, and its suite and package fail
-with it. A deadline that hits before any test runs is booked as a failed
-`global --timeout` package.
+`… N more`), naming the hung method, or only its suite in a plain text test
+run; `gotest bench` names the hung benchmark in text and `--json` alike. A
+suite that hangs in its `BeforeAll`, or in a package fixture's `BeforeAll`, is
+named as the suite. A test whose suite process ended on its own, or that was
+still waiting for a `-parallel` slot, is never named. Each one is booked into
+the stream as failed with `gotest: --timeout expired while this test was
+running` as its output, and its suite and package fail with it. A deadline
+that hits during compilation or shared fixture setup, before any suite
+process starts, is booked as a failed `global --timeout` package.

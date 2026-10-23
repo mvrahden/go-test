@@ -292,6 +292,7 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-nil-key-read-as-zero-key` | a nil needle is looked up as the zero key of a map whose keys cannot be nil | ring-0 predicates suite |
 | `contains-type-guard-silent` | a slice needle of a type the slice cannot hold is reported absent, not refused | canary: no failure message names both types |
 | `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
+| `crashed-suite-named-by-the-timeout` | a test whose suite process crashed on its own stays counted as cut short | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
 | `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
 | `depth-unnamed` | lines deeper than the indented levels do not name their depth | ring-0 format suite |
@@ -302,6 +303,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-failure-leaves-the-suite-unreported` | a suite whose shared fixture never came up gets no verdict | fixtures conformance: the guarded suite gets no fail verdict |
 | `flag-first-occurrence-wins` | a repeated `-run`, `-skip`, `-bench` or `-count` counts by its first value, where the flag package keeps the last | fixtures conformance: the suite the last `-skip` leaves runs without its fixture |
 | `hidden-difference-shown-twice` | values that render alike are printed twice instead of named as such | ring-0 equal suite |
+| `hung-benchmark-named-as-its-suite` | a text bench run names the suite of a hung benchmark, not the benchmark | bench conformance: the `--timeout` names the suite instead of the hung benchmark |
+| `hung-hook-suite-unnamed` | a suite that hangs before any method starts is never named | lifecycle conformance: the `--timeout` names the hung method but not the suite hung in its `BeforeAll` |
 | `hunk-location-dropped` | a hunk does not name the path of its first change | ring-0 equal suite |
 | `hunks-replacement-scattered` | a line replaced among repeated ones shows as an insertion and a deletion far apart | ring-0 equal suite |
 | `indelta-difference-overflows` | `InDelta` subtracts integers in their own type, so the distance between the int64 extremes wraps to 1 | ring-0 compare suite |
@@ -337,10 +340,12 @@ shards of one run do not add up to every mutant exactly once.
 | `skip-of-every-wrapper-keeps-a-testless-suite` | a `-skip` naming every fuzz wrapper never drops a suite without test methods, judged by a Test function it lacks | fuzz conformance: the suite's shared fixture starts |
 | `skip-of-the-test-function-drops-the-seeds` | a `-skip` naming a suite's Test function drops the suite, fuzz seeds included | fuzz conformance: the seed replay has no pass verdict |
 | `skip-pattern-left-unchecked` | a `-skip` pattern is not checked before the run, so one go test rejects runs nothing and passes | cli conformance: the pattern is not refused with exit 2 |
+| `suite-ended-on-its-own-left-running` | what a suite process that ended on its own left open stays counted as running | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `sync-internals-shown` | values of package sync render their bookkeeping fields | ring-0 equal suite |
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
 | `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |
 | `unsigned-as-hex` | unsigned integers render in hex | ring-0 format suite |
+| `waiting-test-named-by-the-timeout` | a parallel test still waiting for a slot counts as running | lifecycle conformance: the `--timeout` names the queued methods besides the one holding the slot |
 | `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |
 | `poll-args-unchecked` | a zero tick or waitFor is polled with | canary: the failing fixture's zero-tick method passes and no message says the durations must be positive |
 | `poll-cut-off-at-the-deadline` | a poll still running at waitFor counts as hung, with no grace | canary: the `latepolls` fixture's late polls fail as still running |
