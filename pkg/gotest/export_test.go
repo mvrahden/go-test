@@ -3,6 +3,7 @@ package gotest
 import (
 	"context"
 	"regexp"
+	"testing"
 )
 
 func ExportTCtx(t *T) context.Context { return t.ctx }
@@ -54,3 +55,6 @@ func ExportCompiledPatternCount() int {
 
 // ExportMaxCompiledPatterns is how many compiled patterns Regexp keeps.
 const ExportMaxCompiledPatterns = maxCompiledPatterns
+
+// ExportEach runs body as one fuzz execution of f under t.
+func ExportEach(f *F, t *testing.T, body func(*T)) { f.each(t, body) }

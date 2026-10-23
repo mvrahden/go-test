@@ -52,6 +52,22 @@ func FuzzAdapterLifecycle(f *testing.F) {
 	}
 }
 
+// FuzzAdapterAfterEachRunsWhenBeforeEachLeaves: a beforeEach that leaves
+// through Goexit — Skipf here, FailNow in a failing suite — still gets its
+// afterEach, as a test method's hooks do.
+func FuzzAdapterAfterEachRunsWhenBeforeEachLeaves(f *testing.F) {
+	var after int
+	gf := gotest.NewF(f,
+		func(t *gotest.T) { t.Skipf("not this seed") },
+		func(*gotest.T) { after++ },
+		nil)
+	gf.Add("ab")
+	gf.Fuzz(func(t *gotest.T, s string) { f.Fatalf("the body ran after a skipping beforeEach") })
+	if after != 1 {
+		f.Fatalf("afterEach ran %d times after a beforeEach that skipped, want 1", after)
+	}
+}
+
 // FuzzAdapterNilHooks proves nil before/after hooks don't panic.
 func FuzzAdapterNilHooks(f *testing.F) {
 	gf := gotest.NewF(f, nil, nil, nil)
@@ -416,5 +432,27 @@ func (s *FWrapperTestSuite) TestSeedGuards(t *gotest.T) {
 		out := runArmedFuzzTarget("FuzzWrongCallbackShape", "GOTEST_TEST_FUZZ_WRONG_SHAPE")
 		gotest.Contains(it, out, "f.Fuzz: callback is func(*gotest.T, string), but this target was generated for func(*gotest.T, fanReq)")
 		gotest.Contains(it, out, "FAIL")
+	})
+}
+
+func (s *FWrapperTestSuite) TestPanicOutlivesALeavingAfterEach(t *gotest.T) {
+	var after bool
+	var got any
+	gf := gotest.NewF(nil,
+		func(*gotest.T) { panic("boom") },
+		func(et *gotest.T) { after = true; et.Skipf("leaves") },
+		nil)
+	t.T().Run("execution", func(et *testing.T) { //nolint:suite-lifecycle // the execution under test is a subtest of this one
+		defer func() { got = recover() }()
+		gotest.ExportEach(gf, et, func(*gotest.T) {})
+	})
+	// SkipNow here, FailNow in a failing suite: either leaves through Goexit.
+	t.When("BeforeEach panics and AfterEach leaves through Goexit", func(w *gotest.T) {
+		w.It("runs AfterEach, and the panic still ends the execution", func(it *gotest.T) {
+			gotest.True(it, after)
+			p, ok := got.(interface{ Unwrap() any })
+			gotest.True(it, ok, "recovered %v", got)
+			gotest.Equal(it, any("boom"), p.Unwrap())
+		})
 	})
 }

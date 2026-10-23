@@ -70,7 +70,7 @@ func TestQueryTestSuite(t *testing.T) {
 		Cases: []gotestruntime.Method{
 			{Name: "TestInsert", Run: func(ttt *gotest.T, run func(func())) {
 				ctx := s.BeforeEach(ttt)
-				defer s.AfterEach(ttt, ctx)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt, ctx) })
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestInsert(t, ctx) }, ttt)
 				})
@@ -190,7 +190,7 @@ func TestOrderTestSuite(t *testing.T) {
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
 				ctx := s.BeforeEach(ttt)
-				defer s.AfterEach(ttt, ctx)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt, ctx) })
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestOne(t, ctx) }, ttt)
 				})
@@ -237,14 +237,14 @@ func TestOrderTestSuite(t *testing.T) {
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
 				ctx := s.BeforeEach(ttt)
-				defer s.AfterEach(ttt, ctx)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt, ctx) })
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestOne(t, ctx) }, ttt)
 				})
 			}},
 			{Name: "TestTwo", Run: func(ttt *gotest.T, run func(func())) {
 				ctx := s.BeforeEach(ttt)
-				defer s.AfterEach(ttt, ctx)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt, ctx) })
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestTwo(t, ctx) }, ttt)
 				})
@@ -286,7 +286,7 @@ func TestOrderTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -368,7 +368,7 @@ func TestCFGTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -566,7 +566,7 @@ func TestPlainTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -767,7 +767,7 @@ func TestEachTestSuite(t *testing.T) {
 		},
 		Cases: []gotestruntime.Method{
 			{Name: "TestCase", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestCase, ttt)
@@ -847,14 +847,14 @@ func TestQueryTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestInsert", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestInsert, ttt)
 				})
 			}},
 			{Name: "TestSelect", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestSelect, ttt)
@@ -931,7 +931,7 @@ func TestBasicTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1008,7 +1008,7 @@ func TestMinimalTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1085,7 +1085,7 @@ func TestBoundTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestBound", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestBound, ttt)
@@ -1114,7 +1114,7 @@ func TestStandaloneTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestFree", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestFree, ttt)
@@ -1224,7 +1224,7 @@ func TestHandlerTestSuite(t *testing.T) {
 		},
 		Cases: []gotestruntime.Method{
 			{Name: "TestGet", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestGet, ttt)
@@ -1301,7 +1301,7 @@ func TestEmbeddedTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1336,7 +1336,7 @@ func TestNamedTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1434,7 +1434,7 @@ func TestLightTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1469,7 +1469,7 @@ func TestFullTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1564,7 +1564,7 @@ func TestUserTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1641,7 +1641,7 @@ func TestQueryTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1734,7 +1734,7 @@ func TestMigrationTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -1832,7 +1832,7 @@ func TestQueryTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestInsert", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestInsert, ttt)
@@ -1927,7 +1927,7 @@ func TestAppTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestRun", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestRun, ttt)
@@ -2004,7 +2004,7 @@ func TestStdlibTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestQuery", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestQuery(t.T()) }, ttt)
@@ -2047,14 +2047,14 @@ func TestMixedTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestStdlib", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestStdlib(t.T()) }, ttt)
 				})
 			}},
 			{Name: "TestGotest", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestGotest, ttt)
@@ -2097,14 +2097,14 @@ func TestPlainTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestFoo", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestFoo(t.T()) }, ttt)
 				})
 			}},
 			{Name: "TestBar", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestBar(t.T()) }, ttt)
@@ -2148,7 +2148,7 @@ func TestConfiguredTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)
@@ -2246,7 +2246,7 @@ func TestPlainTestSuite(t *testing.T) {
 	gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
 		Cases: []gotestruntime.Method{
 			{Name: "TestOne", Run: func(ttt *gotest.T, run func(func())) {
-				defer s.AfterEach(ttt)
+				defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
 				s.BeforeEach(ttt)
 				run(func() {
 					ƒƒ_GOTEST_exec(s.TestOne, ttt)

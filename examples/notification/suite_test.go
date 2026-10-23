@@ -158,7 +158,7 @@ func (s *NotificationServiceTestSuite) FuzzSummary(f *gotest.F) {
 
 func (s *NotificationServiceTestSuite) TestDeadlineContext(t *gotest.T) {
 	t.When("a deadline is configured for the test", func(t *gotest.T) {
-		dt := gotest.NewTWithDeadline(t.T(), 5*time.Second)
+		dt := gotest.NewTWithDeadline(t, 5*time.Second)
 		ctx := dt.Context()
 
 		t.It("exposes the deadline on the context", func(t *gotest.T) {

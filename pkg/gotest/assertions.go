@@ -125,7 +125,7 @@ func pollUntil(fn func(*R), limit time.Time) (rec *R, ok bool) {
 			if state.CompareAndSwap(pollRunning, pollReturned) {
 				done <- captured
 			} else if captured != nil {
-				fmt.Fprintf(os.Stderr, "gotest: a poll abandoned past its deadline panicked: %v\n%s\n", captured.value, captured.stack)
+				fmt.Fprintf(os.Stderr, "gotest: a poll abandoned past its deadline panicked: %v\n%s\n", captured.Unwrap(), captured.Stack())
 			}
 		}()
 		defer func() { captured = capturedFrom(recover(), "poll function") }()

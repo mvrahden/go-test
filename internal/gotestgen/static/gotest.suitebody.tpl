@@ -84,9 +84,9 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
       {Name: "{{ $tc.Identifier }}", Run: func(ttt *gotest.T, run func(func())) {
 {{- if $ts.HasReturningBeforeEach }}
         ctx := s.BeforeEach(ttt)
-        defer s.AfterEach(ttt, ctx)
+        defer gotestruntime.AfterEach(func() { s.AfterEach(ttt, ctx) })
 {{- else }}
-        defer s.AfterEach(ttt)
+        defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
         s.BeforeEach(ttt)
 {{- end }}
         run(func() {

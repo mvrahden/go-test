@@ -288,3 +288,21 @@ func (s *HarnessTTestSuite) TestAwaitDone(t *gotest.T) {
 		})
 	})
 }
+
+func (s *HarnessTTestSuite) TestAfterEach(t *gotest.T) {
+	t.When("the method panics and its AfterEach leaves through Goexit", func(w *gotest.T) {
+		var after bool
+		var got any
+		w.T().Run("method", func(mt *testing.T) { //nolint:suite-lifecycle // the method under test is a subtest of this one
+			defer func() { got = recover() }()
+			defer gotestruntime.AfterEach(func() { after = true; mt.SkipNow() })
+			panic("boom")
+		})
+		w.It("runs AfterEach, and the panic still ends the method", func(it *gotest.T) {
+			gotest.True(it, after)
+			p, ok := got.(interface{ Unwrap() any })
+			gotest.True(it, ok, "recovered %v", got)
+			gotest.Equal(it, any("boom"), p.Unwrap())
+		})
+	})
+}

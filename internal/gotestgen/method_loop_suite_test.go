@@ -56,6 +56,64 @@ func (s *MethodLoopTestSuite) TestAsyncDeadline(t *gotest.T) {
 	})
 }
 
+func (s *MethodLoopTestSuite) TestGoroutineInBeforeAll(t *gotest.T) {
+	for _, c := range []struct {
+		kind string
+		args []string
+	}{
+		{"test", []string{"-test.run=^TestServerTestSuite$"}},
+		{"benchmark", []string{"-test.run=^$", "-test.bench=^BenchmarkServerTestSuite$", "-test.benchtime=1x"}},
+	} {
+		t.It("waits for a goroutine BeforeAll started only after AfterAll stopped it, in a "+c.kind+" wrapper", func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_MethodLoop", childTimeout, c.args...)
+			assertNoDeadlock(it, run)
+			gotest.True(it, run.passed, run.output)
+			gotest.Contains(it, run.output, "MARK:server stopped")
+		})
+	}
+}
+
+func (s *MethodLoopTestSuite) TestGoexitInGoroutine(t *gotest.T) {
+	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestGoexitTestSuite$")
+
+	t.It("fails the method at the wait, and nothing after the wait runs", func(it *gotest.T) {
+		gotest.False(it, run.passed, run.output)
+		gotest.Contains(it, run.output, "from the goroutine")
+		gotest.NotContains(it, run.output, "MARK:after wait")
+	})
+}
+
+func (s *MethodLoopTestSuite) TestFuzzHooksMirrorTestHooks(t *gotest.T) {
+	for _, c := range []struct{ how, suite, mark string }{
+		{"fails", "FuzzBrokenBeforeTestSuite", "MARK:fuzz after broken"},
+		{"panics", "FuzzPanicBeforeTestSuite", "MARK:fuzz after panic"},
+	} {
+		t.It("runs a fuzz execution's AfterEach when its BeforeEach "+c.how, func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^Fuzz"+c.suite+"_FuzzOne$")
+			gotest.False(it, run.passed, run.output)
+			gotest.Contains(it, run.output, c.mark)
+		})
+	}
+}
+
+func (s *MethodLoopTestSuite) TestPanicAheadOfAFailingAfterEach(t *gotest.T) {
+	for _, c := range []struct {
+		kind string
+		args []string
+	}{
+		{"test method", []string{"-test.run=^TestPanicAheadTestSuite$"}},
+		{"benchmark", []string{"-test.run=^$", "-test.bench=^BenchmarkPanicAheadTestSuite$", "-test.benchtime=1x"}},
+		{"fuzz execution", []string{"-test.run=^FuzzPanicAheadTestSuite_FuzzOne$"}},
+	} {
+		t.It("reports a "+c.kind+"'s panic after an AfterEach that fails fatally", func(it *gotest.T) {
+			run := runGeneratedSuiteArgs(it, "TestLifecycle_MethodLoop", childTimeout, c.args...)
+			gotest.False(it, run.passed, run.output)
+			gotest.Contains(it, run.output, "MARK:after the panic")
+			gotest.Contains(it, run.output, "panic: PANIC-AHEAD-OF-AFTEREACH")
+		})
+	}
+}
+
 func (s *MethodLoopTestSuite) TestCallSites(t *gotest.T) {
 	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestSiteTestSuite$")
 

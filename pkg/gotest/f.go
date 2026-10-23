@@ -114,14 +114,22 @@ func (f *F) flushSeeds(explode func(seed []any) ([]any, error)) {
 
 // each runs body under a fresh *T with beforeEach (if non-nil) immediately
 // before it and afterEach (if non-nil) deferred to immediately after —
-// interposed per execution, not once for the whole fuzz target.
+// interposed per execution, not once for the whole fuzz target. The defer
+// comes first: a beforeEach that fails, skips or panics still gets its
+// afterEach, as a test method's hooks pair. A panic is re-raised after
+// afterEach, which a fatal assertion there would otherwise discard.
 func (f *F) each(t *testing.T, body func(*T)) {
 	tt := NewT(t)
+	if f.afterEach != nil {
+		defer func() {
+			if p := capturedFrom(recover(), "the fuzz execution, ahead of its AfterEach"); p != nil {
+				defer panic(p)
+			}
+			f.afterEach(tt)
+		}()
+	}
 	if f.beforeEach != nil {
 		f.beforeEach(tt)
-	}
-	if f.afterEach != nil {
-		defer f.afterEach(tt)
 	}
 	body(tt)
 }

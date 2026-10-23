@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/carry"
 	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/internal/schedinfo"
+	"github.com/mvrahden/go-test/internal/setupwaits"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -68,15 +70,58 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		if bench {
 			defer failOnPanic(b)
 		}
+		// The waits on goroutines BeforeAll started come after AfterAll, which
+		// is what stops them; as cleanups of tb they would run first.
+		defer drainSetupWaits(tb, budget.SetupTimeout)
 		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
 	})
 	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)
 	return cfg, budget
 }
 
-// SetupT builds the *gotest.T handed to a suite's BeforeAll.
+// SetupT builds the *gotest.T handed to a suite's BeforeAll. The waits of the
+// goroutines it, or any T derived from it, starts with gotest.Go are kept for
+// [drainSetupWaits].
 func SetupT(t testing.TB, timeout time.Duration) *gotest.T {
-	return testScopedT(t, timeout)
+	scoped := testScopedT(t, timeout)
+	return gotest.NewTWithContext(t, setupwaits.Open(scoped.Context(), t))
+}
+
+// drainSetupWaits waits for the goroutines tb's BeforeAll started, held to
+// budget as AfterAll is.
+func drainSetupWaits(tb testing.TB, budget time.Duration) {
+	set := setupwaits.Close(tb)
+	if set == nil {
+		return
+	}
+	watchWhile(tb, budget, "the wait on a goroutine BeforeAll started with gotest.Go ", "SetupTimeout", func() {
+		drain(set)
+	})
+}
+
+// drain runs set's waits, last first, as cleanups would, until none is left.
+// Each runs deferred, so one that fails or panics still leaves the others to
+// be waited for.
+func drain(set *setupwaits.Set) {
+	waits := set.Take()
+	if len(waits) == 0 {
+		return
+	}
+	defer drain(set)
+	for _, wait := range waits {
+		defer wait()
+	}
+}
+
+// AfterEach runs after, a test method's AfterEach, from the defer that pairs it
+// with BeforeEach. A panic in BeforeEach or the method is recovered first and
+// re-raised once after returns: a fatal assertion in after would otherwise
+// end the goroutine and discard the panic with it.
+func AfterEach(after func()) {
+	if p := carry.From(recover(), "the test method, ahead of its AfterEach"); p != nil {
+		defer panic(p)
+	}
+	after()
 }
 
 // TestT builds the *gotest.T handed to a single test method. The timeout only
