@@ -37,6 +37,7 @@ type FuzzTarget struct {
 	Package string // import path
 	Dir     string // package source directory (working dir for the subprocess)
 	Func    string // generated wrapper func name, e.g. FuzzParserTestSuite_FuzzParse
+	Suite   string // the suite the target belongs to, e.g. ParserTestSuite
 }
 
 // FuzzRunConfig configures a RunFuzzTargets invocation.
@@ -45,6 +46,7 @@ type FuzzRunConfig struct {
 	Total       time.Duration // --for budget, approximate wall-clock for the whole session; 0 => go's own default per target (no -fuzztime)
 	Jobs        int           // concurrent targets; <=0 => defaultFuzzJobs()
 	BuildFlags  []string      // additional go test build flags (-tags etc.)
+	Fixtures    *FuzzFixtures // the shared fixtures the targets bind; nil when none
 }
 
 // FuzzSchedule is the concrete plan a --for budget resolves to: how many
@@ -314,8 +316,18 @@ func buildFuzzCmd(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, d time.D
 // drained yet (exactly where a FAIL summary or a crasher path would go
 // missing).
 func runOneFuzzTarget(ctx context.Context, t FuzzTarget, cfg FuzzRunConfig, budget time.Duration, out *sync.Mutex) FuzzTargetOutcome { //nolint:gocritic // hugeParam: stable API
+	env, never := cfg.Fixtures.Env(t)
+	if never != "" {
+		out.Lock()
+		fmt.Fprintf(os.Stderr, "[%s] FAIL: %s\n", t.Func, never)
+		out.Unlock()
+		return FuzzTargetOutcome{Func: t.Func, ExitCode: 1}
+	}
 	before := snapshotCrashers(t)
 	cmd := buildFuzzCmd(ctx, t, cfg, budget)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	stdoutW := newLineWriter(os.Stdout, t.Func, out)
 	stderrW := newLineWriter(os.Stderr, t.Func, out)

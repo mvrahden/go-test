@@ -1,0 +1,16 @@
+Expect: releaseslow: exit code 0, want 1
+Expect: releaseslow: the run does not report the release's overrun
+Judge: ./tests/canary CanaryTestSuite/TestAReleaseThatOutlivesItsTimeoutFailsTheRun
+Clause: when a package fixture's AfterAll between its attempts outlives the fixture's declared Timeout and the second attempt comes up → fails the run
+Clause: when a package fixture's AfterAll between its attempts outlives the fixture's declared Timeout and the second attempt comes up → reports that the release exceeded the Timeout
+--- a/pkg/gotestruntime/fixturesetup.go
++++ b/pkg/gotestruntime/fixturesetup.go
+@@ -163,7 +163,7 @@
+ 	if s.AfterAll == nil {
+ 		return nil
+ 	}
+-	td := FixtureTeardown{Name: s.Name, Timeout: s.Timeout, Budget: s.Budget, AfterAll: s.AfterAll}
++	td := FixtureTeardown{Name: s.Name, Timeout: s.Timeout, AfterAll: s.AfterAll}
+ 	if err := runFixtureTeardown(context.WithoutCancel(ctx), td); err != nil {
+ 		return fmt.Errorf("%w: %w", ErrReleaseFailed, err)
+ 	}

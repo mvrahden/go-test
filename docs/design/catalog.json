@@ -4589,6 +4589,112 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "runs no AfterAll for the fixture, and the dependency's AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_no_AfterAll_for_the_fixture,_and_the_dependency's_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is interrupted while a shared fixture's dependency sets up, before the fixture's own BeforeAll runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_is_interrupted_while_a_shared_fixture's_dependency_sets_up,_before_the_fixture's_own_BeforeAll_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SetupEndsBeforeBeforeAll",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSetupEndsBeforeBeforeAll",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lets that AfterAll finish under a context the stop does not cut short",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lets_that_AfterAll_finish_under_a_context_the_stop_does_not_cut_short",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "starts no further attempt and releases the fixture once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_no_further_attempt_and_releases_the_fixture_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is stopped while a shared fixture's AfterAll releases a failed attempt before its retry",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_is_stopped_while_a_shared_fixture's_AfterAll_releases_a_failed_attempt_before_its_retry",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "StopDuringTheReleaseBetweenAttempts",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestStopDuringTheReleaseBetweenAttempts",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureCancel",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureCancelTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "is reported at the hook's declaration, not in the runtime's file",
                       "duration": 0,
                       "excluded": false,
@@ -4701,6 +4807,99 @@
               "focused": false,
               "kind": "method",
               "name": "TestWhereAFixtureHookErrorIsReported",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "fixture BeforeAll returns an error",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "fixture_BeforeAll_returns_an_error",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fixture BeforeAll panics",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "fixture_BeforeAll_panics",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fixture AfterAll returns an error",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "fixture_AfterAll_returns_an_error",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fixture AfterAll panics",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "fixture_AfterAll_panics",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run_with_exit_1,_runs_the_hooks_its_row_names_and_gives_the_verdicts_its_row_names",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's BeforeAll or AfterAll returns an error or panics",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_fixture's_BeforeAll_or_AfterAll_returns_an_error_or_panics",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFixtureBeforeAllOrAfterAllGoesWrong",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFixtureBeforeAllOrAfterAllGoesWrong",
               "output": [],
               "status": "none"
             }
@@ -4819,6 +5018,152 @@
           "focused": false,
           "kind": "suite",
           "name": "TestFixtureOrderTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reports that AfterAll's error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_that_AfterAll's_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's AfterAll fails between its attempts and the second attempt comes up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_fixture's_AfterAll_fails_between_its_attempts_and_the_second_attempt_comes_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reports that AfterAll's error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_that_AfterAll's_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's AfterAll fails between its attempts and the second attempt comes up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_AfterAll_fails_between_its_attempts_and_the_second_attempt_comes_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reports that the release exceeded the Timeout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_that_the_release_exceeded_the_Timeout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's AfterAll between its attempts outlives the fixture's declared Timeout and the second attempt comes up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_fixture's_AfterAll_between_its_attempts_outlives_the_fixture's_declared_Timeout_and_the_second_attempt_comes_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFailedReleaseBetweenAttempts",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFailedReleaseBetweenAttempts",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureRetry",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureRetryTestSuite",
           "output": [],
           "status": "none"
         },
@@ -5086,6 +5431,165 @@
           "focused": false,
           "kind": "suite",
           "name": "TestFixtureSelectionTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll after each of its 2 attempts, releasing what each reached before the next",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_after_each_of_its_2_attempts,_releasing_what_each_reached_before_the_next",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's setup fails on its last attempt",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_setup_fails_on_its_last_attempt",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FailedSharedSetupIsReleased",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFailedSharedSetupIsReleased",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run, runs no method and still runs its Dehydrate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run,_runs_no_method_and_still_runs_its_Dehydrate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's Hydrate fails after reaching part of what it opens",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_Hydrate_fails_after_reaching_part_of_what_it_opens",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FailedHydrateIsDehydrated",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFailedHydrateIsDehydrated",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureTeardown",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureTeardownTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails naming the shared fixture it binds and go tool gotest, before any method runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_naming_the_shared_fixture_it_binds_and_go_tool_gotest,_before_any_method_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite binding a shared fixture runs under plain go test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_binding_a_shared_fixture_runs_under_plain_go_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SharedFixtureSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSharedFixtureSuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "PlainGoTest",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestPlainGoTestTestSuite",
           "output": [],
           "status": "none"
         }
@@ -5427,6 +5931,139 @@
           "focused": false,
           "kind": "suite",
           "name": "TestFuzzSelectionTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "starts the fixture once, its fuzz workers see its state, and it is torn down after",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_the_fixture_once,_its_fuzz_workers_see_its_state,_and_it_is_torn_down_after",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest fuzz runs a target whose suite binds a shared fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "gotest_fuzz_runs_a_target_whose_suite_binds_a_shared_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Fuzz",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFuzz",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails without running the target, naming the fixture",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_without_running_the_target,_naming_the_fixture",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest fuzz runs a target whose suite binds a shared fixture that does not come up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "gotest_fuzz_runs_a_target_whose_suite_binds_a_shared_fixture_that_does_not_come_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FixtureDown",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestFixtureDown",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reports the crasher's own failure, seen with the fixture's state, and tears the fixture down",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_the_crasher's_own_failure,_seen_with_the_fixture's_state,_and_tears_the_fixture_down",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest fuzz triage re-runs a crasher of a target whose suite binds a shared fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "gotest_fuzz_triage_re-runs_a_crasher_of_a_target_whose_suite_binds_a_shared_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Triage",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTriage",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FuzzSharedFixture",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFuzzSharedFixtureTestSuite",
           "output": [],
           "status": "none"
         }
@@ -6746,13 +7383,13 @@
     }
   ],
   "stats": {
-    "behaviors": 225,
+    "behaviors": 245,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 31,
+    "suites": 36,
     "tests": 0
   }
 }

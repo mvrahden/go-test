@@ -184,7 +184,8 @@ func (s *RuntimeTestSuite) TestRetry_SucceedsOnSecondAttempt(t *gotest.T) {
 
 	mustEqual(t, 0, exitCode)
 	mustEqual(t, 2, attempts)
-	mustEqual(t, []string{"root.init", "root.beforeAll", "m.run", "root.afterAll"}, rec.names())
+	// The failed first attempt is released before the retry builds anew.
+	mustEqual(t, []string{"root.init", "root.afterAll", "root.beforeAll", "m.run", "root.afterAll"}, rec.names())
 }
 
 func (s *RuntimeTestSuite) TestRetry_ExhaustedRetriesReturnsExitCode2(t *gotest.T) {
@@ -214,7 +215,34 @@ func (s *RuntimeTestSuite) TestRetry_ExhaustedRetriesReturnsExitCode2(t *gotest.
 	mustEqual(t, 2, exitCode)
 	mustEqual(t, 2, attempts)
 	mustFalse(t, mRunCalled)
-	mustEqual(t, []string{}, rec.names())
+	// Released once between the two attempts and once after the final failure.
+	mustEqual(t, []string{"root.afterAll", "root.afterAll"}, rec.names())
+}
+
+func (s *RuntimeTestSuite) TestRetry_CancelDuringTheReleaseReleasesOnce(t *gotest.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	attempts, afterAlls := 0, 0
+	node := &gotestruntime.FixtureNode{
+		Name:   "Flaky",
+		Config: gotest.FixtureConfig{Timeout: time.Minute, Retries: 2},
+		BeforeAll: func(context.Context) error {
+			attempts++
+			return errors.New("not ready yet")
+		},
+		AfterAll: func(context.Context) error {
+			afterAlls++
+			cancel()
+			return nil
+		},
+	}
+
+	_, err := gotestruntime.SetupFixtureDAG(ctx, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+
+	gotest.ErrorIs(t, err, context.Canceled)
+	gotest.Equal(t, 1, attempts)
+	// The release between attempts already ran: the teardown does not repeat it.
+	gotest.Equal(t, 1, afterAlls)
 }
 
 func (s *RuntimeTestSuite) TestRetry_DelayObservedBetweenAttempts(t *gotest.T) {
@@ -460,14 +488,15 @@ func (s *RuntimeTestSuite) TestChildren_ConcurrentSetup(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 	rec := &recorder{}
-	childAStarted := make(chan struct{})
+	childBStarted := make(chan struct{})
 
 	childA := &gotestruntime.FixtureNode{
 		Name:   "ChildA",
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			close(childAStarted)
+			// Fail only once B is inside its BeforeAll, so B is cancelled mid-setup.
+			<-childBStarted
 			return errors.New("childA fails")
 		},
 		AfterAll: func(ctx context.Context) error {
@@ -480,13 +509,12 @@ func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			// Wait for A to have started (and likely failed)
-			<-childAStarted
-			// Give time for cancellation to propagate
+			close(childBStarted)
+			// Bounded, so a missing cancel fails the test instead of hanging it.
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(10 * time.Second):
 				rec.record("childB.beforeAll.completed")
 				return nil
 			}
@@ -514,14 +542,50 @@ func (s *RuntimeTestSuite) TestChildFailure_CancelsSiblings(t *gotest.T) {
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
-	// ChildA.AfterAll NOT called (never succeeded)
-	mustNotContain(t, events, "childA.afterAll")
-	// ChildB.AfterAll NOT called (cancelled before success)
-	mustNotContain(t, events, "childB.afterAll")
+	// ChildA's BeforeAll ran and failed: whatever it reached is released.
+	mustContain(t, events, "childA.afterAll")
+	// ChildB's BeforeAll ran and was cancelled: released as well.
+	mustContain(t, events, "childB.afterAll")
 	// ChildB.BeforeAll should have been cancelled, not completed
 	mustNotContain(t, events, "childB.beforeAll.completed")
 	// Root.AfterAll IS called (root succeeded)
 	mustContain(t, events, "root.afterAll")
+}
+
+func (s *RuntimeTestSuite) TestChildFailure_ReportsTheCause(t *gotest.T) {
+	aFailed := make(chan struct{})
+	a := &gotestruntime.FixtureNode{Name: "A", Config: gotest.FixtureConfig{Timeout: time.Minute},
+		BeforeAll: func(ctx context.Context) error { close(aFailed); return errors.New("A refused to start") }}
+	b := &gotestruntime.FixtureNode{Name: "B", Config: gotest.FixtureConfig{Timeout: time.Minute},
+		BeforeAll: func(ctx context.Context) error { <-aFailed; <-ctx.Done(); return ctx.Err() }}
+	err := gotestruntime.ExportSetupDAG(context.Background(), []*gotestruntime.FixtureNode{a, b}, nil, gotestruntime.ExportNewNodeTracker())
+	// B saw its context end, but the error the run reports is why: A's failure.
+	gotest.ErrorContains(t, err, "A refused to start")
+	gotest.NotContains(t, err.Error(), "context canceled")
+}
+
+func (s *RuntimeTestSuite) TestChildFailure_SkippedChildIsNotTornDown(t *gotest.T) {
+	rec := &recorder{}
+	root := &gotestruntime.FixtureNode{
+		Name:      "Root",
+		Config:    gotest.DefaultFixtureConfig(),
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { rec.record("root.beforeAll"); return errors.New("root fails") },
+		AfterAll:  func(ctx context.Context) error { rec.record("root.afterAll"); return nil },
+	}
+	child := &gotestruntime.FixtureNode{
+		Name:      "Child",
+		Config:    gotest.FixtureConfig{Timeout: 2 * time.Minute},
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { rec.record("child.beforeAll"); return nil },
+		AfterAll:  func(ctx context.Context) error { rec.record("child.afterAll"); return nil },
+	}
+
+	exitCode := gotestruntime.ExportRun(func() int { return 0 }, gotestruntime.MainConfig{Fixtures: under(root, child)})
+
+	mustEqual(t, 2, exitCode)
+	// The root ran and failed: released. The child never started: nothing to release.
+	mustEqual(t, []string{"root.beforeAll", "root.afterAll"}, rec.names())
 }
 
 func (s *RuntimeTestSuite) TestChildFailure_SucceededSiblingGetsAfterAll(t *gotest.T) {
@@ -571,8 +635,8 @@ func (s *RuntimeTestSuite) TestChildFailure_SucceededSiblingGetsAfterAll(t *gote
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
-	// ChildA never succeeded
-	mustNotContain(t, events, "childA.afterAll")
+	// ChildA ran and failed → AfterAll releases what it reached
+	mustContain(t, events, "childA.afterAll")
 	// ChildB succeeded → AfterAll must be called
 	mustContain(t, events, "childB.afterAll")
 	// Root succeeded → AfterAll must be called
@@ -693,13 +757,16 @@ func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentSetup(t *gotest.T) {
 
 func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 	rec := &recorder{}
+	rootBStarted := make(chan struct{})
 
 	rootA := &gotestruntime.FixtureNode{
 		Name:   "RootA",
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			return errors.New("rootA fails immediately")
+			// Fail only once B is inside its BeforeAll, so B is cancelled mid-setup.
+			<-rootBStarted
+			return errors.New("rootA fails")
 		},
 		AfterAll: func(ctx context.Context) error {
 			rec.record("rootA.afterAll")
@@ -711,9 +778,15 @@ func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 		Config: gotest.FixtureConfig{Timeout: 2 * time.Minute},
 		Init:   func() {},
 		BeforeAll: func(ctx context.Context) error {
-			// Block until cancelled
-			<-ctx.Done()
-			return ctx.Err()
+			close(rootBStarted)
+			// Bounded, so a missing cancel fails the test instead of hanging it.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(10 * time.Second):
+				rec.record("rootB.beforeAll.completed")
+				return nil
+			}
 		},
 		AfterAll: func(ctx context.Context) error {
 			rec.record("rootB.afterAll")
@@ -725,8 +798,10 @@ func (s *RuntimeTestSuite) TestMultipleRoots_OneFailsCancelsOther(t *gotest.T) {
 
 	mustEqual(t, 2, exitCode)
 	events := rec.names()
-	mustNotContain(t, events, "rootA.afterAll")
-	mustNotContain(t, events, "rootB.afterAll")
+	// A failed and B was cancelled mid-setup: both ran BeforeAll, both are released.
+	mustContain(t, events, "rootA.afterAll")
+	mustContain(t, events, "rootB.afterAll")
+	mustNotContain(t, events, "rootB.beforeAll.completed")
 }
 
 func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentTeardown(t *gotest.T) {
@@ -1146,7 +1221,8 @@ func (s *RuntimeTestSuite) TestDAG_DependencyFailure_SkipsDependents(t *gotest.T
 	events := rec.names()
 	mustNotContain(t, events, "child.beforeAll")
 	mustNotContain(t, events, "child.afterAll")
-	mustNotContain(t, events, "root.afterAll")
+	// The root ran and failed: released. The child never started: not.
+	mustContain(t, events, "root.afterAll")
 }
 
 func (s *RuntimeTestSuite) TestDAG_DependencyFailure_PartialTeardown(t *gotest.T) {
@@ -1202,7 +1278,8 @@ func (s *RuntimeTestSuite) TestDAG_DependencyFailure_PartialTeardown(t *gotest.T
 	events := rec.names()
 	mustContain(t, events, "a.beforeAll")
 	mustContain(t, events, "a.afterAll")
-	mustNotContain(t, events, "b.afterAll")
+	// B ran and failed: released with whatever it reached.
+	mustContain(t, events, "b.afterAll")
 }
 
 func (s *RuntimeTestSuite) TestDAG_ComputeMaxPath(t *gotest.T) {
@@ -1329,6 +1406,57 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateNode_HydrateTimeout(t *gotest.T) {
 	mustFalse(t, dehydrateHasDeadline, "Dehydrate runs on context.Background")
 }
 
+// A Hydrate that fails or panics partway may hold what it reached, a pool or
+// a client: its Dehydrate releases it, as AfterAll does a failed BeforeAll.
+func (s *RuntimeTestSuite) TestDAG_FailedHydrateIsDehydrated(t *gotest.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	_ = os.WriteFile(stateFile, []byte(`{"pkg.Postgres": {}}`), 0600)
+	t.Setenv("GOTEST_SHARED_STATE_FILE", stateFile)
+
+	for _, c := range []struct {
+		name    string
+		hydrate func(context.Context) error
+	}{
+		{"fails", func(context.Context) error { return errors.New("pool half open") }},
+		{"panics", func(context.Context) error { panic("pool half open") }},
+	} {
+		t.It("dehydrates a fixture whose Hydrate "+c.name, func(it *gotest.T) {
+			dehydrated := 0
+			node := &gotestruntime.FixtureNode{
+				Name: "Postgres",
+				SharedState: &gotestruntime.SharedStateNode{
+					StateKey:  "pkg.Postgres",
+					Target:    &struct{}{},
+					Hydrate:   c.hydrate,
+					Dehydrate: func(context.Context) error { dehydrated++; return nil },
+				},
+			}
+			_, err := gotestruntime.SetupFixtureDAG(it.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+			gotest.ErrorContains(it, err, "pool half open")
+			gotest.Equal(it, 1, dehydrated)
+		})
+	}
+
+	t.It("does not dehydrate a fixture whose state never reached Hydrate", func(it *gotest.T) {
+		bad := filepath.Join(it.TempDir(), "state.json")
+		_ = os.WriteFile(bad, []byte(`{"pkg.Postgres": "not an object"}`), 0600)
+		it.Setenv("GOTEST_SHARED_STATE_FILE", bad)
+		dehydrated := 0
+		node := &gotestruntime.FixtureNode{
+			Name: "Postgres",
+			SharedState: &gotestruntime.SharedStateNode{
+				StateKey:  "pkg.Postgres",
+				Target:    &struct{ A int }{},
+				Hydrate:   func(context.Context) error { return nil },
+				Dehydrate: func(context.Context) error { dehydrated++; return nil },
+			},
+		}
+		_, err := gotestruntime.SetupFixtureDAG(it.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+		gotest.ErrorContains(it, err, "unmarshal")
+		gotest.Zero(it, dehydrated)
+	})
+}
+
 func (s *RuntimeTestSuite) TestDAG_SharedStateChain(t *gotest.T) {
 	rec := &recorder{}
 
@@ -1383,6 +1511,8 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateChain(t *gotest.T) {
 	mustLess(t, indexOf(events, "schema.hydrate"), indexOf(events, "m.run"))
 }
 
+// A shared node with no state file is plain go test's doing: the setup refuses
+// it, naming the fixture, and sets nothing else up.
 func (s *RuntimeTestSuite) TestDAG_SharedStateNode_MissingStateFile(t *gotest.T) {
 	rec := &recorder{}
 
@@ -1398,10 +1528,6 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateNode_MissingStateFile(t *gotest.T)
 			Target:   pgTarget,
 			Hydrate: func(ctx context.Context) error {
 				rec.record("pg.hydrate")
-				return nil
-			},
-			Dehydrate: func(ctx context.Context) error {
-				rec.record("pg.dehydrate")
 				return nil
 			},
 		},
@@ -1421,20 +1547,14 @@ func (s *RuntimeTestSuite) TestDAG_SharedStateNode_MissingStateFile(t *gotest.T)
 		},
 	}
 
-	exitCode := gotestruntime.ExportRun(func() int {
-		rec.record("m.run")
-		return 0
-	}, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{pgNode, plainNode}})
+	_, err := gotestruntime.SetupFixtureDAG(t.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{pgNode, plainNode}})
 
-	mustEqual(t, 0, exitCode)
-
-	events := rec.names()
-	mustNotContain(t, events, "pg.hydrate")
-	mustNotContain(t, events, "pg.dehydrate")
-	mustContain(t, events, "plain.init")
-	mustContain(t, events, "plain.beforeAll")
-	mustContain(t, events, "m.run")
-	mustContain(t, events, "plain.afterAll")
+	if err == nil {
+		fatalf(t, "a shared node without a state file was set up")
+	}
+	mustContain(t, err.Error(), "suite binds shared fixture PostgresSharedFixture, whose state only the gotest runner provides; run via go tool gotest")
+	mustNotContain(t, rec.names(), "pg.hydrate")
+	mustNotContain(t, rec.names(), "plain.beforeAll")
 }
 
 func (s *RuntimeTestSuite) TestBeforeAllError_IncludesFixtureName(t *gotest.T) {
@@ -1447,7 +1567,7 @@ func (s *RuntimeTestSuite) TestBeforeAllError_IncludesFixtureName(t *gotest.T) {
 		},
 	}
 
-	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node)
+	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node, nil)
 
 	mustErrorContain(t, err, "Database.BeforeAll")
 	mustErrorContain(t, err, "connection refused")
@@ -1464,7 +1584,7 @@ func (s *RuntimeTestSuite) TestBeforeAllError_WrapsOriginalError(t *gotest.T) {
 		},
 	}
 
-	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node)
+	err := gotestruntime.ExportRunBeforeAllWithRetry(context.Background(), node, nil)
 
 	mustErrorIs(t, err, sentinel)
 }
@@ -1482,7 +1602,7 @@ func (s *RuntimeTestSuite) TestBeforeAllError_ContextCancelIncludesFixtureName(t
 		},
 	}
 
-	err := gotestruntime.ExportRunBeforeAllWithRetry(ctx, node)
+	err := gotestruntime.ExportRunBeforeAllWithRetry(ctx, node, nil)
 
 	mustErrorContain(t, err, "Slow.BeforeAll")
 	mustErrorIs(t, err, context.Canceled)
@@ -1569,12 +1689,33 @@ func (s *RuntimeTestSuite) TestDAG_OverrunSetupIsStillTornDown(t *gotest.T) {
 	}
 
 	// gotestruntime.SetupFixtureDAG tears down its partial progress on a setup error; with the
-	// overrun marked succeeded, that pass must include this fixture's AfterAll.
+	// BeforeAll entered, that pass must include this fixture's AfterAll.
 	_, err := gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
 	mustErrorIs(t, err, gotestruntime.ErrSetupOverran)
 	mustEqual(t, []string{"slow.afterAll"}, rec.names(),
 		"an overrun-but-successful setup created real resources; skipping its AfterAll leaks them")
+}
+
+// A setup cancelled before BeforeAll is entered has nothing to release:
+// AfterAll on it would run against a fixture that never set up.
+func (s *RuntimeTestSuite) TestDAG_CancelledBeforeBeforeAllIsNotTornDown(t *gotest.T) {
+	rec := &recorder{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	node := &gotestruntime.FixtureNode{
+		Name:      "Never",
+		Config:    gotest.DefaultFixtureConfig(),
+		Init:      func() {},
+		BeforeAll: func(ctx context.Context) error { rec.record("never.beforeAll"); return nil },
+		AfterAll:  func(ctx context.Context) error { rec.record("never.afterAll"); return nil },
+	}
+
+	_, err := gotestruntime.SetupFixtureDAG(ctx, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+
+	mustErrorIs(t, err, context.Canceled)
+	mustEqual(t, []string{}, rec.names(), "BeforeAll never ran, so AfterAll must not either")
 }
 
 // A dependent that was merely waiting on the fixture that failed must not

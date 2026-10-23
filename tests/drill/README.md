@@ -405,6 +405,19 @@ shards of one run do not add up to every mutant exactly once.
 | `snapshot-legacy-not-renamed` | an old-keyed section that matches keeps its old key | canary: the `snapshotlegacy` baseline is not migrated |
 | `snapshot-legacy-claims-ignored` | an old-keyed section its exact key already read serves a second key | canary: the `snapshotlegacy` second twin compares against the first and fails |
 | `snapshot-cr-runs-kept` | only CRLF is a line ending in a snapshot value | canary: the `snapshotting` fixture's carriage returns no longer match |
+| `shared-fixture-runs-under-plain-go-test` | a suite binding a shared fixture runs under plain go test with empty state | canary: the staged fixture-chain suite's method runs instead of the suite naming the fixture it binds |
+| `shared-fixture-failed-setup-not-released` | a shared fixture whose setup failed is not released | canary: the leaking fixture's AfterAll marker is missing |
+| `fixture-failed-setup-not-released` | a fixture whose BeforeAll failed is not torn down | canary: the setup-failing fixture's AfterAll never runs |
+| `release-between-attempts-best-effort` | the AfterAll between two setup attempts is run bare and its error dropped | canary: a package and a shared fixture whose release between attempts fails leave the run green and say nothing of it |
+| `last-attempt-failure-only-logged` | a setup whose last attempt fails is logged and then reported as a success | canary: a suite bound to a shared fixture that never comes up runs and the run goes green |
+| `unattempted-shared-fixture-released` | the shared fixture process releases every started fixture, whether or not its BeforeAll ran | canary: a stopped run releases the fixture whose setup ended before its BeforeAll |
+| `release-cut-short-by-a-stop` | the release between two setup attempts runs under the setup's context, so a stop cancels it | canary: the stopped run's release between attempts sees its context cancelled |
+| `attempt-after-a-stop-during-the-release` | a stop seen after the release between attempts still lets the next attempt start | canary: the stopped run's fixture starts a second attempt |
+| `released-attempt-released-again` | an attempt released between retries stays marked for release, so the teardown releases it again | canary: the stopped run's fixture is released twice |
+| `release-ignores-its-timeout` | the release between attempts is not held to the fixture's declared Timeout | canary: a package fixture whose release overruns its Timeout leaves the run green |
+| `failed-hydrate-not-dehydrated` | a shared fixture whose Hydrate failed gets no Dehydrate | canary: the failed Hydrate's Dehydrate marker is missing |
+| `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
+| `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
 
 ## Adding a mutant
 

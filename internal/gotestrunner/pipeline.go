@@ -375,29 +375,37 @@ func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []got
 				return
 			}
 			p.proc = proc
-			var deadline <-chan time.Time
-			if setupTimeout > 0 {
-				timer := time.NewTimer(setupTimeout)
-				defer timer.Stop()
-				deadline = timer.C
-			}
-			select {
-			case <-proc.AllDone():
-				if err := proc.SetupErr(); err != nil {
-					p.setupErr = fmt.Errorf("shared fixture setup failed: %w", err)
-				}
-			case <-ctx.Done():
-			case <-deadline:
-				// Scheduling context: a setup deadline is a wall-clock
-				// verdict, and a starved setup looks exactly like a hung one.
-				p.setupTimedOut = true
-				p.setupErr = fmt.Errorf("shared fixture setup timed out after %v %s", setupTimeout, schedinfo.Summary())
-			}
+			p.setupTimedOut, p.setupErr = awaitSharedSetup(ctx, proc, setupTimeout)
 		}()
 	}
 
 	wg.Wait()
 	return p
+}
+
+// awaitSharedSetup waits for the up-front setup of proc and returns what
+// failed, and whether it was the setup timeout. It leaves the process
+// running either way: the fixtures that came up serve the targets that read
+// only them, and a later Teardown releases them.
+func awaitSharedSetup(ctx context.Context, proc *SharedFixtureProcess, setupTimeout time.Duration) (timedOut bool, err error) {
+	var deadline <-chan time.Time
+	if setupTimeout > 0 {
+		timer := time.NewTimer(setupTimeout)
+		defer timer.Stop()
+		deadline = timer.C
+	}
+	select {
+	case <-proc.AllDone():
+		if err := proc.SetupErr(); err != nil {
+			return false, fmt.Errorf("shared fixture setup failed: %w", err)
+		}
+	case <-ctx.Done():
+	case <-deadline:
+		// Scheduling context: a setup deadline is a wall-clock verdict, and a
+		// starved setup looks exactly like a hung one.
+		return true, fmt.Errorf("shared fixture setup timed out after %v %s", setupTimeout, schedinfo.Summary())
+	}
+	return false, nil
 }
 
 func assignBudgetFiles(targets []SuiteTarget) {

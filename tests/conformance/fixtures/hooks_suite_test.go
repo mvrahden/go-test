@@ -11,8 +11,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// FixtureHooksTestSuite: where an error a package fixture's per-method hook
-// returns is reported.
+// FixtureHooksTestSuite: a package fixture's BeforeAll or AfterAll that goes
+// wrong, and where an error a fixture's per-method hook returns is reported.
 type FixtureHooksTestSuite struct{}
 
 func (s *FixtureHooksTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -98,6 +98,49 @@ func (s *FixtureHooksTestSuite) TestWhereAFixtureHookErrorIsReported(t *gotest.T
 			file := filepath.ToSlash(gotest.Must(filepath.Abs(filepath.Join("..", "testdata", elsewhere))))
 			gotest.Regexp(it, failedAt(it, file, elsewhere, "func (f *RemoteFixture) BeforeEach", "elsewhere_RemoteFixture.BeforeEach failed"), outputOf(&run, "TestRemoteTestSuite/TestBody"))
 			gotest.Regexp(it, failedAt(it, file, elsewhere, "func (h *Hooks) AfterEach", "PromotedFixture.AfterEach failed"), outputOf(&run, "TestPromotedTestSuite/TestBody"))
+		})
+	})
+}
+
+const (
+	gridSuite = "TestGridTestSuite"
+	gridBody  = gridSuite + "/TestBody"
+	gridNext  = gridSuite + "/TestNext"
+)
+
+// gridCleanRun is every hook of the hooks package, in order, when none goes wrong.
+var gridCleanRun = []string{"fixture.BeforeAll", "suite.BeforeAll", "fixture.BeforeEach", "suite.BeforeEach", "body", "suite.AfterEach", "fixture.AfterEach", "fixture.BeforeEach", "suite.BeforeEach", "next", "suite.AfterEach", "fixture.AfterEach", "suite.AfterAll", "fixture.AfterAll"}
+
+type setupRow struct {
+	Desc     string
+	at, mode string
+	ran      []string
+	verdicts map[string]string
+}
+
+func (s *FixtureHooksTestSuite) TestAFixtureBeforeAllOrAfterAllGoesWrong(t *gotest.T) {
+	// Each row names the hook and how it goes wrong, and pins which hooks run
+	// (ran) and the verdicts. A BeforeAll that fails still gets its AfterAll,
+	// and the suite never opens.
+	t.When("a package fixture's BeforeAll or AfterAll returns an error or panics", func(w *gotest.T) {
+		w.It("fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []setupRow{
+				{Desc: "fixture BeforeAll returns an error", at: "fixture.BeforeAll", mode: "error",
+					ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{gridSuite: "fail", gridBody: ""}},
+				{Desc: "fixture BeforeAll panics", at: "fixture.BeforeAll", mode: "panic",
+					ran: []string{"fixture.BeforeAll", "fixture.AfterAll"}, verdicts: map[string]string{gridSuite: "fail", gridBody: ""}},
+				{Desc: "fixture AfterAll returns an error", at: "fixture.AfterAll", mode: "error",
+					ran: gridCleanRun, verdicts: map[string]string{gridBody: "pass", gridNext: "pass"}},
+				{Desc: "fixture AfterAll panics", at: "fixture.AfterAll", mode: "panic",
+					ran: gridCleanRun, verdicts: map[string]string{gridBody: "pass", gridNext: "pass"}},
+			}) {
+				run, _ := runHooks(sub, row.at, row.mode)
+				gotest.Equal(sub, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Equal(sub, row.ran, run.Markers)
+				for path, want := range row.verdicts {
+					gotest.Equal(sub, want, run.Verdict(path), "verdict of %s", path)
+				}
+			}
 		})
 	})
 }

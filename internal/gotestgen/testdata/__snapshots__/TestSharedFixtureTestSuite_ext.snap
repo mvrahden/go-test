@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -54,6 +53,7 @@ func main() {
 
 	ƒerrs := make([]error, 2)
 	ƒstarted := make([]bool, 2)
+	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -72,6 +72,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -105,6 +107,8 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -126,37 +130,31 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PostgresFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒstarted[1] {
+		if ƒtorn[1] || !ƒattempted[1] {
 			ƒtorn[1] = true
 			return false
 		}
 		ƒtorn[1] = true
-		if ƒerrs[1] == nil || errors.Is(ƒerrs[1], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "RedisFixture",
-				Timeout:  ƒcfg_sf1.Timeout,
-				Budget:   0,
-				AfterAll: sf1.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "RedisFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -273,7 +271,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -317,6 +314,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -334,6 +332,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -357,20 +357,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PostgresFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -464,7 +461,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -508,6 +504,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -525,6 +522,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -533,20 +532,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "SetupFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "SetupFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -640,7 +636,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -684,6 +679,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -701,6 +697,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -722,20 +720,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PostgresFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -829,7 +824,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -876,6 +870,7 @@ func main() {
 
 	ƒerrs := make([]error, 2)
 	ƒstarted := make([]bool, 2)
+	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -894,6 +889,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -927,6 +924,8 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -948,37 +947,31 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PostgresFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒstarted[1] {
+		if ƒtorn[1] || !ƒattempted[1] {
 			ƒtorn[1] = true
 			return false
 		}
 		ƒtorn[1] = true
-		if ƒerrs[1] == nil || errors.Is(ƒerrs[1], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "RedisFixture",
-				Timeout:  ƒcfg_sf1.Timeout,
-				Budget:   0,
-				AfterAll: sf1.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "RedisFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1095,7 +1088,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -1139,6 +1131,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -1156,6 +1149,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1177,20 +1172,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1284,7 +1276,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -1328,6 +1319,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -1345,6 +1337,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1366,20 +1360,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1473,7 +1464,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -1517,6 +1507,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -1534,6 +1525,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1555,20 +1548,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1662,7 +1652,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -1706,6 +1695,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -1723,6 +1713,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1744,20 +1736,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1851,7 +1840,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -1899,6 +1887,7 @@ func main() {
 
 	ƒerrs := make([]error, 2)
 	ƒstarted := make([]bool, 2)
+	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -1917,6 +1906,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -1950,6 +1941,8 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -1971,37 +1964,31 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒstarted[1] {
+		if ƒtorn[1] || !ƒattempted[1] {
 			ƒtorn[1] = true
 			return false
 		}
 		ƒtorn[1] = true
-		if ƒerrs[1] == nil || errors.Is(ƒerrs[1], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "RedisFixture",
-				Timeout:  ƒcfg_sf1.Timeout,
-				Budget:   0,
-				AfterAll: sf1.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "RedisFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2118,7 +2105,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -2162,6 +2148,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -2179,6 +2166,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -2200,20 +2189,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2307,7 +2293,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -2352,6 +2337,7 @@ func main() {
 
 	ƒerrs := make([]error, 1)
 	ƒstarted := make([]bool, 1)
+	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -2376,6 +2362,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -2397,20 +2385,17 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PGFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   ƒbudget_sf0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PGFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   ƒbudget_sf0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2504,7 +2489,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -2552,6 +2536,7 @@ func main() {
 
 	ƒerrs := make([]error, 2)
 	ƒstarted := make([]bool, 2)
+	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
 
 	ƒdone_sf0 := make(chan struct{})
@@ -2570,6 +2555,8 @@ func main() {
 			Retries:    ƒcfg_sf0.Retries,
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
+			AfterAll:   sf0.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		})
 		if ƒerrs[0] != nil {
 			return
@@ -2603,6 +2590,8 @@ func main() {
 			Retries:    ƒcfg_sf1.Retries,
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
+			AfterAll:   sf1.AfterAll,
+			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		})
 		if ƒerrs[1] != nil {
 			return
@@ -2626,37 +2615,31 @@ func main() {
 	}
 
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒstarted[0] {
+		if ƒtorn[0] || !ƒattempted[0] {
 			ƒtorn[0] = true
 			return false
 		}
 		ƒtorn[0] = true
-		if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "PostgresFixture",
-				Timeout:  ƒcfg_sf0.Timeout,
-				Budget:   0,
-				AfterAll: sf0.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "PostgresFixture",
+			Timeout:  ƒcfg_sf0.Timeout,
+			Budget:   0,
+			AfterAll: sf0.AfterAll,
+		})
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒstarted[1] {
+		if ƒtorn[1] || !ƒattempted[1] {
 			ƒtorn[1] = true
 			return false
 		}
 		ƒtorn[1] = true
-		if ƒerrs[1] == nil || errors.Is(ƒerrs[1], gotestruntime.ErrSetupOverran) {
-			return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-				Name:     "GCSFixture",
-				Timeout:  ƒcfg_sf1.Timeout,
-				Budget:   0,
-				AfterAll: sf1.AfterAll,
-			})
-		}
-		return false
+		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			Name:     "GCSFixture",
+			Timeout:  ƒcfg_sf1.Timeout,
+			Budget:   0,
+			AfterAll: sf1.AfterAll,
+		})
 	}
 
 	var ƒwg sync.WaitGroup

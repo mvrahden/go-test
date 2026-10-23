@@ -28,7 +28,7 @@ Each directory under `testdata/` is one package with one suite:
 | `fixtureteardown` | two suites bound to one package fixture, each in its own process with its own copy of the DAG: every process runs the fixture's `AfterAll`, and so does a bench run |
 | `fixturefuzzing` | a fixture-bound suite's seeds replay while the fixture is still up |
 | `teardownfailing` | a shared fixture whose `AfterAll` fails turns a green run red, and the `-json` stream carries the failure as a failed package |
-| `fixturechain` | a shared fixture reached only through a parent package fixture is started and hydrated for the suite |
+| `fixturechain` | a shared fixture reached only through a parent package fixture is started and hydrated for the suite; under plain `go test` the suite fails naming the fixture and the runner before any method runs |
 | `setupfailing` | a shared fixture that fails to come up fails only the suites that read it, in the `-json` stream and in a bench run |
 | `teardownaftersetup` | a shared fixture whose `AfterAll` fails beside a sibling that never came up: the stream carries both failures |
 | `guardskip` | a suite its guard skips sets up none of its fixtures: one that would fail leaves the run green |
@@ -54,6 +54,15 @@ Each directory under `testdata/` is one package with one suite:
 | `failfastsoft` | a failure `BeforeAll` records without stopping does not stop a FailFast suite's methods |
 | `failfastcleanup` | a parallel FailFast method that fails only in a cleanup, run one at a time, still stops the method that has not started |
 | `parallelpanic` | a panic in a parallel method runs `AfterAll` and the fixture teardown while a sibling is mid-flight, and skips that sibling's `AfterEach` |
+| `fixturesetupfail` | a package fixture whose `BeforeAll` fails still runs its `AfterAll`, and the suite that binds it never opens |
+| `failingshared` | a shared fixture whose `BeforeAll` fails still runs its `AfterAll` |
+| `packagerelease` | a package fixture whose `AfterAll` fails between its two setup attempts fails the run and reports that error, though the second attempt comes up |
+| `sharedrelease` | the same for a shared fixture |
+| `lastattempt` | a shared fixture that fails its last attempt fails the run, though the suite binding it would pass |
+| `cancelbeforesetup` | a run stopped while a shared fixture's dependency sets up runs no `AfterAll` for the fixture, whose `BeforeAll` never ran, and the dependency's `AfterAll` |
+| `releasestop` | a run stopped while a shared fixture's `AfterAll` releases a failed attempt lets that `AfterAll` finish, starts no further attempt and releases the fixture once |
+| `releaseslow` | a package fixture whose `AfterAll` between its attempts outlives its declared `Timeout` fails the run, though the second attempt comes up |
+| `hydratefail` | a shared fixture whose `Hydrate` fails partway still gets its `Dehydrate` |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

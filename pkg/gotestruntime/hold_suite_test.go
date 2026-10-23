@@ -1,9 +1,11 @@
 package gotestruntime_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
@@ -35,7 +37,7 @@ func (s *HoldTestSuite) TestBuildConfig(t *gotest.T) {
 	})
 }
 
-// Sequential with the rest of the package: the watcher is process-wide.
+// Sequential: the watcher is process-wide, and a method sets the environment.
 type HoldWatchTestSuite struct{}
 
 func (s *HoldWatchTestSuite) TestWatcher(t *gotest.T) {
@@ -48,6 +50,39 @@ func (s *HoldWatchTestSuite) TestWatcher(t *gotest.T) {
 			})
 			gotest.True(it, during, "no watcher while the fixtures were held")
 			gotest.False(it, gotestruntime.ExportWatching(), "the watcher outlived the hold: goleak would see it")
+		})
+	})
+}
+
+// fatalRecorder records what a hold fails with instead of failing the test.
+type fatalRecorder struct {
+	testing.TB
+	fatals []string
+}
+
+func (r *fatalRecorder) Fatal(args ...any) { r.fatals = append(r.fatals, fmt.Sprint(args...)) }
+
+func (r *fatalRecorder) Fatalf(format string, args ...any) {
+	r.fatals = append(r.fatals, fmt.Sprintf(format, args...))
+}
+
+func (s *HoldWatchTestSuite) TestRunnerRequired(t *gotest.T) {
+	t.When("several holds of one process bind a shared fixture without the runner's state", func(w *gotest.T) {
+		w.It("fails each, explaining the refusal in full only the first time and never as a setup failure", func(it *gotest.T) {
+			it.Setenv(protocol.EnvSharedStateFile, "")
+			rec := &fatalRecorder{TB: it.T()}
+			build := func() gotestruntime.MainConfig {
+				return gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{{
+					Name:        "OnceSharedFixture",
+					SharedState: &gotestruntime.SharedStateNode{},
+				}}}
+			}
+			gotestruntime.HoldFixtures(rec, build)
+			gotestruntime.HoldFixtures(rec, build)
+			gotest.Equal(it, []string{
+				"suite binds shared fixture OnceSharedFixture, whose state only the gotest runner provides; run via go tool gotest",
+				"suite binds shared fixture OnceSharedFixture; run via go tool gotest",
+			}, rec.fatals)
 		})
 	})
 }

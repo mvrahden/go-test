@@ -375,8 +375,31 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"no second copy of the teardown policy may remain")
 			gotest.Contains(it, code, "Budget:   ƒbudget_sf0,",
 				"a declared Timeout must become a teardown verdict")
-			gotest.Contains(it, code, "if ƒerrs[0] == nil || errors.Is(ƒerrs[0], gotestruntime.ErrSetupOverran) {",
-				"a setup that overran its budget still initialized — its resources exist and must be released")
+			gotest.Contains(it, code, "if ƒtorn[0] || !ƒattempted[0] {",
+				"a fixture whose BeforeAll never ran has nothing to release")
+			gotest.NotContains(it, code, "if ƒerrs[0] == nil",
+				"a fixture whose BeforeAll ran is released however it came out: a failed attempt may hold what it reached")
+		})
+
+		w.It("marks a fixture for release only while an entered BeforeAll is unreleased", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{
+					Identifier:     "PGFixture",
+					HasAfterAll:    true,
+					PkgPath:        "github.com/example/fixtures",
+					TransferFields: []string{"ConnStr"},
+				},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			// A shutdown that cancels setup before BeforeAll runs leaves
+			// nothing to release, and neither does one cancelling it right
+			// after a release between attempts.
+			gotest.Contains(it, code, "Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },")
+			gotest.Equal(it, 1, strings.Count(code, "ƒattempted[0] ="))
 		})
 
 		w.It("gives an undeclared config no teardown verdict", func(it *gotest.T) {
@@ -471,7 +494,6 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"bufio",
 				"context",
 				"encoding/json",
-				"errors",
 				"fmt",
 				"os",
 				"os/signal",

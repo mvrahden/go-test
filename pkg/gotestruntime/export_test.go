@@ -12,7 +12,7 @@ var (
 
 // ExportNewNodeTracker returns an empty tracker of the kind the DAG setup expects.
 func ExportNewNodeTracker() *nodeTracker {
-	return &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
+	return &nodeTracker{}
 }
 
 // ExportRun sets the DAG up, runs the tests and tears it down, as a test

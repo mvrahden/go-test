@@ -1,0 +1,14 @@
+Expect: releasestop: the stop cut the release short
+Judge: ./tests/canary CanaryTestSuite/TestAStopDuringTheReleaseBetweenAttemptsLetsItFinish
+Clause: when a run is stopped while a shared fixture's AfterAll releases a failed attempt before its retry → lets that AfterAll finish under a context the stop does not cut short
+--- a/pkg/gotestruntime/fixturesetup.go
++++ b/pkg/gotestruntime/fixturesetup.go
+@@ -164,7 +164,7 @@
+ 		return nil
+ 	}
+ 	td := FixtureTeardown{Name: s.Name, Timeout: s.Timeout, Budget: s.Budget, AfterAll: s.AfterAll}
+-	if err := runFixtureTeardown(context.WithoutCancel(ctx), td); err != nil {
++	if err := runFixtureTeardown(ctx, td); err != nil {
+ 		return fmt.Errorf("%w: %w", ErrReleaseFailed, err)
+ 	}
+ 	return nil

@@ -1,0 +1,15 @@
+Expect: releasestop: [0-9]+ attempts, want 1
+Judge: ./tests/canary CanaryTestSuite/TestAStopDuringTheReleaseBetweenAttemptsLetsItFinish
+Clause: when a run is stopped while a shared fixture's AfterAll releases a failed attempt before its retry → starts no further attempt and releases the fixture once
+--- a/pkg/gotestruntime/fixturesetup.go
++++ b/pkg/gotestruntime/fixturesetup.go
+@@ -142,9 +142,6 @@
+ 			if s.Held != nil {
+ 				s.Held(false)
+ 			}
+-			if ctx.Err() != nil {
+-				return errors.Join(ctx.Err(), releaseErr)
+-			}
+ 		}
+ 	}
+ 

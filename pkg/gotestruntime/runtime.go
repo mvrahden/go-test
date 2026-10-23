@@ -32,8 +32,10 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 		done[f.Name] = make(chan struct{})
 	}
 
-	childCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	// A failure cancels the siblings with itself as the cause, so a victim
+	// records why it was cancelled, not that it was.
+	childCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
 	errs := make(map[string]error)
 	var mu sync.Mutex
@@ -46,10 +48,11 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 			defer close(done[node.Name])
 			defer func() {
 				if r := recover(); r != nil {
+					err := fmt.Errorf("%s: panic: %v", node.Name, r)
 					mu.Lock()
-					errs[node.Name] = fmt.Errorf("%s: panic: %v", node.Name, r)
+					errs[node.Name] = err
 					mu.Unlock()
-					cancel()
+					cancel(err)
 				}
 			}()
 
@@ -60,15 +63,16 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 					depErr := errs[dep]
 					mu.Unlock()
 					if depErr != nil {
+						err := fmt.Errorf("skipped: dependency %q failed", dep)
 						mu.Lock()
-						errs[node.Name] = fmt.Errorf("skipped: dependency %q failed", dep)
+						errs[node.Name] = err
 						mu.Unlock()
-						cancel()
+						cancel(err)
 						return
 					}
 				case <-childCtx.Done():
 					mu.Lock()
-					errs[node.Name] = childCtx.Err()
+					errs[node.Name] = context.Cause(childCtx)
 					mu.Unlock()
 					return
 				}
@@ -78,7 +82,7 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 				mu.Lock()
 				errs[node.Name] = err
 				mu.Unlock()
-				cancel()
+				cancel(err)
 			}
 		}(f)
 	}
@@ -104,9 +108,6 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
 	// Handle shared state nodes (unmarshal + hydrate)
 	if node.SharedState != nil {
-		if sharedState == nil {
-			return nil
-		}
 		// The file names exactly the fixtures this suite requires; the CLI
 		// refuses to write one with a required key missing. A node it does
 		// not name belongs to a sibling suite of the package and is left
@@ -122,6 +123,9 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 			node.Init()
 		}
 		if node.SharedState.Hydrate != nil { //nolint:nestif // linear hydrate sequence
+			// Dehydrated once Hydrate is entered, however it comes out: a
+			// failed or panicked one may hold what it reached.
+			tracker.setAttempted(node, true)
 			hctx := ctx
 			var cancel context.CancelFunc
 			if node.Config.Timeout > 0 {
@@ -135,7 +139,7 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 				return fmt.Errorf("hydrate shared fixture %q: %w", node.SharedState.StateKey, err)
 			}
 		}
-		tracker.markSucceeded(node)
+		tracker.setAttempted(node, true)
 		return nil
 	}
 
@@ -143,17 +147,13 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 		node.Init()
 	}
 
-	if err := runBeforeAllWithRetry(ctx, node); err != nil {
-		// An overrun setup completed its work before the verdict landed, so the
-		// resources it created exist. Marking it succeeded keeps its AfterAll in
-		// the teardown pass; the run still fails on the returned error.
-		if errors.Is(err, ErrSetupOverran) {
-			tracker.markSucceeded(node)
-		}
+	// Attempted once BeforeAll is entered: whatever it reaches, a failed,
+	// panicked or cancelled setup included, is released by AfterAll in the
+	// teardown pass. A setup cancelled before then has nothing to release,
+	// and neither has an attempt already released between retries.
+	if err := runBeforeAllWithRetry(ctx, node, func(held bool) { tracker.setAttempted(node, held) }); err != nil {
 		return err
 	}
-
-	tracker.markSucceeded(node)
 	return nil
 }
 
@@ -184,21 +184,20 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 				<-done[dep]
 			}
 
-			if tracker.isSucceeded(node) {
-				if node.SharedState != nil {
-					if runDehydrate(node) {
-						mu.Lock()
-						failed[node.Name] = true
-						mu.Unlock()
-					}
-					return // shared state nodes don't have AfterAll in test process
-				}
-
-				if runAfterAll(node) {
+			if node.SharedState != nil {
+				if tracker.isAttempted(node) && runDehydrate(node) {
 					mu.Lock()
 					failed[node.Name] = true
 					mu.Unlock()
 				}
+				return // shared state nodes don't have AfterAll in test process
+			}
+			// A fixture whose BeforeAll ran is released whether it succeeded
+			// or not; one that never started has nothing to release.
+			if tracker.isAttempted(node) && runAfterAll(node) {
+				mu.Lock()
+				failed[node.Name] = true
+				mu.Unlock()
 			}
 		}(f)
 	}
@@ -214,8 +213,8 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 
 // runBeforeAllWithRetry adapts a DAG node onto RunFixtureSetup, the single
 // policy the generated shared-fixture subprocess runs BeforeAll under too, and
-// names the fixture in whatever comes back.
-func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
+// names the fixture in whatever comes back. held is FixtureSetup.Held.
+func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode, held func(bool)) error {
 	wrapErr := func(err error) error {
 		if err == nil {
 			return nil
@@ -230,6 +229,8 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode) error {
 		Retries:    node.Config.Retries,
 		RetryDelay: node.Config.RetryDelay,
 		BeforeAll:  node.BeforeAll,
+		AfterAll:   node.AfterAll,
+		Held:       held,
 	}))
 }
 
@@ -315,12 +316,8 @@ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {
 	return maxPath
 }
 
-func loadSharedState() (map[string]json.RawMessage, error) {
-	path := os.Getenv(protocol.EnvSharedStateFile)
-	if path == "" {
-		return nil, fmt.Errorf("%s not set — run via gotest CLI", protocol.EnvSharedStateFile)
-	}
-	data, err := os.ReadFile(path)
+func loadSharedState(path string) (map[string]json.RawMessage, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the runner names the file
 	if err != nil {
 		return nil, fmt.Errorf("read shared state file: %w", err)
 	}
@@ -331,30 +328,59 @@ func loadSharedState() (map[string]json.RawMessage, error) {
 	return state, nil
 }
 
-func anyNodeHasSharedState(fixtures []*FixtureNode) bool {
+// RunnerRequiredError refuses a suite that binds a shared fixture outside the
+// gotest runner, the only writer of the fixture's state.
+type RunnerRequiredError struct {
+	Fixture string
+}
+
+func (e *RunnerRequiredError) Error() string {
+	return "suite binds shared fixture " + e.Fixture + ", whose state only the gotest runner provides; run via go tool gotest"
+}
+
+// explained holds the fixtures whose refusal this process explained in full.
+var explained sync.Map
+
+// report is the refusal as one test reports it: in full the first time the
+// process refuses the fixture, briefly after that.
+func (e *RunnerRequiredError) report() string {
+	if _, seen := explained.LoadOrStore(e.Fixture, true); seen {
+		return "suite binds shared fixture " + e.Fixture + "; run via go tool gotest"
+	}
+	return e.Error()
+}
+
+// sharedNode returns the first shared fixture among fixtures, or nil.
+func sharedNode(fixtures []*FixtureNode) *FixtureNode {
 	for _, f := range fixtures {
 		if f.SharedState != nil {
-			return true
+			return f
 		}
 	}
-	return false
+	return nil
 }
 
+// nodeTracker records the nodes the teardown pass releases.
 type nodeTracker struct {
 	mu        sync.Mutex
-	succeeded map[*FixtureNode]bool
+	attempted map[*FixtureNode]bool
 }
 
-func (t *nodeTracker) markSucceeded(node *FixtureNode) {
+// setAttempted records whether node's BeforeAll, or a shared node's Hydrate,
+// ran with nothing released since, whatever came of it.
+func (t *nodeTracker) setAttempted(node *FixtureNode, attempted bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.succeeded[node] = true
+	if t.attempted == nil {
+		t.attempted = map[*FixtureNode]bool{}
+	}
+	t.attempted[node] = attempted
 }
 
-func (t *nodeTracker) isSucceeded(node *FixtureNode) bool {
+func (t *nodeTracker) isAttempted(node *FixtureNode) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.succeeded[node]
+	return t.attempted[node]
 }
 
 func SetupFixtureDAG(ctx context.Context, cfg MainConfig) (*FixtureDAG, error) {
@@ -372,16 +398,20 @@ func setupFixtureDAG(ctx context.Context, cfg MainConfig, up func(*FixtureDAG)) 
 		return nil, err
 	}
 	defer done()
-	tracker := &nodeTracker{succeeded: make(map[*FixtureNode]bool)}
+	tracker := &nodeTracker{}
 
+	// Only the runner writes a shared fixture's state; without the file the
+	// suite is running under plain go test and has nothing to hydrate from.
 	var sharedState map[string]json.RawMessage
-	if anyNodeHasSharedState(cfg.Fixtures) {
-		if os.Getenv(protocol.EnvSharedStateFile) != "" {
-			var err error
-			sharedState, err = loadSharedState()
-			if err != nil {
-				return nil, fmt.Errorf("load shared state: %w", err)
-			}
+	if shared := sharedNode(cfg.Fixtures); shared != nil {
+		path := os.Getenv(protocol.EnvSharedStateFile)
+		if path == "" {
+			return nil, &RunnerRequiredError{Fixture: shared.Name}
+		}
+		var err error
+		sharedState, err = loadSharedState(path)
+		if err != nil {
+			return nil, fmt.Errorf("load shared state: %w", err)
 		}
 	}
 

@@ -152,7 +152,7 @@ func (s *FuzzCorpusTestSuite) TestPromoteCrasher(t *gotest.T) {
 			gotest.NoError(it, os.WriteFile(corpusPath, []byte("go test fuzz v1\nstring(\"stale\")\n"), 0600))
 
 			target := gotestrunner.FuzzTarget{Package: "example.com/foo", Dir: dir, Func: "FuzzFooTestSuite_FuzzTrim"}
-			msg, ok := main.ExportPromoteCrasher(&gotestrunner.OverlayResult{}, target, "FooTestSuite", "FuzzTrim", corpusPath)
+			msg, ok := main.ExportPromoteCrasher(&gotestrunner.OverlayResult{}, target, "FooTestSuite", "FuzzTrim", corpusPath, nil)
 
 			gotest.False(it, ok, "msg=%q", msg)
 			gotest.Contains(it, msg, "skipped:")

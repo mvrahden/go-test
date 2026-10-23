@@ -1,0 +1,13 @@
+Expect: hydratefail: markers \[pool.Hydrate\], want
+Judge: ./tests/canary CanaryTestSuite/TestAFailedHydrateIsDehydrated
+Clause: when a shared fixture's Hydrate fails after reaching part of what it opens → fails the run, runs no method and still runs its Dehydrate
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -125,7 +125,6 @@
+ 		if node.SharedState.Hydrate != nil { //nolint:nestif // linear hydrate sequence
+ 			// Dehydrated once Hydrate is entered, however it comes out: a
+ 			// failed or panicked one may hold what it reached.
+-			tracker.setAttempted(node, true)
+ 			hctx := ctx
+ 			var cancel context.CancelFunc
+ 			if node.Config.Timeout > 0 {

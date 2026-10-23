@@ -33,7 +33,13 @@ func (f *E2ESetupFixture) BeforeAll(ctx context.Context) error {
 }
 
 func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
-    f.Pool.Close()
+    // Runs whenever BeforeAll was entered: release only what it reached.
+    if f.Pool != nil {
+        f.Pool.Close()
+    }
+    if f.container == nil {
+        return nil
+    }
     return f.container.Terminate(ctx)
 }
 ```
@@ -56,7 +62,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 - Fixtures can depend on multiple other fixtures, forming a DAG (directed acyclic graph).
   If two fixtures share a common ancestor type, that ancestor is instantiated once (diamond deduplication).
 - The fixture struct must have `BeforeAll(ctx context.Context) error`.
-  `AfterAll(ctx context.Context) error` is optional.
+  `AfterAll(ctx context.Context) error` is optional. It runs whenever `BeforeAll` was entered — after an attempt that failed, panicked or was cancelled too, and between retry attempts — so it releases what `BeforeAll` reached and guards the fields it may not have set.
 - `BeforeEach(ctx context.Context) error` and `AfterEach(ctx context.Context) error` are optional and run around every test case in all child suites.
 - Setup runs in topological order (dependencies first; independent fixtures in parallel).
   Teardown runs in reverse topological order.
@@ -214,7 +220,9 @@ func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
 }
 
 func (f *PostgresSharedFixture) AfterAll(ctx context.Context) error {
-    f.Pool.Close()
+    if f.Pool != nil { // nil when the setup failed before connecting
+        f.Pool.Close()
+    }
     return nil
 }
 
@@ -223,7 +231,9 @@ func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error {
 }
 
 func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error {
-    f.Pool.Close()
+    if f.Pool != nil { // nil when the setup failed before connecting
+        f.Pool.Close()
+    }
     return nil
 }
 
@@ -240,7 +250,7 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
   The setup subprocess compiles outside the module tree and cannot import `internal/` paths.
   Shared fixtures may freely import and depend on `internal/` packages — only the fixture type's own package path is restricted.
 - `BeforeAll(ctx context.Context) error` and `AfterAll(ctx context.Context) error` — runs in the subprocess.
-- `Hydrate(ctx context.Context) error` and `Dehydrate(ctx context.Context) error` — runs in the test process, optional.
+- `Hydrate(ctx context.Context) error` and `Dehydrate(ctx context.Context) error` — runs in the test process, optional. `Dehydrate` runs whenever `Hydrate` was entered, however it came out ([A failed Hydrate is dehydrated](../../specs/fixtures/spec.md#requirement-a-failed-hydrate-is-dehydrated)), so it guards what `Hydrate` may not have set.
 - `BeforeEach`/`AfterEach` are not allowed on shared fixtures: the generator refuses one that declares them, its own or promoted, at the hook ([A shared fixture with per-test hooks](../../specs/cli/spec.md#requirement-a-shared-fixture-with-per-test-hooks)). Per-test work goes in a package fixture that binds the shared one, or in the suite's hooks.
 - Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 - Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
@@ -309,7 +319,9 @@ func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error {
 func (f *PostgresSharedFixture) Hydrate(ctx context.Context) error { return f.connect(ctx) }
 
 func (f *PostgresSharedFixture) Dehydrate(ctx context.Context) error {
-    f.Pool.Close()
+    if f.Pool != nil { // nil when the setup failed before connecting
+        f.Pool.Close()
+    }
     return nil
 }
 
@@ -393,6 +405,7 @@ A package fixture is therefore set up once per function that binds it, not once 
 Under the runner this changes nothing for tests — each suite runs in a process of its own — but a fixture-bound suite with fuzz methods sets its fixtures up once more for each `Fuzz` wrapper, whose seeds replay in a function of their own; the suite's own `BeforeAll` already runs per wrapper the same way.
 Under plain `go test`, every suite of the package sets the fixtures up for itself.
 A resource too expensive for that belongs in a shared fixture, which comes up once per run.
+A shared fixture's state is written by the runner alone, so a suite that binds one is not plain `go test`'s to run ([Shared fixtures need the gotest runner](../../specs/fixtures/spec.md#requirement-shared-fixtures-need-the-gotest-runner)).
 
 **A panic.** The testing package runs the cleanups of the panicking test and of every test above it before it ends the process, so a panic anywhere below a holding function — a method, `It`/`When`/`Each`, `BeforeAll`/`AfterAll`, a fuzz body, a parallel or raw subtest, a cleanup — releases the fixtures. A benchmark is the exception: a panicking sub-benchmark runs only its own cleanups, and the testing package can lose a benchmark's panic altogether, printing PASS and exiting 0. So gotest recovers a panic anywhere on the benchmark path — a benchmark method, its `BeforeEach`/`AfterEach`, the suite's `BeforeAll` or `AfterAll` — prints it with its stack, and fails the benchmark (exit 1); every generated `b.Run` defers `gotestruntime.ReleaseOnPanic` for this. The remaining benchmarks, the suite's `AfterAll` and the fixture teardown then run as after any failure. Under `GODEBUG=panicnil=1` nothing is recovered, since recovering would swallow `panic(nil)`.
 
@@ -413,12 +426,15 @@ A shared fixture starts for the suites the run dispatches, and for no other; `-s
 `spec`, `summary` and `watch` run the same way.
 A `bench` run waits for its first window of shared fixtures instead, and for every package to compile, before it dispatches: benchmarks run one at a time, each reading its own state file of exactly the fixtures it declares.
 
+`fuzz`, `fuzz triage` and `fuzz promote` start the shared fixtures the suites of their targets bind before any target runs, hold them for the whole session and tear them down after the last ([Fuzzing with shared fixtures](../../specs/fuzz/spec.md#requirement-fuzzing-with-shared-fixtures)). Each target reads a state file of its own, which its fuzz workers inherit, so every worker hydrates. The `--for` deadline stops the targets, never the fixtures; a target whose fixture did not come up never runs, and says so.
+
 ### Failure semantics
 
 - A panic inside a fixture *setup* hook is recovered and converted to an error — it fails setup, it does not crash the process.
   Teardown-side panics are contained the same way: a panicking `AfterAll` is recovered and reported as `<fixture>.AfterAll panicked`, a panicking `Dehydrate` as `dehydrate panicked` — both become teardown failures, and teardown of the remaining fixtures continues.
 - Shared-fixture setup failure fails the suites that read the fixture, and the run with exit code 1. Each of those suites is booked into the event stream as failed with `<suite> never ran: shared fixture <fixture> did not come up`; the failure itself is booked as the failed package `shared fixtures`, carrying what the fixture reported (`<fixture>.BeforeAll failed after N attempt(s): …`). Nothing else is affected: fixtures that came up stay up, the suites that read only those run, and so does every suite that reads none. A `bench` run gives up the benchmarks that read the failed fixture the same way — whether it failed in the up-front window or when a later slot asked for it — and runs the rest. `prepare` exits 2: bringing the fixtures up is all it does.
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
+- A retried setup releases each failed attempt with `AfterAll` before the next ([A failed release between attempts](../../specs/fixtures/spec.md#requirement-a-failed-release-between-attempts)). That release runs as the final teardown does: under the fixture's `Timeout`, held to a declared one by verdict, and not cut short by a stop; a stop that arrives meanwhile ends the setup once the release returns, with no further attempt and no second `AfterAll` ([A stop during the release between attempts](../../specs/fixtures/spec.md#requirement-a-stop-during-the-release-between-attempts)). An `AfterAll` that never returns is bounded by `--setup-timeout` or `go test -timeout`, not by its `Timeout`.
 - Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the function that held it (`fixture teardown failed`).
 - Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
 

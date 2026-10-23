@@ -1,7 +1,7 @@
 # Fixtures Specification
 
 ## Purpose
-Which shared fixtures a run starts for the suites it selects, guarded suites included, and how a package fixture's per-method hooks run and where their failures are reported.
+Which shared fixtures a run starts for the suites it selects, guarded suites included, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, and that shared fixtures need the gotest runner.
 
 ## Requirements
 
@@ -42,6 +42,13 @@ A shared fixture bound by a guard-skipped suite SHALL still be started, and its 
 - **WHEN** a guard-skipped suite binds a shared fixture whose setup fails
 - **THEN** the fixture is started for it and its failure fails the run and the suite, whose guard never runs
 
+### Requirement: A package fixture's BeforeAll or AfterAll going wrong
+A package fixture whose BeforeAll returns an error or panics SHALL fail the run and its suite, which never opens, and SHALL still get its AfterAll; one whose AfterAll returns an error or panics SHALL fail the run after every other hook ran. The cases are the table in `tests/conformance/fixtures/hooks_suite_test.go`.
+
+#### Scenario: Each way a package fixture's BeforeAll or AfterAll goes wrong
+- **WHEN** a package fixture's BeforeAll or AfterAll returns an error or panics
+- **THEN** fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names
+
 ### Requirement: Where a fixture hook failure is reported
 An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook's declaration, not inside the runtime, wherever it is declared: in the suite's package, in another package, or promoted from another package's type. The file is named by its base name, or by its full path under -fullpath.
 
@@ -75,3 +82,58 @@ A suite's package fixtures SHALL take their per-method turns in dependency order
 #### Scenario: An AfterEach-only fixture after the one that fails
 - **WHEN** a fixture with only an AfterEach comes after a fixture whose BeforeEach fails
 - **THEN** does not run its AfterEach, as its turn never came
+
+### Requirement: A failed shared setup is released
+A shared fixture whose setup fails on its last attempt SHALL fail the run and SHALL run its AfterAll after every attempt, before the next one starts.
+
+#### Scenario: The last setup attempt fails
+- **WHEN** a shared fixture's setup fails on its last attempt
+- **THEN** fails the run
+- **AND** runs AfterAll after each of its 2 attempts, releasing what each reached before the next
+
+### Requirement: A failed release between attempts
+A fixture whose AfterAll fails between two setup attempts, or outlives there the Timeout the fixture declares, SHALL fail the run and report why, even when a later attempt comes up.
+
+#### Scenario: A package fixture's release fails
+- **WHEN** a package fixture's AfterAll fails between its attempts and the second attempt comes up
+- **THEN** fails the run
+- **AND** reports that AfterAll's error
+
+#### Scenario: A shared fixture's release fails
+- **WHEN** a shared fixture's AfterAll fails between its attempts and the second attempt comes up
+- **THEN** fails the run
+- **AND** reports that AfterAll's error
+
+#### Scenario: A package fixture's release outlives its Timeout
+- **WHEN** a package fixture's AfterAll between its attempts outlives the fixture's declared Timeout and the second attempt comes up
+- **THEN** fails the run
+- **AND** reports that the release exceeded the Timeout
+
+### Requirement: A stop during the release between attempts
+A fixture whose AfterAll runs between two setup attempts when the run is stopped SHALL finish that AfterAll under a context the stop does not cancel, bounded by the fixture's Timeout, and SHALL then start no further attempt and run no second AfterAll.
+
+#### Scenario: A stop while a shared fixture releases a failed attempt
+- **WHEN** a run is stopped while a shared fixture's AfterAll releases a failed attempt before its retry
+- **THEN** lets that AfterAll finish under a context the stop does not cut short
+- **AND** starts no further attempt and releases the fixture once
+
+### Requirement: A setup that ends before BeforeAll
+A shared fixture whose setup ends before its BeforeAll runs SHALL get no AfterAll, while a dependency whose BeforeAll ran SHALL get its AfterAll.
+
+#### Scenario: A shared fixture's setup ends first
+- **WHEN** a run is interrupted while a shared fixture's dependency sets up, before the fixture's own BeforeAll runs
+- **THEN** runs no AfterAll for the fixture, and the dependency's AfterAll
+
+### Requirement: A failed Hydrate is dehydrated
+A shared fixture whose Hydrate fails or panics in a suite's process SHALL fail the run before any of the suite's methods runs, and SHALL still get its Dehydrate there.
+
+#### Scenario: Hydrate fails partway
+- **WHEN** a shared fixture's Hydrate fails after reaching part of what it opens
+- **THEN** fails the run, runs no method and still runs its Dehydrate
+
+### Requirement: Shared fixtures need the gotest runner
+A suite binding a shared fixture SHALL fail under plain go test before any method runs, naming the fixture and go tool gotest.
+
+#### Scenario: A shared-fixture suite under plain go test
+- **WHEN** a suite binding a shared fixture runs under plain go test
+- **THEN** fails naming the shared fixture it binds and go tool gotest, before any method runs
