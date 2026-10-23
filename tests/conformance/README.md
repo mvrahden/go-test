@@ -12,8 +12,8 @@ incomplete, so the index is always the whole, current list.
 
 - One package per capability in `specs/`: `tests/conformance/<capability>`
   verifies `specs/<capability>/spec.md` (`tests/conformance/cli` verifies
-  `specs/cli/spec.md`). The packages `lifecycle`, `fixtures`, `discovery`,
-  `assertions`, `fuzz`, `spec`, `lint` and `migrate` wait for their spec.
+  `specs/cli/spec.md`). The packages `lifecycle`, `discovery`, `spec`,
+  `lint` and `migrate` wait for their spec.
 - A suite groups requirements of its capability (`CLIFlagsTestSuite` in
   `cli`) and a method verifies scenarios of one requirement. Names bind
   nothing; the labels do.

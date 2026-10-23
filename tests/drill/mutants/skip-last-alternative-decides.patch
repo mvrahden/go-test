@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/fixtures .* / go test still enters the suite, so its fixture starts and the suite passes \(
+Clause: when -skip's first alternative matching a suite names one of its methods and a later one names the suite → go test still enters the suite, so its fixture starts and the suite passes
+--- a/internal/gotestrunner/namefilter.go
++++ b/internal/gotestrunner/namefilter.go
+@@ -42,7 +42,8 @@
+ // first element matches decides, and the match is partial when that
+ // alternative goes on to subtest levels.
+ func (f nameFilter) matchTop(name string) (ok, partial bool) {
+-	for _, elems := range f.alts {
++	for i := range f.alts {
++		elems := f.alts[len(f.alts)-1-i]
+ 		if elems[0].MatchString(name) {
+ 			return true, len(elems) > 1
+ 		}

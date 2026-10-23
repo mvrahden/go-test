@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/fuzz .* / its test method does not run \(
+Clause: when -skip names a suite's Test function and the suite has fuzz methods → its test method does not run
+--- a/internal/gotestrunner/args.go
++++ b/internal/gotestrunner/args.go
+@@ -222,6 +222,9 @@
+ 			continue
+ 		}
+ 		name, val, hasEquals := strings.Cut(f, "=")
++		if name == "-skip" {
++			continue // applied when the suites are planned
++		}
+ 		testName := "-test." + strings.TrimPrefix(name, "-")
+ 		if hasEquals {
+ 			out = append(out, testName+"="+val)

@@ -35,6 +35,7 @@ Helpers built on gotest assertions work in every position.
 **Never use `t.T().Skip()` for environment gating.**
 Use `SuiteGuard() string` instead.
 SuiteGuard runs before the suite's fixtures, config resolution, `BeforeAll`, and every test method — the suite's own setup never executes.
+A shared fixture the suite binds is the exception: the runner starts it anyway, and its setup failure fails the suite before the guard is evaluated ([A guard does not hold back a shared fixture](specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
 A guard reads the environment, not fixture fields: they are still nil when it runs.
 `t.T().Skip()` inside `BeforeAll` runs even later, after suite setup has started.
 
@@ -384,7 +385,7 @@ func (s *MyTestSuite) SuiteGuard() string {
 
 Returns empty string to run, non-empty to skip with that reason.
 Runs before the suite's fixtures, config, `BeforeAll`, and any test method, so fixture fields are still nil inside it.
-A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard.
+A shared fixture the suite binds is still started by the runner, which cannot evaluate the guard, and its setup failure fails the suite before the guard is evaluated ([A guard does not hold back a shared fixture](specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
 Works for standalone and fixture-bound suites alike.
 
 ### Focus & Exclude prefixes
@@ -501,6 +502,7 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 Suites reference shared fixtures via pointer fields (same as package fixtures).
 Shared fixtures must not live in `internal/` packages.
 Shared fixtures are window-scheduled: each is resident exactly while a scheduled suite needs it — never started when no dispatched suite requires it, and released or started at the bulk→exclusive-tail barrier as the phases' needs differ.
+`-skip` counts: a fixture no selected suite binds never starts ([Selection decides which shared fixtures start](specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start)).
 
 ### Generic test suites (contract testing)
 

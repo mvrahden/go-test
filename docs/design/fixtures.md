@@ -381,7 +381,8 @@ Window scheduling is always on; there is no configuration.
 
 Fixture setup does not run at package init.
 Each generated top-level function that binds fixtures — a suite's `Test` function, each of its `Fuzz` seed-replay wrappers, its `Benchmark` wrapper — holds them for itself (`gotestruntime.HoldFixtures`): `OpenSuite` sets the DAG up right after the suite's `SuiteGuard`, before its config and `BeforeAll`, and the hold tears it down in its own cleanup, after the suite's `AfterAll`.
-A suite its guard skips sets up none of its package fixtures and hydrates none of its shared ones; the runner still starts those shared fixtures, since it cannot evaluate the guard.
+A suite its guard skips sets up none of its package fixtures and hydrates none of its shared ones; the runner still starts those shared fixtures, since it cannot evaluate the guard ([A guard does not hold back a shared fixture](../../specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
+
 A run whose `-run`/`-skip` selects no fixture-bound function never pays setup, and `-count`, `-shuffle` or any other selection flag cannot tear a fixture down under a test that still uses it: nothing counts tests.
 
 A hold covers the suite's part of the DAG only: the package fixtures the suite binds, their parents, and the shared fixtures any of those or the suite name.
@@ -406,6 +407,9 @@ The watcher is a goroutine and a signal handler that live exactly as long as the
 ### Shared-fixture dispatch
 
 A run streams: each shared fixture's state is emitted as its `BeforeAll` completes, and suites are dispatched as soon as *their* transitive dependencies are ready, with per-suite state files.
+
+A shared fixture starts for the suites the run dispatches, and for no other; `-skip` decides that as `-run` does ([Selection decides which shared fixtures start](../../specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start)).
+
 `spec`, `summary` and `watch` run the same way.
 A `bench` run waits for its first window of shared fixtures instead, and for every package to compile, before it dispatches: benchmarks run one at a time, each reading its own state file of exactly the fixtures it declares.
 

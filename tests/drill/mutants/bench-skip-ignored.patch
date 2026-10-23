@@ -1,0 +1,11 @@
+Expect: ^FAIL .*conformance/fixtures .* / a bench run never starts the fixture and benchmarks the other suite \(
+Clause: when -skip names the only benchmark suite binding a shared fixture → a bench run never starts the fixture and benchmarks the other suite
+--- a/internal/gotestrunner/namefilter.go
++++ b/internal/gotestrunner/namefilter.go
+@@ -167,5 +167,5 @@
+ // suite filter too), and -skip does not skip it, as testing decides for
+ // benchmarks.
+ func selectsBench(userRunFilter, userBenchFilter, userSkipFilter, benchFuncName string) bool {
+-	return selectsFunc(userRunFilter, benchFuncName) && selectsFunc(userBenchFilter, benchFuncName) && !skipsFunc(userSkipFilter, benchFuncName)
++	return selectsFunc(userRunFilter, benchFuncName) && selectsFunc(userBenchFilter, benchFuncName) && !skipsFunc("", benchFuncName)
+ }

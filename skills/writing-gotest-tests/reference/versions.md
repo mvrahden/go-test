@@ -330,3 +330,21 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    — off when unset or `0`, `f`, `F`, `false`, `FALSE`, `False`; any other
    value is on. Below v1.34 only `0` and `false` were off, so
    `GOTEST_UPDATE_SNAPSHOTS=FALSE` rewrote baselines.
+6. **`-skip` takes a suite out of shared-fixture planning** when go test
+   would enter none of its functions: its `Test` function, if it has test
+   methods, and every `Fuzz` wrapper; in `gotest bench`, its `Benchmark`
+   wrapper
+   ([selection](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-selection-follows-go-tests-matching)):
+   a shared fixture no remaining suite binds never starts. As in go test,
+   the first alternative matching a function decides, so
+   `-skip 'TestA/One|TestA'` still enters `TestA`. Below v1.34 `-skip`
+   played no part in planning, so the fixture started anyway.
+7. **`-run`, `-skip` and `-bench` read as the testing package reads them** —
+   a pattern is refused with exit 2 when one of its `|` alternatives or `/`
+   levels does not compile on its own (`-skip '[]|x]'`), a repeated flag
+   (`-run`, `-skip`, `-bench`, `-count`, `-parallel`, `-coverprofile`, `-p`)
+   counts by its last value, and a `-run` alternative's suite is found
+   behind an earlier alternative with a `/` (`-run 'TestA/x|TestB'`). Below
+   v1.34 such a `-skip` ran nothing and passed, the first of a repeated flag
+   counted, and `TestB` was dropped. A suite with only `Fuzz` methods has
+   no `Test` function: `-run TestSuite` no longer replays its seeds.

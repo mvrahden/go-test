@@ -512,6 +512,8 @@ InfraFixture.BeforeAll
 InfraFixture.AfterAll
 ```
 
+A shared fixture starts for the suites the run dispatches — `-skip` decides that as `-run` does — and a guard the runner cannot evaluate does not take a suite out of it ([Selection decides which shared fixtures start](../../specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start), [A guard does not hold back a shared fixture](../../specs/fixtures/spec.md#requirement-a-guard-does-not-hold-back-a-shared-fixture)).
+
 #### Fixture Runtime
 
 Generated fixture code imports `pkg/gotestruntime`, the DAG runtime: `SetupFixtureDAG` (topological setup, parallel independent nodes, panic-to-error recovery), `Teardown` (reverse order), and `HoldFixtures` (each generated top-level function sets the DAG up and tears it down in its own cleanup; a stop during the hold releases it and ends the process by the signal).

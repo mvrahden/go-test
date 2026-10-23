@@ -675,7 +675,7 @@ A fresh process per suite is also a methodological win, not just an implementati
 `-test.benchmem` is on by default — every benchmark line reports `B/op`/`allocs/op` alongside `ns/op`.
 `-benchtime` and `-count` are forwarded to `go test` unchanged.
 `-coverprofile` works; `--min` (coverage gate) isn't available in bench mode.
-`-run` and `-bench` both filter which suites run, both matched against each suite's `Benchmark<SuiteName>` wrapper function — `-run` the same way it scopes suites for `gotest ./...`, `-bench` by its pattern's first slash segment. A plain `-bench Parse` therefore selects suites, not methods; later segments select the methods inside a suite's wrapper (`-bench 'ParserTestSuite/BenchmarkParse'`).
+`-run` and `-bench` both filter which suites run, both matched against each suite's `Benchmark<SuiteName>` wrapper function by the first slash segment of each alternative, as go test matches a top-level name; `-skip` drops a suite whose wrapper it skips whole, as go test does. A plain `-bench Parse` therefore selects suites, not methods; later segments select the methods inside a suite's wrapper (`-bench 'ParserTestSuite/BenchmarkParse'`).
 Given both, a suite must match both to run (AND semantics).
 `-run Test<Suite>`-style values match nothing in bench mode — filter by the suite name itself, not the `Test` prefix.
 

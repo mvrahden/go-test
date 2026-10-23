@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / the suite does not run: its shared fixture never starts and the run passes \(
+Clause: when -skip names every fuzz wrapper of a suite with no test method → the suite does not run: its shared fixture never starts and the run passes
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -391,7 +391,7 @@
+ // function unless it has none, and its generated fuzz wrappers, the names -v
+ // prints for seed replays.
+ func suiteFuncs(suiteName string, testless bool, fuzzFuncs []string) []string {
+-	if testless {
++	if false {
+ 		return fuzzFuncs
+ 	}
+ 	return append([]string{"Test" + suiteName}, fuzzFuncs...)

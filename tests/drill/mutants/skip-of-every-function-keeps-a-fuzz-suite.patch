@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / the suite does not run: its shared fixture never starts and the run passes \(
+Clause: when -skip names every Test and Fuzz function of a suite → the suite does not run: its shared fixture never starts and the run passes
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -409,7 +409,7 @@
+ // test would enter none of funcs. Otherwise the suite runs and the binary
+ // applies the filter.
+ func skipsSuite(userSkipFilter string, funcs []string) bool {
+-	if userSkipFilter == "" || len(funcs) == 0 {
++	if userSkipFilter == "" || len(funcs) != 1 {
+ 		return false
+ 	}
+ 	return !slices.ContainsFunc(funcs, func(f string) bool { return !skipsFunc(userSkipFilter, f) })

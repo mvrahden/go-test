@@ -70,3 +70,15 @@ func (s *CLIFlagsTestSuite) TestValueFlagsAndUnknownFlags(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIFlagsTestSuite) TestTestNamePatterns(t *gotest.T) {
+	t.When("a -skip pattern compiles whole but one of its alternatives does not", func(w *gotest.T) {
+		run, err := testkit.RunCLI(w.Context(), ".", "-json", "../testdata/passing/", "-skip=[]|Nothing]")
+		gotest.NoError(w, err)
+		w.It("is refused with exit 2 before anything runs, naming that alternative as go test does", func(it *gotest.T) {
+			gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stderr, `invalid regexp for alternation 0 of element 0 of -skip ("[]")`)
+			gotest.Empty(it, run.Events)
+		})
+	})
+}
