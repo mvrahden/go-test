@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle DeadlineNaming .* / names only the method holding the slot, not those still waiting for it \(
+Clause: when parallel methods wait for the one slot -parallel=1 leaves and the method holding it hangs until --timeout → names only the method holding the slot, not those still waiting for it
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -273,7 +273,7 @@
+ // the converter when the binary ended under it, with no result of its own. A
+ // unit waiting for a parallel slot is neither.
+ func (x *verdictIndex) active(key CensusCase) bool {
+-	return (x.running[key] || x.cut[key]) && !x.waiting[key]
++	return x.running[key] || x.cut[key]
+ }
+ 
+ func (x *verdictIndex) settle(key CensusCase) {
