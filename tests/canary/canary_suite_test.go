@@ -543,6 +543,178 @@ func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
 	s.check(t, "guardskip")
 }
 
+// A goroutine BeforeAll starts with gotest.Go is waited for after AfterAll,
+// which is what stops it; waiting earlier would deadlock the suite.
+func (s *CanaryTestSuite) TestAGoroutineFromBeforeAllIsWaitedForAfterAfterAll(t *gotest.T) {
+	// go test's own alarm bounds a deadlocked wait, which the runner's graceful
+	// stop cannot end; a passing run never reaches it.
+	code, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s")
+	if !slices.Contains(rows, "goroutines pass TestServerTestSuite") {
+		t.Errorf("goroutines: the suite whose BeforeAll started a goroutine did not pass (exit %d): %v", code, rows)
+	}
+}
+
+// Goroutines BeforeAll starts on Ts derived from the hook's (NewTWithDeadline,
+// When, It, Each) are still waited for after AfterAll, which is what stops
+// them.
+func (s *CanaryTestSuite) TestADerivedTsGoroutineIsWaitedForAfterAfterAll(t *gotest.T) {
+	// go test's own alarm bounds a deadlocked wait; a passing run never reaches it.
+	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestDerivedTestSuite")
+	if !slices.Contains(rows, "setupwaits pass TestDerivedTestSuite") {
+		t.Errorf("setupwaits: the suite whose BeforeAll started goroutines on derived Ts did not pass: %v", rows)
+	}
+}
+
+// When the last of several goroutines BeforeAll started fails or panics, the
+// suite fails and every other one is waited for before the fixture goes.
+func (s *CanaryTestSuite) TestEveryGoroutineBeforeAllStartedIsWaitedFor(t *gotest.T) {
+	dir := t.TempDir()
+	_, rows := s.runWith(t, "setupwaits", dir, nil, "-timeout=20s", "-run=TestFailLastTestSuite|TestPanicLastTestSuite")
+	data, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
+	got := strings.Split(strings.TrimSpace(string(data)), "\n")
+	for _, c := range []struct{ suite, prefix string }{
+		{"TestFailLastTestSuite", "fail: "},
+		{"TestPanicLastTestSuite", "panic: "},
+	} {
+		if !slices.Contains(rows, "setupwaits fail "+c.suite) {
+			t.Errorf("setupwaits: %s did not fail: %v", c.suite, rows)
+		}
+		ended, released := slices.Index(got, c.prefix+"first goroutine ended"), slices.Index(got, c.prefix+"fixture.AfterAll")
+		if ended < 0 || released < ended {
+			t.Errorf("setupwaits: %s released its fixture before every goroutine ended: markers %v", c.suite, got)
+		}
+	}
+}
+
+// A goroutine started by gotest.Go that fails fatally fails the method at the
+// wait: nothing after the wait runs.
+func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T) {
+	_, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s")
+	if !slices.Contains(rows, "goroutines fail TestGoexitTestSuite/TestGoexit") {
+		t.Errorf("goroutines: the method whose goroutine failed did not fail: %v", rows)
+	}
+	if strings.Contains(s.lastStream, "the method went on after the wait") {
+		t.Errorf("goroutines: the method went on after the wait on its failed goroutine")
+	}
+}
+
+// A loop that breaks out of an Each table stops at the break: no later row
+// runs, and the method goes on after the loop.
+func (s *CanaryTestSuite) TestABreakOutOfEachStopsTheRows(t *gotest.T) {
+	dir := s.check(t, "eachbreak")
+	data, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
+	got := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if slices.ContainsFunc(got, func(m string) bool { return strings.HasPrefix(m, "row ") && m != "row first" }) {
+		t.Errorf("eachbreak: a row after the break ran: %v", got)
+	}
+	if !slices.Contains(got, "row first") {
+		t.Errorf("eachbreak: the first row did not run: %v", got)
+	}
+	if !slices.Contains(got, "after the loop") {
+		t.Errorf("eachbreak: the method did not go on after the break: %v", got)
+	}
+}
+
+// A fuzz execution whose BeforeEach fails or panics still runs its AfterEach,
+// as a test method does.
+func (s *CanaryTestSuite) TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves(t *gotest.T) {
+	dir := s.check(t, "fuzzhooks")
+	got, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
+	for _, want := range []string{"after broken", "after panic"} {
+		if !strings.Contains(string(got), want+"\n") {
+			t.Errorf("fuzzhooks: AfterEach did not run after a BeforeEach that left (%s missing):\n%s", want, got)
+		}
+	}
+}
+
+// A fuzz execution whose BeforeEach skips is skipped: its body never runs and
+// its AfterEach still does.
+func (s *CanaryTestSuite) TestAFuzzExecutionSkippedByBeforeEachStillTearsDown(t *gotest.T) {
+	dir := s.check(t, "fuzzskiphook")
+	got, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
+	if strings.Contains(string(got), "body ran\n") {
+		t.Errorf("fuzzskiphook: the body ran after BeforeEach skipped:\n%s", got)
+	}
+	if !strings.Contains(string(got), "after skip\n") {
+		t.Errorf("fuzzskiphook: AfterEach did not run after a BeforeEach that skipped:\n%s", got)
+	}
+}
+
+// A goroutine started by gotest.Go that skips the test skips the method at
+// the wait, without failing it.
+func (s *CanaryTestSuite) TestAGoroutineThatSkipsSkipsTheMethod(t *gotest.T) {
+	_, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s", "-run=TestSkipTestSuite")
+	if !slices.Contains(rows, "goroutines skip TestSkipTestSuite/TestSkip") {
+		t.Errorf("goroutines: the method whose goroutine skipped was not skipped: %v", rows)
+	}
+}
+
+// A goroutine started by gotest.Go that leaves through runtime.Goexit with
+// no verdict fails the method, saying so.
+func (s *CanaryTestSuite) TestAGoroutineLeavingWithoutAVerdictSaysSo(t *gotest.T) {
+	_, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s", "-run=TestRawGoexitTestSuite")
+	if !slices.Contains(rows, "goroutines fail TestRawGoexitTestSuite/TestRawGoexit") {
+		t.Errorf("goroutines: the method whose goroutine left through Goexit did not fail: %v", rows)
+	}
+	if !strings.Contains(s.lastStream, "goroutine started by gotest.Go exited via runtime.Goexit") {
+		t.Errorf("goroutines: no failure says the goroutine exited via runtime.Goexit")
+	}
+}
+
+// A BeforeAll taking a *testing.T that starts goroutines on gotest.NewT(t)
+// and NewTWithDeadline(t) has them waited for after AfterAll.
+func (s *CanaryTestSuite) TestATestingTHooksGoroutineIsWaitedForAfterAfterAll(t *gotest.T) {
+	// go test's own alarm bounds a deadlocked wait; a passing run never reaches it.
+	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestStdTestSuite")
+	if !slices.Contains(rows, "setupwaits pass TestStdTestSuite") {
+		t.Errorf("setupwaits: the suite whose *testing.T BeforeAll started goroutines did not pass: %v", rows)
+	}
+}
+
+// A goroutine started from one BeforeAll started, once AfterAll stopped it,
+// is waited for too: its panic fails the suite.
+func (s *CanaryTestSuite) TestAGoroutineStartedDuringTheWaitIsWaitedFor(t *gotest.T) {
+	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestLateTestSuite")
+	if !slices.Contains(rows, "setupwaits fail TestLateTestSuite") || !strings.Contains(s.lastStream, "LATE-GOROUTINE-PANIC") {
+		t.Errorf("setupwaits: the goroutine started during the wait was not waited for: %v", rows)
+	}
+}
+
+// The wait on BeforeAll's goroutines is held to a declared SetupTimeout.
+func (s *CanaryTestSuite) TestTheWaitOnSetupGoroutinesIsHeldToTheSetupTimeout(t *gotest.T) {
+	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestSlowTestSuite")
+	if !slices.Contains(rows, "setupwaits fail TestSlowTestSuite") ||
+		!strings.Contains(s.lastStream, "the wait on a goroutine BeforeAll started with gotest.Go exceeded its configured SetupTimeout") {
+		t.Errorf("setupwaits: no SetupTimeout verdict names the wait on the slow goroutine: %v", rows)
+	}
+}
+
+// A row that skips skips itself and the method; a row that ends the method's
+// own T ends the method with that verdict alone.
+func (s *CanaryTestSuite) TestEachRowsEndTheMethodWithTheirVerdict(t *gotest.T) {
+	s.check(t, "eachskip")
+	if strings.Contains(s.lastStream, "without a verdict") {
+		t.Errorf("eachskip: a row that ended the method's own T was reported as leaving without a verdict")
+	}
+}
+
+// A panic in BeforeEach is reported even when AfterEach then fails a fatal
+// assertion, for a test method and for a fuzz execution.
+func (s *CanaryTestSuite) TestAPanicAheadOfAFailingAfterEachIsReported(t *gotest.T) {
+	s.runWith(t, "hookpanics", t.TempDir(), nil)
+	for _, c := range []struct{ what, panic, mark string }{
+		{"test method", "panic: TEST-BEFORE-EACH-PANIC", "MARK after the panic"},
+		{"fuzz execution", "panic: FUZZ-BEFORE-EACH-PANIC", "MARK after the fuzz panic"},
+	} {
+		if !strings.Contains(s.lastStream, c.panic) {
+			t.Errorf("hookpanics: the %s's panic was not reported", c.what)
+		}
+		if !strings.Contains(s.lastStream, c.mark) {
+			t.Errorf("hookpanics: the %s's AfterEach did not run", c.what)
+		}
+	}
+}
+
 // benchReport is the part of a bench --json report the canary reads.
 type benchReport struct {
 	Baseline struct {

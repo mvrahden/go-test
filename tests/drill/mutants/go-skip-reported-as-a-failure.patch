@@ -1,0 +1,14 @@
+Expect: goroutines: the method whose goroutine skipped was not skipped
+Judge: ./tests/canary CanaryTestSuite/TestAGoroutineThatSkipsSkipsTheMethod
+Clause: when a goroutine started by gotest.Go skips the test → the wait on it skips the method there, without failing it
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -235,8 +235,6 @@
+ 	switch {
+ 	case tb.Failed():
+ 		tb.FailNow()
+-	case tb.Skipped():
+-		tb.SkipNow()
+ 	default:
+ 		report(tb, "goroutine started by gotest.Go exited via runtime.Goexit")
+ 		tb.FailNow()

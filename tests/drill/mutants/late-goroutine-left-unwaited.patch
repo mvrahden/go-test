@@ -1,0 +1,13 @@
+Expect: setupwaits: the goroutine started during the wait was not waited for
+Judge: ./tests/canary CanaryTestSuite/TestAGoroutineStartedDuringTheWaitIsWaitedFor
+Clause: when a goroutine BeforeAll started starts another with gotest.Go once AfterAll stopped it → that one is waited for too, and its panic fails the suite
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -107,7 +107,6 @@
+ 	if len(waits) == 0 {
+ 		return
+ 	}
+-	defer drain(set)
+ 	for _, wait := range waits {
+ 		defer wait()
+ 	}

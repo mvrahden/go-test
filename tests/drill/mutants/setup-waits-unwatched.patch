@@ -1,0 +1,16 @@
+Expect: setupwaits: no SetupTimeout verdict names the wait on the slow goroutine
+Judge: ./tests/canary CanaryTestSuite/TestTheWaitOnSetupGoroutinesIsHeldToTheSetupTimeout
+Clause: when a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll → fails the suite with a verdict naming the wait and its SetupTimeout
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -94,9 +94,7 @@
+ 	if set == nil {
+ 		return
+ 	}
+-	watchWhile(tb, budget, "the wait on a goroutine BeforeAll started with gotest.Go ", "SetupTimeout", func() {
+-		drain(set)
+-	})
++	drain(set)
+ }
+ 
+ // drain runs set's waits, last first, as cleanups would, until none is left.

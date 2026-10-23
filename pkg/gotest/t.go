@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/setupwaits"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
@@ -17,7 +18,8 @@ func NewT(t *testing.T) *T {
 // NewTFromTB adapts a non-*testing.T testing type (*testing.B, *testing.F)
 // so suite lifecycle hooks written against *gotest.T can run under
 // benchmarks and fuzz targets. T() returns nil and It/When panic on a
-// TB-backed T; the collector statically rejects suites that would hit either.
+// TB-backed T; the generator rejects a hook that calls T() in a suite with
+// benchmark or fuzz methods.
 func NewTFromTB(tb testing.TB) *T { return &T{tb: tb} }
 
 type T struct {
@@ -26,6 +28,10 @@ type T struct {
 	ctx context.Context
 }
 
+// T returns the underlying *testing.T. It is nil when a suite hook runs under
+// a Benchmark* or Fuzz* method, where the wrapper's own testing type stands in;
+// the generator rejects a hook that calls T() in such a suite. It is also nil
+// inside Eventually and Consistently.
 func (t *T) T() *testing.T {
 	return t.t
 }
@@ -46,11 +52,21 @@ func (t *T) Context() context.Context {
 
 // NewTWithDeadline wraps t with a context that expires after timeout, so a test
 // can hold work to a tighter budget than the suite's own. The context is derived
-// from t.Context() and is released when the test ends.
-func NewTWithDeadline(t *testing.T, timeout time.Duration) *T {
-	ctx, cancel := context.WithTimeout(t.Context(), timeout)
-	t.Cleanup(cancel)
-	return &T{t: t, tb: t, ctx: ctx}
+// from t.Context() and is released when the test ends: for a *gotest.T that is
+// the suite's context, its deadline and stop included; for a *testing.T it is
+// the testing package's, which carries neither. [Go] on the result is waited
+// for where it would be on t.
+func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
+	var base *T
+	switch v := any(t).(type) {
+	case *T:
+		base = v
+	case *testing.T:
+		base = NewT(v)
+	}
+	ctx, cancel := context.WithTimeout(base.Context(), timeout)
+	base.testingTB().Cleanup(cancel)
+	return &T{t: base.t, tb: base.tb, ctx: ctx}
 }
 
 // NewTWithContext wraps t, overriding what [T.Context] reports. Use it when the
@@ -103,8 +119,14 @@ func execTestFn(testFn func(it *T), it *T) { testFn(it) }
 // suite's configured Timeout would silently stop applying the moment a test
 // entered a When or an It. Deriving from the parent keeps its deadline and
 // values, and registering the cancel on the child ends it with the child.
+//
+// A T without a context of its own may still be BeforeAll's, wrapped around a
+// hook's *testing.T: the child then carries the suite's [Go] waits.
 func (t *T) sub(tt *testing.T) *T {
 	if t.ctx == nil {
+		if set := setupwaits.Of(context.Background(), t.testingTB()); set != nil {
+			return NewTWithContext(tt, setupwaits.With(tt.Context(), set))
+		}
 		return NewT(tt)
 	}
 	ctx, cancel := context.WithCancel(t.ctx)

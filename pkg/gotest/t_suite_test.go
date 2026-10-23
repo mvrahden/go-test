@@ -21,7 +21,7 @@ func (s *TTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *TTestSuite) TestNewTWithDeadline(t *gotest.T) {
 	t.When("a deadline is set", func(w *gotest.T) {
 		w.It("sets the context deadline", func(it *gotest.T) {
-			tt := gotest.NewTWithDeadline(it.T(), 5*time.Second)
+			tt := gotest.NewTWithDeadline(it, 5*time.Second)
 			deadline, ok := tt.Context().Deadline()
 			gotest.True(it, ok)
 			remaining := time.Until(deadline)
@@ -29,13 +29,21 @@ func (s *TTestSuite) TestNewTWithDeadline(t *gotest.T) {
 		})
 
 		w.It("cancels the context on timeout", func(it *gotest.T) {
-			tt := gotest.NewTWithDeadline(it.T(), 10*time.Millisecond)
+			tt := gotest.NewTWithDeadline(it, 10*time.Millisecond)
 			<-tt.Context().Done()
 			gotest.ErrorIs(it, tt.Context().Err(), context.DeadlineExceeded)
 		})
 
 		w.It("preserves the original testing.T", func(it *gotest.T) {
-			tt := gotest.NewTWithDeadline(it.T(), 1*time.Second)
+			tt := gotest.NewTWithDeadline(it, 1*time.Second)
+			gotest.Equal(it, it.T(), tt.T())
+		})
+
+		w.It("accepts a *testing.T as well, deriving from its context", func(it *gotest.T) {
+			tt := gotest.NewTWithDeadline(it.T(), time.Hour)
+			deadline, ok := tt.Context().Deadline()
+			gotest.True(it, ok)
+			gotest.Greater(it, time.Until(deadline), 59*time.Minute)
 			gotest.Equal(it, it.T(), tt.T())
 		})
 	})
@@ -108,7 +116,7 @@ func (s *TTestSuite) TestTContext(t *gotest.T) {
 func (s *TTestSuite) TestNestedBehaviorContext(t *gotest.T) {
 	t.When("the enclosing T carries a deadline", func(w *gotest.T) {
 		w.It("propagates it into When, It and Each", func(it *gotest.T) {
-			outer := gotest.NewTWithDeadline(it.T(), time.Hour)
+			outer := gotest.NewTWithDeadline(it, time.Hour)
 			outerDeadline, ok := outer.Context().Deadline()
 			gotest.True(it, ok)
 
@@ -137,7 +145,7 @@ func (s *TTestSuite) TestNestedBehaviorContext(t *gotest.T) {
 		})
 
 		w.It("still ends the nested context with the nested subtest", func(it *gotest.T) {
-			outer := gotest.NewTWithDeadline(it.T(), time.Hour)
+			outer := gotest.NewTWithDeadline(it, time.Hour)
 
 			var nested context.Context
 			outer.It("nested it", func(ni *gotest.T) {
@@ -181,5 +189,23 @@ func (s *TTestSuite) TestNewTFromTB(t *gotest.T) {
 			}
 		})
 		gotest.Greater(it, res.N, 0)
+	})
+}
+
+type deadlineKey struct{}
+
+// The deadline T descends from the suite's context, not from testing's: what
+// the suite carries, and what cancels it, reaches the tighter budget too.
+func (s *TTestSuite) TestNewTWithDeadlineDerivesFromTheSuite(t *gotest.T) {
+	t.When("the suite's context carries a value and is cancelled", func(w *gotest.T) {
+		parent, cancel := context.WithCancel(context.WithValue(w.Context(), deadlineKey{}, "carried"))
+		defer cancel()
+		suite := gotest.NewTWithContext(w.T(), parent)
+		tight := gotest.NewTWithDeadline(suite, time.Hour)
+		w.It("the tighter T sees the value and ends with the suite", func(it *gotest.T) {
+			gotest.Equal(it, "carried", tight.Context().Value(deadlineKey{}))
+			cancel()
+			gotest.ErrorIs(it, tight.Context().Err(), context.Canceled)
+		})
 	})
 }

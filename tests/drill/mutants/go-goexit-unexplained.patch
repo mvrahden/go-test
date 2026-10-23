@@ -1,0 +1,13 @@
+Expect: goroutines: no failure says the goroutine exited via runtime.Goexit
+Judge: ./tests/canary CanaryTestSuite/TestAGoroutineLeavingWithoutAVerdictSaysSo
+Clause: when a goroutine started by gotest.Go leaves through runtime.Goexit without a verdict → the wait on it fails the method, saying the goroutine exited via runtime.Goexit
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -238,7 +238,6 @@
+ 	case tb.Skipped():
+ 		tb.SkipNow()
+ 	default:
+-		report(tb, "goroutine started by gotest.Go exited via runtime.Goexit")
+ 		tb.FailNow()
+ 	}
+ }

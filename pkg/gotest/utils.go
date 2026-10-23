@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"iter"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
+
+	"github.com/mvrahden/go-test/internal/callsite"
+	"github.com/mvrahden/go-test/internal/setupwaits"
+	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
 // Each iterates over entries as sub-tests, yielding a fresh *T and the entry for each.
@@ -59,14 +64,31 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 	var result bool
 
 	// Deferred, so the subtest is released and awaited even when yield leaves
-	// via Goexit — that unwinds straight past the inner closure below.
+	// via Goexit — that unwinds straight past the inner closure below. A body
+	// that left early cannot be resumed: Go's range-over-func refuses to go
+	// on after the loop body exited abnormally. So the Goexit carries on into
+	// the method with the row's verdict — failed, or skipped with its reason —
+	// instead of reaching the testing package as a bare Goexit, which it
+	// reports as a failure.
 	defer func() {
 		close(done)
 		<-finished
 		if captured != nil {
 			panic(captured)
 		}
-		if goexited && tt.Failed() {
+		switch {
+		case !goexited:
+		case tt.Failed():
+			parent.t.FailNow()
+		case tt.Skipped():
+			logAtUser(parent.t, "skipped at row "+name)
+			parent.t.SkipNow()
+		case parent.t.Failed():
+			parent.t.FailNow() // the row ended the method on the method's own T
+		case parent.t.Skipped():
+			parent.t.SkipNow()
+		default:
+			logAtUser(parent.t, "row "+name+" left through runtime.Goexit without a verdict")
 			parent.t.FailNow()
 		}
 	}()
@@ -77,6 +99,24 @@ func eachRun[E any](parent *T, name string, entry E, yield func(*T, E) bool) boo
 		goexited = false
 	}()
 	return result
+}
+
+// logAtUser logs msg on tb at the innermost line of the user's on the stack:
+// while a Goexit unwinds, Logf would name a frame of the runtime's.
+func logAtUser(tb testing.TB, msg string) {
+	pcs := make([]uintptr, 64)
+	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
+	for {
+		f, more := frames.Next()
+		if !assert.IsGotestSource(f.File) && !assert.IsGeneratedBridge(f.File) && !callsite.IsStd(f.Function, f.File) {
+			msg = callsite.Format(f.File, f.Line) + ": " + msg
+			break
+		}
+		if !more {
+			break
+		}
+	}
+	fmt.Fprintln(tb.Output(), msg)
 }
 
 func eachEntryName(v reflect.Value, index int) string {
@@ -134,26 +174,71 @@ func Must[T any](val T, ok any) T {
 // A `defer wait()` here would deadlock instead: the test's own defers run
 // before AfterEach, so it would wait for a goroutine nothing has stopped yet.
 //
+// In BeforeAll the wait is drained after AfterAll instead, so a goroutine
+// that serves the whole suite is stopped by AfterAll before anything waits
+// for it. That holds for the hook's T and every T derived from it: When, It,
+// Each rows, NewTWithDeadline, and a T wrapped around a hook's *testing.T.
+//
+// A FailNow in fn — a fatal gotest assertion — exits the goroutine, not the
+// test; the wait turns it into a FailNow on the caller, so the test does not go
+// on as if fn had finished. A SkipNow in fn skips the test at the wait.
+//
 // Calling the returned function more than once is safe.
 func Go(t *T, fn func()) (wait func()) {
 	done := make(chan struct{})
 	var captured *capturedPanic
+	var returned bool
 
 	go func() {
 		defer close(done)
 		defer func() { captured = capturedFrom(recover(), "goroutine started by gotest.Go") }()
 		fn()
+		returned = true
 	}()
 
-	var once sync.Once
-	wait = func() {
-		once.Do(func() {
-			<-done
-			if captured != nil {
-				panic(captured)
-			}
-		})
+	set := setupwaits.Of(t.Context(), t.testingTB())
+	tb := t.testingTB()
+	if set != nil {
+		tb = set.TB // the suite's: a subtest of BeforeAll ends before the wait
 	}
-	t.t.Cleanup(wait)
+	// A mutex, not a sync.Once: a frame of sync's would be named as the
+	// location of the verdict below.
+	var mu sync.Mutex
+	var waited bool
+	wait = func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if waited {
+			return
+		}
+		waited = true
+		<-done
+		if captured != nil {
+			panic(captured)
+		}
+		if !returned {
+			goexited(tb)
+		}
+	}
+	switch {
+	case set == nil:
+		tb.Cleanup(wait)
+	case !set.Add(wait):
+		wait() // the suite's waits were drained already: nothing else waits for it
+	}
 	return wait
+}
+
+// goexited ends tb after fn left through runtime.Goexit: as the verdict fn
+// left on tb, or as a failure that says what happened.
+func goexited(tb testing.TB) {
+	switch {
+	case tb.Failed():
+		tb.FailNow()
+	case tb.Skipped():
+		tb.SkipNow()
+	default:
+		report(tb, "goroutine started by gotest.Go exited via runtime.Goexit")
+		tb.FailNow()
+	}
 }

@@ -1,0 +1,14 @@
+Expect: goroutines: the method went on after the wait on its failed goroutine
+Judge: ./tests/canary CanaryTestSuite/TestAFatalGoroutineFailsTheMethodAtTheWait
+Clause: when a goroutine started by gotest.Go fails a fatal assertion → the wait on it fails the method there, and nothing after the wait runs
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -216,7 +216,7 @@
+ 		if captured != nil {
+ 			panic(captured)
+ 		}
+-		if !returned {
++		if !returned && captured != nil {
+ 			goexited(tb)
+ 		}
+ 	}

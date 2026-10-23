@@ -48,3 +48,11 @@ func (s *PassingTestSuite) TestConsistentlyFinalPoll(t *gotest.T) {
 	gotest.Consistently(t, 200*time.Millisecond, 10*time.Second, func(*gotest.R) { polls.Add(1) })
 	gotest.Equal(t, int32(2), polls.Load())
 }
+
+// TestDeadlineFollowsTheSuite: a tighter T derives from the suite's context,
+// so its deadline is never later than the suite's own.
+func (s *PassingTestSuite) TestDeadlineFollowsTheSuite(t *gotest.T) {
+	d, ok := gotest.NewTWithDeadline(t, time.Hour).Context().Deadline()
+	gotest.True(t, ok)
+	gotest.Less(t, time.Until(d), time.Minute)
+}

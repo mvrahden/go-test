@@ -8,10 +8,10 @@ func Benchmark{{ $ts.Identifier }}(b *testing.B) {
     defer gotestruntime.ReleaseOnPanic(b)
     b.StopTimer()
     ƒeachT := gotest.NewTFromTB(b)
-    defer func() {
+    defer gotestruntime.AfterEach(func() {
       b.StopTimer()
       s.AfterEach(ƒeachT)
-    }()
+    })
     s.BeforeEach(ƒeachT)
     b.StartTimer()
     b.ResetTimer()

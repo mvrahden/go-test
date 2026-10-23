@@ -348,3 +348,19 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    v1.34 such a `-skip` ran nothing and passed, the first of a repeated flag
    counted, and `TestB` was dropped. A suite with only `Fuzz` methods has
    no `Test` function: `-run TestSuite` no longer replays its seeds.
+8. **`gotest.Go` in `BeforeAll` is waited for after `AfterAll`**, on the
+   hook's `t` and on any `T` derived from it (`When`, `It`, `Each`,
+   `NewTWithDeadline`; `gotest.NewT(t)` in a hook taking `*testing.T`),
+   every such goroutine even when one fails, held to a declared
+   `SetupTimeout`
+   ([goroutines](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-beforeall-starts)).
+   Below v1.34 the wait on any of them ran before `AfterAll`, so
+   `gotest.Go(t, func() { <-s.stop })` in `BeforeAll`, stopped in
+   `AfterAll`, deadlocked even on the hook's own `t`, and
+   `NewTWithDeadline` took only a `*testing.T`.
+9. **A fatal assertion on a goroutine started by `gotest.Go` fails the
+   method at the wait**, a skip there skips it, and a `runtime.Goexit`
+   with neither fails it, saying so
+   ([goroutines](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+   Below v1.34 the method went on after such a wait as if the goroutine
+   had finished.

@@ -1,0 +1,14 @@
+Expect: setupwaits: the suite whose BeforeAll started goroutines on derived Ts did not pass
+Judge: ./tests/canary CanaryTestSuite/TestADerivedTsGoroutineIsWaitedForAfterAfterAll
+Clause: when BeforeAll starts goroutines with gotest.Go on When, It, Each row and NewTWithDeadline Ts that only AfterAll stops → the suite passes: the waits come after AfterAll
+--- a/pkg/gotest/utils.go
++++ b/pkg/gotest/utils.go
+@@ -196,7 +196,7 @@
+ 		returned = true
+ 	}()
+ 
+-	set := setupwaits.Of(t.Context(), t.testingTB())
++	set := setupwaits.Of(t.testingTB().Context(), t.testingTB())
+ 	tb := t.testingTB()
+ 	if set != nil {
+ 		tb = set.TB // the suite's: a subtest of BeforeAll ends before the wait

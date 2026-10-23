@@ -114,3 +114,16 @@ func (v lines) GoString() string { return strings.Join(v, "\n") }
 func (s *FailingTestSuite) TestEqualMultiline(t *gotest.T) {
 	gotest.Equal(t, lines{"a", "b", "c", "d", "e"}, lines{"a", "b", "C", "d", "e"})
 }
+
+type failingRow struct {
+	Desc string
+	ok   bool
+}
+
+// TestEachRow fails in its second row: the row and the method fail, the
+// first row passes on its own.
+func (s *FailingTestSuite) TestEachRow(t *gotest.T) {
+	for it, r := range gotest.Each(t, []failingRow{{"first", true}, {"second", false}}) {
+		gotest.True(it, r.ok)
+	}
+}

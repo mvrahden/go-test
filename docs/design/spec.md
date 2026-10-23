@@ -745,11 +745,13 @@ In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if 
 **Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and breaks the test case loop on first failure when `FailFast` is set.
 Bounding the context is not the same as being held to it: `gotestruntime.RunSetup`, `RunTest` and `RunTeardown` additionally take a *budget* duration and fail the phase by verdict if it is still running once the budget elapses — located where the phase is running, and also written to stderr, unbuffered, unless test2json streams the verdict (`-json`), where a raw line would be attributed to whichever test printed last — but that budget is the zero value — nothing enforced — unless the suite declared a `SuiteConfig()` of its own. A suite with no marker gets bounded but unenforced defaults; a suite with a marker gets its own values as both the bound and the budget, verbatim.
 
-**`NewTWithDeadline`:** Creates a `*gotest.T` with a context deadline.
+**`NewTWithDeadline(t, d)`:** Creates a `*gotest.T` with a context deadline derived from `t.Context()`: for a `*gotest.T` the suite's context, its deadline and stop included; for a `*testing.T` the testing package's, which carries neither.
+`gotest.Go` on the derived `T` is waited for where it would be on `t`, so a goroutine started on it in `BeforeAll` is waited for after `AfterAll` ([Goroutines BeforeAll starts](../../specs/lifecycle/spec.md#requirement-goroutines-beforeall-starts)).
 `t.Context()` returns the deadline-aware context.
 
 **`NewTWithContext`:** Creates a `*gotest.T` whose `t.Context()` is the context supplied by the caller, for the cases a deadline off `t.Context()` cannot express — injected values, or a lifetime that must outlive the test's own.
 The caller owns the context; nothing in `gotest` cancels it.
+`gotest.Go` finds a `BeforeAll`'s waits through the `T`'s context or its `testing.TB`: around the hook's own `t`, or with a context derived from the hook's, its goroutines are waited for after `AfterAll`; around a subtest's `testing.TB` with an unrelated context, by that subtest's cleanup, before `AfterAll`.
 This is what lets `AfterAll` run under a context that survives the cancellation the testing package performs immediately before cleanups.
 
 #### Feature Interactions
@@ -819,8 +821,20 @@ A `defer wait()` in the second shape deadlocks instead: the test's own defers ru
 `AfterEach`, so it would wait for a goroutine nothing has stopped yet. Calling the
 returned `wait` more than once is safe.
 
+In `BeforeAll` the same shape serves the whole suite: the waits of goroutines started on
+the hook's `T`, or on any `T` derived from it, are drained after `AfterAll`, held to a
+declared `SetupTimeout`, and so is one a goroutine starts while the drain runs
+([Goroutines BeforeAll starts](../../specs/lifecycle/spec.md#requirement-goroutines-beforeall-starts)).
+A fatal assertion or a skip in `fn` exits the goroutine, not the test; the wait carries it
+over, and a `runtime.Goexit` with neither fails the test, saying so
+([Goroutines started by gotest.Go](../../specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+
+`Go` accepts the T of any hook, the TB-backed one a benchmark or fuzz wrapper hands its
+hooks included.
+
 The cleanup-registered `wait` has no timeout of its own: a goroutine that never
-returns hangs the binary until `go test -timeout` fires, with no named verdict.
+returns hangs the binary until `go test -timeout` fires, with no named verdict, unless
+`BeforeAll` started it and the suite declared a `SetupTimeout`.
 
 ---
 
@@ -989,7 +1003,8 @@ for it, tc := range gotest.Each(t, []struct {
 ```
 
 Uses `Desc` or `Name` field for the subtest name, falls back to `#0`, `#1`, etc.
-A `FailNow` inside an entry aborts the remaining entries (the loop propagates it to the parent); `break` is supported and stops cleanly.
+
+A row is a subtest, and the loop carries its verdict to the method ([Each rows](../../specs/lifecycle/spec.md#requirement-each-rows)).
 
 ---
 
@@ -1362,7 +1377,7 @@ func TestMyTestSuite(t *testing.T) {
     gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
         Cases: []gotestruntime.Method{
             {Name: "TestSomething", Run: func(ttt *gotest.T, run func(func())) {
-                defer s.AfterEach(ttt)
+                defer gotestruntime.AfterEach(func() { s.AfterEach(ttt) })
                 s.BeforeEach(ttt)
                 run(func() {
                     ƒƒ_GOTEST_exec(s.TestSomething, ttt)
@@ -1388,8 +1403,8 @@ contexts: a duration left at zero gets the default and no verdict, exactly as wi
 and a negative one (`gotest.NoDeadline`) gets neither. Fixture markers are normalized the same
 way through `WithFixtureDefaults`, with the declared `Timeout` as their `Budget`.
 `RunMethods` owns the loop: the subtests, `it.Parallel()` and `FailFast`, the method's `*gotest.T` from `TestT`, the fixtures' per-method hooks, and `run`, which holds the method to `ƒbudget.Timeout` through `RunTest`. A case's `Run` keeps only what needs the suite's static types.
-Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* `defer s.AfterEach(ttt, ctx)` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
-In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally.
+Ordering nuance: in the returning-`BeforeEach` form, `ctx := s.BeforeEach(ttt)` runs *before* the deferred `AfterEach` is registered — a fatal failure inside `BeforeEach` means `AfterEach` never runs.
+In the void form shown above, the deferred `AfterEach` is registered first and runs even when `BeforeEach` fails fatally. `gotestruntime.AfterEach` recovers a panic of `BeforeEach` or the method first and re-raises it once `AfterEach` returns, so a fatal assertion in `AfterEach` cannot discard it.
 Method-parallel suites pass `Parallel: true`; `RunMethods` then coordinates `FailFast` as described under Parallel Execution.
 
 ---

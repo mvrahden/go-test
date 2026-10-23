@@ -1,0 +1,13 @@
+Expect: passing: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestPassingSuiteIsGreen
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -64,7 +64,7 @@
+ 	case *testing.T:
+ 		base = NewT(v)
+ 	}
+-	ctx, cancel := context.WithTimeout(base.Context(), timeout)
++	ctx, cancel := context.WithTimeout(base.testingTB().Context(), timeout)
+ 	base.testingTB().Cleanup(cancel)
+ 	return &T{t: base.t, tb: base.tb, ctx: ctx}
+ }

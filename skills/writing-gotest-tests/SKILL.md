@@ -126,6 +126,11 @@ those are your job, below.
    `wait := gotest.Go(…); defer wait()` is the one `defer` that belongs in
    a test, and only for work that finishes on its own — never wait in the
    test on a server or poller that `AfterEach` stops (it deadlocks).
+   (v1.34+) A goroutine `BeforeAll` starts for `AfterAll` to stop goes on
+   the hook's `t` or a `T` derived from it (`When`, `It`, `Each`,
+   `NewTWithDeadline`; `gotest.NewT(t)` in a `*testing.T` hook), never on
+   a subtest the hook starts with `t.Run`: its wait runs before `AfterAll`
+   and deadlocks. Below v1.34 every such wait did.
    Every `BeforeAll` needs an `AfterAll` (`lifecycle-pair`, integrity
    tier). A suite's `AfterAll` runs even when its `BeforeAll` failed or
    panicked midway, so release only what was actually set up — nil-check

@@ -1,0 +1,28 @@
+Expect: fuzzhooks: AfterEach did not run after a BeforeEach that left
+Expect: fuzzskiphook: AfterEach did not run after a BeforeEach that skipped
+Judge: ./tests/canary CanaryTestSuite/TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves CanaryTestSuite/TestAFuzzExecutionSkippedByBeforeEachStillTearsDown
+Clause: when a fuzz execution's BeforeEach fails → the execution fails and its AfterEach still runs
+Clause: when a fuzz execution's BeforeEach panics → the execution fails and its AfterEach still runs
+Clause: when a fuzz execution's BeforeEach skips → the execution skips, its body never runs and its AfterEach still runs
+--- a/pkg/gotest/f.go
++++ b/pkg/gotest/f.go
+@@ -120,16 +120,11 @@
+ // afterEach, which a fatal assertion there would otherwise discard.
+ func (f *F) each(t *testing.T, body func(*T)) {
+ 	tt := NewT(t)
+-	if f.afterEach != nil {
+-		defer func() {
+-			if p := capturedFrom(recover(), "the fuzz execution, ahead of its AfterEach"); p != nil {
+-				defer panic(p)
+-			}
+-			f.afterEach(tt)
+-		}()
+-	}
+ 	if f.beforeEach != nil {
+ 		f.beforeEach(tt)
++	}
++	if f.afterEach != nil {
++		defer f.afterEach(tt)
+ 	}
+ 	body(tt)
+ }
