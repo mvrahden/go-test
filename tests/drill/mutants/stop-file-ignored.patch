@@ -1,0 +1,18 @@
+Expect: stopfile: TestStopTestSuite/TestSecond verdict "[a-z]*", want skip with the reason run stopping
+Expect: stopfile: no verdict for "(TestStopTestSuite/TestHolds|TestStopTestSuite|)" reached the stream
+Expect: stopfile: markers .*, want context ended, suite.AfterAll, fixture.AfterAll in order
+Judge: ./tests/canary CanaryTestSuite/TestOnlyTheStopFileStopsTheSuite
+Clause: when a run is interrupted on Windows, where only the stop file reaches the suite → skips the methods that have not started with the reason run stopping
+Clause: when a run is interrupted on Windows, where only the stop file reaches the suite → every verdict reaches the stream: the holding method's, the suite's and the package's
+Clause: when a run is interrupted on Windows, where only the stop file reaches the suite → runs AfterAll before the fixture is released
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -149,7 +149,7 @@
+ 			return
+ 		case <-tick.C:
+ 		}
+-		if _, err := os.Stat(w.file); err == nil {
++		if _, err := os.Stat(w.file); err == nil && false {
+ 			w.found <- sig // buffered, and sent once
+ 			return
+ 		}

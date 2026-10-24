@@ -226,3 +226,28 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** ends the holding method's context
 - **AND** skips the methods that have not started with the reason run stopping
 - **AND** runs AfterAll before the fixture is released
+
+### Requirement: Every launcher stops cleanly
+A run stopped by SIGINT, SIGTERM or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
+
+#### Scenario: Each launcher and each signal
+- **WHEN** a run is stopped by a signal, however gotest was launched
+- **THEN** ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
+
+### Requirement: A stop by the stop file alone
+On Windows, where the runner stops a suite by its stop file alone, an interrupted run SHALL skip the methods that have not started with the reason run stopping, SHALL carry every verdict to the stream and SHALL run AfterAll before the fixture is released.
+
+#### Scenario: Interrupted on Windows
+- **WHEN** a run is interrupted on Windows, where only the stop file reaches the suite
+- **THEN** skips the methods that have not started with the reason run stopping
+- **AND** every verdict reaches the stream: the holding method's, the suite's and the package's
+- **AND** runs AfterAll before the fixture is released
+
+### Requirement: A stop signals only the suite's own processes
+A cancelled run SHALL send no signal to a pid the suite published that is outside the suite's process group, and SHALL interrupt the suite's process group instead.
+
+#### Scenario: A published pid outside the group
+- **WHEN** the run is interrupted and the pid the suite published names a process outside its group
+- **THEN** sends that process no signal
+- **AND** interrupts the suite's process group instead
+- **AND** runs AfterAll before the fixture is released

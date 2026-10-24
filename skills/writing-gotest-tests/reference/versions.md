@@ -431,7 +431,10 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     ([grace](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)).
     `AfterEach`'s context does not end at the stop; benchmarks and fuzz
     seeds not started are skipped too; a second stop signal releases the
-    fixtures at once. Below v1.34 a stop released the fixtures and ended
+    fixtures at once. Under `-json` the stream carries every verdict of
+    the stopped run, on Windows too
+    ([stop file](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-by-the-stop-file-alone)).
+    Below v1.34 a stop released the fixtures and ended
     the process at once, without `AfterAll`, and only while fixtures were
     held. To migrate a `goleak.VerifyNone` inside a suite method, which now
     sees the stop watcher, pass it

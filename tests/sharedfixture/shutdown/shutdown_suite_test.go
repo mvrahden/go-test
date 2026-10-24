@@ -138,7 +138,14 @@ func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	markers := t.TempDir()
 	run := s.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./slow/")
 	interruptWhen(t, run, markers, "test-running")
-	interruptWhen(t, run, markers, "fixture-tearing-down")
+	first := time.Now()
+	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
+		gotest.True(poll, marker(markers, "fixture-tearing-down"), "fixture-tearing-down never appeared")
+	})
+	// A repeat this soon after the first is the first delivered again, as
+	// go tool forwards it: a person's second Ctrl-C comes later.
+	time.Sleep(time.Until(first.Add(time.Second)))
+	gotest.NoError(t, testkit.Interrupt(run.cmd, run.tree))
 	sent := time.Now()
 
 	exited := make(chan int, 1)
@@ -223,7 +230,7 @@ func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 		{Desc: "gotest ./...", args: []string{"./slow/"}, running: "shutdownmod/slow TestSlowTestSuite\n"},
 		{
 			Desc: "gotest -json", args: []string{"-json", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
-			shows: `{"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"}`,
+			shows: `"Action":"fail","Package":"shutdownmod/slow","Test":"TestSlowTestSuite/TestSleeps"`,
 		},
 		{
 			Desc: "gotest spec", args: []string{"spec", "--no-color", "./slow/"}, running: "shutdownmod/slow TestSlowTestSuite/TestSleeps\n",
