@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,23 +43,9 @@ const MarkersFile = "markers"
 
 // StopGrace is how long a CLI whose context ended has to finish stopping
 // before it is killed: the default fixture Timeout its teardown is given, and
-// the 30s the process adds. WithStopGrace sets another.
+// the 30s the process adds. It also bounds how long its output may be held
+// open once it has exited.
 const StopGrace = 2*time.Minute + 30*time.Second
-
-type stopGraceKey struct{}
-
-// WithStopGrace returns ctx carrying grace in place of StopGrace for the runs
-// started under it.
-func WithStopGrace(ctx context.Context, grace time.Duration) context.Context {
-	return context.WithValue(ctx, stopGraceKey{}, grace)
-}
-
-func stopGrace(ctx context.Context) time.Duration {
-	if grace, ok := ctx.Value(stopGraceKey{}).(time.Duration); ok {
-		return grace
-	}
-	return StopGrace
-}
 
 // RunPackage runs the built CLI with -json over pkg (a path relative to the
 // caller's working directory) and reads back the stream and the markers the
@@ -94,6 +81,12 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 	if err != nil {
 		return Run{}, err
 	}
+	return runBinary(ctx, binary, StopGrace, dir, markerDir, extraEnv, args...)
+}
+
+// runBinary is runCLI with binary as the CLI, given grace to stop.
+func runBinary(ctx context.Context, binary string, grace time.Duration, dir, markerDir string, extraEnv []string, args ...string) (Run, error) {
+	var err error
 	if markerDir == "" {
 		markerDir, err = os.MkdirTemp("", "gotest-markers-")
 		if err != nil {
@@ -104,8 +97,24 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 	cmd := exec.CommandContext(ctx, binary, args...) //nolint:gosec // G204: the repo's own CLI with the caller's arguments
 	cmd.Dir = dir
 	cmd.Env = append(childEnv(markerDir), extraEnv...)
+	// The pipes are the run's own, so a hold past the exit is seen whatever
+	// the exit status: exec reports an *ExitError over ErrWaitDelay.
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		return Run{}, err
+	}
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		_, _ = outR.Close(), outW.Close()
+		return Run{}, err
+	}
+	cmd.Stdout, cmd.Stderr = outW, errW
+	var copying sync.WaitGroup
+	copying.Add(2)
+	go func() { defer copying.Done(); _, _ = io.Copy(&stdout, outR) }()
+	go func() { defer copying.Done(); _, _ = io.Copy(&stderr, errR) }()
+	copied := make(chan struct{})
 	// A context that ends stops the CLI as a user does, so its shared
 	// fixtures are torn down; it is killed only when it outlives the grace.
 	tree := proctree.New(cmd)
@@ -115,20 +124,31 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 		}
 		return nil
 	}
-	cmd.WaitDelay = stopGrace(ctx)
+	cmd.WaitDelay = grace
 	run := Run{}
+	var held error
 	err = tree.Start()
+	_, _ = outW.Close(), errW.Close()
 	if err == nil {
 		err = cmd.Wait()
 		tree.Release()
 	}
+	go func() { copying.Wait(); close(copied) }()
+	select {
+	case <-copied:
+	case <-time.After(grace):
+		// The CLI exited; a process it left behind holds its output.
+		held = fmt.Errorf("run gotest %s: its output was still held open %s after it exited", strings.Join(args, " "), grace)
+	}
+	_, _ = outR.Close(), errR.Close()
+	<-copied
 	if err != nil {
 		var exitErr *exec.ExitError
 		switch {
 		case errors.As(err, &exitErr):
 			run.Exit = exitErr.ExitCode()
 		case cmd.ProcessState != nil:
-			// Stopped by the context, or its output held open past the grace.
+			// Stopped by the context.
 			run.Exit = cmd.ProcessState.ExitCode()
 		default:
 			return Run{}, fmt.Errorf("run gotest %s: %w", strings.Join(args, " "), err)
@@ -137,7 +157,7 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 	run.Stdout, run.Stderr = stdout.String(), stderr.String()
 	run.Events = ParseEvents(stdout.Bytes())
 	run.Markers, err = ReadMarkers(filepath.Join(markerDir, MarkersFile))
-	return run, err
+	return run, errors.Join(held, err)
 }
 
 // Verdict is the last pass, fail or skip the stream recorded for the test

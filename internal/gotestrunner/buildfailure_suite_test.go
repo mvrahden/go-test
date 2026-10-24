@@ -231,3 +231,51 @@ func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *
 		}
 	})
 }
+
+func (s *BuildFailureVerdictsTestSuite) TestAnInterruptBooksTheStop(t *gotest.T, _ *buildFailureCtx) {
+	// stopped records one suite whose stream ended green, as a suite stopped
+	// by the runner ends, and applies the interrupt to a run ending with code.
+	stream := `{"Action":"run","Package":"example.com/pkg","Test":"TestXTestSuite"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestXTestSuite"}
+`
+	stopped := func(mode gotestrunner.RunMode, cutShort bool, err error) (string, string, gotestrunner.PipelineResult) {
+		var stdout, stderr bytes.Buffer
+		c := gotestrunner.NewOutputCollector(mode, false, gotestrunner.WithWriters(&stdout, &stderr))
+		c.Register("example.com/pkg", 1)
+		c.RecordResult("example.com/pkg", 0, gotestrunner.SuiteResult{
+			Target:   gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestXTestSuite"}},
+			Stdout:   []byte(stream),
+			CutShort: cutShort,
+		})
+		result := gotestrunner.PipelineResult{ExitCode: 130}
+		gotestrunner.ExportApplyInterrupt(c, &result, err)
+		return stdout.String() + string(c.CapturedJSON()), stderr.String(), result
+	}
+
+	t.When("an interrupt cut a suite short", func(w *gotest.T) {
+		for sub, mode := range gotest.Each(w, []gotestrunner.RunMode{gotestrunner.RunStreamJSON, gotestrunner.RunCaptureJSON}) {
+			stream, stderr, result := stopped(mode, true, context.Canceled)
+			gotest.Equal(sub, "FAIL: run interrupted while running: example.com/pkg TestXTestSuite\n", stderr)
+			gotest.Contains(sub, stream, `{"Action":"output","Package":"interrupted","Output":"FAIL: run interrupted while running: example.com/pkg TestXTestSuite\n"}`)
+			gotest.Contains(sub, stream, `{"Action":"fail","Package":"interrupted"}`)
+			gotest.Contains(sub, stream, `{"Action":"pass","Package":"example.com/pkg","Test":"TestXTestSuite"}`, "the suite's own verdict is kept")
+			gotest.Equal(sub, 130, result.ExitCode)
+		}
+	})
+
+	t.When("nothing was cut short, or a deadline did it", func(w *gotest.T) {
+		for sub, tC := range gotest.Each(w, []struct {
+			Desc     string
+			cutShort bool
+			err      error
+		}{
+			{"an interrupt after the last suite", false, context.Canceled},
+			{"a deadline", true, context.DeadlineExceeded},
+			{"no stop at all", false, nil},
+		}) {
+			stream, stderr, _ := stopped(gotestrunner.RunCaptureJSON, tC.cutShort, tC.err)
+			gotest.NotContains(sub, stream, `"Package":"interrupted"`)
+			gotest.Empty(sub, stderr)
+		}
+	})
+}

@@ -205,7 +205,7 @@ func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg Pipeli
 		failRun(c, result, "global --timeout", msg)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "FAIL: %s while running: %s\n", msg, unitNames(running))
+	c.reportFailure("FAIL: %s while running: %s\n", msg, unitNames(running))
 	if result.ExitCode == 0 {
 		result.ExitCode = 1
 	}
@@ -217,7 +217,7 @@ func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg Pipeli
 // the captured mode alike, instead of living on the exit code alone. details
 // are lines stderr has carried already; only the stream still needs them.
 func failRun(c *OutputCollector, result *PipelineResult, pkg, msg string, details ...string) {
-	fmt.Fprintf(os.Stderr, "FAIL: %s\n", msg)
+	c.reportFailure("FAIL: %s\n", msg)
 	if result.ExitCode == 0 {
 		result.ExitCode = 1
 	}
@@ -630,6 +630,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	running := collector.bookDeadline(dispatchErr)
 	result := PipelineResult{ExitCode: exitCode}
 	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
+	applyInterrupt(collector, &result, dispatchErr)
 	return finish(result, errors.Join(closeErrs...)), nil
 }
 
@@ -1016,6 +1017,7 @@ loop:
 	running := collector.bookDeadline(dispatchErr)
 	result := PipelineResult{ExitCode: exitCode}
 	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
+	applyInterrupt(collector, &result, dispatchErr)
 	applySetupFailure(collector, &result, setupErr)
 	applyTeardownFailure(collector, &result, teardownErr)
 	result.CapturedJSON = collector.CapturedJSON()
@@ -1027,4 +1029,22 @@ func withExec(targets []SuiteTarget, exec []string) {
 	for i := range targets {
 		targets[i].Exec = exec
 	}
+}
+
+// interruptedPkg is the synthetic package a stopped run is booked under.
+const interruptedPkg = "interrupted"
+
+// applyInterrupt fails a run an interrupt stopped while suites ran, naming
+// them. A stopped suite ends with its tests' own status, so its stream may
+// end green; this keeps a -json consumer from reading the run as a pass,
+// and leaves every verdict the tests reported as it is.
+func applyInterrupt(c *OutputCollector, result *PipelineResult, dispatchErr error) {
+	if !errors.Is(dispatchErr, context.Canceled) {
+		return
+	}
+	cut := c.cutShortUnits()
+	if len(cut) == 0 {
+		return
+	}
+	failRun(c, result, interruptedPkg, "run interrupted while running: "+unitNames(cut))
 }

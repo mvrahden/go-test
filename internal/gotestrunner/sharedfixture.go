@@ -497,10 +497,12 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		failures:        newFailureLog(os.Stderr),
 	}
 
+	track(tree, liveTree{root: cmd.Process.Pid, done: waitDone})
 	scanned := make(chan struct{})
 	logged := make(chan struct{})
 	go func() {
 		proc.waitErr = cmd.Wait()
+		untrack(tree)
 		tree.Release()
 		drainOutput(scanned, sharedFixtureDrainDelay, stdout)
 		drainOutput(logged, sharedFixtureDrainDelay, stderr)

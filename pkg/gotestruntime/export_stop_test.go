@@ -95,3 +95,14 @@ func ExportWatchStopFile(self testing.TB, path string) (stop func()) {
 		settleExcept = nil
 	}
 }
+
+// ExportAfterPublishPID runs then once the watcher has published its pid,
+// until the returned call restores the default.
+func ExportAfterPublishPID(then func()) (restore func()) {
+	prev := publishPID
+	publishPID = func(path string) {
+		prev(path)
+		then()
+	}
+	return func() { publishPID = prev }
+}

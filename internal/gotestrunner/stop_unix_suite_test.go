@@ -8,11 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -30,6 +32,7 @@ type stopCtx struct {
 	dir      string
 	stranger *exec.Cmd
 	exited   chan struct{}
+	leftover int // a process a scenario's suite left running and the run did not end
 }
 
 // BeforeEach starts a process outside any suite's tree that records a SIGTERM
@@ -65,6 +68,9 @@ func (ctx *stopCtx) settled(within time.Duration) bool {
 func (s *StopSignalTestSuite) AfterEach(t *gotest.T, ctx *stopCtx) {
 	_ = ctx.stranger.Process.Kill()
 	<-ctx.exited
+	if ctx.leftover > 0 {
+		_ = syscall.Kill(ctx.leftover, syscall.SIGKILL)
+	}
 }
 
 func (s *StopSignalTestSuite) TestAPublishedPidOutsideTheTree(t *gotest.T, ctx *stopCtx) {
@@ -75,15 +81,13 @@ func (s *StopSignalTestSuite) TestAPublishedPidOutsideTheTree(t *gotest.T, ctx *
 	gotest.NoError(t, os.WriteFile(budget, []byte("1s"), 0o600))
 	target := gotestrunner.SuiteTarget{
 		SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite"},
-		Exec:       []string{"/bin/sh", "-c", `trap 'touch "$0"; exit 0' TERM; while :; do sleep 0.05; done`, marker},
+		Exec:       []string{"/bin/sh", "-c", `trap 'touch "$0"; exit 0' TERM; touch "$0.ready"; while :; do sleep 0.05; done`, marker},
 		BinaryPath: "suite.test",
 		StopFile:   stop,
 		BudgetFile: budget,
 	}
-	run, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
 	started := time.Now()
-	result := gotestrunner.RunSingleSuite(run, target, nil, false)
+	result := gotestrunner.RunSingleSuite(cancelOnceReady(marker+".ready"), target, nil, false)
 	gotest.True(t, ctx.settled(10*time.Second), "the stranger did not answer its probe")
 
 	t.When("the run is cancelled and the pid file names a process outside the suite's tree", func(w *gotest.T) {
@@ -96,6 +100,61 @@ func (s *StopSignalTestSuite) TestAPublishedPidOutsideTheTree(t *gotest.T, ctx *
 			_, err := os.Stat(marker)
 			gotest.NoError(it, err, "the suite process was not interrupted")
 			gotest.Less(it, time.Since(started), 10*time.Second)
+		})
+	})
+}
+
+// cancelOnceReady returns a context canceled once the file ready exists.
+func cancelOnceReady(ready string) context.Context {
+	run, cancel := context.WithCancel(context.Background())
+	go func() {
+		defer cancel()
+		for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Stat(ready); err == nil {
+				return
+			}
+		}
+	}()
+	return run
+}
+
+func (s *StopSignalTestSuite) TestAStopByPidEndsWhatTheSuiteLeft(t *gotest.T, ctx *stopCtx) {
+	stop := filepath.Join(ctx.dir, "stop")
+	marker := filepath.Join(ctx.dir, "suite")
+	budget := filepath.Join(ctx.dir, "budget")
+	gotest.NoError(t, os.WriteFile(budget, []byte("30s"), 0o600))
+	// The suite starts a process of its own, publishes its pid and ends on
+	// the SIGTERM, leaving that process running.
+	target := gotestrunner.SuiteTarget{
+		SuiteSpec: gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite"},
+		Exec: []string{"/bin/sh", "-c", `sleep 120 & echo $! > "$0.leftover"
+echo $$ > "$GOTEST_STOP_FILE.pid"
+trap 'exit 0' TERM
+touch "$0.ready"
+while :; do sleep 0.05; done`, marker},
+		BinaryPath: "suite.test",
+		StopFile:   stop,
+		BudgetFile: budget,
+	}
+	started := time.Now()
+	result := gotestrunner.RunSingleSuite(cancelOnceReady(marker+".ready"), target, nil, false)
+	took := time.Since(started)
+	data, err := os.ReadFile(marker + ".leftover")
+	gotest.NoError(t, err)
+	leftover, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	gotest.NoError(t, err)
+	gone := testkit.EndedWithin(leftover, 2*time.Second)
+	if !gone {
+		ctx.leftover = leftover
+	}
+
+	t.When("the run is cancelled and the suite, stopped by its pid, leaves a process it started running", func(w *gotest.T) {
+		w.It("ends that process before the run returns", func(it *gotest.T) {
+			gotest.True(it, result.CutShort)
+			gotest.True(it, gone, "the process the suite started outlived the run")
+		})
+		w.It("does not wait out the teardown budget for it", func(it *gotest.T) {
+			gotest.Less(it, took, 20*time.Second)
 		})
 	})
 }

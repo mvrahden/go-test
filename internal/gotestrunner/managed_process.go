@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -23,6 +24,8 @@ type ProcessConfig struct {
 	Grace         GraceStrategy
 	GraceDuration time.Duration
 	BudgetFile    string
+	// StopFile is the suite's stop file, for a process that runs a suite.
+	StopFile string
 	// CtrlC interrupts the tree as a terminal's Ctrl-C does, for a program
 	// that stops gracefully on it (go test -fuzz); see proctree.
 	CtrlC bool
@@ -59,6 +62,10 @@ type ManagedProcess struct {
 	pipes   []*outputPipe
 	pipeErr error
 	copied  chan struct{}
+
+	// stopped: the caller stopped the process by a route of its own, which
+	// reached the root's tree no further.
+	stopped atomic.Bool
 }
 
 // outputPipe carries one output stream from the process to the writer the
@@ -229,16 +236,20 @@ func (p *ManagedProcess) Start() error {
 		p.closePipes()
 		return err
 	}
-	track(p)
+	p.track()
 	p.copyOutput()
 	go p.wait()
 	return nil
 }
 
+func (p *ManagedProcess) track() {
+	track(p.tree, liveTree{root: p.cmd.Process.Pid, stopFile: p.config.StopFile, done: p.done})
+}
+
 // Adopt takes over a command the caller started after NewManagedProcess.
 func (p *ManagedProcess) Adopt() {
 	p.tree.Adopt()
-	track(p)
+	p.track()
 	p.copyOutput()
 	go p.wait()
 }
@@ -247,14 +258,24 @@ func (p *ManagedProcess) Adopt() {
 // be reused from then on, and only then drains what is left in the pipes.
 func (p *ManagedProcess) wait() {
 	_ = p.cmd.Wait()
-	// An interrupted root can exit before the rest of its tree is done
-	// shutting down; the grace it was given covers them too.
-	p.tree.Linger(p.graceTimeout())
-	untrack(p)
+	if p.stopped.Load() {
+		// The root is done, and so is its output: what it leaves running is
+		// interrupted, given the grace and killed.
+		p.tree.End(p.graceTimeout())
+	} else {
+		// An interrupted root can exit before the rest of its tree is done
+		// shutting down; the grace it was given covers them too.
+		p.tree.Linger(p.graceTimeout())
+	}
+	untrack(p.tree)
 	p.tree.Release()
 	p.drain()
 	close(p.done)
 }
+
+// Stopped records that the caller stopped the process without interrupting
+// its tree, so the rest of the tree is stopped once the root has exited.
+func (p *ManagedProcess) Stopped() { p.stopped.Store(true) }
 
 func (p *ManagedProcess) Done() <-chan struct{} { return p.done }
 func (p *ManagedProcess) Cmd() *exec.Cmd        { return p.cmd }

@@ -103,9 +103,6 @@ func watchFile(stderr io.Writer, file string) *watcher {
 	candidates := []os.Signal{os.Interrupt}
 	if w.file != "" {
 		candidates = append(candidates, stopSignals...)
-		// The runner stops this process alone, by pid or by the stop file, so
-		// the converter in front of it lives on to relay the stream to its end.
-		_ = os.WriteFile(protocol.StopPIDPath(w.file), []byte(strconv.Itoa(os.Getpid())), 0o600)
 	}
 	for _, s := range candidates {
 		if !signal.Ignored(s) {
@@ -120,6 +117,13 @@ func watchFile(stderr io.Writer, file string) *watcher {
 	if len(w.sigs) > 0 {
 		signal.Notify(w.ch, w.sigs...)
 	}
+	if w.file != "" {
+		// The runner stops this process alone, by pid or by the stop file, so
+		// the converter in front of it lives on to relay the stream to its
+		// end. Published once the signals are caught: the runner signals the
+		// pid it reads at once.
+		publishPID(protocol.StopPIDPath(w.file))
+	}
 	w.running = true
 	go w.loop()
 	if w.file != "" {
@@ -132,6 +136,18 @@ func watchFile(stderr io.Writer, file string) *watcher {
 		close(w.polled)
 	}
 	return w
+}
+
+// publishPID writes this process's pid to path whole, by rename, so the
+// runner never reads a part of it.
+var publishPID = func(path string) {
+	tmp := path + ".tmp"
+	if os.WriteFile(tmp, []byte(strconv.Itoa(os.Getpid())), 0o600) != nil {
+		return
+	}
+	if os.Rename(tmp, path) != nil {
+		_ = os.Remove(tmp)
+	}
 }
 
 // stopFilePoll is how often the watcher looks for the runner's stop file.

@@ -90,3 +90,9 @@ func ExportRenameMarker(rename func(from, to string) error) (restore func()) {
 	renameMarker = rename
 	return func() { renameMarker = os.Rename }
 }
+
+// ExportRunBinary runs binary with args as RunCLI runs the CLI, given grace
+// to stop.
+func ExportRunBinary(ctx context.Context, binary string, grace time.Duration, args ...string) (Run, error) {
+	return runBinary(ctx, binary, grace, ".", "", nil, args...)
+}

@@ -493,6 +493,13 @@ func (c *OutputCollector) bookRunFailure(pkg, msg string, details ...string) {
 	_, _ = c.jsonTarget().Write(runFailureEvents(pkg, msg, details...))
 }
 
+// reportFailure writes a run's failure line to the collector's stderr.
+func (c *OutputCollector) reportFailure(format string, args ...any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	fmt.Fprintf(c.stderr, format, args...)
+}
+
 func (c *OutputCollector) jsonTarget() io.Writer {
 	if c.starts == nil {
 		w := c.stdout
