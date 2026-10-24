@@ -3,6 +3,7 @@ package main_test
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -17,8 +18,8 @@ type FuzzCommandTestSuite struct {
 }
 
 func (s *FuzzCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~52s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
 }
 
 func (s *FuzzCommandTestSuite) BeforeAll(t *gotest.T) {

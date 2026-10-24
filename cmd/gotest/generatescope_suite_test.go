@@ -22,8 +22,7 @@ type GenerateScopeTestSuite struct {
 }
 
 func (s *GenerateScopeTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *GenerateScopeTestSuite) BeforeAll(t *gotest.T) {

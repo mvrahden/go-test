@@ -29,8 +29,8 @@ type LintFixTestSuite struct {
 }
 
 func (s *LintFixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~45s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 func (s *LintFixTestSuite) BeforeAll(t *gotest.T) {

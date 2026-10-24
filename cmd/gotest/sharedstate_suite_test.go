@@ -15,11 +15,6 @@ type SharedStateFilesTestSuite struct {
 	cli cliRunner
 }
 
-func (s *SharedStateFilesTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
-}
-
 func (s *SharedStateFilesTestSuite) BeforeAll(t *gotest.T) {
 	s.cli = newCLIRunner(s.CLI)
 }

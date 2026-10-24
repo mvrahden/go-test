@@ -26,11 +26,6 @@ type WatchCLITestSuite struct {
 	cli cliRunner
 }
 
-func (s *WatchCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
-}
-
 func (s *WatchCLITestSuite) BeforeAll(t *gotest.T) { s.cli = newCLIRunner(s.CLI) }
 
 func (s *WatchCLITestSuite) TestWatchOverAnAbsolutePath(t *gotest.T) {

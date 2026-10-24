@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/gotestcli"
@@ -26,11 +27,9 @@ type FuzzTriagePromoteTestSuite struct {
 	structCorpusFile string
 }
 
-// SuiteConfig: a promote's rebuild per test needs the integration
-// deadlines, not the 30-second default.
 func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~15s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 30 * time.Second}
 }
 
 func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {

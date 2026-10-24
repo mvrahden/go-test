@@ -9,11 +9,8 @@ import (
 // over tiny fixture packages, where a misjudged census would turn green into 2.
 type CensusTestSuite struct{}
 
-// SuiteConfig: every behavior compiles and runs a package through a
-// command, which the 30-second default does not cover on a slow machine.
 func (s *CensusTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 // BeforeAll isolates the temp dir for every method: the runs they make sweep it.
