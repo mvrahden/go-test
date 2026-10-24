@@ -102,6 +102,19 @@ func runDrill(root string, names []string) (int, error) {
 			weights[name] = w
 		}
 	}
+	scratchRoot, err := ScratchRoot()
+	if err != nil {
+		return 0, err
+	}
+	scratch, err := OpenScratch(scratchRoot, root, shardI, shardN)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = scratch.Release() }()
+	// A cache inside the checkout must not be copied into itself.
+	if scratchRoot, err = realPath(scratchRoot); err != nil {
+		return 0, err
+	}
 	started := time.Now()
 	logRoot := environ["DRILL_LOGS"]
 	if logRoot != "" {
@@ -124,11 +137,14 @@ func runDrill(root string, names []string) (int, error) {
 		return 0, err
 	}
 	d := &drillRun{
-		root: root, logs: logs, logRoot: logRoot, names: names, weights: weights,
+		root: root, scratchRoot: scratchRoot, scratch: scratch.Dir, logs: logs, logRoot: logRoot, names: names, weights: weights,
 		shardI: shardI, shardN: shardN, cpus: cpus, jobs: jobs, self: self,
 		supervision: NewSupervision([]string{self}, float64(seconds), logs),
 		results:     map[string]Verdict{},
 	}
+	// A drill killed outright leaves supervisors and workers that still
+	// write in the scratch; they hold its lock until the last one exits.
+	d.supervision.Pass(scratch.Lock())
 	var runErr error
 	WatchSignals(d.supervision, func() { runErr = d.judge() })
 	timings := map[string]float64{}
@@ -164,16 +180,9 @@ func runDrill(root string, names []string) (int, error) {
 	return 0, nil
 }
 
-func realPath(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	return filepath.EvalSymlinks(abs)
-}
-
 type drillRun struct {
-	root, logs, logRoot, self  string
+	root, scratchRoot, scratch string
+	logs, logRoot, self        string
 	names                      []string
 	weights                    map[string]float64
 	shardI, shardN, cpus, jobs int
@@ -184,10 +193,7 @@ type drillRun struct {
 // judge snapshots the repository, bootstraps the pristine judge and planner
 // from the snapshot, and judges this shard's mutants.
 func (d *drillRun) judge() (err error) {
-	scratch, err := os.MkdirTemp("", "gotest-drill-")
-	if err != nil {
-		return err
-	}
+	scratch := d.scratch
 	defer func() {
 		if rerr := removeAll(scratch); rerr != nil && err == nil {
 			err = rerr
@@ -214,7 +220,7 @@ func (d *drillRun) judge() (err error) {
 			return false
 		}
 		resolved, err := realPath(path)
-		return err == nil && (resolved == d.logs || (logRoot != "" && resolved == logRoot))
+		return err == nil && (resolved == d.logs || resolved == d.scratchRoot || (logRoot != "" && resolved == logRoot))
 	}
 	if err := copyTree(d.root, snapshot, skip); err != nil {
 		return err
@@ -330,5 +336,6 @@ func (d *drillRun) judge() (err error) {
 			alone = append(alone, n)
 		}
 	}
-	return JudgeAll([]Phase{{shared, d.jobs, max(1, d.cpus/d.jobs)}, {alone, 1, d.cpus}}, d.supervision, execute, d.results)
+	w := func(name string) float64 { return weight(d.weights, name) }
+	return JudgeAll([]Phase{{shared, d.jobs, max(1, d.cpus/d.jobs), w}, {alone, 1, d.cpus, w}}, d.supervision, execute, d.results)
 }

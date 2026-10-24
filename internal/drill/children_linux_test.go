@@ -14,10 +14,13 @@ import (
 
 // runChild is a child program:
 //   - drill <args...>: the drill's own command line
+//   - --supervise <args...>: a supervisor, as a drill run here starts it
 //   - detach <pidfile>: starts a process in a session of its own that starts
 //     a sleeper and exits, so the sleeper is orphaned; waits for its pid
 //   - session <pidfile>: starts a sleeper in a session of its own, publishes
 //     its pid and sleeps
+//   - hold <root> <checkout> <logs> <pidfile>: holds the checkout's scratch
+//     and starts a sleeper under a supervisor that is passed the lock
 //   - loop <logs> <phases>: judges synthetic workers under real supervisors
 //   - worker <name> <result> <leftover>: a synthetic worker, by name
 func runChild(args []string) int {
@@ -27,6 +30,8 @@ func runChild(args []string) int {
 	switch args[0] {
 	case "drill":
 		return drill.Main(args[1:])
+	case "--supervise":
+		return drill.Main(args)
 	case "detach":
 		cmd := childCommand("orphan", args[1])
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
@@ -61,11 +66,26 @@ func runChild(args []string) int {
 		return 0
 	case "loop":
 		return loop(args[1], args[2])
+	case "hold":
+		scratch, err := drill.OpenScratch(args[1], args[2], 1, 1)
+		if err != nil {
+			return 2
+		}
+		supervision := drill.NewSupervision([]string{self(), "drill"}, 60, args[3])
+		supervision.Pass(scratch.Lock())
+		go func() {
+			_, _, _ = supervision.Run([]string{self(), "sleeper", args[4]}, "sleeper", os.Stderr, os.Stderr, "")
+		}()
+		time.Sleep(time.Minute)
+		return 0
 	case "worker":
 		return syntheticWorker(args[1], args[2], args[3])
 	}
 	return 2
 }
+
+// lockFile locks f as a drill does.
+func lockFile(f *os.File) error { return syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) }
 
 func exists(path string) bool {
 	_, err := os.Stat(path)
@@ -150,4 +170,17 @@ func loop(logs, phasesJSON string) int {
 	data, _ := json.Marshal(report)
 	fmt.Println(string(data))
 	return 0
+}
+
+// judgeStoppedAtStart judges two mutants, stopping the drill as each starts.
+func judgeStoppedAtStart(logs string) (map[string]drill.Verdict, error) {
+	supervision := drill.NewSupervision([]string{self(), "drill"}, 20, logs)
+	execute := func(_ int, name string, _ int) (drill.Verdict, *drill.Status, error) {
+		supervision.Stop()
+		_, _, err := supervision.Run([]string{"true"}, name, os.Stderr, os.Stderr, "")
+		return drill.Verdict{}, nil, err
+	}
+	results := map[string]drill.Verdict{}
+	phases := []drill.Phase{{Names: []string{"a", "b"}, Parallel: 2, CPUs: 1}}
+	return results, drill.JudgeAll(phases, supervision, execute, results)
 }

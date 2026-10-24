@@ -9,3 +9,5 @@ var errLinux = errors.New("the drill requires Linux for subreaper process cleanu
 func superviseCommand(float64, string, []string) (int, error) { return 0, errLinux }
 
 func runDrill(string, []string) (int, error) { return 0, errLinux }
+
+func lockHolders(string) ([]int, bool) { return nil, false }

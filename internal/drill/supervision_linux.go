@@ -27,6 +27,7 @@ type Supervision struct {
 	supervisor []string
 	seconds    float64
 	logs       string
+	pass       []*os.File
 
 	mu       sync.Mutex
 	active   map[*exec.Cmd]bool
@@ -38,6 +39,11 @@ type Supervision struct {
 func NewSupervision(supervisor []string, seconds float64, logs string) *Supervision {
 	return &Supervision{supervisor: supervisor, seconds: seconds, logs: logs, active: map[*exec.Cmd]bool{}}
 }
+
+// Pass hands files to every supervisor started from now on, as fds 3 and
+// up. They are not close-on-exec there, so its command and everything that
+// command starts inherit them too.
+func (s *Supervision) Pass(files ...*os.File) { s.pass = append(s.pass, files...) }
 
 // Stopping reports whether the drill was stopped.
 func (s *Supervision) Stopping() bool {
@@ -79,6 +85,7 @@ func (s *Supervision) Run(command []string, label string, stdout, stderr *os.Fil
 		strconv.FormatFloat(s.seconds, 'g', -1, 64), status), command...)
 	cmd := exec.Command(s.supervisor[0], args...) //nolint:gosec // G204: the drill's own supervisor
 	cmd.Dir, cmd.Stdin, cmd.Stdout, cmd.Stderr = dir, os.Stdin, stdout, stderr
+	cmd.ExtraFiles = s.pass
 	// A session of its own: a signal to a supervisor's group reaches
 	// neither the drill nor what started it.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
@@ -109,12 +116,13 @@ func (s *Supervision) Run(command []string, label string, stdout, stderr *os.Fil
 	return code, &observed, nil
 }
 
-// Phase is one round of judging: its mutants, how many run at once, and
-// the CPUs each gets.
+// Phase is one round of judging: its mutants, how many run at once, the
+// CPUs each gets, and each mutant's expected seconds; nil weighs all alike.
 type Phase struct {
 	Names    []string
 	Parallel int
 	CPUs     int
+	Weight   func(string) float64
 }
 
 // UnmarshalJSON reads a phase as [names, parallel, cpus].
@@ -163,29 +171,23 @@ func JudgeAll(phases []Phase, s *Supervision, execute Execute, results map[strin
 		return nil
 	}
 	for _, phase := range phases {
-		var mu sync.Mutex
-		pending := phase.Names
-		next := func() (string, bool) {
-			mu.Lock()
-			defer mu.Unlock()
-			if len(pending) == 0 {
-				return "", false
-			}
-			name := pending[0]
-			pending = pending[1:]
-			return name, true
-		}
+		queues := NewQueues(phase.Names, phase.Parallel, phase.Weight)
 		errs := make([]chan error, phase.Parallel)
 		for i := range errs {
 			errs[i] = make(chan error, 1)
 			go func(worker int) {
 				errs[worker] <- func() error {
+					defer queues.Done(worker)
 					for !s.Stopping() {
-						name, ok := next()
+						name, ok := queues.Next(worker)
 						if !ok {
 							return nil
 						}
 						verdict, observed, err := execute(worker, name, phase.CPUs)
+						if errors.Is(err, errCancelled) {
+							// Stopped meanwhile: the mutant has no verdict.
+							return nil
+						}
 						if err != nil {
 							return err
 						}
@@ -227,6 +229,17 @@ func sender(pid int) string {
 	return "pid " + strconv.Itoa(pid) + " (" + command + ")"
 }
 
+// stopSignals stop a drill or a supervisor. SIGHUP counts only when not
+// ignored at start, as under nohup: Notify would un-ignore it. Read at init,
+// before any Notify.
+var stopSignals = func() []os.Signal {
+	sigs := []os.Signal{syscall.SIGINT, syscall.SIGTERM}
+	if !signal.Ignored(syscall.SIGHUP) {
+		sigs = append(sigs, syscall.SIGHUP)
+	}
+	return sigs
+}()
+
 // siginfo is the head of the kernel's siginfo_t for a signal sent by kill.
 type siginfo struct {
 	Signo int32
@@ -239,20 +252,22 @@ type siginfo struct {
 }
 
 // WatchSignals runs work while the calling goroutine, which must be locked
-// to the main thread, cancels s on SIGINT or SIGTERM from outside the drill.
+// to the main thread, cancels s on a stop signal from outside
+// the drill.
 // One sent by a process the drill started is a mutant's doing, so it is
 // reported and ignored.
 //
-// Only sigtimedwait names a signal's sender. The main thread keeps both
+// Only sigtimedwait names a signal's sender. The main thread keeps the
 // signals blocked and waits for them; the kernel hands a process-directed
 // signal to the main thread first whenever it waits. One that reaches
 // another thread anyway carries no sender and stops the drill.
 func WatchSignals(s *Supervision, work func()) {
 	fallback := make(chan os.Signal, 4)
-	signal.Notify(fallback, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(fallback, stopSignals...)
 	defer signal.Stop(fallback)
 	var set, previous unix.Sigset_t
-	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
+	for _, sig := range stopSignals {
+		sig := sig.(syscall.Signal)
 		set.Val[(sig-1)/64] |= 1 << ((uint(sig) - 1) % 64)
 	}
 	if err := unix.PthreadSigmask(unix.SIG_BLOCK, &set, &previous); err != nil {

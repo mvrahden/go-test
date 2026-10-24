@@ -17,13 +17,26 @@ fork, detach or leave a process group are still collected when a worker ends.
 Neither the supervisor nor its verdict accounting uses the mutated framework.
 Each supervisor runs in a session of its own and its worker in another, so a
 mutant that signals a process group reaches neither the orchestrator nor
-another worker. The orchestrator ignores a SIGINT or SIGTERM sent by a process
-it started, and names it. A worker or supervisor that dies fails only its own
+another worker. SIGINT, SIGTERM and SIGHUP, unless ignored, stop the drill; the orchestrator
+ignores one sent by a process it started, and names it. A worker or supervisor that dies fails only its own
 mutant: the orchestrator kills what it left behind, and the next mutant gets a
 fresh worker.
 
 The orchestrator snapshots the current repository, including uncommitted
 changes, then builds the judge and reads the selection plan from that snapshot.
+The snapshot and the worker trees sit at fixed paths under
+`<user cache dir>/gotest/drill/<checkout hash>-<i>-of-<n>/`, the same on every
+run of one checkout and shard: Go keys a package's build on its directory, so
+a tree at a new path would rebuild every package into the build cache. The
+directory is emptied when the drill starts and when it ends. Without a cache
+dir it can write, the drill uses `<temp dir>/gotest-drill-<uid>/` instead.
+A lock file beside the directory admits one drill per checkout and shard; every
+supervisor and worker holds it open too, so a drill killed outright keeps it
+until the last process that could still write there has exited. A drill
+starts by removing the directories no drill used for 7 days. Each mutant is judged in the worker tree its name hashes to,
+whichever mutants are selected, so a rerun finds its builds in the cache; a
+worker with no mutants of its own takes the last one of a worker still busy,
+from the one with the most expected seconds left.
 For each mutant, a worker:
 
 1. restores the snapshot at its fixed source path, creates fresh temporary
@@ -56,7 +69,11 @@ reused. The canary does not depend on shared fixture machinery to obtain its CLI
 
 Workers run without the host's `CI`, `GITHUB_ACTIONS` and `GOTEST_*`
 settings, so a mutant gets the same verdict on a CI runner as on a laptop
-(under `CI`, for one, a missing snapshot baseline fails by itself). The
+(under `CI`, for one, a missing snapshot baseline fails by itself).
+`GOTEST_SLOW_BUILD_THRESHOLD` alone passes: it describes the machine, not
+the checks, and a slow runner slows the judge's builds as much as the host's.
+Set very low, it puts the slow-build notice on the stderr of every CLI the
+judged checks start. The
 bootstrap builds `test2json` into Go's build cache before any worker starts:
 Go writes a tool there in place, and a run that resolves it meanwhile cannot
 execute it.
@@ -216,6 +233,12 @@ A failure before any mutant runs prints one line and exits 1:
   `Judge:` line names a test that is not there; a renamed check needs its
   `Judge:` lines renamed with it), `Alone: line gives no reason` or
   `no Expect: line, name the check that must catch it`.
+- `DRILL  another drill is running on <checkout> as shard <i>/<n> (lock <file>); wait for it or stop it`
+  — a drill on the same checkout and shard, or a process a killed one left,
+  holds the scratch directory.
+- `DRILL  cannot lock <file>: its filesystem cannot lock files (...)` — the
+  cache dir is on NFS without locks, virtiofs or 9p; point `XDG_CACHE_HOME`
+  at a local disk.
 - `DRILL  no mutant named <name>`, `DRILL  a mutant was selected more than once`,
   or a complaint about `DRILL_JOBS`, `DRILL_SHARD`, `DRILL_TIMEOUT` or
   `DRILL_TIMINGS` — the command line or environment is wrong.
