@@ -68,6 +68,10 @@ func ExportSetTeardownTimeout(p *SharedFixtureProcess, d time.Duration) {
 	p.teardownTimeout = d
 }
 
+// ExportTeardownBudget is how long Teardown waits for the process to exit
+// before it force-kills it.
+func ExportTeardownBudget(p *SharedFixtureProcess) time.Duration { return p.teardownBudget() }
+
 var ExportBuildFuzzArgs = buildFuzzArgs
 var ExportDefaultFuzzJobs = defaultFuzzJobs
 var ExportResolveFuzzJobs = resolveFuzzJobs
@@ -209,6 +213,25 @@ func ExportReadProtocol(stream io.Reader) *SharedFixtureProcess {
 	}
 	p.readProtocol(stream)
 	return p
+}
+
+// ExportSetSetupReportFloor shrinks the wait before the first reported budget
+// and returns what restores it.
+func ExportSetSetupReportFloor(d time.Duration) (restore func()) {
+	was := setupReportFloor
+	setupReportFloor = d
+	return func() { setupReportFloor = was }
+}
+
+// ExportNewSilentProcess is a process that never reports: no budget, no
+// state, no end of setup.
+func ExportNewSilentProcess() *SharedFixtureProcess {
+	return &SharedFixtureProcess{
+		state:      map[string]json.RawMessage{},
+		allDone:    make(chan struct{}),
+		budgetSeen: make(chan struct{}, 1),
+		setupBegan: time.Now(),
+	}
 }
 
 // ExportResulted counts the units whose result line the collector still keeps.

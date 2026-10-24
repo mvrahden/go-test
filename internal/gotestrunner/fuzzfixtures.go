@@ -43,7 +43,7 @@ func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []Fu
 	}
 	// What failed is on stderr already, from the fixture process; the targets
 	// that read it say so in Env.
-	_, _ = awaitSharedSetup(ctx, proc, setupTimeout)
+	_ = proc.WaitSetup(ctx, setupTimeout)
 	return &FuzzFixtures{proc: proc, reqKeys: overlay.SuiteRequiredSharedFixtureKeys}, nil
 }
 
