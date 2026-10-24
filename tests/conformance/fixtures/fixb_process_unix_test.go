@@ -60,5 +60,9 @@ func (s *SharedProcessTestSuite) TestASetupGivenUp(t *gotest.T) {
 		w.It("fails the run", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
+		w.It("the sibling's 8s AfterAll runs to its end under the teardown budget the process reports", func(it *gotest.T) {
+			gotest.True(it, run.MarkerOrder("healthy up", "hung returned", "healthy released"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
+			gotest.NotContains(it, run.Stderr, "forcing termination")
+		})
 	})
 }

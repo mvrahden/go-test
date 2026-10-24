@@ -41,5 +41,9 @@ func (s *SetupBudgetTestSuite) TestDeclaredBudgetBounds(t *gotest.T) {
 			gotest.Less(it, elapsed, 60*time.Second)
 			gotest.Regexp(it, `shared fixture setup timed out after 2s\b`, run.Stderr)
 		})
+		w.It("never runs the suite reading the fixture", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestHangTestSuite"), "stdout: %s", run.Stdout)
+			gotest.NotContains(it, run.Markers, "suite ran")
+		})
 	})
 }
