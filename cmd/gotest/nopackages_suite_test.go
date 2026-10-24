@@ -120,6 +120,13 @@ func (s *NoPackagesTestSuite) TestAPatternBesideOthersThatMatched(t *gotest.T) {
 	})
 
 	t.It("warns about a meta pattern as go test does: tool in a module declaring none", func(it *gotest.T) {
+		// A tool declared here would be this package: the run would start
+		// this test again, without end.
+		list := exec.Command("go", "list", "tool")
+		list.Dir = s.cli.repoRoot
+		tools, err := list.Output()
+		gotest.NoError(it, err)
+		gotest.Empty(it, tools, "go.mod declares a tool")
 		stdout, stderr, code := s.cli.runSplit(it, notestfiles, "tool")
 		gotest.Equal(it, 0, code, "stderr:\n%s", stderr)
 		gotest.Equal(it, "warning: \"tool\" matched no packages\n", stderr)
