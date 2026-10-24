@@ -629,7 +629,8 @@ makes it a different axis from `go test -p`. These defaults and Level 1's
 (`NumCPU`) apply to uninstrumented builds; under `-race`/`-msan`/`-asan`
 they halve, since instrumentation at least doubles the CPU cost per
 instruction stream. An explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
-wall-clock verdicts diagnosable: builds running past 15s log a slow-build
+wall-clock verdicts diagnosable: builds running past 15s
+(`GOTEST_SLOW_BUILD_THRESHOLD` moves it) log a slow-build
 notice (a log line, never a verdict), and scheduling context (`schedinfo`)
 is appended to fixture-setup deadline failures — a starved build looks
 exactly like a broken one.

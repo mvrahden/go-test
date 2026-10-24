@@ -17,6 +17,7 @@ type ExportOverlayJSON = overlayJSON
 type ExportFixtureStateEntry = fixtureStateEntry
 
 var ExportCompileConcurrency = compileConcurrency
+var ExportCompilePackage = compilePackage
 var ExportBuildSuiteCmd = buildSuiteCmd
 var ExportTest2JSONPath = test2jsonPath
 var ExportResolveTest2JSON = resolveTest2JSON
@@ -103,6 +104,7 @@ var ExportAliveFixtureKeys = aliveFixtureKeys
 
 var ExportSortTargetIndices = sortTargetIndices
 var ExportLogSlowBuild = logSlowBuild
+var ExportSlowBuildThreshold = slowBuildThreshold
 
 // ExportLineWriterProgress reads the progress a line writer captured.
 func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWriter).progress }

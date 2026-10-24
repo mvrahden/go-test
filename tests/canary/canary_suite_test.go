@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -165,18 +166,32 @@ func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, e
 // checks the same on a CI runner as on a laptop. Under CI snapshots are
 // read-only, and a refresh of the repository's own snapshots must not
 // rewrite the snapshotting fixture's deliberately stale baseline. extra
-// pairs are what a case sets on purpose; they go on top.
+// pairs are what a case sets on purpose; they go on top. The slow-build
+// threshold passes: it describes the machine, not the run.
 func childEnv(canaryDir string, extra ...string) []string {
 	env := make([]string, 0, len(os.Environ())+2+len(extra))
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(name, "GOTEST_") || slices.Contains(hostOnlyEnv, name) {
+		gotestVar := strings.HasPrefix(name, "GOTEST_") && name != protocol.EnvSlowBuildThreshold
+		if gotestVar || slices.Contains(hostOnlyEnv, name) {
 			continue
 		}
 		env = append(env, kv)
 	}
 	env = append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+testkit.ChildCacheDir(canaryDir))
 	return append(env, extra...)
+}
+
+func (s *CanaryTestSuite) TestTheChildEnvKeepsOnlyTheSlowBuildThreshold(t *gotest.T) {
+	t.Setenv(protocol.EnvSlowBuildThreshold, "1ns")
+	t.Setenv(protocol.EnvCI, "1")
+	env := childEnv(t.TempDir())
+	if !slices.Contains(env, protocol.EnvSlowBuildThreshold+"=1ns") {
+		t.Errorf("the slow-build threshold does not reach the fixture process")
+	}
+	if slices.Contains(env, protocol.EnvCI+"=1") {
+		t.Errorf("the host's %s reaches the fixture process", protocol.EnvCI)
+	}
 }
 
 // hostOnlyEnv are the variables that put the CLI in CI mode or point it at
