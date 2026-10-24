@@ -29,6 +29,11 @@ func (s *SharedFixtureIntegrationTestSuite) AfterEach(_ *gotest.T) {
 }
 
 func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gotest.T) {
+	// The overlay this writes stays out of the shared temp dir.
+	tmp := t.TempDir()
+	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(env, tmp)
+	}
 	standalonePattern := "github.com/mvrahden/go-test/tests/sharedfixture/standalone/..."
 	fixtureboundPattern := "github.com/mvrahden/go-test/tests/sharedfixture/fixturebound/..."
 

@@ -28,6 +28,12 @@ func (s *SpecInputTestSuite) SuiteConfig() gotest.SuiteConfig {
 // specInputCtx holds the overlay dir a live run of the examples writes.
 type specInputCtx struct{ overlayDir string }
 
+// BeforeAll isolates the temp dir for every method: the runs they make sweep it.
+func (s *SpecInputTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+
+// AfterAll has nothing to release: Setenv restores the temp dir.
+func (s *SpecInputTestSuite) AfterAll(_ *gotest.T) {}
+
 func (s *SpecInputTestSuite) BeforeEach(_ *gotest.T) *specInputCtx { return &specInputCtx{} }
 
 func (s *SpecInputTestSuite) AfterEach(t *gotest.T, ctx *specInputCtx) {

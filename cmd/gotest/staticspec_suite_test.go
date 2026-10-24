@@ -39,6 +39,8 @@ type staticCtx struct {
 }
 
 func (s *StaticSpecTestSuite) BeforeAll(t *gotest.T) {
+	// Every method's run writes an overlay there.
+	isolateTempDir(t)
 	corpus, err := filepath.Abs(filepath.Join("..", "..", "internal", "gotestast", "testdata", "behaviors"))
 	gotest.NoError(t, err)
 	s.corpus = corpus

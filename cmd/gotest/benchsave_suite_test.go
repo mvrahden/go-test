@@ -17,6 +17,12 @@ func (s *BenchSaveTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
+// BeforeAll isolates the temp dir for every method: the runs they make sweep it.
+func (s *BenchSaveTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+
+// AfterAll has nothing to release: Setenv restores the temp dir.
+func (s *BenchSaveTestSuite) AfterAll(_ *gotest.T) {}
+
 func (s *BenchSaveTestSuite) TestABareSaveToTheConfiguredBaseline(t *gotest.T) {
 	baseline := filepath.Join(t.TempDir(), "baseline.json")
 	inv := main.Invocation{Args: []string{"--save=", "./testdata/census/benchplain/", "-benchtime=1x"}}

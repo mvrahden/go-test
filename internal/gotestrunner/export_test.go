@@ -206,3 +206,10 @@ func ExportTrack(tree *proctree.Tree, root int, stopFile string, done <-chan str
 	track(tree, liveTree{root: root, stopFile: stopFile, done: done})
 	return func() { untrack(tree) }
 }
+
+// ExportStubOwnerIdentity stands in ns for this process's pid namespace and
+// boot for its boot, and returns what restores the real readers.
+func ExportStubOwnerIdentity(ns, boot func() string) (restore func()) {
+	selfPIDNamespace, selfBoot = ns, boot
+	return func() { selfPIDNamespace, selfBoot = pidNamespace, bootID }
+}

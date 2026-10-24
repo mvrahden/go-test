@@ -71,7 +71,14 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	}
 
 	workDir, err := os.MkdirTemp("", "gotest-work-*")
+	if err == nil {
+		// The sweep of a later run removes the work dir of a run that died.
+		err = writePIDFile(workDir)
+	}
 	if err != nil {
+		if workDir != "" {
+			os.RemoveAll(workDir)
+		}
 		if !cached {
 			os.RemoveAll(cacheDir)
 		}
@@ -85,6 +92,11 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 	}
 	if debug {
+		// Kept for inspection: the sweep leaves a marked dir alone.
+		_ = markKept(workDir)
+		if !cached {
+			_ = markKept(cacheDir)
+		}
 		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s (cached=%v)\nDEBUG: work dir: %s\nDEBUG: binary cache root: %q\n", cacheDir, cached, workDir, binaryCacheRoot)
 		cleanup = func() {}
 	}
@@ -249,7 +261,7 @@ func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {
 		return "", fmt.Errorf("create overlay dir: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(tmpDir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
+	if err := writePIDFile(tmpDir); err != nil {
 		os.RemoveAll(tmpDir)
 		return "", fmt.Errorf("write pid file: %w", err)
 	}
@@ -259,6 +271,11 @@ func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {
 		return "", err
 	}
 	return tmpDir, nil
+}
+
+// markKept marks dir for the sweep to leave alone.
+func markKept(dir string) error {
+	return os.WriteFile(filepath.Join(dir, keepFile), nil, 0o600)
 }
 
 func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
