@@ -26,8 +26,14 @@
 // its other events, the verdicts of packages it runs nothing in) and a run
 // whose patterns match no package. Times and durations are masked.
 
-import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, readdirSync, mkdtempSync } from "node:fs";
+import { spawn } from "node:child_process";
+import {
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,19 +53,61 @@ const VARIANTS = {
   renderOnly: ["spec", "--input=-", "--format=json", "--render-only"],
 };
 
-function buildBinary() {
+// The command running now, stopped with the script.
+let current;
+
+// A stop removes the build dir and ends the script by the signal. The
+// commands run asynchronously, so the handler runs as the signal arrives.
+const removals = [];
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.once(signal, () => {
+    const stop = () => {
+      for (const remove of removals) remove();
+      process.kill(process.pid, signal);
+    };
+    // The command ends first, so nothing writes in the dir once it is gone.
+    if (current) {
+      current.once("close", stop);
+      current.kill(signal);
+    } else {
+      stop();
+    }
+  });
+}
+
+// spawnAsync runs command to its end, feeding it input.
+function spawnAsync(command, args, input) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: repoRoot });
+    current = child;
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf-8").on("data", (d) => (stdout += d));
+    child.stderr.setEncoding("utf-8").on("data", (d) => (stderr += d));
+    child.on("error", reject);
+    child.on("close", (status) => {
+      current = undefined;
+      resolve({ status, stdout, stderr });
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(input);
+  });
+}
+
+async function buildBinary() {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-contract-"));
+  // Removed however the script ends, a failed build or a stop included.
+  const remove = () => rmSync(dir, { recursive: true, force: true });
+  process.on("exit", remove);
+  removals.push(remove);
   const bin = path.join(
     dir,
     process.platform === "win32" ? "gotest.exe" : "gotest",
   );
-  const built = spawnSync(
+  const built = await spawnAsync(
     "go",
     ["build", "-buildvcs=false", "-o", bin, "./cmd/gotest"],
-    {
-      cwd: repoRoot,
-      encoding: "utf-8",
-    },
+    "",
   );
   if (built.status !== 0) {
     throw new Error(`go build failed: ${built.stderr}`);
@@ -67,13 +115,8 @@ function buildBinary() {
   return bin;
 }
 
-function run(bin, args, input) {
-  const result = spawnSync(bin, args, {
-    cwd: repoRoot,
-    input,
-    encoding: "utf-8",
-  });
-  if (result.error) throw result.error;
+async function run(bin, args, input) {
+  const result = await spawnAsync(bin, args, input);
   return {
     exitCode: result.status,
     stdout: result.stdout,
@@ -81,7 +124,7 @@ function run(bin, args, input) {
   };
 }
 
-const bin = buildBinary();
+const bin = await buildBinary();
 const cases = {};
 
 for (const file of readdirSync(streamDir).sort()) {
@@ -91,8 +134,8 @@ for (const file of readdirSync(streamDir).sort()) {
 
   cases[name] = {};
   for (const [variant, args] of Object.entries(VARIANTS)) {
-    const direct = run(bin, args, input);
-    const goRun = run(
+    const direct = await run(bin, args, input);
+    const goRun = await run(
       "go",
       ["run", "-buildvcs=false", "./cmd/gotest", ...args],
       input,
@@ -143,7 +186,7 @@ function mask(stdout) {
 
 const live = {};
 for (const [name, args] of Object.entries(LIVE)) {
-  const result = run(bin, args, "");
+  const result = await run(bin, args, "");
   live[name] = {
     args,
     exitCode: result.exitCode,

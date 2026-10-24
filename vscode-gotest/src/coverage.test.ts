@@ -1,5 +1,14 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
-import { mkdtemp } from "node:fs/promises";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeAll,
+  afterEach,
+  afterAll,
+} from "vitest";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -459,16 +468,27 @@ describe("filterSupplementaryProfiles", () => {
 
 describe("CoverageStore.clear", () => {
   let CoverageStoreCls: typeof import("./coverageStore.js").CoverageStore;
+  let dir = "";
 
   beforeAll(async () => {
     const mod = await import("./coverageStore.js");
     CoverageStoreCls = mod.CoverageStore;
   });
 
+  afterEach(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  // Every dir a test made is gone once they ran.
+  afterAll(() => {
+    expect(dir).not.toBe("");
+    expect(existsSync(dir)).toBe(false);
+  });
+
   // Clearing memory alone would leave the stored profiles to be restored on
   // the next window activation, which reads as the clear not having worked.
   it("empties the store and does not restore on reload", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "gotest-cov-clear-"));
+    dir = await mkdtemp(path.join(tmpdir(), "gotest-cov-clear-"));
     const store = new CoverageStoreCls({ fsPath: dir } as never);
     store.update(
       "example.com/pkg",

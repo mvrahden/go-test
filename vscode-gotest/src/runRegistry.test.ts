@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { existsSync } from "node:fs";
 import { RunRegistry } from "./runRegistry.js";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -6,11 +7,23 @@ import { tmpdir } from "node:os";
 
 describe("RunRegistry", () => {
   let registry: RunRegistry;
-  let storageDir: string;
+  let storageDir = "";
+  const made: string[] = [];
 
   beforeEach(async () => {
     storageDir = await fs.mkdtemp(path.join(tmpdir(), "gotest-reg-"));
+    made.push(storageDir);
     registry = new RunRegistry(storageDir);
+  });
+
+  afterEach(async () => {
+    if (storageDir) await fs.rm(storageDir, { recursive: true, force: true });
+  });
+
+  // Every dir a test made is gone once they ran.
+  afterAll(() => {
+    expect(made).not.toEqual([]);
+    expect(made.filter((d) => existsSync(d))).toEqual([]);
   });
 
   it("registers and retrieves a run", () => {
