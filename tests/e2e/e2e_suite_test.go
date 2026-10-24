@@ -461,10 +461,13 @@ func (s *E2ETestSuite) TestOutputFormatGolden(t *gotest.T) {
 	t.When("json", func(w *gotest.T) {
 		cmd := exec.Command(s.binary, "github.com/mvrahden/go-test/examples/auth", "-json", "-parallel", "1") //nolint:gosec // G204: controlled binary with fixed args
 		cmd.Dir = filepath.Join(s.workDir, "examples")
-		out, err := cmd.CombinedOutput()
+		// The stream is stdout alone; stderr carries notices that may split its lines.
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		out, err := cmd.Output()
 
 		w.It("single passing package", func(it *gotest.T) {
-			gotest.NoError(it, err, "auth should pass: %s", string(out))
+			gotest.NoError(it, err, "auth should pass: %s%s", string(out), stderr.String())
 			gotest.MatchSnapshot(it, normalizeJSONOutput(string(out)))
 		})
 
