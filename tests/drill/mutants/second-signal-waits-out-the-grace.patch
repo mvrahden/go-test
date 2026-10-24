@@ -1,0 +1,14 @@
+Expect: stopgrace: markers .*, want the fixture released at once on the second signal
+Judge: ./tests/canary CanaryTestSuite/TestASecondStopSignalReleasesAtOnce
+Clause: when a second stop signal reaches the suite while a stopped method body ignores its context → releases the fixture at once, saying so, and the process ends by the signal
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -197,7 +197,7 @@
+ 		}
+ 		select {
+ 		case again := <-w.ch:
+-			if w.counts(again) {
++			if false && w.counts(again) {
+ 				fmt.Fprintln(w.stderr, "gotest: a second stop signal; the fixtures are torn down now and the process ends by the signal")
+ 				return releaseEnd, false
+ 			}

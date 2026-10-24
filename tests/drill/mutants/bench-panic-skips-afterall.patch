@@ -10,6 +10,6 @@ Clause: when a benchmark panics → runs AfterAll before the fixture is released
  {{ range $bm := $ts.Benchmarks }}
    b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
 -    defer gotestruntime.ReleaseOnPanic(b)
+     gotestruntime.SkipIfStopped(b)
      b.StopTimer()
      ƒeachT := gotest.NewTFromTB(b)
-     defer gotestruntime.AfterEach(func() {

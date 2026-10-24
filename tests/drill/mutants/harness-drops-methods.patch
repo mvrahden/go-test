@@ -3,7 +3,7 @@ Expect: got +"beforeAll\\nTestSecond\\nafterAll\\n"
 Judge: ./tests/canary CanaryTestSuite/TestLifecycleRunsInOrder
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -63,7 +63,10 @@
+@@ -70,7 +70,10 @@
  		}
  		return ""
  	}

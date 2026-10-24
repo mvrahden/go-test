@@ -32,9 +32,9 @@ func takeEnv(key string) string {
 // that is gone means the CLI crashed and nobody is left to announce a stop.
 var parentPID = os.Getppid()
 
-// The watcher runs while a hold does: the first hold starts it, the hold
-// that ends last stops it, so it leaves no goroutine and no signal handler
-// behind between holds.
+// The watcher runs while a suite does: the first suite or hold starts it, the
+// one that ends last stops it, so it leaves no goroutine and no signal handler
+// behind between them.
 var (
 	watchMu  sync.Mutex
 	watching int
@@ -57,6 +57,14 @@ func stopWatch() {
 	if watching == 0 {
 		active.close()
 		active = nil
+		// Under plain go test nothing else marks the run interrupted: once the
+		// stopped suite has torn down, the process ends by the signal, and the
+		// suites after it never run. Under the runner the process ends with the
+		// tests' own status, having reported every verdict, and the runner
+		// reports the stop.
+		if stopFile == "" && stopping.Load() {
+			reraise(stoppedBy())
+		}
 	}
 }
 
@@ -71,6 +79,7 @@ func stopWatch() {
 // stays ignored.
 type watcher struct {
 	stderr io.Writer
+	file   string // the runner's stop file; empty under plain go test
 	sigs   []os.Signal
 	ch     chan os.Signal
 	quit   chan struct{}
@@ -79,9 +88,9 @@ type watcher struct {
 
 func watch(stderr io.Writer) *watcher {
 	notePipe()
-	w := &watcher{stderr: stderr, ch: make(chan os.Signal, 1), quit: make(chan struct{}), done: make(chan struct{})}
+	w := &watcher{stderr: stderr, file: stopFile, ch: make(chan os.Signal, 1), quit: make(chan struct{}), done: make(chan struct{})}
 	candidates := []os.Signal{os.Interrupt}
-	if stopFile != "" {
+	if w.file != "" {
 		candidates = append(candidates, stopSignals...)
 	}
 	for _, s := range candidates {
@@ -106,7 +115,7 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
-				w.stop(sig) // does not return
+				w.stop(sig) // returns once the run has stopped, or ends the process
 			}
 		}
 	}
@@ -119,32 +128,123 @@ func (w *watcher) counts(sig os.Signal) bool {
 	if runstate.FuzzTarget() != "" && runstate.FuzzEngine() {
 		return false
 	}
-	if stopFile == "" {
+	if w.file == "" {
 		return sig == os.Interrupt
 	}
-	if _, err := os.Stat(stopFile); err == nil {
+	if _, err := os.Stat(w.file); err == nil {
 		return true
 	}
 	return os.Getppid() != parentPID
 }
 
-// stop releases the held fixtures and ends the process by sig. The tests and
-// the setups in flight are told first — their contexts derive from the stop —
-// so work that honours its context lets go of what teardown needs. A hold
-// already tearing down in its cleanup is waited for, not repeated.
+// stopGrace is how long a stop waits for a running method body to return once
+// its context has ended. A method still running then ignores its context, and
+// nothing but ending the process can stop it.
+const stopGrace = 5 * time.Second
+
+// stop tells the run to stop and lets it finish on its own: the tests and the
+// setups in flight see their contexts end, the methods not yet started are
+// skipped, AfterAll runs, and the hold's cleanup releases the fixtures. A
+// body or BeforeAll still running stopGrace after the stop, or after its own
+// start when that came later, a second stop signal, or a run still going when
+// only the fixtures' teardown time is left of the release bound, forces it:
+// the fixtures are torn down within what is left of the bound and the process
+// ends by sig. Once the stop is settled or forced, the handlers are reset, so
+// the next signal has its default action.
 func (w *watcher) stop(sig os.Signal) {
+	releaseEnd, settled := w.settle(sig, stopGrace)
 	signal.Reset(w.sigs...)
-	stopping.Store(true)
-	runstate.Stop()
-	deadline := time.Now().Add(releaseBound())
-	if !waitSetups(deadline) {
-		fmt.Fprintln(w.stderr, "gotest: fixture setup still running at the stop; what it brings up may be left behind")
+	if settled {
+		return
 	}
-	if !releaseWithin(deadline) {
-		fmt.Fprintf(w.stderr, "gotest: fixture teardown did not finish within %s; what it holds may be left behind\n", releaseBound())
-	}
+	w.force(sig, releaseEnd)
+}
+
+// force tears the held fixtures down, until releaseEnd, and ends the process
+// by sig.
+func (w *watcher) force(sig os.Signal, releaseEnd time.Time) {
+	w.release(releaseEnd)
 	reraise(sig)
 }
+
+// release tears the held fixtures down, until releaseEnd, and says so when
+// that does not finish, naming the time the release got.
+func (w *watcher) release(releaseEnd time.Time) (finished bool) {
+	got := time.Until(releaseEnd)
+	if finished = releaseWithin(releaseEnd); !finished {
+		fmt.Fprintf(w.stderr, "gotest: fixture teardown did not finish within %s; what it holds may be left behind\n", got.Round(100*time.Millisecond))
+	}
+	return finished
+}
+
+// settle stops the run and waits for it to finish on its own, as [watcher.stop]
+// describes. It reports whether the run finished, and until when a forced
+// release may run.
+func (w *watcher) settle(sig os.Signal, grace time.Duration) (releaseEnd time.Time, settled bool) {
+	stoppedSig.Store(sig)
+	stopping.Store(true)
+	runstate.Stop()
+	stopAt := time.Now()
+	releaseEnd = stopAt.Add(releaseBound())
+	// The fixtures' teardown keeps its share of the bound for a forced release.
+	runEnd := releaseEnd.Add(-releaseReserve())
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		now := time.Now()
+		if kind := runstate.Overdue(stopAt, grace, now, settleExcept); kind != "" {
+			fmt.Fprintf(w.stderr, "gotest: %s did not return within %s of its context ending; it is cut short, the fixtures are torn down and the process ends by the signal\n", kind, grace)
+			return releaseEnd, false
+		}
+		if finished() {
+			return releaseEnd, true
+		}
+		if now.After(runEnd) {
+			fmt.Fprintln(w.stderr, "gotest: the run did not stop within its budget; the fixtures are torn down and the process ends by the signal")
+			return releaseEnd, false
+		}
+		select {
+		case again := <-w.ch:
+			if w.counts(again) {
+				fmt.Fprintln(w.stderr, "gotest: a second stop signal; the fixtures are torn down now and the process ends by the signal")
+				return releaseEnd, false
+			}
+		case <-tick.C:
+		}
+	}
+}
+
+// settleExcept is a test whose own body and suite a stop does not wait for:
+// set only by tests that stop the run from inside it.
+var settleExcept any
+
+// finished reports whether the stopped run has ended on its own: no body,
+// setup, hold or suite is left.
+func finished() bool {
+	if runstate.Bodies(settleExcept) > 0 {
+		return false
+	}
+	setupMu.Lock()
+	setups := setupInFlight
+	setupMu.Unlock()
+	heldMu.Lock()
+	holds := len(held)
+	heldMu.Unlock()
+	return setups == 0 && holds == 0 && openSuites.Load() == 0
+}
+
+// stoppedSig is the signal the stop came by, for the process to end by.
+var stoppedSig atomic.Value // os.Signal
+
+func stoppedBy() os.Signal {
+	if sig, ok := stoppedSig.Load().(os.Signal); ok {
+		return sig
+	}
+	return os.Interrupt
+}
+
+// openSuites counts the suites opened and not yet torn down.
+var openSuites atomic.Int64
 
 // close stops the watcher.
 func (w *watcher) close() {
@@ -202,28 +302,33 @@ func beginSetup(ctx context.Context) (context.Context, func(), error) {
 	}, nil
 }
 
-// waitSetups waits for setups in flight, until deadline.
-func waitSetups(deadline time.Time) bool {
-	for {
-		setupMu.Lock()
-		n := setupInFlight
-		setupMu.Unlock()
-		if n == 0 {
-			return true
-		}
-		if time.Now().After(deadline) {
-			return false
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-}
-
 // The teardown budget this process advertised to the runner: the longest
 // fixture path plus suite setup plus headroom, over every DAG it set up.
 var (
 	budgetMu  sync.Mutex
 	maxBudget time.Duration
+	// maxReserve is the longest fixture teardown path among them.
+	maxReserve time.Duration
 )
+
+// recordReserve records d, a DAG's longest teardown path.
+func recordReserve(d time.Duration) {
+	budgetMu.Lock()
+	defer budgetMu.Unlock()
+	if d > maxReserve {
+		maxReserve = d
+	}
+}
+
+// releaseReserve is the part of the release bound a forced release keeps
+// for the fixtures' teardown, never more than the bound.
+func releaseReserve() time.Duration {
+	bound := releaseBound()
+	budgetMu.Lock()
+	r := maxReserve
+	budgetMu.Unlock()
+	return min(r, bound)
+}
 
 func recordBudget(d time.Duration) time.Duration {
 	budgetMu.Lock()

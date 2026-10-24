@@ -1,12 +1,12 @@
 # Lifecycle Specification
 
 ## Purpose
-How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts and a panic ahead of AfterEach included, and what the run reports about them when they do.
+How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, an async method's wait for done and a panic ahead of AfterEach included, and what the run reports about them when they do.
 
 ## Requirements
 
 ### Requirement: A hook or body going wrong
-A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, located at that hook, and SHALL run the later hooks that release what ran, a fixture's AfterEach only after its BeforeEach returned: after an overrun only AfterEach hooks, after a panic in a method no further method. An async method's budget ends at done(), before its AfterEach. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
+A suite hook, a fixture's per-method hook or the body that fails, panics or overruns the Timeout SHALL fail the run and its method or suite, located at that hook, and SHALL run the later hooks that release what ran, a fixture's AfterEach only after its BeforeEach returned: after an overrun only AfterEach hooks, after a panic in a method no further method. The cases are the tables in `tests/conformance/lifecycle/hooks_suite_test.go`.
 
 #### Scenario: Each hook and each way it goes wrong
 - **WHEN** a suite hook or the body fails an assertion, panics or overruns the Timeout
@@ -111,6 +111,37 @@ A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived fr
 - **WHEN** a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll
 - **THEN** fails the suite with a verdict naming the wait and its SetupTimeout
 
+### Requirement: Async methods
+An async method SHALL wait for done until done is called, the run is stopped, a declared Timeout passes or, once it failed or a goroutine gotest.Go started for it panicked, nothing holds done and no goroutine it or its BeforeEach started is left; without a Timeout a failed wait SHALL end with its context. A stop SHALL skip it as run stopping unless it failed; AfterEach SHALL be held to the rest of the Timeout. The cases are the tables in `tests/conformance/lifecycle/async_suite_test.go`.
+
+#### Scenario: The owner of done fails
+- **WHEN** the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left
+- **THEN** fails the method at once, not at the end of its budget
+
+#### Scenario: Another goroutine fails
+- **WHEN** a goroutine of an async method other than the one that owns done fails a fatal assertion
+- **THEN** fails the method, and the wait ends only when the owner calls done, fails or outlasts the Timeout
+
+#### Scenario: A panic on a goroutine gotest.Go started
+- **WHEN** a goroutine gotest.Go started panics while an async method waits for done
+- **THEN** ends the wait at once, runs AfterEach and reports the panic with the stack from where it happened
+
+#### Scenario: A parallel sibling's goroutine
+- **WHEN** the owner of a parallel async method's done fails while a goroutine of its sibling's, whose creators ended, runs on
+- **THEN** ends the failed method's wait without waiting for the sibling's goroutine
+
+#### Scenario: A stop during the wait
+- **WHEN** the run is stopped while an async method waits for done
+- **THEN** ends the wait at the stop and skips the method with the reason run stopping, then runs AfterEach and AfterAll
+
+#### Scenario: A stop during the wait after a failure
+- **WHEN** the run is stopped while an async method waits for done after another of its goroutines failed
+- **THEN** ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method
+
+#### Scenario: AfterEach overruns
+- **WHEN** an async method calls done in time and its AfterEach overruns the declared Timeout
+- **THEN** fails the method for the overrun
+
 ### Requirement: A panic ahead of a failing AfterEach
 A panic in a test method or its BeforeEach SHALL be reported and fail the test even when AfterEach then fails a fatal assertion, and AfterEach SHALL still run.
 
@@ -138,3 +169,60 @@ An expired --timeout SHALL name the test method that was running, and the suite 
 #### Scenario: A hook that hangs
 - **WHEN** one suite hangs in its BeforeAll and another in a test method until --timeout
 - **THEN** names the first suite itself and the second suite's method
+
+### Requirement: The grace a stopped method gets
+When a run is stopped, a method body or a suite's BeforeAll that has not returned 5s after its context ended, counted from its own start when it began after the stop, SHALL be cut short with a message saying so, its fixture released and its AfterAll not run; the 5s SHALL bound only the body and BeforeAll, and the stop SHALL NOT end AfterEach's context, so an AfterEach SHALL run to its end, followed by AfterAll and the fixture release.
+
+#### Scenario: A body that ignores its context
+- **WHEN** the run is stopped and a method body ignores its context
+- **THEN** cuts the body short after 5s, saying so
+- **AND** releases the fixture without running AfterAll
+
+#### Scenario: A body that starts after the stop
+- **WHEN** the run is stopped while a method's BeforeEach runs and its body then ignores its context
+- **THEN** cuts the body short 5s after it began, saying so
+
+#### Scenario: A BeforeAll that ignores its context
+- **WHEN** the run is stopped while a suite's BeforeAll ignores its context
+- **THEN** cuts BeforeAll short after 5s, saying so, and releases the fixture without running AfterAll
+
+#### Scenario: A slow AfterEach
+- **WHEN** the run is stopped and a method's AfterEach outlasts the 5s grace its body gets
+- **THEN** runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body
+
+#### Scenario: An AfterEach that waits on its context
+- **WHEN** the run is stopped and a method's AfterEach waits on its context
+- **THEN** leaves that context alone, so AfterEach runs to its end before AfterAll and the release
+
+### Requirement: A forced stop
+A stopped run still going when only its fixtures' teardown time is left of the release bound SHALL be forced, saying so, and the fixture teardown SHALL still get that time; a second stop signal reaching the suite SHALL force the stop at once, saying so, releasing the fixtures before the process ends by the signal.
+
+#### Scenario: A run that outlasts its release bound
+- **WHEN** the run is stopped and an AfterEach ignores its context until only the fixtures' teardown time is left of the release bound
+- **THEN** forces the stop, saying so, and runs the fixture teardown to its end
+
+#### Scenario: A second stop signal
+- **WHEN** a second stop signal reaches the suite while a stopped method body ignores its context
+- **THEN** releases the fixture at once, saying so, and the process ends by the signal
+
+### Requirement: Stopping benchmarks and fuzz seeds
+A run stopped while a benchmark or a fuzz seed runs SHALL skip the benchmarks or seeds not started with the reason run stopping and run AfterAll before the fixture is released; a benchmark that ignores the stop SHALL be cut short after 5s, saying so, and its fixture released.
+
+#### Scenario: Stopped during a benchmark
+- **WHEN** the run is stopped while a benchmark runs
+- **THEN** skips the benchmarks not started with the reason run stopping, then runs AfterAll before the fixture is released
+- **AND** cuts a benchmark that ignores the stop short after 5s, saying so, and releases the fixture
+
+#### Scenario: Stopped during a fuzz seed
+- **WHEN** the run is stopped while a fuzz seed replays
+- **THEN** skips the seeds not started with the reason run stopping, then runs AfterAll before the fixture is released
+
+### Requirement: Stopping a run
+A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status; under plain go test it ends by the signal.
+
+#### Scenario: Interrupted while a method holds
+- **WHEN** the run is interrupted while a method holds
+- **THEN** exits 130 when gotest runs directly
+- **AND** ends the holding method's context
+- **AND** skips the methods that have not started with the reason run stopping
+- **AND** runs AfterAll before the fixture is released

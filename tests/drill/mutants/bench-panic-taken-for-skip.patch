@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAPanickingBenchmarkStillTearsDown
 Clause: when a benchmark panics → fails the run
 --- a/pkg/gotestruntime/hold.go
 +++ b/pkg/gotestruntime/hold.go
-@@ -103,8 +103,7 @@
+@@ -111,8 +111,7 @@
  		return
  	}
  	if r := recover(); r != nil {

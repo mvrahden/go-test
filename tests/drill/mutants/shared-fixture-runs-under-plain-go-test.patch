@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestASharedFixtureSuiteRefusesPlainGoTest
 Clause: when a suite binding a shared fixture runs under plain go test → fails naming the shared fixture it binds and go tool gotest, before any method runs
 --- a/pkg/gotestruntime/runtime.go
 +++ b/pkg/gotestruntime/runtime.go
-@@ -420,13 +420,12 @@
+@@ -407,13 +407,12 @@
  	var sharedState map[string]json.RawMessage
  	if shared := sharedNode(cfg.Fixtures); shared != nil {
  		path := os.Getenv(protocol.EnvSharedStateFile)

@@ -138,6 +138,13 @@ func readEvents(log string) []string {
 	return lines
 }
 
+// stopAsTheRunnerDoes stops the process the way the runner stops a suite:
+// the stop file first, then the interrupt.
+func stopAsTheRunnerDoes(t *gotest.T, tree *proctree.Tree, stop string) {
+	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
+	gotest.NoError(t, tree.Interrupt())
+}
+
 // Under the runner an interrupt is a stop request only once the runner
 // announced it; the runner creates the stop file before it interrupts.
 func (s *InterruptTestSuite) TestAnAnnouncedStopReleasesTheFixture(t *gotest.T) {
@@ -146,12 +153,11 @@ func (s *InterruptTestSuite) TestAnAnnouncedStopReleasesTheFixture(t *gotest.T) 
 	cmd.Env = append(ownEnv(), protocol.EnvStopFile+"="+stop)
 	tree, log := startTree(t, cmd)
 
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	gotest.NoError(t, tree.Interrupt())
+	stopAsTheRunnerDoes(t, tree, stop)
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process still ends as stopped from outside: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // An interrupt the runner did not announce came from somewhere else, such as

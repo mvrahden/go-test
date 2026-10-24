@@ -1,6 +1,10 @@
 package gotestgen_test
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 // MethodLoopTestSuite runs generated Test wrappers whose method loop lives in
 // gotestruntime.RunMethods, and checks it keeps the per-method lifecycle.
@@ -62,6 +66,17 @@ func (s *MethodLoopTestSuite) TestAsyncDeadline(t *gotest.T) {
 		// test.go:56 declares TestNeverDoneAsync in the fixture source.
 		gotest.Regexp(it, `(?m)^\s+test\.go:56: TestNeverDoneAsync: done\(\) was not called`, run.output)
 		gotest.NotContains(it, run.output, "methods.go:", run.output)
+	})
+}
+
+func (s *MethodLoopTestSuite) TestAsyncFatalEndsTheWait(t *gotest.T) {
+	run := runGeneratedSuiteArgs(t, "TestLifecycle_MethodLoop", childTimeout, "-test.run=^TestFatalAsyncTestSuite$")
+
+	t.It("fails the method the moment its goroutine failed, well before the budget", func(it *gotest.T) {
+		gotest.False(it, run.passed, run.output)
+		gotest.Contains(it, run.output, "the goroutine that owns done fails")
+		// The run's own time, not the build before it: the budget is 20s.
+		gotest.Less(it, run.elapsed, 10*time.Second)
 	})
 }
 

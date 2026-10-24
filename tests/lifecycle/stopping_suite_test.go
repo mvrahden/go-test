@@ -1,12 +1,12 @@
 package lifecycle_test
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -64,20 +64,19 @@ func (s *StoppingTestSuite) announced(t *gotest.T, pkg, run string, env ...strin
 }
 
 // A stop while a fixture is still coming up cancels it; the fixtures that ran
-// their setup, the cancelled one included, are torn down in order, and
-// nothing is left behind.
+// their setup, the cancelled one included, are torn down in order, nothing is
+// left behind, and the process ends with the failure the cancelled setup is.
 func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) {
 	cmd, stop := s.announced(t, "setup", "TestSlowSetupTestSuite")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "container starting")
 
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	gotest.NoError(t, tree.Interrupt())
+	stopAsTheRunnerDoes(t, tree, stop)
 	err := wait(tree, cmd)
 
 	// The container's setup was cancelled: it ran, so it is released, before
 	// the fixture it depends on.
 	gotest.Equal(t, []string{"db up", "container starting", "container down", "db down"}, readEvents(log))
-	gotest.True(t, stoppedFromOutside(err), "the process still ends as stopped from outside: %v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // A test holding what a fixture's teardown waits for is told to stop first —
@@ -87,13 +86,12 @@ func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
 
 	began := time.Now()
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	gotest.NoError(t, tree.Interrupt())
+	stopAsTheRunnerDoes(t, tree, stop)
 	err := wait(tree, cmd)
 
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 10*time.Second, "the teardown waited for the test")
-	gotest.True(t, stoppedFromOutside(err), "%v", err)
+	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
 // The runner's sidecar variables are read once and taken out of the
@@ -105,4 +103,37 @@ func (s *StoppingTestSuite) TestTheRunnersFilesStayWithTheRunner(t *gotest.T) {
 	out, err := cmd.CombinedOutput()
 	gotest.NoError(t, err, string(out))
 	gotest.Equal(t, []string{"env="}, readEvents(log))
+}
+
+// A method that ignores its context cannot be stopped: the stop waits a grace
+// for it to return, then cuts it short, releasing the fixtures and ending the
+// process by the signal, so the runner books the method as cut short instead
+// of waiting its budget out.
+func (s *StoppingTestSuite) TestAMethodIgnoringItsContextIsCutShort(t *gotest.T) {
+	cmd, stop := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1", "STOPPING_IGNORE_CONTEXT=1")
+	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
+	began := time.Now()
+	stopAsTheRunnerDoes(t, tree, stop)
+	err := waitWithin(t, tree, cmd, 20*time.Second)
+	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
+	gotest.Less(t, time.Since(began), 15*time.Second, "the stop waited for the method")
+	gotest.False(t, endedOnItsOwn(err), "the process ends by the signal, its method cut short: %v", err)
+}
+
+// waitWithin waits for cmd, killing its tree when d passes first so nothing
+// outlives the test.
+func waitWithin(t *gotest.T, tree *proctree.Tree, cmd *exec.Cmd, d time.Duration) error {
+	exited := make(chan error, 1)
+	go func() { exited <- cmd.Wait() }()
+	select {
+	case err := <-exited:
+		tree.Release()
+		return err
+	case <-time.After(d):
+		_ = tree.Kill()
+		err := <-exited
+		tree.Release()
+		gotest.Fail(t, "the process was still running %s after the stop: %v", d, err) //nolint:fail-guard // the tree is killed before the test fails
+		return err
+	}
 }

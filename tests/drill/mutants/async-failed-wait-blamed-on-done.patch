@@ -1,0 +1,14 @@
+Expect: asynchelper: TestHelperFailsTestSuite/TestOwnerHangsAsync.s output lacks "TestOwnerHangsAsync failed, and its wait for done\(\) lasted until the test deadline
+Judge: ./tests/canary CanaryTestSuite/TestAnotherGoroutinesFailureLeavesTheWaitToTheOwner
+Clause: when a goroutine of an async method other than the one that owns done fails a fatal assertion → fails the method, and the wait ends only when the owner calls done, fails or outlasts the Timeout
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -222,7 +222,7 @@
+ 			if runstate.StopContext().Err() != nil {
+ 				skipStopping(t.T()) // the stop ended the context, not the deadline
+ 			}
+-			if left != "" {
++			if false && left != "" {
+ 				reportAt(t.T(), callsite.Declared(at), name+" failed, and its wait for done() lasted until the test deadline: "+left)
+ 			} else {
+ 				reportAt(t.T(), callsite.Declared(at), name+": done() was not called before the test deadline")

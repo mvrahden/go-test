@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a fixture's BeforeEach overruns the Timeout ahead of another fixture's → starts no later fixture's BeforeEach, fails the method once, at the hook that overran, and runs that fixture's AfterEach
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -87,10 +87,6 @@
+@@ -97,10 +97,6 @@
  			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
  			defer end()
  			for _, f := range m.Fixtures {

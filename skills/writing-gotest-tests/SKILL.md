@@ -109,7 +109,7 @@ those are your job, below.
    out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
    prefixes focus/exclude. A `Test*Async` method takes a trailing
    `done func()` and completes when it is called, not when it returns
-   (the suite's `Timeout` fails it if never); prefer `Eventually` for
+   (a declared `Timeout` fails it if never); prefer `Eventually` for
    anything that can be polled. A generic suite runs only through one
    type alias per concrete type
    (`type ArticleIndexTestSuite = IndexContractTestSuite[Article]`);

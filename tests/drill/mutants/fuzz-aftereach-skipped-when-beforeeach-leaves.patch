@@ -6,9 +6,9 @@ Clause: when a fuzz execution's BeforeEach panics → the execution fails and it
 Clause: when a fuzz execution's BeforeEach skips → the execution skips, its body never runs and its AfterEach still runs
 --- a/pkg/gotest/f.go
 +++ b/pkg/gotest/f.go
-@@ -120,16 +120,11 @@
- // afterEach, which a fatal assertion there would otherwise discard.
- func (f *F) each(t *testing.T, body func(*T)) {
+@@ -126,17 +126,12 @@
+ 		t.SkipNow()
+ 	}
  	tt := NewT(t)
 -	if f.afterEach != nil {
 -		defer func() {
@@ -20,9 +20,10 @@ Clause: when a fuzz execution's BeforeEach skips → the execution skips, its bo
 -	}
  	if f.beforeEach != nil {
  		f.beforeEach(tt)
-+	}
+ 	}
 +	if f.afterEach != nil {
 +		defer f.afterEach(tt)
- 	}
++	}
+ 	defer runstate.EnterBody(t, "a fuzz execution")()
  	body(tt)
  }

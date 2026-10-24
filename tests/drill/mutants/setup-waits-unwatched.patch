@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestTheWaitOnSetupGoroutinesIsHeldToTheSet
 Clause: when a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll → fails the suite with a verdict naming the wait and its SetupTimeout
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -94,9 +94,7 @@
+@@ -108,9 +108,7 @@
  	if set == nil {
  		return
  	}

@@ -1,0 +1,15 @@
+Expect: stopgrace: markers .*, want AfterEach to its end under a context the stop left alone
+Judge: ./tests/canary CanaryTestSuite/TestAContextAwareAfterEachRunsToItsEndAfterAStop
+Clause: when the run is stopped and a method's AfterEach waits on its context → leaves that context alone, so AfterEach runs to its end before AfterAll and the release
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -145,6 +145,9 @@
+ // declared Timeout it ends as the method's own context does, once the budget
+ // watch has judged an overrun.
+ func AfterEachT(t *gotest.T) *gotest.T {
++	if true {
++		return t
++	}
+ 	if after, ok := afterTs.Load(t); ok {
+ 		return after.(*gotest.T)
+ 	}

@@ -117,8 +117,14 @@ func (f *F) flushSeeds(explode func(seed []any) ([]any, error)) {
 // interposed per execution, not once for the whole fuzz target. The defer
 // comes first: a beforeEach that fails, skips or panics still gets its
 // afterEach, as a test method's hooks pair. A panic is re-raised after
-// afterEach, which a fatal assertion there would otherwise discard.
+// afterEach, which a fatal assertion there would otherwise discard. Once
+// the run is stopped, an execution that has not started is skipped with the
+// reason "run stopping", and one running gets the stop's grace.
 func (f *F) each(t *testing.T, body func(*T)) {
+	if runstate.StopContext().Err() != nil {
+		fmt.Fprintln(t.Output(), "run stopping")
+		t.SkipNow()
+	}
 	tt := NewT(t)
 	if f.afterEach != nil {
 		defer func() {
@@ -131,6 +137,7 @@ func (f *F) each(t *testing.T, body func(*T)) {
 	if f.beforeEach != nil {
 		f.beforeEach(tt)
 	}
+	defer runstate.EnterBody(t, "a fuzz execution")()
 	body(tt)
 }
 

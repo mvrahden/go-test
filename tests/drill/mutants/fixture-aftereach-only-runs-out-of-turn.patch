@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAnAfterEachOnlyFixtureRunsWhenItsTurnC
 Clause: when a fixture with only an AfterEach comes after a fixture whose BeforeEach fails → does not run its AfterEach, as its turn never came
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -87,6 +87,14 @@
+@@ -97,6 +97,14 @@
  			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
  			defer end()
  			for _, f := range m.Fixtures {

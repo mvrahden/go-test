@@ -15,6 +15,12 @@ func (s *HoldingTestSuite) TestHolds(t *gotest.T) {
 	if !on("STOPPING_HOLD") {
 		return
 	}
+	if on("STOPPING_IGNORE_CONTEXT") {
+		// A method that never looks at its context cannot be stopped.
+		logLine("running")
+		time.Sleep(time.Minute)
+		return
+	}
 	s.Pool.Acquire()
 	defer s.Pool.Release()
 	logLine("running")
@@ -23,3 +29,8 @@ func (s *HoldingTestSuite) TestHolds(t *gotest.T) {
 	case <-time.After(time.Minute):
 	}
 }
+
+// LaterTestSuite is declared after HoldingTestSuite, so it would run next.
+type LaterTestSuite struct{}
+
+func (s *LaterTestSuite) TestLater(t *gotest.T) { logLine("later ran") }

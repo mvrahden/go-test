@@ -285,6 +285,8 @@ Hooks accept either `*gotest.T` or `*testing.T`.
 
 A per-method fixture hook that fails is the method's failure, located where the hook produced it ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
 
+A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through its context and the suite through its teardown; a method body or `BeforeAll` that has not returned five seconds after its context ended is cut short, the fixtures torn down and the process ended by the signal; the five seconds bound only the body and `BeforeAll`, so a slow `AfterEach` runs to its end and `AfterAll` after it (see fixtures.md, Execution Model, [Stopping a run](../../specs/lifecycle/spec.md#requirement-stopping-a-run) and [The grace a stopped method gets](../../specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)).
+
 #### Context Consistency Rules
 
 When `BeforeEach` returns a value, the following rules are enforced at generation time:
@@ -326,10 +328,10 @@ func (s *Suite) TestDeliveryAsync(t *gotest.T, done func()) {
 }
 ```
 
-The generated code waits for `done()` or the test deadline, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`, the full path under `-fullpath`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest. It is the only verdict: once the method's body returns it is waiting for `done()`, not running, so a declared `Timeout` never also reports it as still running.
-An async method's budget ends when `done()` is called; its `AfterEach`, its own and the fixtures', is not budgeted.
+The generated code waits for `done()` or the deadline of a declared `Timeout`, whichever comes first (with the deadline failing the test); calling `done()` more than once is safe. The deadline's failure, `<Method>: done() was not called before the test deadline`, is located at the method's declaration (`file.go:line`, the full path under `-fullpath`): the method has returned by then, so no line of the user's is running, and the editor links the method rather than a file inside gotest. It is the only verdict: once the method's body returns it is waiting for `done()`, not running, so a declared `Timeout` never also reports it as still running.
+The wait for `done` ends when `done` is called, the run is stopped (skipping the method with the reason `run stopping` unless it failed) or the `Timeout` passes, and once the method failed, or a goroutine `gotest.Go` started for it panicked, when nothing holds `done` any more and no goroutine the method or its `BeforeEach` started is left: the goroutine the method runs on carries a profiler label that every goroutine it starts inherits, which tells the method's goroutines from its parallel siblings'; a `time.AfterFunc` callback, a pool job or a handler carries none, and keeps the wait only while it holds `done`. A failed wait that lasts on ends at the `Timeout` with `<Method> failed, and its wait for done() lasted until the test deadline: <what was left>`, or, without one, when the method's context ends. `AfterEach`, its own and the fixtures', is held to what is left of the `Timeout` ([Async methods](../../specs/lifecycle/spec.md#requirement-async-methods)).
 With a returning `BeforeEach`, `done` comes last: `(t, ctx, done)`.
-With `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline (a zero `Timeout` gets the 30s default).
+Without a declared `Timeout`, or with `Timeout: gotest.NoDeadline`, a never-called `done()` waits until an outer bound fires — give async suites a deadline: the 30s default a zero `Timeout` gets bounds the method's context, and with it the wait only once the method failed.
 For polling-style asynchrony, prefer `Eventually`.
 
 ### Focus and Exclude

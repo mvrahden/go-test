@@ -11,10 +11,10 @@ Judge: ./tests/canary CanaryTestSuite/TestEveryBenchmarkReportsAResult
 +{{ range $i, $bm := $ts.Benchmarks }}{{ if ne $i 0 }}
    b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
      defer gotestruntime.ReleaseOnPanic(b)
-     b.StopTimer()
-@@ -17,7 +17,7 @@
+     gotestruntime.SkipIfStopped(b)
+@@ -18,7 +18,7 @@
      b.ResetTimer()
-     s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }})
+     gotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }}) })
    })
 -{{ end }}
 +{{ end }}{{ end }}

@@ -1,0 +1,14 @@
+Expect: stopgrace: TestAsyncHoldTestSuite/TestWaitsAsync verdict "[a-z]*", want skip with the reason run stopping
+Judge: ./tests/canary CanaryTestSuite/TestAStopEndsAnAsyncWait
+Clause: when the run is stopped while an async method waits for done → ends the wait at the stop and skips the method with the reason run stopping, then runs AfterEach and AfterAll
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -195,7 +195,7 @@
+ 		select {
+ 		case <-done:
+ 			return
+-		case <-runstate.StopContext().Done():
++		case <-make(chan struct{}):
+ 			if called(done) {
+ 				return
+ 			}

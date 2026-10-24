@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lifecycle .* / exits 130 when gotest runs directly \(
+Expect: stop: exit code [0-9-]+, want 130
+Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted
+Clause: when the run is interrupted while a method holds → exits 130 when gotest runs directly
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -656,7 +656,7 @@
+ // applyDeadlineFailure to fail.
+ func exitCodeAfterDispatch(worst int, dispatchErr error) int {
+ 	if errors.Is(dispatchErr, context.Canceled) {
+-		return 130
++		return worst
+ 	}
+ 	return worst
+ }

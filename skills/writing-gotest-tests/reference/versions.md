@@ -421,3 +421,30 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     ([hydrate](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-failed-hydrate-is-dehydrated)):
     `Dehydrate` runs after a `Hydrate` that failed or panicked. To migrate,
     guard in `Dehydrate` what `Hydrate` may not have set.
+18. **A stop lets the suite finish**
+    ([stop](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-a-run)):
+    on Ctrl-C or `--timeout` the methods not yet started are skipped with
+    the reason `run stopping`, `AfterAll` runs, then the fixtures are
+    released. A method body or `BeforeAll` that ignores its context is cut
+    short after 5s, without `AfterAll`; the 5s bound only those, so a slow
+    `AfterEach` runs to its end
+    ([grace](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)).
+    `AfterEach`'s context does not end at the stop; benchmarks and fuzz
+    seeds not started are skipped too; a second stop signal releases the
+    fixtures at once. Below v1.34 a stop released the fixtures and ended
+    the process at once, without `AfterAll`, and only while fixtures were
+    held. To migrate a `goleak.VerifyNone` inside a suite method, which now
+    sees the stop watcher, pass it
+    `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).loop")`.
+19. **An async method's wait ends on a failed owner, a stop or a declared
+    `Timeout`**
+    ([async](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-async-methods)):
+    a failure, or a panic on a goroutine `gotest.Go` started, ends the wait
+    once nothing holds `done` and no goroutine the method or its
+    `BeforeEach` started is left, or at the `Timeout`, or without one when
+    the method's context ends; a stop skips a waiting method as `run stopping` unless
+    it failed; `AfterEach` is held to what is left of the `Timeout`. Below
+    v1.34 a failure never ended the wait, a stop failed the method for a
+    missed `done()`, `AfterEach` was not budgeted, and the 30s default
+    failed a wait in a suite that declared no `Timeout`. To migrate, declare
+    a `Timeout` on async suites that relied on that default.
