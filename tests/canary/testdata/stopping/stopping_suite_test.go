@@ -1,6 +1,10 @@
 package stopping
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 // StopTestSuite holds in its first method; the two after it never start when
 // the run is stopped meanwhile.
@@ -15,6 +19,9 @@ func (s *StopTestSuite) TestHolds(t *gotest.T) {
 	mark("running")
 	<-t.Context().Done()
 	mark("context ended")
+	// AfterAll waits for this return; a release the stop began early is
+	// marked before it, every time.
+	time.Sleep(500 * time.Millisecond)
 }
 
 func (s *StopTestSuite) TestSecond(t *gotest.T) { mark("second") }
