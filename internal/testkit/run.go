@@ -143,10 +143,10 @@ func runBinary(ctx context.Context, binary string, grace time.Duration, dir, mar
 	run := Run{}
 	var held error
 	err = tree.Start()
+	started := err == nil
 	_, _ = outW.Close(), errW.Close()
-	if err == nil {
+	if started {
 		err = cmd.Wait()
-		tree.Release()
 	}
 	go func() { copying.Wait(); close(copied) }()
 	select {
@@ -154,6 +154,10 @@ func runBinary(ctx context.Context, binary string, grace time.Duration, dir, mar
 	case <-time.After(grace):
 		// The CLI exited; a process it left behind holds its output.
 		held = fmt.Errorf("run gotest %s: its output was still held open %s after it exited", strings.Join(args, " "), grace)
+	}
+	// Released only once the hold was judged: the release kills what the CLI left.
+	if started {
+		tree.Release()
 	}
 	_, _ = outR.Close(), errR.Close()
 	<-copied

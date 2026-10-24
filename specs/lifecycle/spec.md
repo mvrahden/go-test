@@ -267,4 +267,5 @@ A run stopped while a test has a process of its own running SHALL end that proce
 #### Scenario: A process a test started
 - **WHEN** the run is interrupted while a holding method has started a process of its own
 - **THEN** ends that process before gotest exits
+- **AND** interrupts it before killing it
 - **AND** runs AfterAll before the fixture is released

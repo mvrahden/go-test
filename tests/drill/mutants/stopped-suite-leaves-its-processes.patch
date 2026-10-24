@@ -1,5 +1,7 @@
 Expect: ^FAIL .*conformance/lifecycle Stop .* / ends that process before gotest exits \(
+Expect: ^FAIL .*conformance/lifecycle Stop .* / interrupts it before killing it \(
 Clause: when the run is interrupted while a holding method has started a process of its own → ends that process before gotest exits
+Clause: when the run is interrupted while a holding method has started a process of its own → interrupts it before killing it
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go
 @@ -250,7 +250,7 @@
@@ -11,3 +13,14 @@ Clause: when the run is interrupted while a holding method has started a process
  					return nil
  				}
  			}
+--- a/internal/proctree/tree_unix.go
++++ b/internal/proctree/tree_unix.go
+@@ -33,7 +33,7 @@
+ // release kills whatever the root left running in its group: the group's id
+ // stays its own while any member lives, so a signal to it after the root was
+ // reaped reaches no stranger.
+-func (sysTree) release(pid int) { _ = signalGroup(pid, syscall.SIGKILL) }
++func (sysTree) release(pid int) {}
+ 
+ // alive reports whether any process of the group led by pid is left. The
+ // group's id is not reused while it has a member, so probing it after the

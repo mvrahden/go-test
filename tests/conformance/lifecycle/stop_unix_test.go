@@ -42,6 +42,9 @@ func (s *StopTestSuite) TestAStopEndsWhatATestStarted(t *gotest.T) {
 		w.It("ends that process before gotest exits", func(it *gotest.T) {
 			gotest.True(it, gone, "the process the test started outlived the run")
 		})
+		w.It("interrupts it before killing it", func(it *gotest.T) {
+			gotest.Contains(it, run.Markers, "child interrupted")
+		})
 		w.It("runs AfterAll before the fixture is released", func(it *gotest.T) {
 			gotest.True(it, run.MarkerOrder("context ended", "suite.AfterAll", "fixture.AfterAll"), "markers: %v", run.Markers)
 		})

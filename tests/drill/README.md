@@ -474,7 +474,7 @@ shards of one run do not add up to every mutant exactly once.
 | `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | shared fixture shutdown suite: the setup process outlives the CLI |
 | `second-signal-kills-the-shared-fixture` | the CLI's second signal kills a tree without a stop file instead of asking it to tear down | runner unit suite: the tree without a stop file never tears down |
 | `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
-| `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running | lifecycle conformance: a process the test started outlives the run |
+| `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
 | `stop-kills-the-suite` | the runner stops a suite by its pid with SIGKILL | lifecycle conformance: AfterAll never runs before the fixture's release |
 | `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle conformance: the stopped run's stream has no failed package |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
