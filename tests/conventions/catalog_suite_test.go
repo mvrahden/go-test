@@ -3,6 +3,7 @@ package conventions_test
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -15,6 +16,12 @@ import (
 type CatalogTestSuite struct {
 	root string
 	js   []byte
+}
+
+func (s *CatalogTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// Setup builds the CLI and runs it: just over 30s on a cold Windows
+	// runner, so twice that.
+	return gotest.SuiteConfig{SetupTimeout: time.Minute}
 }
 
 func (s *CatalogTestSuite) BeforeAll(t *gotest.T) {
