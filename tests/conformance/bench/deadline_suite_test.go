@@ -2,6 +2,7 @@ package bench_test
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -13,8 +14,8 @@ import (
 type BenchDeadlineTestSuite struct{}
 
 func (s *BenchDeadlineTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~66s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 3 * time.Minute}
 }
 
 func (s *BenchDeadlineTestSuite) TestAHungBenchmark(t *gotest.T) {

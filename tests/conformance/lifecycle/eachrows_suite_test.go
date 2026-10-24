@@ -11,8 +11,7 @@ import (
 type EachRowsTestSuite struct{}
 
 func (s *EachRowsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *EachRowsTestSuite) TestRowsAreSubtests(t *gotest.T) {

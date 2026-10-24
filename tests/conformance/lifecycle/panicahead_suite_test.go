@@ -10,8 +10,7 @@ import (
 type PanicAheadTestSuite struct{}
 
 func (s *PanicAheadTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *PanicAheadTestSuite) TestPanicAheadOfAFailingAfterEach(t *gotest.T) {

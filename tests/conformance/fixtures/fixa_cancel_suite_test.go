@@ -19,8 +19,8 @@ type FixtureCancelTestSuite struct {
 }
 
 func (s *FixtureCancelTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~47s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, SetupTimeout: 2 * time.Minute}
 }
 
 func (s *FixtureCancelTestSuite) BeforeAll(t *gotest.T) {

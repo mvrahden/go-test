@@ -3,6 +3,7 @@ package assertions_test
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,8 +14,8 @@ import (
 type FailureLocationsTestSuite struct{}
 
 func (s *FailureLocationsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~86s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
 }
 
 func (s *FailureLocationsTestSuite) TestHelperUnderTrimpath(t *gotest.T) {

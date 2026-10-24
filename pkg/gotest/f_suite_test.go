@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -299,8 +300,8 @@ func FuzzAddAfterFuzz(f *testing.F) {
 type FWrapperTestSuite struct{}
 
 func (s *FWrapperTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~19s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *FWrapperTestSuite) TestAssertionContract(t *gotest.T) {

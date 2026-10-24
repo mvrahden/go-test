@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -24,8 +25,8 @@ func (s *StopFileTestSuite) SuiteGuard() string {
 }
 
 func (s *StopFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~45s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{SetupTimeout: 90 * time.Second}
 }
 
 func (s *StopFileTestSuite) BeforeAll(t *gotest.T) {

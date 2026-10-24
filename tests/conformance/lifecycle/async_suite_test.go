@@ -17,8 +17,8 @@ type AsyncMethodsTestSuite struct {
 }
 
 func (s *AsyncMethodsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~62s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, SetupTimeout: 3 * time.Minute}
 }
 
 func (s *AsyncMethodsTestSuite) BeforeAll(t *gotest.T) {

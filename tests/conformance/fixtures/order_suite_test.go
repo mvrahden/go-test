@@ -12,8 +12,7 @@ import (
 type FixtureOrderTestSuite struct{}
 
 func (s *FixtureOrderTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 // failureLine matches a located failure line of a test's output.

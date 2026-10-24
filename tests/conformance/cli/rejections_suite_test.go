@@ -13,8 +13,7 @@ import (
 type CLIRejectionsTestSuite struct{}
 
 func (s *CLIRejectionsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 type rejectionRow struct {

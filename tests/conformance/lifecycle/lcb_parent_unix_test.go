@@ -33,8 +33,8 @@ type ForeignPidTestSuite struct {
 }
 
 func (s *ForeignPidTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~14s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, SetupTimeout: 30 * time.Second}
 }
 
 func (s *ForeignPidTestSuite) BeforeAll(t *gotest.T) {

@@ -1,6 +1,8 @@
 package lifecycle_test
 
 import (
+	"time"
+
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -10,8 +12,8 @@ import (
 type SuiteHooksTestSuite struct{}
 
 func (s *SuiteHooksTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~21s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *SuiteHooksTestSuite) TestAHookOrBodyGoesWrong(t *gotest.T) {

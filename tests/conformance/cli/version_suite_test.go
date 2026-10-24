@@ -1,6 +1,8 @@
 package cli_test
 
 import (
+	"time"
+
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -9,8 +11,8 @@ import (
 type CLIVersionTestSuite struct{}
 
 func (s *CLIVersionTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~44s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 90 * time.Second}
 }
 
 func (s *CLIVersionTestSuite) TestVersion(t *gotest.T) {

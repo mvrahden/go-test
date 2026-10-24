@@ -23,8 +23,7 @@ type EachFilterTestSuite struct {
 }
 
 func (s *EachFilterTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 // BeforeAll compiles the child once; every test only runs it.

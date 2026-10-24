@@ -1,6 +1,8 @@
 package fixtures_test
 
 import (
+	"time"
+
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -10,8 +12,8 @@ import (
 type FixtureRetryTestSuite struct{}
 
 func (s *FixtureRetryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~68s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
 }
 
 func (s *FixtureRetryTestSuite) TestAFailedReleaseBetweenAttempts(t *gotest.T) {
