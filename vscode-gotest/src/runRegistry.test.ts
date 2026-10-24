@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { RunRegistry } from "./runRegistry.js";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -11,6 +11,10 @@ describe("RunRegistry", () => {
   beforeEach(async () => {
     storageDir = await fs.mkdtemp(path.join(tmpdir(), "gotest-reg-"));
     registry = new RunRegistry(storageDir);
+  });
+
+  afterEach(async () => {
+    await fs.rm(storageDir, { recursive: true, force: true });
   });
 
   it("registers and retrieves a run", () => {

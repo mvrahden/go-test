@@ -1,7 +1,7 @@
 import * as path from "node:path";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 
 vi.mock("vscode", () => {
   class Position {
@@ -48,8 +48,14 @@ import { DiscoveryCache } from "./discovery.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 
 describe("CodeLens on a fuzz method", () => {
+  let dir: string;
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("offers Run beside Fuzz and Debug Seeds, running the target's seeds like a test", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "gotest-lens-"));
+    dir = mkdtempSync(path.join(tmpdir(), "gotest-lens-"));
     const file = path.join(dir, "suite_test.go");
     writeFileSync(file, "package fuzzing\n");
     const cache = new DiscoveryCache();

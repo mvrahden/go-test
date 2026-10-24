@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 
 vi.mock("vscode", () => {
   class TestTag {
@@ -28,7 +28,7 @@ vi.mock("vscode", () => {
 });
 
 import * as path from "node:path";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import {
   parseFuzzProgress,
@@ -121,8 +121,14 @@ describe("isValidGoDuration", () => {
 });
 
 describe("countCrasherEntries", () => {
+  let dir: string;
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
   it("counts files in the wrapper's corpus dir and 0 when absent", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "gotest-fuzz-"));
+    dir = await mkdtemp(path.join(tmpdir(), "gotest-fuzz-"));
     const corpus = path.join(dir, "testdata", "fuzz", "FuzzMySuite_FuzzParse");
     await mkdir(corpus, { recursive: true });
     await writeFile(path.join(corpus, "aa"), "go test fuzz v1\n");

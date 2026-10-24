@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
-import { mkdtemp } from "node:fs/promises";
+import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -459,16 +459,21 @@ describe("filterSupplementaryProfiles", () => {
 
 describe("CoverageStore.clear", () => {
   let CoverageStoreCls: typeof import("./coverageStore.js").CoverageStore;
+  let dir: string;
 
   beforeAll(async () => {
     const mod = await import("./coverageStore.js");
     CoverageStoreCls = mod.CoverageStore;
   });
 
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
   // Clearing memory alone would leave the stored profiles to be restored on
   // the next window activation, which reads as the clear not having worked.
   it("empties the store and does not restore on reload", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "gotest-cov-clear-"));
+    dir = await mkdtemp(path.join(tmpdir(), "gotest-cov-clear-"));
     const store = new CoverageStoreCls({ fsPath: dir } as never);
     store.update(
       "example.com/pkg",

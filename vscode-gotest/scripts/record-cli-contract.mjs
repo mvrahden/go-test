@@ -27,7 +27,13 @@
 // whose patterns match no package. Times and durations are masked.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, readdirSync, mkdtempSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,6 +55,8 @@ const VARIANTS = {
 
 function buildBinary() {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-contract-"));
+  // Removed however the script ends, a failed build included.
+  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
   const bin = path.join(
     dir,
     process.platform === "win32" ? "gotest.exe" : "gotest",

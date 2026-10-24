@@ -16,7 +16,13 @@ import {
   vi,
 } from "vitest";
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdtempSync, chmodSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdtempSync,
+  chmodSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -49,9 +55,11 @@ const stream = (name: string) =>
 let realBinary = "";
 let prebuiltBinary = "";
 let brokenBinary = "";
+let binDir = "";
 
 beforeAll(() => {
   const dir = mkdtempSync(path.join(tmpdir(), "gotest-integration-"));
+  binDir = dir;
 
   // Named as the platform expects an executable to be named: Windows will not
   // spawn a file without the suffix, however valid its contents.
@@ -112,6 +120,10 @@ beforeAll(() => {
     "utf-8",
   );
   chmodSync(brokenBinary, 0o755);
+});
+
+afterAll(() => {
+  if (binDir) rmSync(binDir, { recursive: true, force: true });
 });
 
 beforeEach(() => {
@@ -471,11 +483,12 @@ describe("the Spec View speaks the vocabulary the tree speaks", () => {
   const fixturesDir = path.join(extensionDir, "testdata", "fixtures");
   let savedGoWork: string | undefined;
   let captured = "";
+  let tmp = "";
 
   beforeAll(() => {
     // The same workspace behaviorTree.test.ts discovers: the fixture module
     // resolves gotest through a go.work that spans this checkout.
-    const tmp = mkdtempSync(path.join(tmpdir(), "gotest-spec-vocab-"));
+    tmp = mkdtempSync(path.join(tmpdir(), "gotest-spec-vocab-"));
     const workFile = path.join(tmp, "corpus.work");
     writeFileSync(
       workFile,
@@ -497,6 +510,7 @@ describe("the Spec View speaks the vocabulary the tree speaks", () => {
   afterAll(() => {
     if (savedGoWork === undefined) delete process.env.GOWORK;
     else process.env.GOWORK = savedGoWork;
+    if (tmp) rmSync(tmp, { recursive: true, force: true });
   });
 
   it("labels a context in the replay exactly as the tree labels it", async () => {
