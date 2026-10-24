@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -212,6 +214,68 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 	return env
 }
 
+// startRetryFirst and startRetryLimit bound the retries of a suite process
+// whose executable is busy: 100ms, doubling to 800ms, 1.5s in all.
+const (
+	startRetryFirst = 100 * time.Millisecond
+	startRetryLimit = 800 * time.Millisecond
+)
+
+// startedSuite is a suite process started under its managed process.
+type startedSuite struct {
+	cmd            *exec.Cmd
+	mp             *ManagedProcess
+	stdout, stderr *bytes.Buffer
+	cutShort       *atomic.Bool
+}
+
+// suiteStart starts a suite process; a variable so tests can count starts.
+var suiteStart = startSuite
+
+func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: a copy per start is nothing beside the process it starts
+	cmd := buildSuiteCmd(ctx, target, env, test2json)
+	s := startedSuite{cmd: cmd, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, cutShort: &atomic.Bool{}}
+	cmd.Stdout = s.stdout
+	cmd.Stderr = s.stderr
+
+	mp := NewManagedProcess(cmd, ProcessConfig{
+		Grace:      GraceBudget,
+		BudgetFile: target.BudgetFile,
+		StopFile:   target.StopFile,
+	})
+	s.mp = mp
+	// exec cancels only a process still running when ctx ends.
+	cancel := cmd.Cancel
+	cmd.Cancel = func() error {
+		s.cutShort.Store(true)
+		// Announced before the signal: the process reads it on the signal,
+		// or polls for it where no signal comes.
+		if target.StopFile != "" {
+			_ = os.WriteFile(target.StopFile, nil, 0o600)
+			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
+				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
+					mp.Stopped()
+					return nil
+				}
+			}
+		}
+		return cancel()
+	}
+	return s, mp.Start()
+}
+
+// waitRetry waits d, or returns ctx's error once it ends.
+func waitRetry(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // RunSingleSuite executes a single suite subprocess.
 // When test2json is true, the binary is wrapped with the test2json tool.
 //
@@ -226,37 +290,22 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 // read by the managed process itself, so a grandchild outside the group that
 // keeps the pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
-	cmd := buildSuiteCmd(ctx, target, env, test2json)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
 	start := time.Now()
-
-	mp := NewManagedProcess(cmd, ProcessConfig{
-		Grace:      GraceBudget,
-		BudgetFile: target.BudgetFile,
-		StopFile:   target.StopFile,
-	})
-	// exec cancels only a process still running when ctx ends.
-	var cutShort atomic.Bool
-	cancel := cmd.Cancel
-	cmd.Cancel = func() error {
-		cutShort.Store(true)
-		// Announced before the signal: the process reads it on the signal,
-		// or polls for it where no signal comes.
-		if target.StopFile != "" {
-			_ = os.WriteFile(target.StopFile, nil, 0o600)
-			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
-				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
-					mp.Stopped()
-					return nil
-				}
-			}
+	s, err := suiteStart(ctx, target, env, test2json)
+	for retry := time.Duration(0); errors.Is(err, syscall.ETXTBSY) && retry < startRetryLimit; {
+		// Another process still has the executable open for writing: a go
+		// command writing a tool into the shared build cache in place.
+		// Unix reports it; Windows refuses such a file with a sharing
+		// violation instead.
+		// It covers starting the suite or test2json, which execs the suite
+		// binary itself; copyFile's ForkLock guards the runner's own writes.
+		retry = max(2*retry, startRetryFirst)
+		if err = waitRetry(ctx, retry); err != nil {
+			break // a cancelled start, as exec reports one
 		}
-		return cancel()
+		s, err = suiteStart(ctx, target, env, test2json)
 	}
-	if err := mp.Start(); err != nil {
+	if err != nil {
 		return SuiteResult{
 			Target:   target,
 			Stderr:   fmt.Appendf(nil, "gotest: %s did not start: %v\n", target.SuiteName, err),
@@ -265,6 +314,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 			Duration: time.Since(start),
 		}
 	}
+	cmd, mp, stdout, stderr, cutShort := s.cmd, s.mp, s.stdout, s.stderr, s.cutShort
 
 	_ = mp.WaitWithGrace(ctx)
 	duration := time.Since(start)

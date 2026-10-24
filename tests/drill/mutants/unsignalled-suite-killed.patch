@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/lifecycle ForeignPid .* / runs AfterAll before the f
 Clause: when the run is interrupted and the pid the suite published names a process outside its group → runs AfterAll before the fixture is released
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go
-@@ -251,7 +251,9 @@
+@@ -259,7 +259,9 @@
  				}
  			}
  		}
@@ -11,5 +11,5 @@ Clause: when the run is interrupted and the pid the suite published names a proc
 +		mp.forceKill()
 +		return nil
  	}
- 	if err := mp.Start(); err != nil {
- 		return SuiteResult{
+ 	return s, mp.Start()
+ }
