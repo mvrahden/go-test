@@ -23,6 +23,8 @@ func runTree(cmd *exec.Cmd) error {
 	if err := tree.Start(); err != nil {
 		return err
 	}
+	track(tree, liveTree{root: cmd.Process.Pid})
+	defer untrack(tree)
 	return cmd.Wait()
 }
 

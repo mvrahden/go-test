@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -159,9 +160,54 @@ func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	}
 	elapsed := time.Since(sent)
 
+	data, err := os.ReadFile(filepath.Join(markers, "fixture-tearing-down"))
+	gotest.NoError(t, err)
+	setup, err := strconv.Atoi(string(data))
+	gotest.NoError(t, err)
+
 	t.It("exits 130 at once instead of waiting the teardown out", func(it *gotest.T) {
 		gotest.Less(it, elapsed, 5*time.Second, "took %v", elapsed)
 		gotest.Equal(it, 130, code)
+	})
+	t.It("leaves no shared fixture process behind", func(it *gotest.T) {
+		gotest.True(it, testkit.EndedWithin(setup, 2*time.Second), "the shared fixture process %d outlived the CLI", setup)
+	})
+}
+
+// A second interrupt while a method still ignores the first reaches the
+// shared fixture before anything asked it to tear down: it is asked then,
+// and its AfterAll runs before the CLI exits.
+func (s *ShutdownTestSuite) TestSecondInterruptDuringAMethod(t *gotest.T) {
+	markers := t.TempDir()
+	run := s.start(t, markers, "held")
+	interruptWhen(t, run, markers, "test-running")
+	first := time.Now()
+	// Past the window of a repeat, well inside the method's 5s grace.
+	time.Sleep(time.Until(first.Add(time.Second)))
+	gotest.NoError(t, testkit.Interrupt(run.cmd, run.tree))
+
+	exited := make(chan int, 1)
+	go func() { exited <- exitCode(t, run) }()
+	var code int
+	select {
+	case code = <-exited:
+	case <-time.After(10 * time.Second):
+		_ = run.tree.Kill()
+		gotest.Fail(t, "the CLI was still running 10s after the second interrupt")
+	}
+
+	t.It("exits 130", func(it *gotest.T) {
+		gotest.Equal(it, 130, code)
+	})
+	t.It("tears the shared fixture down before exiting", func(it *gotest.T) {
+		gotest.True(it, marker(markers, "fixture-down"), "AfterAll did not run")
+	})
+	t.It("leaves no shared fixture process behind", func(it *gotest.T) {
+		data, err := os.ReadFile(filepath.Join(markers, "fixture-tearing-down"))
+		gotest.NoError(it, err)
+		setup, err := strconv.Atoi(string(data))
+		gotest.NoError(it, err)
+		gotest.True(it, testkit.EndedWithin(setup, 2*time.Second), "the shared fixture process %d outlived the CLI", setup)
 	})
 }
 

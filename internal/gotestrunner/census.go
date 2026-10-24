@@ -457,6 +457,13 @@ func (x *verdictIndex) suiteFailures(units []CensusCase) []streamEvent {
 	return fail
 }
 
+// cutShortUnits returns the suites whose process the run's context ended.
+func (c *OutputCollector) cutShortUnits() []CensusCase {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.cutShort)
+}
+
 // bookDeadline returns the units an expired deadline cut short and books each
 // into the JSON stream as failed, with its suite and package. A suite cut short
 // is failed whether or not it reported a verdict: it never finished. The text

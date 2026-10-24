@@ -7458,6 +7458,59 @@
               "name": "TestEveryLauncherStopsCleanly",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the fixture at once, without AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_at_once,_without_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "exits 130 and leaves no suite process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_130_and_leaves_no_suite_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGINT reaches gotest while a stopped method body ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_second_SIGINT_reaches_gotest_while_a_stopped_method_body_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASecondCtrlCReleasesTheFixturesAtOnce",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASecondCtrlCReleasesTheFixturesAtOnce",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LauncherSignal",
@@ -8178,6 +8231,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_stream_with_a_failed_run_naming_the_suite_it_stopped,_the_tests'_own_verdicts_kept",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when the run is interrupted while a method holds",
@@ -8199,6 +8265,59 @@
               "focused": false,
               "kind": "method",
               "name": "TestAnInterruptStopsTheRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "ends that process before gotest exits",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_that_process_before_gotest_exits",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is interrupted while a holding method has started a process of its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run_is_interrupted_while_a_holding_method_has_started_a_process_of_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStopEndsWhatATestStarted",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStopEndsWhatATestStarted",
               "output": [],
               "status": "none"
             }
@@ -8588,7 +8707,7 @@
     }
   ],
   "stats": {
-    "behaviors": 289,
+    "behaviors": 294,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

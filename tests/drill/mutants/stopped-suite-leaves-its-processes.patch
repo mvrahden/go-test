@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle Stop .* / ends that process before gotest exits \(
+Clause: when the run is interrupted while a holding method has started a process of its own → ends that process before gotest exits
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -250,7 +250,7 @@
+ 			_ = os.WriteFile(target.StopFile, nil, 0o600)
+ 			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
+ 				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
+-					mp.Stopped()
++					_ = mp.Stopped
+ 					return nil
+ 				}
+ 			}

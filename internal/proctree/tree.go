@@ -120,6 +120,27 @@ func (t *Tree) Linger(timeout time.Duration) {
 
 const lingerPoll = 50 * time.Millisecond
 
+// End stops what a root left running in its tree once the root has been
+// waited for: the rest is interrupted, unless the tree already was, given at
+// most timeout to exit, as Linger gives it, and then killed. It is for a root
+// stopped some other way than Interrupt, whose tree nothing else signalled.
+// Call it before Release. On Unix it signals the group by the reaped root's
+// pid: a group with a member left keeps that id, but once the group is empty
+// the id may be reused, so a signal can reach a stranger's group then.
+func (t *Tree) End(timeout time.Duration) {
+	t.mu.Lock()
+	interrupted := t.interrupted
+	t.mu.Unlock()
+	if interrupted || t.Interrupt() == nil {
+		t.Linger(timeout)
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.adopted && !t.released && t.sys.alive(t.cmd.Process.Pid) {
+		_ = t.sys.kill(t.cmd.Process.Pid)
+	}
+}
+
 // Kill stops every process in the tree at once. It returns os.ErrProcessDone
 // once the tree is released, and nil for a command that never started.
 func (t *Tree) Kill() error {

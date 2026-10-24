@@ -3,6 +3,7 @@
 package proctree_test
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"strconv"
@@ -92,4 +93,54 @@ func (s *LingerTestSuite) TestALiveMemberIsWaitedFor(t *gotest.T) {
 	tree.Release()
 	gotest.GreaterOrEqual(t, waited, 500*time.Millisecond, "returned while a member still ran")
 	gotest.Less(t, waited, 9*time.Second)
+}
+
+// exitedRoot starts a root in its own group that exits on its own a moment
+// later, starts member in that group, and reaps the root.
+func exitedRoot(t *gotest.T, member *exec.Cmd) *proctree.Tree {
+	root := exec.Command("sleep", "0.3")
+	tree := proctree.New(root)
+	gotest.NoError(t, tree.Start())
+	member.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: root.Process.Pid}
+	gotest.NoError(t, member.Start())
+	_ = root.Wait()
+	return tree
+}
+
+func (s *LingerTestSuite) TestEndInterruptsWhatTheRootLeft(t *gotest.T) {
+	member := exec.Command("sleep", "30")
+	tree := exitedRoot(t, member)
+
+	start := time.Now()
+	tree.End(10 * time.Second)
+	waited := time.Since(start)
+
+	err := member.Wait()
+	tree.Release()
+	var exit *exec.ExitError
+	gotest.True(t, errors.As(err, &exit), "the member was not ended: %v", err)
+	gotest.Equal(t, syscall.SIGTERM, exit.Sys().(syscall.WaitStatus).Signal())
+	gotest.Less(t, waited, 5*time.Second)
+}
+
+func (s *LingerTestSuite) TestEndKillsWhatOutlivesTheTimeout(t *gotest.T) {
+	// Ignores the group's SIGTERM: the shell sets the ignore and becomes
+	// sleep, which keeps it.
+	member := exec.Command("sh", "-c", "trap '' TERM; exec sleep 30")
+	tree := exitedRoot(t, member)
+	gotest.Eventually(t, 5*time.Second, 5*time.Millisecond, func(poll *gotest.R) {
+		comm, _ := os.ReadFile("/proc/" + strconv.Itoa(member.Process.Pid) + "/comm")
+		gotest.Equal(poll, "sleep", strings.TrimSpace(string(comm)), "the member is not sleeping yet")
+	})
+
+	start := time.Now()
+	tree.End(500 * time.Millisecond)
+	waited := time.Since(start)
+
+	err := member.Wait()
+	tree.Release()
+	var exit *exec.ExitError
+	gotest.True(t, errors.As(err, &exit), "the member was not ended: %v", err)
+	gotest.Equal(t, syscall.SIGKILL, exit.Sys().(syscall.WaitStatus).Signal())
+	gotest.GreaterOrEqual(t, waited, 400*time.Millisecond, "killed before the timeout")
 }

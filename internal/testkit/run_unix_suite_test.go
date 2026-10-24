@@ -68,3 +68,24 @@ func processGone(t *gotest.T, markers []string) bool {
 	gotest.Fail(t, "no pid marker in %v", markers)
 	return false
 }
+
+func (s *RunOraclesTestSuite) TestOutputHeldPastTheExitIsAnError(t *gotest.T) {
+	t.When("a run exits while a process it left holds its output open", func(w *gotest.T) {
+		for row, tC := range gotest.Each(w, []struct {
+			Desc   string
+			script string
+			exit   int
+		}{
+			{"cleanly", "sleep 2 & exit 0", 0},
+			{"with a failure", "sleep 2 & exit 3", 3},
+		}) {
+			// The "CLI" exits at once and leaves a process holding its output.
+			started := time.Now()
+			run, err := testkit.ExportRunBinary(row.Context(), "/bin/sh", 300*time.Millisecond, "-c", tC.script)
+			took := time.Since(started)
+			gotest.Equal(row, tC.exit, run.Exit, "returns the exit code")
+			gotest.Less(row, took, 1500*time.Millisecond, "returns once the grace is over")
+			gotest.ErrorContains(row, err, "still held open", "says the output was held")
+		}
+	})
+}

@@ -218,7 +218,7 @@ A run stopped while a benchmark or a fuzz seed runs SHALL skip the benchmarks or
 - **THEN** skips the seeds not started with the reason run stopping, then runs AfterAll before the fixture is released
 
 ### Requirement: Stopping a run
-A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status; under plain go test it ends by the signal.
+A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the signal.
 
 #### Scenario: Interrupted while a method holds
 - **WHEN** the run is interrupted while a method holds
@@ -226,6 +226,7 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** ends the holding method's context
 - **AND** skips the methods that have not started with the reason run stopping
 - **AND** runs AfterAll before the fixture is released
+- **AND** ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
 
 ### Requirement: Every launcher stops cleanly
 A run stopped by SIGINT, SIGTERM or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
@@ -233,6 +234,14 @@ A run stopped by SIGINT, SIGTERM or a second SIGINT SHALL end with its exit code
 #### Scenario: Each launcher and each signal
 - **WHEN** a run is stopped by a signal, however gotest was launched
 - **THEN** ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
+
+### Requirement: A second Ctrl-C to gotest
+A second SIGINT reaching gotest while its suites stop SHALL, on Unix, send each suite process a second stop signal, which releases the fixtures at once, and kill what still runs two seconds later or at a further SIGINT; on Windows, where no second stop reaches a suite, it SHALL kill the suites at once. It SHALL ask the shared fixture process to tear down within those two seconds, and SHALL exit 130 leaving no suite process behind.
+
+#### Scenario: A method that ignores the stop
+- **WHEN** a second SIGINT reaches gotest while a stopped method body ignores its context
+- **THEN** releases the fixture at once, without AfterAll
+- **AND** exits 130 and leaves no suite process behind
 
 ### Requirement: A stop by the stop file alone
 On Windows, where the runner stops a suite by its stop file alone, an interrupted run SHALL skip the methods that have not started with the reason run stopping, SHALL carry every verdict to the stream and SHALL run AfterAll before the fixture is released.
@@ -250,4 +259,12 @@ A cancelled run SHALL send no signal to a pid the suite published that is outsid
 - **WHEN** the run is interrupted and the pid the suite published names a process outside its group
 - **THEN** sends that process no signal
 - **AND** interrupts the suite's process group instead
+- **AND** runs AfterAll before the fixture is released
+
+### Requirement: A stop ends what the tests started
+A run stopped while a test has a process of its own running SHALL end that process before gotest exits: once the suite's process has torn down, what is left of its process tree is, on Unix, interrupted and, past the teardown budget, killed, and on Windows killed at once.
+
+#### Scenario: A process a test started
+- **WHEN** the run is interrupted while a holding method has started a process of its own
+- **THEN** ends that process before gotest exits
 - **AND** runs AfterAll before the fixture is released

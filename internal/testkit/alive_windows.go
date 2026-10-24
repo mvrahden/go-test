@@ -25,3 +25,6 @@ func processAlive(pid int) bool {
 	const stillActive = 259
 	return exitCode == stillActive
 }
+
+// zombie: an exited Windows process is not running, whoever holds a handle.
+func zombie(int) bool { return false }

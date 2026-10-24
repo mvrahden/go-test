@@ -219,11 +219,12 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 // suite process alone, by the pid it published on Unix and by the stop file
 // itself on Windows, so the converter in front of it relays the stream to its
 // end; a process that published no pid, or one outside the suite's process
-// group, gets the group's SIGTERM instead. A per-process kill timer (from the
-// teardown budget file) then governs when SIGKILL is sent, and nothing else
-// kills. Output is read by the
-// managed process itself, so a grandchild outside the group that keeps the
-// pipes open holds the result for the drain delay at most.
+// group, gets the group's SIGTERM instead. A suite stopped alone leaves
+// what it started running; once the root has exited, the rest of the group
+// is interrupted and, past the budget, killed. A per-process kill timer (from
+// the teardown budget file) governs when the suite itself is killed. Output is
+// read by the managed process itself, so a grandchild outside the group that
+// keeps the pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	var stdout, stderr bytes.Buffer
@@ -235,6 +236,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	mp := NewManagedProcess(cmd, ProcessConfig{
 		Grace:      GraceBudget,
 		BudgetFile: target.BudgetFile,
+		StopFile:   target.StopFile,
 	})
 	// exec cancels only a process still running when ctx ends.
 	var cutShort atomic.Bool
@@ -247,6 +249,7 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 			_ = os.WriteFile(target.StopFile, nil, 0o600)
 			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
 				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
+					mp.Stopped()
 					return nil
 				}
 			}

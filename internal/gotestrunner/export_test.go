@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -194,3 +195,12 @@ func ExportBenchCollector(c *OutputCollector) { c.bench = true }
 
 // ExportResulted counts the units whose result line the collector still keeps.
 func ExportResulted(c *OutputCollector) int { return len(c.verdicts.resulted) }
+
+var ExportApplyInterrupt = applyInterrupt
+
+// ExportTrack tracks tree as a live tree rooted at root, for Abandon, until
+// the returned func untracks it.
+func ExportTrack(tree *proctree.Tree, root int, stopFile string, done <-chan struct{}) (stop func()) {
+	track(tree, liveTree{root: root, stopFile: stopFile, done: done})
+	return func() { untrack(tree) }
+}

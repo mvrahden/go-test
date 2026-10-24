@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -20,11 +21,12 @@ func (f *ProbeSharedFixture) BeforeAll(ctx context.Context) error {
 	return os.WriteFile(filepath.Join(f.Dir, "fixture-up"), []byte("up"), 0o600)
 }
 
-// AfterAll writes "fixture-tearing-down" first and, when
+// AfterAll writes "fixture-tearing-down", holding the pid of the process it
+// runs in, first and, when
 // GOTEST_SHUTDOWN_TEARDOWN_SLEEP names a duration, holds the teardown open
 // that long so a test can interrupt the run while it is tearing down.
 func (f *ProbeSharedFixture) AfterAll(ctx context.Context) error {
-	if err := os.WriteFile(filepath.Join(f.Dir, "fixture-tearing-down"), []byte("tearing down"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(f.Dir, "fixture-tearing-down"), []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
 		return err
 	}
 	if d, err := time.ParseDuration(os.Getenv("GOTEST_SHUTDOWN_TEARDOWN_SLEEP")); err == nil {

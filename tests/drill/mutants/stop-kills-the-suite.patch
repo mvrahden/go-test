@@ -1,0 +1,11 @@
+Expect: ^FAIL .*conformance/lifecycle Stop .* / runs AfterAll before the fixture is released \(
+Clause: when the run is interrupted while a holding method has started a process of its own → runs AfterAll before the fixture is released
+--- a/internal/gotestrunner/stop_unix.go
++++ b/internal/gotestrunner/stop_unix.go
+@@ -26,5 +26,5 @@
+ 	if pgid != group {
+ 		return fmt.Errorf("pid %d is outside the suite's process group %d", pid, group)
+ 	}
+-	return syscall.Kill(pid, syscall.SIGTERM)
++	return syscall.Kill(pid, syscall.SIGKILL)
+ }

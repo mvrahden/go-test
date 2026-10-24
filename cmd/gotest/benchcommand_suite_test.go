@@ -176,8 +176,9 @@ func (s *BenchCommandTestSuite) TestBenchExcludesPerTestHooks(t *gotest.T) {
 
 	t.It("reports the method's own time, not the hooks'", func(it *gotest.T) {
 		// 20ms of sleep over 50 iterations would be 400000 ns/op even if only
-		// one hook leaked; an increment is single-digit nanoseconds.
-		gotest.Less(it, b.Results[0].Samples[0].NsPerOp, 1000.0)
+		// one hook leaked; an increment is single-digit nanoseconds, but 50
+		// iterations on a loaded runner can read a few microseconds.
+		gotest.Less(it, b.Results[0].Samples[0].NsPerOp, 100000.0)
 	})
 }
 

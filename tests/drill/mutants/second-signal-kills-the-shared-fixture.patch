@@ -1,0 +1,13 @@
+Judge: ./internal/gotestrunner AbandonTestSuite/TestATreeWithoutAStopFileIsAskedFirst
+Expect: ^FAIL .*internal/gotestrunner Abandon .* / asks it to stop and waits for it \(
+--- a/internal/gotestrunner/abandon.go
++++ b/internal/gotestrunner/abandon.go
+@@ -78,7 +78,7 @@
+ // takes again however often it came.
+ func askAgain(tree *proctree.Tree, l liveTree) bool {
+ 	if l.stopFile == "" {
+-		return tree.Interrupt() == nil
++		return false
+ 	}
+ 	pid := readPID(protocol.StopPIDPath(l.stopFile))
+ 	return pid > 0 && stopAgain(pid, l.root) == nil

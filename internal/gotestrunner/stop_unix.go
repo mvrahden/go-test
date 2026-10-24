@@ -10,6 +10,10 @@ import (
 // signalSuite tells one suite process to stop.
 var signalSuite = signalPID
 
+// stopAgain sends a suite process the second stop signal, which releases its
+// fixtures at once.
+var stopAgain = signalPID
+
 // signalPID sends pid SIGTERM, among the signals the runtime counts once the
 // stop file exists. The pid must be in the suite's process group: under a pid
 // namespace, or after pid reuse, it names a stranger, and the caller
