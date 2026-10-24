@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -70,22 +71,27 @@ func (r *fatalRecorder) Fatalf(format string, args ...any) {
 	r.fatals = append(r.fatals, fmt.Sprintf(format, args...))
 }
 
+// runnerRequiredRuns counts the runs of TestRunnerRequired in this process.
+var runnerRequiredRuns atomic.Int64
+
 func (s *HoldWatchTestSuite) TestRunnerRequired(t *gotest.T) {
 	t.When("several holds of one process bind a shared fixture without the runner's state", func(w *gotest.T) {
 		w.It("fails each, explaining the refusal in full only the first time and never as a setup failure", func(it *gotest.T) {
 			it.Setenv(protocol.EnvSharedStateFile, "")
 			rec := &fatalRecorder{TB: it.T()}
+			// A name of this run's own: the process explains each name once.
+			name := fmt.Sprintf("OnceSharedFixture%d", runnerRequiredRuns.Add(1))
 			build := func() gotestruntime.MainConfig {
 				return gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{{
-					Name:        "OnceSharedFixture",
+					Name:        name,
 					SharedState: &gotestruntime.SharedStateNode{},
 				}}}
 			}
 			gotestruntime.HoldFixtures(rec, build)
 			gotestruntime.HoldFixtures(rec, build)
 			gotest.Equal(it, []string{
-				"suite binds shared fixture OnceSharedFixture, whose state only the gotest runner provides; run via go tool gotest",
-				"suite binds shared fixture OnceSharedFixture; run via go tool gotest",
+				"suite binds shared fixture " + name + ", whose state only the gotest runner provides; run via go tool gotest",
+				"suite binds shared fixture " + name + "; run via go tool gotest",
 			}, rec.fatals)
 		})
 	})
@@ -96,11 +102,14 @@ func (s *HoldWatchTestSuite) TestRunnerRequired(t *gotest.T) {
 const watcherFunc = "github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).loop"
 
 func (s *HoldWatchTestSuite) TestWatcherGoroutine(t *gotest.T) {
-	buf := make([]byte, 1<<20)
-	stacks := string(buf[:runtime.Stack(buf, true)])
 	t.When("a suite runs", func(w *gotest.T) {
 		w.It("has one goroutine of the stop watcher's, in the function the docs name for goleak", func(it *gotest.T) {
-			gotest.Equal(it, 1, strings.Count(stacks, watcherFunc+"("), stacks)
+			// Polled: a goroutine not yet scheduled shows only its go statement's wrapper.
+			gotest.Eventually(it, 5*time.Second, 10*time.Millisecond, func(poll *gotest.R) {
+				buf := make([]byte, 1<<20)
+				stacks := string(buf[:runtime.Stack(buf, true)])
+				gotest.Equal(poll, 1, strings.Count(stacks, watcherFunc+"("), stacks)
+			})
 		})
 	})
 }
