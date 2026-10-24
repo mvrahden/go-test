@@ -165,12 +165,14 @@ func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, e
 // checks the same on a CI runner as on a laptop. Under CI snapshots are
 // read-only, and a refresh of the repository's own snapshots must not
 // rewrite the snapshotting fixture's deliberately stale baseline. extra
-// pairs are what a case sets on purpose; they go on top.
+// pairs are what a case sets on purpose; they go on top. The slow-build
+// threshold passes: it describes the machine, not the run.
 func childEnv(canaryDir string, extra ...string) []string {
 	env := make([]string, 0, len(os.Environ())+2+len(extra))
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(name, "GOTEST_") || slices.Contains(hostOnlyEnv, name) {
+		gotestVar := strings.HasPrefix(name, "GOTEST_") && name != "GOTEST_SLOW_BUILD_THRESHOLD"
+		if gotestVar || slices.Contains(hostOnlyEnv, name) {
 			continue
 		}
 		env = append(env, kv)

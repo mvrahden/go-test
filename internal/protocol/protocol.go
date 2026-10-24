@@ -16,6 +16,9 @@ const (
 	EnvUpdateSnapshots = "GOTEST_UPDATE_SNAPSHOTS"
 	EnvCI              = "GOTEST_CI"
 	EnvCacheDir        = "GOTEST_CACHE_DIR"
+	// EnvSlowBuildThreshold is how long a build runs, as a Go duration,
+	// before the CLI says it is still building.
+	EnvSlowBuildThreshold = "GOTEST_SLOW_BUILD_THRESHOLD"
 
 	// EnvFuzzEchoInput makes the codec path report every execution's decoded
 	// input, not just failing ones. Set by triage/promote when re-running a

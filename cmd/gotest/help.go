@@ -124,6 +124,9 @@ Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
   GOTEST_CI=0             Opt out of CI auto-detection
   GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
+  GOTEST_SLOW_BUILD_THRESHOLD=<duration>
+                          Say a build is still running after this long
+                          (default: 15s)
 
 Configuration:
   Place a .gotest.yml in your project root. Run "gotest help config" for details.

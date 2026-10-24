@@ -103,6 +103,7 @@ var ExportAliveFixtureKeys = aliveFixtureKeys
 
 var ExportSortTargetIndices = sortTargetIndices
 var ExportLogSlowBuild = logSlowBuild
+var ExportSlowBuildThreshold = slowBuildThreshold
 
 // ExportLineWriterProgress reads the progress a line writer captured.
 func ExportLineWriterProgress(w io.WriteCloser) FuzzProgress { return w.(*lineWriter).progress }

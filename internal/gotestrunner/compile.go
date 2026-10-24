@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // CompileResult holds the result of compiling a single test package.
@@ -65,7 +67,7 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	defer logSlowBuild(os.Stderr, "test binary for "+pkgPath, slowBuildThreshold)()
+	defer logSlowBuild(os.Stderr, "test binary for "+pkgPath, slowBuildThreshold())()
 
 	mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
 	if err := mp.Start(); err != nil {
@@ -188,11 +190,20 @@ func sanitizePkgName(pkgPath string) string {
 	return fmt.Sprintf("%s_%x", short, h[:4])
 }
 
-// slowBuildThreshold is when a single build is called out as unexpectedly
-// long. Deliberately a log line, never a verdict: a first-ever -race build
-// recompiles the stdlib's instrumented variant and legitimately runs for
-// minutes — a hard cap here would be a number the user did not choose.
-const slowBuildThreshold = 15 * time.Second
+// defaultSlowBuildThreshold is when a single build is called out as
+// unexpectedly long. Deliberately a log line, never a verdict: a first-ever
+// -race build recompiles the stdlib's instrumented variant and legitimately
+// runs for minutes — a hard cap here would be a number the user did not choose.
+const defaultSlowBuildThreshold = 15 * time.Second
+
+// slowBuildThreshold is GOTEST_SLOW_BUILD_THRESHOLD as a Go duration; unset,
+// unparsable or not positive, it is the default.
+func slowBuildThreshold() time.Duration {
+	if d, err := time.ParseDuration(os.Getenv(protocol.EnvSlowBuildThreshold)); err == nil && d > 0 {
+		return d
+	}
+	return defaultSlowBuildThreshold
+}
 
 // logSlowBuild arms a one-shot notice for a long-running build and returns a
 // done func: past threshold it logs that the build is still running, and on
