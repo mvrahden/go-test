@@ -1,0 +1,13 @@
+Judge: ./tests/sharedfixture/shutdown ShutdownTestSuite/TestSecondInterruptEndsTheRun
+Expect: the shared fixture process [0-9]+ outlived the CLI
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -497,7 +497,7 @@
+ 		failures:        newFailureLog(os.Stderr),
+ 	}
+ 
+-	track(tree, liveTree{root: cmd.Process.Pid, done: waitDone})
++	_ = waitDone
+ 	scanned := make(chan struct{})
+ 	logged := make(chan struct{})
+ 	go func() {

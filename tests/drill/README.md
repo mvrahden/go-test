@@ -446,6 +446,13 @@ shards of one run do not add up to every mutant exactly once.
 | `stop-signals-a-stranger` | a cancelled run signals the pid the suite published even outside the suite's process group | lifecycle conformance: the stranger process gets the SIGTERM and the group none |
 | `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: AfterAll never runs before the fixture's release |
 | `second-signal-leaves-the-processes` | the CLI's second signal exits without killing the processes still running | lifecycle conformance: a suite process outlives the run after a second SIGINT |
+| `second-signal-not-forwarded` | the CLI's second signal kills the suites without sending them the second stop first | lifecycle conformance: the fixture of a method ignoring its context is never released |
+| `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | shared fixture shutdown suite: the setup process outlives the CLI |
+| `second-signal-kills-the-shared-fixture` | the CLI's second signal kills a tree without a stop file instead of asking it to tear down | runner unit suite: the tree without a stop file never tears down |
+| `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
+| `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running | lifecycle conformance: a process the test started outlives the run |
+| `stop-kills-the-suite` | the runner stops a suite by its pid with SIGKILL | lifecycle conformance: AfterAll never runs before the fixture's release |
+| `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle conformance: the stopped run's stream has no failed package |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 
 ## Adding a mutant

@@ -1,6 +1,13 @@
 package stopping
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 // StopTestSuite holds in its first method; the two after it never start when
 // the run is stopped meanwhile.
@@ -12,7 +19,18 @@ func (s *StopTestSuite) BeforeAll(t *gotest.T) { mark("suite.BeforeAll") }
 func (s *StopTestSuite) AfterAll(t *gotest.T)  { mark("suite.AfterAll") }
 
 func (s *StopTestSuite) TestHolds(t *gotest.T) {
+	if os.Getenv("STOPPING_CHILD") == "1" {
+		// A process of the test's own, left running when the stop comes.
+		child := exec.Command("sleep", "120")
+		if child.Start() == nil {
+			mark(fmt.Sprintf("child=%d", child.Process.Pid))
+		}
+	}
 	mark("running")
+	if os.Getenv("STOPPING_IGNORE_CONTEXT") == "1" {
+		// Ignores the stop, until something forces it.
+		time.Sleep(time.Minute)
+	}
 	<-t.Context().Done()
 	mark("context ended")
 }

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle Stop .* / ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept \(
+Clause: when the run is interrupted while a method holds → ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -1042,7 +1042,7 @@
+ 	if !errors.Is(dispatchErr, context.Canceled) {
+ 		return
+ 	}
+-	cut := c.cutShortUnits()
++	cut := c.cutShortUnits()[:0]
+ 	if len(cut) == 0 {
+ 		return
+ 	}

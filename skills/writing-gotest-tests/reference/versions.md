@@ -431,8 +431,14 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     ([grace](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)).
     `AfterEach`'s context does not end at the stop; benchmarks and fuzz
     seeds not started are skipped too; a second stop signal releases the
-    fixtures at once. Under `-json` the stream carries every verdict of
-    the stopped run, on Windows too
+    fixtures at once, and under gotest a second Ctrl-C sends the suites
+    that signal, asks the shared fixtures to tear down and kills what
+    still runs 2s later, or at a third Ctrl-C; on Windows it kills the
+    suites at once
+    ([second Ctrl-C](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-second-ctrl-c-to-gotest)).
+    Under `-json` the stream carries every verdict of the stopped run, on
+    Windows too, and ends with a failed run naming the suites the stop cut
+    short
     ([stop file](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-by-the-stop-file-alone)).
     Below v1.34 a stop released the fixtures and ended
     the process at once, without `AfterAll`, and only while fixtures were

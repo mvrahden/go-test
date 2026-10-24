@@ -85,19 +85,28 @@ func (s *LauncherSignalTestSuite) command(launcher string) *exec.Cmd {
 
 // deliver sends the row's signal to the run's process group, as a terminal
 // (SIGINT) or a job supervisor (SIGTERM) would; "second" is Ctrl-C twice,
-// the second landing while the teardown runs.
-func deliver(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, signal string) {
+// the second landing while the fixture's teardown runs.
+func deliver(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, markerDir, signal string) {
 	group := -cmd.Process.Pid
 	switch signal {
 	case "SIGTERM":
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGTERM))
 	case "second":
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
-		time.Sleep(time.Second)
-		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
+		secondCtrlC(t, cmd, tree, time.Now(), markerDir, "fixture.AfterAll")
 	default:
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
 	}
+}
+
+// secondCtrlC sends the run's process group a second SIGINT once every marker
+// in wants is in markerDir, and no sooner than a person's second Ctrl-C
+// after the first, sent at first: a repeat sooner is the first delivered
+// again.
+func secondCtrlC(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, first time.Time, markerDir string, wants ...string) {
+	awaitMarkers(markerDir, 60*time.Second, wants...)
+	time.Sleep(time.Until(first.Add(600 * time.Millisecond)))
+	signalled(t, cmd, tree, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT))
 }
 
 // pidOf reads the suite process's pid from the markers.
@@ -148,9 +157,15 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 			}) {
 				markerDir := sub.TempDir()
 				cmd := s.command(row.launcher)
-				cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_SLOW=1")
+				// A teardown slow enough to show as one when nobody waits
+				// for it, and to outlast the second signal's kill.
+				slow := "STOPPING_SLOW=2s"
+				if row.signal == "second" {
+					slow = "STOPPING_SLOW=6s"
+				}
+				cmd.Env = testkit.ChildEnv(markerDir, slow)
 				tree := holding(sub, cmd, markerDir)
-				deliver(sub, cmd, tree, row.signal)
+				deliver(sub, cmd, tree, markerDir, row.signal)
 				run := finished(cmd, tree, markerDir)
 
 				switch {
@@ -173,6 +188,33 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				gotest.NotZero(sub, pid, "markers: %v", run.Markers)
 				gotest.True(sub, gone(pid), "the suite process %d outlived the run", pid)
 			}
+		})
+	})
+}
+
+func (s *LauncherSignalTestSuite) TestASecondCtrlCReleasesTheFixturesAtOnce(t *gotest.T) {
+	markerDir := t.TempDir()
+	cmd := s.command("direct")
+	cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_IGNORE_CONTEXT=1")
+	tree := holding(t, cmd, markerDir)
+	first := time.Now()
+	signalled(t, cmd, tree, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT))
+	// The method ignores the stop: the grace it is given outlasts the
+	// second signal by seconds.
+	secondCtrlC(t, cmd, tree, first, markerDir)
+	run := finished(cmd, tree, markerDir)
+
+	t.When("a second SIGINT reaches gotest while a stopped method body ignores its context", func(w *gotest.T) {
+		w.It("releases the fixture at once, without AfterAll", func(it *gotest.T) {
+			gotest.Contains(it, run.Markers, "teardown done", "stderr: %s", run.Stderr)
+			gotest.NotContains(it, run.Markers, "suite.AfterAll")
+		})
+		w.It("exits 130 and leaves no suite process behind", func(it *gotest.T) {
+			gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stderr, "interrupted again")
+			pid := pidOf(run.Markers)
+			gotest.NotZero(it, pid, "markers: %v", run.Markers)
+			gotest.True(it, gone(pid), "the suite process %d outlived the run", pid)
 		})
 	})
 }

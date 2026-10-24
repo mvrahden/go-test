@@ -1,0 +1,11 @@
+Expect: ^FAIL .*conformance/lifecycle LauncherSignal .* / releases the fixture at once, without AfterAll \(
+Clause: when a second SIGINT reaches gotest while a stopped method body ignores its context → releases the fixture at once, without AfterAll
+--- a/internal/gotestrunner/abandon.go
++++ b/internal/gotestrunner/abandon.go
+@@ -81,5 +81,5 @@
+ 		return tree.Interrupt() == nil
+ 	}
+ 	pid := readPID(protocol.StopPIDPath(l.stopFile))
+-	return pid > 0 && stopAgain(pid, l.root) == nil
++	return pid > 0 && false
+ }

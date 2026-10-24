@@ -86,6 +86,28 @@ func finished(cmd *exec.Cmd, tree *proctree.Tree, markerDir string) testkit.Run 
 	return run
 }
 
+// packageVerdict is the last package-level pass, fail or skip of pkg.
+func packageVerdict(run *testkit.Run, pkg string) string {
+	verdict := ""
+	for _, ev := range run.Events {
+		if ev.Package == pkg && ev.Test == "" && (ev.Action == "pass" || ev.Action == "fail" || ev.Action == "skip") {
+			verdict = ev.Action
+		}
+	}
+	return verdict
+}
+
+// packageOutput is everything the stream printed at the level of pkg.
+func packageOutput(run *testkit.Run, pkg string) string {
+	var out strings.Builder
+	for _, ev := range run.Events {
+		if ev.Package == pkg && ev.Test == "" && ev.Action == "output" {
+			out.WriteString(ev.Output)
+		}
+	}
+	return out.String()
+}
+
 func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 	markerDir := t.TempDir()
 	cmd := exec.Command(s.cli, "-json", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
@@ -112,6 +134,12 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 		})
 		w.It("runs AfterAll before the fixture is released", func(it *gotest.T) {
 			gotest.True(it, run.MarkerOrder("context ended", "suite.AfterAll", "fixture.AfterAll"), "markers: %v", run.Markers)
+		})
+		w.It("ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept", func(it *gotest.T) {
+			gotest.Equal(it, "fail", packageVerdict(&run, "interrupted"), "stream:\n%s", run.Stdout)
+			gotest.Contains(it, packageOutput(&run, "interrupted"), "TestStopTestSuite", "stream:\n%s", run.Stdout)
+			gotest.Equal(it, "skip", run.Verdict("TestStopTestSuite/TestSecond"))
+			gotest.NotEmpty(it, run.Verdict("TestStopTestSuite/TestHolds"), "stream:\n%s", run.Stdout)
 		})
 	})
 }
