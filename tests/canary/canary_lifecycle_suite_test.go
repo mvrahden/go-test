@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -14,9 +14,6 @@ import (
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
-
-// The stop runs read go test -v's text, not -json: the runner signals the
-// converter in front of a suite along with it, and the stream ends there.
 
 // liveRun is a CLI run the canary stops from outside.
 type liveRun struct {
@@ -44,11 +41,12 @@ func (s *CanaryTestSuite) startRun(t *gotest.T, dir string, env []string, args .
 	return r
 }
 
-// await waits up to within for marker. It reports false when the time is up
-// or the run ended first.
-func (r *liveRun) await(within time.Duration, marker string) bool {
+// await waits up to within for every marker in wants. It reports false when
+// the time is up or the run ended first.
+func (r *liveRun) await(within time.Duration, wants ...string) bool {
 	for deadline := time.Now().Add(within); ; time.Sleep(20 * time.Millisecond) {
-		if got, _ := testkit.ReadMarkers(r.markers); slices.Contains(got, marker) {
+		got, _ := testkit.ReadMarkers(r.markers)
+		if !slices.ContainsFunc(wants, func(w string) bool { return !slices.Contains(got, w) }) {
 			return true
 		}
 		select {
@@ -86,7 +84,7 @@ func (r *liveRun) end(within time.Duration) (code int, markers []string) {
 // signal is sent: on Windows the interrupt returns only once its helper
 // process has exited, well after the run saw the stop.
 func (s *CanaryTestSuite) interrupted(t *gotest.T, pkg string, env []string, args ...string) (took time.Duration, code int, out string, markers []string) {
-	return s.interruptedRun(t, pkg, env, append(append([]string{"-v"}, args...), "./testdata/"+pkg+"/"), nil)
+	return s.interruptedRun(t, pkg, env, append(append([]string{"-json"}, args...), "./testdata/"+pkg+"/"), nil)
 }
 
 // interruptedRun is interrupted over the CLI's whole argument list; then,
@@ -113,33 +111,16 @@ func (s *CanaryTestSuite) interruptedRun(t *gotest.T, label string, env, args []
 	return time.Since(began), code, r.stdout.String() + r.stderr.String(), markers
 }
 
-// textVerdict is the verdict -v printed for the test at path: pass, fail,
-// skip, or empty when none was printed.
-func textVerdict(out, path string) string {
-	m := regexp.MustCompile(`--- (PASS|FAIL|SKIP): ` + regexp.QuoteMeta(path) + ` \(`).FindStringSubmatch(out)
-	if m == nil {
-		return ""
-	}
-	return strings.ToLower(m[1])
-}
-
-// textOutput is what -v printed under the test at path: the lines after
-// each RUN, CONT or NAME line of it, up to the next such or verdict line.
-func textOutput(out, path string) string {
-	var b strings.Builder
-	in := false
-	for line := range strings.Lines(out) {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
-			fields := strings.Fields(trimmed)
-			in = len(fields) == 3 && fields[2] == path && (fields[1] == "RUN" || fields[1] == "CONT" || fields[1] == "NAME")
-			continue
-		}
-		if in {
-			b.WriteString(line)
+// streamVerdict is the last verdict a -json stream carries for the test at
+// path: pass, fail, skip, or empty when it carries none.
+func streamVerdict(stream, path string) string {
+	verdict := ""
+	for _, ev := range testkit.ParseEvents([]byte(stream)) {
+		if ev.Test == path && (ev.Action == "pass" || ev.Action == "fail" || ev.Action == "skip") {
+			verdict = ev.Action
 		}
 	}
-	return b.String()
+	return verdict
 }
 
 // A run stopped while a method holds: the methods not yet started are skipped
@@ -153,10 +134,10 @@ func (s *CanaryTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
 		t.Errorf("stop: exit code %d, want 130\n%s", code, out)
 	}
 	for _, method := range []string{"TestStopTestSuite/TestSecond", "TestStopTestSuite/TestThird"} {
-		if v := textVerdict(out, method); v != "skip" {
+		if v := streamVerdict(out, method); v != "skip" {
 			t.Errorf("stop: %s verdict %q, want skip\n%s", method, v, out)
 		}
-		if !strings.Contains(textOutput(out, method), "run stopping") {
+		if !strings.Contains(streamOutput(out, method), "run stopping") {
 			t.Errorf("stop: %s was not skipped with the reason run stopping:\n%s", method, out)
 		}
 	}
@@ -259,7 +240,7 @@ func (s *CanaryTestSuite) TestABenchmarkIgnoringTheStopIsCutShort(t *gotest.T) {
 // released.
 func (s *CanaryTestSuite) TestAStopSkipsTheSeedsNotStarted(t *gotest.T) {
 	_, _, out, markers := s.interrupted(t, "stopbench", nil)
-	if !testkit.MarkerOrderOf(markers, "first seed returned", "suite.AfterAll", "fixture.AfterAll") || slices.Contains(markers, "second seed ran") || !strings.Contains(textOutput(out, "FuzzSeedStopTestSuite_FuzzSeeds/seed#1"), "run stopping") {
+	if !testkit.MarkerOrderOf(markers, "first seed returned", "suite.AfterAll", "fixture.AfterAll") || slices.Contains(markers, "second seed ran") || !strings.Contains(streamOutput(out, "FuzzSeedStopTestSuite_FuzzSeeds/seed#1"), "run stopping") {
 		t.Errorf("stopbench: markers %v, want the second seed skipped as run stopping, then AfterAll, then the release\n%s", markers, out)
 	}
 }
@@ -271,7 +252,7 @@ func (s *CanaryTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest.T) {
 	if !suiteSignallable {
 		t.Skipf("only Unix signals a single process")
 	}
-	took, _, out, markers := s.interruptedRun(t, "stopgrace", []string{"STOPGRACE_IGNORE=1"}, []string{"-v", "-run=TestGraceTestSuite", "./testdata/stopgrace/"}, func(r *liveRun) {
+	took, _, out, markers := s.interruptedRun(t, "stopgrace", []string{"STOPGRACE_IGNORE=1"}, []string{"-json", "-run=TestGraceTestSuite", "./testdata/stopgrace/"}, func(r *liveRun) {
 		time.Sleep(500 * time.Millisecond)
 		signalSuite(t, r.markers)
 	})
@@ -286,15 +267,72 @@ func (s *CanaryTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest.T) {
 func (s *CanaryTestSuite) TestAStopEndsAnAsyncWait(t *gotest.T) {
 	_, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestAsyncHoldTestSuite")
 	waits, fails := "TestAsyncHoldTestSuite/TestWaitsAsync", "TestAsyncHoldTestSuite/TestFailsAsync"
-	if v := textVerdict(out, waits); v != "skip" || !strings.Contains(textOutput(out, waits), "run stopping") {
+	if v := streamVerdict(out, waits); v != "skip" || !strings.Contains(streamOutput(out, waits), "run stopping") {
 		t.Errorf("stopgrace: %s verdict %q, want skip with the reason run stopping\n%s", waits, v, out)
 	}
-	if v := textVerdict(out, fails); v != "fail" {
+	if v := streamVerdict(out, fails); v != "fail" {
 		t.Errorf("stopgrace: %s verdict %q, want fail\n%s", fails, v, out)
 	}
 	for _, method := range []string{waits, fails} {
 		if !testkit.MarkerOrderOf(markers, "interrupted", "async AfterEach "+method, "async AfterAll") {
 			t.Errorf("stopgrace: markers %v, want interrupted, %s's AfterEach, async AfterAll in order", markers, method)
 		}
+	}
+}
+
+// stopFileWrapper writes an -exec wrapper that leaves the runner only the
+// stop file to reach the suite, as on Windows: it publishes its own pid in
+// place of the suite's and ignores the signal sent to it. It marks "pid
+// swapped" once it has. Windows itself needs none.
+func stopFileWrapper(t *gotest.T) ([]string, []string) {
+	if runtime.GOOS == "windows" {
+		return nil, []string{"running"}
+	}
+	path := filepath.Join(t.TempDir(), "wrapper.sh")
+	script := `#!/bin/sh
+trap '' INT TERM
+pidfile="$GOTEST_STOP_FILE.pid"
+"$@" &
+child=$!
+while [ "$(cat "$pidfile" 2>/dev/null)" != "$child" ]; do kill -0 "$child" 2>/dev/null || exit 1; sleep 0.02; done
+echo $$ > "$pidfile"
+echo "pid swapped" >> "$GOTEST_CANARY_DIR/markers"
+status=0
+while kill -0 "$child" 2>/dev/null; do wait "$child"; status=$?; done
+exit $status
+`
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the script must be executable
+		fatalf(t, "write wrapper: %v", err)
+	}
+	return []string{"-exec", path}, []string{"running", "pid swapped"}
+}
+
+// A run interrupted where only the stop file reaches the suite skips the
+// methods not started with the reason run stopping, carries every verdict to
+// the stream and runs AfterAll before the fixture is released. A run still
+// going 15s after the stop is killed: the holding method's context would
+// otherwise end it as if stopped.
+func (s *CanaryTestSuite) TestOnlyTheStopFileStopsTheSuite(t *gotest.T) {
+	wrap, held := stopFileWrapper(t)
+	r := s.startRun(t, t.TempDir(), nil, append(append([]string{"-json"}, wrap...), "./testdata/stopping/")...)
+	if !r.await(90*time.Second, held...) {
+		_, _ = r.end(0)
+		fatalf(t, "stopfile: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
+	}
+	_ = testkit.Interrupt(r.cmd, r.tree)
+	_, markers := r.end(15 * time.Second)
+	out := r.stdout.String()
+	for _, method := range []string{"TestStopTestSuite/TestSecond", "TestStopTestSuite/TestThird"} {
+		if v := streamVerdict(out, method); v != "skip" || !strings.Contains(streamOutput(out, method), "run stopping") {
+			t.Errorf("stopfile: %s verdict %q, want skip with the reason run stopping:\n%s", method, v, streamOutput(out, method))
+		}
+	}
+	for _, path := range []string{"TestStopTestSuite/TestHolds", "TestStopTestSuite", ""} {
+		if streamVerdict(out, path) == "" {
+			t.Errorf("stopfile: no verdict for %q reached the stream", path)
+		}
+	}
+	if !testkit.MarkerOrderOf(markers, "context ended", "suite.AfterAll", "fixture.AfterAll") {
+		t.Errorf("stopfile: markers %v, want context ended, suite.AfterAll, fixture.AfterAll in order", markers)
 	}
 }

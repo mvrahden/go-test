@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/lifecycle LauncherSignalTestSuite/TestEveryLauncherStopsCleanly/a_run_is_stopped_by_a_signal,_however_gotest_was_launched/ends_with_its_exit_code,_or_by_the_signal_where_go_run_dies_of_a_SIGTERM,_finishes_the_fixture_teardown_unless_a_second_signal_abandons_it_saying_so,_and_leaves_no_suite_process_behind/direct,_a_second_SIGINT
+Expect: ^FAIL .*conformance/lifecycle .* / (direct|under an -exec wrapper), a second SIGINT \(
+Clause: when a run is stopped by a signal, however gotest was launched → ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
+--- a/cmd/gotest/signals.go
++++ b/cmd/gotest/signals.go
+@@ -28,7 +28,7 @@
+ func shutdownContext() (context.Context, context.CancelFunc) {
+ 	return shutdownContextThen(func() {
+ 		fmt.Fprintln(os.Stderr, "interrupted again: giving up on the teardown")
+-		gotestrunner.KillAll()
++		_ = gotestrunner.KillAll
+ 	})
+ }
+ 

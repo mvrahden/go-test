@@ -3,7 +3,6 @@ package lifecycle_test
 import (
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -72,7 +71,7 @@ func signalled(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, err error) {
 }
 
 // finished waits for cmd and reads back what the run left: its exit code,
-// output and markers.
+// output, events and markers.
 func finished(cmd *exec.Cmd, tree *proctree.Tree, markerDir string) testkit.Run {
 	err := cmd.Wait()
 	tree.Release()
@@ -82,45 +81,14 @@ func finished(cmd *exec.Cmd, tree *proctree.Tree, markerDir string) testkit.Run 
 	}
 	run.Stdout = cmd.Stdout.(*strings.Builder).String()
 	run.Stderr = cmd.Stderr.(*strings.Builder).String()
+	run.Events = testkit.ParseEvents([]byte(run.Stdout))
 	run.Markers, _ = testkit.ReadMarkers(filepath.Join(markerDir, testkit.MarkersFile))
 	return run
 }
 
-// The stop runs read go test -v's text, not -json: the runner signals the
-// converter in front of a suite along with it, and the stream ends there.
-
-// textVerdict is the verdict -v printed for the test at path: pass, fail,
-// skip, or empty when none was printed.
-func textVerdict(out, path string) string {
-	m := regexp.MustCompile(`--- (PASS|FAIL|SKIP): ` + regexp.QuoteMeta(path) + ` \(`).FindStringSubmatch(out)
-	if m == nil {
-		return ""
-	}
-	return strings.ToLower(m[1])
-}
-
-// textOutput is what -v printed under the test at path: the lines after
-// each RUN, CONT or NAME line of it, up to the next such or verdict line.
-func textOutput(out, path string) string {
-	var b strings.Builder
-	in := false
-	for line := range strings.Lines(out) {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
-			fields := strings.Fields(trimmed)
-			in = len(fields) == 3 && fields[2] == path && (fields[1] == "RUN" || fields[1] == "CONT" || fields[1] == "NAME")
-			continue
-		}
-		if in {
-			b.WriteString(line)
-		}
-	}
-	return b.String()
-}
-
 func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 	markerDir := t.TempDir()
-	cmd := exec.Command(s.cli, "-v", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
+	cmd := exec.Command(s.cli, "-json", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
 	cmd.Env = testkit.ChildEnv(markerDir)
 	tree := holding(t, cmd, markerDir)
 	signalled(t, cmd, tree, testkit.Interrupt(cmd, tree))
@@ -136,8 +104,8 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 		w.It("skips the methods that have not started with the reason run stopping", func(it *gotest.T) {
 			for _, method := range []string{"TestSecond", "TestThird"} {
 				path := "TestStopTestSuite/" + method
-				gotest.Equal(it, "skip", textVerdict(run.Stdout, path), "verdict of %s:\n%s", path, run.Stdout)
-				gotest.Contains(it, textOutput(run.Stdout, path), "run stopping")
+				gotest.Equal(it, "skip", run.Verdict(path), "verdict of %s:\n%s", path, run.Stdout)
+				gotest.Contains(it, outputOf(&run, path), "run stopping")
 			}
 			gotest.NotContains(it, run.Markers, "second")
 			gotest.NotContains(it, run.Markers, "third")

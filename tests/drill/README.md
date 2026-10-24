@@ -442,6 +442,11 @@ shards of one run do not add up to every mutant exactly once.
 | `async-siblings-share-a-label` | every method carries one label, so a parallel sibling's goroutines count as the method's | canary: asynchelper's failed parallel method waits for its sibling's goroutine |
 | `async-failed-wait-blamed-on-done` | a failed method whose wait lasts to the deadline is reported for a missed done | canary: asynchelper's hanging owner's output lacks what was left to wait for |
 | `go-panic-unseen-by-an-async-wait` | a panic on a gotest.Go goroutine does not end an async wait | canary: asynchelper's panicking method takes its full 20s budget |
+| `stop-file-ignored` | the suite's watcher never polls for the stop file, so a stop no signal brings never comes | canary: the stopfile run's later methods have no skip verdict and the stream ends without the verdicts |
+| `stop-signals-a-stranger` | a cancelled run signals the pid the suite published even outside the suite's process group | lifecycle conformance: the stranger process gets the SIGTERM and the group none |
+| `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: AfterAll never runs before the fixture's release |
+| `second-signal-leaves-the-processes` | the CLI's second signal exits without killing the processes still running | lifecycle conformance: a suite process outlives the run after a second SIGINT |
+| `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 
 ## Adding a mutant
 

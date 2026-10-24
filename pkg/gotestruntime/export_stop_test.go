@@ -23,13 +23,23 @@ func ExportSettle(self testing.TB, stderr io.Writer, grace time.Duration) bool {
 // the process is left alive. Signals sent on again arrive as further stop
 // signals would.
 func ExportStop(self testing.TB, stderr io.Writer, grace time.Duration, again chan os.Signal) (settled, released bool) {
+	return exportStop(self, stderr, grace, again, false)
+}
+
+// ExportStopFound is [ExportStop] for a stop the poll found in the stop
+// file, before any signal asked for it.
+func ExportStopFound(self testing.TB, stderr io.Writer, grace time.Duration, again chan os.Signal) (settled, released bool) {
+	return exportStop(self, stderr, grace, again, true)
+}
+
+func exportStop(self testing.TB, stderr io.Writer, grace time.Duration, again chan os.Signal, found bool) (settled, released bool) {
 	settleExcept = self
 	openSuites.Add(-1)
 	defer func() {
 		openSuites.Add(1)
 		settleExcept = nil
 	}()
-	w := &watcher{stderr: stderr, ch: again}
+	w := &watcher{stderr: stderr, ch: again, unasked: found}
 	releaseEnd, settled := w.settle(os.Interrupt, grace)
 	if settled {
 		return true, false
@@ -69,5 +79,19 @@ func ExportReleaseBound(d, reserve time.Duration) (restore func()) {
 		budgetMu.Lock()
 		maxBudget, maxReserve = was, wasReserve
 		budgetMu.Unlock()
+	}
+}
+
+// ExportWatchStopFile starts a watcher as the runner's environment would,
+// with path as the stop file, and returns the call that stops it. self is
+// the test calling it, whose own body and suite a stop does not wait for.
+func ExportWatchStopFile(self testing.TB, path string) (stop func()) {
+	settleExcept = self
+	openSuites.Add(-1)
+	w := watchFile(io.Discard, path)
+	return func() {
+		w.close()
+		openSuites.Add(1)
+		settleExcept = nil
 	}
 }

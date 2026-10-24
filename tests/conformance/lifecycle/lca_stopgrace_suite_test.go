@@ -39,7 +39,7 @@ func (s *StopGraceTestSuite) AfterAll(t *gotest.T) {}
 // "interrupted" is written just before the signal. A run that never holds,
 // or that outlives the stop by 40s, is killed before the test fails.
 func (s *StopGraceTestSuite) stopped(t *gotest.T, env []string, args ...string) (testkit.Run, time.Duration) {
-	return s.stoppedRun(t, env, append([]string{"-v", "../testdata/lcastop/"}, args...), nil)
+	return s.stoppedRun(t, env, append([]string{"-json", "../testdata/lcastop/"}, args...), nil)
 }
 
 // stoppedRun is stopped over the CLI's whole argument list; then, when not
@@ -95,6 +95,7 @@ func (s *StopGraceTestSuite) stoppedRun(t *gotest.T, env, args []string, then fu
 	}
 	run.Stdout = cmd.Stdout.(*strings.Builder).String()
 	run.Stderr = cmd.Stderr.(*strings.Builder).String()
+	run.Events = testkit.ParseEvents([]byte(run.Stdout))
 	run.Markers, _ = testkit.ReadMarkers(markers)
 	return run, took
 }
@@ -127,19 +128,18 @@ func (s *StopGraceTestSuite) TestASlowAfterEach(t *gotest.T) {
 
 func (s *StopGraceTestSuite) TestAStopDuringAnAsyncWait(t *gotest.T) {
 	run, _ := s.stopped(t, nil, "-run=TestAsyncHoldTestSuite")
-	out := run.Stdout + run.Stderr
 	waits, fails := "TestAsyncHoldTestSuite/TestWaitsAsync", "TestAsyncHoldTestSuite/TestFailsAsync"
 	t.When("the run is stopped while an async method waits for done", func(w *gotest.T) {
 		w.It("ends the wait at the stop and skips the method with the reason run stopping, then runs AfterEach and AfterAll", func(it *gotest.T) {
-			gotest.Equal(it, "skip", textVerdict(out, waits), out)
-			gotest.Contains(it, textOutput(out, waits), "run stopping")
+			gotest.Equal(it, "skip", run.Verdict(waits), run.Stdout)
+			gotest.Contains(it, outputOf(&run, waits), "run stopping")
 			gotest.True(it, run.MarkerOrder("interrupted", "async AfterEach "+waits, "async AfterAll"), "markers: %v", run.Markers)
 		})
 	})
 	t.When("the run is stopped while an async method waits for done after another of its goroutines failed", func(w *gotest.T) {
 		w.It("ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method", func(it *gotest.T) {
 			gotest.True(it, run.MarkerOrder("interrupted", "async AfterEach "+fails, "async AfterAll"), "markers: %v", run.Markers)
-			gotest.Equal(it, "fail", textVerdict(out, fails), out)
+			gotest.Equal(it, "fail", run.Verdict(fails), run.Stdout)
 		})
 	})
 }
@@ -193,7 +193,7 @@ func (s *StopGraceTestSuite) TestAForcedStop(t *gotest.T) {
 // stoppedBench runs the lcastopbench package as stopped does, with args after
 // the package.
 func (s *StopGraceTestSuite) stoppedBench(t *gotest.T, env []string, args ...string) (testkit.Run, time.Duration) {
-	return s.stoppedRun(t, env, append([]string{"-v"}, append(args, "../testdata/lcastopbench/")...), nil)
+	return s.stoppedRun(t, env, append([]string{"-json"}, append(args, "../testdata/lcastopbench/")...), nil)
 }
 
 func (s *StopGraceTestSuite) TestAStopDuringABenchmark(t *gotest.T) {
@@ -230,7 +230,7 @@ func (s *StopGraceTestSuite) TestASecondStopSignal(t *gotest.T) {
 		t.Skipf("only Unix signals a single process")
 	}
 	var sent error
-	run, took := s.stoppedRun(t, []string{"LCA_IGNORE=1"}, []string{"-v", "../testdata/lcastop/", "-run=TestGraceTestSuite"}, func(markers string) {
+	run, took := s.stoppedRun(t, []string{"LCA_IGNORE=1"}, []string{"-json", "../testdata/lcastop/", "-run=TestGraceTestSuite"}, func(markers string) {
 		time.Sleep(500 * time.Millisecond)
 		sent = signalSuite(markers)
 	})

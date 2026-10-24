@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -40,6 +41,49 @@ func (s *StopTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
 	t.When("the run is asked to stop while a method runs", func(w *gotest.T) {
 		w.It("runs no method that had not started", func(it *gotest.T) {
 			gotest.Equal(it, []string{"TestFirst"}, ran)
+		})
+	})
+}
+
+func (s *StopTestSuite) TestAStopFileWithoutASignalStopsTheRun(t *gotest.T) {
+	path := filepath.Join(t.TempDir(), "stop")
+	stopped := runstate.StopContext()
+	stop := gotestruntime.ExportWatchStopFile(t.T(), path)
+	gotest.NoError(t, os.WriteFile(path, nil, 0o600))
+	var ended bool
+	select {
+	case <-stopped.Done():
+		ended = true
+	case <-time.After(5 * time.Second):
+	}
+	stop()
+	t.When("the runner's stop file appears and no signal follows", func(w *gotest.T) {
+		w.It("stops the run", func(it *gotest.T) {
+			gotest.True(it, ended)
+		})
+	})
+}
+
+func (s *StopTestSuite) TestAStopTheStopFileBeganTakesTheNextSignalAsItsRequest(t *gotest.T) {
+	stopWith := func(signals int) string {
+		defer gotestruntime.ExportReleaseBound(time.Second, 0)()
+		defer gotestruntime.ExportHoldSuiteOpen()()
+		again := make(chan os.Signal, signals)
+		for range signals {
+			again <- os.Interrupt
+		}
+		var stderr bytes.Buffer
+		gotestruntime.ExportStopFound(t.T(), &stderr, 5*time.Second, again)
+		gotestruntime.ExportResetStop()
+		return stderr.String()
+	}
+	one, two := stopWith(1), stopWith(2)
+	t.When("the stop file began a stop and the runner's signal follows it", func(w *gotest.T) {
+		w.It("takes that signal for the request, not for a second one", func(it *gotest.T) {
+			gotest.NotContains(it, one, "a second stop signal")
+		})
+		w.It("forces the stop on the signal after it", func(it *gotest.T) {
+			gotest.Contains(it, two, "a second stop signal")
 		})
 	})
 }
