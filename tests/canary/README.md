@@ -66,6 +66,7 @@ Each directory under `testdata/` is one package with one suite:
 | `releaseslow` | a package fixture whose `AfterAll` between its attempts outlives its declared `Timeout` fails the run, though the second attempt comes up |
 | `hydratefail` | a shared fixture whose `Hydrate` fails partway still gets its `Dehydrate` |
 | `stopping` | a run stopped while a method holds exits 130, skips the methods not started with the reason run stopping, ends the holding method's context and runs `AfterAll` before the fixture is released |
+| `orphan` | a process a test started and never waited for does not outlive the run (Unix only) |
 | `stopgrace` | a stopped run cuts a body or a `BeforeAll` that ignores its context short after 5s, counted from a late body's own start, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace, or one waiting on its context, runs to its end before `AfterAll` and the release; a forced stop still gives the fixtures' release its time; a second stop signal releases at once; a stop ends an async wait, skipping the method as run stopping or failing it when a helper goroutine failed, then runs `AfterEach` and `AfterAll` |
 | `stopbench` | a stopped benchmark or fuzz seed run skips what has not started with the reason run stopping and runs `AfterAll` before the release; a benchmark that ignores the stop is cut short after 5s |
 | `noisysetup` | a shared fixture that writes to stdout while coming up still hands its state to the suite whole |
