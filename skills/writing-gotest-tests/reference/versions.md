@@ -457,3 +457,9 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     missed `done()`, `AfterEach` was not budgeted, and the 30s default
     failed a wait in a suite that declared no `Timeout`. To migrate, declare
     a `Timeout` on async suites that relied on that default.
+20. **Shared fixture setup waits for the declared budget** — without
+    `--setup-timeout`, the runner waits as long as the fixtures'
+    `SharedFixtureConfig()` declares, and 30s until the first reports
+    ([the setup-budget requirement](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
+    Below v1.34 the wait is a flat 2m whatever the marker says, so a
+    slower fixture needs `--setup-timeout` raised.

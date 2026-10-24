@@ -1,7 +1,7 @@
 # Fixtures Specification
 
 ## Purpose
-Which shared fixtures a run starts for the suites it selects, guarded suites included, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, and that shared fixtures need the gotest runner.
+Which shared fixtures a run starts for the suites it selects, guarded suites included, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, and that shared fixtures need the gotest runner.
 
 ## Requirements
 
@@ -138,6 +138,17 @@ A suite binding a shared fixture SHALL fail under plain go test before any metho
 - **WHEN** a suite binding a shared fixture runs under plain go test
 - **THEN** fails naming the shared fixture it binds and go tool gotest, before any method runs
 
+### Requirement: A shared fixture's declared setup budget
+When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them; a fixture that hangs past that budget SHALL fail the run, saying the setup timed out.
+
+#### Scenario: A container fixture slower than the default budget
+- **WHEN** a shared fixture declaring ContainerFixtureConfig takes 35s to come up and no --setup-timeout is given
+- **THEN** the run passes: the wait is the fixture's declared budget
+
+#### Scenario: A fixture that hangs past its budget
+- **WHEN** a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given
+- **THEN** fails the run within 60s, saying the setup timed out
+
 ### Requirement: Shared fixture state reaches its suites
 The state a shared fixture's setup produces SHALL reach the suites that bind it when the setup prints to stdout, with or without a trailing newline and in a JSON-shaped line, and when the state is 2 MiB, and nothing the setup prints SHALL become an event of the run.
 
@@ -165,3 +176,10 @@ A process a shared fixture's setup starts SHALL get neither the protocol descrip
 - **WHEN** a shared fixture's setup starts a process that outlives it
 - **THEN** the run passes before that process ends
 - **AND** the process sees no protocol variable, and what it writes to descriptor 3 is not read
+
+### Requirement: Siblings of a setup that is given up
+When the run gives up on a shared fixture's setup while a sibling that came up is still to be released, the run SHALL fail.
+
+#### Scenario: A sibling still to be released
+- **WHEN** a shared fixture's setup is given up while a sibling that came up is still to be released
+- **THEN** fails the run

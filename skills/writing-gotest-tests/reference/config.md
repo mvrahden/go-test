@@ -57,10 +57,11 @@ where a test must be failed at its budget.
 Fixtures follow the same rule via `FixtureConfig()` /
 `SharedFixtureConfig()` markers: no marker or a zero `Timeout` →
 `DefaultFixtureConfig()`'s 2m; `Retries`/`RetryDelay` are used as written;
-`ContainerFixtureConfig()` (5m, 1 retry) suits container startups. All
-shared fixture setup together is also capped by the run's
-`--setup-timeout` (default 2m; `setup-timeout:` in `.gotest.yml`),
-whatever the marker says — raise it with a long shared fixture.
+`ContainerFixtureConfig()` (5m, 1 retry) suits container startups. The
+runner waits for shared fixture setup as long as the fixtures declare
+(v1.34+), and 30s until the setup process reports its first fixture's
+budget (v1.34+); the run's `--setup-timeout` (`setup-timeout:` in `.gotest.yml`)
+replaces that with a flat budget.
 
 ## Exclusive suites (v1.27+)
 
