@@ -412,6 +412,7 @@ shards of one run do not add up to every mutant exactly once.
 | `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |
 | `poll-args-unchecked` | a zero tick or waitFor is polled with | canary: the failing fixture's zero-tick method passes and no message says the durations must be positive |
 | `poll-cut-off-at-the-deadline` | a poll still running at waitFor counts as hung, with no grace | canary: the `latepolls` fixture's late polls fail as still running |
+| `watch-help-names-the-old-setup-default` | `help watch` gives `--setup-timeout`'s default as a flat 2m | cli conformance: the help watch row lacks the declared-budgets default |
 | `poll-final-skipped` | the deadline fails `Eventually` without a last poll | canary: the passing fixture's final poll never runs |
 | `poll-waited-out` | a poll that runs past the deadline is waited for | canary: the failing fixture's hanging polls pass once their sleep ends, and no message names a poll still running past its deadline |
 | `poll-grace-one-tick` | a poll in flight at the deadline gets one tick, not waitFor, before it counts as hung | canary: the `latepolls` fixture's polls of many ticks fail as still running |
@@ -478,6 +479,8 @@ shards of one run do not add up to every mutant exactly once.
 | `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle conformance: the stopped run's stream has no failed package |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 | `fixture-stdout-is-protocol` | a shared fixture's stdout is the protocol stream | canary: a setup that prints a fragment and a forged `_done` fails the run |
+| `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full; fixtures conformance: a hanging 2s-budget fixture is given up only after 30s, and a container fixture taking 35s is given up at 30s |
+| `given-up-setup-passes-the-run` | a shared fixture setup that is given up is not booked, and the suite reading it is recorded as passed | fixtures conformance: the run whose setup was given up beside a released sibling exits 0 |
 | `protocol-handed-to-started-processes` | the shared fixture process leaves the protocol descriptor and its variable to the processes a fixture starts | canary: the started process sees the variable and its write to descriptor 3 fails the setup |
 
 ## Adding a mutant

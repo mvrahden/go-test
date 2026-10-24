@@ -112,6 +112,9 @@ func main() {
 		{{ $f.VarName }}.{{ $pa.FieldName }} = {{ $pa.ParentVar }}
 {{- end }}
 {{- /*
+  The budget the setup is about to be held to goes to the runner first, whose
+  wait for the whole setup follows what the fixtures declare unless a
+  --setup-timeout names a flat one.
   One policy, shared with the in-process DAG: a panic here would otherwise kill
   the process holding every sibling fixture's resources, so none of their
   AfterAlls would ever run. RunFixtureSetup also writes the per-attempt and
@@ -119,7 +122,7 @@ func main() {
   released, only once its BeforeAll is entered and until a release between
   attempts has run.
 */}}
-		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{
+		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "{{ $f.Identifier }}",
 			Timeout:    ƒcfg_{{ $f.VarName }}.Timeout,
 			Budget:     {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
@@ -130,7 +133,9 @@ func main() {
 			AfterAll:   {{ $f.VarName }}.AfterAll,
 {{- end }}
 			Held:       func(ƒheld bool) { ƒattempted[{{ $i }}] = ƒheld },
-		})
+		}
+		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("{{ $f.StateKey }}"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
+		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[{{ $i }}] != nil {
 			return
 		}

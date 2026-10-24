@@ -441,7 +441,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// An inlined second copy of the loop is how the subprocess ended up
 			// without panic containment, retry-on-panic or a Timeout verdict
 			// while the DAG had all three.
-			gotest.Contains(it, code, "gotestruntime.RunFixtureSetup(ƒctx, gotestruntime.FixtureSetup{",
+			gotest.Contains(it, code, "gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)",
 				"setup must go through the shared policy")
 			gotest.NotContains(it, code, "ƒattempts := 1 + ƒcfg_sf0.Retries",
 				"no second copy of the retry loop may remain")

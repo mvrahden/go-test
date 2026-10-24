@@ -1,0 +1,17 @@
+Expect: setupbudget: the run took .*; the wait outlived the fixture's declared 2s budget
+Expect: ^FAIL .*conformance/fixtures .* / fails the run within 60s, saying the setup timed out \(
+Expect: ^FAIL .*conformance/fixtures .* / the run passes: the wait is the fixture's declared budget \(
+Judge: ./tests/canary CanaryTestSuite/TestTheSetupWaitIsTheFixturesBudget
+Clause: when a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given → fails the run within 60s, saying the setup timed out
+Clause: when a shared fixture declaring ContainerFixtureConfig takes 35s to come up and no --setup-timeout is given → the run passes: the wait is the fixture's declared budget
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -715,7 +715,7 @@
+ 			continue
+ 		}
+ 		if entry.Key == "_setup" {
+-			if d, err := time.ParseDuration(entry.Budget); err == nil {
++			if d, err := time.ParseDuration(entry.Budget); err == nil && d < 0 {
+ 				p.noteSetupBudget(d)
+ 			}
+ 			continue

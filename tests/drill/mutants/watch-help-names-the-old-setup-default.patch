@@ -1,0 +1,15 @@
+Judge: ./tests/conformance/cli CLIHelpTestSuite/TestTheSetupTimeoutDefault/a_help_text_lists_--setup-timeout/gives_its_default_as_the_fixtures'_declared_budgets,_30s_until_the_first_reports/help_watch
+Expect: ^FAIL .*conformance/cli .* / gives its default as the fixtures' declared budgets, 30s until the first reports / help watch \(
+Clause: when a help text lists --setup-timeout → gives its default as the fixtures' declared budgets, 30s until the first reports
+--- a/cmd/gotest/help.go
++++ b/cmd/gotest/help.go
+@@ -351,8 +351,7 @@
+                           ns/op delta against the previous run
+   --update-snapshots      Regenerate snapshot files
+   --no-cache              Disable the overlay and test binary caches
+-  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
+-                          budgets, 30s until the first reports; 0 to disable)
++  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
+   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
+   --parallel=<n>          Total concurrent test method budget (default: 2×GOMAXPROCS,
+                           halved under -race/-msan/-asan)

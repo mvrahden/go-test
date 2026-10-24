@@ -24,6 +24,12 @@ const deadPID = "999999999"
 // Sequential: the methods move the process's temp dir.
 type CLIDirTestSuite struct{}
 
+func (s *CLIDirTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// Two methods build the CLI: past 30s on a cold Windows runner, so twice
+	// that.
+	return gotest.SuiteConfig{Timeout: time.Minute}
+}
+
 func (s *CLIDirTestSuite) TestStaleCLIDirsAreSwept(t *gotest.T) {
 	tmp := privateTempDir(t)
 	aged := time.Now().Add(-48 * time.Hour) // past every age the sweep allows

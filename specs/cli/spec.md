@@ -128,6 +128,13 @@ The version subcommand SHALL exit 0 and print the version on stdout.
 - **WHEN** the version subcommand runs
 - **THEN** exits 0 and prints the version on stdout
 
+### Requirement: The setup budget's default in the help
+Every help text that lists --setup-timeout SHALL give its default as the fixtures' declared budgets, 30s until the first reports. The cases are the table in `tests/conformance/cli/help_suite_test.go`.
+
+#### Scenario: A help text that lists --setup-timeout
+- **WHEN** a help text lists --setup-timeout
+- **THEN** gives its default as the fixtures' declared budgets, 30s until the first reports
+
 ### Requirement: A shared fixture with per-test hooks
 gotest SHALL refuse with exit 2 a shared fixture that declares BeforeEach or AfterEach, in the suite's package or another: shared fixtures have no per-test hooks, so the hook would never run. The error is located at the hook and says where the per-test work goes instead.
 

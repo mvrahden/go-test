@@ -134,6 +134,9 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 				doneEntry = entry
 				break
 			}
+			if strings.HasPrefix(entry.Key, "_") {
+				continue // the protocol's own lines, such as a fixture's setup budget
+			}
 			state[entry.Key] = entry.State
 		}
 		gotest.NoError(w, scanner.Err())
