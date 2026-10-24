@@ -17,11 +17,6 @@ import (
 // Sequential: each test chooses the optional build-cache environment.
 type BuildCacheTestSuite struct{}
 
-func (s *BuildCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
-}
-
 func (s *BuildCacheTestSuite) TestCachedBuildsFollowSourcesAndKeepPrivateExecutables(t *gotest.T) {
 	t.Setenv("GOTEST_TEST_CLI_CACHE_DIR", filepath.Join(t.TempDir(), "cache with spaces"))
 	root := t.TempDir()
@@ -63,11 +58,6 @@ type InProcessCacheTestSuite struct {
 	builds          atomic.Int32
 	active, overlap atomic.Int32
 	restore         func()
-}
-
-func (s *InProcessCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *InProcessCacheTestSuite) BeforeEach(t *gotest.T) {

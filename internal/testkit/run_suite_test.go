@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -20,8 +21,8 @@ type RunOraclesTestSuite struct {
 }
 
 func (s *RunOraclesTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~54s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{SetupTimeout: 2 * time.Minute}
 }
 
 func (s *RunOraclesTestSuite) BeforeAll(t *gotest.T) {
@@ -126,8 +127,8 @@ type UserCacheTestSuite struct {
 }
 
 func (s *UserCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~56s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{SetupTimeout: 2 * time.Minute}
 }
 
 func (s *UserCacheTestSuite) BeforeAll(t *gotest.T) {

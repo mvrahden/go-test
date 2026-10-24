@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -22,8 +23,8 @@ var (
 type BenchFuzzFrameTestSuite struct{}
 
 func (s *BenchFuzzFrameTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~25s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
 func (s *BenchFuzzFrameTestSuite) TestBenchmarkLifecycleContexts(t *gotest.T) {

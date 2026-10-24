@@ -17,8 +17,7 @@ import (
 type FuzzArgsTestSuite struct{}
 
 func (s *FuzzArgsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func named(name string, under types.Type) *types.Named {

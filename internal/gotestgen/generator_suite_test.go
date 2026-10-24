@@ -3,6 +3,7 @@ package gotestgen_test
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -12,11 +13,9 @@ import (
 // fixtures in testdata_e2e/.
 type GeneratorTestSuite struct{}
 
-// SuiteConfig: the end-to-end fixtures are generated and built, which
-// the 30-second default does not cover on a slow machine.
 func (s *GeneratorTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~14s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *GeneratorTestSuite) TestStdlibPackageHasNoSuites(t *gotest.T) {

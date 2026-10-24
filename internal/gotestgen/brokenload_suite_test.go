@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -28,8 +29,8 @@ func brokenloadDir(t *gotest.T) string {
 type BrokenLoadTestSuite struct{}
 
 func (s *BrokenLoadTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~16s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *BrokenLoadTestSuite) TestBrokenPackageVerdicts(t *gotest.T) {
