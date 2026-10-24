@@ -115,7 +115,7 @@ Go 1.16 introduced the `-overlay` flag for the `go` toolchain. It takes a JSON f
 
 gotest writes the generated files to a content-addressable cache directory, creates the overlay JSON, and passes it to `go test -overlay=...`. Nothing is ever written into your project. Your source directory stays clean, your git status stays unchanged, and pull requests don't include generated code.
 
-The cache is keyed by a SHA-256 hash of the generated content. If you run tests twice without changing any suite code, the second run hashes to the same entry and reuses the existing overlay files — and because the overlay path stays stable, Go's own build cache can reuse the compiled test packages.
+The cache is keyed by a SHA-256 hash of the generated content. If you run tests twice without changing any suite code, the second run hashes to the same entry and reuses the existing overlay files instead of writing them again. Compile reuse comes from Go's own build cache, which keys each compiled package by its files' names and contents, not by where an overlay keeps them.
 
 ## What code generation gains over reflection
 
@@ -192,6 +192,6 @@ Code generation isn't free. It adds a build step: the AST discovery and generati
 
 If part of your workflow has to invoke `go test` directly, run `gotest generate ./...` first to materialize the bridge files on disk, and `gotest clean ./...` to remove them afterwards.
 
-Day to day, the build step mostly disappears: generation operates on parse trees, and the overlay cache keeps the compile step warm, so the edit-test loop stays close to plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
+Day to day, the build step mostly disappears: generation operates on parse trees, Go's build cache recompiles only the packages whose files changed, and an unchanged test binary is not linked again, so the edit-test loop stays close to plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
 
 The code generation approach aligns with Go's broader philosophy: explicit over implicit, compile-time over runtime, readable code over framework magic. The generated code is what a careful developer would write by hand. gotest just writes it for you.
