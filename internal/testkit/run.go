@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -37,6 +39,26 @@ type Event struct {
 // MarkersFile is the file, inside the directory GOTEST_CANARY_DIR names, that
 // suites under test append one marker per line to.
 const MarkersFile = "markers"
+
+// StopGrace is how long a CLI whose context ended has to finish stopping
+// before it is killed: the default fixture Timeout its teardown is given, and
+// the 30s the process adds. WithStopGrace sets another.
+const StopGrace = 2*time.Minute + 30*time.Second
+
+type stopGraceKey struct{}
+
+// WithStopGrace returns ctx carrying grace in place of StopGrace for the runs
+// started under it.
+func WithStopGrace(ctx context.Context, grace time.Duration) context.Context {
+	return context.WithValue(ctx, stopGraceKey{}, grace)
+}
+
+func stopGrace(ctx context.Context) time.Duration {
+	if grace, ok := ctx.Value(stopGraceKey{}).(time.Duration); ok {
+		return grace
+	}
+	return StopGrace
+}
 
 // RunPackage runs the built CLI with -json over pkg (a path relative to the
 // caller's working directory) and reads back the stream and the markers the
@@ -84,16 +106,36 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 	cmd.Env = append(childEnv(markerDir), extraEnv...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	// A context that ends stops the CLI as a user does, so its shared
+	// fixtures are torn down; it is killed only when it outlives the grace.
+	tree := proctree.New(cmd)
+	cmd.Cancel = func() error {
+		if err := Interrupt(cmd, tree); err != nil {
+			return os.ErrProcessDone
+		}
+		return nil
+	}
+	cmd.WaitDelay = stopGrace(ctx)
 	run := Run{}
-	if err := cmd.Run(); err != nil {
+	err = tree.Start()
+	if err == nil {
+		err = cmd.Wait()
+		tree.Release()
+	}
+	if err != nil {
 		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
+		switch {
+		case errors.As(err, &exitErr):
+			run.Exit = exitErr.ExitCode()
+		case cmd.ProcessState != nil:
+			// Stopped by the context, or its output held open past the grace.
+			run.Exit = cmd.ProcessState.ExitCode()
+		default:
 			return Run{}, fmt.Errorf("run gotest %s: %w", strings.Join(args, " "), err)
 		}
-		run.Exit = exitErr.ExitCode()
 	}
 	run.Stdout, run.Stderr = stdout.String(), stderr.String()
-	run.Events = parseEvents(stdout.Bytes())
+	run.Events = ParseEvents(stdout.Bytes())
 	run.Markers, err = ReadMarkers(filepath.Join(markerDir, MarkersFile))
 	return run, err
 }
@@ -171,7 +213,8 @@ func ChildEnv(markerDir string, extra ...string) []string {
 	return append(childEnv(markerDir), extra...)
 }
 
-func parseEvents(stdout []byte) []Event {
+// ParseEvents reads the go test -json events among stdout's lines.
+func ParseEvents(stdout []byte) []Event {
 	var events []Event
 	for _, line := range bytes.Split(stdout, []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {

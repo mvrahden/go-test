@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -60,7 +61,7 @@ func stopWatch() {
 		// Under plain go test nothing else marks the run interrupted: once the
 		// stopped suite has torn down, the process ends by the signal, and the
 		// suites after it never run. Under the runner the process ends with the
-		// tests' own status, having reported every verdict, and the runner
+		// tests' own status, so the stream carries every verdict and the runner
 		// reports the stop.
 		if stopFile == "" && stopping.Load() {
 			reraise(stoppedBy())
@@ -72,39 +73,87 @@ func stopWatch() {
 //
 // Under the gotest runner a signal counts only once the runner has created the
 // stop file, so a signal the code under test sends its own process is left to
-// that code; a parent that is gone counts as well. Under plain go test only
-// SIGINT counts, the Ctrl-C a developer sends. Fuzzing is left to Go once its
-// engine has the target: it stops on an interrupt by itself, saving what it
-// found, and the target returns. A signal ignored when the process started
-// stays ignored.
+// that code; a parent that is gone counts as well. The stop file counts by
+// itself too, which the watcher polls for: on Windows it is the only stop the
+// runner sends. Under plain go test only SIGINT counts, the Ctrl-C a developer
+// sends, and nothing is polled. Fuzzing is left to Go once its engine has the
+// target: it stops on an interrupt by itself, saving what it found, and the
+// target returns. A signal ignored when the process started stays ignored.
 type watcher struct {
-	stderr io.Writer
-	file   string // the runner's stop file; empty under plain go test
-	sigs   []os.Signal
-	ch     chan os.Signal
-	quit   chan struct{}
-	done   chan struct{}
+	stderr  io.Writer
+	file    string // the runner's stop file; empty under plain go test
+	sigs    []os.Signal
+	ch      chan os.Signal // the signals that arrived
+	found   chan os.Signal // a stop the poll found
+	running bool
+	// unasked: the stop under way is one the poll found, which no signal
+	// has asked for yet.
+	unasked bool
+	quit    chan struct{}
+	done    chan struct{}
+	polled  chan struct{}
 }
 
-func watch(stderr io.Writer) *watcher {
+func watch(stderr io.Writer) *watcher { return watchFile(stderr, stopFile) }
+
+func watchFile(stderr io.Writer, file string) *watcher {
 	notePipe()
-	w := &watcher{stderr: stderr, file: stopFile, ch: make(chan os.Signal, 1), quit: make(chan struct{}), done: make(chan struct{})}
+	w := &watcher{stderr: stderr, file: file, ch: make(chan os.Signal, 1), found: make(chan os.Signal, 1),
+		quit: make(chan struct{}), done: make(chan struct{}), polled: make(chan struct{})}
 	candidates := []os.Signal{os.Interrupt}
 	if w.file != "" {
 		candidates = append(candidates, stopSignals...)
+		// The runner stops this process alone, by pid or by the stop file, so
+		// the converter in front of it lives on to relay the stream to its end.
+		_ = os.WriteFile(protocol.StopPIDPath(w.file), []byte(strconv.Itoa(os.Getpid())), 0o600)
 	}
 	for _, s := range candidates {
 		if !signal.Ignored(s) {
 			w.sigs = append(w.sigs, s)
 		}
 	}
-	if len(w.sigs) == 0 {
+	if len(w.sigs) == 0 && w.file == "" {
 		close(w.done)
+		close(w.polled)
 		return w
 	}
-	signal.Notify(w.ch, w.sigs...)
+	if len(w.sigs) > 0 {
+		signal.Notify(w.ch, w.sigs...)
+	}
+	w.running = true
 	go w.loop()
+	if w.file != "" {
+		sig := os.Interrupt
+		if len(stopSignals) > 0 {
+			sig = stopSignals[0]
+		}
+		go w.poll(sig)
+	} else {
+		close(w.polled)
+	}
 	return w
+}
+
+// stopFilePoll is how often the watcher looks for the runner's stop file.
+const stopFilePoll = 25 * time.Millisecond
+
+// poll hands the loop sig once the runner's stop file exists. It runs under
+// the runner only, and fires once.
+func (w *watcher) poll(sig os.Signal) {
+	defer close(w.polled)
+	tick := time.NewTicker(stopFilePoll)
+	defer tick.Stop()
+	for {
+		select {
+		case <-w.quit:
+			return
+		case <-tick.C:
+		}
+		if _, err := os.Stat(w.file); err == nil {
+			w.found <- sig // buffered, and sent once
+			return
+		}
+	}
 }
 
 func (w *watcher) loop() {
@@ -115,7 +164,12 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
-				w.stop(sig) // returns once the run has stopped, or ends the process
+				w.stop(sig, true) // returns once the run has stopped, or ends the process
+			}
+		case sig := <-w.found:
+			// A stop a signal already began has read the file too.
+			if !stopping.Load() && w.counts(sig) {
+				w.stop(sig, false)
 			}
 		}
 	}
@@ -150,8 +204,11 @@ const stopGrace = 5 * time.Second
 // only the fixtures' teardown time is left of the release bound, forces it:
 // the fixtures are torn down within what is left of the bound and the process
 // ends by sig. Once the stop is settled or forced, the handlers are reset, so
-// the next signal has its default action.
-func (w *watcher) stop(sig os.Signal) {
+// the next signal has its default action. A stop no signal asked for, which
+// the poll found, takes the first signal that follows as its request, the
+// runner's own after its stop file among them; only the next one forces it.
+func (w *watcher) stop(sig os.Signal, requested bool) {
+	w.unasked = !requested
 	releaseEnd, settled := w.settle(sig, stopGrace)
 	signal.Reset(w.sigs...)
 	if settled {
@@ -205,7 +262,11 @@ func (w *watcher) settle(sig os.Signal, grace time.Duration) (releaseEnd time.Ti
 		}
 		select {
 		case again := <-w.ch:
-			if w.counts(again) {
+			switch {
+			case !w.counts(again):
+			case w.unasked:
+				w.unasked = false // the request the poll ran ahead of
+			default:
 				fmt.Fprintln(w.stderr, "gotest: a second stop signal; the fixtures are torn down now and the process ends by the signal")
 				return releaseEnd, false
 			}
@@ -250,9 +311,12 @@ var openSuites atomic.Int64
 func (w *watcher) close() {
 	if len(w.sigs) > 0 {
 		signal.Stop(w.ch)
+	}
+	if w.running {
 		close(w.quit)
 	}
 	<-w.done
+	<-w.polled
 }
 
 // releaseWithin tears the held fixtures down, giving up waiting at deadline.

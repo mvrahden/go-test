@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -214,9 +215,13 @@ func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: s
 // RunSingleSuite executes a single suite subprocess.
 // When test2json is true, the binary is wrapped with the test2json tool.
 //
-// On context cancellation, cmd.Cancel sends SIGTERM to the process group.
-// A per-process kill timer (from the teardown budget file) then governs
-// when SIGKILL is sent, and nothing else kills. Output is read by the
+// On context cancellation, cmd.Cancel announces the stop and signals the
+// suite process alone, by the pid it published on Unix and by the stop file
+// itself on Windows, so the converter in front of it relays the stream to its
+// end; a process that published no pid, or one outside the suite's process
+// group, gets the group's SIGTERM instead. A per-process kill timer (from the
+// teardown budget file) then governs when SIGKILL is sent, and nothing else
+// kills. Output is read by the
 // managed process itself, so a grandchild outside the group that keeps the
 // pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
@@ -236,9 +241,15 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	cancel := cmd.Cancel
 	cmd.Cancel = func() error {
 		cutShort.Store(true)
-		// Announced before the interrupt: the process reads it on the signal.
+		// Announced before the signal: the process reads it on the signal,
+		// or polls for it where no signal comes.
 		if target.StopFile != "" {
 			_ = os.WriteFile(target.StopFile, nil, 0o600)
+			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
+				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
+					return nil
+				}
+			}
 		}
 		return cancel()
 	}
@@ -533,4 +544,14 @@ func insertBeforeWords(args []string, flag string) []string {
 		}
 	}
 	return append(slices.Clone(args), flag)
+}
+
+// readPID reads the pid a suite process published, 0 when there is none.
+func readPID(path string) int {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the runner's own sidecar file
+	if err != nil {
+		return 0
+	}
+	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+	return pid
 }
