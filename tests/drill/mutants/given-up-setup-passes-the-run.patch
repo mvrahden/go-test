@@ -1,0 +1,22 @@
+Expect: ^FAIL .*conformance/fixtures .*ASetupGivenUp.* / fails the run \(
+Clause: when a shared fixture's setup is given up while a sibling that came up is still to be released → fails the run
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -685,8 +685,6 @@
+ 	var setupErr error
+ 	var setupTimedOut bool
+ 	failSetup := func(err error) {
+-		setupErr = err
+-		sharedSetupFailed.Store(true)
+ 		close(setupGaveUp)
+ 	}
+ 
+@@ -823,7 +821,7 @@
+ 					switch {
+ 					case recorded:
+ 					case missing != "":
+-						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
++						collector.RecordResult(t.Package, idx, SuiteResult{})
+ 					default:
+ 						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+ 					}
