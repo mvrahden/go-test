@@ -57,6 +57,22 @@ func main() {
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 2)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 	ƒdone_sf1 := make(chan struct{})
@@ -77,6 +93,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -114,6 +131,7 @@ func main() {
 			AfterAll:   sf1.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		}
+		ƒshare(1, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/redis.RedisFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[1] != nil {
@@ -186,13 +204,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -254,7 +266,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -324,6 +336,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -343,6 +371,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -397,11 +426,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -451,7 +476,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -518,6 +543,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -537,6 +578,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.SetupFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -576,11 +618,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -630,7 +668,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -697,6 +735,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -716,6 +770,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -768,11 +823,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -822,7 +873,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -892,6 +943,22 @@ func main() {
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 2)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 	ƒdone_sf1 := make(chan struct{})
@@ -912,6 +979,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/shared.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -949,6 +1017,7 @@ func main() {
 			AfterAll:   sf1.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		}
+		ƒshare(1, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/shared.RedisFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[1] != nil {
@@ -1021,13 +1090,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -1089,7 +1152,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -1159,6 +1222,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -1178,6 +1257,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -1230,11 +1310,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -1284,7 +1360,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -1351,6 +1427,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -1370,6 +1462,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -1422,11 +1515,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -1476,7 +1565,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -1543,6 +1632,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -1562,6 +1667,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -1614,11 +1720,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -1668,7 +1770,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -1735,6 +1837,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -1754,6 +1872,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -1806,11 +1925,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -1860,7 +1975,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -1931,6 +2046,22 @@ func main() {
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 2)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 	ƒdone_sf1 := make(chan struct{})
@@ -1951,6 +2082,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -1988,6 +2120,7 @@ func main() {
 			AfterAll:   sf1.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		}
+		ƒshare(1, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/redis.RedisFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[1] != nil {
@@ -2060,13 +2193,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -2128,7 +2255,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -2198,6 +2325,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -2217,6 +2360,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -2269,11 +2413,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -2323,7 +2463,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -2391,6 +2531,22 @@ func main() {
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 1)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 
@@ -2417,6 +2573,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -2469,11 +2626,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -2523,7 +2676,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
@@ -2594,6 +2747,22 @@ func main() {
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, 2)
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 
 	ƒdone_sf0 := make(chan struct{})
 	ƒdone_sf1 := make(chan struct{})
@@ -2614,6 +2783,7 @@ func main() {
 			AfterAll:   sf0.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
 		}
+		ƒshare(0, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[0] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[0] != nil {
@@ -2651,6 +2821,7 @@ func main() {
 			AfterAll:   sf1.AfterAll,
 			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
 		}
+		ƒshare(1, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("github.com/example/project/tests/gcs.GCSFixture"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[1] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[1] != nil {
@@ -2725,13 +2896,7 @@ func main() {
 			break
 		}
 	}
-	var ƒbudget time.Duration
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)
-
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf1.Timeout)
-
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -2793,7 +2958,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 

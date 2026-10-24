@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/fixtures .* / the sibling's 8s AfterAll runs to its end under the teardown budget the process reports \(
+Clause: when a shared fixture's setup is given up while a sibling that came up is still to be released → the sibling's 8s AfterAll runs to its end under the teardown budget the process reports
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -791,7 +791,6 @@
+ 			if entry.Error != "" {
+ 				p.setupErr = fmt.Errorf("%s", entry.Error)
+ 			}
+-			p.noteTeardownBudget(entry.TeardownBudget)
+ 			doneSeen = true
+ 			close(p.allDone)
+ 			continue

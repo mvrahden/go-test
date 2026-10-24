@@ -32,6 +32,7 @@ type CanaryTestSuite struct {
 	binary     string
 	expected   map[string]expectation
 	lastStream string // the -json stdout of the last run, for checks on what it carried
+	lastStderr string // the stderr of the last run
 }
 
 func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -134,7 +135,7 @@ func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, e
 		}
 		code = exitErr.ExitCode()
 	}
-	s.lastStream = stdout.String()
+	s.lastStream, s.lastStderr = stdout.String(), stderr.String()
 	seen := map[string]bool{}
 	for _, line := range bytes.Split(stdout.Bytes(), []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {
@@ -209,11 +210,15 @@ var hostOnlyEnv = []string{"CI", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"}
 // check runs a fixture, with flags before the package, and compares exit
 // code and rows with the golden.
 func (s *CanaryTestSuite) check(t *gotest.T, pkg string, flags ...string) string {
+	return s.checkIn(t, pkg, t.TempDir(), flags...)
+}
+
+// checkIn is check with dir as the canary dir.
+func (s *CanaryTestSuite) checkIn(t *gotest.T, pkg, dir string, flags ...string) string {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)
 	}
-	dir := t.TempDir()
 	code, rows := s.runWith(t, pkg, dir, nil, flags...)
 	if code != want.exit {
 		t.Errorf("%s: exit code %d, want %d", pkg, code, want.exit)

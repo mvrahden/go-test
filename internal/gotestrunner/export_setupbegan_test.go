@@ -6,18 +6,29 @@ import "time"
 // process reports it.
 func ExportNoteSetupBudget(p *SharedFixtureProcess, budget time.Duration) { p.noteSetupBudget(budget) }
 
-// discardStdin takes every command and answers none.
-type discardStdin struct{}
+// reportingStdin reports a setup with budget delay after it receives the
+// start command, and returns lag after the report.
+type reportingStdin struct {
+	p                  *SharedFixtureProcess
+	budget, delay, lag time.Duration
+}
 
-func (discardStdin) Write(b []byte) (int, error) { return len(b), nil }
-func (discardStdin) Close() error                { return nil }
+func (w reportingStdin) Write(b []byte) (int, error) {
+	time.Sleep(w.delay)
+	w.p.noteSetupBudget(w.budget)
+	time.Sleep(w.lag)
+	return len(b), nil
+}
 
-// ExportNewHungStartProcess is a process that takes start commands and never
-// acknowledges them; it exits only when exit is called.
-func ExportNewHungStartProcess() (p *SharedFixtureProcess, exit func()) {
-	p = ExportNewSilentProcess()
+func (reportingStdin) Close() error { return nil }
+
+// ExportNewReportingProcess is a process that reports a setup declaring budget
+// delay after a command reaches it, lag before the command's write returns,
+// and never acknowledges.
+func ExportNewReportingProcess(budget, delay, lag time.Duration) *SharedFixtureProcess {
+	p := ExportNewSilentProcess()
 	p.done = make(chan struct{})
 	p.cmdResp = make(chan string, 1)
-	p.stdin = discardStdin{}
-	return p, func() { close(p.done) }
+	p.stdin = reportingStdin{p: p, budget: budget, delay: delay, lag: lag}
+	return p
 }

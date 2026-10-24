@@ -218,3 +218,14 @@ detachedchild exit 0
 detachedchild pass -
 detachedchild pass TestDetachTestSuite
 detachedchild pass TestDetachTestSuite/TestStateArrived
+latebudget exit 1
+latebudget fail -
+latebudget pass -
+latebudget pass TestBulkTestSuite
+latebudget pass TestBulkTestSuite/TestOne
+latebudget pass TestTailTestSuite
+latebudget pass TestTailTestSuite/TestStateArrived
+slowretry exit 0
+slowretry pass -
+slowretry pass TestSlowTestSuite
+slowretry pass TestSlowTestSuite/TestStateArrived

@@ -69,6 +69,37 @@ func main() {
 	ƒstarted := make([]bool, {{ len .Fixtures }})
 	ƒattempted := make([]bool, {{ len .Fixtures }})
 	ƒtorn := make([]bool, {{ len .Fixtures }})
+{{- /*
+  The teardown budget covers every fixture whose setup was reached, at the
+  config it derived: an up-front fixture by _done, a late one by the
+  acknowledgement of the start that brought it up. A late fixture not yet
+  started counts at the default config, so a stop during its start still gets
+  a window for its release. Teardown is strictly sequential, so the budget is
+  the SUM of the shares: a max would force-kill a set of teardowns that each
+  obeyed its own declared Timeout. An up-front fixture skipped for a failed
+  dependency has nothing to release.
+*/}}
+	var ƒshareMu sync.Mutex
+	ƒshares := make([]time.Duration, {{ len .Fixtures }})
+{{- range $i, $f := .Fixtures }}
+{{- if $f.Deferred }}
+	ƒshares[{{ $i }}] = gotestruntime.SupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout)
+{{- end }}
+{{- end }}
+	ƒshare := func(i int, timeout time.Duration) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
+	}
+	ƒteardownBudget := func() time.Duration {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒbudget := 30 * time.Second
+		for _, ƒs := range ƒshares {
+			ƒbudget += ƒs
+		}
+		return ƒbudget
+	}
 {{ range $f := .Fixtures }}
 	ƒdone_{{ $f.VarName }} := make(chan struct{})
 {{- end }}
@@ -134,6 +165,7 @@ func main() {
 {{- end }}
 			Held:       func(ƒheld bool) { ƒattempted[{{ $i }}] = ƒheld },
 		}
+		ƒshare({{ $i }}, ƒsetup.Timeout)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("{{ $f.StateKey }}"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
 		if ƒerrs[{{ $i }}] != nil {
@@ -219,18 +251,10 @@ func main() {
 	}
 
 {{- /*
-  Teardown is strictly sequential, so the budget the supervisor gets is the
-  SUM of the members' budgets: a max would force-kill a set of teardowns that
-  each obeyed its own declared Timeout. Deferred fixtures are counted at their
-  default config — their derivation runs at StartKeys time. Reported on both
-  _done forms — a failed setup still has succeeded siblings to release under
-  this budget.
+  Reported on both _done forms: a failed setup still has succeeded siblings to
+  release under this budget.
 */}}
-	var ƒbudget time.Duration
-{{ range $f := .Fixtures }}
-	ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_{{ $f.VarName }}.Timeout)
-{{ end }}
-	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
+	ƒbudgetStr := ƒquote(ƒteardownBudget().String())
 
 	if ƒanyFailed {
 		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
@@ -248,8 +272,9 @@ func main() {
   DAG order and TeardownKeys in reverse-DAG order because the fixture lists
   below are generated in topological order. Each command is acknowledged on
   the protocol stream with a _cmd line carrying the joined per-fixture
-  failures. A SIGTERM that already arrived (canceling setup above) has ƒctx
-  closed and falls straight through.
+  failures and the teardown budget, which now covers what the command brought
+  up. A SIGTERM that already arrived (canceling setup above) has ƒctx closed
+  and falls straight through.
 */}}
 	ƒcmds := make(chan ƒcommand)
 	go func() {
@@ -296,7 +321,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
 
