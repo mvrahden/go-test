@@ -255,6 +255,8 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 - Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 - Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
 
+The protocol is read whole, line by line, and nothing a fixture prints is part of it ([Shared fixture state reaches its suites](../../specs/fixtures/spec.md#requirement-shared-fixture-state-reaches-its-suites)).
+
 ### State transfer
 
 In the example above, `ConnStr` and `Port` are transferable (not assigned in `Hydrate`'s call chain).
@@ -360,7 +362,7 @@ gotest ./tests/e2e ./tests/integration -v
 
 1. Load target packages, collect test suites and fixtures from AST
 2. Resolve fixtures demand-driven: walk the type graph from targeted suites to discover all required package and shared fixtures (including cross-package)
-3. If shared fixtures are needed, generate and start a setup subprocess (calls `BeforeAll`, serializes transferable fields as JSON to stdout)
+3. If shared fixtures are needed, generate and start a setup subprocess (calls `BeforeAll`, serializes transferable fields as JSON lines on a protocol descriptor of its own — fd 3; on Windows its stdout, which the process takes away from fixture code before any runs, so what a fixture prints lands on stderr)
 4. Generate test code for each package
 5. Run `go test` — test harness deserializes fixture state, calls `Hydrate` if present
 6. Send SIGTERM to the setup subprocess (calls `AfterAll` in reverse order)
@@ -384,7 +386,7 @@ Each phase has an alive set — `Alive(phase)` is the DAG-closure of the union o
 - At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)` in reverse dependency order, then starts `Alive(tail) ∖ Alive(bulk)` in dependency order, under the same per-fixture retry and budget policy as the up-front phase.
 - Run-end teardown releases whatever is still resident. Fixtures released at the barrier are skipped there: every fixture's teardown has exactly one owner.
 
-The barrier speaks two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on stdout after any late state lines.
+The barrier speaks two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on the protocol stream after any late state lines.
 `Alive(tail)` is computed from the tail suites that actually became runnable, so a fixture whose only exclusive suite failed to compile is released at the barrier, not started for nothing.
 On cancellation the barrier is skipped entirely and run-end teardown owns everything.
 Window scheduling is always on; there is no configuration.

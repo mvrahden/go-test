@@ -795,6 +795,12 @@ func (s *CanaryTestSuite) TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves(t
 	}
 }
 
+// What a shared fixture's setup prints to stdout is not the protocol: its
+// state still reaches the suite whole.
+func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T) {
+	s.check(t, "noisysetup")
+}
+
 // A fuzz execution whose BeforeEach skips is skipped: its body never runs and
 // its AfterEach still does.
 func (s *CanaryTestSuite) TestAFuzzExecutionSkippedByBeforeEachStillTearsDown(t *gotest.T) {

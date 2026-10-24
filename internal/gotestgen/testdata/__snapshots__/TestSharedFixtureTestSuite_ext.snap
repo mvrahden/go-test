@@ -44,6 +44,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PostgresFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -90,7 +92,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PostgresFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), string(b))
 		}
 	}
 
@@ -125,7 +127,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "RedisFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/redis.RedisFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/redis.RedisFixture"), string(b))
 		}
 	}
 
@@ -189,9 +191,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -248,7 +250,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -308,6 +310,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PostgresFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -352,7 +356,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PostgresFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PostgresFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PostgresFixture"), string(b))
 		}
 	}
 
@@ -394,9 +398,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -441,7 +445,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -498,6 +502,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.SetupFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -528,7 +534,7 @@ func main() {
 		if ƒerrs[0] != nil {
 			return
 		}
-		fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":{}}\n", ƒquote("github.com/example/fixtures.SetupFixture"))
+		fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":{}}\n", ƒquote("github.com/example/fixtures.SetupFixture"))
 	}
 
 	ƒteardown_sf0 := func() bool {
@@ -569,9 +575,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -616,7 +622,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -673,6 +679,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PostgresFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -715,7 +723,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PostgresFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), string(b))
 		}
 	}
 
@@ -757,9 +765,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -804,7 +812,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -861,6 +869,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PostgresFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -907,7 +917,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PostgresFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/shared.PostgresFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/shared.PostgresFixture"), string(b))
 		}
 	}
 
@@ -942,7 +952,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "RedisFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/shared.RedisFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/shared.RedisFixture"), string(b))
 		}
 	}
 
@@ -1006,9 +1016,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -1065,7 +1075,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -1125,6 +1135,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -1167,7 +1179,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -1209,9 +1221,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -1256,7 +1268,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -1313,6 +1325,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -1355,7 +1369,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -1397,9 +1411,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -1444,7 +1458,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -1501,6 +1515,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -1543,7 +1559,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -1585,9 +1601,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -1632,7 +1648,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -1689,6 +1705,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -1731,7 +1749,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -1773,9 +1791,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -1820,7 +1838,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -1878,6 +1896,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -1924,7 +1944,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -1959,7 +1979,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "RedisFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/redis.RedisFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/redis.RedisFixture"), string(b))
 		}
 	}
 
@@ -2023,9 +2043,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -2082,7 +2102,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -2142,6 +2162,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -2184,7 +2206,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -2226,9 +2248,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -2273,7 +2295,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -2330,6 +2352,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PGFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -2380,7 +2404,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PGFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/fixtures.PGFixture"), string(b))
 		}
 	}
 
@@ -2422,9 +2446,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -2469,7 +2493,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 
@@ -2527,6 +2551,8 @@ func ƒhasKey(keys []string, key string) bool {
 func main() {
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
+	// Before any fixture code: its stdout is not the runner's to read.
+	ƒproto := gotestruntime.ClaimSharedProtocol()
 
 	sf0 := &sfpkg0.PostgresFixture{}
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
@@ -2573,7 +2599,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "PostgresFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/fixtures.PostgresFixture"), string(b))
 		}
 	}
 
@@ -2610,7 +2636,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "GCSFixture: marshal: %v\n", err)
 				return
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/gcs.GCSFixture"), string(b))
+			fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":%s}\n", ƒquote("github.com/example/project/tests/gcs.GCSFixture"), string(b))
 		}
 	}
 
@@ -2674,9 +2700,9 @@ func main() {
 	ƒbudgetStr := ƒquote((ƒbudget + 30*time.Second).String())
 
 	if ƒanyFailed {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"error\":\"one or more shared fixtures failed\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	} else {
-		fmt.Fprintf(os.Stdout, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
+		fmt.Fprintf(ƒproto, "{\"key\":\"_done\",\"teardownBudget\":%s}\n", ƒbudgetStr)
 	}
 
 	ƒteardownFailed := false
@@ -2733,7 +2759,7 @@ func main() {
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(os.Stdout, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
 		}
 	}
 

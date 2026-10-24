@@ -137,3 +137,31 @@ A suite binding a shared fixture SHALL fail under plain go test before any metho
 #### Scenario: A shared-fixture suite under plain go test
 - **WHEN** a suite binding a shared fixture runs under plain go test
 - **THEN** fails naming the shared fixture it binds and go tool gotest, before any method runs
+
+### Requirement: Shared fixture state reaches its suites
+The state a shared fixture's setup produces SHALL reach the suites that bind it when the setup prints to stdout, with or without a trailing newline and in a JSON-shaped line, and when the state is 2 MiB, and nothing the setup prints SHALL become an event of the run.
+
+#### Scenario: Setup output without a trailing newline
+- **WHEN** a shared fixture's setup prints to stdout without a newline
+- **THEN** its suite receives the state
+
+#### Scenario: Setup logs a JSON-shaped line
+- **WHEN** a shared fixture's setup logs a JSON-shaped line
+- **THEN** its suite receives the state
+- **AND** the line is not an event of the run
+
+#### Scenario: Large state
+- **WHEN** a shared fixture carries 2 MiB of state
+- **THEN** its suite receives the state
+
+#### Scenario: Every protocol fixture comes up
+- **WHEN** every protocol fixture comes up despite its output
+- **THEN** the run passes
+
+### Requirement: A process a shared fixture's setup starts
+A process a shared fixture's setup starts SHALL get neither the protocol descriptor nor the variable naming it, and the run SHALL NOT wait for it, on Unix.
+
+#### Scenario: A process that outlives the setup
+- **WHEN** a shared fixture's setup starts a process that outlives it
+- **THEN** the run passes before that process ends
+- **AND** the process sees no protocol variable, and what it writes to descriptor 3 is not read

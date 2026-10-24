@@ -16,6 +16,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/proctree"
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // sharedTeardownFailedExit is the status the generated setup program exits with
@@ -47,6 +48,7 @@ type SharedFixtureProcess struct {
 	mu       sync.Mutex
 	allDone  chan struct{}
 	setupErr error
+	protoErr error // under mu: a stream the process got wrong after its setup was read
 	waitErr  error // exit status of the subprocess; valid once done is closed
 
 	stdin   io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
@@ -360,13 +362,21 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if forceKilled {
 		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", budget)
 	}
+	p.mu.Lock()
+	protoErr := p.protoErr
+	p.mu.Unlock()
+	return errors.Join(exitVerdict(p.setupErr, p.waitErr, diedEarly), protoErr)
+}
+
+// exitVerdict judges the process's exit status once it exited unforced.
+func exitVerdict(setupErr, waitErr error, diedEarly bool) error {
 
 	// A setup failure already surfaced through SetupErr; the subprocess ran its
 	// sibling teardowns under the runner's shutdown request and exited 1 for
 	// the setup failure. Reporting that status here again would blame teardown
 	// for it. Sibling AfterAll failures still reach the run through the
 	// fixtures' own reports, which the pipeline reads separately.
-	if p.setupErr != nil {
+	if setupErr != nil {
 		return nil
 	}
 
@@ -376,17 +386,17 @@ func (p *SharedFixtureProcess) Teardown() error {
 	// status supports. exec maps a success status under a canceled command
 	// context to ctx.Err() — and only a success status, so a context error here
 	// IS the clean exit, just relabeled.
-	if p.waitErr == nil || errors.Is(p.waitErr, context.Canceled) || errors.Is(p.waitErr, context.DeadlineExceeded) {
+	if waitErr == nil || errors.Is(waitErr, context.Canceled) || errors.Is(waitErr, context.DeadlineExceeded) {
 		return nil
 	}
 	var exitErr *exec.ExitError
-	if errors.As(p.waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
+	if errors.As(waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
 		return fmt.Errorf("shared fixture teardown failed")
 	}
 	if diedEarly {
-		return fmt.Errorf("shared fixture process exited before teardown was requested (%v); its AfterAll may not have run and its resources may be leaked", p.waitErr)
+		return fmt.Errorf("shared fixture process exited before teardown was requested (%v); its AfterAll may not have run and its resources may be leaked", waitErr)
 	}
-	return fmt.Errorf("shared fixture process died during teardown (%v); its AfterAll may not have finished and its resources may be leaked", p.waitErr)
+	return fmt.Errorf("shared fixture process died during teardown (%v); its AfterAll may not have finished and its resources may be leaked", waitErr)
 }
 
 // StartSharedFixtures generates a shared setup binary in the overlay temp dir,
@@ -426,8 +436,16 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		return nil, fmt.Errorf("build shared fixture setup: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, setupBin)
+	keys := make([]string, len(fixtures))
+	for i := range fixtures {
+		keys[i] = fixtures[i].PkgPath + "." + fixtures[i].Identifier
+	}
+	return launchSharedFixtures(exec.CommandContext(ctx, setupBin), sharedDir, keys, setupTimeout)
+}
 
+// launchSharedFixtures starts cmd as the shared fixture process serving the
+// fixtures with the given state keys.
+func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
 	// The teardown budget the process reports is the only kill timer: exec's
 	// WaitDelay stays unset, since any bound set here would have to be chosen
 	// before the budget is known, and one below it becomes the budget — a
@@ -441,21 +459,31 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	// scan has finished, so a child the fixture left on the pipe would hold
 	// the scan, and with it the teardown verdict, until it let go. Here the
 	// scan is bounded by the drain delay past the exit instead.
-	stdout, stdoutW, err := os.Pipe()
+	proto, protoW, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
-	cmd.Stdout = stdoutW
-	// Stderr is read the same way, for the same reason, and passed on.
+	// Stderr is read the same way, for the same reason, and passed on. The
+	// process's stdout joins it: the protocol has a descriptor of its own,
+	// so what a fixture prints is never read as protocol. Windows passes no
+	// extra files, so there the protocol stays on stdout, which the process
+	// takes away from fixture code before any of it runs.
 	stderr, stderrW, err := os.Pipe()
 	if err != nil {
-		_ = stdout.Close()
-		_ = stdoutW.Close()
+		_ = proto.Close()
+		_ = protoW.Close()
 		return nil, err
 	}
 	cmd.Stderr = stderrW
+	if runtime.GOOS == "windows" {
+		cmd.Stdout = protoW
+	} else {
+		cmd.Stdout = stderrW
+		cmd.ExtraFiles = []*os.File{protoW} // descriptor 3
+		cmd.Env = append(os.Environ(), protocol.EnvSharedProtocolFD+"=3")
+	}
 	closePipes := func() {
-		for _, f := range []*os.File{stdout, stdoutW, stderr, stderrW} {
+		for _, f := range []*os.File{proto, protoW, stderr, stderrW} {
 			_ = f.Close()
 		}
 	}
@@ -469,13 +497,12 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		closePipes()
 		return nil, fmt.Errorf("start shared fixture process: %w", err)
 	}
-	_ = stdoutW.Close()
+	_ = protoW.Close()
 	_ = stderrW.Close()
 
 	// Build per-fixture readiness channels.
-	ready := make(map[string]chan struct{}, len(fixtures))
-	for i := range fixtures {
-		key := fixtures[i].PkgPath + "." + fixtures[i].Identifier
+	ready := make(map[string]chan struct{}, len(keys))
+	for _, key := range keys {
 		ready[key] = make(chan struct{})
 	}
 
@@ -504,7 +531,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		proc.waitErr = cmd.Wait()
 		untrack(tree)
 		tree.Release()
-		drainOutput(scanned, sharedFixtureDrainDelay, stdout)
+		drainOutput(scanned, sharedFixtureDrainDelay, proto)
 		drainOutput(logged, sharedFixtureDrainDelay, stderr)
 		close(waitDone)
 	}()
@@ -515,63 +542,93 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 
 	go func() {
 		defer close(scanned)
-		closedReady := make(map[string]bool, len(ready))
-		doneSeen := false
-		scanner := bufio.NewScanner(stdout)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		// The scan outlives _done: window verbs keep the stream alive with
-		// late state lines (deferred StartKeys) and _cmd acknowledgements,
-		// until EOF at process exit.
-		for scanner.Scan() {
-			var entry fixtureStateEntry
-			if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-				continue
-			}
-			if entry.Key == "_done" {
-				if entry.Error != "" {
-					proc.setupErr = fmt.Errorf("%s", entry.Error)
-				}
-				if entry.TeardownBudget != "" {
-					if d, err := time.ParseDuration(entry.TeardownBudget); err == nil && d > 0 {
-						// Under proc.mu: an interrupted run can reach Teardown
-						// while this goroutine is still draining a late _done.
-						proc.mu.Lock()
-						proc.teardownTimeout = d
-						proc.mu.Unlock()
-					}
-				}
-				doneSeen = true
-				close(allDone)
-				continue
-			}
-			if entry.Key == "_cmd" {
-				// Ack for the one in-flight command; drop it if no one waits
-				// (the commander timed out) rather than stall the scan.
-				select {
-				case proc.cmdResp <- entry.Error:
-				default:
-				}
-				continue
-			}
-			proc.mu.Lock()
-			state[entry.Key] = entry.State
-			proc.mu.Unlock()
-			if ch, ok := ready[entry.Key]; ok && !closedReady[entry.Key] {
-				close(ch)
-				closedReady[entry.Key] = true
-			}
-		}
-		if doneSeen {
-			return
-		}
-		// A read end closed by the drain is the end of the stream too.
-		if err := scanner.Err(); err != nil && !errors.Is(err, os.ErrClosed) {
-			proc.setupErr = fmt.Errorf("reading subprocess stdout: %w", err)
-		} else if proc.setupErr == nil {
-			proc.setupErr = fmt.Errorf("subprocess exited without _done sentinel")
-		}
-		close(allDone)
+		proc.readProtocol(proto)
 	}()
 
 	return proc, nil
+}
+
+// readProtocol reads the protocol stream to its end: state lines, the _done
+// sentinel and _cmd acknowledgements.
+func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
+	closedReady := make(map[string]bool, len(p.ready))
+	doneSeen := false
+	// Lines are read whole, however long a fixture's state is. The scan
+	// outlives _done: window verbs keep the stream alive with late state
+	// lines (deferred StartKeys) and _cmd acknowledgements, until EOF at
+	// process exit.
+	lines := bufio.NewReader(stream)
+	var readErr error
+	for {
+		line, err := lines.ReadBytes('\n')
+		if err != nil && len(line) == 0 {
+			readErr = err
+			break
+		}
+		var entry fixtureStateEntry
+		if json.Unmarshal(line, &entry) != nil {
+			continue
+		}
+		if entry.Key == "_done" {
+			if doneSeen {
+				// The stream is the process's alone now; a second sentinel is
+				// its error, not the runner's to trip over.
+				p.protocolError(fmt.Errorf("the shared fixture process reported _done twice"))
+				continue
+			}
+			if entry.Error != "" {
+				p.setupErr = fmt.Errorf("%s", entry.Error)
+			}
+			if entry.TeardownBudget != "" {
+				if d, err := time.ParseDuration(entry.TeardownBudget); err == nil && d > 0 {
+					// Under p.mu: an interrupted run can reach Teardown
+					// while this goroutine is still draining a late _done.
+					p.mu.Lock()
+					p.teardownTimeout = d
+					p.mu.Unlock()
+				}
+			}
+			doneSeen = true
+			close(p.allDone)
+			continue
+		}
+		if entry.Key == "_cmd" {
+			// Ack for the one in-flight command; drop it if no one waits
+			// (the commander timed out) rather than stall the scan.
+			select {
+			case p.cmdResp <- entry.Error:
+			default:
+			}
+			continue
+		}
+		p.mu.Lock()
+		p.state[entry.Key] = entry.State
+		p.mu.Unlock()
+		if ch, ok := p.ready[entry.Key]; ok && !closedReady[entry.Key] {
+			close(ch)
+			closedReady[entry.Key] = true
+		}
+	}
+	if doneSeen {
+		return
+	}
+	// A read end closed by the drain, like EOF, is the end of the stream too.
+	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, os.ErrClosed) {
+		p.setupErr = fmt.Errorf("reading the protocol stream: %w", readErr)
+	} else if p.setupErr == nil {
+		p.setupErr = fmt.Errorf("subprocess exited without _done sentinel")
+	}
+	close(p.allDone)
+}
+
+// protocolError records a stream the process got wrong after its setup was
+// read as done: the setup's verdict stands, the teardown's adds this, and the
+// failure log carries it.
+func (p *SharedFixtureProcess) protocolError(err error) {
+	p.mu.Lock()
+	if p.protoErr == nil {
+		p.protoErr = err
+	}
+	p.mu.Unlock()
+	fmt.Fprintf(p.failures, "shared fixture protocol: %v\n", err)
 }

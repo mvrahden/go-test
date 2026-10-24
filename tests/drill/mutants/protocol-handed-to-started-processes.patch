@@ -1,0 +1,17 @@
+Expect: detachedchild: the started process saw the protocol variable
+Judge: ./tests/canary CanaryTestSuite/TestAProcessTheSetupStartsGetsNoProtocol
+Clause: when a shared fixture's setup starts a process that outlives it → the process sees no protocol variable, and what it writes to descriptor 3 is not read
+Clause: when a shared fixture's setup starts a process that outlives it → the run passes before that process ends
+--- a/pkg/gotestruntime/sharedprotocol.go
++++ b/pkg/gotestruntime/sharedprotocol.go
+@@ -19,10 +19,8 @@
+ func ClaimSharedProtocol() *os.File {
+ 	stream := os.Stdout
+ 	if fd, err := strconv.Atoi(os.Getenv(protocol.EnvSharedProtocolFD)); err == nil && fd > 2 {
+-		closeOnExec(fd)
+ 		stream = os.NewFile(uintptr(fd), "shared-protocol")
+ 	}
+-	_ = os.Unsetenv(protocol.EnvSharedProtocolFD)
+ 	os.Stdout = os.Stderr
+ 	return stream
+ }

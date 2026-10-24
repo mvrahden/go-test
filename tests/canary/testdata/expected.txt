@@ -207,3 +207,11 @@ releaseslow fail TestSlowTestSuite
 hydratefail exit 1
 hydratefail fail -
 hydratefail fail TestHydrateTestSuite
+noisysetup exit 0
+noisysetup pass -
+noisysetup pass TestNoisyTestSuite
+noisysetup pass TestNoisyTestSuite/TestStateArrived
+detachedchild exit 0
+detachedchild pass -
+detachedchild pass TestDetachTestSuite
+detachedchild pass TestDetachTestSuite/TestStateArrived
