@@ -102,6 +102,15 @@ func runDrill(root string, names []string) (int, error) {
 			weights[name] = w
 		}
 	}
+	scratchRoot, err := ScratchRoot()
+	if err != nil {
+		return 0, err
+	}
+	scratch, err := OpenScratch(scratchRoot, root, shardI, shardN)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = scratch.Release() }()
 	started := time.Now()
 	logRoot := environ["DRILL_LOGS"]
 	if logRoot != "" {
@@ -124,7 +133,7 @@ func runDrill(root string, names []string) (int, error) {
 		return 0, err
 	}
 	d := &drillRun{
-		root: root, logs: logs, logRoot: logRoot, names: names, weights: weights,
+		root: root, scratch: scratch.Dir, logs: logs, logRoot: logRoot, names: names, weights: weights,
 		shardI: shardI, shardN: shardN, cpus: cpus, jobs: jobs, self: self,
 		supervision: NewSupervision([]string{self}, float64(seconds), logs),
 		results:     map[string]Verdict{},
@@ -164,16 +173,9 @@ func runDrill(root string, names []string) (int, error) {
 	return 0, nil
 }
 
-func realPath(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	return filepath.EvalSymlinks(abs)
-}
-
 type drillRun struct {
-	root, logs, logRoot, self  string
+	root, scratch, logs        string
+	logRoot, self              string
 	names                      []string
 	weights                    map[string]float64
 	shardI, shardN, cpus, jobs int
@@ -184,10 +186,7 @@ type drillRun struct {
 // judge snapshots the repository, bootstraps the pristine judge and planner
 // from the snapshot, and judges this shard's mutants.
 func (d *drillRun) judge() (err error) {
-	scratch, err := os.MkdirTemp("", "gotest-drill-")
-	if err != nil {
-		return err
-	}
+	scratch := d.scratch
 	defer func() {
 		if rerr := removeAll(scratch); rerr != nil && err == nil {
 			err = rerr

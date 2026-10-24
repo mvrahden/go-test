@@ -163,25 +163,14 @@ func JudgeAll(phases []Phase, s *Supervision, execute Execute, results map[strin
 		return nil
 	}
 	for _, phase := range phases {
-		var mu sync.Mutex
-		pending := phase.Names
-		next := func() (string, bool) {
-			mu.Lock()
-			defer mu.Unlock()
-			if len(pending) == 0 {
-				return "", false
-			}
-			name := pending[0]
-			pending = pending[1:]
-			return name, true
-		}
+		queues := NewQueues(phase.Names, phase.Parallel)
 		errs := make([]chan error, phase.Parallel)
 		for i := range errs {
 			errs[i] = make(chan error, 1)
 			go func(worker int) {
 				errs[worker] <- func() error {
 					for !s.Stopping() {
-						name, ok := next()
+						name, ok := queues.Next(worker)
 						if !ok {
 							return nil
 						}
