@@ -29,8 +29,8 @@ type InterruptTestSuite struct {
 }
 
 func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~25s, setup ~47s; budgets are twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute, SetupTimeout: 2 * time.Minute}
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {

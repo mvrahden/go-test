@@ -30,8 +30,8 @@ type ShutdownTestSuite struct {
 }
 
 func (s *ShutdownTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Exclusive: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~38s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Exclusive: true, Timeout: 90 * time.Second}
 }
 
 func (s *ShutdownTestSuite) BeforeAll(t *gotest.T) {

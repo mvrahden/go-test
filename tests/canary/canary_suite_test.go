@@ -35,8 +35,8 @@ type CanaryTestSuite struct {
 }
 
 func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~50s, setup ~13s; budgets are twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
 }
 
 type expectation struct {

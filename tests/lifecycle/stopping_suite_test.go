@@ -19,8 +19,8 @@ type StoppingTestSuite struct {
 }
 
 func (s *StoppingTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~53s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, SetupTimeout: 2 * time.Minute}
 }
 
 func (s *StoppingTestSuite) BeforeAll(t *gotest.T) {

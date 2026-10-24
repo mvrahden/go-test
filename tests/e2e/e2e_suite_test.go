@@ -31,20 +31,16 @@ var testdataFS embed.FS
 
 // E2ETestSuite tests the gotest CLI end-to-end against real packages.
 // Sequential: every method runs against one shared module copy, and performTest asserts it is clean afterwards.
+//
+// Not Exclusive. Its verdicts are events; its one clock, the exit bound after
+// the last package verdict, is a minute against milliseconds of work, so the
+// bulk's load cannot fail it. Keep invocations frugal: one CLI run per
+// distinct pipeline behavior, assertions merged into it, module copies built
+// once in BeforeAll, workloads pinned tiny (-benchtime=10x scale).
 type E2ETestSuite struct {
 	CLI     *gotestcli.BinarySharedFixture
 	binary  string
 	workDir string
-}
-
-// SuiteConfig: not Exclusive. Its verdicts are events; its one clock, the
-// exit bound after the last package verdict, is a minute against milliseconds
-// of work, so the bulk's load cannot fail it. Keep invocations frugal: one CLI
-// run per distinct pipeline behavior, assertions merged into it, module copies
-// built once in BeforeAll, workloads pinned tiny (-benchtime=10x scale).
-func (s *E2ETestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
 }
 
 func (s *E2ETestSuite) BeforeAll(t *gotest.T) {
