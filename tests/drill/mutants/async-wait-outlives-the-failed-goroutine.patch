@@ -1,0 +1,14 @@
+Expect: asyncfatal: the method took .*; the wait outlived the failed goroutine
+Judge: ./tests/canary CanaryTestSuite/TestAFatalGoroutineEndsAnAsyncWait
+Clause: when the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left → fails the method at once, not at the end of its budget
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -245,7 +245,7 @@
+ 			if deadline == nil {
+ 				settled = t.Context().Done()
+ 			}
+-			if left = leftToWaitFor(held, label.(string)); left == "" {
++			if left = leftToWaitFor(held, label.(string)); false {
+ 				return // nothing can call done, and nothing of the method's runs on
+ 			}
+ 			// Each look stops the world: look less often the longer it lasts.

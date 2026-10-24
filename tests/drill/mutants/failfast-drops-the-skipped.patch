@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestFailFastReportsWhatItSkipped
 Clause: when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -69,7 +69,6 @@
+@@ -72,7 +72,6 @@
  	}
  	for _, c := range m.Cases {
  		if first := tripped(); first != "" {

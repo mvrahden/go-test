@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -100,7 +100,7 @@
+@@ -103,7 +103,7 @@
  				}
  				if f.Before != nil {
  					mt.enter(f.Name + ".BeforeEach ")

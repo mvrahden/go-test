@@ -1,6 +1,7 @@
 package lifecycle_test
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -12,7 +13,7 @@ import (
 )
 
 // StopGraceTestSuite: how long a stopped method's body may take to return,
-// and what that bound covers.
+// what that bound covers, and where a stop ends an async wait.
 type StopGraceTestSuite struct {
 	cli string
 }
@@ -34,9 +35,9 @@ func (s *StopGraceTestSuite) BeforeAll(t *gotest.T) {
 func (s *StopGraceTestSuite) AfterAll(t *gotest.T) {}
 
 // stopped runs the lcastop package with args and env, interrupts it once a
-// method marked "running", and reads back what the run left. A run that
-// never holds, or that outlives the stop by 40s, is killed before the test
-// fails.
+// method marked "running", and reads back what the run left. The marker
+// "interrupted" is written just before the signal. A run that never holds,
+// or that outlives the stop by 40s, is killed before the test fails.
 func (s *StopGraceTestSuite) stopped(t *gotest.T, env []string, args ...string) (testkit.Run, time.Duration) {
 	return s.stoppedRun(t, env, append([]string{"-v", "../testdata/lcastop/"}, args...), nil)
 }
@@ -66,6 +67,10 @@ func (s *StopGraceTestSuite) stoppedRun(t *gotest.T, env, args []string, then fu
 		if time.Now().After(deadline) {
 			kill("the run never held:\n%s%s", cmd.Stdout, cmd.Stderr)
 		}
+	}
+	if f, err := os.OpenFile(markers, os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+		_, _ = f.WriteString("interrupted\n")
+		_ = f.Close()
 	}
 	began := time.Now()
 	if err := testkit.Interrupt(cmd, tree); err != nil {
@@ -116,6 +121,25 @@ func (s *StopGraceTestSuite) TestASlowAfterEach(t *gotest.T) {
 		w.It("runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body", func(it *gotest.T) {
 			gotest.True(it, run.MarkerOrder("context ended", "AfterEach began", "AfterEach ended", "suite.AfterAll", "fixture.AfterAll"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
 			gotest.NotContains(it, run.Stdout+run.Stderr, "cut short")
+		})
+	})
+}
+
+func (s *StopGraceTestSuite) TestAStopDuringAnAsyncWait(t *gotest.T) {
+	run, _ := s.stopped(t, nil, "-run=TestAsyncHoldTestSuite")
+	out := run.Stdout + run.Stderr
+	waits, fails := "TestAsyncHoldTestSuite/TestWaitsAsync", "TestAsyncHoldTestSuite/TestFailsAsync"
+	t.When("the run is stopped while an async method waits for done", func(w *gotest.T) {
+		w.It("ends the wait at the stop and skips the method with the reason run stopping, then runs AfterEach and AfterAll", func(it *gotest.T) {
+			gotest.Equal(it, "skip", textVerdict(out, waits), out)
+			gotest.Contains(it, textOutput(out, waits), "run stopping")
+			gotest.True(it, run.MarkerOrder("interrupted", "async AfterEach "+waits, "async AfterAll"), "markers: %v", run.Markers)
+		})
+	})
+	t.When("the run is stopped while an async method waits for done after another of its goroutines failed", func(w *gotest.T) {
+		w.It("ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method", func(it *gotest.T) {
+			gotest.True(it, run.MarkerOrder("interrupted", "async AfterEach "+fails, "async AfterAll"), "markers: %v", run.Markers)
+			gotest.Equal(it, "fail", textVerdict(out, fails), out)
 		})
 	})
 }

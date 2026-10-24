@@ -99,19 +99,21 @@ func textVerdict(out, path string) string {
 	return strings.ToLower(m[1])
 }
 
-// textOutput is what -v printed under the test at path, between its RUN line
-// and the next RUN or verdict line.
+// textOutput is what -v printed under the test at path: the lines after
+// each RUN, CONT or NAME line of it, up to the next such or verdict line.
 func textOutput(out, path string) string {
-	_, rest, found := strings.Cut(out, "=== RUN   "+path+"\n")
-	if !found {
-		return ""
-	}
 	var b strings.Builder
-	for line := range strings.Lines(rest) {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
-			break
+	in := false
+	for line := range strings.Lines(out) {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
+			fields := strings.Fields(trimmed)
+			in = len(fields) == 3 && fields[2] == path && (fields[1] == "RUN" || fields[1] == "CONT" || fields[1] == "NAME")
+			continue
 		}
-		b.WriteString(line)
+		if in {
+			b.WriteString(line)
+		}
 	}
 	return b.String()
 }

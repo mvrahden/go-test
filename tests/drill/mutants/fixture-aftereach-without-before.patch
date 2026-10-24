@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAFailedFixtureBeforeEachPairsWithNothi
 Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -98,13 +98,6 @@
+@@ -101,13 +101,6 @@
  				if mt.overran() {
  					return
  				}
@@ -17,7 +17,7 @@ Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or ove
  				if f.After != nil {
  					defer func() {
  						mt.enter(f.Name + ".AfterEach ")
-@@ -115,6 +108,13 @@
+@@ -118,6 +111,13 @@
  						}
  					}()
  				}

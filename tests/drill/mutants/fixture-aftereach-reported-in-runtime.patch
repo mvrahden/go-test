@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAFixtureAfterEachErrorIsReportedAtTheH
 Clause: when a fixture AfterEach returns an error → is reported at the hook's declaration, not in the runtime's file
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -111,7 +111,7 @@
+@@ -114,7 +114,7 @@
  						// Releases what BeforeEach acquired, so neither the
  						// deadline nor a stop ends its context.
  						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on

@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestFailFastSeesACleanupFailure
 Clause: when a parallel method of a FailFast suite fails only in a cleanup, the methods running one at a time → skips the method that has not started, with the failing method as the reason
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -77,11 +77,11 @@
+@@ -80,11 +80,11 @@
  				it.Parallel()
  				// The first cleanup runs last: it sees the failures the others
  				// record, the wait on a gotest.Go goroutine's among them.

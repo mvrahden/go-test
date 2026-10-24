@@ -2,6 +2,7 @@ package canary_test //nolint:fail-guard
 
 import (
 	"bytes"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -79,7 +80,7 @@ func (r *liveRun) end(within time.Duration) (code int, markers []string) {
 }
 
 // interrupted runs pkg with env and args, interrupts it once a method marked
-// running, and returns how long it took to end after the signal, its exit
+// running, marking "interrupted" just before the signal, and returns how long it took to end after the signal, its exit
 // code, its output and the markers. A run that never holds is killed at
 // once, one that outlives the stop by 40s then. The time is taken before the
 // signal is sent: on Windows the interrupt returns only once its helper
@@ -95,6 +96,10 @@ func (s *CanaryTestSuite) interruptedRun(t *gotest.T, label string, env, args []
 	if !r.await(90*time.Second, "running") {
 		_, _ = r.end(0)
 		fatalf(t, "%s: the run never held:\n%s%s", label, r.stdout.String(), r.stderr.String())
+	}
+	if f, err := os.OpenFile(r.markers, os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+		_, _ = f.WriteString("interrupted\n")
+		_ = f.Close()
 	}
 	began := time.Now()
 	if err := testkit.Interrupt(r.cmd, r.tree); err != nil {
@@ -118,19 +123,21 @@ func textVerdict(out, path string) string {
 	return strings.ToLower(m[1])
 }
 
-// textOutput is what -v printed under the test at path, between its RUN line
-// and the next RUN or verdict line.
+// textOutput is what -v printed under the test at path: the lines after
+// each RUN, CONT or NAME line of it, up to the next such or verdict line.
 func textOutput(out, path string) string {
-	_, rest, found := strings.Cut(out, "=== RUN   "+path+"\n")
-	if !found {
-		return ""
-	}
 	var b strings.Builder
-	for line := range strings.Lines(rest) {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
-			break
+	in := false
+	for line := range strings.Lines(out) {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- ") {
+			fields := strings.Fields(trimmed)
+			in = len(fields) == 3 && fields[2] == path && (fields[1] == "RUN" || fields[1] == "CONT" || fields[1] == "NAME")
+			continue
 		}
-		b.WriteString(line)
+		if in {
+			b.WriteString(line)
+		}
 	}
 	return b.String()
 }
@@ -270,5 +277,24 @@ func (s *CanaryTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest.T) {
 	})
 	if !strings.Contains(out, "a second stop signal") || !slices.Contains(markers, "fixture.AfterAll") || took > 4*time.Second {
 		t.Errorf("stopgrace: markers %v, want the fixture released at once on the second signal (the run ended %s after the first):\n%s", markers, took, out)
+	}
+}
+
+// A stop ends an async wait: a method waiting for done is skipped with the
+// reason run stopping, one whose helper goroutine failed fails, and AfterEach
+// and AfterAll run after the stop.
+func (s *CanaryTestSuite) TestAStopEndsAnAsyncWait(t *gotest.T) {
+	_, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestAsyncHoldTestSuite")
+	waits, fails := "TestAsyncHoldTestSuite/TestWaitsAsync", "TestAsyncHoldTestSuite/TestFailsAsync"
+	if v := textVerdict(out, waits); v != "skip" || !strings.Contains(textOutput(out, waits), "run stopping") {
+		t.Errorf("stopgrace: %s verdict %q, want skip with the reason run stopping\n%s", waits, v, out)
+	}
+	if v := textVerdict(out, fails); v != "fail" {
+		t.Errorf("stopgrace: %s verdict %q, want fail\n%s", fails, v, out)
+	}
+	for _, method := range []string{waits, fails} {
+		if !testkit.MarkerOrderOf(markers, "interrupted", "async AfterEach "+method, "async AfterAll") {
+			t.Errorf("stopgrace: markers %v, want interrupted, %s's AfterEach, async AfterAll in order", markers, method)
+		}
 	}
 }

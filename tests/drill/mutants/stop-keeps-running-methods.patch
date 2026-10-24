@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted
 Clause: when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -86,7 +86,7 @@
+@@ -89,7 +89,7 @@
  					skipFailFast(it, first)
  				}
  			}

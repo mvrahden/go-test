@@ -278,7 +278,7 @@ Methods can also accept `*testing.T` for stdlib compatibility.
 
 A test that calls `os.Exit` fails, `os.Exit(0)` included, as under `go test`.
 
-A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); the suite's `Timeout` fails it if `done()` never is, located at the method's declaration — and only that: a method waiting for `done()` is not reported as still running. Prefer `Eventually` for anything that can be polled.
+A method named `Test*Async` with a trailing `done func()` parameter completes when `done()` is called, not when it returns (`(t, done)`, or `(t, ctx, done)` with a returning `BeforeEach`); a `Timeout` the suite declares fails it if `done()` never is, located at the method's declaration — and only that: a method waiting for `done()` is not reported as still running; without one, only `go test`'s `-timeout` bounds a wait for a `done()` that never comes. A fatal failure, or a panic on a goroutine `gotest.Go` started, fails the method but ends the wait only once nothing holds `done` any more (no goroutine, timer, pool job or handler) and no goroutine the method or its `BeforeEach` started is left; a goroutine it keeps running, like the `srv.Serve` one above that `AfterEach` stops, holds the failed wait until the `Timeout`, or until the method's context ends (30s by default) when none is declared. A stop ends the wait and skips the method with the reason `run stopping` unless it failed, and `AfterEach` is held to what is left of the `Timeout` ([Async methods](specs/lifecycle/spec.md#requirement-async-methods)). Prefer `Eventually` for anything that can be polled.
 
 ### Lifecycle methods
 
@@ -370,8 +370,8 @@ A method's `Timeout` covers its `BeforeEach`, body and `AfterEach`, the fixtures
 hooks included, and the context they get ends at it: a hook that overruns it fails the method,
 located at the hook and naming it, and nothing after that hook starts but the `AfterEach` hooks
 ([A hook or body going wrong](specs/lifecycle/spec.md#requirement-a-hook-or-body-going-wrong)).
-An async method's budget ends when `done()` is called; its `AfterEach`, its own and the
-fixtures', is not budgeted.
+An async method's budget pauses while it waits for `done()`; its `AfterEach`, its own and the
+fixtures', is held to what is left of it ([Async methods](specs/lifecycle/spec.md#requirement-async-methods)).
 
 A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, is not held
 to a budget: being failed against a number you did not choose is not a verdict you can act on. Bounding the process remains

@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -92,7 +92,6 @@
+@@ -95,7 +95,6 @@
  			// The budget covers the fixture hooks, the suite hooks and the body:
  			// ended last, after every AfterEach registered below.
  			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
@@ -11,7 +11,7 @@ Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or ove
  			for _, f := range m.Fixtures {
  				// After a BeforeEach that overran no later fixture's turn comes.
  				if mt.overran() {
-@@ -116,6 +115,7 @@
+@@ -119,6 +118,7 @@
  					}()
  				}
  			}

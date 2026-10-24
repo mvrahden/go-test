@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestFailFastReportsWhatItSkipped
 Clause: when the first method of a FailFast suite fails → skips every method that has not started, with the failing method as the reason
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -138,8 +138,8 @@
+@@ -141,8 +141,8 @@
  // skipFailFast skips t, naming the method that stopped the suite, with no
  // location: a runtime file is nothing the user can open.
  func skipFailFast(t *testing.T, first string) {

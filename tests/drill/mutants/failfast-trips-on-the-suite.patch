@@ -3,7 +3,7 @@ Judge: ./tests/canary CanaryTestSuite/TestFailFastIgnoresASoftSuiteFailure
 Clause: when BeforeAll of a FailFast suite records a failure without stopping and no method fails → runs every method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -129,7 +129,7 @@
+@@ -132,7 +132,7 @@
  				method()
  			})
  		})

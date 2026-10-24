@@ -436,3 +436,15 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     held. To migrate a `goleak.VerifyNone` inside a suite method, which now
     sees the stop watcher, pass it
     `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).loop")`.
+19. **An async method's wait ends on a failed owner, a stop or a declared
+    `Timeout`**
+    ([async](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-async-methods)):
+    a failure, or a panic on a goroutine `gotest.Go` started, ends the wait
+    once nothing holds `done` and no goroutine the method or its
+    `BeforeEach` started is left, or at the `Timeout`, or without one when
+    the method's context ends; a stop skips a waiting method as `run stopping` unless
+    it failed; `AfterEach` is held to what is left of the `Timeout`. Below
+    v1.34 a failure never ended the wait, a stop failed the method for a
+    missed `done()`, `AfterEach` was not budgeted, and the 30s default
+    failed a wait in a suite that declared no `Timeout`. To migrate, declare
+    a `Timeout` on async suites that relied on that default.
