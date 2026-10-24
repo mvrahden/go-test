@@ -211,6 +211,9 @@ noisysetup exit 0
 noisysetup pass -
 noisysetup pass TestNoisyTestSuite
 noisysetup pass TestNoisyTestSuite/TestStateArrived
+setupbudget exit 1
+setupbudget fail -
+setupbudget fail TestSlowTestSuite
 detachedchild exit 0
 detachedchild pass -
 detachedchild pass TestDetachTestSuite

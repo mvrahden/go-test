@@ -14,7 +14,7 @@ import (
 )
 
 // SharedProcessTestSuite: what a shared fixture process hands a process its
-// setup starts.
+// setup starts, and what a run whose setup is given up beside a sibling says.
 type SharedProcessTestSuite struct{}
 
 func (s *SharedProcessTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -51,4 +51,14 @@ func (s *SharedProcessTestSuite) TestAProcessTheSetupStarts(t *gotest.T) {
 			_ = syscall.Kill(-pid, syscall.SIGKILL)
 		}
 	}
+}
+
+func (s *SharedProcessTestSuite) TestASetupGivenUp(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixbsibling/")
+	gotest.NoError(t, err)
+	t.When("a shared fixture's setup is given up while a sibling that came up is still to be released", func(w *gotest.T) {
+		w.It("fails the run", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		})
+	})
 }
