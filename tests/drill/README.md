@@ -467,7 +467,7 @@ shards of one run do not add up to every mutant exactly once.
 | `go-panic-unseen-by-an-async-wait` | a panic on a gotest.Go goroutine does not end an async wait | canary: asynchelper's panicking method takes its full 20s budget |
 | `stop-file-ignored` | the suite's watcher never polls for the stop file, so a stop no signal brings never comes | canary: the stopfile run's later methods have no skip verdict and the stream ends without the verdicts |
 | `stop-signals-a-stranger` | a cancelled run signals the pid the suite published even outside the suite's process group | lifecycle conformance: the stranger process gets the SIGTERM and the group none |
-| `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: AfterAll never runs before the fixture's release |
+| `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: the group gets no interrupt, and AfterAll never runs before the fixture's release |
 | `second-signal-leaves-the-processes` | the CLI's second signal exits without killing the processes still running | lifecycle conformance: a suite process outlives the run after a second SIGINT |
 | `second-signal-not-forwarded` | the CLI's second signal kills the suites without sending them the second stop first | lifecycle conformance: the fixture of a method ignoring its context is never released |
 | `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | shared fixture shutdown suite: the setup process outlives the CLI |
