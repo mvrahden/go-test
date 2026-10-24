@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -14,10 +14,22 @@ function makeFakeOutputChannel() {
 }
 
 describe("ensureGitExclude", () => {
-  let tmpDir: string;
+  let tmpDir = "";
+  const made: string[] = [];
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "git-exclude-test-"));
+    made.push(tmpDir);
+  });
+
+  afterEach(() => {
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // Every dir a test made is gone once they ran.
+  afterAll(() => {
+    expect(made).not.toEqual([]);
+    expect(made.filter((d) => fs.existsSync(d))).toEqual([]);
   });
 
   it("appends patterns to an existing exclude file", () => {

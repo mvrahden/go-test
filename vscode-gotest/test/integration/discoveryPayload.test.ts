@@ -13,7 +13,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { spawnSync } from "node:child_process";
-import { writeFileSync, mkdirSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -92,8 +92,10 @@ function generateSuites(): string {
   return lines.join("\n");
 }
 
+let tmp = "";
+
 beforeAll(async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "gotest-payload-"));
+  tmp = mkdtempSync(path.join(tmpdir(), "gotest-payload-"));
   payloadDir = path.join(tmp, "payload");
   mkdirSync(payloadDir);
 
@@ -147,6 +149,9 @@ beforeAll(async () => {
 afterAll(() => {
   if (savedGoWork === undefined) delete process.env.GOWORK;
   else process.env.GOWORK = savedGoWork;
+  for (const dir of [tmp, storageDir]) {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 describe("a payload larger than a buffered read", () => {

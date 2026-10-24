@@ -14,6 +14,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // SharedDivisor is each shared mutant's share of a shard's wall time. Fixed,
@@ -423,10 +425,13 @@ func ReadResult(path, name string, supervisor *Status, supervisorExit int) Verdi
 var hostOnly = []string{"CI", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"}
 
 // WorkerEnv is the judge's environment, the same on a CI runner as on a laptop.
+// The slow-build threshold passes: it describes the machine, not the
+// checks, and a slow runner slows the judge's builds as much as the host's.
 func WorkerEnv(base map[string]string, work, tmp string, cpus int) map[string]string {
 	env := map[string]string{}
 	for k, v := range base {
-		if !slices.Contains(hostOnly, k) && !strings.HasPrefix(k, "GOTEST_") {
+		gotestVar := strings.HasPrefix(k, "GOTEST_") && k != protocol.EnvSlowBuildThreshold
+		if !slices.Contains(hostOnly, k) && !gotestVar {
 			env[k] = v
 		}
 	}

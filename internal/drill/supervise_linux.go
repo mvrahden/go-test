@@ -155,7 +155,7 @@ func EnableSubreaper() error {
 }
 
 // supervise runs command in a session of its own, bounded by seconds and by
-// SIGINT or SIGTERM, then kills whatever it left. It writes what it observed
+// a stop signal, then kills whatever it left. It writes what it observed
 // to statusPath and returns nonzero when the bound or the cleanup failed.
 func supervise(seconds float64, statusPath string, command []string) int {
 	if err := EnableSubreaper(); err != nil {
@@ -163,7 +163,7 @@ func supervise(seconds float64, statusPath string, command []string) int {
 		return 1
 	}
 	stopped := make(chan os.Signal, 2)
-	signal.Notify(stopped, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(stopped, stopSignals...)
 	began := time.Now()
 	status := Status{}
 	failed := false

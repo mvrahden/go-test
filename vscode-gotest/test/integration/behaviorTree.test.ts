@@ -8,7 +8,7 @@
 // tree node rather than two.
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -43,6 +43,7 @@ let cache: DiscoveryCache;
 let controller: GoTestController;
 let fake: FakeTestController;
 let savedGoWork: string | undefined;
+let tmp = "";
 
 const token = {
   isCancellationRequested: false,
@@ -58,7 +59,7 @@ function idsUnder(prefix: string): string[] {
 }
 
 beforeAll(async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "gotest-behaviors-"));
+  tmp = mkdtempSync(path.join(tmpdir(), "gotest-behaviors-"));
   const workFile = path.join(tmp, "corpus.work");
   writeFileSync(
     workFile,
@@ -94,6 +95,7 @@ afterAll(() => {
   if (savedGoWork === undefined) delete process.env.GOWORK;
   else process.env.GOWORK = savedGoWork;
   controller?.dispose();
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 
 describe("the specification is in the tree before anything runs", () => {
@@ -359,6 +361,12 @@ describe("the run counter has its total up front", () => {
 });
 
 describe("results survive a reload", () => {
+  let dir = "";
+
+  afterAll(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
   // Restoring a stored result does `findItem(id)` and drops anything it cannot
   // resolve. Behavior ids used to exist only during a run, so every behavior
   // result was persisted, aged, and then silently discarded on load. Declaring
@@ -374,7 +382,7 @@ describe("results survive a reload", () => {
   });
 
   it("persists and reloads behavior results under the current store version", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "gotest-restore-"));
+    dir = mkdtempSync(path.join(tmpdir(), "gotest-restore-"));
     const behaviorId = `${pkg("table")}/TableTestSuite/TestClassify/classifying_a_number/zero`;
 
     const store = new TestResultStore({ fsPath: dir });

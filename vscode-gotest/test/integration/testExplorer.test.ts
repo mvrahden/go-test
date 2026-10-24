@@ -6,7 +6,7 @@
 // the real CLI and the real fixture corpus, with only the editor stubbed.
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -45,6 +45,7 @@ let cache: DiscoveryCache;
 let controller: GoTestController;
 let registry: RunRegistry;
 let savedGoWork: string | undefined;
+let tmp = "";
 
 const token = {
   isCancellationRequested: false,
@@ -62,7 +63,7 @@ function itemsFor(importPath: string) {
 }
 
 beforeAll(async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "gotest-explorer-"));
+  tmp = mkdtempSync(path.join(tmpdir(), "gotest-explorer-"));
   const workFile = path.join(tmp, "corpus.work");
   // A superset of the repository's own workspace, so anything spawned during
   // these tests resolves the fixture module and the repo alike.
@@ -100,6 +101,7 @@ afterAll(() => {
   if (savedGoWork === undefined) delete process.env.GOWORK;
   else process.env.GOWORK = savedGoWork;
   controller?.dispose();
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 
 describe("discovery builds the Test Explorer tree", () => {

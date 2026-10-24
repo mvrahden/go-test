@@ -157,8 +157,9 @@ func (s *PlanningTestSuite) TestABuildFailureCannotBeAcceptedAsAnAssertionFailur
 
 func (s *PlanningTestSuite) TestTheJudgeRunsWithoutTheHostsCISettings(t *gotest.T) {
 	host := map[string]string{"PATH": "/bin", "CI": "true", "GOTEST_CI": "1", "GOTEST_UPDATE_SNAPSHOTS": "1",
-		"GOTEST_CACHE_DIR": "/shared", "GITHUB_ACTIONS": "true", "GOFLAGS": "-mod=mod"}
+		"GOTEST_CACHE_DIR": "/shared", "GITHUB_ACTIONS": "true", "GOFLAGS": "-mod=mod", "GOTEST_SLOW_BUILD_THRESHOLD": "1ns"}
 	env := drill.WorkerEnv(host, "/w", "/w/tmp", 3)
+	gotest.Equal(t, "1ns", env["GOTEST_SLOW_BUILD_THRESHOLD"], "the machine's slow-build threshold reaches the judge")
 	for _, name := range []string{"CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS", "GITHUB_ACTIONS"} {
 		gotest.NotContains(t, env, name)
 	}

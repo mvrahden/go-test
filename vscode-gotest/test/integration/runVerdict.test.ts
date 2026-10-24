@@ -6,7 +6,7 @@
 // Driven against the real CLI, with only the editor stubbed.
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -46,9 +46,10 @@ let cache: DiscoveryCache;
 let controller: GoTestController;
 let recorder: ReturnType<typeof createRecordingChannel>;
 let savedGoWork: string | undefined;
+let tmp = "";
 
 beforeAll(async () => {
-  const tmp = mkdtempSync(path.join(tmpdir(), "gotest-verdict-"));
+  tmp = mkdtempSync(path.join(tmpdir(), "gotest-verdict-"));
   const workFile = path.join(tmp, "teardownfail.work");
   writeFileSync(
     workFile,
@@ -83,6 +84,7 @@ afterAll(() => {
   if (savedGoWork === undefined) delete process.env.GOWORK;
   else process.env.GOWORK = savedGoWork;
   controller?.dispose();
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 
 async function runPackage(env?: Record<string, string>): Promise<FakeTestRun> {

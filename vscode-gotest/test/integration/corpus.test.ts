@@ -11,8 +11,14 @@
 // fail to compile. A `testdata` directory is invisible to `go ./...` patterns,
 // so none of it can reach the repository's own build.
 
-import { describe, it, expect, beforeAll, vi } from "vitest";
-import { readFileSync, writeFileSync, mkdtempSync, readdirSync } from "node:fs";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -201,11 +207,13 @@ function packageNamed(name: string): SpecPackage | undefined {
   return spec.packages.find((p) => p.path === `gotest.fixtures/${name}`);
 }
 
+let tmp = "";
+
 beforeAll(async () => {
   // The fixture module is not part of the repository's workspace — that is the
   // point. A generated go.work joins it to the repo so the suites compile
   // against this working tree's gotest rather than a published release.
-  const tmp = mkdtempSync(path.join(tmpdir(), "gotest-corpus-"));
+  tmp = mkdtempSync(path.join(tmpdir(), "gotest-corpus-"));
   const workFile = path.join(tmp, "corpus.work");
   writeFileSync(
     workFile,
@@ -255,6 +263,10 @@ beforeAll(async () => {
   spec = JSON.parse(
     /const SPEC_STATE = (.*);\n/.exec(html)?.[1] ?? "null",
   ) as typeof spec;
+});
+
+afterAll(() => {
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 
 describe("the corpus reaches the spec view", () => {

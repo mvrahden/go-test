@@ -124,14 +124,14 @@ func (s *SupervisorTestSuite) BeforeEach(t *gotest.T) *procs { return newProcs(t
 func (s *SupervisorTestSuite) AfterEach(t *gotest.T, p *procs) { p.stop() }
 
 // supervise runs the child program mode under a supervisor bounded by
-// seconds, interrupts the supervisor once the descendant mode starts
-// published its pid if asked to, and requires that descendant gone.
-func supervise(t *gotest.T, p *procs, mode, seconds string, interrupt bool) (int, drill.Status) {
+// seconds, sends the supervisor interrupt, if any, once the descendant mode
+// starts published its pid, and requires that descendant gone.
+func supervise(t *gotest.T, p *procs, mode, seconds string, interrupt syscall.Signal) (int, drill.Status) {
 	status, pidfile := filepath.Join(p.dir, "status"), filepath.Join(p.dir, "pid")
 	supervisor := p.start(t, childCommand("drill", "--supervise", seconds, status, self(), mode, pidfile))
 	child := p.pid(t, pidfile)
-	if interrupt {
-		gotest.NoError(t, supervisor.cmd.Process.Signal(syscall.SIGTERM))
+	if interrupt != 0 {
+		gotest.NoError(t, supervisor.cmd.Process.Signal(interrupt))
 	}
 	code := supervisor.wait(t, time.Minute)
 	data, err := os.ReadFile(status)
@@ -143,7 +143,7 @@ func supervise(t *gotest.T, p *procs, mode, seconds string, interrupt bool) (int
 }
 
 func (s *SupervisorTestSuite) TestANormalExitReapsADoubleForkedDetachedChild(t *gotest.T, p *procs) {
-	code, status := supervise(t, p, "detach", "30", false)
+	code, status := supervise(t, p, "detach", "30", 0)
 	gotest.Zero(t, code)
 	gotest.NotZero(t, status.Exit)
 	gotest.Zero(t, *status.Exit)
@@ -151,15 +151,56 @@ func (s *SupervisorTestSuite) TestANormalExitReapsADoubleForkedDetachedChild(t *
 }
 
 func (s *SupervisorTestSuite) TestATimeoutCleansAChildInASeparateSession(t *gotest.T, p *procs) {
-	code, status := supervise(t, p, "session", "2", false)
+	code, status := supervise(t, p, "session", "2", 0)
 	gotest.NotZero(t, code)
 	gotest.True(t, status.Timeout)
 }
 
 func (s *SupervisorTestSuite) TestCancellationCleansDescendants(t *gotest.T, p *procs) {
-	code, status := supervise(t, p, "session", "30", true)
+	code, status := supervise(t, p, "session", "30", syscall.SIGTERM)
 	gotest.NotZero(t, code)
 	gotest.True(t, status.Interrupted)
+}
+
+func (s *SupervisorTestSuite) TestAHangupCancelsLikeATermination(t *gotest.T, p *procs) {
+	code, status := supervise(t, p, "session", "30", syscall.SIGHUP)
+	gotest.NotZero(t, code)
+	gotest.True(t, status.Interrupted)
+}
+
+func (s *SupervisorTestSuite) TestAHangupIgnoredAtStartIsStillIgnored(t *gotest.T, p *procs) {
+	status, pidfile := filepath.Join(p.dir, "status"), filepath.Join(p.dir, "pid")
+	supervisor := p.start(t, underNohup(t, childCommand("drill", "--supervise", "30", status, self(), "session", pidfile)))
+	p.pid(t, pidfile)
+	gotest.NoError(t, supervisor.cmd.Process.Signal(syscall.SIGHUP))
+	survives(t, supervisor, "a supervisor started under nohup stopped on SIGHUP")
+	gotest.NoError(t, supervisor.cmd.Process.Signal(syscall.SIGTERM))
+	supervisor.wait(t, time.Minute)
+	data, err := os.ReadFile(status)
+	gotest.NoError(t, err)
+	var observed drill.Status
+	gotest.NoError(t, json.Unmarshal(data, &observed))
+	gotest.True(t, observed.Interrupted)
+}
+
+// underNohup runs cmd with SIGHUP ignored, as nohup starts it.
+func underNohup(t *gotest.T, cmd *exec.Cmd) *exec.Cmd {
+	nohup, err := exec.LookPath("nohup")
+	gotest.NoError(t, err)
+	wrapped := exec.Command(nohup, append([]string{cmd.Path}, cmd.Args[1:]...)...) //nolint:gosec // G204: this test binary
+	wrapped.Env = cmd.Env
+	return wrapped
+}
+
+// survives requires s still running a second from now.
+func survives(t *gotest.T, s *started, msg string) {
+	gotest.Consistently(t, time.Second, 50*time.Millisecond, func(poll *gotest.R) {
+		select {
+		case <-s.done:
+			gotest.Fail(poll, msg)
+		default:
+		}
+	})
 }
 
 // DrillLoopTestSuite: the drill's loop with real supervisors and synthetic
@@ -190,16 +231,16 @@ type loopReport struct {
 	Caught  map[string]bool `json:"caught"`
 }
 
-// loopRun runs the loop over phases, each [names, parallel, cpus]; outside
-// sends it a SIGTERM once a worker published its pid.
-func loopRun(t *gotest.T, p *procs, phases string, outside bool) (loopReport, string) {
+// loopRun runs the loop over phases, each [names, parallel, cpus]; it sends
+// the loop outside, if any, once a worker published its pid.
+func loopRun(t *gotest.T, p *procs, phases string, outside syscall.Signal) (loopReport, string) {
 	cmd := childCommand("loop", p.dir, phases)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	l := p.start(t, cmd)
-	if outside {
+	if outside != 0 {
 		p.pid(t, filepath.Join(p.dir, "leftover"))
-		gotest.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
+		gotest.NoError(t, cmd.Process.Signal(outside))
 	}
 	code := l.wait(t, 2*time.Minute)
 	gotest.Zero(t, code, "the loop failed:\n%s\n%s", stdout.String(), stderr.String())
@@ -210,16 +251,43 @@ func loopRun(t *gotest.T, p *procs, phases string, outside bool) (loopReport, st
 }
 
 func (s *DrillLoopTestSuite) TestASignalFromOutsideStillStopsTheDrill(t *gotest.T, p *procs) {
-	report, out := loopRun(t, p, `[[["g", "a"], 1, 1]]`, true)
+	report, out := loopRun(t, p, `[[["g", "a"], 1, 1]]`, syscall.SIGTERM)
 	gotest.True(t, report.Stopped)
 	gotest.Equal(t, map[string]bool{"g": false}, report.Caught)
 	gotest.Contains(t, out, "DRILL  stopped by SIGTERM from pid "+strconv.Itoa(os.Getpid())+" (")
 }
 
+func (s *DrillLoopTestSuite) TestAHangupStopsTheDrillLikeATermination(t *gotest.T, p *procs) {
+	report, out := loopRun(t, p, `[[["g", "a"], 1, 1]]`, syscall.SIGHUP)
+	gotest.True(t, report.Stopped)
+	gotest.Equal(t, map[string]bool{"g": false}, report.Caught)
+	gotest.Contains(t, out, "DRILL  stopped by SIGHUP from pid "+strconv.Itoa(os.Getpid())+" (")
+}
+
+func (s *DrillLoopTestSuite) TestAHangupIgnoredAtStartDoesNotStopTheDrill(t *gotest.T, p *procs) {
+	cmd := underNohup(t, childCommand("loop", p.dir, `[[["g", "a"], 1, 1]]`))
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	l := p.start(t, cmd)
+	p.pid(t, filepath.Join(p.dir, "leftover"))
+	gotest.NoError(t, cmd.Process.Signal(syscall.SIGHUP))
+	survives(t, l, "a drill started under nohup stopped on SIGHUP")
+	gotest.NoError(t, cmd.Process.Signal(syscall.SIGTERM))
+	gotest.Zero(t, l.wait(t, 2*time.Minute), "the loop failed:\n%s\n%s", stdout.String(), stderr.String())
+	gotest.NotContains(t, stdout.String(), "SIGHUP")
+	gotest.Contains(t, stdout.String(), "DRILL  stopped by SIGTERM from pid "+strconv.Itoa(os.Getpid())+" (")
+}
+
 func (s *DrillLoopTestSuite) TestADeadWorkerFailsOnlyItsOwnMutant(t *gotest.T, p *procs) {
-	report, out := loopRun(t, p, `[[["a", "b", "c", "d", "e"], 2, 1], [["f"], 1, 1]]`, false)
+	report, out := loopRun(t, p, `[[["a", "b", "c", "d", "e"], 2, 1], [["f"], 1, 1]]`, 0)
 	gotest.Regexp(t, `drill  ignored SIGTERM from pid \d+, a process under judgment`, out)
 	gotest.Equal(t, map[string]bool{"a": true, "b": false, "c": false, "d": true, "e": true, "f": true}, report.Caught)
 	gotest.False(t, report.Stopped)
 	gotest.True(t, gone(p.pid(t, filepath.Join(p.dir, "leftover"))), "the dead supervisor's worker outlived the drill")
+}
+
+func (s *DrillLoopTestSuite) TestAStopAsAMutantStartsLeavesItWithoutAVerdict(t *gotest.T, p *procs) {
+	results, err := judgeStoppedAtStart(p.dir)
+	gotest.NoError(t, err)
+	gotest.Empty(t, results)
 }
