@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -19,12 +20,34 @@ import (
 // Sequential: Setenv (the cache directory).
 type OverlayTestSuite struct{}
 
-// overlayDirsCtx collects the directories a test creates, for AfterEach to remove.
-type overlayDirsCtx struct{ dirs []string }
+// overlayDirsCtx collects the directories a test creates, for AfterEach to
+// remove, and what restores the owner readers a test stood in for.
+type overlayDirsCtx struct {
+	dirs    []string
+	restore func()
+}
 
-func (s *OverlayTestSuite) BeforeEach(_ *gotest.T) *overlayDirsCtx { return &overlayDirsCtx{} }
+// BeforeEach gives every method a temp dir and cache of its own: its sweeps
+// never reach those of other runs.
+func (s *OverlayTestSuite) BeforeEach(t *gotest.T) *overlayDirsCtx {
+	isolateTempDir(t)
+	t.Setenv(protocol.EnvCacheDir, t.TempDir())
+	return &overlayDirsCtx{}
+}
+
+// isolateTempDir points the temp dir at one of t's own, so no sweep a test
+// runs reaches the work and overlay dirs of other runs.
+func isolateTempDir(t *gotest.T) {
+	dir := t.TempDir()
+	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(env, dir)
+	}
+}
 
 func (s *OverlayTestSuite) AfterEach(t *gotest.T, ctx *overlayDirsCtx) {
+	if ctx.restore != nil {
+		ctx.restore()
+	}
 	for _, dir := range ctx.dirs {
 		gotest.NoError(t, os.RemoveAll(dir))
 	}
@@ -140,7 +163,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 			gotest.False(it, os.IsNotExist(err), "expected live overlay to be kept")
 		})
 
-		w.It("removes overlay with no PID file", func(it *gotest.T) {
+		w.It("keeps a fresh overlay with no PID file: its writer has not written the pid yet", func(it *gotest.T) {
 			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
 			gotest.NoError(it, err)
 			ctx.dirs = append(ctx.dirs, dir)
@@ -148,7 +171,121 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 			gotestrunner.CleanStaleOverlays()
 
 			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the fresh overlay to be kept")
+		})
+
+		w.It("removes an overlay with no PID file once it is older than a minute", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-overlay-test-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			old := time.Now().Add(-2 * time.Minute)
+			gotest.NoError(it, os.Chtimes(dir, old, old))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
 			gotest.True(it, os.IsNotExist(err), "expected overlay without PID file to be removed")
+		})
+
+		w.It("removes a work dir whose owner is dead", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			_ = os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0600)
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.True(it, os.IsNotExist(err), "expected the dead run's work dir to be removed")
+		})
+
+		w.It("keeps a fresh work dir with no pid file: an earlier gotest, which wrote none, may still be running in it", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the fresh work dir to be kept")
+		})
+
+		w.It("keeps a fresh work dir whose pid file is empty, as an earlier gotest's unfinished write leaves it", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".pid"), nil, 0o600))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the fresh work dir to be kept")
+		})
+
+		w.It("keeps a work dir marked to be kept, even once its owner is dead", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0o600))
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".keep"), nil, 0o600))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the marked work dir to be kept")
+		})
+
+		w.It("removes a work dir marked to be kept once it is older than 7 days", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0o600))
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".keep"), nil, 0o600))
+			then := time.Now().Add(-8 * 24 * time.Hour)
+			gotest.NoError(it, os.Chtimes(dir, then, then))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.True(it, os.IsNotExist(err), "expected the aged marked work dir to be removed")
+		})
+
+		w.It("keeps a work dir with no pid file that is two days old: an earlier gotest's session may run that long", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			old := time.Now().Add(-48 * time.Hour)
+			gotest.NoError(it, os.Chtimes(dir, old, old))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.NoError(it, err, "expected the two-day-old work dir to be kept")
+		})
+
+		w.It("removes a work dir with no pid file once it is older than 7 days", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			old := time.Now().Add(-8 * 24 * time.Hour)
+			gotest.NoError(it, os.Chtimes(dir, old, old))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.True(it, os.IsNotExist(err), "expected the aged work dir to be removed")
+		})
+
+		w.It("keeps a work dir whose owner is alive", func(it *gotest.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "gotest-work-")
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, dir)
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".pid"), []byte(strconv.Itoa(os.Getpid())), 0o600))
+
+			gotestrunner.CleanStaleOverlays()
+
+			_, err = os.Stat(dir)
+			gotest.False(it, os.IsNotExist(err), "expected the live run's work dir to be kept")
 		})
 
 		w.It("ignores non-overlay directories", func(it *gotest.T) {
@@ -331,6 +468,212 @@ func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T, ctx *overlayDirsCtx) {
 
 			_, err = os.Stat(freshDir)
 			gotest.False(it, os.IsNotExist(err), "expected fresh cache entry to be kept")
+		})
+	})
+}
+
+// The work dir names the run that owns it, so a later run's sweep can tell
+// a crashed run's leftover from one still in use.
+func (s *OverlayTestSuite) TestWorkDirNamesItsRun(t *gotest.T, ctx *overlayDirsCtx) {
+	t.Setenv(protocol.EnvCacheDir, t.TempDir())
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+	gotest.NoError(t, err)
+	pid, readErr := os.ReadFile(filepath.Join(overlay.WorkDir, ".pid"))
+	cleanup()
+	t.It("writes the run's pid into its work dir", func(it *gotest.T) {
+		gotest.NoError(it, readErr)
+		gotest.Equal(it, strconv.Itoa(os.Getpid()), string(pid))
+	})
+}
+
+// A --debug run keeps its work dir and overlay for inspection: a later run's
+// sweep leaves them, though their owner is gone.
+func (s *OverlayTestSuite) TestADebugRunKeepsItsDirs(t *gotest.T, ctx *overlayDirsCtx) {
+	t.Setenv(protocol.EnvCacheDir, t.TempDir())
+	overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, true, true, false)
+	gotest.NoError(t, err)
+	ctx.dirs = append(ctx.dirs, overlay.WorkDir, overlay.CacheDir)
+	for _, dir := range ctx.dirs {
+		// The debug run is over.
+		gotest.NoError(t, os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0o600))
+	}
+
+	gotestrunner.CleanStaleOverlays()
+
+	_, workErr := os.Stat(overlay.WorkDir)
+	_, overlayErr := os.Stat(overlay.CacheDir)
+	t.It("a later run's sweep keeps its work dir and its overlay", func(it *gotest.T) {
+		gotest.NoError(it, workErr)
+		gotest.NoError(it, overlayErr)
+	})
+}
+
+// A sweep tells a dir's owner by more than its pid: the boot and the pid
+// namespace it was read in. Only a dir from this boot and namespace whose
+// pid runs no process is removed; every other stamp keeps it.
+func (s *OverlayTestSuite) TestASweepTellsAnOwnerByMoreThanItsPid(t *gotest.T, ctx *overlayDirsCtx) {
+	// stamp makes a work dir and an overlay dir as a run does, its identity
+	// read as boot and ns.
+	stamp := func(it *gotest.T, boot, ns string) []string {
+		ctx.restore = gotestrunner.ExportStubOwnerIdentity(func() string { return ns }, func() string { return boot })
+		it.Setenv(protocol.EnvCacheDir, it.TempDir())
+		overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+		gotest.NoError(it, err)
+		ctx.restore()
+		ctx.dirs = append(ctx.dirs, overlay.WorkDir, overlay.CacheDir)
+		return []string{overlay.WorkDir, overlay.CacheDir}
+	}
+	// sweep sweeps with this process's identity read as boot and ns.
+	sweep := func(boot, ns string) {
+		ctx.restore = gotestrunner.ExportStubOwnerIdentity(func() string { return ns }, func() string { return boot })
+		gotestrunner.CleanStaleOverlays()
+		ctx.restore()
+	}
+	// age makes dirs older than 7 days.
+	age := func(it *gotest.T, dirs []string) {
+		then := time.Now().Add(-8 * 24 * time.Hour)
+		for _, dir := range dirs {
+			gotest.NoError(it, os.Chtimes(dir, then, then))
+		}
+	}
+	kept := func(it *gotest.T, dirs []string) {
+		for _, dir := range dirs {
+			_, err := os.Stat(dir)
+			gotest.NoError(it, err, "expected %s to be kept", dir)
+		}
+	}
+	removed := func(it *gotest.T, dirs []string) {
+		for _, dir := range dirs {
+			_, err := os.Stat(dir)
+			gotest.True(it, os.IsNotExist(err), "expected %s to be removed", dir)
+		}
+	}
+	// deadHere makes dirs name a pid no process has here.
+	deadHere := func(it *gotest.T, dirs []string) {
+		for _, dir := range dirs {
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0o600))
+		}
+	}
+	// keptWhenDead checks that dirs stamped as boot and ns, their pid dead
+	// here, outlive a sweep read as selfBoot and selfNS, at any age.
+	keptWhenDead := func(w *gotest.T, boot, ns, selfBoot, selfNS string) {
+		w.It("keeps them, though their pid names no process here", func(it *gotest.T) {
+			dirs := stamp(it, boot, ns)
+			deadHere(it, dirs)
+
+			sweep(selfBoot, selfNS)
+
+			kept(it, dirs)
+		})
+		w.It("keeps them once they are older than 7 days", func(it *gotest.T) {
+			dirs := stamp(it, boot, ns)
+			deadHere(it, dirs)
+			age(it, dirs)
+
+			sweep(selfBoot, selfNS)
+
+			kept(it, dirs)
+		})
+	}
+
+	t.When("a run in another boot, or on another host, stamped the dirs", func(w *gotest.T) {
+		keptWhenDead(w, "boot-a", "pid:[1]", "boot-b", "pid:[1]")
+	})
+
+	t.When("a run in another pid namespace stamped the dirs", func(w *gotest.T) {
+		keptWhenDead(w, "boot-a", "pid:[1]", "boot-a", "pid:[2]")
+	})
+
+	t.When("neither the run that stamped the dirs nor this one could read its boot", func(w *gotest.T) {
+		keptWhenDead(w, "unknown", "pid:[1]", "unknown", "pid:[1]")
+	})
+
+	t.When("the run that stamped the dirs could read its boot and this one cannot", func(w *gotest.T) {
+		keptWhenDead(w, "boot-a", "pid:[1]", "unknown", "pid:[1]")
+	})
+
+	t.When("neither the run that stamped the dirs nor this one could read its pid namespace", func(w *gotest.T) {
+		keptWhenDead(w, "boot-a", "unknown", "boot-a", "unknown")
+	})
+
+	t.When("the run that stamped the dirs could read its pid namespace and this one cannot", func(w *gotest.T) {
+		keptWhenDead(w, "boot-a", "pid:[1]", "boot-a", "unknown")
+	})
+
+	t.When("the dirs' identity file is there but cannot be read", func(w *gotest.T) {
+		w.It("keeps them, though their pid names no process here", func(it *gotest.T) {
+			if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+				it.Skipf("file modes do not stop this reader")
+			}
+			dirs := stamp(it, "boot-a", "pid:[1]")
+			deadHere(it, dirs)
+			for _, dir := range dirs {
+				gotest.NoError(it, os.Chmod(filepath.Join(dir, ".owner"), 0))
+			}
+
+			sweep("boot-a", "pid:[1]")
+
+			kept(it, dirs)
+		})
+	})
+
+	t.When("a run in this boot and pid namespace stamped the dirs and their pid now names another live process", func(w *gotest.T) {
+		w.It("keeps them", func(it *gotest.T) {
+			dirs := stamp(it, "boot-a", "pid:[1]")
+			for _, dir := range dirs {
+				gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".pid"), []byte(strconv.Itoa(os.Getppid())), 0o600))
+			}
+			age(it, dirs)
+
+			sweep("boot-a", "pid:[1]")
+
+			kept(it, dirs)
+		})
+	})
+
+	t.When("a run in this boot and pid namespace stamped the dirs and its pid runs no process", func(w *gotest.T) {
+		w.It("removes them", func(it *gotest.T) {
+			dirs := stamp(it, "boot-a", "pid:[1]")
+			deadHere(it, dirs)
+
+			sweep("boot-a", "pid:[1]")
+
+			removed(it, dirs)
+		})
+
+		w.It("removes them as this platform's own readers tell it", func(it *gotest.T) {
+			it.Setenv(protocol.EnvCacheDir, it.TempDir())
+			overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+			gotest.NoError(it, err)
+			dirs := []string{overlay.WorkDir, overlay.CacheDir}
+			ctx.dirs = append(ctx.dirs, dirs...)
+			deadHere(it, dirs)
+
+			gotestrunner.CleanStaleOverlays()
+
+			removed(it, dirs)
+		})
+	})
+
+	t.When("a run in this boot and pid namespace stamped the dirs and its pid runs", func(w *gotest.T) {
+		w.It("keeps them, though the pid may now name another process", func(it *gotest.T) {
+			dirs := stamp(it, "boot-a", "pid:[1]")
+			age(it, dirs)
+
+			sweep("boot-a", "pid:[1]")
+
+			kept(it, dirs)
+		})
+
+		w.It("keeps them as this platform's own readers tell it", func(it *gotest.T) {
+			it.Setenv(protocol.EnvCacheDir, it.TempDir())
+			overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, overlay.WorkDir, overlay.CacheDir)
+
+			gotestrunner.CleanStaleOverlays()
+
+			kept(it, []string{overlay.WorkDir, overlay.CacheDir})
 		})
 	})
 }

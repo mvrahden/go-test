@@ -2,10 +2,12 @@ package gotestrunner
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -205,4 +207,33 @@ var ExportApplyInterrupt = applyInterrupt
 func ExportTrack(tree *proctree.Tree, root int, stopFile string, done <-chan struct{}) (stop func()) {
 	track(tree, liveTree{root: root, stopFile: stopFile, done: done})
 	return func() { untrack(tree) }
+}
+
+// ExportCountSuiteStarts counts suite process starts, calling after with the
+// count once each start returns, and returns what restores the real start.
+func ExportCountSuiteStarts(after func(n int)) (restore func()) {
+	var n atomic.Int32
+	suiteStart = func(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: as startSuite
+		s, err := startSuite(ctx, target, env, test2json)
+		after(int(n.Add(1)))
+		return s, err
+	}
+	return func() { suiteStart = startSuite }
+}
+
+// ExportFailSuiteStarts makes every suite start fail with err, calling each
+// per start, and returns what restores the real start.
+func ExportFailSuiteStarts(err error, each func()) (restore func()) {
+	suiteStart = func(context.Context, SuiteTarget, []string, bool) (startedSuite, error) {
+		each()
+		return startedSuite{}, err
+	}
+	return func() { suiteStart = startSuite }
+}
+
+// ExportStubOwnerIdentity stands in ns for this process's pid namespace and
+// boot for its boot, and returns what restores the real readers.
+func ExportStubOwnerIdentity(ns, boot func() string) (restore func()) {
+	selfPIDNamespace, selfBoot = ns, boot
+	return func() { selfPIDNamespace, selfBoot = pidNamespace, bootID }
 }

@@ -91,7 +91,8 @@ Run "gotest help <subcommand>" for subcommand-specific help.
 
 Flags (gotest — use --double-dash):
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep generated overlay for inspection
+  --debug                 Keep the overlay and work dir for inspection;
+                          a later run removes them after 7 days
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
@@ -154,7 +155,8 @@ that did not change is not linked again.
 
 Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep generated overlay for inspection
+  --debug                 Keep the overlay and work dir for inspection;
+                          a later run removes them after 7 days
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
@@ -239,7 +241,8 @@ Flags:
                           the suites; nodes carry no verdict
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep generated overlay
+  --debug                 Keep the overlay and work dir; a later run
+                          removes them after 7 days
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
@@ -300,7 +303,8 @@ Flags:
   --coverage=<file>       Include coverage from profile in summary output
   --badge=<file>          Write a coverage badge SVG (enables -coverprofile)
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep generated overlay
+  --debug                 Keep the overlay and work dir; a later run
+                          removes them after 7 days
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the overlay and test binary caches
   --min=<pct>             Fail if coverage < pct% (0-100)
@@ -339,7 +343,8 @@ keeps watching: the first package written there runs.
 Flags:
   --debounce=<dur>        Re-run delay after change (default: 200ms)
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep generated overlay
+  --debug                 Keep the overlay and work dir; a later run
+                          removes them after 7 days
   --spec                  Render spec view after each run
   --bench                 Benchmark mode: re-run benchmarks on change, with the
                           ns/op delta against the previous run
@@ -379,7 +384,8 @@ benchmark line reports allocations (B/op, allocs/op) alongside ns/op.
 Flags:
   --spec                  Render spec view instead of raw benchmark output
   --no-color              Disable ANSI color codes (with --spec)
-  --debug                 Keep generated overlay for inspection
+  --debug                 Keep the overlay and work dir for inspection;
+                          a later run removes them after 7 days
   --no-cache              Disable the overlay and test binary caches
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -496,7 +502,8 @@ Flags:
                           (-run, -skip and -bench are refused in its favour)
   --no-harvest            Do not mine table-test literals into seeds for this run
   --no-cache              Disable the overlay and test binary caches
-  --debug                 Keep generated overlay for inspection
+  --debug                 Keep the overlay and work dir for inspection;
+                          a later run removes them after 7 days
 
 --for is the session's only clock: the deadline follows it, so --timeout
 is refused here. With --for=0 only the first --jobs targets run, since

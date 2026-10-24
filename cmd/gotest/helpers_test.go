@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -26,19 +27,32 @@ type cliRunner struct {
 // keeps them from the children.
 func newCLIRunner(cli *gotestcli.BinarySharedFixture) cliRunner {
 	testkit.ScrubActionsEnv()
+	childTempDir = cli.TmpDir
 	return cliRunner{binary: cli.Binary, repoRoot: cli.RepoRoot}
 }
 
+// childTempDir is the run's temp dir for child CLIs, set by newCLIRunner.
+var childTempDir string
+
 // cliEnviron is this process's environment minus the CI and snapshot
-// switches, so a child CLI sees only the flags its case gives it.
+// switches, so a child CLI sees only the flags its case gives it. Its temp
+// dir is the run's own, so its sweep never reaches the real one's dirs.
 func cliEnviron() []string {
-	env := make([]string, 0, len(os.Environ()))
+	env := make([]string, 0, len(os.Environ())+3)
 	for _, kv := range os.Environ() {
-		switch name, _, _ := strings.Cut(kv, "="); name {
+		name, _, _ := strings.Cut(kv, "=")
+		switch name {
 		case "CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS":
 			continue
 		}
+		// Windows spells these in any case.
+		if childTempDir != "" && slices.ContainsFunc([]string{"TMPDIR", "TMP", "TEMP"}, func(v string) bool { return strings.EqualFold(v, name) }) {
+			continue
+		}
 		env = append(env, kv)
+	}
+	if childTempDir != "" {
+		env = append(env, "TMPDIR="+childTempDir, "TMP="+childTempDir, "TEMP="+childTempDir)
 	}
 	return env
 }

@@ -165,20 +165,25 @@ func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, e
 // gotest cache, and none of the host's CI or GOTEST_* settings, so a run
 // checks the same on a CI runner as on a laptop. Under CI snapshots are
 // read-only, and a refresh of the repository's own snapshots must not
-// rewrite the snapshotting fixture's deliberately stale baseline. extra
-// pairs are what a case sets on purpose; they go on top. The slow-build
-// threshold passes: it describes the machine, not the run.
+// rewrite the snapshotting fixture's deliberately stale baseline. Its temp
+// dir is inside the canary dir, so its sweep never reaches the real one's
+// dirs. extra pairs are what a case sets on purpose; they go on top. The
+// slow-build threshold passes: it describes the machine, not the run.
 func childEnv(canaryDir string, extra ...string) []string {
-	env := make([]string, 0, len(os.Environ())+2+len(extra))
+	env := make([]string, 0, len(os.Environ())+5+len(extra))
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
 		gotestVar := strings.HasPrefix(name, "GOTEST_") && name != protocol.EnvSlowBuildThreshold
-		if gotestVar || slices.Contains(hostOnlyEnv, name) {
+		if gotestVar || slices.Contains(hostOnlyEnv, name) || slices.ContainsFunc(tempEnv, func(v string) bool { return strings.EqualFold(v, name) }) {
 			continue
 		}
 		env = append(env, kv)
 	}
-	env = append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+testkit.ChildCacheDir(canaryDir))
+	tmp := filepath.Join(canaryDir, "tmp")
+	// A failure here fails the run, which cannot make its work dir.
+	_ = os.MkdirAll(tmp, 0o700)
+	env = append(env, "GOTEST_CANARY_DIR="+canaryDir, "GOTEST_CACHE_DIR="+testkit.ChildCacheDir(canaryDir),
+		"TMPDIR="+tmp, "TMP="+tmp, "TEMP="+tmp)
 	return append(env, extra...)
 }
 
@@ -193,6 +198,9 @@ func (s *CanaryTestSuite) TestTheChildEnvKeepsOnlyTheSlowBuildThreshold(t *gotes
 		t.Errorf("the host's %s reaches the fixture process", protocol.EnvCI)
 	}
 }
+
+// tempEnv name the temp dir; Windows spells them in any case.
+var tempEnv = []string{"TMPDIR", "TMP", "TEMP"}
 
 // hostOnlyEnv are the variables that put the CLI in CI mode or point it at
 // the job's step summary.
@@ -224,11 +232,12 @@ func (s *CanaryTestSuite) TestPassingSuiteIsGreen(t *gotest.T) {
 // A fixture run leaves the host's gotest cache and CI settings alone: its
 // entries land in its own cache, and only what a case sets reaches it.
 func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
-	host := t.TempDir()
+	host, hostTmp := t.TempDir(), t.TempDir()
 	t.Setenv("GOTEST_CACHE_DIR", host)
 	t.Setenv("CI", "true")
 	t.Setenv("GOTEST_CI", "1")
 	dir := s.check(t, "passing")
+	t.Setenv("TMPDIR", hostTmp)
 	if entries, err := os.ReadDir(host); err != nil || len(entries) != 0 {
 		t.Errorf("host gotest cache: %d entries (err %v), want none", len(entries), err)
 	}
@@ -240,6 +249,14 @@ func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
 		if kv == "CI=true" || kv == "GOTEST_CI=1" || kv == "GOTEST_CACHE_DIR="+host {
 			t.Errorf("child env inherits the host's %s", kv)
 		}
+	}
+	for _, name := range tempEnv {
+		if !slices.Contains(env, name+"="+filepath.Join(dir, "tmp")) {
+			t.Errorf("child env names no temp dir of its own as %s, so its sweep reaches other runs' dirs", name)
+		}
+	}
+	if slices.Contains(env, "TMPDIR="+hostTmp) {
+		t.Errorf("child env keeps the host's temp dir")
 	}
 	if env[len(env)-1] != "GOTEST_CI=0" {
 		t.Errorf("child env drops what the case set: ends with %q", env[len(env)-1])

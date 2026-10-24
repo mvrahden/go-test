@@ -20,6 +20,9 @@ type BinarySharedFixture struct {
 	Binary   string // the built CLI
 	RepoRoot string // the checkout it was built from
 	CacheDir string // the run's gotest cache, removed with the run
+	// TmpDir is the temp dir for the CLIs the suites start, removed with
+	// the run: their sweeps of leftover work dirs stay off the real one.
+	TmpDir string
 }
 
 // SharedFixtureConfig: no deadline: this fixture compiles the CLI, so its time
@@ -45,7 +48,12 @@ func (f *BinarySharedFixture) BeforeAll(ctx context.Context) error {
 		_ = os.RemoveAll(dir)
 		return err
 	}
-	f.Binary, f.RepoRoot, f.CacheDir = binary, root, filepath.Join(dir, "cache")
+	tmp := filepath.Join(dir, "tmp")
+	if err := os.Mkdir(tmp, 0o700); err != nil {
+		_ = os.RemoveAll(dir)
+		return err
+	}
+	f.Binary, f.RepoRoot, f.CacheDir, f.TmpDir = binary, root, filepath.Join(dir, "cache"), tmp
 	return nil
 }
 

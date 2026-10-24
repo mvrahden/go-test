@@ -19,6 +19,12 @@ func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
 // windowCtx holds the overlay cleanup a test registers, if any.
 type windowCtx struct{ cleanup func() }
 
+// BeforeAll isolates the temp dir for every method: the runs they make sweep it.
+func (s *FixtureWindowTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+
+// AfterAll has nothing to release: Setenv restores the temp dir.
+func (s *FixtureWindowTestSuite) AfterAll(_ *gotest.T) {}
+
 func (s *FixtureWindowTestSuite) BeforeEach(_ *gotest.T) *windowCtx { return &windowCtx{} }
 
 func (s *FixtureWindowTestSuite) AfterEach(_ *gotest.T, ctx *windowCtx) {

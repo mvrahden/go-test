@@ -1,0 +1,25 @@
+//go:build unix
+
+package proctree
+
+import (
+	"errors"
+	"os"
+	"syscall"
+)
+
+// Alive reports whether a process with pid is running.
+func Alive(pid int) bool {
+	// 0 and -1 would signal a group, not a process.
+	if pid <= 0 {
+		return false
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	// Linux holds a pidfd for proc until it is released.
+	defer func() { _ = proc.Release() }()
+	err = proc.Signal(syscall.Signal(0))
+	return err == nil || errors.Is(err, syscall.EPERM)
+}

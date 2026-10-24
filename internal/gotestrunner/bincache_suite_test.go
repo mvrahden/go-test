@@ -70,6 +70,7 @@ func (s *BinaryCacheKeyTestSuite) TestLock(t *gotest.T) {
 
 func (s *BinaryCacheKeyTestSuite) TestEviction(t *gotest.T) {
 	t.It("removes bin entries older than the cache age and keeps fresh ones", func(it *gotest.T) {
+		isolateTempDir(it)
 		root := it.TempDir()
 		it.Setenv(protocol.EnvCacheDir, root)
 		old := filepath.Join(root, "bin", "0000000000000000")

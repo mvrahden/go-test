@@ -16,6 +16,12 @@ func (s *CensusTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
 }
 
+// BeforeAll isolates the temp dir for every method: the runs they make sweep it.
+func (s *CensusTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+
+// AfterAll has nothing to release: Setenv restores the temp dir.
+func (s *CensusTestSuite) AfterAll(_ *gotest.T) {}
+
 func (s *CensusTestSuite) TestRunsAreCensused(t *gotest.T) {
 	t.When("a suite skips itself in BeforeAll", func(w *gotest.T) {
 		w.It("summary stays green: the skip covers the suite's methods", func(it *gotest.T) {

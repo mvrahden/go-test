@@ -10,6 +10,15 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// isolateTempDir points the temp dir at one of t's own, so no sweep a test
+// runs reaches the work and overlay dirs of other runs.
+func isolateTempDir(t *gotest.T) {
+	dir := t.TempDir()
+	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(env, dir)
+	}
+}
+
 // OverlayTestSuite covers the overlay the CLI writes for a generated package.
 type OverlayTestSuite struct{}
 
@@ -20,6 +29,12 @@ func (s *OverlayTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 // overlayCtx holds the overlay dir a test's WriteOverlay call creates.
 type overlayCtx struct{ dir string }
+
+// BeforeAll isolates the temp dir for every method: the runs they make sweep it.
+func (s *OverlayTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+
+// AfterAll has nothing to release: Setenv restores the temp dir.
+func (s *OverlayTestSuite) AfterAll(_ *gotest.T) {}
 
 func (s *OverlayTestSuite) BeforeEach(_ *gotest.T) *overlayCtx { return &overlayCtx{} }
 
