@@ -4827,6 +4827,72 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "both come up, the dependency first, and the suite reading them passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "both_come_up,_the_dependency_first,_and_the_suite_reading_them_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "both are torn down, the dependent first",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "both_are_torn_down,_the_dependent_first",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_the_exclusive_tail_depends_on_a_shared_fixture_only_the_tail_needs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATailOnlyDependency",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATailOnlyDependency",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureDependency",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureDependencyTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "is reported at the hook's declaration, not in the runtime's file",
                       "duration": 0,
                       "excluded": false,
@@ -5287,6 +5353,46 @@
               "name": "TestAFailedReleaseBetweenAttempts",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the run passes: the wait counts the release",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_run_passes:_the_wait_counts_the_release",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture with a 2s Timeout and 1 retry spends 1.6s on each attempt and on the release between them, and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_with_a_2s_Timeout_and_1_retry_spends_1.6s_on_each_attempt_and_on_the_release_between_them,_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasesCountTowardTheWait",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasesCountTowardTheWait",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureRetry",
@@ -5680,6 +5786,258 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the wait ends at the declared budget and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_ends_at_the_declared_budget_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "never runs the suite reading it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "never_runs_the_suite_reading_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_the_exclusive_tail_hangs_past_its_declared_2s_Timeout_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheExclusiveTail",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheExclusiveTail",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait ends at the declared budget and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_ends_at_the_declared_budget_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "never runs the benchmark reading it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "never_runs_the_benchmark_reading_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_a_bench_slot_hangs_past_its_declared_2s_Timeout_and_no_--setup-timeout_is_given",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABenchSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABenchSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its process is force-killed once its 32s teardown budget has passed, and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "its_process_is_force-killed_once_its_32s_teardown_budget_has_passed,_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_the_exclusive_tail_declares_a_2s_Timeout_and_its_AfterAll_never_returns",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATailFixturesTeardownBudget",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATailFixturesTeardownBudget",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the slot's release is given up once its 32s teardown budget has passed, and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_slot's_release_is_given_up_once_its_32s_teardown_budget_has_passed,_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_started_for_a_bench_slot_declares_a_2s_Timeout_and_its_AfterAll_never_returns",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABenchSlotFixturesTeardownBudget",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestABenchSlotFixturesTeardownBudget",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the wait ends with the run and the run fails",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_wait_ends_with_the_run_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no fixture process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_no_fixture_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run's --timeout expires while a shared fixture started for the exclusive tail hangs with no Timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run's_--timeout_expires_while_a_shared_fixture_started_for_the_exclusive_tail_hangs_with_no_Timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStoppedRunEndsTheWait",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStoppedRunEndsTheWait",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureWindow",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureWindowTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails naming the shared fixture it binds and go tool gotest, before any method runs",
                       "duration": 0,
                       "excluded": false,
@@ -5780,6 +6138,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "fails_the_run_within_60s,_saying_the_setup_timed_out",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "never runs the suite reading the fixture",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "never_runs_the_suite_reading_the_fixture",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -6033,6 +6404,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "fails_the_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the sibling's 8s AfterAll runs to its end under the teardown budget the process reports",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_sibling's_8s_AfterAll_runs_to_its_end_under_the_teardown_budget_the_process_reports",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -9185,13 +9569,13 @@
     }
   ],
   "stats": {
-    "behaviors": 310,
+    "behaviors": 323,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 46,
+    "suites": 48,
     "tests": 0
   }
 }

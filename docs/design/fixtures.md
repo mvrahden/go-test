@@ -255,7 +255,7 @@ func (f *PostgresSharedFixture) connect(ctx context.Context) error {
 - Exported fields are serialized as JSON and transferred to the test process via a state file (`GOTEST_SHARED_STATE_FILE`).
 - Fields assigned in `Hydrate` (directly, or in receiver methods called from `Hydrate`, one level deep) are **local** — excluded from serialization and reconstructed by `Hydrate`.
 
-Without `--setup-timeout`, the wait for the whole setup is what the fixtures declare: each reports `Timeout × (Retries+1) + RetryDelay × Retries`, plus `Timeout × Retries` for the releases between attempts when it has an `AfterAll`, as its setup starts and the deadline moves to the latest, 30s until the first report; a fixture without a `Timeout` lifts it ([A shared fixture's declared setup budget](../../specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
+Without `--setup-timeout`, the wait for the whole setup is what the fixtures declare: each reports `Timeout × (Retries+1) + RetryDelay × Retries`, plus `Timeout × Retries` for the releases between attempts when it has an `AfterAll`, as its setup starts and the deadline moves to the latest, 30s until the first report; a fixture without a `Timeout` lifts it. The same budget bounds a fixture started later for the exclusive tail or a bench slot, and a `--timeout` that expires ends that wait too ([A stopped run ends the wait for a late fixture](../../specs/fixtures/spec.md#requirement-a-stopped-run-ends-the-wait-for-a-late-fixture)) ([A shared fixture's declared setup budget](../../specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
 
 The protocol is read whole, line by line, and nothing a fixture prints is part of it ([Shared fixture state reaches its suites](../../specs/fixtures/spec.md#requirement-shared-fixture-state-reaches-its-suites)).
 
@@ -385,7 +385,7 @@ Each phase has an alive set — `Alive(phase)` is the DAG-closure of the union o
 
 - Fixtures in neither alive set never start.
 - `Alive(bulk)` starts up-front, concurrent with package compilation.
-- At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)` in reverse dependency order, then starts `Alive(tail) ∖ Alive(bulk)` in dependency order, under the same per-fixture retry and budget policy as the up-front phase.
+- At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)` in reverse dependency order, then starts `Alive(tail) ∖ Alive(bulk)` in dependency order, under the same per-fixture retry and budget policy as the up-front phase. A fixture started there with a dependency only the tail needs comes up after it and is released before it ([A late fixture's dependencies](../../specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies)).
 - Run-end teardown releases whatever is still resident. Fixtures released at the barrier are skipped there: every fixture's teardown has exactly one owner.
 
 The barrier speaks two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on the protocol stream after any late state lines.

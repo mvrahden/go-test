@@ -1,7 +1,7 @@
 # Fixtures Specification
 
 ## Purpose
-Which shared fixtures a run starts for the suites it selects, guarded suites included, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, and that shared fixtures need the gotest runner.
+Which shared fixtures a run starts for the suites it selects, guarded suites included, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, how a shared fixture started late comes up and is released, and that shared fixtures need the gotest runner.
 
 ## Requirements
 
@@ -139,7 +139,7 @@ A suite binding a shared fixture SHALL fail under plain go test before any metho
 - **THEN** fails naming the shared fixture it binds and go tool gotest, before any method runs
 
 ### Requirement: A shared fixture's declared setup budget
-When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them; a fixture that hangs past that budget SHALL fail the run, saying the setup timed out.
+When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them, for a setup at the start of the run and for one started later for the exclusive tail or a bench slot; a fixture that hangs past that budget SHALL fail the run and the suites that read it SHALL never run.
 
 #### Scenario: A container fixture slower than the default budget
 - **WHEN** a shared fixture declaring ContainerFixtureConfig takes 35s to come up and no --setup-timeout is given
@@ -148,6 +148,48 @@ When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be
 #### Scenario: A fixture that hangs past its budget
 - **WHEN** a shared fixture declaring a 2s Timeout hangs in BeforeAll and no --setup-timeout is given
 - **THEN** fails the run within 60s, saying the setup timed out
+- **AND** never runs the suite reading the fixture
+
+#### Scenario: Releases between attempts
+- **WHEN** a shared fixture with a 2s Timeout and 1 retry spends 1.6s on each attempt and on the release between them, and no --setup-timeout is given
+- **THEN** the run passes: the wait counts the release
+
+#### Scenario: A fixture started for the exclusive tail
+- **WHEN** a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given
+- **THEN** the wait ends at the declared budget and the run fails
+- **AND** never runs the suite reading it
+
+#### Scenario: A fixture started for a bench slot
+- **WHEN** a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given
+- **THEN** the wait ends at the declared budget and the run fails
+- **AND** never runs the benchmark reading it
+
+### Requirement: A late fixture's dependencies
+A shared fixture started for the exclusive tail together with a dependency only the tail needs SHALL come up after that dependency, serve the suites that read it, and be torn down before it.
+
+#### Scenario: A tail fixture with a tail-only dependency
+- **WHEN** a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs
+- **THEN** both come up, the dependency first, and the suite reading them passes
+- **AND** both are torn down, the dependent first
+
+### Requirement: A late fixture's teardown budget
+A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run.
+
+#### Scenario: A tail fixture whose AfterAll never returns
+- **WHEN** a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns
+- **THEN** its process is force-killed once its 32s teardown budget has passed, and the run fails
+
+#### Scenario: A bench slot's fixture whose AfterAll never returns
+- **WHEN** a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns
+- **THEN** the slot's release is given up once its 32s teardown budget has passed, and the run fails
+
+### Requirement: A stopped run ends the wait for a late fixture
+A run whose --timeout expires while a shared fixture started for the exclusive tail hangs SHALL end the wait, fail, and leave no fixture process behind.
+
+#### Scenario: The run's --timeout expires during the wait
+- **WHEN** the run's --timeout expires while a shared fixture started for the exclusive tail hangs with no Timeout
+- **THEN** the wait ends with the run and the run fails
+- **AND** leaves no fixture process behind
 
 ### Requirement: Shared fixture state reaches its suites
 The state a shared fixture's setup produces SHALL reach the suites that bind it when the setup prints to stdout, with or without a trailing newline and in a JSON-shaped line, and when the state is 2 MiB, and nothing the setup prints SHALL become an event of the run.
@@ -178,8 +220,9 @@ A process a shared fixture's setup starts SHALL get neither the protocol descrip
 - **AND** the process sees no protocol variable, and what it writes to descriptor 3 is not read
 
 ### Requirement: Siblings of a setup that is given up
-When the run gives up on a shared fixture's setup while a sibling that came up is still to be released, the run SHALL fail.
+When the run gives up on a shared fixture's setup, a sibling that came up SHALL be released under the teardown budget the shared fixture process reports once its setups return.
 
 #### Scenario: A sibling still to be released
 - **WHEN** a shared fixture's setup is given up while a sibling that came up is still to be released
 - **THEN** fails the run
+- **AND** the sibling's 8s AfterAll runs to its end under the teardown budget the process reports
