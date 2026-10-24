@@ -23,8 +23,9 @@ import (
 type fixtureWindows struct {
 	Bulk map[string]bool // Alive(bulk): state keys the parallel bulk needs
 	Tail map[string]bool // Alive(tail): state keys the exclusive tail needs
-	// Fixtures is Alive(bulk) ∪ Alive(tail) in the overlay's topological
-	// order — the only fixtures the setup subprocess is generated with.
+	// Fixtures is Alive(bulk) ∪ Alive(tail), dependencies first — the only
+	// fixtures the setup subprocess is generated with, in the order it starts
+	// a command's fixtures and the reverse of the order it releases them.
 	Fixtures []gotestgen.SharedFixtureInfo
 	// Skipped counts overlay fixtures no scheduled suite requires.
 	Skipped int
@@ -54,7 +55,38 @@ func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter st
 			w.Skipped++
 		}
 	}
+	w.Fixtures = dependenciesFirst(w.Fixtures)
 	return w
+}
+
+// dependenciesFirst orders fixtures so each comes after its dependencies,
+// keeping the given order otherwise. Discovery lists them by name, and the
+// setup process starts a command's fixtures one by one in list order: a
+// dependent listed first would wait on a dependency it has not started yet.
+func dependenciesFirst(fixtures []gotestgen.SharedFixtureInfo) []gotestgen.SharedFixtureInfo {
+	byKey := make(map[string]int, len(fixtures))
+	for i := range fixtures {
+		byKey[sharedFixtureKey(&fixtures[i])] = i
+	}
+	out := make([]gotestgen.SharedFixtureInfo, 0, len(fixtures))
+	placed := make([]bool, len(fixtures))
+	var place func(i int)
+	place = func(i int) {
+		if placed[i] {
+			return
+		}
+		placed[i] = true
+		for _, dep := range fixtures[i].Dependencies {
+			if j, ok := byKey[dep]; ok {
+				place(j)
+			}
+		}
+		out = append(out, fixtures[i])
+	}
+	for i := range fixtures {
+		place(i)
+	}
+	return out
 }
 
 // aliveFromTargets computes the alive set for one phase's actual targets —
@@ -209,6 +241,7 @@ func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFil
 			w.Skipped++
 		}
 	}
+	w.Fixtures = dependenciesFirst(w.Fixtures)
 	return w
 }
 
