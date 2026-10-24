@@ -184,14 +184,34 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// methodWatches holds, per running test method, the end of its budget watch:
-// an async method's body ends before the method does (see [AwaitDoneAt]).
-var methodWatches sync.Map // *testing.T -> func()
+// methodWatches holds, per running test method, its budget watch: an async
+// method's body ends before the method does (see [AwaitDoneAt]).
+var methodWatches sync.Map // *testing.T -> bodyWatch
 
-// endBody ends the budget watch of t's method, whose body has returned.
-func endBody(t *testing.T) {
-	if end, ok := methodWatches.Load(t); ok {
-		end.(func())()
+// bodyWatch is a method's budget watch as an async method's wait sees it.
+type bodyWatch interface {
+	// endBody ends the watch, the body having returned, and returns the
+	// budget the suite declared; zero when it declared none.
+	endBody() time.Duration
+	// resume holds the hooks after the wait to what is left of the budget.
+	resume()
+}
+
+// endBody ends the budget watch of t's method, whose body has returned, and
+// returns the budget the method was declared; zero when there is none.
+func endBody(t *testing.T) time.Duration {
+	if w, ok := methodWatches.Load(t); ok {
+		return w.(bodyWatch).endBody()
+	}
+	return 0
+}
+
+// resumeHooks holds the hooks left to run after t's method, whose watch
+// [endBody] ended, to what remains of the method's budget. A wait that
+// ended at the deadline leaves the hooks none to be held to.
+func resumeHooks(t *testing.T) {
+	if w, ok := methodWatches.Load(t); ok {
+		w.(bodyWatch).resume()
 	}
 }
 

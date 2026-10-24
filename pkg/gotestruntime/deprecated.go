@@ -49,12 +49,26 @@ func AwaitDone(t *gotest.T, name string, start func(done func())) {
 // Deprecated: regenerate the harness.
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
 	end := watchPhase(t.T(), budget, "", "Timeout")
-	methodWatches.Store(t.T(), end)
+	methodWatches.Store(t.T(), bodyWatch(bodyOnly{end, budget}))
 	defer methodWatches.Delete(t.T())
 	defer end()
 	defer runstate.EnterBody(t.T(), "a method")()
 	run()
 }
+
+// bodyOnly is the watch [RunTest] keeps: it held the body alone, so an async
+// method's hooks after the wait are held to nothing.
+type bodyOnly struct {
+	end    func()
+	budget time.Duration
+}
+
+func (w bodyOnly) endBody() time.Duration {
+	w.end()
+	return w.budget
+}
+
+func (w bodyOnly) resume() {}
 
 // Deprecated: regenerate the harness.
 func CountMatchingTests([]string) int {

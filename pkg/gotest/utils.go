@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/internal/callsite"
+	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/internal/setupwaits"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
@@ -189,9 +190,15 @@ func Go(t *T, fn func()) (wait func()) {
 	var captured *capturedPanic
 	var returned bool
 
+	owner := t.testingTB()
 	go func() {
 		defer close(done)
-		defer func() { captured = capturedFrom(recover(), "goroutine started by gotest.Go") }()
+		defer func() {
+			captured = capturedFrom(recover(), "goroutine started by gotest.Go")
+			if captured != nil || !returned {
+				runstate.Abend(owner) // an async method's wait ends on it
+			}
+		}()
 		fn()
 		returned = true
 	}()

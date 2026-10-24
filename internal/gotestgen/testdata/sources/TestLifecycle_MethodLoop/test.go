@@ -146,3 +146,15 @@ func (s *PanicAheadTestSuite) FuzzOne(f *gotest.F) {
 	f.Add("seed")
 	f.Fuzz(func(t *gotest.T, in string) {})
 }
+
+// FatalAsyncTestSuite's goroutine fails fatally without calling done; the
+// wait must end with the failure, not with the budget.
+type FatalAsyncTestSuite struct{}
+
+func (s *FatalAsyncTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Timeout: 20 * time.Second}
+}
+
+func (s *FatalAsyncTestSuite) TestFatalGoroutineAsync(t *gotest.T, done func()) {
+	gotest.Go(t, func() { gotest.Fail(t, "the goroutine that owns done fails") })
+}
