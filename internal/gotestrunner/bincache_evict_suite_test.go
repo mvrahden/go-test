@@ -3,6 +3,7 @@ package gotestrunner_test
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -91,5 +92,92 @@ func (s *BinaryCacheEvictionTestSuite) TestAKeyWithoutACheckout(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Equal(it, cwd, string(got))
 		})
+	})
+}
+
+// aged sets path's modification time to ago before now.
+func aged(t *gotest.T, path string, ago time.Duration) {
+	then := time.Now().Add(-ago)
+	gotest.NoError(t, os.Chtimes(path, then, then))
+}
+
+func (s *BinaryCacheEvictionTestSuite) TestTheCapEvictsTheOldestFirst(t *gotest.T) {
+	t.When("the cache holds more than its cap", func(w *gotest.T) {
+		w.It("evicts the binaries used longest ago until the total is at or under the cap", func(it *gotest.T) {
+			root := isolated(it)
+			cwd := it.TempDir()
+			a := cacheKey(it, root, "dddddddddddddddd", cwd, "old.test", "new.test")
+			b := cacheKey(it, root, "eeeeeeeeeeeeeeee", cwd, "older.test", "newer.test")
+			// Six bytes each ("binary"); used 4, 3, 2 and 1 hours ago.
+			aged(it, filepath.Join(b, "older.test"), 4*time.Hour)
+			aged(it, filepath.Join(a, "old.test"), 3*time.Hour)
+			aged(it, filepath.Join(b, "newer.test"), 2*time.Hour)
+			aged(it, filepath.Join(a, "new.test"), time.Hour)
+			it.Setenv(protocol.EnvCacheMaxSize, "12")
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.False(it, exists(filepath.Join(b, "older.test")))
+			gotest.False(it, exists(filepath.Join(a, "old.test")))
+			gotest.True(it, exists(filepath.Join(b, "newer.test")))
+			gotest.True(it, exists(filepath.Join(a, "new.test")))
+		})
+	})
+	t.When("a binary has not been used for 7 days", func(w *gotest.T) {
+		w.It("evicts it though the cache is under its cap", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "ffffffffffffffff", it.TempDir(), "stale.test", "fresh.test")
+			aged(it, filepath.Join(dir, "stale.test"), 8*24*time.Hour)
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.False(it, exists(filepath.Join(dir, "stale.test")))
+			gotest.True(it, exists(filepath.Join(dir, "fresh.test")))
+		})
+	})
+	t.When("the cap is off", func(w *gotest.T) {
+		w.It("keeps every binary used within 7 days", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "abababababababab", it.TempDir(), "a.test", "b.test")
+			it.Setenv(protocol.EnvCacheMaxSize, "off")
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.True(it, exists(filepath.Join(dir, "a.test")))
+			gotest.True(it, exists(filepath.Join(dir, "b.test")))
+		})
+	})
+}
+
+func (s *BinaryCacheEvictionTestSuite) TestTheCapsSpelling(t *gotest.T) {
+	type row struct {
+		Desc  string
+		value string
+		want  int64
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "unset is the 5 GiB default", value: "", want: 5 << 30},
+		{Desc: "bytes", value: "1024", want: 1024},
+		{Desc: "KiB", value: "3KiB", want: 3 << 10},
+		{Desc: "MiB", value: "200MiB", want: 200 << 20},
+		{Desc: "GiB", value: "2GiB", want: 2 << 30},
+		{Desc: "off is no cap", value: "off", want: 0},
+	}) {
+		got, err := gotestrunner.ExportParseCacheMaxSize(r.value)
+		gotest.NoError(t, err)
+		gotest.Equal(t, r.want, got)
+	}
+	for t, bad := range gotest.Each(t, []struct{ Desc string }{{Desc: "5GB"}, {Desc: "-1"}, {Desc: "0"}, {Desc: "lots"}, {Desc: "1.5GiB"}}) {
+		_, err := gotestrunner.ExportParseCacheMaxSize(bad.Desc)
+		gotest.ErrorContains(t, err, protocol.EnvCacheMaxSize)
+	}
+}
+
+func (s *BinaryCacheEvictionTestSuite) TestARunRefusesAnUnreadableCap(t *gotest.T) {
+	isolated(t)
+	t.Setenv(protocol.EnvCacheMaxSize, "5GB")
+	_, _, err := gotestrunner.GenerateOverlay(nil, nil, false, false, false)
+	t.It("fails before it generates anything, naming the variable", func(it *gotest.T) {
+		gotest.ErrorContains(it, err, protocol.EnvCacheMaxSize+"=5GB")
 	})
 }

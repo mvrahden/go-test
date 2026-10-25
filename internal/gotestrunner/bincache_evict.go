@@ -1,65 +1,166 @@
 package gotestrunner
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // checkoutFile, in a key dir of the test binary cache, names the working
 // directory the key was made for.
 const checkoutFile = ".cwd"
 
+// defaultCacheMaxSize caps the test binary cache when GOTEST_CACHE_MAX_SIZE
+// is unset: about nine full sets of this repository's binaries.
+const defaultCacheMaxSize = 5 << 30
+
+// parseCacheMaxSize reads GOTEST_CACHE_MAX_SIZE: bytes, or a whole number
+// with KiB, MiB or GiB; "off" is no cap, returned as 0.
+func parseCacheMaxSize(value string) (int64, error) {
+	switch value {
+	case "":
+		return defaultCacheMaxSize, nil
+	case "off":
+		return 0, nil
+	}
+	digits, shift := value, 0
+	for unit, s := range map[string]int{"KiB": 10, "MiB": 20, "GiB": 30} {
+		if d, ok := strings.CutSuffix(value, unit); ok {
+			digits, shift = d, s
+		}
+	}
+	n, err := strconv.ParseInt(digits, 10, 64)
+	if err != nil || n <= 0 || n > (1<<62)>>shift {
+		return 0, fmt.Errorf("%s=%s: want a positive number of bytes, optionally with KiB, MiB or GiB, or off for no cap", protocol.EnvCacheMaxSize, value)
+	}
+	return n << shift, nil
+}
+
+// cacheMaxSize is the cap a sweep holds the cache to; a run has refused an
+// unreadable value before it sweeps, so one here is the default.
+func cacheMaxSize() int64 {
+	n, err := parseCacheMaxSize(os.Getenv(protocol.EnvCacheMaxSize))
+	if err != nil {
+		return defaultCacheMaxSize
+	}
+	return n
+}
+
 // cachedBinary is one test binary of the cache as the sweep scanned it.
 type cachedBinary struct {
 	path    string
+	size    int64
 	modTime time.Time
 }
 
-// sweepBinaryCache evicts the binaries of every key whose recorded checkout
-// no longer exists. A key that records none is left to the other rules.
-func sweepBinaryCache(root string) {
-	bin := filepath.Join(root, "bin")
-	keys, err := os.ReadDir(bin)
-	if err != nil {
-		return
+// cacheKeyDir is one key of the cache as the sweep scanned it.
+type cacheKeyDir struct {
+	dir      string
+	gone     bool // its recorded checkout no longer exists
+	modTime  time.Time
+	binaries []cachedBinary
+	locks    []cachedBinary // lock files whose binary is not there
+}
+
+// sweepBinaryCache evicts, in order: every binary of a key whose recorded
+// checkout no longer exists; every binary unused for cacheMaxAge; then the
+// binaries used longest ago until the total is at most maxSize (0: no cap).
+// A key recording no checkout is held to the other two rules alone.
+func sweepBinaryCache(root string, maxSize int64, now time.Time) {
+	keys := scanKeys(filepath.Join(root, "bin"))
+	var kept []cachedBinary
+	var total int64
+	for i := range keys {
+		k := &keys[i]
+		for _, b := range k.binaries {
+			if k.gone || now.Sub(b.modTime) > cacheMaxAge {
+				evictBinary(b)
+				continue
+			}
+			kept = append(kept, b)
+			total += b.size
+		}
+		if k.gone || now.Sub(k.modTime) > cacheMaxAge {
+			for _, l := range k.locks {
+				evictLock(l)
+			}
+		}
+	}
+	if maxSize > 0 && total > maxSize {
+		slices.SortFunc(kept, func(a, b cachedBinary) int { return a.modTime.Compare(b.modTime) })
+		for _, b := range kept {
+			if total <= maxSize {
+				break
+			}
+			if evictBinary(b) {
+				total -= b.size
+			}
+		}
 	}
 	for _, k := range keys {
-		if !k.IsDir() {
-			continue
+		if k.gone || now.Sub(k.modTime) > cacheMaxAge || len(k.binaries) > 0 {
+			removeEmptyKey(k.dir)
 		}
-		dir := filepath.Join(bin, k.Name())
-		cwd, err := os.ReadFile(filepath.Join(dir, checkoutFile))
-		if err != nil || exists(string(cwd)) {
-			continue
-		}
-		for _, b := range scanBinaries(dir) {
-			evictBinary(b)
-		}
-		removeEmptyKey(dir)
 	}
 }
 
-// scanBinaries lists dir's test binaries with the time each was last used:
-// go touches a binary it finds up to date instead of relinking it.
-func scanBinaries(dir string) []cachedBinary {
-	entries, err := os.ReadDir(dir)
+// scanKeys reads the metadata of every key dir under bin: its binaries with
+// the time each was last used (go touches a binary it finds up to date
+// instead of relinking it), lock files left without a binary, and whether
+// its recorded checkout is gone.
+func scanKeys(bin string) []cacheKeyDir {
+	entries, err := os.ReadDir(bin)
 	if err != nil {
 		return nil
 	}
-	var out []cachedBinary
+	var keys []cacheKeyDir
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".test") {
+		if !e.IsDir() {
 			continue
 		}
 		info, err := e.Info()
 		if err != nil {
 			continue
 		}
-		out = append(out, cachedBinary{path: filepath.Join(dir, e.Name()), modTime: info.ModTime()})
+		k := cacheKeyDir{dir: filepath.Join(bin, e.Name()), modTime: info.ModTime()}
+		if cwd, err := os.ReadFile(filepath.Join(k.dir, checkoutFile)); err == nil {
+			k.gone = !exists(string(cwd))
+		}
+		files, err := os.ReadDir(k.dir)
+		if err != nil {
+			continue
+		}
+		names := map[string]bool{}
+		for _, f := range files {
+			names[f.Name()] = true
+		}
+		for _, f := range files {
+			name := f.Name()
+			isBinary := strings.HasSuffix(name, ".test")
+			orphanLock := strings.HasSuffix(name, ".test.lock") && !names[strings.TrimSuffix(name, ".lock")]
+			if f.IsDir() || !isBinary && !orphanLock {
+				continue
+			}
+			fi, err := f.Info()
+			if err != nil {
+				continue
+			}
+			b := cachedBinary{path: filepath.Join(k.dir, name), size: fi.Size(), modTime: fi.ModTime()}
+			if isBinary {
+				k.binaries = append(k.binaries, b)
+			} else {
+				k.locks = append(k.locks, b)
+			}
+		}
+		keys = append(keys, k)
 	}
-	return out
+	return keys
 }
 
 // evictBinary removes b under its lock, taken without waiting: a binary a
@@ -82,6 +183,19 @@ func evictBinary(b cachedBinary) bool {
 	}
 	releaseEvicted(lock, unlock)
 	return true
+}
+
+// evictLock removes a lock file left without its binary, under that lock.
+func evictLock(l cachedBinary) {
+	unlock, err := tryLockFile(l.path)
+	if err != nil {
+		return
+	}
+	if exists(strings.TrimSuffix(l.path, ".lock")) {
+		unlock()
+		return
+	}
+	releaseEvicted(l.path, unlock)
 }
 
 // removeEmptyKey removes a key dir that holds no binary and no lock file:

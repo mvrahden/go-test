@@ -280,3 +280,5 @@ func ExportLockOpened(then func(path string)) (restore func()) {
 	lockOpened = then
 	return func() { lockOpened = prev }
 }
+
+var ExportParseCacheMaxSize = parseCacheMaxSize

@@ -1,0 +1,13 @@
+Judge: ./internal/gotestrunner BinaryCacheEvictionTestSuite/TestTheCapEvictsTheOldestFirst
+Expect: ^FAIL .*internal/gotestrunner BinaryCacheEviction .* / evicts the binaries used longest ago until the total is at or under the cap \(
+--- a/internal/gotestrunner/bincache_evict.go
++++ b/internal/gotestrunner/bincache_evict.go
+@@ -93,7 +93,7 @@ func sweepBinaryCache(root string, maxSize int64, now time.Time) {
+ 		}
+ 	}
+ 	if maxSize > 0 && total > maxSize {
+-		slices.SortFunc(kept, func(a, b cachedBinary) int { return a.modTime.Compare(b.modTime) })
++		slices.SortFunc(kept, func(a, b cachedBinary) int { return b.modTime.Compare(a.modTime) })
+ 		for _, b := range kept {
+ 			if total <= maxSize {
+ 				break

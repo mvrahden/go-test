@@ -505,6 +505,7 @@ shards of one run do not add up to every mutant exactly once.
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
 | `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run links into the evicted cache entry |
 | `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
+| `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
 
 ## Adding a mutant
 
