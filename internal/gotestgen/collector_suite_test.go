@@ -562,7 +562,7 @@ func (s *CollectorTestSuite) TestTestMethod(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_TooManyParams")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.NotEmpty(it, result.Errs, "expected error for 3 params on a non-async method")
+			gotest.NotEmpty(it, result.Errs, "expected error for 3 params on a test method")
 			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported number of params")
 		})
 	})
