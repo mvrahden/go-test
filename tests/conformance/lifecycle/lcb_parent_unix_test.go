@@ -21,6 +21,63 @@ func wrapper(t *gotest.T, dir, body string) string {
 	return path
 }
 
+// ParentGoneTestSuite: a suite process whose parent ends under the runner
+// stops and tears down by itself.
+type ParentGoneTestSuite struct {
+	cli string
+}
+
+// SuiteConfig: cold, BeforeAll took 7.4s locally and a method 0.7s; both
+// budgets hold twice a run seven times slower.
+func (s *ParentGoneTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 2 * time.Minute}
+}
+
+func (s *ParentGoneTestSuite) BeforeAll(t *gotest.T) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
+	gotest.NoError(t, err)
+	testkit.ScrubActionsEnv()
+}
+
+// AfterAll has nothing to release: the binary lives in a temp dir.
+func (s *ParentGoneTestSuite) AfterAll(t *gotest.T) {}
+
+func (s *ParentGoneTestSuite) TestTheParentIsKilled(t *gotest.T) {
+	markerDir := t.TempDir()
+	// The wrapper stays the suite's parent: sh waits for the command it runs.
+	wrap := wrapper(t, t.TempDir(), `echo "wrapper=$$" >> "$GOTEST_CANARY_DIR/markers"
+"$@"
+`)
+	cmd := commandOf(s.cli, "-json", "-exec", wrap, "../testdata/stopping/")
+	cmd.Env = testkit.ChildEnv(markerDir)
+	tree := started(t, cmd, markerDir, "running", "wrapper=", "pid=")
+	parent, err := strconv.Atoi(markerValue(awaitMarkers(markerDir, 0), "wrapper"))
+	gotest.NoError(t, err)
+	signalled(t, cmd, tree, syscall.Kill(parent, syscall.SIGKILL))
+	markers := awaitMarkers(markerDir, 60*time.Second, "fixture.AfterAll")
+	run := ended(cmd, tree, markerDir, 60*time.Second)
+	pid, _ := strconv.Atoi(markerValue(run.Markers, "pid"))
+
+	t.When("the parent of a suite process under the runner is killed while a method holds", func(w *gotest.T) {
+		w.It("ends the holding method's context", func(it *gotest.T) {
+			gotest.Contains(it, markers, "context ended", "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		})
+		w.It("the methods that have not started never run", func(it *gotest.T) {
+			gotest.NotContains(it, markers, "second")
+			gotest.NotContains(it, markers, "third")
+		})
+		w.It("runs AfterAll before the fixture is released", func(it *gotest.T) {
+			gotest.True(it, run.MarkerOrder("context ended", "suite.AfterAll", "fixture.AfterAll"), "markers: %v", run.Markers)
+		})
+		w.It("leaves no suite process behind", func(it *gotest.T) {
+			gotest.NotZero(it, pid, "markers: %v", run.Markers)
+			gotest.True(it, gone(pid), "the suite process %d outlived the run", pid)
+		})
+	})
+}
+
 // commandOf is the CLI invocation with args, run from this package.
 func commandOf(cli string, args ...string) *exec.Cmd {
 	return exec.Command(cli, args...) //nolint:gosec // G204: binary built by this suite

@@ -1,6 +1,10 @@
 Expect: stop: TestStopTestSuite/TestSecond verdict "[a-z]*", want skip
-Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted
+Expect: parentgone: a method that had not started ran
+Expect: readergone: a method that had not started ran
+Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted CanaryTestSuite/TestASuiteWhoseParentIsKilledStops CanaryTestSuite/TestASuiteWhoseStreamNobodyReadsStops
 Clause: when the run is interrupted while a method holds → skips the methods that have not started with the reason run stopping
+Clause: when the parent of a suite process under the runner is killed while a method holds → the methods that have not started never run
+Clause: when the runner and its converter are killed under -json while an -exec wrapper waits on the suite → the methods that have not started never run
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
 @@ -89,7 +89,7 @@

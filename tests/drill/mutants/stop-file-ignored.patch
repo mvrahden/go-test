@@ -7,12 +7,13 @@ Clause: when a run is interrupted on Windows, where only the stop file reaches t
 Clause: when a run is interrupted on Windows, where only the stop file reaches the suite → runs AfterAll before the fixture is released
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go
-@@ -149,7 +149,7 @@
- 			return
+@@ -179,7 +179,8 @@
  		case <-tick.C:
  		}
--		if _, err := os.Stat(w.file); err == nil {
-+		if _, err := os.Stat(w.file); err == nil && false {
+ 		_, err := os.Stat(w.file)
+-		if err == nil || n%int(readerPoll/stopFilePoll) == 0 && (parentExited() || stdoutReaderGone()) {
++		_ = err
++		if n%int(readerPoll/stopFilePoll) == 0 && (parentExited() || stdoutReaderGone()) {
  			w.found <- sig // buffered, and sent once
  			return
  		}
