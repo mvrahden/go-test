@@ -1,0 +1,13 @@
+Expect: defaultdeadline: the default deadline was named 2 times in the run, want once
+Judge: ./tests/canary CanaryTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
+Clause: when a suite declares a Timeout and its method waits on t.Context() past it → fails the method by the Timeout and prints no line about the default deadline
+--- a/pkg/gotestruntime/methodbudget.go
++++ b/pkg/gotestruntime/methodbudget.go
+@@ -138,6 +138,7 @@ func (m *method) deadlinePassed() {
+ 	m.mu.Lock()
+ 	m.expired = true
+ 	close(m.due)
++	_, _ = defaultDeadlineOut(m.it).Write([]byte(m.it.Name() + ": t.Context() ended at the default " + m.budget.String() + " deadline; the suite declares no Timeout\n"))
+ 	watching := m.watch != nil
+ 	m.mu.Unlock()
+ 	if !watching {

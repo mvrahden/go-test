@@ -495,6 +495,9 @@ shards of one run do not add up to every mutant exactly once.
 | `given-up-setup-passes-the-run` | a shared fixture setup that is given up is not booked, and the suite reading it is recorded as passed | fixtures conformance: the run whose setup was given up beside a released sibling exits 0 |
 | `protocol-handed-to-started-processes` | the shared fixture process leaves the protocol descriptor and its variable to the processes a fixture starts | canary: the started process sees the variable and its write to descriptor 3 fails the setup |
 | `orphan-exits-without-its-budgets` | a shared fixture process whose runner is gone exits at once instead of after its budgets | canary: the CLI killed while the fixture is up cuts the fixture's AfterAll short |
+| `default-deadline-line-dropped` | a method whose context the default deadline ended is not named | canary: the defaultdeadline waiting method is named no times |
+| `default-deadline-line-fails-the-method` | the line naming a context the default deadline ended also fails its method | canary: the defaultdeadline verdicts differ from the golden list |
+| `default-deadline-line-under-a-declared-timeout` | a method past its declared `Timeout` is also named as ended at the default deadline | canary: the defaultdeadline run names the default deadline twice |
 
 ## Adding a mutant
 

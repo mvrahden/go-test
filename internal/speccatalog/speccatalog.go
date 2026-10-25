@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/testkit"
 )
 
@@ -39,12 +40,18 @@ func render(ctx context.Context, repoRoot string) ([]byte, error) {
 		return nil, err
 	}
 	if run.Exit != 0 {
-		return nil, fmt.Errorf("spec --static exited %d:\n%s", run.Exit, run.Stderr)
+		return nil, staticExitError(run.Exit, run.Stderr)
 	}
 	if run.Stdout == "" {
 		return nil, errors.New("spec --static printed nothing")
 	}
 	return []byte(run.Stdout), nil
+}
+
+// staticExitError says spec --static exited with exit, a Windows
+// termination status in hex with its name, and what it wrote to stderr.
+func staticExitError(exit int, stderr string) error {
+	return fmt.Errorf("spec --static exited %s:\n%s", proctree.ExitStatus(exit), stderr)
 }
 
 func withoutVersion(raw []byte) ([]byte, error) {

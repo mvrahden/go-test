@@ -229,3 +229,10 @@ slowretry exit 0
 slowretry pass -
 slowretry pass TestSlowTestSuite
 slowretry pass TestSlowTestSuite/TestStateArrived
+defaultdeadline exit 1
+defaultdeadline fail -
+defaultdeadline fail TestBudgetedTestSuite
+defaultdeadline fail TestBudgetedTestSuite/TestWaitsOnItsContext
+defaultdeadline pass TestWaitingTestSuite
+defaultdeadline pass TestWaitingTestSuite/TestEndsAtOnce
+defaultdeadline pass TestWaitingTestSuite/TestWaitsOnItsContext

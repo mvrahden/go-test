@@ -374,7 +374,7 @@ An async method's budget pauses while it waits for `done()`; its `AfterEach`, it
 fixtures', is held to what is left of it ([Async methods](specs/lifecycle/spec.md#requirement-async-methods)).
 
 A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, is not held
-to a budget: being failed against a number you did not choose is not a verdict you can act on. Bounding the process remains
+to a budget: being failed against a number you did not choose is not a verdict you can act on; a context the default ends is only named, in one line that fails nothing ([A context the default deadline ended](specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended)). Bounding the process remains
 `go test -timeout`'s job either way.
 
 `SetupTimeout` works the same way for `BeforeAll`, `AfterAll` and the wait on the goroutines

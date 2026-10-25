@@ -12,6 +12,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/gotestspec"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -26,7 +27,7 @@ func (s *SpecInputTestSuite) SuiteConfig() gotest.SuiteConfig {
 type specInputCtx struct{ overlayDir string }
 
 // BeforeAll isolates the temp dir for every method: the runs they make sweep it.
-func (s *SpecInputTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+func (s *SpecInputTestSuite) BeforeAll(t *gotest.T) { testkit.IsolateTempDir(t) }
 
 // AfterAll has nothing to release: Setenv restores the temp dir.
 func (s *SpecInputTestSuite) AfterAll(_ *gotest.T) {}

@@ -3,6 +3,7 @@ package gotestrunner_test
 import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -19,7 +20,7 @@ func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
 type windowCtx struct{ cleanup func() }
 
 // BeforeAll isolates the temp dir for every method: the runs they make sweep it.
-func (s *FixtureWindowTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+func (s *FixtureWindowTestSuite) BeforeAll(t *gotest.T) { testkit.IsolateTempDir(t) }
 
 // AfterAll has nothing to release: Setenv restores the temp dir.
 func (s *FixtureWindowTestSuite) AfterAll(_ *gotest.T) {}

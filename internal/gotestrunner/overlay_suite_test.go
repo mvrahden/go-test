@@ -13,6 +13,7 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -30,18 +31,9 @@ type overlayDirsCtx struct {
 // BeforeEach gives every method a temp dir and cache of its own: its sweeps
 // never reach those of other runs.
 func (s *OverlayTestSuite) BeforeEach(t *gotest.T) *overlayDirsCtx {
-	isolateTempDir(t)
+	testkit.IsolateTempDir(t)
 	t.Setenv(protocol.EnvCacheDir, t.TempDir())
 	return &overlayDirsCtx{}
-}
-
-// isolateTempDir points the temp dir at one of t's own, so no sweep a test
-// runs reaches the work and overlay dirs of other runs.
-func isolateTempDir(t *gotest.T) {
-	dir := t.TempDir()
-	for _, env := range []string{"TMPDIR", "TMP", "TEMP"} {
-		t.Setenv(env, dir)
-	}
 }
 
 func (s *OverlayTestSuite) AfterEach(t *gotest.T, ctx *overlayDirsCtx) {
