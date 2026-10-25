@@ -3,10 +3,10 @@ Judge: ./tests/canary CanaryTestSuite/TestAFailedSharedSetupIsReleased
 Clause: when a shared fixture's setup fails on its last attempt → runs AfterAll after each of its 2 attempts, releasing what each reached before the next
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -173,6 +173,9 @@
- 			return false
+@@ -267,6 +267,9 @@
  		}
  		ƒtorn[{{ $f.Index }}] = true
+ 		defer ƒlife.Released({{ $f.Index }})
 +		if ƒerrs[{{ $f.Index }}] != nil {
 +			return false
 +		}

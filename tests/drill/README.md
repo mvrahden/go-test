@@ -494,6 +494,7 @@ shards of one run do not add up to every mutant exactly once.
 | `setup-budget-drops-the-release` | the setup budget a fixture reports leaves out the AfterAll between attempts | canary: a 2s-Timeout fixture whose attempts and release take 1.6s each is given up |
 | `given-up-setup-passes-the-run` | a shared fixture setup that is given up is not booked, and the suite reading it is recorded as passed | fixtures conformance: the run whose setup was given up beside a released sibling exits 0 |
 | `protocol-handed-to-started-processes` | the shared fixture process leaves the protocol descriptor and its variable to the processes a fixture starts | canary: the started process sees the variable and its write to descriptor 3 fails the setup |
+| `orphan-exits-without-its-budgets` | a shared fixture process whose runner is gone exits at once instead of after its budgets | canary: the CLI killed while the fixture is up cuts the fixture's AfterAll short |
 
 ## Adding a mutant
 

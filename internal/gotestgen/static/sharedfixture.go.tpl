@@ -54,10 +54,59 @@ func main() {
   attempts abort instead of the default disposition killing the process
   mid-lifecycle, and the epilogue below still releases whatever came up.
 */}}
+{{- /*
+  The runner is this process's parent: a parent pid that changed means it is
+  gone, and nobody waits for the teardown any more.
+*/}}
+	ƒparent := os.Getppid()
 	ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer ƒstop()
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
+	ƒlife := gotestruntime.NewSharedLifetime({{ range .Fixtures }}"{{ .Identifier }}", {{ end }})
+{{- /*
+  Runner commands on stdin, read from the start. Stdin ending means the
+  runner is gone, the one sign of it where no death signal is sent: it ends
+  setup as SIGTERM does. The reader keeps reading past a shutdown, so the end
+  of stdin is seen during teardown as well.
+*/}}
+	ƒctx, ƒend := context.WithCancel(ƒctx)
+	defer ƒend()
+	ƒcmds := make(chan ƒcommand)
+	ƒeof := make(chan struct{})
+	go func() {
+		defer ƒend()
+		defer close(ƒeof)
+		ƒsc := bufio.NewScanner(os.Stdin)
+		for ƒsc.Scan() {
+			var ƒc ƒcommand
+			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
+				continue
+			}
+			select {
+			case ƒcmds <- ƒc:
+			case <-ƒctx.Done():
+			}
+		}
+	}()
+{{- /*
+  The runner is gone once stdin ends, or once a signal finds the parent
+  changed. From then on, in setup or in teardown, the process exits by itself
+  once it has had its budgets: with no runner left to kill it, a BeforeAll or
+  an AfterAll that hangs would otherwise keep it alive for good.
+*/}}
+	ƒgone := make(chan struct{})
+	go func() {
+		defer close(ƒgone)
+		select {
+		case <-ƒeof:
+		case <-ƒctx.Done():
+			if os.Getppid() == ƒparent {
+				<-ƒeof
+			}
+		}
+	}()
+	go ƒlife.ExitWhenOrphaned(ƒgone)
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
 	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
@@ -98,6 +147,7 @@ func main() {
 		for _, ƒs := range ƒshares {
 			ƒbudget += ƒs
 		}
+		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
 {{ range $f := .Fixtures }}
@@ -166,8 +216,10 @@ func main() {
 			Held:       func(ƒheld bool) { ƒattempted[{{ $i }}] = ƒheld },
 		}
 		ƒshare({{ $i }}, ƒsetup.Timeout)
+		ƒlife.SetupBegins({{ $i }}, ƒsetup)
 		fmt.Fprintf(ƒproto, "{\"key\":\"_setup\",\"fixture\":%s,\"budget\":%s}\n", ƒquote("{{ $f.StateKey }}"), ƒquote(gotestruntime.SetupBudget(ƒsetup).String()))
 		ƒerrs[{{ $i }}] = gotestruntime.RunFixtureSetup(ƒctx, ƒsetup)
+		ƒlife.SetupEnds({{ $i }})
 		if ƒerrs[{{ $i }}] != nil {
 			return
 		}
@@ -210,9 +262,11 @@ func main() {
 	ƒteardown_{{ $f.VarName }} := func() bool {
 		if ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}] {
 			ƒtorn[{{ $f.Index }}] = true
+			ƒlife.Released({{ $f.Index }})
 			return false
 		}
 		ƒtorn[{{ $f.Index }}] = true
+		defer ƒlife.Released({{ $f.Index }})
 		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
 			Name:     "{{ $f.Identifier }}",
 			Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
@@ -274,28 +328,15 @@ func main() {
   the protocol stream with a _cmd line carrying the joined per-fixture
   failures and the teardown budget, which now covers what the command brought
   up. A SIGTERM that already arrived (canceling setup above) has ƒctx closed
-  and falls straight through.
+  and falls straight through, as does the end of stdin.
 */}}
-	ƒcmds := make(chan ƒcommand)
-	go func() {
-		ƒsc := bufio.NewScanner(os.Stdin)
-		for ƒsc.Scan() {
-			var ƒc ƒcommand
-			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
-				continue
-			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
-				return
-			}
-		}
-	}()
 
 ƒloop:
 	for {
 		select {
 		case <-ƒctx.Done():
+			break ƒloop
+		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
