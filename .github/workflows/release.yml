@@ -14,6 +14,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GORACE: atexit_sleep_ms=0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -21,7 +23,7 @@ jobs:
           # Pinned, not "stable": a release must never be the first
           # place a new toolchain runs. Keep in step with quality.yml.
           go-version: "1.27"
-      - run: make ci SPEC_FLAGS=--no-color
+      - run: make ci SPEC_FLAGS="--no-color --parallel=16"
 
   build:
     runs-on: ubuntu-latest
