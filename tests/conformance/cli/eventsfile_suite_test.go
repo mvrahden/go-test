@@ -33,3 +33,30 @@ func (s *CLIEventsFileTestSuite) TestTheFileHoldsTheStream(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIEventsFileTestSuite) TestTheFileReplaysAsTheRun(t *gotest.T) {
+	type row struct {
+		Desc   string
+		format string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "the summary as JSON", format: "json"},
+		{Desc: "the summary as Markdown", format: "md"},
+		{Desc: "the summary for a terminal", format: "terminal"},
+	}) {
+		path := filepath.Join(t.TempDir(), "events.json")
+		live, err := testkit.RunCLI(t.Context(), ".", "summary", "--no-color", "--format="+r.format, "--events-file="+path, "../testdata/failing/")
+		gotest.NoError(t, err)
+		replay, err := testkit.RunCLI(t.Context(), ".", "summary", "--no-color", "--format="+r.format, "--input="+path)
+		gotest.NoError(t, err)
+
+		t.When("a summary run's --events-file is read back with summary --input", func(w *gotest.T) {
+			w.It("renders the summary the run rendered, with its exit code", func(it *gotest.T) {
+				gotest.Equal(it, 1, live.Exit, "stderr: %s", live.Stderr)
+				gotest.Equal(it, live.Exit, replay.Exit, "stderr: %s", replay.Stderr)
+				gotest.NotEmpty(it, live.Stdout)
+				gotest.Equal(it, live.Stdout, replay.Stdout)
+			})
+		})
+	}
+}

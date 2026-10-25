@@ -1,5 +1,7 @@
 Expect: ^FAIL .*conformance/cli .* / writes the bytes it prints to the file, making its directories \(
 Clause: when a -json run is given --events-file → writes the bytes it prints to the file, making its directories
+Expect: ^FAIL .*conformance/cli .* / renders the summary the run rendered, with its exit code \(
+Clause: when a summary run's --events-file is read back with summary --input → renders the summary the run rendered, with its exit code
 --- a/internal/gotestrunner/output_collector.go
 +++ b/internal/gotestrunner/output_collector.go
 @@ -513,7 +513,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {

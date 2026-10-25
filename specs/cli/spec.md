@@ -193,3 +193,7 @@ A run given --events-file SHALL write the go test -json event stream to that fil
 #### Scenario: A -json run with --events-file
 - **WHEN** a -json run is given --events-file
 - **THEN** writes the bytes it prints to the file, making its directories
+
+#### Scenario: Reading the file back
+- **WHEN** a summary run's --events-file is read back with summary --input
+- **THEN** renders the summary the run rendered, with its exit code
