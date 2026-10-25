@@ -281,8 +281,6 @@ func ExportLockOpened(then func(path string)) (restore func()) {
 	return func() { lockOpened = prev }
 }
 
-var ExportParseCacheMaxSize = parseCacheMaxSize
-
 // ExportAfterScan runs then between the binary cache sweep's scan and its
 // evictions, until the returned call restores the default.
 func ExportAfterScan(then func()) (restore func()) {

@@ -5,7 +5,7 @@ Expect: ^FAIL .*internal/gotestrunner Overlay .* / removes the entries older tha
 @@ -181,7 +181,7 @@ func cleanOldCacheEntries() {
  	}
  	now := time.Now()
- 	sweepBinaryCache(root, cacheMaxSize(), now)
+ 	sweepBinaryCache(root, cacheMaxSize, now)
 -	dir := filepath.Join(root, "overlays")
 +	dir := filepath.Join(root, "overlays-not-swept")
  	entries, err := os.ReadDir(dir)

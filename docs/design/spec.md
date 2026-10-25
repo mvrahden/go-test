@@ -1572,8 +1572,7 @@ User-facing:
 |----------|--------|
 | `GOTEST_UPDATE_SNAPSHOTS=1` | Regenerate snapshot baselines (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
 | `GOTEST_CI` | `1`/`true` forces CI mode; any value suppresses auto-detection from `CI`; unset → auto-detect |
-| `GOTEST_CACHE_DIR` | Cache location for test binaries (default `os.UserCacheDir()/gotest`; a run evicts the binaries of a gone checkout, those unused for 7 days, then the least recently used above `GOTEST_CACHE_MAX_SIZE`) |
-| `GOTEST_CACHE_MAX_SIZE` | Cap of the test binary cache: bytes, or a whole number with `KiB`, `MiB` or `GiB`; `off` for no cap (default `5GiB`; any other value exits 2 before any build) |
+| `GOTEST_CACHE_DIR` | Cache location for test binaries (default `os.UserCacheDir()/gotest`; a run evicts the binaries of a gone checkout, those unused for 7 days, then the least recently used above 5 GiB) |
 | `GOTEST_SLOW_BUILD_THRESHOLD` | How long a build runs, as a Go duration, before the CLI says it is still building (default `15s`; unparsable or not positive → the default) |
 
 Internal protocol between the CLI and test/subprocess boundaries (may change without notice): `GOTEST_SHARED_STATE_FILE` (shared-fixture state file for the test process), `GOTEST_TEARDOWN_BUDGET_FILE` (teardown grace-period handshake).

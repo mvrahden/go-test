@@ -69,12 +69,3 @@ func (s *BinaryCacheTestSuite) TestNoCacheLeavesNoBinaryBehind(t *gotest.T) {
 	_, err := os.Stat(filepath.Join(cache, "bin"))
 	gotest.ErrorIs(t, err, fs.ErrNotExist)
 }
-
-func (s *BinaryCacheTestSuite) TestAnUnreadableCapStopsTheRunBeforeAnyBuild(t *gotest.T) {
-	cache := t.TempDir()
-	out, code := s.cli.runEnv(t, append(cacheEnv(cache), "GOTEST_CACHE_MAX_SIZE=5GB"), cachedPkg)
-	gotest.Equal(t, 2, code, out)
-	gotest.Contains(t, out, "GOTEST_CACHE_MAX_SIZE=5GB")
-	_, err := os.Stat(filepath.Join(cache, "bin"))
-	gotest.ErrorIs(t, err, fs.ErrNotExist)
-}

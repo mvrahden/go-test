@@ -20,9 +20,6 @@ const (
 	EnvUpdateSnapshots  = "GOTEST_UPDATE_SNAPSHOTS"
 	EnvCI               = "GOTEST_CI"
 	EnvCacheDir         = "GOTEST_CACHE_DIR"
-	// EnvCacheMaxSize caps the test binary cache: bytes, or a number with
-	// KiB, MiB or GiB; "off" disables the cap.
-	EnvCacheMaxSize = "GOTEST_CACHE_MAX_SIZE"
 	// EnvSlowBuildThreshold is how long a build runs, as a Go duration,
 	// before the CLI says it is still building.
 	EnvSlowBuildThreshold = "GOTEST_SLOW_BUILD_THRESHOLD"

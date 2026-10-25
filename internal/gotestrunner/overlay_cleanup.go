@@ -180,7 +180,7 @@ func cleanOldCacheEntries() {
 		return
 	}
 	now := time.Now()
-	sweepBinaryCache(root, cacheMaxSize(), now)
+	sweepBinaryCache(root, cacheMaxSize, now)
 	dir := filepath.Join(root, "overlays")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
