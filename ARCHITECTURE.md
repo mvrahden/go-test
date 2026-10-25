@@ -1253,14 +1253,15 @@ reported `harness.go:38` as the user's frame. The tracer now treats
    panicking suite cannot affect others. The OS enforces memory isolation.
 
 3. **Overlay filesystem**: Generated code is injected via Go's `-overlay` flag.
-   Source files are never modified. Overlays are written to a content-addressable
-   cache (`~/.cache/gotest/overlays/<hash>/`), which dedupes the file writes;
-   Go's build cache is path-independent, so the overlay cache itself buys no
-   compile reuse. The test binaries do get reuse: each links into
+   Source files are never modified. Each run writes its overlay into its own
+   work dir (`<work dir>/overlay/`), so runs never share or remove each other's;
+   Go's build cache keys overlaid files by content under their original path,
+   so an overlay at a new path each run costs no rebuild. The test binaries do
+   get reuse: each links into
    `~/.cache/gotest/bin/<key>/`, keyed by working directory, build flags,
    platform and Go version, so go skips the link for an unchanged package, and
-   the run copies the binary into its own work dir before executing it. Both
-   caches auto-evict after 7 days. Use `--no-cache` to bypass both.
+   the run copies the binary into its own work dir before executing it. The
+   binary cache auto-evicts after 7 days. Use `--no-cache` to bypass it.
 
 4. **Streaming compilation**: `CompilePackagesStream` sends results to a
    channel as each package finishes. Test execution begins before all packages

@@ -2,14 +2,11 @@ package gotestrunner
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -17,8 +14,10 @@ import (
 )
 
 type OverlayResult struct {
-	CacheDir string
-	WorkDir  string
+	// OverlayDir holds the run's overlay.json and the generated files it
+	// names, inside WorkDir: no other run shares or removes it.
+	OverlayDir string
+	WorkDir    string
 	// BinaryCacheRoot is the cache root the run's test binaries link under
 	// (see binaryCacheDir); empty under --no-cache or without a usable root.
 	BinaryCacheRoot string
@@ -59,10 +58,6 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 
 	CleanStaleOverlays()
 
-	cacheDir, cached, err := writeOverlayCached(allResults, noCache)
-	if err != nil {
-		return nil, nil, err
-	}
 	binaryCacheRoot := ""
 	if !noCache {
 		if root, err := cacheRoot(); err == nil {
@@ -79,25 +74,19 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		if workDir != "" {
 			os.RemoveAll(workDir)
 		}
-		if !cached {
-			os.RemoveAll(cacheDir)
-		}
 		return nil, nil, fmt.Errorf("create work dir: %w", err)
 	}
-
-	cleanup := func() {
+	overlayDir := filepath.Join(workDir, "overlay")
+	if err := writeOverlayFiles(overlayDir, allResults); err != nil {
 		os.RemoveAll(workDir)
-		if !cached {
-			os.RemoveAll(cacheDir)
-		}
+		return nil, nil, err
 	}
+
+	cleanup := func() { os.RemoveAll(workDir) }
 	if debug {
 		// Kept for inspection: the sweep leaves a marked dir alone.
 		_ = markKept(workDir)
-		if !cached {
-			_ = markKept(cacheDir)
-		}
-		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s (cached=%v)\nDEBUG: work dir: %s\nDEBUG: binary cache root: %q\n", cacheDir, cached, workDir, binaryCacheRoot)
+		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\nDEBUG: work dir: %s\nDEBUG: binary cache root: %q\n", overlayDir, workDir, binaryCacheRoot)
 		cleanup = func() {}
 	}
 
@@ -172,10 +161,10 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	}
 
 	return &OverlayResult{
-		CacheDir:                       cacheDir,
+		OverlayDir:                     overlayDir,
 		BinaryCacheRoot:                binaryCacheRoot,
 		WorkDir:                        workDir,
-		OverlayFlag:                    "-overlay=" + filepath.Join(cacheDir, "overlay.json"),
+		OverlayFlag:                    "-overlay=" + filepath.Join(overlayDir, "overlay.json"),
 		SharedFixtures:                 allSharedFixtures,
 		SuitePackages:                  suitePkgs,
 		BrokenPackages:                 broken,
@@ -199,54 +188,10 @@ type overlayJSON struct {
 	Replace map[string]string `json:"Replace"`
 }
 
-// writeOverlayCached attempts to write the overlay to a content-addressable
-// cache directory. On cache hit it returns the existing directory. On failure
-// to resolve or write to the cache, it falls back to a temporary directory.
-// The returned bool indicates whether the directory is cached (true) or
-// ephemeral (false).
-func writeOverlayCached(results gotestgen.GenerateResults, noCache bool) (string, bool, error) {
-	if !noCache {
-		root, err := cacheRoot()
-		if err == nil {
-			dir, err := writeToCacheDir(root, results)
-			if err == nil {
-				return dir, true, nil
-			}
-		}
-	}
-
-	dir, err := writeToTmpDir(results)
-	if err != nil {
-		return "", false, err
-	}
-	return dir, false, nil
-}
-
-// WriteOverlay writes overlay files to a temporary directory (legacy behaviour).
-// Exported for backward compatibility with tests.
+// WriteOverlay writes overlay files to a stamped temporary directory of their
+// own, for tests that need an overlay without a run.
 func WriteOverlay(results gotestgen.GenerateResults) (string, error) {
 	return writeToTmpDir(results)
-}
-
-func writeToCacheDir(root string, results gotestgen.GenerateResults) (string, error) {
-	hash := overlayContentHash(results)
-	dir := filepath.Join(root, "overlays", hash)
-
-	if _, err := os.Stat(filepath.Join(dir, "overlay.json")); err == nil {
-		now := time.Now()
-		_ = os.Chtimes(dir, now, now)
-		return dir, nil
-	}
-
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("create cache dir: %w", err)
-	}
-
-	if err := writeOverlayFiles(dir, results); err != nil {
-		os.RemoveAll(dir)
-		return "", err
-	}
-	return dir, nil
 }
 
 func writeToTmpDir(results gotestgen.GenerateResults) (string, error) {
@@ -280,6 +225,9 @@ func markKept(dir string) error {
 
 func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 	overlay := overlayJSON{Replace: map[string]string{}}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create overlay dir: %w", err)
+	}
 
 	for i, result := range results {
 		subDir := filepath.Join(dir, strconv.Itoa(i))
@@ -307,40 +255,11 @@ func writeOverlayFiles(dir string, results gotestgen.GenerateResults) error {
 	if err != nil {
 		return fmt.Errorf("marshal overlay json: %w", err)
 	}
-	// Write overlay.json last — its presence signals a complete, valid entry.
+	// Written last: the files it names are all in place by then.
 	if err := os.WriteFile(filepath.Join(dir, "overlay.json"), data, 0600); err != nil {
 		return fmt.Errorf("write overlay json: %w", err)
 	}
 	return nil
-}
-
-// overlayContentHash computes a deterministic SHA-256 hash over the generated
-// overlay content. The hash covers AbsPath and file content for each result,
-// sorted by AbsPath for stability.
-func overlayContentHash(results gotestgen.GenerateResults) string {
-	type entry struct {
-		absPath string
-		ptest   []byte
-		pxtest  []byte
-	}
-	entries := make([]entry, len(results))
-	for i, r := range results {
-		entries[i] = entry{absPath: r.AbsPath, ptest: r.PTest, pxtest: r.PXTest}
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].absPath < entries[j].absPath
-	})
-
-	h := sha256.New()
-	for _, e := range entries {
-		h.Write([]byte(e.absPath))
-		h.Write([]byte{0})
-		h.Write(e.ptest)
-		h.Write([]byte{0})
-		h.Write(e.pxtest)
-		h.Write([]byte{0})
-	}
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 // cacheRoot returns the gotest cache directory, respecting the GOTEST_CACHE_DIR

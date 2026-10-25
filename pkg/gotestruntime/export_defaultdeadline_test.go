@@ -22,3 +22,6 @@ func ExportOpenMethod(it *testing.T, timeout, budget time.Duration) (*gotest.T, 
 	m, end := openMethod(it, timeout, budget)
 	return m.t, end
 }
+
+// ExportNoteDefaultDeadline is noteDefaultDeadline.
+var ExportNoteDefaultDeadline = noteDefaultDeadline

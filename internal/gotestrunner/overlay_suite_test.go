@@ -17,7 +17,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// OverlayTestSuite covers overlay generation and the content-addressed write cache.
+// OverlayTestSuite covers overlay generation, the run's own overlay dir and the sweep.
 // Sequential: Setenv (the cache directory).
 type OverlayTestSuite struct{}
 
@@ -293,59 +293,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 	})
 }
 
-func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T, ctx *overlayDirsCtx) {
-	t.When("computing content hash", func(w *gotest.T) {
-		w.It("produces deterministic hash for same content", func(it *gotest.T) {
-			results := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/a", PTest: []byte("package a\n")},
-				{AbsPath: "/pkg/b", PTest: []byte("package b\n"), PXTest: []byte("package b_test\n")},
-			}
-			h1 := gotestrunner.ExportOverlayContentHash(results)
-			h2 := gotestrunner.ExportOverlayContentHash(results)
-			gotest.Equal(it, h1, h2)
-			gotest.Len(it, h1, 64)
-		})
-
-		w.It("is order-independent (sorted by AbsPath)", func(it *gotest.T) {
-			r1 := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/a", PTest: []byte("aaa")},
-				{AbsPath: "/pkg/b", PTest: []byte("bbb")},
-			}
-			r2 := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/b", PTest: []byte("bbb")},
-				{AbsPath: "/pkg/a", PTest: []byte("aaa")},
-			}
-			gotest.Equal(it, gotestrunner.ExportOverlayContentHash(r1), gotestrunner.ExportOverlayContentHash(r2))
-		})
-
-		w.It("changes when content changes", func(it *gotest.T) {
-			r1 := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/a", PTest: []byte("version1")},
-			}
-			r2 := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/a", PTest: []byte("version2")},
-			}
-			gotest.NotEqual(it, gotestrunner.ExportOverlayContentHash(r1), gotestrunner.ExportOverlayContentHash(r2))
-		})
-
-		w.It("changes when AbsPath changes", func(it *gotest.T) {
-			r1 := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/a", PTest: []byte("same")},
-			}
-			r2 := gotestgen.GenerateResults{
-				{AbsPath: "/pkg/b", PTest: []byte("same")},
-			}
-			gotest.NotEqual(it, gotestrunner.ExportOverlayContentHash(r1), gotestrunner.ExportOverlayContentHash(r2))
-		})
-
-		w.It("returns empty-stable hash for nil results", func(it *gotest.T) {
-			h1 := gotestrunner.ExportOverlayContentHash(nil)
-			h2 := gotestrunner.ExportOverlayContentHash(gotestgen.GenerateResults{})
-			gotest.Equal(it, h1, h2)
-			gotest.Len(it, h1, 64)
-		})
-	})
-
+func (s *OverlayTestSuite) TestCacheRoot(t *gotest.T, ctx *overlayDirsCtx) {
 	t.When("cache root resolution", func(w *gotest.T) {
 		w.It("respects GOTEST_CACHE_DIR env var", func(it *gotest.T) {
 			dir := it.TempDir()
@@ -366,75 +314,8 @@ func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T, ctx *overlayDirsCtx) {
 		})
 	})
 
-	t.When("writing to cache", func(w *gotest.T) {
-		w.It("creates valid overlay in cache directory", func(it *gotest.T) {
-			cacheDir := it.TempDir()
-			it.Setenv(protocol.EnvCacheDir, cacheDir)
-
-			results := gotestgen.GenerateResults{
-				{AbsPath: "/fake/pkg/m", PTest: []byte("package m\n"), PXTest: []byte("package m_test\n")},
-			}
-
-			hash := gotestrunner.ExportOverlayContentHash(results)
-			expectedDir := filepath.Join(cacheDir, "overlays", hash)
-
-			// Ensure it doesn't exist yet.
-			_, err := os.Stat(expectedDir)
-			gotest.True(it, os.IsNotExist(err))
-
-			// Write via the exported WriteOverlay — this uses tmpdir path.
-			// For cache path, we test the internal via GenerateOverlay with noCache=false.
-			// Since GenerateOverlay needs loaded packages, test the cache write separately.
-			// We'll use writeOverlayCached indirectly by calling the exported function.
-			dir, err := gotestrunner.ExportWriteOverlayCached(results, false)
-			gotest.NoError(it, err)
-
-			gotest.Equal(it, expectedDir, dir)
-
-			// Verify overlay.json exists and is valid.
-			data, err := os.ReadFile(filepath.Join(dir, "overlay.json"))
-			gotest.NoError(it, err)
-			var ov gotestrunner.ExportOverlayJSON
-			gotest.NoError(it, json.Unmarshal(data, &ov))
-			gotest.Len(it, ov.Replace, 2)
-		})
-
-		w.It("returns same directory on repeated calls (cache hit)", func(it *gotest.T) {
-			cacheDir := it.TempDir()
-			it.Setenv(protocol.EnvCacheDir, cacheDir)
-
-			results := gotestgen.GenerateResults{
-				{AbsPath: "/fake/pkg/r", PTest: []byte("package r\n")},
-			}
-
-			dir1, err := gotestrunner.ExportWriteOverlayCached(results, false)
-			gotest.NoError(it, err)
-
-			dir2, err := gotestrunner.ExportWriteOverlayCached(results, false)
-			gotest.NoError(it, err)
-
-			gotest.Equal(it, dir1, dir2)
-		})
-
-		w.It("falls back to tmpdir when noCache is true", func(it *gotest.T) {
-			cacheDir := it.TempDir()
-			it.Setenv(protocol.EnvCacheDir, cacheDir)
-
-			results := gotestgen.GenerateResults{
-				{AbsPath: "/fake/pkg/nc", PTest: []byte("package nc\n")},
-			}
-
-			dir, err := gotestrunner.ExportWriteOverlayCached(results, true)
-			gotest.NoError(it, err)
-			ctx.dirs = append(ctx.dirs, dir)
-
-			// Should be in tmpdir, not in cache.
-			gotest.False(it, strings.HasPrefix(dir, cacheDir))
-		})
-	})
-
-	t.When("cleaning old cache entries", func(w *gotest.T) {
-		w.It("removes entries older than 7 days", func(it *gotest.T) {
+	t.When("an earlier CLI left overlay entries in the cache", func(w *gotest.T) {
+		w.It("removes the entries older than 7 days and keeps the fresh ones", func(it *gotest.T) {
 			cacheDir := it.TempDir()
 			it.Setenv(protocol.EnvCacheDir, cacheDir)
 
@@ -464,6 +345,71 @@ func (s *OverlayTestSuite) TestOverlayCache(t *gotest.T, ctx *overlayDirsCtx) {
 	})
 }
 
+// Each run's overlay is its own: it lives in the run's work dir, so no
+// other run can hand it out half-written or remove it.
+func (s *OverlayTestSuite) TestTheOverlayIsTheRunsOwn(t *gotest.T, ctx *overlayDirsCtx) {
+	cache := t.TempDir()
+	t.Setenv(protocol.EnvCacheDir, cache)
+	// open generates an overlay of nothing, as a run of no suite does.
+	open := func(it *gotest.T, debug, noCache bool) (*gotestrunner.OverlayResult, func()) {
+		overlay, cleanup, err := gotestrunner.GenerateOverlay(nil, nil, debug, noCache, false)
+		gotest.NoError(it, err)
+		ctx.dirs = append(ctx.dirs, overlay.WorkDir)
+		return overlay, cleanup
+	}
+
+	t.When("two runs generate the same overlay", func(w *gotest.T) {
+		w.It("gives each a dir of its own inside its work dir", func(it *gotest.T) {
+			first, endFirst := open(it, false, false)
+			second, endSecond := open(it, false, false)
+			gotest.NotEqual(it, first.OverlayDir, second.OverlayDir)
+			for _, o := range []*gotestrunner.OverlayResult{first, second} {
+				gotest.Equal(it, filepath.Join(o.WorkDir, "overlay"), o.OverlayDir)
+				gotest.Equal(it, "-overlay="+filepath.Join(o.OverlayDir, "overlay.json"), o.OverlayFlag)
+				_, err := os.Stat(filepath.Join(o.OverlayDir, "overlay.json"))
+				gotest.NoError(it, err)
+			}
+			endFirst()
+			endSecond()
+		})
+		w.It("writes nothing under the cache's overlays dir", func(it *gotest.T) {
+			_, end := open(it, false, false)
+			end()
+			_, err := os.Stat(filepath.Join(cache, "overlays"))
+			gotest.True(it, os.IsNotExist(err), "a run wrote under %s", filepath.Join(cache, "overlays"))
+		})
+	})
+
+	t.When("a run ends", func(w *gotest.T) {
+		w.It("removes its overlay with its work dir", func(it *gotest.T) {
+			overlay, end := open(it, false, false)
+			end()
+			_, err := os.Stat(overlay.OverlayDir)
+			gotest.True(it, os.IsNotExist(err), "the overlay %s outlived its run", overlay.OverlayDir)
+		})
+	})
+
+	t.When("a --debug run ends", func(w *gotest.T) {
+		w.It("keeps its overlay and marks its work dir kept", func(it *gotest.T) {
+			overlay, end := open(it, true, false)
+			end()
+			_, err := os.Stat(filepath.Join(overlay.OverlayDir, "overlay.json"))
+			gotest.NoError(it, err)
+			_, err = os.Stat(filepath.Join(overlay.WorkDir, ".keep"))
+			gotest.NoError(it, err)
+		})
+	})
+
+	t.When("a --no-cache run generates its overlay", func(w *gotest.T) {
+		w.It("puts it in its work dir as any run does, with no binary cache", func(it *gotest.T) {
+			overlay, end := open(it, false, true)
+			gotest.Equal(it, filepath.Join(overlay.WorkDir, "overlay"), overlay.OverlayDir)
+			gotest.Empty(it, overlay.BinaryCacheRoot)
+			end()
+		})
+	})
+}
+
 // The work dir names the run that owns it, so a later run's sweep can tell
 // a crashed run's leftover from one still in use.
 func (s *OverlayTestSuite) TestWorkDirNamesItsRun(t *gotest.T, ctx *overlayDirsCtx) {
@@ -484,7 +430,7 @@ func (s *OverlayTestSuite) TestADebugRunKeepsItsDirs(t *gotest.T, ctx *overlayDi
 	t.Setenv(protocol.EnvCacheDir, t.TempDir())
 	overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, true, true, false)
 	gotest.NoError(t, err)
-	ctx.dirs = append(ctx.dirs, overlay.WorkDir, overlay.CacheDir)
+	ctx.dirs = append(ctx.dirs, overlay.WorkDir)
 	for _, dir := range ctx.dirs {
 		// The debug run is over.
 		gotest.NoError(t, os.WriteFile(filepath.Join(dir, ".pid"), []byte("999999999"), 0o600))
@@ -493,7 +439,7 @@ func (s *OverlayTestSuite) TestADebugRunKeepsItsDirs(t *gotest.T, ctx *overlayDi
 	gotestrunner.CleanStaleOverlays()
 
 	_, workErr := os.Stat(overlay.WorkDir)
-	_, overlayErr := os.Stat(overlay.CacheDir)
+	_, overlayErr := os.Stat(overlay.OverlayDir)
 	t.It("a later run's sweep keeps its work dir and its overlay", func(it *gotest.T) {
 		gotest.NoError(it, workErr)
 		gotest.NoError(it, overlayErr)
@@ -512,8 +458,8 @@ func (s *OverlayTestSuite) TestASweepTellsAnOwnerByMoreThanItsPid(t *gotest.T, c
 		overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
 		gotest.NoError(it, err)
 		ctx.restore()
-		ctx.dirs = append(ctx.dirs, overlay.WorkDir, overlay.CacheDir)
-		return []string{overlay.WorkDir, overlay.CacheDir}
+		ctx.dirs = append(ctx.dirs, overlay.WorkDir)
+		return []string{overlay.WorkDir}
 	}
 	// sweep sweeps with this process's identity read as boot and ns.
 	sweep := func(boot, ns string) {
@@ -637,7 +583,7 @@ func (s *OverlayTestSuite) TestASweepTellsAnOwnerByMoreThanItsPid(t *gotest.T, c
 			it.Setenv(protocol.EnvCacheDir, it.TempDir())
 			overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
 			gotest.NoError(it, err)
-			dirs := []string{overlay.WorkDir, overlay.CacheDir}
+			dirs := []string{overlay.WorkDir}
 			ctx.dirs = append(ctx.dirs, dirs...)
 			deadHere(it, dirs)
 
@@ -661,11 +607,11 @@ func (s *OverlayTestSuite) TestASweepTellsAnOwnerByMoreThanItsPid(t *gotest.T, c
 			it.Setenv(protocol.EnvCacheDir, it.TempDir())
 			overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
 			gotest.NoError(it, err)
-			ctx.dirs = append(ctx.dirs, overlay.WorkDir, overlay.CacheDir)
+			ctx.dirs = append(ctx.dirs, overlay.WorkDir)
 
 			gotestrunner.CleanStaleOverlays()
 
-			kept(it, []string{overlay.WorkDir, overlay.CacheDir})
+			kept(it, []string{overlay.WorkDir, overlay.OverlayDir})
 		})
 	})
 }

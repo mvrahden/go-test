@@ -75,7 +75,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	out := prepareOutput{
 		Version:     about.ResolvedVersion(),
-		OverlayFile: filepath.Join(overlay.CacheDir, "overlay.json"),
+		OverlayFile: filepath.Join(overlay.OverlayDir, "overlay.json"),
 		Dir:         overlay.WorkDir,
 	}
 	if setupProc != nil {

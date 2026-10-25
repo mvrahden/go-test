@@ -131,7 +131,7 @@ The principles above point toward code generation almost by necessity. If you wa
 
 Code generation also solves the error-reporting problem that plagues reflection-based frameworks. If a lifecycle method has the wrong signature, the code generator rejects it at generation time with a clear error message, file name, and line number. With reflection, the method is silently ignored at runtime. You discover the problem when your `BeforeEach` never runs and your tests pass for the wrong reason.
 
-The overlay filesystem injection is what makes this practical. Without it, code generation would mean generated files in your source tree: files to `.gitignore`, files that clutter your editor, files that go stale if you forget to regenerate. The `-overlay` flag removes all of that. The generated code exists only during the test run, in a content-addressable cache that handles invalidation automatically.
+The overlay filesystem injection is what makes this practical. Without it, code generation would mean generated files in your source tree: files to `.gitignore`, files that clutter your editor, files that go stale if you forget to regenerate. The `-overlay` flag removes all of that. The generated code exists only during the test run, in the run's own work dir, and is gone when the run ends.
 
 What adoption costs is the build step itself: `gotest` runs before `go test`, both locally and in CI. [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}) shows what that looks like in a pipeline, and [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers the day-to-day loop once the caching kicks in.
 

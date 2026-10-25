@@ -1,0 +1,13 @@
+Judge: ./internal/gotestrunner OverlayTestSuite/TestTheOverlayIsTheRunsOwn
+Expect: ^FAIL .*internal/gotestrunner Overlay .* / gives each a dir of its own inside its work dir \(
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -76,7 +76,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
+ 		}
+ 		return nil, nil, fmt.Errorf("create work dir: %w", err)
+ 	}
+-	overlayDir := filepath.Join(workDir, "overlay")
++	overlayDir := filepath.Join(os.TempDir(), "gotest-overlay-shared")
+ 	if err := writeOverlayFiles(overlayDir, allResults); err != nil {
+ 		os.RemoveAll(workDir)
+ 		return nil, nil, err

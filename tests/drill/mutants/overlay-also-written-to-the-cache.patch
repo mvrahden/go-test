@@ -1,0 +1,14 @@
+Judge: ./internal/gotestrunner OverlayTestSuite/TestTheOverlayIsTheRunsOwn
+Expect: ^FAIL .*internal/gotestrunner Overlay .* / writes nothing under the cache.s overlays dir \(
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -82,6 +82,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
+ 		return nil, nil, err
+ 	}
+ 
++	if binaryCacheRoot != "" {
++		_ = writeOverlayFiles(filepath.Join(binaryCacheRoot, "overlays", "entry"), allResults)
++	}
+ 	cleanup := func() { os.RemoveAll(workDir) }
+ 	if debug {
+ 		// Kept for inspection: the sweep leaves a marked dir alone.

@@ -67,7 +67,7 @@ never pass it there. `--spec` renders the spec view
 instead of default output. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` a flat shared-fixture
 setup budget (default: what the fixtures declare, v1.34+) — `0` disables either; `--min <pct>` gates
-coverage, `--no-cache` forces fresh generation and linking, `--debug` keeps overlays.
+coverage, `--no-cache` skips the test binary cache and forces a fresh link, `--debug` keeps the run's work dir and overlay.
 
 ## Benchmarks — `gotest bench` (v1.29+)
 

@@ -95,7 +95,7 @@ Flags (gotest — use --double-dash):
                           a later run removes them after 7 days
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --min=<pct>             Fail if coverage < pct%% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
@@ -160,7 +160,7 @@ Flags:
                           a later run removes them after 7 days
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
@@ -246,7 +246,7 @@ Flags:
   --debug                 Keep the overlay and work dir; a later run
                           removes them after 7 days
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
@@ -309,7 +309,7 @@ Flags:
   --debug                 Keep the overlay and work dir; a later run
                           removes them after 7 days
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --min=<pct>             Fail if coverage < pct% (0-100)
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
@@ -353,7 +353,7 @@ Flags:
   --bench                 Benchmark mode: re-run benchmarks on change, with the
                           ns/op delta against the previous run
   --update-snapshots      Regenerate snapshot files
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -391,7 +391,7 @@ Flags:
   --no-color              Disable ANSI color codes (with --spec)
   --debug                 Keep the overlay and work dir for inspection;
                           a later run removes them after 7 days
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -507,7 +507,7 @@ Flags:
                           session output; an unmatched name lists the targets
                           (-run, -skip and -bench are refused in its favour)
   --no-harvest            Do not mine table-test literals into seeds for this run
-  --no-cache              Disable the overlay and test binary caches
+  --no-cache              Disable the test binary cache
   --debug                 Keep the overlay and work dir for inspection;
                           a later run removes them after 7 days
 
@@ -966,10 +966,10 @@ package only, as generate does; before v1.33 it walked the directory
 tree. Above several modules, or for a module pulled in by a replace
 directive, use a go.work that lists them, or run clean inside each.
 
-The overlay cache and the test binary cache (used for faster repeated
-runs) are managed separately and auto-evict entries older than 7 days.
-Set GOTEST_CACHE_DIR to control the cache location; use --no-cache to
-bypass both entirely.
+The test binary cache (used for faster repeated runs) is managed
+separately and auto-evicts entries older than 7 days. Set
+GOTEST_CACHE_DIR to control the cache location; use --no-cache to
+bypass it.
 
 Examples:
   gotest clean ./...                         Clean all packages

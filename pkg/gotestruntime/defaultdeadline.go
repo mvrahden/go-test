@@ -27,20 +27,26 @@ var defaultDeadlineOut = func(tb testing.TB) io.Writer {
 // stop or the phase's end cancels ctx instead and says nothing. The returned
 // call, made when the phase returns, ends the note.
 func noteDefaultDeadline(tb testing.TB, ctx context.Context, who, field string, timeout time.Duration) (end func()) {
-	said := make(chan struct{})
-	stop := context.AfterFunc(ctx, func() {
-		defer close(said)
+	say := func() {
 		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
 			fmt.Fprintf(defaultDeadlineOut(tb), "%s: t.Context() ended at the default %s deadline; the suite declares no %s\n", who, timeout, field)
 		}
+	}
+	said := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(said)
+		say()
 	})
 	// A phase that returns the moment its context ends gets here before the
-	// line is written; it waits for it, as the test's output panics once the
-	// test has completed.
+	// line is written. Either it waits for the callback, as the test's output
+	// panics once the test has completed, or it stops the callback before it
+	// started, the context already done: then it says so itself.
 	return sync.OnceFunc(func() {
-		if !stop() {
-			<-said
+		if stop() {
+			say()
+			return
 		}
+		<-said
 	})
 }
 

@@ -171,8 +171,9 @@ func exists(path string) bool {
 
 const cacheMaxAge = 7 * 24 * time.Hour
 
-// cleanOldCacheEntries evicts overlay and test-binary cache entries that no
-// run has touched within cacheMaxAge.
+// cleanOldCacheEntries evicts test-binary cache entries, and the overlay
+// entries older CLIs pinned in other modules still write, that no run has
+// touched within cacheMaxAge.
 func cleanOldCacheEntries() {
 	root, err := cacheRoot()
 	if err != nil {

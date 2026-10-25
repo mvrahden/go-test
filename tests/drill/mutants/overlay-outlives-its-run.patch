@@ -1,0 +1,15 @@
+Judge: ./internal/gotestrunner OverlayTestSuite/TestTheOverlayIsTheRunsOwn
+Expect: ^FAIL .*internal/gotestrunner Overlay .* / removes its overlay with its work dir \(
+Expect: ^FAIL .*conformance/cli .* / leaves none of the files it generated behind \(
+Clause: when a run ends → leaves none of the files it generated behind
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -76,7 +76,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
+ 		}
+ 		return nil, nil, fmt.Errorf("create work dir: %w", err)
+ 	}
+-	overlayDir := filepath.Join(workDir, "overlay")
++	overlayDir := workDir + "-overlay"
+ 	if err := writeOverlayFiles(overlayDir, allResults); err != nil {
+ 		os.RemoveAll(workDir)
+ 		return nil, nil, err

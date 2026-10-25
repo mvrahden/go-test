@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -42,7 +41,6 @@ func ExportSetSharedFixtureDrainDelay(d time.Duration) (restore func()) {
 }
 
 var ExportBuildBaseEnv = buildBaseEnv
-var ExportOverlayContentHash = overlayContentHash
 var ExportCacheRoot = cacheRoot
 var ExportBinaryCacheKey = binaryCacheKey
 var ExportBinaryCacheDir = binaryCacheDir
@@ -86,11 +84,6 @@ func ExportAutoDetectCI(cfg PipelineConfig) PipelineConfig { //nolint:gocritic /
 		cfg.CI = true
 	}
 	return cfg
-}
-
-func ExportWriteOverlayCached(results gotestgen.GenerateResults, noCache bool) (string, error) {
-	dir, _, err := writeOverlayCached(results, noCache)
-	return dir, err
 }
 
 func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {

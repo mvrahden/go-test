@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / names its overlay on stderr and keeps it \(
+Clause: when a --debug run ends → names its overlay on stderr and keeps it
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -87,7 +87,6 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
+ 		// Kept for inspection: the sweep leaves a marked dir alone.
+ 		_ = markKept(workDir)
+ 		fmt.Fprintf(os.Stderr, "DEBUG: overlay dir: %s\nDEBUG: work dir: %s\nDEBUG: binary cache root: %q\n", overlayDir, workDir, binaryCacheRoot)
+-		cleanup = func() {}
+ 	}
+ 
+ 	var suitePkgs []string

@@ -61,7 +61,7 @@ Only caches keyed on the current sources outlive a mutant: Go's build cache
 (`GOCACHE`) and the worker's `cache/cli`, whose binaries the testkit files
 under a key from `go list -export` build IDs, the Go settings and the
 checkout, and copies to a caller-private executable before running. The worker's `cache/children` (`GOTEST_TEST_CACHE_DIR`)
-holds the overlay and binary-cache entries of gotest's own child runs. Go does
+holds the binary-cache entries of gotest's own child runs. Go does
 not validate those, and a mutated CLI writes them, so each mutant starts with
 it empty. The pristine judge's cache (`cache/judge`) is written only by the
 pristine judge. Marker files, snapshots and other mutable test state are never
@@ -498,6 +498,11 @@ shards of one run do not add up to every mutant exactly once.
 | `default-deadline-line-dropped` | a method whose context the default deadline ended is not named | canary: the defaultdeadline waiting method is named no times |
 | `default-deadline-line-fails-the-method` | the line naming a context the default deadline ended also fails its method | canary: the defaultdeadline verdicts differ from the golden list |
 | `default-deadline-line-under-a-declared-timeout` | a method past its declared `Timeout` is also named as ended at the default deadline | canary: the defaultdeadline run names the default deadline twice |
+| `overlay-shared-between-runs` | every run writes its overlay into one shared dir | runner: two runs of one overlay get the same dir |
+| `overlay-outlives-its-run` | the overlay is written beside the work dir, so the run's cleanup leaves it | runner: the overlay outlives its run |
+| `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
+| `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
+| `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
 
 ## Adding a mutant
 
