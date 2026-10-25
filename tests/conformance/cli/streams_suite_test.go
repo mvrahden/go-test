@@ -3,6 +3,7 @@ package cli_test
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -14,7 +15,9 @@ import (
 type CLIStreamsTestSuite struct{}
 
 func (s *CLIStreamsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	// Measured on Windows CI: slowest method ~12s, over 30s on a loaded
+	// runner. The CLI runs end with the method's context.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
 }
 
 type streamRow struct {
@@ -47,7 +50,7 @@ func (s *CLIStreamsTestSuite) TestJSONOutputsStayPure(t *gotest.T) {
 		w.It("holds JSON lines only, inside GitHub Actions too", func(it *gotest.T) {
 			run, err := testkit.RunCLIWithEnv(it.Context(), ".", []string{"GITHUB_ACTIONS=true"}, "-json", "../testdata/failing/")
 			gotest.NoError(it, err)
-			gotest.Equal(it, 1, run.Exit)
+			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
 			for _, line := range strings.Split(strings.TrimSpace(run.Stdout), "\n") {
 				gotest.Regexp(it, `^\{`, line)
 			}

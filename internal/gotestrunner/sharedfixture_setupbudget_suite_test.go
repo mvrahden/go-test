@@ -100,9 +100,11 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestAnInterruptedSetupGetsTheDefault
 func (s *SharedFixtureSetupBudgetTestSuite) TestTheBudgetOutlivesTheFloor(t *gotest.T) {
 	// The floor is the wait before the process reports its first budget;
 	// shrunk here so the declared budget, not the floor, is what is tested.
-	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
+	// The process must report within the floor of its launch, which a
+	// Windows runner has missed at 1s; the setup outlasts the floor.
+	restore := gotestrunner.ExportSetSetupReportFloor(5 * time.Second)
 	defer restore()
-	proc, release, _, err := startSlowSetup(t, 20*time.Second, 3*time.Second, 0)
+	proc, release, _, err := startSlowSetup(t, 20*time.Second, 6*time.Second, 0)
 	defer release()
 	key := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.SlowSetupSharedFixture"
 	t.When("a fixture declares a Timeout longer than the runner's floor and needs it", func(w *gotest.T) {
