@@ -3531,6 +3531,101 @@
               "name": "TestEveryOutcomeWritesTheFile",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming the flag before any package is built",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_the_flag_before_any_package_is_built",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when --events-file names a path that cannot be written",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--events-file_names_a_path_that_cannot_be_written",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a -json run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-json_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming the flag before any package is built",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_the_flag_before_any_package_is_built",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when --events-file names a path that cannot be written",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--events-file_names_a_path_that_cannot_be_written",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a summary",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_summary",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "AnUnwritablePathFailsFirst",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnUnwritablePathFailsFirst",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIEventsFile",
@@ -10490,7 +10585,7 @@
     }
   ],
   "stats": {
-    "behaviors": 346,
+    "behaviors": 348,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

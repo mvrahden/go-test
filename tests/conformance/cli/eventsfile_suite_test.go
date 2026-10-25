@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -129,6 +130,33 @@ func (s *CLIEventsFileTestSuite) TestEveryOutcomeWritesTheFile(t *gotest.T) {
 				gotest.NoError(it, readErr)
 				gotest.Contains(it, string(got), r.event)
 				gotest.Equal(it, run.Stdout, string(got))
+			})
+		})
+	}
+}
+
+func (s *CLIEventsFileTestSuite) TestAnUnwritablePathFailsFirst(t *gotest.T) {
+	type row struct {
+		Desc string
+		args []string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "a -json run", args: []string{"-json"}},
+		{Desc: "a summary", args: []string{"summary", "--no-color"}},
+	}) {
+		// A path below a regular file can be neither made nor created, on
+		// every platform.
+		blocker := filepath.Join(t.TempDir(), "a-file")
+		gotest.NoError(t, os.WriteFile(blocker, nil, 0o600))
+		args := slices.Concat(r.args, []string{"--events-file=" + filepath.Join(blocker, "events.json"), "../../canary/testdata/broken/"})
+		run, err := testkit.RunCLI(t.Context(), ".", args...)
+		gotest.NoError(t, err)
+
+		t.When("--events-file names a path that cannot be written", func(w *gotest.T) {
+			w.It("exits 2 naming the flag before any package is built", func(it *gotest.T) {
+				gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Regexp(it, "^FAIL: --events-file: ", run.Stderr)
+				gotest.Empty(it, run.Stdout)
 			})
 		})
 	}
