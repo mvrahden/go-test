@@ -50,7 +50,25 @@ func binaryCacheDir(root string, buildFlags []string) string {
 	}
 	now := time.Now()
 	_ = os.Chtimes(dir, now, now)
+	recordCheckout(dir, cwd)
 	return dir
+}
+
+// recordCheckout writes cwd into the key dir's .cwd unless it is there
+// already, so the sweep can tell a key whose checkout is gone. It goes
+// through a rename: a sweep never reads half a path.
+func recordCheckout(dir, cwd string) {
+	if got, err := os.ReadFile(filepath.Join(dir, checkoutFile)); err == nil && string(got) == cwd {
+		return
+	}
+	tmp, err := os.CreateTemp(dir, checkoutFile+".tmp-*")
+	if err != nil {
+		return
+	}
+	_, werr := tmp.WriteString(cwd)
+	if cerr := tmp.Close(); werr != nil || cerr != nil || os.Rename(tmp.Name(), filepath.Join(dir, checkoutFile)) != nil {
+		_ = os.Remove(tmp.Name())
+	}
 }
 
 // errLockReplaced is a lock taken on a file no longer at its path: an

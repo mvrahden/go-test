@@ -30,3 +30,27 @@ func lockFile(path string) (func(), error) {
 		f.Close()
 	}, nil
 }
+
+// tryLockFile is lockFile without waiting: a lock someone holds is an error.
+func tryLockFile(path string) (func(), error) {
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		f.Close()
+	}, nil
+}
+
+// releaseEvicted removes an evicted binary's lock file while still holding
+// it, then unlocks: a run that opened the file meanwhile finds it replaced
+// once it gets the lock (see stillAt).
+func releaseEvicted(lock string, unlock func()) {
+	_ = os.Remove(lock)
+	unlock()
+}

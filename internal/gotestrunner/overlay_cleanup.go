@@ -179,6 +179,7 @@ func cleanOldCacheEntries() {
 	if err != nil {
 		return
 	}
+	sweepBinaryCache(root)
 	now := time.Now()
 	for _, sub := range []string{"overlays", "bin"} {
 		dir := filepath.Join(root, sub)

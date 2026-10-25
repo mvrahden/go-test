@@ -1,0 +1,13 @@
+Judge: ./internal/gotestrunner BinaryCacheEvictionTestSuite/TestAGoneCheckoutLosesItsBinaries
+Expect: ^FAIL .*internal/gotestrunner BinaryCacheEviction .* / keeps its binaries \(
+--- a/internal/gotestrunner/bincache_evict.go
++++ b/internal/gotestrunner/bincache_evict.go
+@@ -31,7 +31,7 @@ func sweepBinaryCache(root string) {
+ 		}
+ 		dir := filepath.Join(bin, k.Name())
+ 		cwd, err := os.ReadFile(filepath.Join(dir, checkoutFile))
+-		if err != nil || exists(string(cwd)) {
++		if err != nil || len(cwd) == 0 {
+ 			continue
+ 		}
+ 		for _, b := range scanBinaries(dir) {
