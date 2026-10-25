@@ -37,7 +37,6 @@ var (
 	IS_BEFORE_EACH       = regexp.MustCompile(`^BeforeEach$`)
 	IS_AFTER_EACH        = regexp.MustCompile(`^AfterEach$`)
 	IS_TEST_CASE         = &regexpW{regexp2.MustCompile(`^(?:X_|F_)?Test.+$`, regexp2.ECMAScript)}                                      // matches all test cases
-	IS_TEST_CASE_ASYNC   = regexp.MustCompile(`^(?:X_|F_)?Test.+Async$`)                                                                // matches all test cases with async suffix
 	IS_BENCHMARK         = &regexpW{regexp2.MustCompile(fmt.Sprintf(`^(?:X_|F_)?%s.+$`, protocol.PrefixBenchmark), regexp2.ECMAScript)} // matches all benchmark methods
 	IS_FUZZ              = &regexpW{regexp2.MustCompile(fmt.Sprintf(`^(?:X_|F_)?%s.+$`, protocol.PrefixFuzz), regexp2.ECMAScript)}      // matches all fuzz methods
 )
@@ -424,7 +423,6 @@ func (m *TestSuiteMethod) DeclaredAt(fset *token.FileSet) string {
 	return filepath.Base(p.Filename) + ":" + strconv.Itoa(p.Line)
 }
 
-func (m *TestSuiteMethod) IsAsync() bool    { return IS_TEST_CASE_ASYNC.MatchString(m.m.Name()) }
 func (m *TestSuiteMethod) IsFocused() bool  { return strings.HasPrefix(m.m.Name(), "F_") }
 func (m *TestSuiteMethod) IsExcluded() bool { return strings.HasPrefix(m.m.Name(), "X_") }
 
@@ -748,27 +746,25 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		return -1, nil
 	}
 
+	if n := sig.Params().Len(); n >= 2 && sig.Params().At(n-1).Type().String() == "func()" {
+		return m.Pos(), fmt.Errorf("test method %q takes a trailing done func(): async test methods are gone. Signal from the callback on a channel and wait for it in the method, asserting on the test goroutine:\n"+
+			"\tdone := make(chan struct{})\n"+
+			"\tgo func() { defer close(done); /* the work that called done() */ }()\n"+
+			"\tselect {\n"+
+			"\tcase <-done:\n"+
+			"\tcase <-t.Context().Done():\n"+
+			"\t\tgotest.Fail(t, \"never finished\")\n"+
+			"\t}", methodID)
+	}
+
 	s.th.TestCases = append(s.th.TestCases, tm)
 	s.th.DeclaresTests = true
 
 	maxParams := 1
 
-	// optional context parameter (second position, before optional done func())
+	// optional context parameter, from a returning BeforeEach
 	if sig.Params().Len() >= 2 {
-		secondParam := sig.Params().At(1)
-		secondType := secondParam.Type().String()
-		if secondType != "func()" {
-			tm.contextParam = secondParam
-			maxParams += 1
-		}
-	}
-
-	// end with `done func()` IF test case IS ASYNC
-	if IS_TEST_CASE_ASYNC.MatchString(m.Name()) {
-		lastParam := sig.Params().At(sig.Params().Len() - 1)
-		if lastParam.String() != "var done func()" {
-			return lastParam.Pos(), fmt.Errorf("unsupported last argument for %q", methodID)
-		}
+		tm.contextParam = sig.Params().At(1)
 		maxParams += 1
 	}
 

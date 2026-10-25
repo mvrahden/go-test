@@ -531,24 +531,29 @@ func (s *CollectorTestSuite) TestTestMethod(t *gotest.T) {
 		})
 	})
 
-	t.When("async with context", func(w *gotest.T) {
-		w.It("detects HasContextParam on async test method", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_AsyncWithContext")
-			c := gotestgen.NewCollector()
-			result := c.CollectSuiteSpecs(pkg)
+	for t, row := range gotest.Each(t, []struct {
+		Desc   string
+		source string
+		method string
+	}{
+		{Desc: "a test method takes a trailing done func()", source: "TestCollector_TestMethod_Done", method: "TestPingAsync"},
+		{Desc: "a test method takes a context and a trailing done func()", source: "TestCollector_TestMethod_DoneWithContext", method: "TestOneAsync"},
+	}) {
+		pkg := gotestgen.ExportMustTestPkg(t.T(), row.source)
+		result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+		gotest.Len(t, result.Errs, 1)
+		msg := result.Errs[0].Err.Error()
+		gotest.Contains(t, msg, row.method)
+		gotest.Contains(t, msg, "make(chan struct{})")
+		gotest.Contains(t, msg, "case <-t.Context().Done():")
+	}
+
+	t.When("a method is named for the async methods but takes no done", func(w *gotest.T) {
+		w.It("collects it as an ordinary test method", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_NamedAsync")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
 			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
 			gotest.Len(it, result.Suites[0].TestCases(), 1)
-			gotest.True(it, result.Suites[0].TestCases()[0].HasContextParam(), "expected context param")
-		})
-	})
-
-	t.When("async method's last param is not done func()", func(w *gotest.T) {
-		w.It("reports an error", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_AsyncWrongDoneParam")
-			c := gotestgen.NewCollector()
-			result := c.CollectSuiteSpecs(pkg)
-			gotest.NotEmpty(it, result.Errs, "expected error for Async method without trailing done func()")
-			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported last argument")
 		})
 	})
 
