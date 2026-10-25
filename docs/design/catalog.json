@@ -2941,6 +2941,46 @@
               "name": "TestAnUnreadableCap",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a run removes the binaries used longest ago until it is at or under the cap",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_run_removes_the_binaries_used_longest_ago_until_it_is_at_or_under_the_cap",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the cache holds more than GOTEST_CACHE_MAX_SIZE",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_cache_holds_more_than_GOTEST_CACHE_MAX_SIZE",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheCapGoesOldestFirst",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheCapGoesOldestFirst",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIBinaryCache",
@@ -10431,7 +10471,7 @@
     }
   ],
   "stats": {
-    "behaviors": 348,
+    "behaviors": 349,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

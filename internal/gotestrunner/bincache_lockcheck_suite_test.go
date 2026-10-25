@@ -28,7 +28,7 @@ func (s *BinaryCacheLockCheckTestSuite) TestALockEvictedWhileWaitingIsNotTheCach
 
 	// An eviction holds the lock and has the binary there.
 	release := gotest.Must(gotestrunner.ExportLockFile(cached + ".lock"))
-	gotest.NoError(t, os.WriteFile(cached, []byte("old"), 0o755))
+	gotest.NoError(t, os.WriteFile(cached, []byte("old"), 0o600))
 	opened := make(chan struct{})
 	restore := gotestrunner.ExportLockOpened(func(string) { close(opened) })
 	type outcome struct {

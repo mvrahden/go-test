@@ -35,7 +35,7 @@ func lockFile(path string) (func(), error) {
 
 // tryLockFile is lockFile without waiting: a lock someone holds is an error.
 func tryLockFile(path string) (func(), error) {
-	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, err
 	}

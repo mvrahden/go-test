@@ -18,8 +18,7 @@ type BinaryCacheSweepCostTestSuite struct{}
 // binaries each, every one fresh and their checkouts present, so each sweep
 // reads all of it and evicts nothing.
 func (s *BinaryCacheSweepCostTestSuite) BenchmarkSweepOf200KeysOf60Binaries(b *gotest.B) {
-	root, err := os.MkdirTemp("", "gotest-sweepcost-")
-	gotest.NoError(b, err)
+	root := b.B().TempDir()
 	cwd, err := os.Getwd()
 	gotest.NoError(b, err)
 	for k := range 200 {
@@ -28,12 +27,11 @@ func (s *BinaryCacheSweepCostTestSuite) BenchmarkSweepOf200KeysOf60Binaries(b *g
 		gotest.NoError(b, os.WriteFile(filepath.Join(dir, ".cwd"), []byte(cwd), 0o600))
 		for i := range 60 {
 			bin := filepath.Join(dir, fmt.Sprintf("pkg%02d.test", i))
-			gotest.NoError(b, os.WriteFile(bin, []byte("binary"), 0o755))
-			gotest.NoError(b, os.WriteFile(bin+".lock", nil, 0o644))
+			gotest.NoError(b, os.WriteFile(bin, []byte("binary"), 0o600))
+			gotest.NoError(b, os.WriteFile(bin+".lock", nil, 0o600))
 		}
 	}
 	for b.Loop() {
 		gotestrunner.ExportSweepBinaryCache(root, 0, time.Now())
 	}
-	gotest.NoError(b, os.RemoveAll(root))
 }

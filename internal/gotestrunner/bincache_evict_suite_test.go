@@ -25,8 +25,8 @@ func cacheKey(t *gotest.T, root, key, cwd string, binaries ...string) string {
 		gotest.NoError(t, os.WriteFile(filepath.Join(dir, ".cwd"), []byte(cwd), 0o600))
 	}
 	for _, b := range binaries {
-		gotest.NoError(t, os.WriteFile(filepath.Join(dir, b), []byte("binary"), 0o755))
-		gotest.NoError(t, os.WriteFile(filepath.Join(dir, b+".lock"), nil, 0o644))
+		gotest.NoError(t, os.WriteFile(filepath.Join(dir, b), []byte("binary"), 0o600))
+		gotest.NoError(t, os.WriteFile(filepath.Join(dir, b+".lock"), nil, 0o600))
 	}
 	return dir
 }
@@ -221,7 +221,7 @@ func (s *BinaryCacheEvictionTestSuite) TestEvictionNeverTakesABinaryInUse(t *got
 			dir := cacheKey(it, root, "5656565656565656", filepath.Join(it.TempDir(), "gone"), "a.test")
 			fresh := filepath.Join(dir, "b.test.lock")
 			restore := gotestrunner.ExportKeyEmptied(func(string) {
-				gotest.NoError(it, os.WriteFile(fresh, nil, 0o644))
+				gotest.NoError(it, os.WriteFile(fresh, nil, 0o600))
 			})
 
 			gotestrunner.CleanStaleOverlays()
@@ -242,6 +242,33 @@ func (s *BinaryCacheEvictionTestSuite) TestEvictionNeverTakesABinaryInUse(t *got
 			gotest.False(it, exists(filepath.Join(dir, "a.test")))
 			gotest.False(it, exists(filepath.Join(dir, "a.test.lock")))
 			gotest.True(it, exists(filepath.Join(dir, "b.test.lock")))
+		})
+	})
+}
+
+func (s *BinaryCacheEvictionTestSuite) TestNothingKeepsADeadKeyForever(t *gotest.T) {
+	t.When("a key of a gone checkout holds a temp file a run died writing", func(w *gotest.T) {
+		w.It("removes the key dir with it", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "9a9a9a9a9a9a9a9a", filepath.Join(it.TempDir(), "gone"), "a.test")
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, ".cwd.tmp-123"), []byte("/half"), 0o600))
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.False(it, exists(dir), "the key dir %s is left", dir)
+		})
+	})
+	t.When("a binary unused for 7 days has no lock file", func(w *gotest.T) {
+		w.It("evicts it all the same", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "9b9b9b9b9b9b9b9b", it.TempDir(), "a.test", "b.test")
+			gotest.NoError(it, os.Remove(filepath.Join(dir, "a.test.lock")))
+			aged(it, filepath.Join(dir, "a.test"), 8*24*time.Hour)
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.False(it, exists(filepath.Join(dir, "a.test")))
+			gotest.False(it, exists(filepath.Join(dir, "a.test.lock")))
 		})
 	})
 }

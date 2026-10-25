@@ -16,10 +16,10 @@ import (
 type CLIBinaryCacheTestSuite struct{}
 
 func (s *CLIBinaryCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on linux: three rounds of 8 runs ~10s. Not yet measured on
-	// Windows CI, whose process starts and file writes are far slower; 3m
-	// leaves room.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	// Measured on linux: three rounds of 8 runs ~5s. Not yet measured on
+	// Windows CI, whose process starts and file writes are far slower; 2m
+	// leaves room, as for the concurrent overlay runs.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
 }
 
 func (s *CLIBinaryCacheTestSuite) TestRunsUnderATinyCap(t *gotest.T) {
@@ -59,8 +59,8 @@ func staleKey(t *gotest.T, cache, key, checkout string, ago time.Duration) strin
 	gotest.NoError(t, os.MkdirAll(dir, 0o755))
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, ".cwd"), []byte(checkout), 0o600))
 	bin := filepath.Join(dir, "other.test")
-	gotest.NoError(t, os.WriteFile(bin, []byte("binary"), 0o755))
-	gotest.NoError(t, os.WriteFile(bin+".lock", nil, 0o644))
+	gotest.NoError(t, os.WriteFile(bin, []byte("binary"), 0o600))
+	gotest.NoError(t, os.WriteFile(bin+".lock", nil, 0o600))
 	then := time.Now().Add(-ago)
 	gotest.NoError(t, os.Chtimes(bin, then, then))
 	return bin
@@ -100,6 +100,27 @@ func (s *CLIBinaryCacheTestSuite) TestAnUnreadableCap(t *gotest.T) {
 			gotest.Equal(it, 2, run.Exit, "stderr: %s", run.Stderr)
 			gotest.Contains(it, run.Stderr+run.Stdout, "GOTEST_CACHE_MAX_SIZE=5GB")
 			gotest.True(it, os.IsNotExist(statErr), "a build ran: %s exists", filepath.Join(cache, "bin"))
+		})
+	})
+}
+
+func (s *CLIBinaryCacheTestSuite) TestTheCapGoesOldestFirst(t *gotest.T) {
+	cache := t.TempDir()
+	checkout := t.TempDir()
+	oldest := staleKey(t, cache, "00000000000000d1", checkout, 3*time.Hour)
+	older := staleKey(t, cache, "00000000000000d2", checkout, 2*time.Hour)
+	newer := staleKey(t, cache, "00000000000000d3", checkout, time.Hour)
+	// Six bytes each: a cap of 12 keeps two, swept before this run links.
+	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), []string{protocol.EnvCacheDir + "=" + cache, protocol.EnvCacheMaxSize + "=12"}, "../testdata/passing/")
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	present := func(path string) bool { _, err := os.Stat(path); return err == nil }
+
+	t.When("the cache holds more than GOTEST_CACHE_MAX_SIZE", func(w *gotest.T) {
+		w.It("a run removes the binaries used longest ago until it is at or under the cap", func(it *gotest.T) {
+			gotest.False(it, present(oldest), "%s outlived the run", oldest)
+			gotest.True(it, present(older), "%s was evicted", older)
+			gotest.True(it, present(newer), "%s was evicted", newer)
 		})
 	})
 }

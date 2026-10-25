@@ -194,3 +194,7 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 #### Scenario: An unreadable cap
 - **WHEN** GOTEST_CACHE_MAX_SIZE is not a size
 - **THEN** exits 2 naming the variable, before any build
+
+#### Scenario: Over the cap
+- **WHEN** the cache holds more than GOTEST_CACHE_MAX_SIZE
+- **THEN** a run removes the binaries used longest ago until it is at or under the cap
