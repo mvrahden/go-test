@@ -397,20 +397,33 @@ describe("the watch entry point", () => {
     try {
       await manager.start("./passing/...", fixturesDir);
 
+      // The run streams its verdicts: wait for the one this test reads, not
+      // for the first, which on a slow runner is often another's.
       const run = await waitFor(
-        () => fake.runs.slice(runsBefore).find((r) => r.verdicts.size > 0),
+        () =>
+          fake.runs
+            .slice(runsBefore)
+            .find((r) =>
+              r
+                .verdictsMatching("passed")
+                .some((id) => id.endsWith("returns_their_sum")),
+            ),
         120_000,
       );
 
-      const passed = run.verdictsMatching("passed");
-      expect(passed.some((id) => id.endsWith("returns_their_sum"))).toBe(true);
       expect(run.ended).toBe(false);
     } finally {
       manager.stopAll();
       manager.dispose();
     }
 
-    const run = fake.runs.slice(runsBefore).find((r) => r.verdicts.size > 0)!;
+    const run = fake.runs
+      .slice(runsBefore)
+      .find((r) =>
+        r
+          .verdictsMatching("passed")
+          .some((id) => id.endsWith("returns_their_sum")),
+      )!;
     expect(run.ended, "stopping the watch must end its run").toBe(true);
   }, 300_000);
 });
