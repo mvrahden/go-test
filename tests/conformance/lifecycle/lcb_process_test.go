@@ -48,6 +48,16 @@ func prefixed(want string) func(string) bool {
 	}
 }
 
+// markerValue is the value of the first key=value marker with key.
+func markerValue(markers []string, key string) string {
+	for _, m := range markers {
+		if v, ok := strings.CutPrefix(m, key+"="); ok {
+			return v
+		}
+	}
+	return ""
+}
+
 // awaitMarkers waits up to within for every marker in wants and reports the
 // markers it read last.
 func awaitMarkers(markerDir string, within time.Duration, wants ...string) []string {

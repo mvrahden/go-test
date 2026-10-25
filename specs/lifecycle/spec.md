@@ -259,6 +259,30 @@ On Windows, where the runner stops a suite by its stop file alone, an interrupte
 - **AND** every verdict reaches the stream: the holding method's, the suite's and the package's
 - **AND** runs AfterAll before the fixture is released
 
+### Requirement: A suite whose parent is gone
+A suite process under the runner whose parent ends SHALL stop by itself: it SHALL end the holding method's context, run none of the methods that have not started, run AfterAll before the fixture is released, and exit.
+
+#### Scenario: The parent is killed
+- **WHEN** the parent of a suite process under the runner is killed while a method holds
+- **THEN** ends the holding method's context
+- **AND** the methods that have not started never run
+- **AND** runs AfterAll before the fixture is released
+- **AND** leaves no suite process behind
+
+### Requirement: A suite whose stream nobody reads
+A suite process under the runner whose stdout nobody reads any more, because the runner and its converter died while an -exec wrapper keeps the suite running, SHALL stop by itself the same way; outside the runner, a stdout nobody reads SHALL NOT stop a suite.
+
+#### Scenario: The runner and its converter are killed
+- **WHEN** the runner and its converter are killed under -json while an -exec wrapper waits on the suite
+- **THEN** ends the holding method's context
+- **AND** the methods that have not started never run
+- **AND** runs AfterAll before the fixture is released
+- **AND** leaves no suite process behind
+
+#### Scenario: Outside the runner
+- **WHEN** a suite run by its test binary outside the gotest runner loses the reader of its stdout
+- **THEN** the holding method runs on: its context does not end
+
 ### Requirement: A stop signals only the suite's own processes
 A cancelled run SHALL send no signal to a pid the suite published that is outside the suite's process group, and SHALL interrupt the suite's process group instead.
 

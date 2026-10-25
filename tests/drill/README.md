@@ -443,7 +443,7 @@ shards of one run do not add up to every mutant exactly once.
 | `failed-hydrate-not-dehydrated` | a shared fixture whose Hydrate failed gets no Dehydrate | canary: the failed Hydrate's Dehydrate marker is missing |
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
-| `stop-keeps-running-methods` | a stopped run still starts the methods that had not started | canary: the stopped fixture's later methods have no skip verdict |
+| `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the parent or the stream reader is gone |
 | `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
 | `stop-releases-before-afterall` | a stop releases the fixtures before the suite's AfterAll runs | canary: the stopped fixture's markers show the release ahead of AfterAll |
 | `stop-grace-past-5s` | a stopped method body that ignores its context gets 15s instead of 5s | canary: the stopgrace run does not say the body was cut short after 5s |
@@ -468,6 +468,10 @@ shards of one run do not add up to every mutant exactly once.
 | `async-failed-wait-blamed-on-done` | a failed method whose wait lasts to the deadline is reported for a missed done | canary: asynchelper's hanging owner's output lacks what was left to wait for |
 | `go-panic-unseen-by-an-async-wait` | a panic on a gotest.Go goroutine does not end an async wait | canary: asynchelper's panicking method takes its full 20s budget |
 | `stop-file-ignored` | the suite's watcher never polls for the stop file, so a stop no signal brings never comes | canary: the stopfile run's later methods have no skip verdict and the stream ends without the verdicts |
+| `plain-run-taken-for-the-runner` | a run without the runner's stop file falls back to a default one, so a plain run watches its stream | canary: the plainreader method's context ends when its reader goes |
+| `parent-death-not-asked` | a suite process under the runner neither asks for its parent's death signal nor polls for its parent | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
+| `death-signal-is-a-stop-signal` | the death signal is SIGTERM, so landing during a requested stop it counts as the second signal | runtime: the parent's death abandons the teardown a stop it asked for runs |
+| `reader-loss-read-as-hangup` | a stream nobody reads is taken for one only on a hang-up, which a pipe's writer never gets | canary: after the runner and converter are killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
 | `stop-signals-a-stranger` | a cancelled run signals the pid the suite published even outside the suite's process group | lifecycle conformance: the stranger process gets the SIGTERM and the group none |
 | `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: the group gets no interrupt, and AfterAll never runs before the fixture's release |
 | `second-signal-leaves-the-processes` | the CLI's second signal exits without killing the processes still running | lifecycle conformance: a suite process outlives the run after a second SIGINT |

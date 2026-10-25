@@ -1,0 +1,16 @@
+Expect: readergone: the holding method.s context never ended
+Expect: readergone: markers .*, want context ended, suite.AfterAll, fixture.AfterAll in order
+Expect: readergone: the suite process [0-9]+ outlived the run
+Judge: ./tests/canary CanaryTestSuite/TestASuiteWhoseStreamNobodyReadsStops
+Clause: when the runner and its converter are killed under -json while an -exec wrapper waits on the suite → ends the holding method's context
+Clause: when the runner and its converter are killed under -json while an -exec wrapper waits on the suite → runs AfterAll before the fixture is released
+Clause: when the runner and its converter are killed under -json while an -exec wrapper waits on the suite → leaves no suite process behind
+--- a/pkg/gotestruntime/stdoutreader_linux.go
++++ b/pkg/gotestruntime/stdoutreader_linux.go
+@@ -44,5 +44,5 @@
+ 	}{{fd: 1}}
+ 	var now syscall.Timespec
+ 	n, _, errno := syscall.Syscall6(syscall.SYS_PPOLL, uintptr(unsafe.Pointer(&fds[0])), 1, uintptr(unsafe.Pointer(&now)), 0, 0, 0)
+-	return errno == 0 && n == 1 && fds[0].revent&(pollErr|pollHup) != 0
++	return errno == 0 && n == 1 && fds[0].revent&pollHup != 0
+ }
