@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/fixtures .*TheExclusiveTail.* / the wait ends at the declared budget and the run fails \(
+Expect: ^FAIL .*conformance/fixtures .*ABenchSlot.* / the wait ends at the declared budget and the run fails \(
+Clause: when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given → the wait ends at the declared budget and the run fails
+Clause: when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given → the wait ends at the declared budget and the run fails
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -426,6 +426,9 @@
+ // acknowledgement, ctx ending, or the deadline flat sets as for [WaitSetup]:
+ // at zero, the budgets the started fixtures declare.
+ func (p *SharedFixtureProcess) StartKeys(ctx context.Context, keys []string, flat time.Duration) error {
++	if flat == 0 {
++		flat = 2 * time.Minute
++	}
+ 	return p.command(ctx, "start", keys, flat)
+ }
+ 

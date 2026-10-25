@@ -71,6 +71,8 @@ Each directory under `testdata/` is one package with one suite:
 | `noisysetup` | a shared fixture that writes to stdout while coming up still hands its state to the suite whole |
 | `setupbudget` | a shared fixture slower than its declared 2s `Timeout` fails the run at that budget, not when it finishes |
 | `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
+| `slowretry` | a shared fixture whose attempts and the release between them each take 1.6s of its 2s `Timeout` is waited for: the budget counts the release |
+| `latebudget` | a shared fixture started for the exclusive tail is released under the teardown budget its declared 2s `Timeout` gives: its `AfterAll`, which never returns, is force-killed after 32s, not the default's 2m30s |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

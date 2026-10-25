@@ -289,8 +289,10 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// budget is the SUM of the members' floored budgets — a max would
 			// force-kill a fixture set whose teardowns each obeyed their own
 			// declared Timeout.
-			gotest.Contains(it, code, "ƒbudget += gotestruntime.SupervisorBudget(ƒcfg_sf0.Timeout)",
-				"each member's budget must go through the shared floor and into the sum")
+			gotest.Contains(it, code, "ƒshares[i] = gotestruntime.SupervisorBudget(timeout)",
+				"each member's budget must go through the shared floor")
+			gotest.Contains(it, code, "ƒbudget += ƒs",
+				"and into the sum")
 			gotest.NotContains(it, code, "func ƒsupervisorBudget(",
 				"no local copy of the floor may remain")
 			gotest.NotContains(it, code, "ƒb > ƒmaxTimeout",

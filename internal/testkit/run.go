@@ -44,8 +44,23 @@ const MarkersFile = "markers"
 // StopGrace is how long a CLI whose context ended has to finish stopping
 // before it is killed: the default fixture Timeout its teardown is given, and
 // the 30s the process adds. It also bounds how long its output may be held
-// open once it has exited.
+// open once it has exited. WithStopGrace sets another.
 const StopGrace = 2*time.Minute + 30*time.Second
+
+type stopGraceKey struct{}
+
+// WithStopGrace returns ctx carrying grace in place of StopGrace for the runs
+// started under it.
+func WithStopGrace(ctx context.Context, grace time.Duration) context.Context {
+	return context.WithValue(ctx, stopGraceKey{}, grace)
+}
+
+func stopGrace(ctx context.Context) time.Duration {
+	if grace, ok := ctx.Value(stopGraceKey{}).(time.Duration); ok {
+		return grace
+	}
+	return StopGrace
+}
 
 // RunPackage runs the built CLI with -json over pkg (a path relative to the
 // caller's working directory) and reads back the stream and the markers the
@@ -81,7 +96,7 @@ func runCLI(ctx context.Context, dir, markerDir string, extraEnv []string, args 
 	if err != nil {
 		return Run{}, err
 	}
-	return runBinary(ctx, binary, StopGrace, dir, markerDir, extraEnv, args...)
+	return runBinary(ctx, binary, stopGrace(ctx), dir, markerDir, extraEnv, args...)
 }
 
 // runBinary is runCLI with binary as the CLI, given grace to stop.

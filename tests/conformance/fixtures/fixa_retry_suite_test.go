@@ -8,7 +8,8 @@ import (
 )
 
 // FixtureRetryTestSuite: a release between a retried setup's attempts that
-// fails, or outlives the fixture's declared Timeout, fails the run.
+// fails, or outlives the fixture's declared Timeout, fails the run; the
+// releases count toward the wait for the setup.
 type FixtureRetryTestSuite struct{}
 
 func (s *FixtureRetryTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -45,6 +46,18 @@ func (s *FixtureRetryTestSuite) TestAFailedReleaseBetweenAttempts(t *gotest.T) {
 		})
 		w.It("reports that the release exceeded the Timeout", func(it *gotest.T) {
 			gotest.Contains(it, run.Stdout+run.Stderr, "SlowReleaseFixture.AfterAll failed: exceeded its configured Timeout of 200ms")
+		})
+	})
+}
+
+func (s *FixtureRetryTestSuite) TestReleasesCountTowardTheWait(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixaslowretry/")
+	gotest.NoError(t, err)
+	t.When("a shared fixture with a 2s Timeout and 1 retry spends 1.6s on each attempt and on the release between them, and no --setup-timeout is given", func(w *gotest.T) {
+		w.It("the run passes: the wait counts the release", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestSlowTestSuite/TestStateArrived"), "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Equal(it, []string{"slow.BeforeAll", "slow.AfterAll", "slow.BeforeAll", "slow.AfterAll"}, run.Markers)
 		})
 	})
 }

@@ -100,9 +100,11 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestAnInterruptedSetupGetsTheDefault
 func (s *SharedFixtureSetupBudgetTestSuite) TestTheBudgetOutlivesTheFloor(t *gotest.T) {
 	// The floor is the wait before the process reports its first budget;
 	// shrunk here so the declared budget, not the floor, is what is tested.
-	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
+	// The process must report within the floor of its launch, which a
+	// Windows runner has missed at 1s; the setup outlasts the floor.
+	restore := gotestrunner.ExportSetSetupReportFloor(5 * time.Second)
 	defer restore()
-	proc, release, _, err := startSlowSetup(t, 20*time.Second, 3*time.Second, 0)
+	proc, release, _, err := startSlowSetup(t, 20*time.Second, 6*time.Second, 0)
 	defer release()
 	key := "github.com/mvrahden/go-test/tests/sharedfixture/fixtures.SlowSetupSharedFixture"
 	t.When("a fixture declares a Timeout longer than the runner's floor and needs it", func(w *gotest.T) {
@@ -169,17 +171,24 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestAFlatTimeoutIsStillTheBudget(t *
 func (s *SharedFixtureSetupBudgetTestSuite) TestTheTimeoutIsTimedFromTheSetupsStart(t *gotest.T) {
 	// The bubble's clock: the fixture reports its 2s budget 500ms before the
 	// runner starts waiting.
-	var upFront error
+	var upFront, window error
 	synctest.Test(t.T(), func(*testing.T) {
 		proc := gotestrunner.ExportNewSilentProcess()
 		gotestrunner.ExportNoteSetupBudget(proc, 2*time.Second)
 		time.Sleep(500 * time.Millisecond)
 		upFront = proc.WaitSetup(context.Background(), 0)
 	})
+	synctest.Test(t.T(), func(*testing.T) {
+		proc := gotestrunner.ExportNewReportingProcess(2*time.Second, 0, 500*time.Millisecond)
+		window = proc.StartKeys(context.Background(), []string{"k"}, 0)
+	})
 	t.When("a fixture's budget is reported before the wait for it begins", func(w *gotest.T) {
 		w.It("the up-front wait says it timed out after the declared budget", func(it *gotest.T) {
 			timeout := gotest.ErrorAs[*gotestrunner.SetupTimeoutError](it, upFront)
 			gotest.Equal(it, 2*time.Second, timeout.After)
+		})
+		w.It("a window's wait says it timed out after the declared budget", func(it *gotest.T) {
+			gotest.ErrorContains(it, window, "timed out after 2s")
 		})
 	})
 }
@@ -187,42 +196,24 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheTimeoutIsTimedFromTheSetupsSt
 func (s *SharedFixtureSetupBudgetTestSuite) TestTheTimeoutNamesTheBudgetHeldTo(t *gotest.T) {
 	// The bubble's clock: the fixture reports its 2s budget 1.5s after its
 	// setup began, as a loaded machine delays it.
-	var upFront error
+	var upFront, window error
 	synctest.Test(t.T(), func(*testing.T) {
 		proc := gotestrunner.ExportNewSilentProcess()
 		time.Sleep(1500 * time.Millisecond)
 		gotestrunner.ExportNoteSetupBudget(proc, 2*time.Second)
 		upFront = proc.WaitSetup(context.Background(), 0)
 	})
+	synctest.Test(t.T(), func(*testing.T) {
+		proc := gotestrunner.ExportNewReportingProcess(2*time.Second, 1500*time.Millisecond, 0)
+		window = proc.StartKeys(context.Background(), []string{"k"}, 0)
+	})
 	t.When("a fixture's budget is reported late", func(w *gotest.T) {
 		w.It("the up-front wait says it timed out after the declared budget", func(it *gotest.T) {
 			timeout := gotest.ErrorAs[*gotestrunner.SetupTimeoutError](it, upFront)
 			gotest.Equal(it, 2*time.Second, timeout.After)
 		})
-	})
-}
-
-func (s *SharedFixtureSetupBudgetTestSuite) TestALateStartKeepsTheDefaultBound(t *gotest.T) {
-	// The bubble's clock: a start that is never acknowledged, watched for
-	// longer than the bound.
-	var err error
-	var ended bool
-	synctest.Test(t.T(), func(*testing.T) {
-		proc, exit := gotestrunner.ExportNewHungStartProcess()
-		result := make(chan error, 1)
-		go func() { result <- proc.StartKeys([]string{"k"}, 0) }()
-		select {
-		case err = <-result:
-			ended = true
-		case <-time.After(3 * time.Minute):
-			exit() // ends the wait, so the bubble can end
-			<-result
-		}
-	})
-	t.When("no --setup-timeout is given and a fixture started late never comes up", func(w *gotest.T) {
-		w.It("the wait ends after 2m as a timeout", func(it *gotest.T) {
-			gotest.True(it, ended, "the late start was still waiting after 3m")
-			gotest.ErrorContains(it, err, "timed out after 2m0s")
+		w.It("a window's wait says it timed out after the declared budget", func(it *gotest.T) {
+			gotest.ErrorContains(it, window, "timed out after 2s")
 		})
 	})
 }

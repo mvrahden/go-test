@@ -274,3 +274,6 @@ func ExportStubOwnerIdentity(ns, boot func() string) (restore func()) {
 	selfPIDNamespace, selfBoot = ns, boot
 	return func() { selfPIDNamespace, selfBoot = pidNamespace, bootID }
 }
+
+// ExportExited is closed once the shared fixture process has exited.
+func ExportExited(p *SharedFixtureProcess) <-chan struct{} { return p.done }
