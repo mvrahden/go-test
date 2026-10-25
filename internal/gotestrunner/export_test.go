@@ -298,3 +298,5 @@ func ExportKeyEmptied(then func(dir string)) (restore func()) {
 	keyEmptied = then
 	return func() { keyEmptied = prev }
 }
+
+var ExportSweepBinaryCache = sweepBinaryCache

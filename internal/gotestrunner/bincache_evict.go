@@ -85,11 +85,14 @@ func sweepBinaryCache(root string, maxSize int64, now time.Time) {
 	afterScan()
 	var kept []cachedBinary
 	var total int64
+	emptied := map[string]bool{} // key dirs an eviction may have left empty
 	for i := range keys {
 		k := &keys[i]
 		for _, b := range k.binaries {
 			if k.gone || now.Sub(b.modTime) > cacheMaxAge {
-				evictBinary(b)
+				if evictBinary(b) {
+					emptied[k.dir] = true
+				}
 				continue
 			}
 			kept = append(kept, b)
@@ -109,11 +112,12 @@ func sweepBinaryCache(root string, maxSize int64, now time.Time) {
 			}
 			if evictBinary(b) {
 				total -= b.size
+				emptied[filepath.Dir(b.path)] = true
 			}
 		}
 	}
 	for _, k := range keys {
-		if k.gone || now.Sub(k.modTime) > cacheMaxAge || len(k.binaries) > 0 {
+		if k.gone || now.Sub(k.modTime) > cacheMaxAge || emptied[k.dir] {
 			removeEmptyKey(k.dir)
 		}
 	}
