@@ -2,6 +2,7 @@ package main_test
 
 import (
 	main "github.com/mvrahden/go-test/cmd/gotest"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -14,7 +15,7 @@ func (s *CensusTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 // BeforeAll isolates the temp dir for every method: the runs they make sweep it.
-func (s *CensusTestSuite) BeforeAll(t *gotest.T) { isolateTempDir(t) }
+func (s *CensusTestSuite) BeforeAll(t *gotest.T) { testkit.IsolateTempDir(t) }
 
 // AfterAll has nothing to release: Setenv restores the temp dir.
 func (s *CensusTestSuite) AfterAll(_ *gotest.T) {}
