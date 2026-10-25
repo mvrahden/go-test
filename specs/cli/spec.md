@@ -160,3 +160,10 @@ gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper
 #### Scenario: A guarded call
 - **WHEN** a hook checks t.T() for nil before it uses it
 - **THEN** runs the suite
+
+### Requirement: Generated files are the run's own
+The files a run generates for its packages SHALL be the run's own: runs that share a cache SHALL never share or remove each other's, and a --debug run SHALL keep its own for inspection.
+
+#### Scenario: Runs sharing a cache
+- **WHEN** 16 runs of one package start at once and share one cache
+- **THEN** passes every run
