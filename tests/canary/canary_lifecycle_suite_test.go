@@ -41,12 +41,17 @@ func (s *CanaryTestSuite) startRun(t *gotest.T, dir string, env []string, args .
 	return r
 }
 
-// await waits up to within for every marker in wants. It reports false when
-// the time is up or the run ended first.
+// await waits up to within for every marker in wants; a want ending in "="
+// matches that key with any value. It reports false when the time is up or
+// the run ended first.
 func (r *liveRun) await(within time.Duration, wants ...string) bool {
 	for deadline := time.Now().Add(within); ; time.Sleep(20 * time.Millisecond) {
 		got, _ := testkit.ReadMarkers(r.markers)
-		if !slices.ContainsFunc(wants, func(w string) bool { return !slices.Contains(got, w) }) {
+		if !slices.ContainsFunc(wants, func(w string) bool {
+			return !slices.ContainsFunc(got, func(m string) bool {
+				return m == w || strings.HasSuffix(w, "=") && strings.HasPrefix(m, w)
+			})
+		}) {
 			return true
 		}
 		select {
