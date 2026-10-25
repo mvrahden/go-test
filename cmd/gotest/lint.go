@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/config"
 	"github.com/mvrahden/go-test/internal/filewrite"
@@ -233,14 +234,14 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 			fmt.Fprintf(stderr, "FAIL: %v\n", err)
 			return 1, true
 		}
-		defer func() { _ = os.RemoveAll(tmp) }()
+		defer removeLintTemp(tmp, lintTempBound)
 		targets.TempDir = tmp
 		// Nothing is written until every pass is done, so a stop before
 		// then leaves every file as it was; writing holds off a second
 		// signal until it is done.
 		var stop context.CancelFunc
 		ctx, stop = shutdownContextThen(func(<-chan struct{}) {
-			_ = os.RemoveAll(tmp)
+			removeLintTemp(tmp, time.Second)
 			if len(written) == 0 {
 				fmt.Fprintln(stderr, "lint: interrupted again; nothing was written")
 			} else {
@@ -537,4 +538,23 @@ func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { 
 		}
 	}
 	return flags, nil
+}
+
+// lintTempBound is how long a lint's end waits for the compiles of a go
+// command it stopped to stop writing into its temporary dir.
+const lintTempBound = 5 * time.Second
+
+// removeAll is os.RemoveAll; tests replace it.
+var removeAll = os.RemoveAll
+
+// removeLintTemp removes dir, the load's temporary dir, trying again while
+// that fails: a stopped go list is killed, but the compiles it started may
+// still write into dir, and a removal that meets a file created meanwhile
+// fails. Once the dir is gone it stays gone: a compile writes into a dir the
+// go command made, never makes one. It gives up after bound.
+func removeLintTemp(dir string, bound time.Duration) {
+	deadline := time.Now().Add(bound)
+	for removeAll(dir) != nil && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
 }
