@@ -18,11 +18,6 @@ type SpecOrderTestSuite struct {
 	cli cliRunner
 }
 
-func (s *SpecOrderTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
-}
-
 func (s *SpecOrderTestSuite) BeforeAll(t *gotest.T) {
 	s.cli = newCLIRunner(s.CLI)
 }

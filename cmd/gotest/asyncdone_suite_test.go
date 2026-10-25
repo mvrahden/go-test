@@ -20,8 +20,7 @@ type AsyncDoneTestSuite struct {
 }
 
 func (s *AsyncDoneTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *AsyncDoneTestSuite) BeforeAll(t *gotest.T) {

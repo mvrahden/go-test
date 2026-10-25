@@ -3,6 +3,7 @@ package lifecycle_test
 import (
 	"encoding/json"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,8 +14,8 @@ import (
 type BenchPanicTestSuite struct{}
 
 func (s *BenchPanicTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~54s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
 }
 
 func (s *BenchPanicTestSuite) TestAPanickingBenchmark(t *gotest.T) {

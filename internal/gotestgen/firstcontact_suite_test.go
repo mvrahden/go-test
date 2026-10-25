@@ -16,8 +16,7 @@ import (
 type FirstContactTestSuite struct{}
 
 func (s *FirstContactTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func firstContact(t *gotest.T, pkg string) []*gotestgen.LoadResult {

@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -18,8 +19,8 @@ type PlainGoTestTestSuite struct {
 }
 
 func (s *PlainGoTestTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: setup ~17s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{SetupTimeout: 45 * time.Second}
 }
 
 // BeforeAll stages a package binding a shared fixture into a module of its

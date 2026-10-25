@@ -21,8 +21,7 @@ type ClauseListingTestSuite struct {
 }
 
 func (s *ClauseListingTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *ClauseListingTestSuite) BeforeAll(t *gotest.T) {

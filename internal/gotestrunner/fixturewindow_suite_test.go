@@ -12,8 +12,7 @@ import (
 type FixtureWindowTestSuite struct{}
 
 func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 // windowCtx holds the overlay cleanup a test registers, if any.

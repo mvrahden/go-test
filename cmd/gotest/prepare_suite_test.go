@@ -29,11 +29,6 @@ type PrepareCLITestSuite struct {
 	cli cliRunner
 }
 
-func (s *PrepareCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
-}
-
 func (s *PrepareCLITestSuite) BeforeAll(t *gotest.T) {
 	s.cli = newCLIRunner(s.CLI)
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -18,8 +19,8 @@ type MigrateFileTestSuite struct {
 }
 
 func (s *MigrateFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~96s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
 }
 
 type migrateFileCtx struct{}

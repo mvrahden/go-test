@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -25,8 +26,8 @@ type FixTestSuite struct {
 }
 
 func (s *FixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Measured on Windows CI: slowest method ~56s; estimated setup ~19s. Budgets are twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 45 * time.Second}
 }
 
 func (s *FixTestSuite) BeforeAll(t *gotest.T) {

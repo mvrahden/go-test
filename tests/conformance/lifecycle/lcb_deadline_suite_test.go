@@ -3,6 +3,7 @@ package lifecycle_test
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,8 +14,8 @@ import (
 type DeadlineNamingTestSuite struct{}
 
 func (s *DeadlineNamingTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~35s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 // runUntilTimeout runs pkg until a short --timeout ends it. A first run with

@@ -3,6 +3,7 @@ package cli_test
 import (
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -14,8 +15,8 @@ import (
 type CLICoverageProfileTestSuite struct{}
 
 func (s *CLICoverageProfileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~59s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
 }
 
 func (s *CLICoverageProfileTestSuite) TestProfileSpellings(t *gotest.T) {

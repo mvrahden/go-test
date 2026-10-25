@@ -21,8 +21,7 @@ type RunFailureStreamTestSuite struct {
 }
 
 func (s *RunFailureStreamTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *RunFailureStreamTestSuite) BeforeAll(t *gotest.T) {

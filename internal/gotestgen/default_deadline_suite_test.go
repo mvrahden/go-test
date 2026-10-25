@@ -9,8 +9,7 @@ import (
 type DefaultDeadlineTestSuite struct{}
 
 func (s *DefaultDeadlineTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *DefaultDeadlineTestSuite) TestSuiteMarker(t *gotest.T) {

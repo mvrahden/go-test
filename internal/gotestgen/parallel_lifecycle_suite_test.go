@@ -46,8 +46,7 @@ type ParallelLifecycleTestSuite struct{}
 func (s *ParallelLifecycleTestSuite) SuiteConfig() gotest.SuiteConfig {
 	// Exclusive: these methods hold child suites to wall-clock budgets, and a
 	// budget verdict taken on a saturated machine is not a verdict to act on.
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Exclusive: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true, Exclusive: true}
 }
 
 type childRun struct {

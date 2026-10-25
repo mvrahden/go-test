@@ -3,6 +3,7 @@ package gotestgen_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,8 +14,8 @@ import (
 type RendererTestSuite struct{}
 
 func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Measured on macOS CI: slowest method ~24s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
 func renderTestPkg(t testing.TB, pkg *packages.Package, harvestSeeds bool) (string, gotestgen.SpecOutcome) {

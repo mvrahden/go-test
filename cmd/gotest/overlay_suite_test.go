@@ -23,8 +23,7 @@ func isolateTempDir(t *gotest.T) {
 type OverlayTestSuite struct{}
 
 func (s *OverlayTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 // overlayCtx holds the overlay dir a test's WriteOverlay call creates.

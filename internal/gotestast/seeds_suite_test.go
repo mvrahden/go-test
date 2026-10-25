@@ -93,8 +93,7 @@ func collectHarvestSuites(t *testing.T, pkg *packages.Package) gotestast.TestSui
 type SeedsTestSuite struct{}
 
 func (s *SeedsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	return gotest.SuiteConfig{Parallel: true}
 }
 
 func (s *SeedsTestSuite) TestHarvestSeeds(t *gotest.T) {

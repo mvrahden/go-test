@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -16,8 +17,8 @@ import (
 type HoldsTestSuite struct{ root string }
 
 func (s *HoldsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~16s, setup ~38s; budgets are twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second, SetupTimeout: 90 * time.Second}
 }
 
 var plainPackages = []string{"./testdata/holds/", "./testdata/panics/"}

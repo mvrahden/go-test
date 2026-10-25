@@ -19,8 +19,8 @@ type StopGraceTestSuite struct {
 }
 
 func (s *StopGraceTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline, SetupTimeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~59s, setup ~14s; budgets are twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
 }
 
 func (s *StopGraceTestSuite) BeforeAll(t *gotest.T) {

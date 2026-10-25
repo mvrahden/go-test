@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -15,8 +16,8 @@ import (
 type LintTestSuite struct{}
 
 func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Measured on macOS CI: slowest method ~110s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
 }
 
 // analysistest type-checks the fixture package and everything it imports, which

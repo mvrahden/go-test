@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/scaffold"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -18,8 +19,8 @@ type ContractScaffoldTestSuite struct{}
 // SuiteConfig: each case builds a scratch module, which the 30-second default
 // does not cover on a slow machine.
 func (s *ContractScaffoldTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~22s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 45 * time.Second}
 }
 
 // contractDriver instantiates the scaffold via an alias and runs its BeforeEach.

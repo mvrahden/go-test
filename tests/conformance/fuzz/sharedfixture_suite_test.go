@@ -3,6 +3,7 @@ package fuzz_test
 import (
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,8 +14,8 @@ import (
 type FuzzSharedFixtureTestSuite struct{}
 
 func (s *FuzzSharedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~98s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
 }
 
 // runFuzzCLI runs the CLI with args over fzshared and returns the run and its

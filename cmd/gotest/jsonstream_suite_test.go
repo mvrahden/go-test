@@ -22,8 +22,8 @@ type JSONStreamTestSuite struct {
 }
 
 func (s *JSONStreamTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~28s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
 func (s *JSONStreamTestSuite) BeforeAll(t *gotest.T) {

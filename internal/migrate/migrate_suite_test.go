@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/migrate"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -64,8 +65,8 @@ type MigrateTestSuite struct {
 }
 
 func (s *MigrateTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// No deadline: this suite compiles code, so its time is not a verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: gotest.NoDeadline}
+	// Estimated for Windows CI: slowest method ~115s; the budget is twice that, rounded up.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
 }
 
 // migrateSource migrates src as the only test file of a package and
