@@ -38,7 +38,7 @@ never upgrade just to silence it.
 This skill describes **v1.34**. On a release you could not upgrade from,
 read `reference/versions.md` before writing anything: it lists what each
 older release lacks or does differently, including rules below that fail
-there (on v1.25.x, rules 1–3 and 10). A rule tagged **v1.27+** (or later)
+there (on v1.25.x, rules 2, 3 and 10). A rule tagged **v1.27+** (or later)
 needs that release; skip it on older ones.
 
 ## The Two Runners — a complete run is BOTH commands
@@ -107,10 +107,7 @@ those are your job, below.
    `gotest_pxsuite_test.go` files `gotest generate` writes; `gotest clean ./...`
    removes them). A `TestMain` of your own still runs; keep resource setup
    out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
-   prefixes focus/exclude. A `Test*Async` method takes a trailing
-   `done func()` and completes when it is called, not when it returns
-   (a declared `Timeout` fails it if never); prefer `Eventually` for
-   anything that can be polled. A generic suite runs only through one
+   prefixes focus/exclude. A generic suite runs only through one
    type alias per concrete type
    (`type ArticleIndexTestSuite = IndexContractTestSuite[Article]`);
    without an alias it silently never runs.

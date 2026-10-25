@@ -574,17 +574,21 @@ func (s *Suite) TestParsing(t *gotest.T) {
 Each entry becomes a subtest.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
-### Async Test Methods
+### Testing a Callback
 
-A method whose name ends in `Async` and whose last parameter is `done func()` completes when `done()` is called, not when it returns; a `Timeout` the suite declares fails it if `done()` never is, and the failure names the method's declaration. Once the method has returned it is waiting, not running, so that failure is the only one: it is not also reported as an overrun. A failure, or a panic on a goroutine `gotest.Go` started, ends the wait only once nothing holds `done` any more and no goroutine the method or its `BeforeEach` started is left; a goroutine it keeps running, such as a server `AfterEach` stops, holds the failed wait until the `Timeout`, or until the method's context ends when none is declared. A stop ends the wait too, and `AfterEach` is held to what is left of the `Timeout` ([Async methods](specs/lifecycle/spec.md#requirement-async-methods)).
+For an API that reports through a callback, close a channel from the callback and wait for it in the method, asserting on the test goroutine:
 
 ```go
-func (s *BusTestSuite) TestDeliveryAsync(t *gotest.T, done func()) {
-    s.bus.Subscribe(func(evt Event) {
-        gotest.Equal(t, "created", evt.Kind)
-        done()
-    })
+func (s *BusTestSuite) TestDelivery(t *gotest.T) {
+    got := make(chan Event, 1)
+    s.bus.Subscribe(func(evt Event) { got <- evt })
     s.bus.Publish(Event{Kind: "created"})
+    select {
+    case evt := <-got:
+        gotest.Equal(t, "created", evt.Kind)
+    case <-t.Context().Done():
+        gotest.Fail(t, "no event delivered")
+    }
 }
 ```
 
