@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +64,9 @@ type ExecConfig struct {
 	Parallel        int
 	CompileParallel int
 	HarvestSeeds    bool
+	// Events receives the run's go test -json event stream as it is
+	// written; nil without --events-file.
+	Events io.Writer
 }
 
 // knownSubcommands is the set of recognized subcommands.

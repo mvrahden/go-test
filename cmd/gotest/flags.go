@@ -29,6 +29,7 @@ var gotestFlags = map[string]FlagKind{
 	"--format":           ValueFlag,
 	"--output":           ValueFlag,
 	"--input":            ValueFlag,
+	"--events-file":      ValueFlag,
 	"--parallel":         ValueFlag,
 	"--compile-parallel": ValueFlag,
 	"--timeout":          ValueFlag,
@@ -50,7 +51,7 @@ var gotestFlags = map[string]FlagKind{
 var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
-	"--no-harvest",
+	"--no-harvest", "--events-file",
 )
 
 var specAllowed = flagSet(
@@ -64,7 +65,7 @@ var summaryAllowed = flagSet(
 	"--debug", "--ci", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--github",
-	"--coverage", "--render-only", "--badge",
+	"--coverage", "--render-only", "--badge", "--events-file",
 )
 
 var watchAllowed = flagSet(

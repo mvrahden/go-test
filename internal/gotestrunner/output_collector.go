@@ -43,6 +43,8 @@ type OutputCollector struct {
 	stderr io.Writer
 	// starts writes the JSON stream, opening each package as go test does.
 	starts *startWriter
+	// events receives a copy of the JSON stream; nil for none.
+	events io.Writer
 }
 
 type pkgState struct {
@@ -64,6 +66,11 @@ func WithWriters(stdout, stderr io.Writer) OutputOption {
 		c.stdout = stdout
 		c.stderr = stderr
 	}
+}
+
+// WithEvents tees the JSON stream into w as it is written; nil for none.
+func WithEvents(w io.Writer) OutputOption {
+	return func(c *OutputCollector) { c.events = w }
 }
 
 func NewOutputCollector(mode RunMode, verbose bool, opts ...OutputOption) *OutputCollector {
@@ -505,6 +512,9 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 		w := c.stdout
 		if c.mode == RunCaptureJSON {
 			w = &c.captured
+		}
+		if c.events != nil {
+			w = io.MultiWriter(w, c.events)
 		}
 		c.starts = &startWriter{w: w, started: map[string]bool{}}
 	}

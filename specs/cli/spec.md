@@ -186,3 +186,10 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 #### Scenario: A binary unused for 7 days
 - **WHEN** a cached binary has not been used for 7 days
 - **THEN** a run removes it and keeps the binaries used since
+
+### Requirement: Saving the event stream
+A run given --events-file SHALL write the go test -json event stream to that file as it happens, byte for byte what -json prints for the same run.
+
+#### Scenario: A -json run with --events-file
+- **WHEN** a -json run is given --events-file
+- **THEN** writes the bytes it prints to the file, making its directories

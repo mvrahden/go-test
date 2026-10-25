@@ -159,6 +159,18 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 	jsonMode, goTestArgs := stripJSONFlag(goTestArgs)
+	if own.Given("--events-file") && !jsonMode {
+		fmt.Fprintln(os.Stderr, "FAIL: --events-file saves the go test -json event stream, which a text run does not produce; add -json, or use gotest summary")
+		return 2
+	}
+	events, err := openEventsFile(own)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if events != nil {
+		defer events.Close()
+	}
 
 	minCoverage, err := parseMinFlag(own)
 	if err != nil {
@@ -182,6 +194,7 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 	cfg.JSON = jsonMode
+	cfg.Events = eventsWriter(events)
 
 	return enforceCoverage(coverProfile, minCoverage, Run(cfg))
 }

@@ -3052,6 +3052,59 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "writes the bytes it prints to the file, making its directories",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "writes_the_bytes_it_prints_to_the_file,_making_its_directories",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run is given --events-file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-json_run_is_given_--events-file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheFileHoldsTheStream",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheFileHoldsTheStream",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIEventsFile",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIEventsFileTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -9992,13 +10045,13 @@
     }
   ],
   "stats": {
-    "behaviors": 334,
+    "behaviors": 335,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 55,
+    "suites": 56,
     "tests": 0
   }
 }

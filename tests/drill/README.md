@@ -502,6 +502,7 @@ shards of one run do not add up to every mutant exactly once.
 | `emptied-key-removed-with-its-new-lock` | the sweep removes an emptied key dir with `RemoveAll`, taking a lock file a run just created | runner: the key dir and its fresh lock file go |
 | `gone-checkout-kept` | the sweep keeps the binaries of a key whose checkout no longer exists | cli conformance: the gone checkout's binary outlives the run |
 | `unused-binaries-kept` | the sweep keeps binaries unused for 7 days | cli conformance: the stale binary outlives the run |
+| `events-file-not-written` | the collector never tees the event stream into the `--events-file` file | cli conformance: the file differs from what -json prints |
 
 ## Adding a mutant
 

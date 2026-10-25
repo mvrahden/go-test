@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / writes the bytes it prints to the file, making its directories \(
+Clause: when a -json run is given --events-file → writes the bytes it prints to the file, making its directories
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -513,7 +513,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {
+ 		if c.mode == RunCaptureJSON {
+ 			w = &c.captured
+ 		}
+-		if c.events != nil {
++		if false && c.events != nil {
+ 			w = io.MultiWriter(w, c.events)
+ 		}
+ 		c.starts = &startWriter{w: w, started: map[string]bool{}}
