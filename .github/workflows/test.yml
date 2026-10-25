@@ -75,11 +75,20 @@ jobs:
           pkgs=$(go list ./... ./examples/... | "${sel[@]}" "$cli" | tr '\n' ' ')
           echo "packages=$pkgs" >> "$GITHUB_OUTPUT"
       - name: Test (suites)
+        id: test
         uses: ./
         with:
           packages: ${{ steps.shard.outputs.packages }}
           race: true
           flags: "--parallel=${{ matrix.parallel }}"
+          events-file: ${{ runner.temp }}/test-events.json
+      - name: Upload the test event stream
+        if: ${{ always() && steps.test.outputs.events-file != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: test-events-${{ runner.os }}-${{ matrix.shard }}
+          path: ${{ steps.test.outputs.events-file }}
+          retention-days: 14
       - name: Save the Go build cache
         if: ${{ !cancelled() }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
