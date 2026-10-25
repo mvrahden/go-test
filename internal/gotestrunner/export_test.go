@@ -282,3 +282,19 @@ func ExportLockOpened(then func(path string)) (restore func()) {
 }
 
 var ExportParseCacheMaxSize = parseCacheMaxSize
+
+// ExportAfterScan runs then between the binary cache sweep's scan and its
+// evictions, until the returned call restores the default.
+func ExportAfterScan(then func()) (restore func()) {
+	prev := afterScan
+	afterScan = then
+	return func() { afterScan = prev }
+}
+
+// ExportKeyEmptied runs then between the check that a key dir is empty and
+// its removal, until the returned call restores the default.
+func ExportKeyEmptied(then func(dir string)) (restore func()) {
+	prev := keyEmptied
+	keyEmptied = then
+	return func() { keyEmptied = prev }
+}

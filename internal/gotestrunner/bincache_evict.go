@@ -52,6 +52,14 @@ func cacheMaxSize() int64 {
 	return n
 }
 
+// afterScan runs between the sweep's scan and its evictions; tests replace
+// it to use the cache meanwhile, as a run would.
+var afterScan = func() {}
+
+// keyEmptied runs between removeEmptyKey's check and its removal of the dir;
+// tests replace it to create a lock file meanwhile, as a run would.
+var keyEmptied = func(dir string) {}
+
 // cachedBinary is one test binary of the cache as the sweep scanned it.
 type cachedBinary struct {
 	path    string
@@ -74,6 +82,7 @@ type cacheKeyDir struct {
 // A key recording no checkout is held to the other two rules alone.
 func sweepBinaryCache(root string, maxSize int64, now time.Time) {
 	keys := scanKeys(filepath.Join(root, "bin"))
+	afterScan()
 	var kept []cachedBinary
 	var total int64
 	for i := range keys {
@@ -212,5 +221,6 @@ func removeEmptyKey(dir string) {
 		}
 	}
 	_ = os.Remove(filepath.Join(dir, checkoutFile))
+	keyEmptied(dir)
 	_ = os.Remove(dir)
 }

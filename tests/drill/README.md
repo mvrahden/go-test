@@ -506,6 +506,9 @@ shards of one run do not add up to every mutant exactly once.
 | `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run links into the evicted cache entry |
 | `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
 | `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
+| `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |
+| `eviction-ignores-a-use-since-the-scan` | the sweep evicts a binary a run used after the scan | runner: the binary used since the scan goes |
+| `emptied-key-removed-with-its-new-lock` | the sweep removes an emptied key dir with `RemoveAll`, taking a lock file a run just created | runner: the key dir and its fresh lock file go |
 
 ## Adding a mutant
 

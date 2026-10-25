@@ -181,3 +181,67 @@ func (s *BinaryCacheEvictionTestSuite) TestARunRefusesAnUnreadableCap(t *gotest.
 		gotest.ErrorContains(it, err, protocol.EnvCacheMaxSize+"=5GB")
 	})
 }
+
+func (s *BinaryCacheEvictionTestSuite) TestEvictionNeverTakesABinaryInUse(t *gotest.T) {
+	t.When("the binary to evict first is locked by a run", func(w *gotest.T) {
+		w.It("skips it and evicts the next one instead", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "1212121212121212", it.TempDir(), "held.test", "next.test", "newest.test")
+			aged(it, filepath.Join(dir, "held.test"), 3*time.Hour)
+			aged(it, filepath.Join(dir, "next.test"), 2*time.Hour)
+			aged(it, filepath.Join(dir, "newest.test"), time.Hour)
+			release := gotest.Must(gotestrunner.ExportLockFile(filepath.Join(dir, "held.test.lock")))
+			it.Setenv(protocol.EnvCacheMaxSize, "12")
+
+			gotestrunner.CleanStaleOverlays()
+			release()
+
+			gotest.True(it, exists(filepath.Join(dir, "held.test")))
+			gotest.False(it, exists(filepath.Join(dir, "next.test")))
+			gotest.True(it, exists(filepath.Join(dir, "newest.test")))
+		})
+	})
+	t.When("a run uses a binary between the sweep's scan and its eviction", func(w *gotest.T) {
+		w.It("keeps it", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "3434343434343434", it.TempDir(), "a.test")
+			bin := filepath.Join(dir, "a.test")
+			aged(it, bin, 8*24*time.Hour)
+			restore := gotestrunner.ExportAfterScan(func() { aged(it, bin, 0) })
+
+			gotestrunner.CleanStaleOverlays()
+			restore()
+
+			gotest.True(it, exists(bin))
+		})
+	})
+	t.When("a run creates a lock file in a key dir the sweep is removing", func(w *gotest.T) {
+		w.It("keeps the key dir and the lock file", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "5656565656565656", filepath.Join(it.TempDir(), "gone"), "a.test")
+			fresh := filepath.Join(dir, "b.test.lock")
+			restore := gotestrunner.ExportKeyEmptied(func(string) {
+				gotest.NoError(it, os.WriteFile(fresh, nil, 0o644))
+			})
+
+			gotestrunner.CleanStaleOverlays()
+			restore()
+
+			gotest.False(it, exists(filepath.Join(dir, "a.test")))
+			gotest.True(it, exists(fresh))
+		})
+	})
+	t.When("a binary is evicted", func(w *gotest.T) {
+		w.It("takes its lock file with it", func(it *gotest.T) {
+			root := isolated(it)
+			dir := cacheKey(it, root, "7878787878787878", it.TempDir(), "a.test", "b.test")
+			aged(it, filepath.Join(dir, "a.test"), 8*24*time.Hour)
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.False(it, exists(filepath.Join(dir, "a.test")))
+			gotest.False(it, exists(filepath.Join(dir, "a.test.lock")))
+			gotest.True(it, exists(filepath.Join(dir, "b.test.lock")))
+		})
+	})
+}
