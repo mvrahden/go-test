@@ -1,0 +1,16 @@
+Judge: ./internal/gotestrunner BinaryCacheLockCheckTestSuite/TestALockEvictedWhileWaitingIsNotTheCache
+Expect: ^FAIL .*internal/gotestrunner BinaryCacheLockCheck .* / links the run.s binary into its work dir and leaves none in the cache \(
+--- a/internal/gotestrunner/bincache_lock_unix.go
++++ b/internal/gotestrunner/bincache_lock_unix.go
+@@ -20,11 +20,6 @@ func lockFile(path string) (func(), error) {
+ 		f.Close()
+ 		return nil, err
+ 	}
+-	if !stillAt(f, path) {
+-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+-		f.Close()
+-		return nil, errLockReplaced
+-	}
+ 	return func() {
+ 		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+ 		f.Close()
