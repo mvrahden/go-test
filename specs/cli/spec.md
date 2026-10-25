@@ -188,7 +188,7 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 - **THEN** a run removes it and keeps the binaries used since
 
 ### Requirement: Saving the event stream
-A run given --events-file SHALL write the go test -json event stream to that file as it happens, byte for byte what -json prints for the same run, and SHALL change none of the run's other output, its coverage or its exit code.
+A run given --events-file SHALL write the go test -json event stream to that file as it happens, byte for byte what -json prints for the same run, and SHALL change none of the run's other output, its coverage or its exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends, so a run stopped or killed leaves every event written before, each line whole.
 
 #### Scenario: A -json run with --events-file
 - **WHEN** a -json run is given --events-file
@@ -201,3 +201,12 @@ A run given --events-file SHALL write the go test -json event stream to that fil
 #### Scenario: Nothing else changes
 - **WHEN** a summary with annotations and coverage is run with and without --events-file
 - **THEN** prints, annotates, covers and exits the same
+
+#### Scenario: A stopped run
+- **WHEN** a -json run with --events-file is stopped while a suite holds
+- **THEN** keeps the events of the suites that ended before the stop, each line whole
+- **AND** writes the stopped suite's events too, as -json prints them
+
+#### Scenario: A killed run
+- **WHEN** a -json run with --events-file is killed while a suite holds
+- **THEN** keeps the events of the suites that ended before the kill, each line whole

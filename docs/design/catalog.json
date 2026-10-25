@@ -3052,6 +3052,180 @@
                 {
                   "children": [
                     {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "keeps the events of the suites that ended before the stop, each line whole",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "keeps_the_events_of_the_suites_that_ended_before_the_stop,_each_line_whole",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        },
+                        {
+                          "children": [],
+                          "display": "writes the stopped suite's events too, as -json prints them",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_the_stopped_suite's_events_too,_as_-json_prints_them",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run with --events-file is stopped while a suite holds",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_with_--events-file_is_stopped_while_a_suite_holds",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "an interrupt",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_interrupt",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "keeps the events of the suites that ended before the stop, each line whole",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "keeps_the_events_of_the_suites_that_ended_before_the_stop,_each_line_whole",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        },
+                        {
+                          "children": [],
+                          "display": "writes the stopped suite's events too, as -json prints them",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_the_stopped_suite's_events_too,_as_-json_prints_them",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run with --events-file is stopped while a suite holds",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_with_--events-file_is_stopped_while_a_suite_holds",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a forced stop",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_forced_stop",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "AStoppedRunLeavesItsEventsFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStoppedRunLeavesItsEventsFile",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "keeps the events of the suites that ended before the kill, each line whole",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "keeps_the_events_of_the_suites_that_ended_before_the_kill,_each_line_whole",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run with --events-file is killed while a suite holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-json_run_with_--events-file_is_killed_while_a_suite_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AKilledRunLeavesItsEventsFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAKilledRunLeavesItsEventsFile",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIEventsFileStop",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIEventsFileStopTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [],
                       "display": "writes the bytes it prints to the file, making its directories",
                       "duration": 0,
@@ -10221,13 +10395,13 @@
     }
   ],
   "stats": {
-    "behaviors": 339,
+    "behaviors": 344,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 56,
+    "suites": 57,
     "tests": 0
   }
 }
