@@ -498,6 +498,9 @@ shards of one run do not add up to every mutant exactly once.
 | `default-deadline-line-dropped` | a method whose context the default deadline ended is not named | canary: the defaultdeadline waiting method is named no times |
 | `default-deadline-line-fails-the-method` | the line naming a context the default deadline ended also fails its method | canary: the defaultdeadline verdicts differ from the golden list |
 | `default-deadline-line-under-a-declared-timeout` | a method past its declared `Timeout` is also named as ended at the default deadline | canary: the defaultdeadline run names the default deadline twice |
+| `overlay-shared-between-runs` | every run writes its overlay into one shared dir | runner: two runs of one overlay get the same dir |
+| `overlay-outlives-its-run` | the overlay is written beside the work dir, so the run's cleanup leaves it | runner: the overlay outlives its run |
+| `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
 
 ## Adding a mutant
 
