@@ -266,25 +266,6 @@ func (s *CanaryTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest.T) {
 	}
 }
 
-// A stop ends an async wait: a method waiting for done is skipped with the
-// reason run stopping, one whose helper goroutine failed fails, and AfterEach
-// and AfterAll run after the stop.
-func (s *CanaryTestSuite) TestAStopEndsAnAsyncWait(t *gotest.T) {
-	_, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestAsyncHoldTestSuite")
-	waits, fails := "TestAsyncHoldTestSuite/TestWaitsAsync", "TestAsyncHoldTestSuite/TestFailsAsync"
-	if v := streamVerdict(out, waits); v != "skip" || !strings.Contains(streamOutput(out, waits), "run stopping") {
-		t.Errorf("stopgrace: %s verdict %q, want skip with the reason run stopping\n%s", waits, v, out)
-	}
-	if v := streamVerdict(out, fails); v != "fail" {
-		t.Errorf("stopgrace: %s verdict %q, want fail\n%s", fails, v, out)
-	}
-	for _, method := range []string{waits, fails} {
-		if !testkit.MarkerOrderOf(markers, "interrupted", "async AfterEach "+method, "async AfterAll") {
-			t.Errorf("stopgrace: markers %v, want interrupted, %s's AfterEach, async AfterAll in order", markers, method)
-		}
-	}
-}
-
 // stopFileWrapper writes an -exec wrapper that leaves the runner only the
 // stop file to reach the suite, as on Windows: it publishes its own pid in
 // place of the suite's and ignores the signal sent to it. It marks "pid

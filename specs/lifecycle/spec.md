@@ -1,7 +1,7 @@
 # Lifecycle Specification
 
 ## Purpose
-How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, an async method's wait for done and a panic ahead of AfterEach included, and what the run reports about them when they do.
+How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, and what the run reports about them when they do.
 
 ## Requirements
 
@@ -110,37 +110,6 @@ A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived fr
 #### Scenario: The wait outlasts the SetupTimeout
 - **WHEN** a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll
 - **THEN** fails the suite with a verdict naming the wait and its SetupTimeout
-
-### Requirement: Async methods
-An async method SHALL wait for done until done is called, the run is stopped, a declared Timeout passes or, once it failed or a goroutine gotest.Go started for it panicked, nothing holds done and no goroutine it or its BeforeEach started is left; without a Timeout a failed wait SHALL end with its context. A stop SHALL skip it as run stopping unless it failed; AfterEach SHALL be held to the rest of the Timeout. The cases are the tables in `tests/conformance/lifecycle/async_suite_test.go`.
-
-#### Scenario: The owner of done fails
-- **WHEN** the goroutine that owns done fails a fatal assertion and no other goroutine of the method is left
-- **THEN** fails the method at once, not at the end of its budget
-
-#### Scenario: Another goroutine fails
-- **WHEN** a goroutine of an async method other than the one that owns done fails a fatal assertion
-- **THEN** fails the method, and the wait ends only when the owner calls done, fails or outlasts the Timeout
-
-#### Scenario: A panic on a goroutine gotest.Go started
-- **WHEN** a goroutine gotest.Go started panics while an async method waits for done
-- **THEN** ends the wait at once, runs AfterEach and reports the panic with the stack from where it happened
-
-#### Scenario: A parallel sibling's goroutine
-- **WHEN** the owner of a parallel async method's done fails while a goroutine of its sibling's, whose creators ended, runs on
-- **THEN** ends the failed method's wait without waiting for the sibling's goroutine
-
-#### Scenario: A stop during the wait
-- **WHEN** the run is stopped while an async method waits for done
-- **THEN** ends the wait at the stop and skips the method with the reason run stopping, then runs AfterEach and AfterAll
-
-#### Scenario: A stop during the wait after a failure
-- **WHEN** the run is stopped while an async method waits for done after another of its goroutines failed
-- **THEN** ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method
-
-#### Scenario: AfterEach overruns
-- **WHEN** an async method calls done in time and its AfterEach overruns the declared Timeout
-- **THEN** fails the method for the overrun
 
 ### Requirement: A panic ahead of a failing AfterEach
 A panic in a test method or its BeforeEach SHALL be reported and fail the test even when AfterEach then fails a fatal assertion, and AfterEach SHALL still run.

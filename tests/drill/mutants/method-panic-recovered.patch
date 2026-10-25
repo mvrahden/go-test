@@ -3,11 +3,11 @@ Judge: ./tests/canary CanaryTestSuite/TestAParallelPanicEndsTheSuiteAroundItsSib
 Clause: when a parallel method panics while a sibling is still running → AfterAll and the fixture teardown run, the sibling is cut short and its AfterEach never runs, and the run fails
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -81,6 +81,7 @@
+@@ -73,6 +73,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
  			continue
  		}
  		passed := t.Run(c.Name, func(it *testing.T) {
 +			defer func() { _ = recover() }()
- 			// Before any hook: goroutines BeforeEach starts are the method's.
- 			_, unlabel := labelMethod(it)
- 			defer unlabel()
+ 			if m.Parallel {
+ 				it.Parallel()
+ 				// The first cleanup runs last: it sees the failures the others

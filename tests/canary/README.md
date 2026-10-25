@@ -22,9 +22,6 @@ Each directory under `testdata/` is one package with one suite:
 | `benching` | a capturing bench run reports a result for every declared benchmark, read from `bench --json` |
 | `benchfailing` | a benchmark that fails, halts at `FailNow` or skips reports no result and turns the run red |
 | `fuzzing` | seeds replay as subtests of their wrapper; a failing seed fails the wrapper |
-| `asynchronous` | an async method passes when `done()` is called from another goroutine and fails at the deadline when it never is |
-| `asyncfatal` | an async method whose done-owning goroutine fails fatally fails at once, without waiting for the `Timeout` |
-| `asynchelper` | an async method whose helper goroutine fails waits for the owner of done to call it, fail or outlast the `Timeout`, the owner being a pool job, a `time.AfterFunc` callback or the body's while a goroutine `BeforeEach` started works on; a panic on a `gotest.Go` goroutine ends the wait at once; a parallel sibling's goroutine is not the method's; one that calls done in time fails when its `AfterEach` overruns the `Timeout` |
 | `broken` | a package that does not compile exits 2 |
 | `panicking` | a panic fails its method and the run is red |
 | `fixtureteardown` | two suites bound to one package fixture, each in its own process with its own copy of the DAG: every process runs the fixture's `AfterAll`, and so does a bench run |
@@ -68,7 +65,7 @@ Each directory under `testdata/` is one package with one suite:
 | `stopping` | a run stopped while a method holds exits 130, skips the methods not started with the reason run stopping, ends the holding method's context and runs `AfterAll` before the fixture is released; a suite whose parent or whose stream reader is killed stops by itself the same way and leaves no process (Linux and macOS) |
 | `orphan` | a process a test started and never waited for does not outlive the run (Unix only) |
 | `plainreader` | a test binary run outside the runner whose stdout reader goes keeps its method running (Linux and macOS) |
-| `stopgrace` | a stopped run cuts a body or a `BeforeAll` that ignores its context short after 5s, counted from a late body's own start, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace, or one waiting on its context, runs to its end before `AfterAll` and the release; a forced stop still gives the fixtures' release its time; a second stop signal releases at once; a stop ends an async wait, skipping the method as run stopping or failing it when a helper goroutine failed, then runs `AfterEach` and `AfterAll` |
+| `stopgrace` | a stopped run cuts a body or a `BeforeAll` that ignores its context short after 5s, counted from a late body's own start, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace, or one waiting on its context, runs to its end before `AfterAll` and the release; a forced stop still gives the fixtures' release its time; a second stop signal releases at once |
 | `stopbench` | a stopped benchmark or fuzz seed run skips what has not started with the reason run stopping and runs `AfterAll` before the release; a benchmark that ignores the stop is cut short after 5s |
 | `noisysetup` | a shared fixture that writes to stdout while coming up still hands its state to the suite whole |
 | `setupbudget` | a shared fixture slower than its declared 2s `Timeout` fails the run at that budget, not when it finishes |

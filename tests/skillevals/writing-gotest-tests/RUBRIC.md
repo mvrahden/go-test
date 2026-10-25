@@ -72,7 +72,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C7 | "Improve these tests" | blue phase; smells 1–9; invariants |
 | C8 | Set up CI (three variants, §5) | ci.md conditionals |
 | C9 | GREENFIELD: fresh module, no example suite, "add tests" | rules 1–6 unaided by imitation |
-| C10 | Test an async callback API | `Test*Async` + `done()`, or `Eventually`; goroutines via `gotest.Go` |
+| C10 | Test an async callback API | `Eventually`, or a channel the callback closes with a `select` on it and `t.Context()`; goroutines via `gotest.Go` |
 | C11 | Two suites share expensive setup — extract it | fixtures.md; blue rung 3 (a package fixture still sets up per suite; once → shared fixture) |
 | C12 | Old-version consumer whose latest release needs a newer Go (v1.25.0 pin, `go 1.24.0`, no replace): parallelize + async task | upgraded to the newest release that fits (v1.27.x), never `@latest`; go line untouched; v1.27 rules applied (compose onto a preset — a zero duration means no deadline there) |
 | C13 | Fixture without tool directive: "run the tests" | bootstrap path |
@@ -84,7 +84,7 @@ Runners split). Missing traps are in the fixture backlog (§8).
 | C19 | The loaded skill copy documents a flag gotest lacks, and the task needs it | reporting.md: reproduced in a scratch module, duplicates searched, draft in the form's sections with no fixture code, sent only after the user's yes — filed through `gh` when authenticated, handed over as draft + prefilled link when not |
 | C20 | Add a benchmark for `Inventory.Reserve` to the parallel store suite (returning `BeforeEach`) | rule 9: benchmark in a sequential sibling suite, measured work in `for b.Loop()`; the parallel suite unchanged |
 | C21 | Add a fuzz target for a parser-like function | rule 9: suite `Fuzz*` method on `*gotest.F`, typed seeds, a property asserted; no top-level `FuzzX(*testing.F)` |
-| C23 | C12's consumer, but the prompt rules out dependency changes | pin kept; v1.25.x exceptions applied (literal config form, no `Test*Async`) |
+| C23 | C12's consumer, but the prompt rules out dependency changes | pin kept; v1.25.x exceptions applied (literal config form) |
 | C24 | Two `Store` implementations must satisfy one contract | generic contract suite (`scaffold` on the interface or by hand) with one type alias per implementation; the scaffold's `default` case filled in |
 | C25 | Suite whose `BeforeAll` opens two resources, the second of which can fail | `AfterAll` releases only what exists (nil checks); no `defer`/`Cleanup`; `lifecycle-pair` satisfied |
 | C26 | GREENFIELD with no go-test dependency yet, module go line below latest's: "set up gotest and add a test" | newest release whose go line fits added via `go get -tool …@<release>`, never `@latest`; go line untouched |
@@ -165,7 +165,7 @@ Task-specific mandatories:
 - C12/C26: the release chosen is the newest whose go line fits, checked
   before `go get`; go.mod's go line unchanged afterwards.
 - C23: agent applies the v1.25.x exceptions — literal `SuiteConfig`
-  (never the compose form), no `Test*Async`, `-1` to disable timeouts.
+  (never the compose form), `-1` to disable timeouts.
 - C18: the upgrade lands before any test is written; a failure after it
   is checked against the old pin before it is blamed or reverted.
 - C19: nothing sent before an explicit yes; duplicates searched first; the
@@ -188,7 +188,7 @@ SKILL.md without a row here, the change is incomplete.
 | Start here: version and upgrade (`setup.md`, `versions.md`) | C12, C13, C18, C23, C26, H8, H9 |
 | The Two Runners | C6, C5 |
 | The write loop, suppression | C14, H5 |
-| Rule 1 — suites, `Test*Async`, generic suites | C9, C10, C24 |
+| Rule 1 — suites, generic suites | C9, C10, C24 |
 | Rule 2 — lifecycle, `gotest.Go`, `AfterAll` after failed setup | C2, C10, C11, C25 |
 | Rule 3 — config intent and budgets | C1, C5, H2 |
 | Rule 4 — parallel | C4, C20, H1, H3 |

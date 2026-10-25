@@ -91,11 +91,6 @@ fuzzing pass FuzzFuzzingTestSuite_FuzzHolds
 fuzzing pass FuzzFuzzingTestSuite_FuzzHolds/seed#0
 fuzzing pass TestFuzzingTestSuite
 fuzzing pass TestFuzzingTestSuite/TestSeedsReplay
-asynchronous exit 1
-asynchronous fail -
-asynchronous fail TestAsyncTestSuite
-asynchronous fail TestAsyncTestSuite/TestNeverDoneAsync
-asynchronous pass TestAsyncTestSuite/TestCallsDoneAsync
 fixtureteardown exit 0
 fixtureteardown pass -
 fixtureteardown pass TestFirstBoundTestSuite
