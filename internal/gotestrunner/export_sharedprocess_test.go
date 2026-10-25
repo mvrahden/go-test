@@ -17,3 +17,6 @@ func ExportProtocolErr(p *SharedFixtureProcess) error {
 	defer p.mu.Unlock()
 	return p.protoErr
 }
+
+// ExportPid is the shared fixture process's pid.
+func ExportPid(p *SharedFixtureProcess) int { return p.cmd.Process.Pid }

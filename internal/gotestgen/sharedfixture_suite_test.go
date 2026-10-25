@@ -349,6 +349,56 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.NotContains(it, code, "signal.Notify(sig",
 				"the late signal registration left a window where SIGTERM killed the process mid-setup")
 		})
+
+		w.It("ends its command loop when the runner's end of stdin closes", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			// Without a death signal, stdin is the one sign the runner is gone.
+			gotest.Contains(it, code, "defer close(ƒeof)")
+			gotest.Regexp(it, `case <-ƒeof:\s+break ƒloop`, code)
+		})
+
+		w.It("exits on its own once the teardown budget has passed with the runner gone", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			gotest.Contains(it, code, "ƒparent := os.Getppid()")
+			gotest.Contains(it, code, "if os.Getppid() == ƒparent {")
+			gotest.Regexp(it, `ƒlife\.Reported\(ƒbudget\)\s+return ƒbudget`, code,
+				"the bound is the budget the runner was told")
+			gotest.Contains(it, code, `ƒbudgetStr := ƒquote(ƒteardownBudget().String())`)
+		})
+
+		w.It("bounds a setup that hangs once the runner is gone", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, HasConfig: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			setupWait := strings.Index(code, "ƒwg.Wait()")
+			gotest.Contains(it, code, "go ƒlife.ExitWhenOrphaned(ƒgone)")
+			gotest.Less(it, strings.Index(code, "go ƒlife.ExitWhenOrphaned(ƒgone)"), setupWait,
+				"the bound must hold while setup runs, not only after it")
+			gotest.Less(it, strings.Index(code, "defer close(ƒeof)"), setupWait,
+				"the end of stdin must be seen during setup")
+			gotest.Regexp(it, `ƒlife\.SetupBegins\(0, ƒsetup\)\s+fmt\.Fprintf\(ƒproto, "\{\\"key\\":\\"_setup\\"`, code)
+			gotest.Regexp(it, `RunFixtureSetup\(ƒctx, ƒsetup\)\s+ƒlife\.SetupEnds\(0\)`, code)
+			gotest.Contains(it, code, "ƒlife.Released(0)")
+		})
 	})
 
 	t.When("teardown policy", func(w *gotest.T) {

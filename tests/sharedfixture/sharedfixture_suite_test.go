@@ -114,6 +114,10 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 
 		stdout, err := cmd.StdoutPipe()
 		gotest.NoError(w, err)
+		// Held open as the runner holds it: the process reads the end of
+		// stdin as the runner gone and abandons its setup.
+		stdin, err := cmd.StdinPipe()
+		gotest.NoError(w, err)
 		gotest.NoError(w, cmd.Start())
 		mp.Adopt()
 
@@ -231,6 +235,7 @@ func (s *SharedFixtureIntegrationTestSuite) TestSharedFixtureIntegration(t *gote
 		})
 
 		mp.Terminate()
+		_ = stdin.Close()
 	})
 
 	t.When("PerSuiteDispatch", func(w *gotest.T) {
