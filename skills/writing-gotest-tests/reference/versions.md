@@ -603,5 +603,6 @@ Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
    }
    ```
 
-   A harness an older gotest wrote to disk still compiles; each such method
-   in it fails, naming the fix, until `gotest generate` runs again.
+   A harness an older gotest wrote to disk still compiles; its first such
+   method panics with the fix, which ends the suite's run, until
+   `gotest generate` runs again.

@@ -47,8 +47,9 @@ func RunTest(t *gotest.T, budget time.Duration, run func()) {
 }
 
 // AwaitDoneAt and AwaitDone are what harnesses before v1.35 called for a test
-// method taking done func(). Such a harness still compiles, and the method
-// fails with the fix: the generator now refuses the method.
+// method taking done func(). Such a harness still compiles, and the first such
+// method panics with the fix, ending the suite's run: the generator now
+// refuses the method.
 
 // Deprecated: regenerate the harness.
 func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
