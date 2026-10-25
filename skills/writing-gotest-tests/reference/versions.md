@@ -585,9 +585,7 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     after 7 days unused.
 39. **The binary cache is capped** — each run's start evicts the binaries
     of a checkout that no longer exists, those unused for 7 days, then the
-    least recently used until the cache is under `GOTEST_CACHE_MAX_SIZE`
-    (default `5GiB`; bytes or `KiB`/`MiB`/`GiB`, `off` for no cap; any
-    other value exits 2 before any build). A binary a run is linking or
+    least recently used until the cache is under 5 GiB. A binary a run is linking or
     copying is never evicted, and a run whose lock was evicted while it
     waited links without the cache. Below v1.34 a key any run touched kept
     every binary.

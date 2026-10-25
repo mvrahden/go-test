@@ -2801,46 +2801,6 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "passes every run, each suite running and reporting",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "passes_every_run,_each_suite_running_and_reporting",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when 8 runs at once, in 3 rounds, share a cache capped at one byte",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "focused": false,
-                  "kind": "block",
-                  "name": "8_runs_at_once,_in_3_rounds,_share_a_cache_capped_at_one_byte",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "RunsUnderATinyCap",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "focused": false,
-              "kind": "method",
-              "name": "TestRunsUnderATinyCap",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
                       "display": "a run removes its binaries",
                       "duration": 0,
                       "excluded": false,
@@ -2899,86 +2859,6 @@
               "focused": false,
               "kind": "method",
               "name": "TestWhatARunEvicts",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "exits 2 naming the variable, before any build",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "exits_2_naming_the_variable,_before_any_build",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when GOTEST_CACHE_MAX_SIZE is not a size",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "focused": false,
-                  "kind": "block",
-                  "name": "GOTEST_CACHE_MAX_SIZE_is_not_a_size",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "AnUnreadableCap",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "focused": false,
-              "kind": "method",
-              "name": "TestAnUnreadableCap",
-              "output": [],
-              "status": "none"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
-                      "display": "a run removes the binaries used longest ago until it is at or under the cap",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "a_run_removes_the_binaries_used_longest_ago_until_it_is_at_or_under_the_cap",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when the cache holds more than GOTEST_CACHE_MAX_SIZE",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "focused": false,
-                  "kind": "block",
-                  "name": "the_cache_holds_more_than_GOTEST_CACHE_MAX_SIZE",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "TheCapGoesOldestFirst",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "focused": false,
-              "kind": "method",
-              "name": "TestTheCapGoesOldestFirst",
               "output": [],
               "status": "none"
             }
@@ -10471,7 +10351,7 @@
     }
   ],
   "stats": {
-    "behaviors": 349,
+    "behaviors": 346,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

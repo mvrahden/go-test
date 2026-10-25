@@ -1,56 +1,20 @@
 package gotestrunner
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // checkoutFile, in a key dir of the test binary cache, names the working
 // directory the key was made for.
 const checkoutFile = ".cwd"
 
-// defaultCacheMaxSize caps the test binary cache when GOTEST_CACHE_MAX_SIZE
-// is unset: about nine full sets of this repository's binaries.
-const defaultCacheMaxSize = 5 << 30
-
-// parseCacheMaxSize reads GOTEST_CACHE_MAX_SIZE: bytes, or a whole number
-// with KiB, MiB or GiB; "off" is no cap, returned as 0.
-func parseCacheMaxSize(value string) (int64, error) {
-	switch value {
-	case "":
-		return defaultCacheMaxSize, nil
-	case "off":
-		return 0, nil
-	}
-	digits, shift := value, 0
-	for unit, s := range map[string]int{"KiB": 10, "MiB": 20, "GiB": 30} {
-		if d, ok := strings.CutSuffix(value, unit); ok {
-			digits, shift = d, s
-		}
-	}
-	n, err := strconv.ParseInt(digits, 10, 64)
-	if err != nil || n <= 0 || n > (1<<62)>>shift {
-		return 0, fmt.Errorf("%s=%s: want a positive number of bytes, optionally with KiB, MiB or GiB, or off for no cap", protocol.EnvCacheMaxSize, value)
-	}
-	return n << shift, nil
-}
-
-// cacheMaxSize is the cap a sweep holds the cache to; a run has refused an
-// unreadable value before it sweeps, so one here is the default.
-func cacheMaxSize() int64 {
-	n, err := parseCacheMaxSize(os.Getenv(protocol.EnvCacheMaxSize))
-	if err != nil {
-		return defaultCacheMaxSize
-	}
-	return n
-}
+// cacheMaxSize caps the test binary cache: about nine full sets of this
+// repository's binaries.
+const cacheMaxSize = 5 << 30
 
 // afterScan runs between the sweep's scan and its evictions; tests replace
 // it to use the cache meanwhile, as a run would.

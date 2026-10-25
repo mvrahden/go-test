@@ -1,7 +1,5 @@
 Judge: ./internal/gotestrunner BinaryCacheEvictionTestSuite/TestTheCapEvictsTheOldestFirst
 Expect: ^FAIL .*internal/gotestrunner BinaryCacheEviction .* / evicts the binaries used longest ago until the total is at or under the cap \(
-Expect: ^FAIL .*conformance/cli .* / a run removes the binaries used longest ago until it is at or under the cap \(
-Clause: when the cache holds more than GOTEST_CACHE_MAX_SIZE → a run removes the binaries used longest ago until it is at or under the cap
 --- a/internal/gotestrunner/bincache_evict.go
 +++ b/internal/gotestrunner/bincache_evict.go
 @@ -93,7 +93,7 @@ func sweepBinaryCache(root string, maxSize int64, now time.Time) {

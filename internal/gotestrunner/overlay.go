@@ -56,9 +56,6 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		return nil, nil, err
 	}
 
-	if _, err := parseCacheMaxSize(os.Getenv(protocol.EnvCacheMaxSize)); err != nil {
-		return nil, nil, err
-	}
 	CleanStaleOverlays()
 
 	binaryCacheRoot := ""

@@ -126,9 +126,6 @@ Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
   GOTEST_CI=0             Opt out of CI auto-detection
   GOTEST_CACHE_DIR=<dir>  Override the cache location (default: ~/.cache/gotest)
-  GOTEST_CACHE_MAX_SIZE=<size>
-                          Cap the test binary cache: bytes, KiB, MiB or GiB
-                          (default: 5GiB; off for no cap)
   GOTEST_SLOW_BUILD_THRESHOLD=<duration>
                           Report a build still running after this long
                           (default: 15s)
@@ -972,7 +969,7 @@ directive, use a go.work that lists them, or run clean inside each.
 The test binary cache (used for faster repeated runs) is managed
 separately: each run's start evicts the binaries of a checkout that no
 longer exists, those unused for 7 days, then the least recently used
-above GOTEST_CACHE_MAX_SIZE (default 5GiB). Set GOTEST_CACHE_DIR to
+above 5 GiB. Set GOTEST_CACHE_DIR to
 control the cache location; use --no-cache to bypass it.
 
 Examples:
