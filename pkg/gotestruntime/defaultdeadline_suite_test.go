@@ -3,6 +3,7 @@ package gotestruntime_test //nolint:fail-guard
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -94,4 +95,25 @@ func (s *DefaultDeadlineTestSuite) TestNoLineOnAStop(t *gotest.T) {
 	time.Sleep(100 * time.Millisecond)
 	end()
 	mustEqual(t, "", s.out.String())
+}
+
+// opaque hides a context's cancel machinery, so an AfterFunc on it watches it
+// from a goroutine of its own: the widest gap between Done and the callback.
+type opaque struct{ context.Context }
+
+func (opaque) Value(any) any { return nil }
+
+// A phase that returns the instant its context ends still gets the line,
+// however its end races the deadline's callback.
+func (s *DefaultDeadlineTestSuite) TestAPhaseEndingWithItsContextIsNamed(t *gotest.T) {
+	const tries = 500
+	for range tries {
+		inner, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+		ctx := opaque{inner}
+		end := gotestruntime.ExportNoteDefaultDeadline(t.T(), ctx, "who", "Timeout", 30*time.Second)
+		<-ctx.Done()
+		end()
+		cancel()
+	}
+	mustEqual(t, tries, strings.Count(s.out.String(), "who: t.Context() ended at the default 30s deadline"))
 }
