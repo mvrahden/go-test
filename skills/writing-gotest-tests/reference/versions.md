@@ -528,3 +528,7 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     ([refusal](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-hooks-that-call-tt-where-it-is-nil)).
     Below v1.34 it passed generation and nil-panicked at run time; a call
     whose result is checked for nil is still accepted.
+28. **The runtime floor is v1.34.0** — a v1.34 CLI refuses a pin below
+    v1.34.0, which only a CLI not run through `go tool gotest` can meet.
+    The v1.34 harness calls runtime functions v1.33.0 lacks, and the
+    extension needs a v1.34 CLI.

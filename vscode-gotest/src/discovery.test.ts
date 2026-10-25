@@ -86,7 +86,7 @@ type Pkg = { importPath: string; dir: string };
 
 function discoverJson(pkgs: Pkg[], version?: string | null): string {
   return JSON.stringify({
-    ...(version === null ? {} : { version: version ?? "v1.33.0" }),
+    ...(version === null ? {} : { version: version ?? "v1.34.0" }),
     packages: pkgs.map((p) => ({
       importPath: p.importPath,
       dir: p.dir,
@@ -273,19 +273,19 @@ describe("DiscoveryService", () => {
       expect(script.calls).toHaveLength(1);
       expect(cache.packages).toHaveLength(0);
       expect(mockShowWarningMessage).toHaveBeenCalledWith(
-        expect.stringContaining("wrote no version, so it predates v1.33.0"),
+        expect.stringContaining("wrote no version, so it predates v1.34.0"),
         "Open Output",
       );
     });
 
     it("refuses a CLI below the floor, naming the version", async () => {
-      script.always = { stdout: [discoverJson(pkgs, "v1.32.0")] };
+      script.always = { stdout: [discoverJson(pkgs, "v1.33.0")] };
       await service.discover("/ws", ["./..."]);
       expect(script.calls).toHaveLength(1);
       expect(cache.packages).toHaveLength(0);
       expect(mockShowWarningMessage).toHaveBeenCalledWith(
         expect.stringContaining(
-          "the CLI is v1.32.0, but >= v1.33.0 is required",
+          "the CLI is v1.33.0, but >= v1.34.0 is required",
         ),
         "Open Output",
       );
@@ -298,7 +298,7 @@ describe("DiscoveryService", () => {
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);
       script.once.push({
-        stdout: [discoverJson(pkgs, "v1.33.0-0.20261011200000-3588ff09a1b2")],
+        stdout: [discoverJson(pkgs, "v1.34.0-0.20261011200000-3588ff09a1b2")],
       });
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);
@@ -306,10 +306,10 @@ describe("DiscoveryService", () => {
     });
 
     it("names the producer in the discovery log line", async () => {
-      script.once.push({ stdout: [discoverJson(pkgs, "v1.33.0")] });
+      script.once.push({ stdout: [discoverJson(pkgs, "v1.34.0")] });
       await service.discover("/ws", ["./..."]);
       expect(outputChannel.info).toHaveBeenCalledWith(
-        expect.stringContaining("from gotest v1.33.0"),
+        expect.stringContaining("from gotest v1.34.0"),
       );
     });
   });
@@ -389,7 +389,7 @@ describe("DiscoveryService", () => {
       script.once.push({
         stdout: [
           JSON.stringify({
-            version: "v1.33.0",
+            version: "v1.34.0",
             packages: [
               {
                 importPath: "example.com/pkg",
