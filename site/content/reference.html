@@ -696,7 +696,7 @@ percentage = covered / total</div>
           <tr><td><code>--format=&lt;fmt&gt;</code></td><td>Output format for <code>spec</code> command: <code>md</code> (Markdown) or <code>json</code> (structured JSON).</td></tr>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
           <tr><td><code>--no-color</code></td><td>Strip ANSI codes from output.</td></tr>
-          <tr><td><code>--debug</code></td><td>Preserve overlays after the run for inspection.</td></tr>
+          <tr><td><code>--debug</code></td><td>Keep the run's work dir and overlay for inspection; a later run removes them after 7 days.</td></tr>
           <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Total budget for all shared fixture setup (default: the fixtures' declared budgets, 30s until the first reports; <code>0</code> to disable).</td></tr>
           <tr><td><code>--timeout=&lt;dur&gt;</code></td><td>Global pipeline deadline (default: 15m, <code>0</code> to disable).</td></tr>
           <tr><td><code>--parallel=&lt;n&gt;</code></td><td>Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>

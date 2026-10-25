@@ -475,7 +475,8 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     [teardown](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-late-fixtures-teardown-budget)).
     Below v1.34 one whose name sorted before that dependency's waited for
     a dependency not yet started, and its release got the default's
-    budget whatever it declared.
+    budget whatever it declared. A stop or `--timeout` ends the wait for a
+    late fixture.
 22. **Shared fixtures can print freely** — the state travels on a
     descriptor of its own (on Windows, the process's own stdout, taken
     from fixture code before any of it runs), so what a setup prints to stdout, a line
@@ -497,6 +498,8 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     its budgets have passed if a hook never returns. Below v1.34 nothing
     told them the CLI was gone: a suite could die without teardown, and
     the shared fixture process ran on, holding what its fixtures built.
+    So does a suite whose stdout nobody reads any more under an `-exec`
+    wrapper.
 24. **No process a test started outlives the run**, even one it never
     waits for
     ([processes](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-no-process-outlives-the-run)).
@@ -532,3 +535,70 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     v1.34.0, which only a CLI not run through `go tool gotest` can meet.
     The v1.34 harness calls runtime functions v1.33.0 lacks, and the
     extension needs a v1.34 CLI.
+29. **Flags read one way everywhere** — a boolean takes `--x`, `--x=true` or
+    `--x=false`, the last one wins, and any other value exits 2; a value
+    flag with no value, or one another command owns (`clean --debug`),
+    exits 2. Below v1.34 `--ci=true` was silently ignored.
+30. **go test flags keep go test's meaning** — `-p P` caps the suite
+    processes and compiles, `-exec` wraps every suite binary, `-o` exits 2,
+    `-run` takes a `Fuzz<Suite>_<Method>` name, `-parallel M` divides the
+    budget instead of multiplying it (below v1.34: 2×GOMAXPROCS processes
+    of M each), words after `-args` reach the binary, and `--min` and
+    `summary` find `-coverprofile <file>` given as two words.
+31. **Output follows its reader** — no color into a pipe whatever
+    `--no-color` says, JSON documents carry no color or `::error` lines,
+    and two output modes (`--spec -json`, `summary -json`) or an unknown
+    `--format` exit 2. `version` and `help` print despite a broken
+    `.gotest.yml`; `gotest sumary` and `gotest test` suggest the command
+    meant (exit 2); every mode notes stdlib-only packages on stderr.
+32. **A bench gate needs `-count=4`** (exit 2 below it) and fails when the
+    baseline and the run share no benchmark; `--save` naming the
+    `--against` file exits 2. Below v1.34 a gate judged any count and
+    could compare a run against itself. Sub-benchmarks are keyed by path.
+33. **An expired `--timeout` names only what was running** — not a test
+    whose process had ended, nor one waiting for a `-parallel` slot; a hang
+    in `BeforeAll` names the suite.
+34. **`Equal` diffs field by field** — under `diff (-expected +actual):`,
+    each hunk led by the path of its first change, with no addresses.
+    `Regexp` and `Contains` take named string types (below v1.34 `Regexp`
+    nil-panicked on one); a first message argument that is not a string
+    keeps every argument in the message; helper lines are named under
+    `-trimpath` in a module whose path has no dot.
+35. **Snapshot names that span lines or spell a section header are
+    refused**; a value with a trailing `\r\n` matches its baseline again;
+    a panic in an abandoned poll goes to stderr.
+36. **An `Each` row that skips ends the method as skipped** — below v1.34
+    it failed it; a loop that breaks leaves the method running. A fuzz
+    `BeforeEach` that fails or panics gets its `AfterEach`, and a panic is
+    reported even when `AfterEach` then fails.
+37. **A run sweeps what crashed runs left** — the `gotest-work-*` dirs of a
+    dead owner in this boot and pid namespace go; unstamped ones after 7
+    days, `--debug` ones are kept 7 days. A test binary briefly "text file
+    busy" is retried.
+38. **Each run writes its overlay into its own work dir** — nothing
+    generated is cached, so concurrent runs sharing a cache never break
+    each other's build
+    ([generated files](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-generated-files-are-the-runs-own));
+    `--no-cache` turns off only the test binary cache, and `--debug`
+    prints the overlay inside the work dir. Below v1.34 overlays were
+    shared under `~/.cache/gotest/overlays`; entries left there drain
+    after 7 days unused.
+39. **The binary cache is capped** — each run's start evicts the binaries
+    of a checkout that no longer exists, those unused for 7 days, then the
+    least recently used until the cache is under `GOTEST_CACHE_MAX_SIZE`
+    (default `5GiB`; bytes or `KiB`/`MiB`/`GiB`, `off` for no cap; any
+    other value exits 2 before any build). A binary a run is linking or
+    copying is never evicted, and a run whose lock was evicted while it
+    waited links without the cache. Below v1.34 a key any run touched kept
+    every binary.
+40. **A context the default deadline ended is named** — one stderr line
+    (with its test under `-json`) when the 30s default ends a method's,
+    `BeforeAll`'s or `AfterAll`'s context in a suite that declares no
+    `Timeout` or `SetupTimeout`
+    ([default deadline](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended));
+    it fails nothing.
+41. **The GitHub action splits `packages`, `flags` and `go-test-flags` on
+    every line** and exits 2 on quotes; below v1.34 only the first line
+    counted.
+42. **`GOTEST_SLOW_BUILD_THRESHOLD`** sets when a build is reported as
+    still running (a Go duration, default `15s`).
