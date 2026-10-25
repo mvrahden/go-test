@@ -1,0 +1,13 @@
+Judge: ./internal/gotestrunner BinaryCacheEvictionTestSuite/TestEvictionNeverTakesABinaryInUse
+Expect: ^FAIL .*internal/gotestrunner BinaryCacheEviction .* / skips it and evicts the next one instead \(
+--- a/internal/gotestrunner/bincache_evict.go
++++ b/internal/gotestrunner/bincache_evict.go
+@@ -175,7 +175,7 @@ func evictBinary(b cachedBinary) bool {
+ 	lock := b.path + ".lock"
+ 	unlock, err := tryLockFile(lock)
+ 	if err != nil {
+-		return false
++		unlock = func() {}
+ 	}
+ 	info, err := os.Lstat(b.path)
+ 	if err != nil || !info.ModTime().Equal(b.modTime) {

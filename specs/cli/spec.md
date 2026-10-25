@@ -175,3 +175,26 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 #### Scenario: A --debug run ends
 - **WHEN** a --debug run ends
 - **THEN** names its overlay on stderr and keeps it
+
+### Requirement: The test binary cache
+A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most GOTEST_CACHE_MAX_SIZE, and an eviction SHALL never fail a run or take a binary a run is linking or copying.
+
+#### Scenario: Runs under a tiny cap
+- **WHEN** 8 runs at once, in 3 rounds, share a cache capped at one byte
+- **THEN** passes every run, each suite running and reporting
+
+#### Scenario: A checkout that no longer exists
+- **WHEN** a cache key records a checkout that no longer exists
+- **THEN** a run removes its binaries
+
+#### Scenario: A binary unused for 7 days
+- **WHEN** a cached binary has not been used for 7 days
+- **THEN** a run removes it and keeps the binaries used since
+
+#### Scenario: An unreadable cap
+- **WHEN** GOTEST_CACHE_MAX_SIZE is not a size
+- **THEN** exits 2 naming the variable, before any build
+
+#### Scenario: Over the cap
+- **WHEN** the cache holds more than GOTEST_CACHE_MAX_SIZE
+- **THEN** a run removes the binaries used longest ago until it is at or under the cap

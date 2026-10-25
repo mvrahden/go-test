@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / a run removes its binaries \(
+Clause: when a cache key records a checkout that no longer exists → a run removes its binaries
+--- a/internal/gotestrunner/bincache_evict.go
++++ b/internal/gotestrunner/bincache_evict.go
+@@ -143,7 +143,7 @@ func scanKeys(bin string) []cacheKeyDir {
+ 		}
+ 		k := cacheKeyDir{dir: filepath.Join(bin, e.Name()), modTime: info.ModTime()}
+ 		if cwd, err := os.ReadFile(filepath.Join(k.dir, checkoutFile)); err == nil {
+-			k.gone = !exists(string(cwd))
++			k.gone = !exists(string(cwd)) && false
+ 		}
+ 		files, err := os.ReadDir(k.dir)
+ 		if err != nil {

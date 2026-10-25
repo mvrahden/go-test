@@ -2,12 +2,12 @@ Judge: ./internal/gotestrunner OverlayTestSuite/TestCacheRoot
 Expect: ^FAIL .*internal/gotestrunner Overlay .* / removes the entries older than 7 days and keeps the fresh ones \(
 --- a/internal/gotestrunner/overlay_cleanup.go
 +++ b/internal/gotestrunner/overlay_cleanup.go
-@@ -180,7 +180,7 @@ func cleanOldCacheEntries() {
- 		return
+@@ -181,7 +181,7 @@ func cleanOldCacheEntries() {
  	}
  	now := time.Now()
--	for _, sub := range []string{"overlays", "bin"} {
-+	for _, sub := range []string{"bin"} {
- 		dir := filepath.Join(root, sub)
- 		entries, err := os.ReadDir(dir)
- 		if err != nil {
+ 	sweepBinaryCache(root, cacheMaxSize(), now)
+-	dir := filepath.Join(root, "overlays")
++	dir := filepath.Join(root, "overlays-not-swept")
+ 	entries, err := os.ReadDir(dir)
+ 	if err != nil {
+ 		return

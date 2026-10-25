@@ -270,3 +270,33 @@ func ExportStubOwnerIdentity(ns, boot func() string) (restore func()) {
 
 // ExportExited is closed once the shared fixture process has exited.
 func ExportExited(p *SharedFixtureProcess) <-chan struct{} { return p.done }
+
+var ExportSanitizePkgName = sanitizePkgName
+
+// ExportLockOpened runs then each time a lock file is opened, before it is
+// locked, until the returned call restores the default.
+func ExportLockOpened(then func(path string)) (restore func()) {
+	prev := lockOpened
+	lockOpened = then
+	return func() { lockOpened = prev }
+}
+
+var ExportParseCacheMaxSize = parseCacheMaxSize
+
+// ExportAfterScan runs then between the binary cache sweep's scan and its
+// evictions, until the returned call restores the default.
+func ExportAfterScan(then func()) (restore func()) {
+	prev := afterScan
+	afterScan = then
+	return func() { afterScan = prev }
+}
+
+// ExportKeyEmptied runs then between the check that a key dir is empty and
+// its removal, until the returned call restores the default.
+func ExportKeyEmptied(then func(dir string)) (restore func()) {
+	prev := keyEmptied
+	keyEmptied = then
+	return func() { keyEmptied = prev }
+}
+
+var ExportSweepBinaryCache = sweepBinaryCache

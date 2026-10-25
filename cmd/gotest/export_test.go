@@ -228,3 +228,12 @@ var (
 	ExportBenchDeltaLines = benchDeltaLines
 	ExportRenderWatchRun  = renderWatchRun
 )
+
+// ExportRemoveLintTemp is removeLintTemp with remove standing in for
+// os.RemoveAll.
+func ExportRemoveLintTemp(dir string, bound time.Duration, remove func(string) error) {
+	prev := removeAll
+	removeAll = remove
+	defer func() { removeAll = prev }()
+	removeLintTemp(dir, bound)
+}

@@ -1,0 +1,13 @@
+Judge: ./internal/gotestrunner BinaryCacheEvictionTestSuite/TestAGoneCheckoutLosesItsBinaries
+Expect: ^FAIL .*internal/gotestrunner BinaryCacheEviction .* / keeps its binaries \(
+--- a/internal/gotestrunner/bincache_evict.go
++++ b/internal/gotestrunner/bincache_evict.go
+@@ -130,7 +130,7 @@ func scanKeys(bin string) []cacheKeyDir {
+ 		}
+ 		k := cacheKeyDir{dir: filepath.Join(bin, e.Name()), modTime: info.ModTime()}
+ 		if cwd, err := os.ReadFile(filepath.Join(k.dir, checkoutFile)); err == nil {
+-			k.gone = !exists(string(cwd))
++			k.gone = len(cwd) > 0
+ 		}
+ 		files, err := os.ReadDir(k.dir)
+ 		if err != nil {

@@ -1260,8 +1260,15 @@ reported `harness.go:38` as the user's frame. The tracer now treats
    get reuse: each links into
    `~/.cache/gotest/bin/<key>/`, keyed by working directory, build flags,
    platform and Go version, so go skips the link for an unchanged package, and
-   the run copies the binary into its own work dir before executing it. The
-   binary cache auto-evicts after 7 days. Use `--no-cache` to bypass it.
+   the run copies the binary into its own work dir before executing it. Each
+   key records its checkout in `.cwd`, and every run's start evicts the
+   binaries of a checkout that no longer exists, those unused for 7 days (go
+   touches a binary it finds up to date, so its modification time is its
+   last use), then the least recently used until the cache is under
+   `GOTEST_CACHE_MAX_SIZE` (default 5 GiB). A binary goes only under its own
+   lock, taken without waiting, and only if unused since the scan; a run
+   that waited on a lock whose file was replaced meanwhile links without the
+   cache. Use `--no-cache` to bypass it.
 
 4. **Streaming compilation**: `CompilePackagesStream` sends results to a
    channel as each package finishes. Test execution begins before all packages

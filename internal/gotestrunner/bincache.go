@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -49,8 +50,45 @@ func binaryCacheDir(root string, buildFlags []string) string {
 	}
 	now := time.Now()
 	_ = os.Chtimes(dir, now, now)
+	recordCheckout(dir, cwd)
 	return dir
 }
+
+// recordCheckout writes cwd into the key dir's .cwd unless it is there
+// already, so the sweep can tell a key whose checkout is gone. It goes
+// through a rename: a sweep never reads half a path.
+func recordCheckout(dir, cwd string) {
+	if got, err := os.ReadFile(filepath.Join(dir, checkoutFile)); err == nil && string(got) == cwd {
+		return
+	}
+	tmp, err := os.CreateTemp(dir, checkoutFile+".tmp-*")
+	if err != nil {
+		return
+	}
+	_, werr := tmp.WriteString(cwd)
+	if cerr := tmp.Close(); werr != nil || cerr != nil || os.Rename(tmp.Name(), filepath.Join(dir, checkoutFile)) != nil {
+		_ = os.Remove(tmp.Name())
+	}
+}
+
+// errLockReplaced is a lock taken on a file no longer at its path: an
+// eviction removed it while this run waited, and the cache entry it guarded
+// is gone. The run treats the cache as absent.
+var errLockReplaced = errors.New("lock file replaced while waiting")
+
+// stillAt reports whether path still names f.
+func stillAt(f *os.File, path string) bool {
+	held, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	now, err := os.Stat(path)
+	return err == nil && os.SameFile(held, now)
+}
+
+// lockOpened runs once a lock file is open and before it is locked; tests
+// replace it to act while a run waits on a lock.
+var lockOpened = func(path string) {}
 
 // copyFile writes src's bytes to dst as an executable, replacing dst. No
 // process is forked while dst is open: a child forked then would hold the

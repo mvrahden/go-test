@@ -171,32 +171,31 @@ func exists(path string) bool {
 
 const cacheMaxAge = 7 * 24 * time.Hour
 
-// cleanOldCacheEntries evicts test-binary cache entries, and the overlay
-// entries older CLIs pinned in other modules still write, that no run has
-// touched within cacheMaxAge.
+// cleanOldCacheEntries sweeps the test binary cache (see sweepBinaryCache)
+// and evicts the overlay entries older CLIs pinned in other modules still
+// write that no run has touched within cacheMaxAge.
 func cleanOldCacheEntries() {
 	root, err := cacheRoot()
 	if err != nil {
 		return
 	}
 	now := time.Now()
-	for _, sub := range []string{"overlays", "bin"} {
-		dir := filepath.Join(root, sub)
-		entries, err := os.ReadDir(dir)
+	sweepBinaryCache(root, cacheMaxSize(), now)
+	dir := filepath.Join(root, "overlays")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		info, err := e.Info()
 		if err != nil {
 			continue
 		}
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			info, err := e.Info()
-			if err != nil {
-				continue
-			}
-			if now.Sub(info.ModTime()) > cacheMaxAge {
-				os.RemoveAll(filepath.Join(dir, e.Name()))
-			}
+		if now.Sub(info.ModTime()) > cacheMaxAge {
+			os.RemoveAll(filepath.Join(dir, e.Name()))
 		}
 	}
 }

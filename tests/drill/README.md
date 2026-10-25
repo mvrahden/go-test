@@ -503,6 +503,15 @@ shards of one run do not add up to every mutant exactly once.
 | `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
 | `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
+| `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run links into the evicted cache entry |
+| `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
+| `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
+| `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |
+| `eviction-ignores-a-use-since-the-scan` | the sweep evicts a binary a run used after the scan | runner: the binary used since the scan goes |
+| `emptied-key-removed-with-its-new-lock` | the sweep removes an emptied key dir with `RemoveAll`, taking a lock file a run just created | runner: the key dir and its fresh lock file go |
+| `gone-checkout-kept` | the sweep keeps the binaries of a key whose checkout no longer exists | cli conformance: the gone checkout's binary outlives the run |
+| `unused-binaries-kept` | the sweep keeps binaries unused for 7 days | cli conformance: the stale binary outlives the run |
+| `unreadable-cap-ignored` | an unreadable `GOTEST_CACHE_MAX_SIZE` is taken for the default instead of refused | cli conformance: the run does not exit 2 |
 
 ## Adding a mutant
 
