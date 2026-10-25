@@ -287,6 +287,8 @@ A per-method fixture hook that fails is the method's failure, located where the 
 
 A stop — Ctrl-C, gotest's `--timeout` — reaches the running method through its context and the suite through its teardown; a method body or `BeforeAll` that has not returned five seconds after its context ended is cut short, the fixtures torn down and the process ended by the signal; the five seconds bound only the body and `BeforeAll`, so a slow `AfterEach` runs to its end and `AfterAll` after it (see fixtures.md, Execution Model, [Stopping a run](../../specs/lifecycle/spec.md#requirement-stopping-a-run) and [The grace a stopped method gets](../../specs/lifecycle/spec.md#requirement-the-grace-a-stopped-method-gets)).
 
+A method that panics ends the suite as it would under `go test`: its own teardown and `AfterAll` run, and in a parallel suite the siblings still running are cut short with it ([A panic among parallel methods](../../specs/lifecycle/spec.md#requirement-a-panic-among-parallel-methods)).
+
 #### Context Consistency Rules
 
 When `BeforeEach` returns a value, the following rules are enforced at generation time:
@@ -604,11 +606,11 @@ Read transferred fields but do not reassign them — use local variables for any
 Subprocess (compiled binary):
   sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
   serialize transferable fields  → JSON (local fields excluded)
-  write to stdout, wait for SIGTERM
+  write to the protocol stream, wait for the runner's signal (or a barrier teardown verb)
   sf.AfterAll(ctx)               → tears down infrastructure
 
 CLI (gotest):
-  read JSON from subprocess stdout
+  read JSON from the subprocess's protocol stream
   write state files in the work dir — per-suite shared/<Suite>.json in the
   test run; one global shared/state.json in a bench run
   set GOTEST_SHARED_STATE_FILE env var for test process
@@ -629,6 +631,8 @@ The serialization boundary only exists between the subprocess and test processes
 
 `BeforeAll` always sets transfer fields. Local fields only need to be set in `BeforeAll` when a dependent shared fixture accesses them — otherwise they may add an idle resource to the subprocess.
 `Hydrate` is not called within the subprocess — it runs only in test processes after JSON deserialization.
+
+The protocol stream is a descriptor of its own (on Windows, the process's own stdout, taken from fixture code before any of it runs), so the subprocess's stdout and stderr stay the fixture's to print to, and the state is read whole however large it is ([Shared fixture state reaches its suites](../../specs/fixtures/spec.md#requirement-shared-fixture-state-reaches-its-suites)).
 
 The runner waits for setup as long as the fixture's declared config allows, not for a number of its own ([A shared fixture's declared setup budget](../../specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
 
@@ -749,9 +753,9 @@ A fixture with no marker gets the default bounds and no verdict; it is never fai
 A setup overrun on a *successful* return is terminal (`gotestruntime.ErrSetupOverran`): it is not retried — the work completed and the overrun is deterministic — and the fixture still gets its `AfterAll`, because the resources it built exist.
 
 **Shared fixtures:** The generated subprocess uses `SharedFixtureConfig()` when present (otherwise `DefaultFixtureConfig()`), wrapping each SharedFixture's `BeforeAll(ctx)` in the same retry loop with `context.WithTimeout`, under the same declared-budget verdicts as package fixtures.
-After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized to stdout as JSON.
+After `BeforeAll`, transferable fields (determined by Hydrate-assignment analysis) are serialized as JSON on the protocol stream.
 `AfterAll(ctx)` runs through `gotestruntime.RunFixtureTeardown` in the teardown handler: context-bounded always, and held to a declared `Timeout` by verdict, with a failed teardown reaching the runner through the process exit status.
-The subprocess is shutdown-capable from birth and never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed.
+The subprocess is shutdown-capable from birth and, while the runner lives, never tears down on its own initiative: it reports setup outcome (and its teardown budget) on the `_done` line, then waits for the runner's signal — only the runner knows when every suite has stopped using the fixtures — and a clean exit is the runner's sole proof that teardown ran and passed. A runner that is gone (killed, crashed, its end of stdin closed) leaves nobody to send that signal, so the subprocess then ends its setup's context, runs `AfterAll` for every fixture whose `BeforeAll` ran, and exits; past its setup and teardown budgets it exits with status 1 regardless ([A shared fixture process whose CLI is killed](../../specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)). A process the setup starts inherits neither the protocol descriptor nor its variable, so it can neither hold the run open nor write protocol lines ([A process a shared fixture's setup starts](../../specs/fixtures/spec.md#requirement-a-process-a-shared-fixtures-setup-starts)); a setup the runner gives up on leaves its siblings the teardown budget the process reports ([Siblings of a setup that is given up](../../specs/fixtures/spec.md#requirement-siblings-of-a-setup-that-is-given-up)).
 In the test harness, the deserialized fixture is hydrated via `Hydrate(ctx)` if present, and `Dehydrate(ctx)` is deferred for cleanup.
 
 **Suites:** The test harness uses the marker's config when present (otherwise `DefaultSuiteConfig()`) to bound each phase's context — `gotestruntime.SetupT`/`TestT` bound it by the timeout when positive, and end it when the runner announces a stop — and, when `FailFast` is set, skips every method not yet started once one has failed, naming that method ([FailFast](../../specs/lifecycle/spec.md#requirement-failfast)).
@@ -859,6 +863,7 @@ All functions accept any type implementing `testingT` (`Errorf()` + `FailNow()`)
 Failure messages always include the user call site, resolved by an internal stack-frame tracer.
 The failure is located (`file.go:line:` before the message, as `go test` prints it) at the line that failed, whichever testing type the assertion got — `*gotest.T`, `*testing.T`, `*gotest.B`, `*gotest.F`, or a fuzz body's `t` — inside a helper too, and never at a file of gotest's, reflect's or the runtime's. When that line is in a helper, the message names the test's own call site after it. Both honour `-fullpath`.
 Never call `t.T().Helper()` — it degrades location reporting; the `t-escape` lint rule flags it.
+A module whose path has no dot, built with `-trimpath`, is located the same way ([Failure locations](../../specs/assertions/spec.md#requirement-failure-locations)).
 
 <!-- fence:pseudo -->
 ```go
@@ -954,15 +959,19 @@ Equal failed:
 ```
 
 Both renderings are printed above the diff when each has at most 10 lines of at most 80 bytes. A single changed line longer than 80 bytes is shown around its first difference with a caret under it, and any other line is cut at 160 bytes. Two long single-line strings, or byte slices of text, are shown around their first differing byte instead, the caret counting a wide character as two columns. Values of different dynamic types are named first (`types differ: int vs float64`) and shown in their types. Values whose renderings are identical are rendered again without their `GoString` methods and with `sync` values opened, and that is diffed; when even that agrees (a NaN, a func, a channel), the message says where the values differ and that the rendering does not show it, and prints the value once. Lines deeper than 32 levels keep the indent of level 32 and name their depth (`‹depth 40›`). A rendering stops at 50,000 lines or 4 MiB; when the values agree up to there, the message names the path of their first difference. `NotEqual` shows the shared value in the same rendering.
-The same diff presentation serves snapshot mismatches.
+The same diff presentation serves snapshot mismatches ([Mismatch diffs](../../specs/assertions/spec.md#requirement-mismatch-diffs), [Renderings](../../specs/assertions/spec.md#requirement-renderings)).
+How the extra arguments enter the message is stated in [Failure messages](../../specs/assertions/spec.md#requirement-failure-messages).
 
 Runtime argument guards — each fails with a type error instead of guessing:
 
-- `Contains`/`NotContains` accept a string (substring), slice/array (element, `DeepEqual`), or map (**key** presence)
+- `Contains`/`NotContains` accept a string (substring), slice/array (element, `DeepEqual`), or map (**key** presence; a nil needle is the nil element or key only where the element or key type can be nil, see [A nil needle](../../specs/assertions/spec.md#requirement-a-nil-needle))
+- `JSONEq` takes one JSON value per input ([One JSON value](../../specs/assertions/spec.md#requirement-one-json-value))
 - `Len` accepts slice, array, map, chan, string
 - `Empty`/`NotEmpty` accept slice, map, array, chan, string, or pointer (recursively); other types are rejected — use `Nil`/`Zero`
 - `ErrorIs` with a nil target and `ErrorContains` with an empty string are rejected — use `NoError`/`Error`
 - `Must`'s second argument may be `nil`, `bool`, or `error`; anything else panics
+
+A guard refuses a kind, never a named type of an accepted kind ([Named string types](../../specs/assertions/spec.md#requirement-named-string-types), [A needle of the wrong type](../../specs/assertions/spec.md#requirement-a-needle-of-the-wrong-type)), and a comparison reads the value, not its spelling ([InDelta at the edges of float64](../../specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64), [JSON numbers](../../specs/assertions/spec.md#requirement-json-numbers)); `ErrorAs` names the type it expected ([Failure messages](../../specs/assertions/spec.md#requirement-failure-messages)).
 
 The assertion engine has zero external dependencies — `reflect.DeepEqual`, `cmp.Compare`, `fmt.Sprintf("%#v")`, and a minimal inline diff renderer.
 
@@ -1059,6 +1068,8 @@ The `poll *gotest.R` captures assertion failures without propagating them to the
 On timeout, `Eventually` reports the last poll's assertion failures.
 `Consistently` fails on first assertion failure and reports which poll failed.
 
+A poll that started before the deadline is judged by its result, and one still running `waitFor` past it fails as still running ([Polls and their deadline](../../specs/assertions/spec.md#requirement-polls-and-their-deadline)); the arguments are checked before the first poll ([Polling arguments](../../specs/assertions/spec.md#requirement-polling-arguments)).
+
 ---
 
 ## Snapshot Testing
@@ -1074,6 +1085,9 @@ gotest.MatchSnapshot(t, result, "variant")    // custom snapshot name
 - Update: `gotest --update-snapshots ./...` (sets `GOTEST_UPDATE_SNAPSHOTS=1`; use the env var directly under plain `go test`)
 - CI mode (`--ci` / `GOTEST_CI=1`): read-only — a missing baseline fails instead of being created
 - Safe under parallel tests: snapshot files are guarded by per-file mutexes
+
+Each subtest reads a section of its own, the baselines are found beside the test, under `-trimpath` in the package directory go test runs in, and a name that could not be a section header is refused ([Snapshot sections](../../specs/assertions/spec.md#requirement-snapshot-sections), [Snapshot names](../../specs/assertions/spec.md#requirement-snapshot-names)).
+With `GOTEST_UPDATE_SNAPSHOTS` off (unset, `0`, `false` and the other `strconv.ParseBool` spellings of false) nothing is updated ([Snapshot updates switched off](../../specs/assertions/spec.md#requirement-snapshot-updates-switched-off)).
 
 ---
 

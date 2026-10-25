@@ -25,7 +25,7 @@
  │  ┌─────────────────────┐    ┌────────────────────────────┐  │
  │  │ CompilePackages-    │    │ startSharedFixtures        │  │
  │  │ Stream              │    │   go build → start → read  │  │
- │  │   go test -c per    │    │   JSON state from stdout   │  │
+ │  │   go test -c per    │    │   JSON state, own stream   │  │
  │  │   pkg (NumCPU par)  │    │   → write state.json       │  │
  │  └────────┬────────────┘    └────────────┬───────────────┘  │
  │           │ <-chan CompileResult         │ *SharedFixtureProcess
@@ -509,11 +509,12 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │  └──────────┬───────────────────────────────────────────────────┘     │
 │             │ emit JSON state                                         │
 │                                                                       │
-│  Each fixture's state emitted to stdout immediately after BeforeAll   │
+│  State to the protocol fd after BeforeAll (stdout on Windows)         │
 │  Include _teardownBudget = sum of SupervisorBudget(Timeout) + 30s     │
-│  (teardown below is sequential, so the members' budgets add; the      │
-│  budget rides both _done forms — a failed setup still has succeeded   │
-│  siblings to release under it)                                        │
+│  over the fixtures whose setup was reached (teardown below is         │
+│  sequential, so the members' budgets add; the budget rides both _done │
+│  forms — a failed setup still has succeeded siblings to release under │
+│  it — and the _cmd acknowledging a start that brought one up late)    │
 │                                                                       │
 │  ═══════════ block on SIGTERM/SIGINT ═══════════                      │
 │                                                                       │
@@ -522,7 +523,7 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │                                                                       │
 └───────────────────────────────────────────────────────────────────────┘
 
-         │ stdout: JSON state       │ per-suite state.json files
+         │ JSON state               │ per-suite state.json files
          ▼                          ▼
 
 ┌── TEST PROCESS (per suite binary) ───────────────────────────────────┐
@@ -871,6 +872,21 @@ executable (`GOTEST_INTERNAL_INTERRUPT_CONSOLE`, handled in an `init` of
 `internal/proctree`) with no console; it attaches to the tree's console and
 sends the event there. The job object, with kill-on-close, is also what stops
 the tree when the runner itself is killed.
+
+On Linux a tree's root also gets SIGTERM from the kernel when the runner dies
+(`Pdeathsig`), so a suite or shared-fixture process tears down before it
+exits. A suite process under the runner asks for SIGHUP instead, which only
+wakes its watcher to look at its parent: no SIGINT or SIGTERM it gets is the
+kernel's, so each is someone's request, and the second abandons the
+teardown, while the death signal never does. A second signal to the CLI
+kills every tree it still runs before it exits, so none outlives it where no
+death signal comes. On Linux, macOS, the BSDs and Windows the suite process watches for a
+dead runner itself (its parent gone, or, on Linux and macOS, nobody reading its stdout), and a shared-fixture process
+tears down when its stdin closes, exiting with status 1 once its setup and
+teardown budgets have passed if a hook never returns. A wrapper that
+re-pipes stdout (`tee`) or runs the suite remotely (`ssh`, `docker`) hides
+both traces. See [A suite whose parent is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone)
+and [A shared fixture process whose CLI is killed](specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed).
 
 A tree holds its root until `Release`, which runs once the root has been
 waited for; after it, the root's pid may name another process, so nothing is

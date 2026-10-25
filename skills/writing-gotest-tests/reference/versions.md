@@ -337,8 +337,11 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
    ([selection](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-selection-follows-go-tests-matching)):
    a shared fixture no remaining suite binds never starts. As in go test,
    the first alternative matching a function decides, so
-   `-skip 'TestA/One|TestA'` still enters `TestA`. Below v1.34 `-skip`
-   played no part in planning, so the fixture started anyway.
+   `-skip 'TestA/One|TestA'` still enters `TestA`, and a `-skip` naming
+   only a suite's `Test` function still replays its fuzz seeds
+   ([skip](https://github.com/mvrahden/go-test/blob/main/specs/fuzz/spec.md#requirement-skipping-a-suites-functions)).
+   Below v1.34 `-skip` played no part in planning, so the fixture started
+   anyway.
 7. **`-run`, `-skip` and `-bench` read as the testing package reads them** —
    a pattern is refused with exit 2 when one of its `|` alternatives or `/`
    levels does not compile on its own (`-skip '[]|x]'`), a repeated flag
@@ -459,7 +462,69 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     a `Timeout` on async suites that relied on that default.
 20. **Shared fixture setup waits for the declared budget** — without
     `--setup-timeout`, the runner waits as long as the fixtures'
-    `SharedFixtureConfig()` declares, and 30s until the first reports
+    `SharedFixtureConfig()` declares, every attempt and every release
+    between them counted, and 30s until the first reports
     ([the setup-budget requirement](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
     Below v1.34 the wait is a flat 2m whatever the marker says, so a
     slower fixture needs `--setup-timeout` raised.
+21. **A shared fixture started late comes up after its dependencies** —
+    one started for the exclusive tail or a bench slot comes up after a
+    dependency only that phase needs, is torn down before it, and is
+    released under the teardown budget its declared `Timeout` gives
+    ([dependencies](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies),
+    [teardown](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-late-fixtures-teardown-budget)).
+    Below v1.34 one whose name sorted before that dependency's waited for
+    a dependency not yet started, and its release got the default's
+    budget whatever it declared.
+22. **Shared fixtures can print freely** — the state travels on a
+    descriptor of its own (on Windows, the process's own stdout, taken
+    from fixture code before any of it runs), so what a setup prints to stdout, a line
+    without a newline or a JSON-shaped log line included, never reaches
+    it, and the state has no size limit
+    ([state](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-shared-fixture-state-reaches-its-suites));
+    on Unix, a process the setup starts gets no part of it and does not hold the
+    run open
+    ([started processes](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-process-a-shared-fixtures-setup-starts)).
+    Below v1.34 the state shared the fixture process's stdout, so such
+    output could break it, and a state line past 1 MiB failed the setup.
+23. **A suite or shared fixture whose CLI died tears down by itself**
+    ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone),
+    [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)):
+    after `kill -9`, an OOM kill or a crash of the CLI, a suite ends the
+    holding method's context, starts no further method and runs
+    `AfterAll`; a shared fixture process runs the `AfterAll` of every
+    fixture whose `BeforeAll` ran, and on Linux exits with status 1 once
+    its budgets have passed if a hook never returns. Below v1.34 nothing
+    told them the CLI was gone: a suite could die without teardown, and
+    the shared fixture process ran on, holding what its fixtures built.
+24. **No process a test started outlives the run**, even one it never
+    waits for
+    ([processes](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-no-process-outlives-the-run)).
+    Below v1.34 such a process kept running after the run ended on Unix.
+25. **`Eventually` and `Consistently` poll on a goroutine of their own** —
+    a poll that started before `waitFor` is judged by its result, one
+    still running `waitFor` past the deadline fails as still running
+    ([polls](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-polls-and-their-deadline)),
+    and a `waitFor` or `tick` that is not positive fails before the first
+    poll
+    ([arguments](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-polling-arguments)).
+    Below v1.34 a poll that never returned hung the test, and a `tick`
+    that is not positive panicked.
+26. **Numbers compare by value** — `InDelta` fails on a NaN delta, holds
+    equal infinities within any delta and measures integers exactly
+    ([edges](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64),
+    [integers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-on-integers)),
+    and `JSONEq` keeps integers past float64's exact range apart
+    ([JSON numbers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-json-numbers)).
+    Below v1.34 both went through float64: a NaN delta passed, equal
+    infinities failed and `9007199254740993` equalled `9007199254740992`.
+    `Contains` now finds a nil key in a map keyed by an interface or
+    pointer type
+    ([nil needle](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-a-nil-needle));
+    below v1.34 a nil key was never found.
+27. **A hook that calls `t.T()` where it is nil is refused** — every hook
+    of a suite with a benchmark method, `BeforeAll` and `AfterAll` of one
+    with a fuzz method; one error names every such hook in source order
+    ([refusal](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-hooks-that-call-tt-where-it-is-nil)).
+    Below v1.34 it passed generation and nil-panicked at run time; a call
+    whose result is checked for nil is still accepted.
