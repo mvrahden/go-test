@@ -61,7 +61,7 @@ Only caches keyed on the current sources outlive a mutant: Go's build cache
 (`GOCACHE`) and the worker's `cache/cli`, whose binaries the testkit files
 under a key from `go list -export` build IDs, the Go settings and the
 checkout, and copies to a caller-private executable before running. The worker's `cache/children` (`GOTEST_TEST_CACHE_DIR`)
-holds the overlay and binary-cache entries of gotest's own child runs. Go does
+holds the binary-cache entries of gotest's own child runs. Go does
 not validate those, and a mutated CLI writes them, so each mutant starts with
 it empty. The pristine judge's cache (`cache/judge`) is written only by the
 pristine judge. Marker files, snapshots and other mutable test state are never

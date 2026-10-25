@@ -171,9 +171,8 @@ func (s *SeedsTestSuite) TestHarvestSeeds(t *gotest.T) {
 
 // TestHarvestSeeds_OrderingIsStable asserts two consecutive HarvestSeeds
 // calls over the same package return identical, identically-ordered Args
-// slices — the generated f.Add(...) lines must not flap between runs (which
-// would make generated output diff noisily / break content-addressed
-// overlay caching).
+// slices — the generated f.Add(...) lines must not flap between runs, which
+// would make generated output diff noisily and defeat Go's build cache.
 func (s *SeedsTestSuite) TestHarvestSeedsOrderingIsStable(t *gotest.T) {
 	ptestPkg, _ := loadHarvestTestPkgs(t.T())
 	suites := collectHarvestSuites(t.T(), ptestPkg)

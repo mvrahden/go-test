@@ -6,7 +6,7 @@ Clause: when a help text lists --setup-timeout → gives its default as the fixt
 @@ -351,8 +351,7 @@
                            ns/op delta against the previous run
    --update-snapshots      Regenerate snapshot files
-   --no-cache              Disable the overlay and test binary caches
+   --no-cache              Disable the test binary cache
 -  --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
 -                          budgets, 30s until the first reports; 0 to disable)
 +  --setup-timeout=<dur>   Total budget for shared fixture setup (default: 2m, 0 to disable)

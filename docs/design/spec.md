@@ -133,7 +133,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 |------|--------|
 | `--debug` | Keep generated files after run |
 | `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only |
-| `--no-cache` | Bypass the overlay write cache and the test binary cache (generation is not cached) |
+| `--no-cache` | Bypass the test binary cache (generation is not cached) |
 | `--spec` | Render the spec view instead of the default output (default and watch modes) |
 | `--update-snapshots` | Regenerate snapshot files |
 | `--format=<fmt>` | Output format for `spec`/`summary` (terminal, md/markdown, json) |
@@ -1572,7 +1572,7 @@ User-facing:
 |----------|--------|
 | `GOTEST_UPDATE_SNAPSHOTS=1` | Regenerate snapshot baselines (what `--update-snapshots` sets; the only mechanism under plain `go test`) |
 | `GOTEST_CI` | `1`/`true` forces CI mode; any value suppresses auto-detection from `CI`; unset → auto-detect |
-| `GOTEST_CACHE_DIR` | Cache location for overlays and test binaries (default `os.UserCacheDir()/gotest`; entries evicted after 7 days) |
+| `GOTEST_CACHE_DIR` | Cache location for test binaries (default `os.UserCacheDir()/gotest`; entries evicted after 7 days) |
 | `GOTEST_SLOW_BUILD_THRESHOLD` | How long a build runs, as a Go duration, before the CLI says it is still building (default `15s`; unparsable or not positive → the default) |
 
 Internal protocol between the CLI and test/subprocess boundaries (may change without notice): `GOTEST_SHARED_STATE_FILE` (shared-fixture state file for the test process), `GOTEST_TEARDOWN_BUDGET_FILE` (teardown grace-period handshake).
@@ -1798,8 +1798,8 @@ If a feature can't be implemented as (a) generated code, (b) a method on `gotest
 
 3. **No incremental generation:** The tool regenerates all suite files on every run.
    There is no staleness detection.
-   (The overlay cache — `--no-cache`, `GOTEST_CACHE_DIR` — is a post-generation, content-addressed write cache: it dedupes disk writes, not generation work.
-   The test binary cache beside it keeps each package's linked binary at a path keyed by working directory, build flags, platform and Go version, so a run over unchanged code skips the link; each run copies the binary into its own work dir before executing it.)
+   (Each run writes its overlay into its own work dir; nothing generated is cached.
+   The test binary cache — `--no-cache`, `GOTEST_CACHE_DIR` — keeps each package's linked binary at a path keyed by working directory, build flags, platform and Go version, so a run over unchanged code skips the link; each run copies the binary into its own work dir before executing it.)
 
 4. **Hydrate method walking depth:** The generator follows receiver method calls from `Hydrate` one level deep to classify local fields.
    Assignments hidden behind two or more levels of indirection are not detected.

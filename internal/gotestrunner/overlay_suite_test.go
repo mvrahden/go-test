@@ -17,7 +17,7 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// OverlayTestSuite covers overlay generation and the content-addressed write cache.
+// OverlayTestSuite covers overlay generation, the run's own overlay dir and the sweep.
 // Sequential: Setenv (the cache directory).
 type OverlayTestSuite struct{}
 

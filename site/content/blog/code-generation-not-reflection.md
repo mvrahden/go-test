@@ -102,20 +102,20 @@ For suites with fixtures, the generated test function also sets the fixtures up 
 
 Here's the part that makes code generation practical: the generated files never touch your source tree.
 
-Go 1.16 introduced the `-overlay` flag for the `go` toolchain. It takes a JSON file that maps virtual file paths to actual file paths on disk. When the compiler encounters a file reference, it checks the overlay map first. This means a file can appear to exist at `pkg/user/gotest_psuite_test.go` while actually living in gotest's cache directory.
+Go 1.16 introduced the `-overlay` flag for the `go` toolchain. It takes a JSON file that maps virtual file paths to actual file paths on disk. When the compiler encounters a file reference, it checks the overlay map first. This means a file can appear to exist at `pkg/user/gotest_psuite_test.go` while actually living in the run's own work dir.
 
 ```json {title="overlay.json"}
 {
   "Replace": {
-    "/home/you/project/pkg/user/gotest_psuite_test.go": "/home/you/.cache/gotest/overlays/3f2a…/0/gotest_psuite_test.go",
-    "/home/you/project/pkg/order/gotest_psuite_test.go": "/home/you/.cache/gotest/overlays/3f2a…/1/gotest_psuite_test.go"
+    "/home/you/project/pkg/user/gotest_psuite_test.go": "/tmp/gotest-work-1234/overlay/0/gotest_psuite_test.go",
+    "/home/you/project/pkg/order/gotest_psuite_test.go": "/tmp/gotest-work-1234/overlay/1/gotest_psuite_test.go"
   }
 }
 ```
 
-gotest writes the generated files to a content-addressable cache directory, creates the overlay JSON, and passes it to `go test -overlay=...`. Nothing is ever written into your project. Your source directory stays clean, your git status stays unchanged, and pull requests don't include generated code.
+gotest writes the generated files into the run's work dir, creates the overlay JSON, and passes it to `go test -overlay=...`. Nothing is ever written into your project. Your source directory stays clean, your git status stays unchanged, and pull requests don't include generated code.
 
-The cache is keyed by a SHA-256 hash of the generated content. If you run tests twice without changing any suite code, the second run hashes to the same entry and reuses the existing overlay files instead of writing them again. Compile reuse comes from Go's own build cache, which keys each compiled package by its files' names and contents, not by where an overlay keeps them.
+Each run writes its own overlay, so two runs never share one. Compile reuse comes from Go's own build cache, which keys each compiled package by its files' names and contents, not by where an overlay keeps them.
 
 ## What code generation gains over reflection
 
@@ -161,11 +161,11 @@ When you run `gotest ./...`, the full pipeline executes automatically:
 1. **AST discovery**: walk source files for suites, fixtures, lifecycle hooks
 1. **Validate**: check method signatures, fixture consistency, dependency cycles
 1. **Generate**: produce bridge code for each package
-1. **Cache**: write generated files to the content-addressable cache
+1. **Write**: write generated files into the run's work dir
 1. **Overlay**: create the overlay JSON mapping
 1. **Compile & run**: invoke `go test -overlay=...`
 
-Steps 1--6 are fast; they operate on parse trees, not compiled code. And caching keeps repeat runs cheap: unchanged sources hash to the same overlay entry, so nothing is rewritten and the compile step hits Go's build cache.
+Steps 1--6 are fast; they operate on parse trees, not compiled code. And repeat runs stay cheap: Go's build cache keys the overlaid files by their content, so an unchanged source hits it wherever the overlay lives.
 
 For large projects, gotest also uses streaming compilation: test packages start running as soon as they're compiled, without waiting for all packages to finish compiling. This overlaps compilation time with execution time, reducing wall-clock duration for multi-package test runs — the place this matters most is CI, as covered in [Go Tests in GitHub Actions]({{< ref "/blog/gotest-in-ci" >}}).
 
