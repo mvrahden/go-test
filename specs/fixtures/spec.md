@@ -226,3 +226,22 @@ When the run gives up on a shared fixture's setup, a sibling that came up SHALL 
 - **WHEN** a shared fixture's setup is given up while a sibling that came up is still to be released
 - **THEN** fails the run
 - **AND** the sibling's 8s AfterAll runs to its end under the teardown budget the process reports
+
+### Requirement: A shared fixture process whose CLI is killed
+When the CLI is killed, its shared fixture process SHALL end the setup's context, run the AfterAll of every fixture whose BeforeAll ran, and exit, on Unix; on Linux, a process whose hook never returns SHALL exit with status 1 once it has had its setup budget and the teardown budget it reported.
+
+#### Scenario: Killed while a fixture is up
+- **WHEN** the CLI is killed while a shared fixture is up
+- **THEN** the fixture's AfterAll runs to its end, then its process exits
+
+#### Scenario: Killed while a setup waits on its context
+- **WHEN** the CLI is killed while a shared fixture's BeforeAll waits on its context
+- **THEN** the setup's context ends, the fixture's AfterAll runs, then its process exits
+
+#### Scenario: An AfterAll that never returns
+- **WHEN** the CLI is killed and the shared fixture's AfterAll never returns
+- **THEN** the fixture process exits with status 1 once the 31s teardown budget it reported has passed
+
+#### Scenario: A BeforeAll that ignores its context
+- **WHEN** the CLI is killed while a shared fixture's BeforeAll ignores its context
+- **THEN** the fixture process exits with status 1 once its 1s setup budget and 31s teardown budget have passed

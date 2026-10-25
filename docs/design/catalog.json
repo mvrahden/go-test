@@ -6038,6 +6038,192 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the fixture's AfterAll runs to its end, then its process exits",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture's_AfterAll_runs_to_its_end,_then_its_process_exits",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed while a shared fixture is up",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_while_a_shared_fixture_is_up",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "KilledWhileUp",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestKilledWhileUp",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the setup's context ends, the fixture's AfterAll runs, then its process exits",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_setup's_context_ends,_the_fixture's_AfterAll_runs,_then_its_process_exits",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed while a shared fixture's BeforeAll waits on its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_while_a_shared_fixture's_BeforeAll_waits_on_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "KilledDuringSetup",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestKilledDuringSetup",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "KilledCLI",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestKilledCLITestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture process exits with status 1 once the 31s teardown budget it reported has passed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_process_exits_with_status_1_once_the_31s_teardown_budget_it_reported_has_passed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed and the shared fixture's AfterAll never returns",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_and_the_shared_fixture's_AfterAll_never_returns",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATeardownThatNeverReturns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATeardownThatNeverReturns",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture process exits with status 1 once its 1s setup budget and 31s teardown budget have passed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fixture_process_exits_with_status_1_once_its_1s_setup_budget_and_31s_teardown_budget_have_passed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the CLI is killed while a shared fixture's BeforeAll ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_CLI_is_killed_while_a_shared_fixture's_BeforeAll_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASetupThatIgnoresItsContext",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASetupThatIgnoresItsContext",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "OrphanedFixture",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestOrphanedFixtureTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails naming the shared fixture it binds and go tool gotest, before any method runs",
                       "duration": 0,
                       "excluded": false,
@@ -9859,13 +10045,13 @@
     }
   ],
   "stats": {
-    "behaviors": 334,
+    "behaviors": 338,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 51,
+    "suites": 53,
     "tests": 0
   }
 }
