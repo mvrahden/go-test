@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 2 naming the variable, before any build \(
+Clause: when GOTEST_CACHE_MAX_SIZE is not a size → exits 2 naming the variable, before any build
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -56,7 +56,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
+ 		return nil, nil, err
+ 	}
+ 
+-	if _, err := parseCacheMaxSize(os.Getenv(protocol.EnvCacheMaxSize)); err != nil {
++	if _, err := parseCacheMaxSize(os.Getenv(protocol.EnvCacheMaxSize)); err != nil && false {
+ 		return nil, nil, err
+ 	}
+ 	CleanStaleOverlays()

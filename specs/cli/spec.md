@@ -182,3 +182,15 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 #### Scenario: Runs under a tiny cap
 - **WHEN** 8 runs at once, in 3 rounds, share a cache capped at one byte
 - **THEN** passes every run, each suite running and reporting
+
+#### Scenario: A checkout that no longer exists
+- **WHEN** a cache key records a checkout that no longer exists
+- **THEN** a run removes its binaries
+
+#### Scenario: A binary unused for 7 days
+- **WHEN** a cached binary has not been used for 7 days
+- **THEN** a run removes it and keeps the binaries used since
+
+#### Scenario: An unreadable cap
+- **WHEN** GOTEST_CACHE_MAX_SIZE is not a size
+- **THEN** exits 2 naming the variable, before any build

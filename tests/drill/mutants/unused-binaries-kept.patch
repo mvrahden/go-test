@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / a run removes it and keeps the binaries used since \(
+Clause: when a cached binary has not been used for 7 days → a run removes it and keeps the binaries used since
+--- a/internal/gotestrunner/bincache_evict.go
++++ b/internal/gotestrunner/bincache_evict.go
+@@ -89,7 +89,7 @@ func sweepBinaryCache(root string, maxSize int64, now time.Time) {
+ 	for i := range keys {
+ 		k := &keys[i]
+ 		for _, b := range k.binaries {
+-			if k.gone || now.Sub(b.modTime) > cacheMaxAge {
++			if k.gone {
+ 				if evictBinary(b) {
+ 					emptied[k.dir] = true
+ 				}

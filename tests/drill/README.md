@@ -509,6 +509,9 @@ shards of one run do not add up to every mutant exactly once.
 | `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |
 | `eviction-ignores-a-use-since-the-scan` | the sweep evicts a binary a run used after the scan | runner: the binary used since the scan goes |
 | `emptied-key-removed-with-its-new-lock` | the sweep removes an emptied key dir with `RemoveAll`, taking a lock file a run just created | runner: the key dir and its fresh lock file go |
+| `gone-checkout-kept` | the sweep keeps the binaries of a key whose checkout no longer exists | cli conformance: the gone checkout's binary outlives the run |
+| `unused-binaries-kept` | the sweep keeps binaries unused for 7 days | cli conformance: the stale binary outlives the run |
+| `unreadable-cap-ignored` | an unreadable `GOTEST_CACHE_MAX_SIZE` is taken for the default instead of refused | cli conformance: the run does not exit 2 |
 
 ## Adding a mutant
 

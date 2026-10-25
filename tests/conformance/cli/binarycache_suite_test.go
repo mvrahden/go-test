@@ -1,6 +1,8 @@
 package cli_test
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -17,7 +19,7 @@ func (s *CLIBinaryCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
 	// Measured on linux: three rounds of 8 runs ~10s. Not yet measured on
 	// Windows CI, whose process starts and file writes are far slower; 3m
 	// leaves room.
-	return gotest.SuiteConfig{Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
 }
 
 func (s *CLIBinaryCacheTestSuite) TestRunsUnderATinyCap(t *gotest.T) {
@@ -46,6 +48,58 @@ func (s *CLIBinaryCacheTestSuite) TestRunsUnderATinyCap(t *gotest.T) {
 				gotest.Equal(it, 0, run.Exit, "run %d stdout: %s\nstderr: %s", i, run.Stdout, run.Stderr)
 				gotest.Equal(it, "pass", run.Verdict("TestPassingTestSuite"), "run %d stdout: %s", i, run.Stdout)
 			}
+		})
+	})
+}
+
+// staleKey makes a key dir in cache's bin dir that records checkout and
+// holds one binary used ago, and returns the binary's path.
+func staleKey(t *gotest.T, cache, key, checkout string, ago time.Duration) string {
+	dir := filepath.Join(cache, "bin", key)
+	gotest.NoError(t, os.MkdirAll(dir, 0o755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, ".cwd"), []byte(checkout), 0o600))
+	bin := filepath.Join(dir, "other.test")
+	gotest.NoError(t, os.WriteFile(bin, []byte("binary"), 0o755))
+	gotest.NoError(t, os.WriteFile(bin+".lock", nil, 0o644))
+	then := time.Now().Add(-ago)
+	gotest.NoError(t, os.Chtimes(bin, then, then))
+	return bin
+}
+
+func (s *CLIBinaryCacheTestSuite) TestWhatARunEvicts(t *gotest.T) {
+	cache := t.TempDir()
+	gone := staleKey(t, cache, "00000000000000aa", filepath.Join(t.TempDir(), "deleted-worktree"), time.Hour)
+	aged := staleKey(t, cache, "00000000000000bb", t.TempDir(), 8*24*time.Hour)
+	fresh := staleKey(t, cache, "00000000000000cc", t.TempDir(), time.Hour)
+	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), []string{protocol.EnvCacheDir + "=" + cache}, "../testdata/passing/")
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	present := func(path string) bool { _, err := os.Stat(path); return err == nil }
+
+	t.When("a cache key records a checkout that no longer exists", func(w *gotest.T) {
+		w.It("a run removes its binaries", func(it *gotest.T) {
+			gotest.False(it, present(gone), "%s outlived the run", gone)
+		})
+	})
+	t.When("a cached binary has not been used for 7 days", func(w *gotest.T) {
+		w.It("a run removes it and keeps the binaries used since", func(it *gotest.T) {
+			gotest.False(it, present(aged), "%s outlived the run", aged)
+			gotest.True(it, present(fresh), "%s was evicted", fresh)
+		})
+	})
+}
+
+func (s *CLIBinaryCacheTestSuite) TestAnUnreadableCap(t *gotest.T) {
+	cache := t.TempDir()
+	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), []string{protocol.EnvCacheDir + "=" + cache, protocol.EnvCacheMaxSize + "=5GB"}, "../testdata/passing/")
+	gotest.NoError(t, err)
+	_, statErr := os.Stat(filepath.Join(cache, "bin"))
+
+	t.When("GOTEST_CACHE_MAX_SIZE is not a size", func(w *gotest.T) {
+		w.It("exits 2 naming the variable, before any build", func(it *gotest.T) {
+			gotest.Equal(it, 2, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Contains(it, run.Stderr+run.Stdout, "GOTEST_CACHE_MAX_SIZE=5GB")
+			gotest.True(it, os.IsNotExist(statErr), "a build ran: %s exists", filepath.Join(cache, "bin"))
 		})
 	})
 }
