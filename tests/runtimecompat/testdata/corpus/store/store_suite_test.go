@@ -75,10 +75,6 @@ func (s *StoreTestSuite) TestNormalize(t *gotest.T, c *storeCtx) {
 	})
 }
 
-func (s *StoreTestSuite) TestFlushAsync(t *gotest.T, c *storeCtx, done func()) {
-	gotest.Go(t, func() { done() })
-}
-
 type CodecTestSuite struct {
 	seen int
 }

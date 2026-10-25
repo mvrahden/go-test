@@ -1,6 +1,8 @@
 package gotestruntime_test
 
 import (
+	"fmt"
+
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
@@ -26,15 +28,21 @@ func (s *DeprecatedTestSuite) TestAnOlderHarness(t *gotest.T) {
 	})
 }
 
-func (s *DeprecatedTestSuite) TestAHarnessBeforeAwaitDoneAt(t *gotest.T) {
-	t.It("still compiles and waits for done", func(it *gotest.T) {
-		called := false
-		gotestruntime.AwaitDone(it, "TestAsync", func(done func()) { //nolint:staticcheck // the older harness's shape
-			go func() {
-				called = true
-				done()
-			}()
-		})
-		gotest.True(it, called)
-	})
+func (s *DeprecatedTestSuite) TestAHarnessThatAwaitsDone(t *gotest.T) {
+	for t, call := range gotest.Each(t, []struct {
+		Desc string
+		run  func(*gotest.T)
+	}{
+		{Desc: "AwaitDoneAt", run: func(t *gotest.T) {
+			gotestruntime.AwaitDoneAt(t, "TestPingAsync", "ping_test.go:7", func(func()) {}) //nolint:staticcheck // the older harness's shape
+		}},
+		{Desc: "AwaitDone", run: func(t *gotest.T) {
+			gotestruntime.AwaitDone(t, "TestPingAsync", func(func()) {}) //nolint:staticcheck // the older harness's shape
+		}},
+	}) {
+		got := fmt.Sprint(gotest.Panics(t, func() { call.run(t) }))
+		gotest.Contains(t, got, "TestPingAsync")
+		gotest.Contains(t, got, "Run `gotest generate` again")
+		gotest.Contains(t, got, "make(chan struct{})")
+	}
 }

@@ -68,10 +68,8 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 		stop()
 		cancel()
 	})
-	methodWatches.Store(it, bodyWatch(m))
 	return m, func() {
 		afterTs.Delete(m.t)
-		methodWatches.Delete(it)
 		m.watchOff()
 	}
 }
@@ -120,17 +118,6 @@ func (m *method) watchOff() {
 		m.after.end(context.DeadlineExceeded)
 	}
 }
-
-// endBody ends the watch while an async method waits for done and returns
-// the budget it declared.
-func (m *method) endBody() time.Duration {
-	m.watchOff()
-	return m.budget
-}
-
-// resume holds the hooks after an async method's wait to what is left of
-// the budget: the same deadline, so none is left once it has passed.
-func (m *method) resume() { m.watchOn() }
 
 // deadlinePassed ends the method's context at its deadline, or leaves that
 // to the watch while it runs.
