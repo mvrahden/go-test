@@ -3436,6 +3436,101 @@
               "name": "TestTheFileChangesNoOtherOutput",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "writes its stream to the file, verdict included, and exits as without it",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_its_stream_to_the_file,_verdict_included,_and_exits_as_without_it",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run that does not pass is given --events-file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_that_does_not_pass_is_given_--events-file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a failing run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_failing_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "writes its stream to the file, verdict included, and exits as without it",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_its_stream_to_the_file,_verdict_included,_and_exits_as_without_it",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run that does not pass is given --events-file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_that_does_not_pass_is_given_--events-file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a build failure",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_build_failure",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "EveryOutcomeWritesTheFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestEveryOutcomeWritesTheFile",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIEventsFile",
@@ -10395,7 +10490,7 @@
     }
   ],
   "stats": {
-    "behaviors": 344,
+    "behaviors": 346,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -1,3 +1,5 @@
+Expect: ^FAIL .*conformance/cli .* / writes its stream to the file, verdict included, and exits as without it \(
+Clause: when a -json run that does not pass is given --events-file → writes its stream to the file, verdict included, and exits as without it
 Expect: ^FAIL .*conformance/cli .* / writes the bytes it prints to the file, making its directories \(
 Clause: when a -json run is given --events-file → writes the bytes it prints to the file, making its directories
 Expect: ^FAIL .*conformance/cli .* / renders the summary the run rendered, with its exit code \(

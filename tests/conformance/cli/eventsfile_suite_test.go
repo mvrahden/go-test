@@ -106,3 +106,30 @@ func (s *CLIEventsFileTestSuite) TestTheFileChangesNoOtherOutput(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIEventsFileTestSuite) TestEveryOutcomeWritesTheFile(t *gotest.T) {
+	type row struct {
+		Desc  string
+		pkg   string
+		exit  int
+		event string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "a failing run", pkg: "../testdata/failing/", exit: 1, event: `"Action":"fail"`},
+		{Desc: "a build failure", pkg: "../../canary/testdata/broken/", exit: 2, event: `"Action":"build-fail"`},
+	}) {
+		path := filepath.Join(t.TempDir(), "events.json")
+		run, err := testkit.RunPackage(t.Context(), t.TempDir(), r.pkg, "--events-file="+path)
+		gotest.NoError(t, err)
+		got, readErr := os.ReadFile(path)
+
+		t.When("a -json run that does not pass is given --events-file", func(w *gotest.T) {
+			w.It("writes its stream to the file, verdict included, and exits as without it", func(it *gotest.T) {
+				gotest.Equal(it, r.exit, run.Exit, "stderr: %s", run.Stderr)
+				gotest.NoError(it, readErr)
+				gotest.Contains(it, string(got), r.event)
+				gotest.Equal(it, run.Stdout, string(got))
+			})
+		})
+	}
+}

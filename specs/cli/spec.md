@@ -202,6 +202,10 @@ A run given --events-file SHALL write the go test -json event stream to that fil
 - **WHEN** a summary with annotations and coverage is run with and without --events-file
 - **THEN** prints, annotates, covers and exits the same
 
+#### Scenario: A run that does not pass
+- **WHEN** a -json run that does not pass is given --events-file
+- **THEN** writes its stream to the file, verdict included, and exits as without it
+
 #### Scenario: A stopped run
 - **WHEN** a -json run with --events-file is stopped while a suite holds
 - **THEN** keeps the events of the suites that ended before the stop, each line whole
