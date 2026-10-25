@@ -242,6 +242,10 @@ runtime function the generator stops calling stays behind as a deprecated
 shim (`pkg/gotestruntime/deprecated.go`): a harness an older gotest left on
 disk still compiles. A changed signature is a new symbol, never an edit;
 calling one moves the floor to the first release that has it.
+`make runtime-compat` holds both: `apidiff` fails a runtime that drops or
+changes a symbol of the last release, and a corpus under
+`tests/runtimecompat` runs this tree's generated code against the floor
+release, reaching every runtime symbol the templates call.
 
 For **suites with fixtures**, every generated top-level function — the
 `TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`

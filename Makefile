@@ -1,4 +1,4 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
@@ -60,4 +60,15 @@ golangci-lint:
 golangci-version:
 	@echo $(GOLANGCI_VERSION)
 
-checks: fmt-check vuln golangci-lint
+# Generated code and the runtime may come from different releases: an older
+# harness must compile against this runtime, and this tree's generated code
+# against the oldest runtime it accepts. Both read the release tags.
+runtime-compat: runtime-api runtime-floor
+
+runtime-api:
+	bash tests/runtimecompat/api.sh
+
+runtime-floor:
+	bash tests/runtimecompat/floor.sh
+
+checks: fmt-check vuln golangci-lint runtime-compat
