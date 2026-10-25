@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 import { spawn } from "node:child_process";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { GoTestController } from "./testController.js";
@@ -196,6 +196,40 @@ export class BenchRunner {
     }
 
     const outDir = await mkdtemp(path.join(os.tmpdir(), "gotest-bench-prof-"));
+    // Removed when the run fails or is cancelled, and once pprof, which reads
+    // the profile, has exited.
+    const removeOutDir = () =>
+      rm(outDir, { recursive: true, force: true }).catch(() => {});
+    if (!(await this.runProfiled(target, kind, workspaceDir, outDir))) {
+      await removeOutDir();
+      return;
+    }
+
+    const profile = path.join(outDir, `${kind}.pprof`);
+    // pprof owns its lifetime: it picks a free port and opens the browser.
+    // Detached on purpose — closing the editor must not kill the analysis.
+    const pprof = spawn("go", ["tool", "pprof", "-http=127.0.0.1:0", profile], {
+      cwd: workspaceDir,
+      detached: true,
+      stdio: "ignore",
+    });
+    pprof.on("exit", removeOutDir);
+    pprof.on("error", removeOutDir);
+    pprof.unref();
+    this.outputChannel.info(`[bench] pprof UI launched for ${profile}`);
+  }
+
+  /**
+   * runProfiled runs the profiling bench invocation into outDir and records
+   * its numbers. It reports whether a profile is there to open: false when
+   * the run failed or was cancelled.
+   */
+  private async runProfiled(
+    target: BenchTarget,
+    kind: ProfileKind,
+    workspaceDir: string,
+    outDir: string,
+  ): Promise<boolean> {
     let cmd: CliCommand;
     try {
       cmd = await buildCliCommand(
@@ -204,10 +238,10 @@ export class BenchRunner {
         this.outputChannel,
       );
     } catch (err: unknown) {
-      if (offerCliUpgrade(err)) return;
+      if (offerCliUpgrade(err)) return false;
       const message = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`gotest bench: ${message}`);
-      return;
+      return false;
     }
     this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
 
@@ -220,29 +254,21 @@ export class BenchRunner {
         workspaceDir,
         cts.token,
       );
+      if (cts.token.isCancellationRequested) return false;
       if (stderr.trim()) this.outputChannel.warn(stderr.trimEnd());
       if (!stdout.trim()) {
         throw new Error(`gotest bench exited with code ${code}`);
       }
       this.recordAndLog(parseBenchReport(stdout));
+      return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       vscode.window.showErrorMessage(`gotest bench failed: ${message}`);
-      return;
+      return false;
     } finally {
       if (this.active === cts) this.active = undefined;
       cts.dispose();
     }
-
-    const profile = path.join(outDir, `${kind}.pprof`);
-    // pprof owns its lifetime: it picks a free port and opens the browser.
-    // Detached on purpose — closing the editor must not kill the analysis.
-    spawn("go", ["tool", "pprof", "-http=127.0.0.1:0", profile], {
-      cwd: workspaceDir,
-      detached: true,
-      stdio: "ignore",
-    }).unref();
-    this.outputChannel.info(`[bench] pprof UI launched for ${profile}`);
   }
 
   /**
