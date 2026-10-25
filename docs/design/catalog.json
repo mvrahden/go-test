@@ -7648,6 +7648,99 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "prints one line naming the method and the default deadline",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "prints_one_line_naming_the_method_and_the_default_deadline",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves the method's verdict as it is",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_the_method's_verdict_as_it_is",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a method of a suite that declares no Timeout waits on t.Context() past the default 30s deadline",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_method_of_a_suite_that_declares_no_Timeout_waits_on_t.Context()_past_the_default_30s_deadline",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the method by the Timeout and prints no line about the default deadline",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_method_by_the_Timeout_and_prints_no_line_about_the_default_deadline",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares a Timeout and its method waits on t.Context() past it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_declares_a_Timeout_and_its_method_waits_on_t.Context()_past_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AContextTheDefaultDeadlineEnded",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAContextTheDefaultDeadlineEnded",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DefaultDeadline",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestDefaultDeadlineTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails that row and the method, and the rows after it never run",
                       "duration": 0,
                       "excluded": false,
@@ -10045,13 +10138,13 @@
     }
   ],
   "stats": {
-    "behaviors": 338,
+    "behaviors": 341,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 53,
+    "suites": 54,
     "tests": 0
   }
 }

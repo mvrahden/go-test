@@ -40,7 +40,11 @@ type phaseWatch struct{ done, stopped chan struct{} }
 // when the verdict is written.
 func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end func()) {
 	if budget <= 0 {
-		return &method{it: it, t: TestT(it, timeout)}, func() {}
+		m = &method{it: it, t: TestT(it, timeout)}
+		if !defaultApplies(timeout, budget) {
+			return m, func() {}
+		}
+		return m, noteDefaultDeadline(it, m.t.Context(), it.Name(), "Timeout", timeout)
 	}
 	parent, cancel := context.WithCancel(it.Context())
 	// As in [testScopedT]: a stop already in effect is seen at once.

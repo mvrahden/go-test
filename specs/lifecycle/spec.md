@@ -149,6 +149,18 @@ A panic in a test method or its BeforeEach SHALL be reported and fail the test e
 - **WHEN** a test method's BeforeEach panics and its AfterEach fails a fatal assertion
 - **THEN** the test fails with the panic reported, and its AfterEach still runs
 
+### Requirement: A context the default deadline ended
+When the default deadline of a suite that declares no Timeout or SetupTimeout ends the context of a test method, BeforeAll or AfterAll still running, the harness SHALL write one line naming it and the default, unbuffered on stderr or, under -json, with its test, and SHALL leave its verdict as it is. A declared budget reports its own verdict, so it gets no such line, and neither does a context a stop or the end of its phase ended.
+
+#### Scenario: A method waits past the default deadline
+- **WHEN** a method of a suite that declares no Timeout waits on t.Context() past the default 30s deadline
+- **THEN** prints one line naming the method and the default deadline
+- **AND** leaves the method's verdict as it is
+
+#### Scenario: A method waits past a declared Timeout
+- **WHEN** a suite declares a Timeout and its method waits on t.Context() past it
+- **THEN** fails the method by the Timeout and prints no line about the default deadline
+
 ### Requirement: What an expired --timeout names
 An expired --timeout SHALL name as running only the tests whose process it cut short, not a test whose suite process ended on its own before it.
 

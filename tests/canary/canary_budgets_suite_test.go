@@ -31,3 +31,18 @@ func (s *CanaryTestSuite) TestALateFixtureIsReleasedUnderItsDeclaredBudget(t *go
 func (s *CanaryTestSuite) TestTheSetupWaitCountsTheReleaseBetweenAttempts(t *gotest.T) {
 	s.check(t, "slowretry")
 }
+
+// A context the default deadline ended in a suite that declares no Timeout
+// is named once, with its method, and the method still passes; a method
+// past a declared Timeout fails by it and gets no such line.
+func (s *CanaryTestSuite) TestAContextTheDefaultDeadlineEndedIsNamed(t *gotest.T) {
+	s.check(t, "defaultdeadline")
+	const line = "t.Context() ended at the default 30s deadline; the suite declares no Timeout"
+	waiting := streamOutput(s.lastStream, "TestWaitingTestSuite/TestWaitsOnItsContext")
+	if n := strings.Count(waiting, "TestWaitingTestSuite/TestWaitsOnItsContext: "+line); n != 1 {
+		t.Errorf("defaultdeadline: the waiting method was named %d times, want once:\n%s", n, waiting)
+	}
+	if n := strings.Count(s.lastStream, "t.Context() ended at the default "); n != 1 {
+		t.Errorf("defaultdeadline: the default deadline was named %d times in the run, want once:\n%s", n, s.lastStream)
+	}
+}

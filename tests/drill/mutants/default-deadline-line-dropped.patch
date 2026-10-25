@@ -1,0 +1,17 @@
+Expect: defaultdeadline: the waiting method was named 0 times, want once
+Judge: ./tests/canary CanaryTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
+Clause: when a method of a suite that declares no Timeout waits on t.Context() past the default 30s deadline → prints one line naming the method and the default deadline
+--- a/pkg/gotestruntime/methodbudget.go
++++ b/pkg/gotestruntime/methodbudget.go
+@@ -41,10 +41,7 @@ type phaseWatch struct{ done, stopped chan struct{} }
+ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end func()) {
+ 	if budget <= 0 {
+ 		m = &method{it: it, t: TestT(it, timeout)}
+-		if !defaultApplies(timeout, budget) {
+-			return m, func() {}
+-		}
+-		return m, noteDefaultDeadline(it, m.t.Context(), it.Name(), "Timeout", timeout)
++		return m, func() {}
+ 	}
+ 	parent, cancel := context.WithCancel(it.Context())
+ 	// As in [testScopedT]: a stop already in effect is seen at once.

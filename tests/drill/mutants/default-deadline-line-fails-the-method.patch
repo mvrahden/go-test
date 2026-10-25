@@ -1,0 +1,13 @@
+Expect: defaultdeadline: verdicts differ from the golden list
+Judge: ./tests/canary CanaryTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
+Clause: when a method of a suite that declares no Timeout waits on t.Context() past the default 30s deadline → leaves the method's verdict as it is
+--- a/pkg/gotestruntime/defaultdeadline.go
++++ b/pkg/gotestruntime/defaultdeadline.go
+@@ -32,6 +32,7 @@ func noteDefaultDeadline(tb testing.TB, ctx context.Context, who, field string,
+ 		defer close(said)
+ 		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
+ 			fmt.Fprintf(defaultDeadlineOut(tb), "%s: t.Context() ended at the default %s deadline; the suite declares no %s\n", who, timeout, field)
++			tb.Fail()
+ 		}
+ 	})
+ 	// A phase that returns the moment its context ends gets here before the

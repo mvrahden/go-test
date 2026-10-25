@@ -220,6 +220,9 @@ func resumeHooks(t *testing.T) {
 // declared no config of its own.
 func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
 	tt := SetupT(t, timeout)
+	if defaultApplies(timeout, budget) {
+		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" BeforeAll", "SetupTimeout", timeout)()
+	}
 	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() {
 		// A stop gives BeforeAll the grace a method body gets: AfterAll
 		// cannot run before it returns.
@@ -232,6 +235,9 @@ func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotes
 // as [RunSetup].
 func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*gotest.T)) {
 	tt := TeardownT(t, timeout)
+	if defaultApplies(timeout, budget) {
+		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" AfterAll", "SetupTimeout", timeout)()
+	}
 	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
 }
 
