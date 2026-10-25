@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/proctree"
 )
 
 // envChild makes a run of this test binary one of the child programs below.
@@ -34,6 +36,8 @@ func TestMain(m *testing.M) {
 //   - ignore: swallows shutdown requests; with spawn it first starts an
 //     ignoring grandchild and prints its pid
 //   - orphan: starts an ignoring grandchild, prints its pid and exits
+//   - parent: starts a listening grandchild through a tree of its own, with
+//     the grandchild marker as its marker, prints its pid and stays
 //   - exit: exits as soon as it is ready
 //   - consoles: prints the pids attached to its console (Windows)
 func runChild(mode string) int {
@@ -56,6 +60,8 @@ func runChild(mode string) int {
 		}
 		fmt.Println("ready")
 		return 0
+	case "parent":
+		return parent()
 	case "exit":
 		fmt.Println("ready")
 		return 0
@@ -89,6 +95,23 @@ func listen() int {
 	if grandchild != nil {
 		_ = grandchild.Wait()
 	}
+	return 0
+}
+
+func parent() int {
+	cmd := exec.Command(os.Args[0]) //nolint:gosec // G204: this test binary
+	cmd.Env = append(childEnv("listen"), envMarker+"="+os.Getenv(envGrandMarker))
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return 2
+	}
+	tree := proctree.New(cmd)
+	if tree.Start() != nil || !waitReady(bufio.NewScanner(out)) {
+		return 2
+	}
+	fmt.Printf("pid=%d\n", cmd.Process.Pid)
+	fmt.Println("ready")
+	time.Sleep(5 * time.Minute)
 	return 0
 }
 

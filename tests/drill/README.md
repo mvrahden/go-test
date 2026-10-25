@@ -431,6 +431,7 @@ shards of one run do not add up to every mutant exactly once.
 | `snapshot-cr-runs-kept` | only CRLF is a line ending in a snapshot value | canary: the `snapshotting` fixture's carriage returns no longer match |
 | `shared-fixture-runs-under-plain-go-test` | a suite binding a shared fixture runs under plain go test with empty state | canary: the staged fixture-chain suite's method runs instead of the suite naming the fixture it binds |
 | `shared-fixture-failed-setup-not-released` | a shared fixture whose setup failed is not released | canary: the leaking fixture's AfterAll marker is missing |
+| `release-leaves-the-group` | releasing a suite's process tree leaves its stragglers alive | canary: a sleep the test never waited for outlives the run |
 | `fixture-failed-setup-not-released` | a fixture whose BeforeAll failed is not torn down | canary: the setup-failing fixture's AfterAll never runs |
 | `release-between-attempts-best-effort` | the AfterAll between two setup attempts is run bare and its error dropped | canary: a package and a shared fixture whose release between attempts fails leave the run green and say nothing of it |
 | `last-attempt-failure-only-logged` | a setup whose last attempt fails is logged and then reported as a success | canary: a suite bound to a shared fixture that never comes up runs and the run goes green |
@@ -474,7 +475,7 @@ shards of one run do not add up to every mutant exactly once.
 | `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | shared fixture shutdown suite: the setup process outlives the CLI |
 | `second-signal-kills-the-shared-fixture` | the CLI's second signal kills a tree without a stop file instead of asking it to tear down | runner unit suite: the tree without a stop file never tears down |
 | `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
-| `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running | lifecycle conformance: a process the test started outlives the run |
+| `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
 | `stop-kills-the-suite` | the runner stops a suite by its pid with SIGKILL | lifecycle conformance: AfterAll never runs before the fixture's release |
 | `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle conformance: the stopped run's stream has no failed package |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |

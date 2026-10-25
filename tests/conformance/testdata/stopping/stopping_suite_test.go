@@ -20,8 +20,9 @@ func (s *StopTestSuite) AfterAll(t *gotest.T)  { mark("suite.AfterAll") }
 
 func (s *StopTestSuite) TestHolds(t *gotest.T) {
 	if os.Getenv("STOPPING_CHILD") == "1" {
-		// A process of the test's own, left running when the stop comes.
-		child := exec.Command("sleep", "120")
+		// A process of the test's own, left running when the stop comes; it
+		// marks an interrupt, which a kill gives it no chance to.
+		child := exec.Command("sh", "-c", `trap 'echo "child interrupted" >> "$GOTEST_CANARY_DIR/markers"; exit 0' INT TERM; while :; do sleep 0.1; done`)
 		if child.Start() == nil {
 			mark(fmt.Sprintf("child=%d", child.Process.Pid))
 		}

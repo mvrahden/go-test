@@ -235,6 +235,13 @@ A run stopped by SIGINT, SIGTERM or a second SIGINT SHALL end with its exit code
 - **WHEN** a run is stopped by a signal, however gotest was launched
 - **THEN** ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
 
+### Requirement: No process outlives the run
+A run SHALL leave no process a test started behind, even one the test never waits for.
+
+#### Scenario: A process nobody waits for
+- **WHEN** a test starts sleep 4242 and never waits for it
+- **THEN** the test passes and no such process outlives the run
+
 ### Requirement: A second Ctrl-C to gotest
 A second SIGINT reaching gotest while its suites stop SHALL, on Unix, send each suite process a second stop signal, which releases the fixtures at once, and kill what still runs two seconds later or at a further SIGINT; on Windows, where no second stop reaches a suite, it SHALL kill the suites at once. It SHALL ask the shared fixture process to tear down within those two seconds, and SHALL exit 130 leaving no suite process behind.
 
@@ -267,4 +274,5 @@ A run stopped while a test has a process of its own running SHALL end that proce
 #### Scenario: A process a test started
 - **WHEN** the run is interrupted while a holding method has started a process of its own
 - **THEN** ends that process before gotest exits
+- **AND** interrupts it before killing it
 - **AND** runs AfterAll before the fixture is released

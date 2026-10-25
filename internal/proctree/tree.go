@@ -158,7 +158,7 @@ func (t *Tree) Kill() error {
 
 // Release ends ownership; call it once the command has been waited for. Its pid
 // may belong to another process from then on, so nothing is signalled after.
-// On Windows it also kills what the root left running in its tree.
+// It also kills what the root left running in its tree.
 func (t *Tree) Release() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -167,6 +167,6 @@ func (t *Tree) Release() {
 	}
 	t.released = true
 	if t.adopted {
-		t.sys.release()
+		t.sys.release(t.cmd.Process.Pid)
 	}
 }

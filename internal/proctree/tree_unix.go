@@ -16,6 +16,7 @@ func prepare(cmd *exec.Cmd) {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.Setpgid = true
+	deathSignal(cmd.SysProcAttr)
 }
 
 func (sysTree) adopt(int) {}
@@ -29,7 +30,10 @@ func (sysTree) interrupt(pid int, ctrlC bool) error {
 
 func (sysTree) kill(pid int) error { return signalGroup(pid, syscall.SIGKILL) }
 
-func (sysTree) release() {}
+// release kills whatever the root left running in its group: the group's id
+// stays its own while any member lives, so a signal to it after the root was
+// reaped reaches no stranger.
+func (sysTree) release(pid int) { _ = signalGroup(pid, syscall.SIGKILL) }
 
 // alive reports whether any process of the group led by pid is left. The
 // group's id is not reused while it has a member, so probing it after the
