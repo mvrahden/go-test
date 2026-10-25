@@ -230,3 +230,16 @@ func (s *SpecTestSuite) TestFences(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SpecTestSuite) TestAFailedRenderNamesItsExitStatus(t *gotest.T) {
+	t.When("spec --static ends by a Windows termination status", func(w *gotest.T) {
+		w.It("names the status in hex with its name", func(it *gotest.T) {
+			gotest.ErrorContains(it, speccatalog.ExportStaticExitError(3221225786, "boom"), "spec --static exited 0xC000013A (STATUS_CONTROL_C_EXIT):\nboom")
+		})
+	})
+	t.When("spec --static exits with a code of its own", func(w *gotest.T) {
+		w.It("names the code in decimal", func(it *gotest.T) {
+			gotest.ErrorContains(it, speccatalog.ExportStaticExitError(2, "boom"), "spec --static exited 2:\nboom")
+		})
+	})
+}

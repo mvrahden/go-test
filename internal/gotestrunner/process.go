@@ -1,7 +1,6 @@
 package gotestrunner
 
 import (
-	"fmt"
 	"os/exec"
 	"time"
 
@@ -41,16 +40,11 @@ func ExitStatusVerdict(status int) (code int, how string) {
 		// -race reports a race found after the last test — in fixture
 		// teardown, which runs after m.Run — by its own exit code.
 		return 1, "by the race detector (exit status 66)"
-	case status > maxExitCode:
-		return 1, fmt.Sprintf("by the system (status 0x%X)", uint32(status)) //nolint:gosec // G115: a Windows exit status is a DWORD
+	case proctree.Terminated(status):
+		return 1, "by the system (status " + proctree.StatusHex(status) + ")"
 	}
 	return status, ""
 }
 
 // raceExitCode is the race detector's default exit status (GORACE exitcode).
 const raceExitCode = 66
-
-// maxExitCode is the highest status a program sets as its own exit code.
-// Windows allows any 32-bit value, but a termination status uses the high bits
-// (0xC000013A), so anything above the conventional range is a termination.
-const maxExitCode = 255
