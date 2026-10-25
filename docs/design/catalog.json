@@ -3880,6 +3880,86 @@
               "name": "TestConcurrentRunsSharingACache",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "leaves none of the files it generated behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_none_of_the_files_it_generated_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunsGeneratedFilesEndWithIt",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestARunsGeneratedFilesEndWithIt",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names its overlay on stderr and keeps it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "names_its_overlay_on_stderr_and_keeps_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a --debug run ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_--debug_run_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ADebugRunKeepsItsGeneratedFiles",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestADebugRunKeepsItsGeneratedFiles",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIOverlay",
@@ -10191,7 +10271,7 @@
     }
   ],
   "stats": {
-    "behaviors": 342,
+    "behaviors": 344,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

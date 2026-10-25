@@ -501,6 +501,7 @@ shards of one run do not add up to every mutant exactly once.
 | `overlay-shared-between-runs` | every run writes its overlay into one shared dir | runner: two runs of one overlay get the same dir |
 | `overlay-outlives-its-run` | the overlay is written beside the work dir, so the run's cleanup leaves it | runner: the overlay outlives its run |
 | `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
+| `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
 
 ## Adding a mutant

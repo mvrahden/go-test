@@ -167,3 +167,11 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 #### Scenario: Runs sharing a cache
 - **WHEN** 16 runs of one package start at once and share one cache
 - **THEN** passes every run
+
+#### Scenario: A run ends
+- **WHEN** a run ends
+- **THEN** leaves none of the files it generated behind
+
+#### Scenario: A --debug run ends
+- **WHEN** a --debug run ends
+- **THEN** names its overlay on stderr and keeps it
