@@ -503,6 +503,7 @@ shards of one run do not add up to every mutant exactly once.
 | `gone-checkout-kept` | the sweep keeps the binaries of a key whose checkout no longer exists | cli conformance: the gone checkout's binary outlives the run |
 | `unused-binaries-kept` | the sweep keeps binaries unused for 7 days | cli conformance: the stale binary outlives the run |
 | `events-file-not-written` | the collector never tees the event stream into the `--events-file` file | cli conformance: the file differs from what -json prints |
+| `events-file-replaces-output` | the `--events-file` file takes the event stream instead of sharing it with the run's own output | cli conformance: the summary, annotations and step summary differ from a run without the flag |
 
 ## Adding a mutant
 

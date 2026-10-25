@@ -3,6 +3,7 @@ package cli_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -59,4 +60,49 @@ func (s *CLIEventsFileTestSuite) TestTheFileReplaysAsTheRun(t *gotest.T) {
 			})
 		})
 	}
+}
+
+// elapsed masks the durations a summary prints, which differ between two runs.
+var elapsed = regexp.MustCompile(`\(<?[0-9][0-9.hmnsµ]*\)`)
+
+func (s *CLIEventsFileTestSuite) TestTheFileChangesNoOtherOutput(t *gotest.T) {
+	type outputs struct {
+		run                          testkit.Run
+		stepSummary, profile, stdout string
+	}
+	summarize := func(events bool) outputs {
+		dir := t.TempDir()
+		args := []string{"summary", "--no-color", "--github", "--coverage=" + filepath.Join(dir, "cover.out"), "--min=100"}
+		if events {
+			args = append(args, "--events-file="+filepath.Join(dir, "events.json"))
+		}
+		args = append(args, "--", "-coverprofile="+filepath.Join(dir, "cover.out"), "../testdata/failing/", "../testdata/covered/")
+		run, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{"GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY=" + filepath.Join(dir, "step.md")}, args...)
+		gotest.NoError(t, err)
+		step, err := os.ReadFile(filepath.Join(dir, "step.md"))
+		gotest.NoError(t, err)
+		profile, err := os.ReadFile(filepath.Join(dir, "cover.out"))
+		gotest.NoError(t, err)
+		return outputs{
+			run:         run,
+			stepSummary: elapsed.ReplaceAllString(string(step), "(…)"),
+			profile:     string(profile),
+			stdout:      elapsed.ReplaceAllString(run.Stdout, "(…)"),
+		}
+	}
+	without, with := summarize(false), summarize(true)
+
+	t.When("a summary with annotations and coverage is run with and without --events-file", func(w *gotest.T) {
+		w.It("prints, annotates, covers and exits the same", func(it *gotest.T) {
+			gotest.Equal(it, 1, without.run.Exit, "stderr: %s", without.run.Stderr)
+			gotest.Contains(it, without.stdout, "::error ")
+			gotest.Contains(it, without.stdout, "100.0%")
+			gotest.NotEmpty(it, without.stepSummary)
+			gotest.Equal(it, without.run.Exit, with.run.Exit, "stderr: %s", with.run.Stderr)
+			gotest.Equal(it, without.stdout, with.stdout)
+			gotest.Equal(it, without.run.Stderr, with.run.Stderr)
+			gotest.Equal(it, without.stepSummary, with.stepSummary)
+			gotest.Equal(it, without.profile, with.profile)
+		})
+	})
 }

@@ -3222,6 +3222,46 @@
               "name": "TestTheFileReplaysAsTheRun",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints, annotates, covers and exits the same",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "prints,_annotates,_covers_and_exits_the_same",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a summary with annotations and coverage is run with and without --events-file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_summary_with_annotations_and_coverage_is_run_with_and_without_--events-file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheFileChangesNoOtherOutput",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheFileChangesNoOtherOutput",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIEventsFile",
@@ -10181,7 +10221,7 @@
     }
   ],
   "stats": {
-    "behaviors": 338,
+    "behaviors": 339,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
