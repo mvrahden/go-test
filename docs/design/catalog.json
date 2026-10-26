@@ -5959,6 +5959,101 @@
               "name": "TestReleasedAfterItsLastSuite",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "releases the fixture once its readers that can run have finished, before the unrelated suite ends",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "releases_the_fixture_once_its_readers_that_can_run_have_finished,_before_the_unrelated_suite_ends",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a shared fixture's reader is in a package that never links, while an unrelated suite still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_shared_fixture's_reader_is_in_a_package_that_never_links,_while_an_unrelated_suite_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "one of its two readers never links",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_of_its_two_readers_never_links",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "releases the fixture once its readers that can run have finished, before the unrelated suite ends",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "releases_the_fixture_once_its_readers_that_can_run_have_finished,_before_the_unrelated_suite_ends",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a shared fixture's reader is in a package that never links, while an unrelated suite still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_shared_fixture's_reader_is_in_a_package_that_never_links,_while_an_unrelated_suite_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "its only reader never links",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "its_only_reader_never_links",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "SuitesThatNeverRunHoldNothing",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSuitesThatNeverRunHoldNothing",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureLastUse",
@@ -10731,7 +10826,7 @@
     }
   ],
   "stats": {
-    "behaviors": 351,
+    "behaviors": 353,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -771,6 +771,11 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
 
+	// A package that will never run holds no fixture.
+	for i := range overlay.BrokenPackages {
+		releaser.Release(ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
+	}
+
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	// The flush order holds every package the collector will report on.
@@ -803,6 +808,7 @@ loop:
 			}
 			buildFailed = true
 			bookBuildFailures(collector, nil, []BuildFailure{{Package: outcome.Package, Err: outcome.Err}})
+			releaser.Release(ledger.DoneExcept(outcome.Package, nil))
 			continue
 		}
 		cr := outcome.Result
@@ -811,6 +817,12 @@ loop:
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
 		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter, pf.UserSkipFilter)
 		withExec(targets, pf.Exec)
+		// The planned suites the package produced no target for never run.
+		produced := make(map[string]bool, len(targets))
+		for j := range targets {
+			produced[targets[j].SuiteName] = true
+		}
+		releaser.Release(ledger.DoneExcept(cr.Package, produced))
 
 		if len(targets) == 0 {
 			collector.RecordNothingToRun(cr.Package)

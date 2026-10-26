@@ -63,6 +63,26 @@ func (l *fixtureLedger) Done(pkg, suite string) []string {
 	return free
 }
 
+// DoneExcept is Done for every planned suite of pkg not in kept: the suites
+// a build failure or the selection left without a process.
+func (l *fixtureLedger) DoneExcept(pkg string, kept map[string]bool) []string {
+	l.mu.Lock()
+	suites := make([]string, 0, len(l.needs[pkg]))
+	for suite := range l.needs[pkg] {
+		if !kept[suite] {
+			suites = append(suites, suite)
+		}
+	}
+	l.mu.Unlock()
+	sort.Strings(suites)
+	var free []string
+	for _, suite := range suites {
+		free = append(free, l.Done(pkg, suite)...)
+	}
+	sort.Strings(free)
+	return free
+}
+
 func sortedKeys(set map[string]bool) []string {
 	keys := make([]string, 0, len(set))
 	for k := range set {

@@ -30,3 +30,32 @@ func (s *FixtureLastUseTestSuite) TestReleasedAfterItsLastSuite(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FixtureLastUseTestSuite) TestSuitesThatNeverRunHoldNothing(t *gotest.T) {
+	type row struct {
+		Desc     string
+		pkgs     []string
+		released []string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{
+			Desc: "one of its two readers never links", pkgs: []string{"reader", "broken", "slow"},
+			released: []string{"reader ran", "a.AfterAll", "slow ends"},
+		},
+		{Desc: "its only reader never links", pkgs: []string{"broken", "slow"}, released: []string{"a.AfterAll", "slow ends"}},
+	}) {
+		args := make([]string, 0, len(r.pkgs))
+		for _, p := range r.pkgs {
+			args = append(args, "../testdata/fixaneverrun/"+p+"/")
+		}
+		run, err := testkit.RunPackage(t.Context(), t.TempDir(), args[0], args[1:]...)
+		gotest.NoError(t, err)
+		t.When("a shared fixture's reader is in a package that never links, while an unrelated suite still runs", func(w *gotest.T) {
+			w.It("releases the fixture once its readers that can run have finished, before the unrelated suite ends", func(it *gotest.T) {
+				gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Subset(it, run.Markers, r.released)
+				gotest.True(it, run.MarkerOrder(r.released...), "markers: %v", run.Markers)
+			})
+		})
+	}
+}
