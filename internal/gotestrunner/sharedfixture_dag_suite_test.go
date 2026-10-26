@@ -135,3 +135,40 @@ func (s *SharedFixtureDAGTestSuite) TestALateStartWaitsForDependencies(t *gotest
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestReleasesRunConcurrentlyDependentsFirst(t *gotest.T) {
+	type row struct {
+		Desc    string
+		release func(proc *gotestrunner.SharedFixtureProcess, ctx context.Context) error
+	}
+	keys := []string{dagKey("DagA"), dagKey("DagB"), dagKey("DagChild")}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "the teardown command", release: func(proc *gotestrunner.SharedFixtureProcess, ctx context.Context) error {
+			return proc.TeardownKeys(ctx, keys, time.Minute)
+		}},
+		{Desc: "the terminal teardown", release: func(*gotestrunner.SharedFixtureProcess, context.Context) error { return nil }},
+	}) {
+		log := filepath.Join(t.TempDir(), "dag.log")
+		t.Setenv(fixtures.EnvDagLog, log)
+		t.Setenv(fixtures.EnvDagTeardownDelay, (500 * time.Millisecond).String())
+		proc, release := startDAG(t, dagFixtures(false, "DagA", "DagB", "DagChild"))
+		releaseErr := r.release(proc, t.Context())
+		teardownErr := release()
+		events := readDagLog(t, log)
+
+		t.When("three fixtures are released, one depending on another", func(w *gotest.T) {
+			w.It("releases the independent ones at once, a dependent before its dependency", func(it *gotest.T) {
+				gotest.NoError(it, releaseErr)
+				gotest.NoError(it, teardownErr)
+				childDone := dagAt(events, "DagChild", "AfterAll", "end")
+				parentBegins := dagAt(events, "DagA", "AfterAll", "begin")
+				siblingBegins := dagAt(events, "DagB", "AfterAll", "begin")
+				gotest.NotZero(it, childDone, "log: %v", events)
+				gotest.NotZero(it, parentBegins, "log: %v", events)
+				gotest.NotZero(it, siblingBegins, "log: %v", events)
+				gotest.LessOrEqual(it, childDone, parentBegins, "log: %v", events)
+				gotest.Less(it, siblingBegins, childDone, "log: %v", events)
+			})
+		})
+	}
+}
