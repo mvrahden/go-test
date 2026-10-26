@@ -310,7 +310,8 @@ shards of one run do not add up to every mutant exactly once.
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |
 | `snapshot-always-matches` | `MatchSnapshot` never reports a differing value | canary: the `snapshotting` fixture's `fail` row vanishes from the golden list |
 | `exclusive-runs-in-bulk` | the dispatcher never defers an Exclusive suite past the bulk | canary: the `exclusive` fixture's window stamps overlap |
-| `teardown-error-dropped-after-setup-failure` | a sibling fixture's `AfterAll` failure is not booked once another fixture's setup failed | canary: the `teardownaftersetup` stream carries no word of the teardown failure |
+| `teardown-error-dropped-after-setup-failure` | a teardown that returned no error is not failed by an `AfterAll` report, as when another fixture's setup failure claimed the process's exit status | gotestrunner `TeardownVerdict`: the `AfterAll` report fails nothing |
+| `teardown-reports-dropped-from-the-verdict` | a teardown error goes out without the `AfterAll` reports that say why | canary: the `teardownaftersetup` stream carries no word of the teardown failure |
 | `bench-gate-passes-on-nothing` | a bench gate with no benchmark in both the baseline and the run passes | canary: the gate against a foreign baseline exits 0 instead of 1 |
 | `bench-unmatched-dropped` | a bench comparison reports no benchmark as missing or added | canary: the report against a foreign baseline lists no missing benchmark |
 | `bench-same-file-accepted` | `bench --save` and `--against` on one file compare the run against itself | canary: the same file for both is not refused with exit 2 |
