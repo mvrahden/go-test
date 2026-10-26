@@ -59,3 +59,14 @@ func (s *FixtureLastUseTestSuite) TestSuitesThatNeverRunHoldNothing(t *gotest.T)
 		})
 	}
 }
+
+func (s *FixtureLastUseTestSuite) TestADependencyOutlastsItsDependents(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixadeps/")
+	gotest.NoError(t, err)
+	t.When("the suite binding a shared fixture directly finishes while a suite reading a dependent of it still runs", func(w *gotest.T) {
+		w.It("releases the fixture only after its dependent, once neither is needed", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.True(it, run.MarkerOrder("direct ran", "child reader ends", "child.AfterAll", "parent.AfterAll"), "markers: %v", run.Markers)
+		})
+	})
+}
