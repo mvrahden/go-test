@@ -273,22 +273,6 @@ func (s *HarnessTTestSuite) TestRunMethods(t *gotest.T) {
 	})
 }
 
-func (s *HarnessTTestSuite) TestAwaitDone(t *gotest.T) {
-	t.When("the method calls done from another goroutine", func(w *gotest.T) {
-		w.It("returns once done is called", func(it *gotest.T) {
-			called := false
-			gotestruntime.AwaitDoneAt(it, "TestAsync", "async_test.go:7", func(done func()) {
-				go func() {
-					called = true
-					done()
-					done() // a second call must not block
-				}()
-			})
-			gotest.True(it, called)
-		})
-	})
-}
-
 func (s *HarnessTTestSuite) TestAfterEach(t *gotest.T) {
 	t.When("the method panics and its AfterEach leaves through Goexit", func(w *gotest.T) {
 		var after bool

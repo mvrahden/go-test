@@ -143,3 +143,14 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 		})
 	})
 }
+
+// outputOf is everything the stream printed for the test at path.
+func outputOf(run *testkit.Run, path string) string {
+	var out strings.Builder
+	for _, ev := range run.Events {
+		if ev.Test == path && ev.Action == "output" {
+			out.WriteString(ev.Output)
+		}
+	}
+	return out.String()
+}

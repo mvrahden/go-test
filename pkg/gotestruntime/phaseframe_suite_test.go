@@ -55,7 +55,7 @@ fmt.Fprintln({0x1, 0x2}, {0xc0, 0x1, 0x1})
 	%s:%d +0x48
 github.com/mvrahden/go-test/pkg/gotestruntime.reportAt({0x1, 0x2}, {0x0, 0x0}, {0xc0, 0x3c})
 	/mod/pkg/gotestruntime/harness.go:226 +0x8a
-github.com/mvrahden/go-test/pkg/gotestruntime.AwaitDoneAt(0xc0, {0x5, 0x12}, {0x0, 0x0}, 0xc0)
+github.com/mvrahden/go-test/pkg/gotestruntime.RunMethods.func1(0xc0)
 	/mod/pkg/gotestruntime/methods.go:110 +0x1a5`, file, line))))
 	})
 

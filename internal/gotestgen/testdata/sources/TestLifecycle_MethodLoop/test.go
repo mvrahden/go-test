@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -46,15 +45,6 @@ func (s *FailFastTestSuite) SuiteConfig() gotest.SuiteConfig {
 func (s *FailFastTestSuite) TestA(t *gotest.T) { gotest.Fail(t, "first") }
 func (s *FailFastTestSuite) TestB(t *gotest.T) { fmt.Println("MARK:after failfast") }
 
-// AsyncTestSuite never calls done.
-type AsyncTestSuite struct{}
-
-func (s *AsyncTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 100 * time.Millisecond}
-}
-
-func (s *AsyncTestSuite) TestNeverDoneAsync(t *gotest.T, done func()) {}
-
 type loopCtx struct{ n int }
 
 // SiteTestSuite fails an assertion through a helper in each method shape that
@@ -65,11 +55,6 @@ func (s *SiteTestSuite) BeforeEach(t *gotest.T) *loopCtx { return &loopCtx{n: 1}
 
 func (s *SiteTestSuite) TestReturning(t *gotest.T, c *loopCtx) {
 	check(t, 2, c.n) // SITE:returning
-}
-
-func (s *SiteTestSuite) TestWaitsAsync(t *gotest.T, c *loopCtx, done func()) {
-	defer done()
-	check(t, 3, c.n) // SITE:async
 }
 
 func check(t *gotest.T, want, got int) { gotest.Equal(t, want, got) }
@@ -145,16 +130,4 @@ func (s *PanicAheadTestSuite) BenchmarkOne(b *gotest.B) {
 func (s *PanicAheadTestSuite) FuzzOne(f *gotest.F) {
 	f.Add("seed")
 	f.Fuzz(func(t *gotest.T, in string) {})
-}
-
-// FatalAsyncTestSuite's goroutine fails fatally without calling done; the
-// wait must end with the failure, not with the budget.
-type FatalAsyncTestSuite struct{}
-
-func (s *FatalAsyncTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 20 * time.Second}
-}
-
-func (s *FatalAsyncTestSuite) TestFatalGoroutineAsync(t *gotest.T, done func()) {
-	gotest.Go(t, func() { gotest.Fail(t, "the goroutine that owns done fails") })
 }

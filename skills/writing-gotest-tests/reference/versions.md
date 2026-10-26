@@ -19,9 +19,6 @@ still applies EXCEPT these, which fail there:
    defaults: `0` means "keep the default", `-1` disables, and
    `Parallel`/`FailFast` are one-way latches in that merge (once true,
    never reset to false).
-3. **`Test*Async` (rule 1)** — the generated harness does not compile, and
-   v1.25.x still exits 0 ("no test suites to run"); write a synchronous
-   test with `Eventually` instead.
 4. **Filtering `Each` rows** — on v1.25.x, `-run` selecting individual
    `Each` entries (e.g. `-run 'TestX/#1'`) DEADLOCKS the test binary until
    `-test.timeout` kills it with no teardown, and so does any entry after
@@ -264,9 +261,6 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
     wildcard pattern that matches nothing beside others that match only
     warns (a path that does not exist still fails the run). Below v1.33
     such a run passed green having tested nothing.
-12. **A `Test*Async` method that never calls `done()` fails once, at its
-    declaration** — not inside gotest, and without a second "still
-    running" overrun verdict.
 13. **Assertion locations name the user's line everywhere** — in generic
     suite code inlined into the harness, on a plain `*testing.T`, in
     benchmarks and fuzz bodies, helpers included, and for `Skipf`;
@@ -448,18 +442,6 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     held. To migrate a `goleak.VerifyNone` inside a suite method, which now
     sees the stop watcher, pass it
     `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).loop")`.
-19. **An async method's wait ends on a failed owner, a stop or a declared
-    `Timeout`**
-    ([async](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-async-methods)):
-    a failure, or a panic on a goroutine `gotest.Go` started, ends the wait
-    once nothing holds `done` and no goroutine the method or its
-    `BeforeEach` started is left, or at the `Timeout`, or without one when
-    the method's context ends; a stop skips a waiting method as `run stopping` unless
-    it failed; `AfterEach` is held to what is left of the `Timeout`. Below
-    v1.34 a failure never ended the wait, a stop failed the method for a
-    missed `done()`, `AfterEach` was not budgeted, and the 30s default
-    failed a wait in a suite that declared no `Timeout`. To migrate, declare
-    a `Timeout` on async suites that relied on that default.
 20. **Shared fixture setup waits for the declared budget** — without
     `--setup-timeout`, the runner waits as long as the fixtures'
     `SharedFixtureConfig()` declares, every attempt and every release
@@ -600,3 +582,27 @@ Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
     counted.
 42. **`GOTEST_SLOW_BUILD_THRESHOLD`** sets when a build is reported as
     still running (a Go duration, default `15s`).
+
+## v1.35
+
+Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
+
+1. **Test methods taking `done func()` are gone** — the generator refuses
+   a `Test*` method whose last parameter is `done func()`, naming it; a
+   method merely named `…Async` is an ordinary test. Rewrite one: close a
+   channel from the callback, then wait for it in the method, asserting on
+   the test goroutine:
+
+   ```go
+   done := make(chan struct{})
+   go func() { defer close(done); /* the work that called done() */ }()
+   select {
+   case <-done:
+   case <-t.Context().Done():
+       gotest.Fail(t, "never finished")
+   }
+   ```
+
+   A harness an older gotest wrote to disk still compiles; its first such
+   method panics with the fix, which ends the suite's run, until
+   `gotest generate` runs again.

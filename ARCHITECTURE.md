@@ -229,10 +229,7 @@ subtest per method, `it.Parallel()` and the `FailFast` stop, the method's
 because it needs the suite's static types: the suite's `BeforeEach` and
 `AfterEach`, with a returned context, and the method call. Every method call
 goes through the `ƒƒ_GOTEST_exec` trampoline, where an assertion's call-site
-search stops; runtime and generated frames are skipped either way. Async
-methods wait in `gotestruntime.AwaitDoneAt`, which ends the method's
-`Timeout` watch once its body returns: from then on the deadline's verdict is
-the `done()` one, located at the declaration, never an overrun. Benchmark
+search stops; runtime and generated frames are skipped either way. Benchmark
 wrappers keep their own generated loop, fenced around the timer.
 
 Generated code and the runtime are meant to come from one module version,
@@ -1167,7 +1164,7 @@ guard:
    swallowed failure end to end. It builds the CLI, runs it over the
    fixture packages in its `testdata`, each written to pass or fail in one
    specific way (a green suite, one failing assertion per family, a halting
-   `FailNow`, `AfterEach` after a failure, lifecycle order, async methods,
+   `FailNow`, `AfterEach` after a failure, lifecycle order,
    benchmarks, fuzz seeds, an uncompilable package, a panicking method,
    fixtures torn down and shared fixtures failing to come up or to let go),
    and compares exit codes and the raw `-json`

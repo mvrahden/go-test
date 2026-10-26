@@ -458,15 +458,6 @@ shards of one run do not add up to every mutant exactly once.
 | `stop-runs-the-seeds-not-started` | a stopped run still replays the fuzz seeds not started | canary: the stopbench second seed runs |
 | `cut-short-releases-nothing` | a stop that cuts a body short ends the process without releasing the fixtures | canary: the stopgrace fixture's release marker is missing |
 | `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' verdict instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
-| `async-wait-outlives-the-failed-goroutine` | an async wait goes on after the owner of done failed and no goroutine of the method is left | canary: the asyncfatal method takes its full 20s budget |
-| `async-wait-ends-at-any-failure` | an async wait ends at the first recorded failure, whoever's goroutine failed | canary: asynchelper's AfterEach runs before the owner calls done, and the stopgrace failed method's AfterEach comes before the stop |
-| `async-stop-taken-for-a-missed-done` | a stop does not end an async wait, which runs on until the grace cuts it short | canary: the stopgrace waiting method gets no skip verdict |
-| `async-aftereach-unwatched` | after an async method's done, its AfterEach is no longer held to the Timeout | canary: asynchelper's overrunning AfterEach leaves the method passing |
-| `async-wait-ignores-who-holds-done` | a failed async wait ends while a pool job or a `time.AfterFunc` callback still holds done | canary: asynchelper's AfterEach runs before the AfterFunc owner calls done |
-| `async-wait-labels-the-body-only` | the goroutines an async method's BeforeEach starts are not the method's | canary: asynchelper's AfterEach runs before BeforeEach's goroutine failed |
-| `async-siblings-share-a-label` | every method carries one label, so a parallel sibling's goroutines count as the method's | canary: asynchelper's failed parallel method waits for its sibling's goroutine |
-| `async-failed-wait-blamed-on-done` | a failed method whose wait lasts to the deadline is reported for a missed done | canary: asynchelper's hanging owner's output lacks what was left to wait for |
-| `go-panic-unseen-by-an-async-wait` | a panic on a gotest.Go goroutine does not end an async wait | canary: asynchelper's panicking method takes its full 20s budget |
 | `stop-file-ignored` | the suite's watcher never polls for the stop file, so a stop no signal brings never comes | canary: the stopfile run's later methods have no skip verdict and the stream ends without the verdicts |
 | `plain-run-taken-for-the-runner` | a run without the runner's stop file falls back to a default one, so a plain run watches its stream | canary: the plainreader method's context ends when its reader goes |
 | `parent-death-not-asked` | a suite process under the runner neither asks for its parent's death signal nor polls for its parent | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |

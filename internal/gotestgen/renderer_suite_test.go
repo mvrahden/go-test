@@ -135,14 +135,14 @@ func (s *RendererTestSuite) TestFixtureRendering(t *gotest.T) {
 
 // --- stdlib T support tests ---
 
-func (s *RendererTestSuite) TestAsyncTestCases(t *gotest.T) {
-	t.When("a suite has an async test case", func(w *gotest.T) {
-		w.It("awaits done in the runtime and calls every case through the trampoline", func(it *gotest.T) {
-			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_AsyncTestCases")
+func (s *RendererTestSuite) TestAMethodNamedAsyncIsOrdinary(t *gotest.T) {
+	t.When("a test method's name ends in Async", func(w *gotest.T) {
+		w.It("calls it through the trampoline like any other", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_NamedAsync")
 			output, _ := renderTestPkg(it.T(), pkg, false)
-			gotest.Contains(it, output, `gotestruntime.AwaitDoneAt(ttt, "TestPingAsync", "test.go:7", func(done func()) {`)
-			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(func(t *gotest.T) { s.TestPingAsync(t, done) }, ttt)")
+			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(s.TestPingAsync, ttt)")
 			gotest.Contains(it, output, "ƒƒ_GOTEST_exec(s.TestPlain, ttt)")
+			gotest.NotContains(it, output, "AwaitDone")
 		})
 	})
 }

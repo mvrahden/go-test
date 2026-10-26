@@ -35,40 +35,38 @@ func (f *FixtureOnce) Do(fn func() error) error {
 	return f.err
 }
 
-// AwaitDone is what harnesses before [AwaitDoneAt] called; its verdict names
-// no location.
-//
-// Deprecated: regenerate the harness.
-func AwaitDone(t *gotest.T, name string, start func(done func())) {
-	AwaitDoneAt(t, name, "", start)
-}
-
 // RunTest is what harnesses before [RunMethods] called to hold a test
 // method's body to budget.
 //
 // Deprecated: regenerate the harness.
 func RunTest(t *gotest.T, budget time.Duration, run func()) {
 	end := watchPhase(t.T(), budget, "", "Timeout")
-	methodWatches.Store(t.T(), bodyWatch(bodyOnly{end, budget}))
-	defer methodWatches.Delete(t.T())
 	defer end()
 	defer runstate.EnterBody(t.T(), "a method")()
 	run()
 }
 
-// bodyOnly is the watch [RunTest] keeps: it held the body alone, so an async
-// method's hooks after the wait are held to nothing.
-type bodyOnly struct {
-	end    func()
-	budget time.Duration
+// AwaitDoneAt and AwaitDone are what harnesses before v1.35 called for a test
+// method taking done func(). Such a harness still compiles, and the first such
+// method panics with the fix, ending the suite's run: the generator now
+// refuses the method.
+
+// Deprecated: regenerate the harness.
+func AwaitDoneAt(t *gotest.T, name, at string, start func(done func())) {
+	panic(name + ": this generated harness was written by an older gotest and calls a test method taking done func(), which gotest no longer runs. Run `gotest generate` again, and in the method signal from the callback on a channel and wait for it, asserting on the test goroutine:\n" +
+		"\tdone := make(chan struct{})\n" +
+		"\tgo func() { defer close(done); /* the work that called done() */ }()\n" +
+		"\tselect {\n" +
+		"\tcase <-done:\n" +
+		"\tcase <-t.Context().Done():\n" +
+		"\t\tgotest.Fail(t, \"never finished\")\n" +
+		"\t}")
 }
 
-func (w bodyOnly) endBody() time.Duration {
-	w.end()
-	return w.budget
+// Deprecated: regenerate the harness.
+func AwaitDone(t *gotest.T, name string, start func(done func())) {
+	AwaitDoneAt(t, name, "", start)
 }
-
-func (w bodyOnly) resume() {}
 
 // Deprecated: regenerate the harness.
 func CountMatchingTests([]string) int {

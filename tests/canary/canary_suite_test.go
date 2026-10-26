@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"slices"
 	"sort"
@@ -485,117 +484,6 @@ func (s *CanaryTestSuite) TestSeedsReplayWithVerdicts(t *gotest.T) {
 	s.check(t, "fuzzing")
 }
 
-// An async method completes when done() is called from any goroutine; one
-// that never calls it fails at the suite's deadline instead of hanging.
-func (s *CanaryTestSuite) TestAsyncMethodsWaitForDone(t *gotest.T) {
-	// A wait for done that nothing bounds would hold this run until go test's
-	// own timeout; the global bound names it within a minute instead.
-	s.check(t, "asynchronous", "--timeout=60s")
-}
-
-// An async method whose done-owning goroutine fails fatally fails at once:
-// nothing is left to call done, so nothing waits for its 20s budget.
-func (s *CanaryTestSuite) TestAFatalGoroutineEndsAnAsyncWait(t *gotest.T) {
-	const method = "TestAsyncTestSuite/TestFatalGoroutineAsync"
-	code, rows := s.run(t, "asyncfatal", t.TempDir())
-	if code != 1 {
-		t.Errorf("asyncfatal: exit code %d, want 1", code)
-	}
-	if !slices.Contains(rows, "asyncfatal fail "+method) {
-		t.Errorf("asyncfatal: the method did not fail: %v", rows)
-	}
-	// The method's own time from the stream, not the build before it.
-	if took, ok := elapsedOf(s.lastStream, method); !ok || took > 10*time.Second {
-		t.Errorf("asyncfatal: the method took %s (reported: %v); the wait outlived the failed goroutine", took, ok)
-	}
-}
-
-// A goroutine of an async method other than the one that owns done fails:
-// the method fails, and the wait ends only when the owner calls done, fails
-// or outlasts the Timeout, the owner being one the body started, a job of a
-// pool BeforeAll started, a time.AfterFunc callback, or the body's while a
-// goroutine BeforeEach started works on. AfterEach marks the wait's end.
-func (s *CanaryTestSuite) TestAnotherGoroutinesFailureLeavesTheWaitToTheOwner(t *gotest.T) {
-	dir := t.TempDir()
-	_, rows := s.runWith(t, "asynchelper", dir, nil, "-run=^(TestHelperFailsTestSuite|TestOwnersTestSuite|TestBeforeEachGoroutineTestSuite)$")
-	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
-	helper := "a helper goroutine fails"
-	for _, c := range []struct {
-		path, ends string
-		says       []string
-	}{
-		{"TestHelperFailsTestSuite/TestOwnerCallsDoneAsync", "owner called done", []string{helper}},
-		{"TestHelperFailsTestSuite/TestOwnerFailsAsync", "owner failed", []string{helper, "the owner of done fails"}},
-		{"TestHelperFailsTestSuite/TestOwnerHangsAsync", "", []string{helper, "TestOwnerHangsAsync failed, and its wait for done() lasted until the test deadline: a goroutine it started was still running"}},
-		{"TestOwnersTestSuite/TestPoolOwnerFailsAsync", "pool owner failed", []string{helper, "the pool owner fails late"}},
-		{"TestOwnersTestSuite/TestAfterFuncOwnerAsync", "AfterFunc owner called done", []string{helper}},
-		{"TestBeforeEachGoroutineTestSuite/TestOwnerFailsAsync", "BeforeEach's goroutine failed", []string{"the owner of done fails", "BeforeEach's goroutine fails late"}},
-	} {
-		if !slices.Contains(rows, "asynchelper fail "+c.path) {
-			t.Errorf("asynchelper: %s did not fail: %v\n%s", c.path, rows, s.lastStream)
-		}
-		out := streamOutput(s.lastStream, c.path)
-		for _, says := range c.says {
-			if !strings.Contains(out, says) {
-				t.Errorf("asynchelper: %s's output lacks %q:\n%s", c.path, says, out)
-			}
-		}
-		if !slices.Contains(got, "AfterEach "+c.path) {
-			t.Errorf("asynchelper: %s ran no AfterEach: markers %v", c.path, got)
-		}
-		if c.ends != "" && !testkit.MarkerOrderOf(got, c.ends, "AfterEach "+c.path) {
-			t.Errorf("asynchelper: %s: the wait ended before %s: markers %v", c.path, c.ends, got)
-		}
-	}
-}
-
-// A goroutine gotest.Go started panics while an async method waits for done:
-// the wait ends at once, AfterEach runs, and the panic is reported with the
-// stack from where it happened.
-func (s *CanaryTestSuite) TestAGoPanicEndsAnAsyncWait(t *gotest.T) {
-	const method = "TestPanicTestSuite/TestGoPanicsAsync"
-	dir := t.TempDir()
-	_, rows := s.runWith(t, "asynchelper", dir, nil, "-run=^TestPanicTestSuite$")
-	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
-	if !slices.Contains(rows, "asynchelper fail "+method) || !slices.Contains(got, "AfterEach "+method) {
-		t.Errorf("asynchelper: %s did not fail after its AfterEach: %v, markers %v", method, rows, got)
-	}
-	if !strings.Contains(s.lastStream, "[recovered from goroutine started by gotest.Go]") || !regexp.MustCompile(`owners_suite_test\.go:\d+`).MatchString(s.lastStream) {
-		t.Errorf("asynchelper: %s: the panic was not reported with its stack:\n%s", method, s.lastStream)
-	}
-	// The method's own time from the stream, not the build before it.
-	if took, ok := elapsedOf(s.lastStream, method); !ok || took > 10*time.Second {
-		t.Errorf("asynchelper: %s took %s (reported: %v); the wait outlived the panic", method, took, ok)
-	}
-}
-
-// The owner of a parallel async method's done fails while a goroutine of its
-// sibling's, whose creators ended, runs on: the failed method's wait does not
-// wait for the sibling's goroutine.
-func (s *CanaryTestSuite) TestAParallelSiblingsGoroutineIsNotTheMethods(t *gotest.T) {
-	failed := "TestParallelTestSuite/TestOwnerFailsAsync"
-	dir := t.TempDir()
-	_, rows := s.runWith(t, "asynchelper", dir, nil, "-run=^TestParallelTestSuite$")
-	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
-	if !slices.Contains(rows, "asynchelper fail "+failed) || !slices.Contains(rows, "asynchelper pass TestParallelTestSuite/TestOrphanCallsDoneAsync") {
-		t.Errorf("asynchelper: parallel verdicts %v", rows)
-	}
-	if !testkit.MarkerOrderOf(got, "AfterEach "+failed, "orphan called done") {
-		t.Errorf("asynchelper: %s waited for its sibling's goroutine: markers %v", failed, got)
-	}
-}
-
-// An async method that calls done in time is still held to the Timeout in
-// its AfterEach.
-func (s *CanaryTestSuite) TestAnAsyncAfterEachIsHeldToTheTimeout(t *gotest.T) {
-	_, rows := s.runWith(t, "asynchelper", t.TempDir(), nil, "-run=TestHookOverrunTestSuite")
-	path := "TestHookOverrunTestSuite/TestCallsDoneAsync"
-	out := streamOutput(s.lastStream, path)
-	if !slices.Contains(rows, "asynchelper fail "+path) || !strings.Contains(out, "AfterEach exceeded its configured Timeout of 1s") {
-		t.Errorf("asynchelper: %s did not fail for its AfterEach's overrun: %v\n%s", path, rows, out)
-	}
-}
-
 // streamOutput is what a -json stream printed for the test at path.
 func streamOutput(stream, path string) string {
 	var out strings.Builder
@@ -606,22 +494,6 @@ func streamOutput(stream, path string) string {
 		}
 	}
 	return out.String()
-}
-
-// elapsedOf is the time a -json stream says the test at path took, and
-// whether it said.
-func elapsedOf(stream, path string) (time.Duration, bool) {
-	for line := range strings.Lines(stream) {
-		var ev struct {
-			Action  string   `json:"Action"`
-			Test    string   `json:"Test"`
-			Elapsed *float64 `json:"Elapsed"`
-		}
-		if json.Unmarshal([]byte(line), &ev) == nil && ev.Test == path && (ev.Action == "pass" || ev.Action == "fail") && ev.Elapsed != nil {
-			return time.Duration(*ev.Elapsed * float64(time.Second)), true
-		}
-	}
-	return 0, false
 }
 
 // Two suites share one package fixture; each runs in its own process with

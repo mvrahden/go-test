@@ -13,7 +13,7 @@ import (
 )
 
 // StopGraceTestSuite: how long a stopped method's body may take to return,
-// what that bound covers, and where a stop ends an async wait.
+// and what that bound covers.
 type StopGraceTestSuite struct {
 	cli string
 }
@@ -122,24 +122,6 @@ func (s *StopGraceTestSuite) TestASlowAfterEach(t *gotest.T) {
 		w.It("runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body", func(it *gotest.T) {
 			gotest.True(it, run.MarkerOrder("context ended", "AfterEach began", "AfterEach ended", "suite.AfterAll", "fixture.AfterAll"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
 			gotest.NotContains(it, run.Stdout+run.Stderr, "cut short")
-		})
-	})
-}
-
-func (s *StopGraceTestSuite) TestAStopDuringAnAsyncWait(t *gotest.T) {
-	run, _ := s.stopped(t, nil, "-run=TestAsyncHoldTestSuite")
-	waits, fails := "TestAsyncHoldTestSuite/TestWaitsAsync", "TestAsyncHoldTestSuite/TestFailsAsync"
-	t.When("the run is stopped while an async method waits for done", func(w *gotest.T) {
-		w.It("ends the wait at the stop and skips the method with the reason run stopping, then runs AfterEach and AfterAll", func(it *gotest.T) {
-			gotest.Equal(it, "skip", run.Verdict(waits), run.Stdout)
-			gotest.Contains(it, outputOf(&run, waits), "run stopping")
-			gotest.True(it, run.MarkerOrder("interrupted", "async AfterEach "+waits, "async AfterAll"), "markers: %v", run.Markers)
-		})
-	})
-	t.When("the run is stopped while an async method waits for done after another of its goroutines failed", func(w *gotest.T) {
-		w.It("ends the wait at the stop, then runs AfterEach and AfterAll, and fails the method", func(it *gotest.T) {
-			gotest.True(it, run.MarkerOrder("interrupted", "async AfterEach "+fails, "async AfterAll"), "markers: %v", run.Markers)
-			gotest.Equal(it, "fail", run.Verdict(fails), run.Stdout)
 		})
 	})
 }
