@@ -664,6 +664,9 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	win := planFixtureWindows(overlay, pf.UserRunFilter, pf.UserSkipFilter)
 	win.reportSkipped()
+	// A shared fixture is released once no planned suite left needs it.
+	plannedBulk, plannedTail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, pf.UserRunFilter, pf.UserSkipFilter)
+	ledger := newFixtureLedger([]map[string][]string{plannedBulk, plannedTail}, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
 
 	// Exclusive suites collected during the stream, run serially after it.
 	type deferredTarget struct {
@@ -676,6 +679,8 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	defer streamCancel()
 
 	fixtureStarted := make(chan struct{})
+	// setupOver closes once the up-front phase has ended, however it ended.
+	setupOver := make(chan struct{})
 	var setupProc *SharedFixtureProcess
 	var fixtureStartErr error
 	var fixtureWg sync.WaitGroup
@@ -698,6 +703,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		fixtureWg.Add(1)
 		go func() {
 			defer fixtureWg.Done()
+			defer close(setupOver)
 			var err error
 			// The subprocess is bound to the pipeline ctx, not streamCtx:
 			// Teardown below is the one owner of shutdown, and it runs only
@@ -730,7 +736,25 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		}()
 	} else {
 		close(fixtureStarted)
+		close(setupOver)
 	}
+
+	// Releases go to a process whose up-front phase ended; one still busy
+	// with it after a timeout would answer no command, and the terminal
+	// teardown owns its fixtures.
+	releaseCtx, releaseCancel := context.WithCancel(streamCtx)
+	defer releaseCancel()
+	releaser := startFixtureReleaser(releaseCtx, func() *SharedFixtureProcess {
+		select {
+		case <-setupOver:
+		case <-releaseCtx.Done():
+			return nil
+		}
+		if setupProc == nil || setupTimedOut {
+			return nil
+		}
+		return setupProc
+	})
 
 	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, pf.BuildFlags), cfg.CompileParallel)
 
@@ -820,6 +844,8 @@ loop:
 			wg.Add(1)
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
+				// Last of all, once the suite's process is gone.
+				defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)) }()
 				recorded := false
 				// missing names the shared fixture the suite is given up for.
 				missing := ""
@@ -893,6 +919,20 @@ loop:
 
 	wg.Wait()
 
+	// Once the last verdict is in, what the context says is not the run's
+	// business (see exitCodeAfterDispatch): a stop during the releases that
+	// follow keeps the verdicts.
+	var dispatchErr error
+	verdictsIn := false
+	allIn := func() {
+		if !verdictsIn {
+			dispatchErr, verdictsIn = ctx.Err(), true
+		}
+	}
+	if len(deferredExclusive) == 0 {
+		allIn()
+	}
+
 	// Bulk→tail barrier: re-window shared fixtures for the exclusive tail.
 	// Alive(tail) comes from the actual deferred targets — suites whose
 	// packages never compiled are not in it. Skipped entirely on cancellation
@@ -909,6 +949,8 @@ loop:
 		tailTargets[i], tailOrder[i] = deferredExclusive[i].t, i
 	}
 	var barrierErr error
+	// The setup process serves one command at a time.
+	releaser.Drain()
 	if len(deferredExclusive) > 0 && setupProc != nil && !setupTimedOut {
 		tailAlive := aliveFromTargets(tailTargets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
 		barrierErr = fixtureBarrier(streamCtx, setupProc, win.Bulk, tailAlive, resolvedSetupTimeout)
@@ -919,43 +961,54 @@ loop:
 	// — they are infrastructure the suites talk to, not competing suites —
 	// and tear down only after the last exclusive finishes.
 	sortTargetIndices(tailTargets, tailOrder)
-	for _, i := range tailOrder {
-		d := &deferredExclusive[i]
-		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[d.t.Package][d.t.SuiteName]
+	runTailSlot := func(t SuiteTarget, idx int) { //nolint:gocritic // hugeParam: a copy per slot is nothing beside the process it starts
+		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 		if streamCtx.Err() != nil {
-			collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
-			continue
+			collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+			return
 		}
 		if missing := missingFixture(setupProc, requiredKeys); missing != "" {
-			collector.RecordGivenUp(d.t.Package, d.idx, d.t.SuiteName, neverRan(d.t.SuiteName, missing))
-			continue
+			collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
+			return
 		}
 		env := baseEnv
 		if len(requiredKeys) > 0 {
-			stateFile, err := setupProc.WriteSuiteStateFile(d.t.Package, d.t.SuiteName, requiredKeys)
+			stateFile, err := setupProc.WriteSuiteStateFile(t.Package, t.SuiteName, requiredKeys)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", d.t.Package, d.t.SuiteName, err)
-				collector.RecordResult(d.t.Package, d.idx, SuiteResult{ExitCode: 1})
-				continue
+				fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
+				collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+				return
 			}
 			env = make([]string, len(baseEnv), len(baseEnv)+1)
 			copy(env, baseEnv)
 			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
 		}
-		runRecorded(streamCtx, collector, d.t.Package, d.idx, d.t, env, collector.UsesTest2JSON())
+		runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
 	}
-	// The last verdict is in; what the context says from here on is not the
-	// run's business (see exitCodeAfterDispatch).
-	dispatchErr := ctx.Err()
+	for n, i := range tailOrder {
+		d := &deferredExclusive[i]
+		runTailSlot(d.t, d.idx)
+		if n == len(tailOrder)-1 {
+			allIn()
+		}
+		// The slot's process is gone; the next slot's commands wait for
+		// this release.
+		releaser.Release(ledger.Done(d.t.Package, d.t.SuiteName))
+		releaser.Drain()
+	}
+	allIn()
 
 	// Teardown owns the shared fixture process's shutdown: it signals, then
 	// waits out the configured teardown budget. Cancelling streamCtx first
 	// would signal the process behind Teardown's back, leaving two owners for
 	// one shutdown — and Teardown could no longer tell a process that died on
 	// its own from one that simply obeyed the signal it never sent.
+	releaser.Drain()
+	releaseCancel()
+	releaseErr := releaser.Err()
 	var teardownErr error
 	if setupProc != nil {
-		teardownErr = errors.Join(barrierErr, setupProc.Teardown())
+		teardownErr = errors.Join(barrierErr, releaseErr, setupProc.Teardown())
 		reports := setupProc.TakeFailures()
 		setupErr = withReports(setupErr, reports, false)
 		teardownErr = teardownVerdict(teardownErr, reports)

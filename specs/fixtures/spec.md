@@ -172,6 +172,13 @@ Shared fixtures started late SHALL start concurrently, each after what it depend
 - **THEN** both come up, the dependency first, and the suite reading them passes
 - **AND** both are torn down, the dependent first
 
+### Requirement: A shared fixture released at its last use
+A shared fixture SHALL be released once no remaining planned suite needs it, while unrelated suites still run.
+
+#### Scenario: The last reader finishes first
+- **WHEN** the only suite reading a shared fixture finishes while an unrelated suite still runs
+- **THEN** releases the fixture before the unrelated suite ends
+
 ### Requirement: Releasing shared fixtures
 Shared fixtures SHALL be released concurrently, each after the fixtures that depend on it, under a teardown budget of 30s plus the longest chain still resident: a fixture's share, its declared Timeout or the default, plus the longest chain among the fixtures depending on it. A fixture's share SHALL leave the budget once it is released.
 
