@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / releases the fixture before the unrelated suite ends \(
+Clause: when the only suite reading a shared fixture finishes while an unrelated suite still runs → releases the fixture before the unrelated suite ends
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -845,7 +845,7 @@ loop:
+ 			go func(t SuiteTarget, idx int) {
+ 				defer wg.Done()
+ 				// Last of all, once the suite's process is gone.
+-				defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)) }()
++				defer func() { _ = ledger.Done(t.Package, t.SuiteName) }()
+ 				recorded := false
+ 				// missing names the shared fixture the suite is given up for.
+ 				missing := ""

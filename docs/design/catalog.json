@@ -5926,6 +5926,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "releases the fixture before the unrelated suite ends",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_before_the_unrelated_suite_ends",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the only suite reading a shared fixture finishes while an unrelated suite still runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_only_suite_reading_a_shared_fixture_finishes_while_an_unrelated_suite_still_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasedAfterItsLastSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasedAfterItsLastSuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureLastUse",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureLastUseTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "starts no later fixture's BeforeEach, fails the method once, at the hook that overran, and runs that fixture's AfterEach",
                       "duration": 0,
                       "excluded": false,
@@ -10678,13 +10731,13 @@
     }
   ],
   "stats": {
-    "behaviors": 350,
+    "behaviors": 351,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 58,
+    "suites": 59,
     "tests": 0
   }
 }
