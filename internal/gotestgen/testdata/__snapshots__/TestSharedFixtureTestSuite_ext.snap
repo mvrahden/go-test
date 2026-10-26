@@ -116,17 +116,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -324,11 +331,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -387,11 +396,11 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") && ƒteardown_sf1() {
+				if ƒreleases[1] && ƒteardown_sf1() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
 				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
@@ -538,17 +547,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -669,11 +685,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -715,7 +733,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
@@ -854,17 +872,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -970,11 +995,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -1016,7 +1043,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: teardown failed")
 				}
@@ -1155,17 +1182,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -1284,11 +1318,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -1330,7 +1366,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
@@ -1474,17 +1510,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -1682,11 +1725,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -1745,11 +1790,11 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") && ƒteardown_sf1() {
+				if ƒreleases[1] && ƒteardown_sf1() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
 				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
@@ -1896,17 +1941,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -2025,11 +2077,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -2071,7 +2125,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -2210,17 +2264,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -2339,11 +2400,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -2385,7 +2448,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -2524,17 +2587,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -2653,11 +2723,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -2699,7 +2771,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -2838,17 +2910,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -2967,11 +3046,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -3013,7 +3094,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -3158,17 +3239,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -3366,11 +3454,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -3429,11 +3519,11 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") && ƒteardown_sf1() {
+				if ƒreleases[1] && ƒteardown_sf1() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
 				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -3580,17 +3670,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -3709,11 +3806,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -3755,7 +3854,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -3895,17 +3994,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -4031,11 +4137,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -4077,7 +4185,7 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
@@ -4222,17 +4330,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -4432,11 +4547,13 @@ func main() {
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -4495,11 +4612,11 @@ func main() {
 					}()
 				}
 				ƒreleasing.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") && ƒteardown_sf1() {
+				if ƒreleases[1] && ƒteardown_sf1() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: teardown failed")
 				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒteardown_sf0() {
+				if ƒreleases[0] && ƒteardown_sf0() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}

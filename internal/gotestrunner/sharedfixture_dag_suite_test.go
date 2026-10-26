@@ -284,3 +284,18 @@ func (s *SharedFixtureDAGTestSuite) TestATeardownGoingWrongLetsTheOthersFinish(t
 		})
 	}
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAReleaseIsReportedByTheCommandThatRanIt(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagPanic, "DagB")
+	proc, release := startDAG(t, dagFixtures(false, "DagA", "DagB"))
+	first := proc.TeardownKeys(t.Context(), []string{dagKey("DagB")}, time.Minute)
+	again := proc.TeardownKeys(t.Context(), []string{dagKey("DagB")}, time.Minute)
+	_ = release()
+
+	t.When("a fixture whose release failed is named in a later teardown command", func(w *gotest.T) {
+		w.It("fails only the command that released it", func(it *gotest.T) {
+			gotest.ErrorContains(it, first, "DagBSharedFixture: teardown failed")
+			gotest.NoError(it, again)
+		})
+	})
+}

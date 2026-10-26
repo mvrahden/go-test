@@ -288,7 +288,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// into the chain of the fixtures released after one another.
 			gotest.Contains(it, code, "ƒshares[i] = gotestruntime.SupervisorBudget(timeout)",
 				"each member's budget must go through the shared floor")
-			gotest.Contains(it, code, "ƒchains[ƒi] = ƒshares[ƒi] + ƒafter",
+			gotest.Contains(it, code, "ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true",
 				"and into the chain")
 			gotest.NotContains(it, code, "func ƒsupervisorBudget(",
 				"no local copy of the floor may remain")

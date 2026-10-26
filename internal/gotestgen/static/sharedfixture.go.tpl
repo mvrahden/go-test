@@ -167,17 +167,24 @@ func main() {
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		// Dependents come later in the dependency order, so walking it
-		// backwards finds every dependent's chain before its dependency's.
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
 		ƒchains := make([]time.Duration, len(ƒshares))
-		ƒlongest := time.Duration(0)
-		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
-			ƒafter := time.Duration(0)
-			for _, ƒd := range ƒdependents[ƒi] {
-				ƒafter = max(ƒafter, ƒchains[ƒd])
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
 			}
-			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
-			ƒlongest = max(ƒlongest, ƒchains[ƒi])
+			return ƒchains[ƒi]
+		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
 		}
 		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
@@ -407,11 +414,14 @@ func main() {
   with it, or a release waiting for a dependent that is up and not released
   with it.
 */}}
+{{- /* ƒreleases: the keys this command releases; one released earlier reports nothing again. */}}
+			ƒreleases := make([]bool, len(ƒkeys))
 			ƒstateMu.Lock()
 			for ƒi := range ƒkeys {
 				if !ƒrequested(ƒi) {
 					continue
 				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
 					for _, ƒd := range ƒdependencies[ƒi] {
@@ -464,7 +474,7 @@ func main() {
 {{- end }}
 				ƒreleasing.Wait()
 {{- range .TeardownFixtures }}
-				if ƒhasKey(ƒc.Keys, "{{ .StateKey }}") && ƒteardown_{{ .VarName }}() {
+				if ƒreleases[{{ .Index }}] && ƒteardown_{{ .VarName }}() {
 					ƒteardownFailed = true
 					ƒcmdErrs = append(ƒcmdErrs, "{{ .Identifier }}: teardown failed")
 				}
