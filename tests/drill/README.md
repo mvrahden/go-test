@@ -479,6 +479,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-held-past-its-last-use` | a parallel suite that finishes never hands its shared fixtures to the releaser | fixtures conformance: the fixture is released after an unrelated suite ends |
 | `build-failure-holds-its-fixtures` | a package that fails to build keeps its planned suites' shared fixtures until the end of the run | fixtures conformance: the fixture is released after an unrelated suite ends |
 | `ledger-without-dependency-closure` | the fixture ledger counts a suite only for the shared fixtures it binds directly, not their dependencies | fixtures conformance: the dependency is released while its dependent is up, and the run fails |
+| `release-before-the-suite-is-gone` | a parallel suite frees its shared fixtures as its process starts, not once its process group is gone | fixtures conformance: the fixture is released while the suite, or what it started, still runs |
 | `release-before-dependents` | a shared fixture's release no longer waits for the fixtures depending on it | fixtures conformance: a dependent is released after its dependency |
 | `start-before-dependencies` | a shared fixture started late no longer waits for its dependencies to come up | fixtures conformance: the tail's fixture starts before the dependency it reads |
 | `teardown-budget-summed` | the setup process reports the sum of the resident fixtures' shares as its teardown budget | fixtures conformance: the hung release is force-killed after 37s, not 35s |
