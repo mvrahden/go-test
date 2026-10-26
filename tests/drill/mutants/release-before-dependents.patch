@@ -1,9 +1,10 @@
 Expect: dagrelease: a dependent was released after its dependency
 Judge: ./tests/canary CanaryTestSuite/TestSharedFixturesStartAndReleaseInDependencyOrder
 Clause: when two independent shared fixtures and a dependent of one are released at the end of a run → releases the independent ones at once and the dependent before its dependency
+Clause: when a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs → both are torn down, the dependent first
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -315,7 +315,7 @@ func main() {
+@@ -322,7 +322,7 @@ func main() {
  			ƒheld_{{ $d.Var }} := ƒattempted[{{ $d.Index }}] || ƒtorn[{{ $d.Index }}]
  			ƒstateMu.Unlock()
  			if ƒheld_{{ $d.Var }} {
