@@ -152,6 +152,13 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{ {{- range .Fixtures }}"{{ .StateKey }}", {{ end -}} }
+	ƒnames := []string{ {{- range .Fixtures }}"{{ .Identifier }}", {{ end -}} }
+	ƒdependencies := [][]int{
+{{- range $f := .Fixtures }}
+		{ {{- range $d := $f.DependsOnIndices }}{{ $d }}, {{ end -}} },
+{{- end }}
+	}
 	ƒdependents := [][]int{
 {{- range $f := .Fixtures }}
 		{ {{- range $d := $f.Dependents }}{{ $d.Index }}, {{ end -}} },
@@ -393,8 +400,37 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+{{- /*
+  A command that could only hang is refused whole, before anything starts or
+  is released: a start waiting for a dependency that is neither up nor started
+  with it, or a release waiting for a dependent that is up and not released
+  with it.
+*/}}
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 {{- /*
   Every requested fixture starts on a goroutine of its own, as in the up-front
   phase: the dependency channels order them, whatever order the keys came in.
@@ -415,7 +451,7 @@ func main() {
 					ƒcmdErrs = append(ƒcmdErrs, "{{ $f.Identifier }}: "+ƒerrs[{{ $f.Index }}].Error())
 				}
 {{- end }}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 {{- range .TeardownFixtures }}
 				if ƒhasKey(ƒc.Keys, "{{ .StateKey }}") {

@@ -103,6 +103,12 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/project/tests/fixtures.PostgresFixture", "github.com/example/project/tests/redis.RedisFixture"}
+	ƒnames := []string{"PostgresFixture", "RedisFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 		{},
@@ -317,8 +323,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
 					ƒstarting.Add(1)
@@ -341,7 +370,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") && ƒerrs[1] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
 					ƒreleasing.Add(1)
@@ -498,6 +527,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.PostgresFixture"}
+	ƒnames := []string{"PostgresFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -634,8 +668,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
 					ƒstarting.Add(1)
@@ -648,7 +705,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
 					ƒreleasing.Add(1)
@@ -786,6 +843,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.SetupFixture"}
+	ƒnames := []string{"SetupFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -907,8 +969,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
 					ƒstarting.Add(1)
@@ -921,7 +1006,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
 					ƒreleasing.Add(1)
@@ -1059,6 +1144,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/project/tests/fixtures.PostgresFixture"}
+	ƒnames := []string{"PostgresFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -1193,8 +1283,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
 					ƒstarting.Add(1)
@@ -1207,7 +1320,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
 					ƒreleasing.Add(1)
@@ -1347,6 +1460,12 @@ func main() {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/shared.PostgresFixture", "github.com/example/shared.RedisFixture"}
+	ƒnames := []string{"PostgresFixture", "RedisFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
 	}
 	ƒdependents := [][]int{
 		{},
@@ -1562,8 +1681,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
 					ƒstarting.Add(1)
@@ -1586,7 +1728,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") && ƒerrs[1] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
 					ƒreleasing.Add(1)
@@ -1743,6 +1885,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -1877,8 +2024,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -1891,7 +2061,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒreleasing.Add(1)
@@ -2029,6 +2199,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -2163,8 +2338,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -2177,7 +2375,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒreleasing.Add(1)
@@ -2315,6 +2513,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -2449,8 +2652,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -2463,7 +2689,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒreleasing.Add(1)
@@ -2601,6 +2827,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -2735,8 +2966,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -2749,7 +3003,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒreleasing.Add(1)
@@ -2890,6 +3144,12 @@ func main() {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture", "github.com/example/redis.RedisFixture"}
+	ƒnames := []string{"PGFixture", "RedisFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
 	}
 	ƒdependents := [][]int{
 		{},
@@ -3105,8 +3365,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -3129,7 +3412,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") && ƒerrs[1] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
 					ƒreleasing.Add(1)
@@ -3286,6 +3569,11 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
 	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
 	ƒdependents := [][]int{
 		{},
 	}
@@ -3420,8 +3708,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -3434,7 +3745,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒreleasing.Add(1)
@@ -3572,6 +3883,11 @@ func main() {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
 	}
 	ƒdependents := [][]int{
 		{},
@@ -3714,8 +4030,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒstarting.Add(1)
@@ -3728,7 +4067,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
 					ƒreleasing.Add(1)
@@ -3869,6 +4208,12 @@ func main() {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/project/tests/fixtures.PostgresFixture", "github.com/example/project/tests/gcs.GCSFixture"}
+	ƒnames := []string{"PostgresFixture", "GCSFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
 	}
 	ƒdependents := [][]int{
 		{},
@@ -4086,8 +4431,31 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
 				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
 					ƒstarting.Add(1)
@@ -4110,7 +4478,7 @@ func main() {
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") && ƒerrs[1] != nil {
 					ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: "+ƒerrs[1].Error())
 				}
-			case "teardown":
+			case ƒc.Verb == "teardown":
 				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
 					ƒreleasing.Add(1)

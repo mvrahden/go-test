@@ -210,3 +210,47 @@ func (s *SharedFixtureDAGTestSuite) TestTheTeardownBudgetIsTheLongestChain(t *go
 		})
 	}
 }
+
+func (s *SharedFixtureDAGTestSuite) TestARequestThatCouldOnlyHangIsRefused(t *gotest.T) {
+	type row struct {
+		Desc     string
+		deferred bool
+		send     func(proc *gotestrunner.SharedFixtureProcess, ctx context.Context) error
+		names    []string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{
+			Desc: "a start without the dependency it waits for", deferred: true,
+			send: func(proc *gotestrunner.SharedFixtureProcess, ctx context.Context) error {
+				return proc.StartKeys(ctx, []string{dagKey("DagChild")}, 0)
+			},
+			names: []string{"DagChildSharedFixture", "DagASharedFixture"},
+		},
+		{
+			Desc: "a release without the dependent still up",
+			send: func(proc *gotestrunner.SharedFixtureProcess, ctx context.Context) error {
+				return proc.TeardownKeys(ctx, []string{dagKey("DagA")}, time.Minute)
+			},
+			names: []string{"DagASharedFixture", "DagChildSharedFixture"},
+		},
+	}) {
+		proc, release := startDAG(t, dagFixtures(r.deferred, "DagA", "DagChild"))
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		began := time.Now()
+		err := r.send(proc, ctx)
+		took := time.Since(began)
+		cancel()
+		gotestrunner.ExportSetTeardownTimeout(proc, 2*time.Second)
+		_ = release()
+
+		t.When("a command could only wait for a fixture nothing will start or release", func(w *gotest.T) {
+			w.It("fails within a second, naming both fixtures", func(it *gotest.T) {
+				gotest.Error(it, err)
+				for _, name := range r.names {
+					gotest.ErrorContains(it, err, name)
+				}
+				gotest.Less(it, took, time.Second)
+			})
+		})
+	}
+}
