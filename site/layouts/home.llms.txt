@@ -9,7 +9,7 @@ gotest is a code-generation framework for Go test suites: you write `*TestSuite`
 - [README]({{ .Site.Params.repoURL }}/blob/main/README.md): install, suites, fixtures, assertions, CLI, CI
 - [Agent reference]({{ .Site.Params.repoURL }}/blob/main/AGENTS.md): the rules an agent must follow, and the full assertion list
 - [Reference]({{ "reference/" | absURL }}): naming conventions, lifecycle, fixture model, assertions, coverage
-- [Agent skill]({{ .Site.Params.repoURL }}/tree/main/skills/writing-gotest-tests): `writing-gotest-tests`, installable with `npx skills add mvrahden/go-test` or, from v1.34.0, `go tool gotest skill install`, which writes the copy matching the pinned version
+- [Agent skill]({{ .Site.Params.repoURL }}/tree/main/skills/writing-gotest-tests): `writing-gotest-tests`, installable with `npx skills add mvrahden/go-test` or, from v1.35.0, `go tool gotest skill install`, which writes the copy matching the pinned version
 - [API]({{ "https://pkg.go.dev/github.com/mvrahden/go-test" }}): package documentation
 
 ## Blog

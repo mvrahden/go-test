@@ -9,10 +9,11 @@ import (
 )
 
 // MinRuntimeVersion is the oldest gotest runtime generated code compiles
-// against; bump it when the renderer uses a newer runtime symbol. The
+// against; bump it when the renderer uses a newer runtime symbol, and never
+// leave it on a retracted release (v1.34.0 is one). The
 // extension's MIN_CLI_VERSION is a separate, CLI-side floor that must never
 // fall below it (a test guards the order).
-const MinRuntimeVersion = "v1.34.0"
+const MinRuntimeVersion = "v1.35.0"
 
 // CheckRuntimeVersion refuses to generate against a runtime older than
 // MinRuntimeVersion. Replaced and main modules have no version to check.

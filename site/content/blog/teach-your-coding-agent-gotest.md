@@ -32,7 +32,7 @@ gotest ships breaking changes in minor releases, so "how gotest behaves" depends
 
 ## Installing it
 
-From v1.34.0 the CLI installs the skill itself:
+From v1.35.0 the CLI installs the skill itself:
 
 ```bash
 go tool gotest skill install                         # .agents/skills: Copilot, Codex, Cursor, Gemini CLI, Antigravity, ...

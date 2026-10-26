@@ -285,7 +285,10 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
 
 ## v1.34
 
-Rules and sections tagged **v1.34+** need v1.34.0 or newer. What v1.34 changes:
+Rules and sections tagged **v1.34+** need v1.34.0 or newer, which in
+practice means v1.35.0: **v1.34.0 is retracted** (its tag moved after the
+module proxy recorded it, so the proxy and GitHub serve different code).
+Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
 
 1. **`gotest skill install` writes this skill** into `.agents/skills`
    (`--dir=.claude/skills` for Claude Code), as shipped with the pinned
@@ -606,3 +609,6 @@ Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
    A harness an older gotest wrote to disk still compiles; its first such
    method panics with the fix, which ends the suite's run, until
    `gotest generate` runs again.
+2. **The runtime floor is v1.35.0 from v1.35.1** — a v1.35.1 CLI refuses
+   a pin below v1.35.0, skipping the retracted v1.34.0; v1.35.0 still
+   accepts a v1.34.0 pin. The extension from 1.35.1 needs a v1.35.0 CLI.

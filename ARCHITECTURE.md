@@ -238,7 +238,8 @@ runtime, but a replaced or main module carries no version to check, so a
 runtime function the generator stops calling stays behind as a deprecated
 shim (`pkg/gotestruntime/deprecated.go`): a harness an older gotest left on
 disk still compiles. A changed signature is a new symbol, never an edit;
-calling one moves the floor to the first release that has it.
+calling one moves the floor to the first release that has it. A retracted
+release is never the floor: v1.34.0 is one, so the floor skipped to v1.35.0.
 `make runtime-compat` holds both: `apidiff` fails a runtime that drops or
 changes a symbol of the last release, and a corpus under
 `tests/runtimecompat` runs this tree's generated code against the floor

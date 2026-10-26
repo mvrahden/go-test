@@ -22,7 +22,8 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // v1.34.0 is the release whose generated code calls gotestruntime.AfterEach
 // and the shared fixture lifetime, so the CLI's runtime floor moved there
-// and this floor with it. From v1.31.0 on the stream carries
+// and this floor with it; v1.34.0 is retracted, so both sit at v1.35.0.
+// From v1.31.0 on the stream carries
 // every verdict the tree shows, including a shared fixture that failed to
 // set up. Every
 // JSON document opens with `version` from v1.30.2 on, which is how the
@@ -32,7 +33,7 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // that older versions do not have. Never below the CLI's
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
-const MIN_CLI_VERSION = "v1.34.0";
+const MIN_CLI_VERSION = "v1.35.0";
 
 export interface CliCommand {
   bin: string;
