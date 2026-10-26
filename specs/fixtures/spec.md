@@ -187,6 +187,10 @@ A shared fixture SHALL be released once no remaining planned suite needs it, whi
 - **WHEN** the suite binding a shared fixture directly finishes while a suite reading a dependent of it still runs
 - **THEN** releases the fixture only after its dependent, once neither is needed
 
+#### Scenario: A suite that leaves a process running
+- **WHEN** the last suite reading a shared fixture returns while a process it started still runs
+- **THEN** releases the fixture only once that process is gone
+
 ### Requirement: Releasing shared fixtures
 Shared fixtures SHALL be released concurrently, each after the fixtures that depend on it, under a teardown budget of 30s plus the longest chain still resident: a fixture's share, its declared Timeout or the default, plus the longest chain among the fixtures depending on it. A fixture's share SHALL leave the budget once it is released.
 

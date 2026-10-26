@@ -56,7 +56,7 @@ func (f *ASharedFixture) BeforeAll(ctx context.Context) error {
 	mark("a.BeforeAll ends")
 	return nil
 }
-func (f *ASharedFixture) AfterAll(ctx context.Context) error  { return release("a") }
+func (f *ASharedFixture) AfterAll(ctx context.Context) error { return release("a") }
 
 type BSharedFixture struct{}
 

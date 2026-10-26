@@ -23,7 +23,6 @@ func mark(event string) {
 	_, _ = f.WriteString(event + "\n")
 }
 
-
 type ParentSharedFixture struct {
 	State string
 }

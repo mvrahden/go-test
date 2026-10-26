@@ -6094,6 +6094,46 @@
               "name": "TestADependencyOutlastsItsDependents",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the fixture only once that process is gone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_only_once_that_process_is_gone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the last suite reading a shared fixture returns while a process it started still runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_last_suite_reading_a_shared_fixture_returns_while_a_process_it_started_still_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasedOnceTheSuitesProcessesAreGone",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasedOnceTheSuitesProcessesAreGone",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureLastUse",
@@ -10866,7 +10906,7 @@
     }
   ],
   "stats": {
-    "behaviors": 354,
+    "behaviors": 355,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
