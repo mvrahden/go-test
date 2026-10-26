@@ -20,15 +20,21 @@ import (
 type BenchCommandTestSuite struct {
 	CLI *gotestcli.BinarySharedFixture
 	cli cliRunner
+	// baseline is a saved run the methods compare against; none writes it.
+	baseline string
 }
 
 func (s *BenchCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~16s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
+	// Estimated for Windows CI: a bench run takes up to ~20s there and no
+	// method makes more than one; each budget is about twice that.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *BenchCommandTestSuite) BeforeAll(t *gotest.T) {
 	s.cli = newCLIRunner(s.CLI)
+	s.baseline = filepath.Join(t.TempDir(), "baseline.json")
+	_, code := s.cli.runExit(t, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+s.baseline)
+	gotest.Equal(t, 0, code)
 }
 
 func (s *BenchCommandTestSuite) TestBenchDeltaLines(t *gotest.T) {
@@ -183,7 +189,7 @@ func (s *BenchCommandTestSuite) TestBenchExcludesPerTestHooks(t *gotest.T) {
 	})
 }
 
-func (s *BenchCommandTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
+func (s *BenchCommandTestSuite) TestBenchSave(t *gotest.T) {
 	t.It("saves a baseline with one Sample per -count repetition", func(it *gotest.T) {
 		dir := it.TempDir()
 		baselinePath := filepath.Join(dir, "baseline.json")
@@ -206,15 +212,11 @@ func (s *BenchCommandTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 			gotest.Len(it, r.Samples, 4)
 		}
 	})
+}
 
-	t.It("compares two saved baselines and passes an impossible-to-trip gate", func(it *gotest.T) {
-		dir := it.TempDir()
-		firstPath := filepath.Join(dir, "first.json")
-
-		_, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+firstPath)
-		gotest.Equal(it, 0, code)
-
-		out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+firstPath, "--gate=500")
+func (s *BenchCommandTestSuite) TestBenchAgainstGate(t *gotest.T) {
+	t.It("compares against a saved baseline and passes an impossible-to-trip gate", func(it *gotest.T) {
+		out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+s.baseline, "--gate=500")
 		gotest.Equal(it, 0, code)
 		// A bare --against (no --spec/--save) must still show the benchmark
 		// actually ran, not just a delta table header: the tree's own
@@ -230,15 +232,11 @@ func (s *BenchCommandTestSuite) TestBenchSaveAgainstGate(t *gotest.T) {
 		gotest.NotEqual(it, 0, code)
 		gotest.Contains(it, out, "--gate requires --against")
 	})
+}
 
+func (s *BenchCommandTestSuite) TestBenchSpecAgainst(t *gotest.T) {
 	t.It("renders exactly one summary trailer for --spec --against", func(it *gotest.T) {
-		dir := it.TempDir()
-		firstPath := filepath.Join(dir, "first.json")
-
-		_, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+firstPath)
-		gotest.Equal(it, 0, code)
-
-		out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--spec", "--against="+firstPath)
+		out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--spec", "--against="+s.baseline)
 		gotest.Equal(it, 0, code)
 		// The spec tree's own trailing counts line must appear exactly
 		// once, with no second, stacked "N tests passed (...)" trailer
@@ -257,19 +255,19 @@ func (s *BenchCommandTestSuite) TestBenchForeignBaseline(t *gotest.T) {
 	// across a toolchain upgrade.
 	t.When("the baseline records another platform", func(w *gotest.T) {
 		w.It("warns, keeps the delta table, and leaves the exit code alone", func(it *gotest.T) {
-			baselinePath := saveForeignBaseline(it, s.cli)
-
-			out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+baselinePath)
+			out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+foreignBaseline(it, s.baseline))
 			gotest.Equal(it, 0, code)
 			gotest.Contains(it, out, "WARN: baseline was recorded in a different environment")
 			gotest.Contains(it, out, "goos plan9, now ")
 			gotest.Contains(it, out, "OLD ns/op")
 		})
+	})
+}
 
+func (s *BenchCommandTestSuite) TestBenchForeignBaselineJSON(t *gotest.T) {
+	t.When("the baseline records another platform", func(w *gotest.T) {
 		w.It("carries the mismatch in the --json report", func(it *gotest.T) {
-			baselinePath := saveForeignBaseline(it, s.cli)
-
-			out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+baselinePath, "--json")
+			out, code := s.cli.runExit(it, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--against="+foreignBaseline(it, s.baseline), "--json")
 			gotest.Equal(it, 0, code)
 
 			var report gotestbench.Report
@@ -291,21 +289,17 @@ func jsonDoc(t *gotest.T, out string) string {
 	return out[start : end+1]
 }
 
-// saveForeignBaseline writes a baseline and rewrites its goos, so the next
-// run reads one no machine in the test could have produced.
-func saveForeignBaseline(t *gotest.T, cli cliRunner) string {
-	path := filepath.Join(t.TempDir(), "foreign.json")
-
-	_, code := cli.runExit(t, "bench", "./examples/notification", "-benchtime=10x", "-count=6", "--save="+path)
-	gotest.Equal(t, 0, code)
-
-	data, err := os.ReadFile(path)
+// foreignBaseline copies baseline with its goos rewritten, so the run reads
+// one no machine in the test could have produced.
+func foreignBaseline(t *gotest.T, baseline string) string {
+	data, err := os.ReadFile(baseline)
 	gotest.NoError(t, err)
 	var b gotestbench.Baseline
 	gotest.NoError(t, json.Unmarshal(data, &b))
 	b.GOOS = "plan9"
 	data, err = json.Marshal(b)
 	gotest.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "foreign.json")
 	gotest.NoError(t, os.WriteFile(path, data, 0o600))
 	return path
 }
