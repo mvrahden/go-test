@@ -2,6 +2,7 @@ package gotestruntime_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -244,31 +245,24 @@ func (s *HarnessTTestSuite) TestRunMethods(t *gotest.T) {
 	})
 
 	t.When("the suite runs its methods in parallel", func(w *gotest.T) {
-		w.It("runs them at the same time", func(it *gotest.T) {
-			started := make(chan struct{})
-			met := make(chan bool, 1)
+		// A parallel subtest starts once its parent's body has returned. A
+		// rendezvous between two methods would need two -parallel slots free
+		// at once, which other parallel tests in the binary may hold.
+		w.It("runs each method as a parallel subtest", func(it *gotest.T) {
+			var mu sync.Mutex
+			var order []string
+			note := func(s string) { mu.Lock(); order = append(order, s); mu.Unlock() }
 			cases := []gotestruntime.Method{
-				{Name: "TestWaits", Run: func(_ *gotest.T, run func(func())) {
-					run(func() {
-						select {
-						case <-started:
-							met <- true
-						case <-time.After(10 * time.Second):
-							met <- false
-						}
-					})
-				}},
-				{Name: "TestStarts", Run: func(_ *gotest.T, run func(func())) { run(func() { close(started) }) }},
+				{Name: "TestFirst", Run: func(_ *gotest.T, run func(func())) { run(func() { note("first") }) }},
+				{Name: "TestSecond", Run: func(_ *gotest.T, run func(func())) { run(func() { note("second") }) }},
 			}
 			it.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
 				gotestruntime.RunMethods(tt, gotest.DefaultSuiteConfig(), gotest.SuiteConfig{}, gotestruntime.Methods{Parallel: true, Cases: cases})
+				note("all started")
 			})
-			select {
-			case ok := <-met:
-				gotest.True(it, ok, "the first method never saw the second start")
-			default:
-				gotest.Fail(it, "the first method never ran")
-			}
+			gotest.Len(it, order, 3)
+			gotest.Equal(it, "all started", order[0], "order: %v", order)
+			gotest.ElementsMatch(it, []string{"first", "second"}, order[1:])
 		})
 	})
 }
