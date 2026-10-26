@@ -1,6 +1,7 @@
 package gotestrunner
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -34,13 +35,65 @@ func untrack(tree *proctree.Tree) {
 	delete(live, tree)
 }
 
+// Suite runs whose events are yet to reach the stream: a suite's events go
+// out once its result is recorded, after its process ended.
+var (
+	relayMu   sync.Mutex
+	relaying  int
+	relayIdle = closed()
+)
+
+func closed() chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
+}
+
+// relay counts a suite run until done marks its events passed on.
+func relay() (done func()) {
+	relayMu.Lock()
+	if relaying == 0 {
+		relayIdle = make(chan struct{})
+	}
+	relaying++
+	relayMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			relayMu.Lock()
+			defer relayMu.Unlock()
+			if relaying--; relaying == 0 {
+				close(relayIdle)
+			}
+		})
+	}
+}
+
+func relaysIdle() <-chan struct{} {
+	relayMu.Lock()
+	defer relayMu.Unlock()
+	return relayIdle
+}
+
+// relayGrace is how long a tree killed at the bound gets for its suite's
+// events to reach the stream.
+const relayGrace = 500 * time.Millisecond
+
+// runRecorded runs a suite and records its result, counted as a relay so
+// a CLI that abandons the run still passes the suite's events on.
+func runRecorded(ctx context.Context, c *OutputCollector, pkg string, idx int, t SuiteTarget, env []string, test2json bool) { //nolint:gocritic // hugeParam: as RunSingleSuite
+	defer relay()()
+	c.RecordResult(pkg, idx, RunSingleSuite(ctx, t, env, test2json))
+}
+
 // Abandon gives up on every process tree still running, for a CLI about to
 // exit without waiting for them. Each suite process that published its pid
 // is sent a second stop signal, which releases its fixtures at once, and a
 // tree with no stop file, the shared fixture's, is asked to tear down; a tree
 // neither reaches is killed at once. Within bound of that, or as soon as
 // hurry closes, every tree still running is killed, so no process outlives
-// the CLI.
+// the CLI. The events of the suites that ended are passed on before it
+// returns, within bound, or relayGrace past it for a tree killed there.
 func Abandon(bound time.Duration, hurry <-chan struct{}) {
 	liveMu.Lock()
 	trees := make(map[*proctree.Tree]liveTree, len(live))
@@ -58,16 +111,34 @@ func Abandon(bound time.Duration, hurry <-chan struct{}) {
 	}
 	timer := time.NewTimer(bound)
 	defer timer.Stop()
+	expired := false
 wait:
 	for _, done := range stopping {
 		select {
 		case <-done:
 		case <-timer.C:
+			expired = true
 			break wait
 		case <-hurry:
-			break wait
+			killAll(trees)
+			return
 		}
 	}
+	killAll(trees)
+	left := timer.C
+	if expired {
+		grace := time.NewTimer(relayGrace)
+		defer grace.Stop()
+		left = grace.C
+	}
+	select {
+	case <-relaysIdle():
+	case <-left:
+	case <-hurry:
+	}
+}
+
+func killAll(trees map[*proctree.Tree]liveTree) {
 	for tree := range trees {
 		_ = tree.Kill()
 	}

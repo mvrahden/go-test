@@ -232,6 +232,10 @@ func ExportResulted(c *OutputCollector) int { return len(c.verdicts.resulted) }
 
 var ExportApplyInterrupt = applyInterrupt
 
+// ExportRelay counts a suite run whose events are yet to reach the stream,
+// until the returned func marks them passed on.
+var ExportRelay = relay
+
 // ExportTrack tracks tree as a live tree rooted at root, for Abandon, until
 // the returned func untracks it.
 func ExportTrack(tree *proctree.Tree, root int, stopFile string, done <-chan struct{}) (stop func()) {

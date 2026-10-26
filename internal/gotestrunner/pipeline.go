@@ -885,8 +885,7 @@ loop:
 				}
 				defer func() { <-sem }()
 
-				r := RunSingleSuite(streamCtx, t, env, collector.UsesTest2JSON())
-				collector.RecordResult(t.Package, idx, r)
+				runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
 				recorded = true
 			}(target, i)
 		}
@@ -943,8 +942,7 @@ loop:
 			copy(env, baseEnv)
 			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
 		}
-		r := RunSingleSuite(streamCtx, d.t, env, collector.UsesTest2JSON())
-		collector.RecordResult(d.t.Package, d.idx, r)
+		runRecorded(streamCtx, collector, d.t.Package, d.idx, d.t, env, collector.UsesTest2JSON())
 	}
 	// The last verdict is in; what the context says from here on is not the
 	// run's business (see exitCodeAfterDispatch).
