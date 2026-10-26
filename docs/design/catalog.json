@@ -6101,6 +6101,46 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "starts the fixture after the first suite ran, and releases it after the second",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_the_fixture_after_the_first_suite_ran,_and_releases_it_after_the_second",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when only the second of two exclusive suites reads a shared fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "only_the_second_of_two_exclusive_suites_reads_a_shared_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATailFixtureComesUpForItsSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATailFixtureComesUpForItsSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "releases the fixture only once that process is gone",
                       "duration": 0,
                       "excluded": false,
@@ -10906,7 +10946,7 @@
     }
   ],
   "stats": {
-    "behaviors": 355,
+    "behaviors": 356,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

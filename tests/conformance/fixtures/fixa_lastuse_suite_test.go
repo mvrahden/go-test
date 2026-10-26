@@ -70,3 +70,14 @@ func (s *FixtureLastUseTestSuite) TestADependencyOutlastsItsDependents(t *gotest
 		})
 	})
 }
+
+func (s *FixtureLastUseTestSuite) TestATailFixtureComesUpForItsSlot(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixaslots/")
+	gotest.NoError(t, err)
+	t.When("only the second of two exclusive suites reads a shared fixture", func(w *gotest.T) {
+		w.It("starts the fixture after the first suite ran, and releases it after the second", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.True(it, run.MarkerOrder("first ran", "late.BeforeAll", "second ran", "late.AfterAll"), "markers: %v", run.Markers)
+		})
+	})
+}

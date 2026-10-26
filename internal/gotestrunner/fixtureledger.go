@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -142,7 +143,7 @@ func startFixtureReleaser(ctx context.Context, ready func() *SharedFixtureProces
 			if proc != nil && ctx.Err() == nil {
 				if err := proc.TeardownKeys(ctx, batch, proc.teardownBudget()); err != nil && ctx.Err() == nil {
 					r.mu.Lock()
-					r.errs = append(r.errs, err)
+					r.errs = append(r.errs, fmt.Errorf("early shared fixture teardown: %w", err))
 					r.mu.Unlock()
 				}
 			}

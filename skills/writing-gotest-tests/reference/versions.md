@@ -618,3 +618,9 @@ Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
    shared fixtures that share something without such a field (a Docker
    network, a port) used to be released one after another by accident; give
    the one that must go last a pointer field to the other.
+
+4. **A shared fixture is released at its last use** — once no remaining
+   planned suite declares it, not at the end of the run, and one only an
+   exclusive suite needs starts just before that suite. A suite that reads
+   a shared fixture it does not declare can find it gone; declare a pointer
+   field for every fixture a suite touches.

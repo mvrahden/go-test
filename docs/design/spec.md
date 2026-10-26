@@ -587,7 +587,7 @@ Read transferred fields but do not reassign them — use local variables for any
 Subprocess (compiled binary):
   sf.BeforeAll(ctx)              → provisions infrastructure, populates all fields
   serialize transferable fields  → JSON (local fields excluded)
-  write to the protocol stream, wait for the runner's signal (or a barrier teardown verb)
+  write to the protocol stream, wait for the runner's signal (or a teardown verb)
   sf.AfterAll(ctx)               → tears down infrastructure
 
 CLI (gotest):

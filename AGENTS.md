@@ -542,7 +542,7 @@ func (f *PostgresSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 Suites reference shared fixtures via pointer fields (same as package fixtures).
 Shared fixtures have no per-test hooks: the generator refuses one that declares `BeforeEach` or `AfterEach` ([A shared fixture with per-test hooks](specs/cli/spec.md#requirement-a-shared-fixture-with-per-test-hooks)). Put per-test work in a package fixture that binds the shared one, or in the suite's `BeforeEach`/`AfterEach`.
 Shared fixtures must not live in `internal/` packages.
-Shared fixtures are window-scheduled: each is resident exactly while a scheduled suite needs it — never started when no dispatched suite requires it, and released or started at the bulk→exclusive-tail barrier as the phases' needs differ.
+A shared fixture is resident only while a planned suite still needs it: never started when no dispatched suite requires it, started for an exclusive suite just before it runs, and released once no remaining planned suite needs it ([A shared fixture released at its last use](specs/fixtures/spec.md#requirement-a-shared-fixture-released-at-its-last-use)).
 `-skip` counts: a fixture no selected suite binds never starts ([Selection decides which shared fixtures start](specs/fixtures/spec.md#requirement-selection-decides-which-shared-fixtures-start)).
 
 ### Generic test suites (contract testing)

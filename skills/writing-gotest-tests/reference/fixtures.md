@@ -93,7 +93,7 @@ through the fixture DAG) needs it. Two consequences:
   never fail the run. Do not "test" a fixture by leaving it wired to
   nothing; nothing will execute it.
 - A shared fixture you read without declaring may be absent: never
-  started, or already torn down at the bulk→exclusive-tail barrier.
+  started yet, or already released once its last declared reader finished.
   Reaching one through a package-level variable or another struct
   compiles and then lies at run time. Declare a pointer field for every
   fixture a suite touches (or reach it through a declared fixture); the

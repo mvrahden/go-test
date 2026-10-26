@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -227,28 +228,6 @@ func failRun(c *OutputCollector, result *PipelineResult, pkg, msg string, detail
 		result.ExitCode = 1
 	}
 	c.bookRunFailure(pkg, msg, details...)
-}
-
-// fixtureBarrier performs the bulk→tail window transition on the setup
-// process: release what only the bulk needed (the subprocess applies
-// reverse-DAG order), then start what only the tail needs (DAG order).
-// Skipped entirely on cancellation — the terminal Teardown owns shutdown.
-func fixtureBarrier(ctx context.Context, proc *SharedFixtureProcess, bulkAlive, tailAlive map[string]bool, setupTimeout time.Duration) error {
-	if proc == nil || ctx.Err() != nil {
-		return nil
-	}
-	var errs []error
-	if release := diffKeys(bulkAlive, tailAlive); len(release) > 0 {
-		if err := proc.TeardownKeys(ctx, release, proc.teardownBudget()); err != nil {
-			errs = append(errs, fmt.Errorf("early shared fixture teardown: %w", err))
-		}
-	}
-	if acquire := diffKeys(tailAlive, bulkAlive); len(acquire) > 0 {
-		if err := proc.StartKeys(ctx, acquire, setupTimeout); err != nil {
-			errs = append(errs, fmt.Errorf("shared fixture start for exclusive tail: %w", err))
-		}
-	}
-	return errors.Join(errs...)
 }
 
 // stageFailurePkg names the synthetic package under which a build failure
@@ -945,13 +924,9 @@ loop:
 		allIn()
 	}
 
-	// Bulk→tail barrier: re-window shared fixtures for the exclusive tail.
-	// Alive(tail) comes from the actual deferred targets — suites whose
-	// packages never compiled are not in it. Skipped entirely on cancellation
-	// or when nothing dispatches after the bulk: the terminal Teardown owns
-	// whatever is still resident.
-	//
-	// A failed setup leaves the process serving commands, so the tail's own
+	// The exclusive tail runs on slots: before each suite, the fixtures it
+	// needs that are not up yet start; the releases go through the ledger.
+	// A failed setup leaves the process serving commands, so a slot's own
 	// fixtures still start; one that timed out is still busy with the
 	// up-front phase and would answer no command.
 	fixtureWg.Wait()
@@ -960,12 +935,25 @@ loop:
 	for i := range deferredExclusive {
 		tailTargets[i], tailOrder[i] = deferredExclusive[i].t, i
 	}
-	var barrierErr error
-	// The setup process serves one command at a time.
-	releaser.Drain()
-	if len(deferredExclusive) > 0 && setupProc != nil && !setupTimedOut {
-		tailAlive := aliveFromTargets(tailTargets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
-		barrierErr = fixtureBarrier(streamCtx, setupProc, win.Bulk, tailAlive, resolvedSetupTimeout)
+	var slotErr error
+	started := maps.Clone(win.Bulk)
+	startSlot := func(t *SuiteTarget) {
+		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
+			return
+		}
+		need := aliveFixtureKeys(map[string][]string{t.Package: {t.SuiteName}}, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+		start := diffKeys(need, started)
+		if len(start) == 0 {
+			return
+		}
+		for _, key := range start {
+			started[key] = true
+		}
+		// The setup process serves one command at a time.
+		releaser.Drain()
+		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
+			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for exclusive tail: %w", err))
+		}
 	}
 
 	// Exclusive suites own the machine: after the stream has fully drained,
@@ -999,6 +987,7 @@ loop:
 	}
 	for n, i := range tailOrder {
 		d := &deferredExclusive[i]
+		startSlot(&d.t)
 		runTailSlot(d.t, d.idx)
 		if n == len(tailOrder)-1 {
 			allIn()
@@ -1020,7 +1009,7 @@ loop:
 	releaseErr := releaser.Err()
 	var teardownErr error
 	if setupProc != nil {
-		teardownErr = errors.Join(barrierErr, releaseErr, setupProc.Teardown())
+		teardownErr = errors.Join(slotErr, releaseErr, setupProc.Teardown())
 		reports := setupProc.TakeFailures()
 		setupErr = withReports(setupErr, reports, false)
 		teardownErr = teardownVerdict(teardownErr, reports)
