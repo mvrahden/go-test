@@ -299,3 +299,27 @@ func (s *SharedFixtureDAGTestSuite) TestAReleaseIsReportedByTheCommandThatRanIt(
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAHungReleaseHoldsUpNoLaterStart(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagSlow, "DagA")
+	t.Setenv(fixtures.EnvDagTeardownDelay, (3 * time.Second).String())
+	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagB")...)
+	proc, release := startDAG(t, infos)
+	released := make(chan error, 1)
+	go func() { released <- proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute) }()
+	time.Sleep(200 * time.Millisecond)
+	began := time.Now()
+	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagB")}, 0)
+	took := time.Since(began)
+	releaseErr := <-released
+	teardownErr := release()
+
+	t.When("a fixture is started while another's release still runs", func(w *gotest.T) {
+		w.It("comes up without waiting for the release", func(it *gotest.T) {
+			gotest.NoError(it, startErr)
+			gotest.NoError(it, releaseErr)
+			gotest.NoError(it, teardownErr)
+			gotest.Less(it, took, 1500*time.Millisecond)
+		})
+	})
+}

@@ -81,3 +81,14 @@ func (s *FixtureLastUseTestSuite) TestATailFixtureComesUpForItsSlot(t *gotest.T)
 		})
 	})
 }
+
+func (s *FixtureLastUseTestSuite) TestASlowReleaseHoldsUpNoSlot(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixaslowrelease/")
+	gotest.NoError(t, err)
+	t.When("a shared fixture's release takes its time while an exclusive suite needs a fixture of its own", func(w *gotest.T) {
+		w.It("starts that fixture and runs the suite while the release still runs", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.True(it, run.MarkerOrder("slow.AfterAll begins", "tail ran", "slow.AfterAll ends"), "markers: %v", run.Markers)
+		})
+	})
+}

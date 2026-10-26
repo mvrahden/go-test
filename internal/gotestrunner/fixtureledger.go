@@ -95,7 +95,8 @@ func sortedKeys(set map[string]bool) []string {
 
 // fixtureReleaser releases the keys the ledger frees on one goroutine of its
 // own, one teardown command at a time, so a suite that frees a fixture never
-// waits for its release. Keys freed while a command is in flight go out
+// waits for its release, and neither does a start: the process serves
+// commands concurrently. Keys freed while a command is in flight go out
 // together in the next.
 type fixtureReleaser struct {
 	mu      sync.Mutex

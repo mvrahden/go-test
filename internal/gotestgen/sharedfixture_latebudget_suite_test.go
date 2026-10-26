@@ -51,12 +51,17 @@ func lateBudgetReports(t *gotest.T, timeout time.Duration) (done, ack string) {
 	cmd.Stderr = io.Discard
 	gotest.NoError(t, cmd.Start())
 
-	lines := make(chan map[string]string)
+	// A protocol line: its key and, on _done and _cmd, the teardown budget.
+	type protocolLine struct {
+		Key            string `json:"key"`
+		TeardownBudget string `json:"teardownBudget"`
+	}
+	lines := make(chan protocolLine)
 	go func() {
 		defer close(lines)
 		sc := bufio.NewScanner(stdout)
 		for sc.Scan() {
-			var line map[string]string
+			var line protocolLine
 			if json.Unmarshal(sc.Bytes(), &line) == nil {
 				lines <- line
 			}
@@ -72,8 +77,8 @@ func lateBudgetReports(t *gotest.T, timeout time.Duration) (done, ack string) {
 				if !ok {
 					return ""
 				}
-				if line["key"] == key {
-					return line["teardownBudget"]
+				if line.Key == key {
+					return line.TeardownBudget
 				}
 			case <-timer.C:
 				return ""

@@ -55,10 +55,10 @@ func (s *SharedFixtureWindowTestSuite) TestAWindowIsHeldToTheDeclaredBudget(t *g
 			gotest.ErrorContains(it, err, "timed out")
 			gotest.Less(it, took, 10*time.Second)
 		})
-		w.It("a later command is refused at once while the process is still busy", func(it *gotest.T) {
-			began := time.Now()
-			gotest.ErrorContains(it, proc.TeardownKeys(it.Context(), []string{slowSetupKey}, time.Minute), "busy")
-			gotest.Less(it, time.Since(began), time.Second)
+		w.It("a release of the fixture sent meanwhile waits for its setup to end", func(it *gotest.T) {
+			ctx, cancel := context.WithTimeout(it.Context(), time.Second)
+			defer cancel()
+			gotest.ErrorIs(it, proc.TeardownKeys(ctx, []string{slowSetupKey}, time.Minute), context.DeadlineExceeded)
 		})
 	})
 }

@@ -31,6 +31,7 @@ type fixtureStateEntry struct {
 	TeardownBudget string          `json:"teardownBudget,omitempty"`
 	Budget         string          `json:"budget,omitempty"` // _setup: what the fixture's setup may take
 	Error          string          `json:"error,omitempty"`
+	ID             uint64          `json:"id,omitempty"` // _cmd: the command it acknowledges
 }
 
 // SetupTimeoutError is the wait for shared fixtures giving up. After is the
@@ -88,12 +89,13 @@ type SharedFixtureProcess struct {
 	// reports a new teardown budget: a fixture started late came up.
 	teardownSeen chan struct{}
 
-	stdin   io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
-	cmdMu   sync.Mutex     // serializes commands: one in flight, one _cmd ack each
-	cmdResp chan string    // _cmd ack payloads (error text, "" on success)
-	// cmdPending: a command was given up before its ack, so the process is
-	// still busy with it. Under cmdMu.
-	cmdPending bool
+	stdin io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
+	// Commands run concurrently in the process; each waits for the ack
+	// carrying its id. A command given up drops its waiter, and its late ack
+	// with it. Under cmdMu.
+	cmdMu      sync.Mutex
+	cmdNext    uint64
+	cmdWaiters map[uint64]chan string
 
 	// failures keeps what the process reported on stderr about fixtures
 	// that failed.
@@ -441,10 +443,9 @@ func (p *SharedFixtureProcess) TeardownKeys(ctx context.Context, keys []string, 
 	return p.command(ctx, "teardown", keys, timeout)
 }
 
-// command sends one window verb and waits for its ack. A command given up
-// leaves the process busy with it, so later ones are refused until its ack
-// arrives: the process serves one at a time, and an ack read by the wrong
-// command would answer for it.
+// command sends one window verb and waits for the ack carrying its id. The
+// process serves commands concurrently, so one that hangs holds up nothing
+// sent after it.
 func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []string, flat time.Duration) error {
 	if len(keys) == 0 {
 		return nil
@@ -452,22 +453,26 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	if p.stdin == nil {
 		return fmt.Errorf("shared fixture process has no command channel")
 	}
+	resp := make(chan string, 1)
 	p.cmdMu.Lock()
-	defer p.cmdMu.Unlock()
-
-	if p.cmdPending {
-		select {
-		case <-p.cmdResp:
-			p.cmdPending = false
-		default:
-			return fmt.Errorf("shared fixture %s: the process is still busy with an earlier command", verb)
-		}
+	p.cmdNext++
+	id := p.cmdNext
+	if p.cmdWaiters == nil {
+		p.cmdWaiters = map[uint64]chan string{}
 	}
+	p.cmdWaiters[id] = resp
+	p.cmdMu.Unlock()
+	defer func() {
+		p.cmdMu.Lock()
+		delete(p.cmdWaiters, id)
+		p.cmdMu.Unlock()
+	}()
 
 	line, err := json.Marshal(struct {
 		Verb string   `json:"verb"`
 		Keys []string `json:"keys"`
-	}{Verb: verb, Keys: keys})
+		ID   uint64   `json:"id"`
+	}{Verb: verb, Keys: keys, ID: id})
 	if err != nil {
 		return err
 	}
@@ -476,7 +481,10 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		p.setupBegan, p.setupDeadline, p.setupBudget, p.setupUnbounded = time.Now(), time.Time{}, 0, false
 		p.mu.Unlock()
 	}
-	if _, err := p.stdin.Write(append(line, '\n')); err != nil {
+	p.cmdMu.Lock()
+	_, err = p.stdin.Write(append(line, '\n'))
+	p.cmdMu.Unlock()
+	if err != nil {
 		return fmt.Errorf("send %s to shared fixture process: %w", verb, err)
 	}
 
@@ -484,7 +492,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	defer clock.stop()
 	for {
 		select {
-		case msg := <-p.cmdResp:
+		case msg := <-resp:
 			if msg != "" {
 				return fmt.Errorf("shared fixture %s: %s", verb, msg)
 			}
@@ -492,10 +500,8 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		case <-p.done:
 			return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
 		case <-ctx.Done():
-			p.cmdPending = true
 			return fmt.Errorf("shared fixture %s cancelled: %w", verb, ctx.Err())
 		case <-clock.C:
-			p.cmdPending = true
 			return fmt.Errorf("shared fixture %s timed out after %v", verb, clock.expired().After)
 		case <-p.budgetSeen:
 			clock.follow()
@@ -730,7 +736,6 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 		state:           state,
 		allDone:         allDone,
 		stdin:           stdin,
-		cmdResp:         make(chan string, 1),
 		budgetSeen:      make(chan struct{}, 1),
 		teardownSeen:    make(chan struct{}, 1),
 		failures:        newFailureLog(os.Stderr),
@@ -810,11 +815,13 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 				default:
 				}
 			}
-			// Ack for the one in-flight command; drop it if no one waits
-			// (the commander timed out) rather than stall the scan.
-			select {
-			case p.cmdResp <- entry.Error:
-			default:
+			// An ack no one waits for any more (the command was given up)
+			// is dropped.
+			p.cmdMu.Lock()
+			resp := p.cmdWaiters[entry.ID]
+			p.cmdMu.Unlock()
+			if resp != nil {
+				resp <- entry.Error
 			}
 			continue
 		}

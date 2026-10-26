@@ -6141,6 +6141,46 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "starts that fixture and runs the suite while the release still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_that_fixture_and_runs_the_suite_while_the_release_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's release takes its time while an exclusive suite needs a fixture of its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_release_takes_its_time_while_an_exclusive_suite_needs_a_fixture_of_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASlowReleaseHoldsUpNoSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASlowReleaseHoldsUpNoSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "releases the fixture only once that process is gone",
                       "duration": 0,
                       "excluded": false,
@@ -10946,7 +10986,7 @@
     }
   ],
   "stats": {
-    "behaviors": 356,
+    "behaviors": 357,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

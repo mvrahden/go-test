@@ -949,8 +949,6 @@ loop:
 		for _, key := range start {
 			started[key] = true
 		}
-		// The setup process serves one command at a time.
-		releaser.Drain()
 		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
 			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for exclusive tail: %w", err))
 		}
@@ -992,10 +990,9 @@ loop:
 		if n == len(tailOrder)-1 {
 			allIn()
 		}
-		// The slot's process is gone; the next slot's commands wait for
-		// this release.
+		// The slot's process is gone. Its release runs beside the next
+		// slot, which needs none of what it frees.
 		releaser.Release(ledger.Done(d.t.Package, d.t.SuiteName))
-		releaser.Drain()
 	}
 	allIn()
 

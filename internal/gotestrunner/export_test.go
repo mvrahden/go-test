@@ -201,7 +201,6 @@ func ExportReadProtocol(stream io.Reader) *SharedFixtureProcess {
 		ready:    map[string]chan struct{}{},
 		state:    map[string]json.RawMessage{},
 		allDone:  make(chan struct{}),
-		cmdResp:  make(chan string, 1),
 		failures: newFailureLog(io.Discard),
 	}
 	p.readProtocol(stream)

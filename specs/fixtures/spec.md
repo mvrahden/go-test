@@ -195,6 +195,10 @@ A shared fixture SHALL be released once no remaining planned suite needs it, whi
 - **WHEN** only the second of two exclusive suites reads a shared fixture
 - **THEN** starts the fixture after the first suite ran, and releases it after the second
 
+#### Scenario: A slow release beside a slot
+- **WHEN** a shared fixture's release takes its time while an exclusive suite needs a fixture of its own
+- **THEN** starts that fixture and runs the suite while the release still runs
+
 ### Requirement: Releasing shared fixtures
 Shared fixtures SHALL be released concurrently, each after the fixtures that depend on it, under a teardown budget of 30s plus the longest chain still resident: a fixture's share, its declared Timeout or the default, plus the longest chain among the fixtures depending on it. A fixture's share SHALL leave the budget once it is released.
 
