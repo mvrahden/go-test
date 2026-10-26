@@ -1,0 +1,14 @@
+Expect: dagbudget: the hung release was not force-killed after 35s
+Judge: ./tests/canary CanaryTestSuite/TestTheTeardownBudgetIsTheLongestResidentChain
+Clause: when shared fixtures declaring 2s, 3s on a 2s one, and a released 10s one are resident and an AfterAll never returns → their process is force-killed after 30s plus the longest chain still resident, 35s, and the run fails
+--- a/internal/gotestgen/static/sharedfixture.go.tpl
++++ b/internal/gotestgen/static/sharedfixture.go.tpl
+@@ -150,7 +150,7 @@ func main() {
+ 	ƒunshare := func(i int) {
+ 		ƒshareMu.Lock()
+ 		defer ƒshareMu.Unlock()
+-		ƒshares[i] = 0
++		_ = i
+ 	}
+ 	ƒkeys := []string{ {{- range .Fixtures }}"{{ .StateKey }}", {{ end -}} }
+ 	ƒnames := []string{ {{- range .Fixtures }}"{{ .Identifier }}", {{ end -}} }

@@ -165,12 +165,23 @@ When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be
 - **AND** never runs the benchmark reading it
 
 ### Requirement: A late fixture's dependencies
-A shared fixture started for the exclusive tail together with a dependency only the tail needs SHALL come up after that dependency, serve the suites that read it, and be torn down before it.
+Shared fixtures started late SHALL start concurrently, each after what it depends on: one started for the exclusive tail together with a dependency only the tail needs SHALL come up after that dependency, serve the suites that read it, and be torn down before it.
 
 #### Scenario: A tail fixture with a tail-only dependency
 - **WHEN** a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs
 - **THEN** both come up, the dependency first, and the suite reading them passes
 - **AND** both are torn down, the dependent first
+
+### Requirement: Releasing shared fixtures
+Shared fixtures SHALL be released concurrently, each after the fixtures that depend on it, under a teardown budget of 30s plus the longest chain still resident: a fixture's share, its declared Timeout or the default, plus the longest chain among the fixtures depending on it. A fixture's share SHALL leave the budget once it is released.
+
+#### Scenario: Two independent fixtures released at once
+- **WHEN** two independent shared fixtures and a dependent of one are released at the end of a run
+- **THEN** releases the independent ones at once and the dependent before its dependency
+
+#### Scenario: A budget computed from the longest chain
+- **WHEN** shared fixtures declaring 2s, 3s on a 2s one, and a released 10s one are resident and an AfterAll never returns
+- **THEN** their process is force-killed after 30s plus the longest chain still resident, 35s, and the run fails
 
 ### Requirement: A late fixture's teardown budget
 A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run.
