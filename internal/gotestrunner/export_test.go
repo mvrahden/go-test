@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -301,3 +302,12 @@ func ExportKeyEmptied(then func(dir string)) (restore func()) {
 }
 
 var ExportSweepBinaryCache = sweepBinaryCache
+
+// ExportTeardownVerdict is teardownVerdict with the reports its error carries.
+func ExportTeardownVerdict(teardownErr error, reports []string) ([]string, error) {
+	err := teardownVerdict(teardownErr, reports)
+	if f := (*fixtureFailure)(nil); errors.As(err, &f) {
+		return f.reports, err
+	}
+	return nil, err
+}
