@@ -477,6 +477,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-stdout-is-protocol` | a shared fixture's stdout is the protocol stream | canary: a setup that prints a fragment and a forged `_done` fails the run |
 | `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full; fixtures conformance: a hanging 2s-budget fixture is given up only after 30s, and a container fixture taking 35s is given up at 30s |
 | `fixture-held-past-its-last-use` | a parallel suite that finishes never hands its shared fixtures to the releaser | fixtures conformance: the fixture is released after an unrelated suite ends |
+| `build-failure-holds-its-fixtures` | a package that fails to build keeps its planned suites' shared fixtures until the end of the run | fixtures conformance: the fixture is released after an unrelated suite ends |
 | `release-before-dependents` | a shared fixture's release no longer waits for the fixtures depending on it | fixtures conformance: a dependent is released after its dependency |
 | `start-before-dependencies` | a shared fixture started late no longer waits for its dependencies to come up | fixtures conformance: the tail's fixture starts before the dependency it reads |
 | `teardown-budget-summed` | the setup process reports the sum of the resident fixtures' shares as its teardown budget | fixtures conformance: the hung release is force-killed after 37s, not 35s |
