@@ -16,11 +16,15 @@ import (
 // EnvDagTimeout is the Timeout each declares, EnvDagSetupDelay and
 // EnvDagTeardownDelay how long BeforeAll and AfterAll take, and EnvDagLog a
 // file each appends "<name> <hook> begin|end <unix nanoseconds>" lines to.
+// EnvDagPanic names a fixture whose AfterAll panics, and EnvDagSlow one whose
+// AfterAll alone takes EnvDagTeardownDelay.
 const (
 	EnvDagTimeout       = "GOTEST_TEST_DAG_TIMEOUT"
 	EnvDagSetupDelay    = "GOTEST_TEST_DAG_SETUP_DELAY"
 	EnvDagTeardownDelay = "GOTEST_TEST_DAG_TEARDOWN_DELAY"
 	EnvDagLog           = "GOTEST_TEST_DAG_LOG"
+	EnvDagPanic         = "GOTEST_TEST_DAG_PANIC"
+	EnvDagSlow          = "GOTEST_TEST_DAG_SLOW"
 )
 
 type DagASharedFixture struct{}
@@ -47,8 +51,14 @@ func dagConfig() gotest.FixtureConfig {
 // dagHook logs the hook's begin and end around the delay env names.
 func dagHook(name, hook, delayEnv string) error {
 	dagLog(name, hook, "begin")
-	if d, err := time.ParseDuration(os.Getenv(delayEnv)); err == nil && d > 0 {
-		time.Sleep(d)
+	if hook == "AfterAll" && os.Getenv(EnvDagPanic) == name {
+		panic(name + " AfterAll panics")
+	}
+	slow := os.Getenv(EnvDagSlow)
+	if hook != "AfterAll" || slow == "" || slow == name {
+		if d, err := time.ParseDuration(os.Getenv(delayEnv)); err == nil && d > 0 {
+			time.Sleep(d)
+		}
 	}
 	dagLog(name, hook, "end")
 	return nil

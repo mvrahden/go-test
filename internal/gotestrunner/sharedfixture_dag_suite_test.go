@@ -254,3 +254,33 @@ func (s *SharedFixtureDAGTestSuite) TestARequestThatCouldOnlyHangIsRefused(t *go
 		})
 	}
 }
+
+func (s *SharedFixtureDAGTestSuite) TestATeardownGoingWrongLetsTheOthersFinish(t *gotest.T) {
+	type row struct {
+		Desc string
+		env  map[string]string
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "a panicking AfterAll", env: map[string]string{fixtures.EnvDagPanic: "DagChild"}},
+		{Desc: "an AfterAll outliving its declared Timeout", env: map[string]string{
+			fixtures.EnvDagSlow: "DagChild", fixtures.EnvDagTimeout: "1s", fixtures.EnvDagTeardownDelay: "2s",
+		}},
+	}) {
+		log := filepath.Join(t.TempDir(), "dag.log")
+		t.Setenv(fixtures.EnvDagLog, log)
+		for k, v := range r.env {
+			t.Setenv(k, v)
+		}
+		_, release := startDAG(t, dagFixtures(false, "DagA", "DagB", "DagChild"))
+		teardownErr := release()
+		events := readDagLog(t, log)
+
+		t.When("one fixture's release goes wrong while the others are released with it", func(w *gotest.T) {
+			w.It("lets every other fixture finish its release, and fails the run", func(it *gotest.T) {
+				gotest.Error(it, teardownErr)
+				gotest.NotZero(it, dagAt(events, "DagA", "AfterAll", "end"), "log: %v", events)
+				gotest.NotZero(it, dagAt(events, "DagB", "AfterAll", "end"), "log: %v", events)
+			})
+		})
+	}
+}
