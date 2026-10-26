@@ -174,9 +174,7 @@ func (s *CLIEventsFileStopTestSuite) TestAStoppedRunLeavesItsEventsFile(t *gotes
 		stop func(cmd *exec.Cmd, tree *proctree.Tree) error
 	}
 	for t, row := range gotest.Each(t, []row{
-		{Desc: "an interrupt", stop: func(cmd *exec.Cmd, tree *proctree.Tree) error {
-			return testkit.Interrupt(cmd, tree)
-		}},
+		{Desc: "an interrupt", stop: testkit.Interrupt},
 		{Desc: "a forced stop", stop: func(cmd *exec.Cmd, tree *proctree.Tree) error {
 			if err := testkit.Interrupt(cmd, tree); err != nil {
 				return err
