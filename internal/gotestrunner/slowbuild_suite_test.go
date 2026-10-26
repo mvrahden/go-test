@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -57,31 +58,32 @@ func stderrOf(t *gotest.T, f func()) string {
 	return string(data)
 }
 
-// shortly is a context that ends 30ms in: the build starts, is cut short and
-// fails, and the notice is all that is left to see. A context already done
-// would never start it, and on Windows' coarse clock such a build lasts 0s.
-func shortly() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 30*time.Millisecond)
-}
+// missing is a package of this module that does not exist: its build starts,
+// fails on its own and lasts as long as the go command takes to say so. No
+// deadline cuts it short, since one that ends before it starts leaves no
+// build to notice.
+const missing = "github.com/mvrahden/go-test/internal/gotestrunner/testdata/missing"
 
 func (s *SlowBuildThresholdTestSuite) TestATestBinaryBuildHonorsTheVariable(t *gotest.T) {
 	t.Setenv(protocol.EnvSlowBuildThreshold, "1ns")
-	ctx, cancel := shortly()
 	out := stderrOf(t, func() {
-		_, err := gotestrunner.ExportCompilePackage(ctx, "example.com/slow", "-overlay=", nil, t.TempDir(), "")
+		_, err := gotestrunner.ExportCompilePackage(context.Background(), missing, "-overlay=", nil, t.TempDir(), "")
 		gotest.Error(t, err)
 	})
-	cancel()
-	gotest.Contains(t, out, "gotest: test binary for example.com/slow finished building after")
+	gotest.Contains(t, out, "gotest: test binary for "+missing+" finished building after")
 }
 
 func (s *SlowBuildThresholdTestSuite) TestASharedFixtureBuildHonorsTheVariable(t *gotest.T) {
 	t.Setenv(protocol.EnvSlowBuildThreshold, "1ns")
-	ctx, cancel := shortly()
+	fixtures := []gotestgen.SharedFixtureInfo{{
+		Identifier:    "MissingSharedFixture",
+		PkgPath:       missing,
+		PkgName:       "missing",
+		QualifiedType: "missing.MissingSharedFixture",
+	}}
 	out := stderrOf(t, func() {
-		_, err := gotestrunner.StartSharedFixtures(ctx, t.TempDir(), slowTeardownFixture(), time.Minute)
+		_, err := gotestrunner.StartSharedFixtures(context.Background(), t.TempDir(), fixtures, time.Minute)
 		gotest.Error(t, err)
 	})
-	cancel()
 	gotest.Contains(t, out, "gotest: shared fixture setup binary finished building after")
 }
