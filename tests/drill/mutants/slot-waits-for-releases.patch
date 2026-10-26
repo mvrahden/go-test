@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/fixtures .* / starts that fixture and runs the suite while the release still runs \(
+Clause: when a shared fixture's release takes its time while an exclusive suite needs a fixture of its own → starts that fixture and runs the suite while the release still runs
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -939,6 +939,7 @@ loop:
+ 	var slotErr error
+ 	started := maps.Clone(win.Bulk)
+ 	startSlot := func(t *SuiteTarget) {
++		releaser.Drain()
+ 		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
+ 			return
+ 		}
