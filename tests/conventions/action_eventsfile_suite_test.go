@@ -91,7 +91,9 @@ func (s *ActionEventsFileTestSuite) runStep(t *gotest.T, eventsFile string, old 
 	log, output := filepath.Join(bin, "calls"), filepath.Join(bin, "output")
 	cmd := exec.CommandContext(t.Context(), "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", s.script) //nolint:gosec // G204: the action's own script
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	// PWD as a runner's shell has it: inherited, bash would distrust it and
+	// read the resolved path, /private/var/... on macOS.
+	cmd.Env = append(os.Environ(), "PWD="+dir,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GITHUB_OUTPUT="+output, "RUNNER_TEMP="+bin, "STANDIN_LOG="+log,
 		"INPUT_VERSION=v1.33.0", "INPUT_PACKAGES=./...", "INPUT_EVENTS_FILE="+eventsFile)
