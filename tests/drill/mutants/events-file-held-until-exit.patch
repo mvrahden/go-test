@@ -1,0 +1,28 @@
+Expect: ^FAIL .*conformance/cli .* / keeps the events of the suites that ended before the stop, each line whole \(
+Clause: when a -json run with --events-file is stopped while a suite holds → keeps the events of the suites that ended before the stop, each line whole
+Expect: ^FAIL .*conformance/cli .* / writes the stopped suite's events too, as -json prints them \(
+Clause: when a -json run with --events-file is stopped while a suite holds → writes the stopped suite's events too, as -json prints them
+Expect: ^FAIL .*conformance/cli .* / keeps the events of the suites that ended before the kill, each line whole \(
+Clause: when a -json run with --events-file is killed while a suite holds → keeps the events of the suites that ended before the kill, each line whole
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -1,6 +1,7 @@
+ package main
+ 
+ import (
++	"bufio"
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
+@@ -195,6 +196,11 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 	}
+ 	cfg.JSON = jsonMode
+ 	cfg.Events = eventsWriter(events)
++	if events != nil {
++		bw := bufio.NewWriterSize(events, 1<<24)
++		defer bw.Flush()
++		cfg.Events = bw
++	}
+ 
+ 	return enforceCoverage(coverProfile, minCoverage, Run(cfg))
+ }

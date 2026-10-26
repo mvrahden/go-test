@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / a -json run / when --events-file names a path that cannot be written / exits 2 naming the flag before any package is built \(
+Clause: when --events-file names a path that cannot be written → exits 2 naming the flag before any package is built
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -164,7 +164,7 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+ 		return 2
+ 	}
+ 	events, err := openEventsFile(own)
+-	if err != nil {
++	if false && err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return 2
+ 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -84,6 +85,9 @@ type PipelineConfig struct {
 	// PackageOrder is every matched package in the order go test reports
 	// them; a text run prints its verdicts in that order.
 	PackageOrder []string
+	// Events receives a copy of the run's go test -json event stream as it
+	// is written; nil for none.
+	Events io.Writer
 }
 
 // flushOrder is the order a text run prints its verdicts in: the matched
@@ -743,7 +747,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
 
-	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
+	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	// The flush order holds every package the collector will report on.
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
@@ -881,8 +885,7 @@ loop:
 				}
 				defer func() { <-sem }()
 
-				r := RunSingleSuite(streamCtx, t, env, collector.UsesTest2JSON())
-				collector.RecordResult(t.Package, idx, r)
+				runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
 				recorded = true
 			}(target, i)
 		}
@@ -939,8 +942,7 @@ loop:
 			copy(env, baseEnv)
 			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
 		}
-		r := RunSingleSuite(streamCtx, d.t, env, collector.UsesTest2JSON())
-		collector.RecordResult(d.t.Package, d.idx, r)
+		runRecorded(streamCtx, collector, d.t.Package, d.idx, d.t, env, collector.UsesTest2JSON())
 	}
 	// The last verdict is in; what the context says from here on is not the
 	// run's business (see exitCodeAfterDispatch).

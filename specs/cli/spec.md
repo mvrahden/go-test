@@ -186,3 +186,35 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 #### Scenario: A binary unused for 7 days
 - **WHEN** a cached binary has not been used for 7 days
 - **THEN** a run removes it and keeps the binaries used since
+
+### Requirement: Saving the event stream
+A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
+
+#### Scenario: A -json run with --events-file
+- **WHEN** a -json run is given --events-file
+- **THEN** writes the bytes it prints to the file, making its directories
+
+#### Scenario: Reading the file back
+- **WHEN** a summary run's --events-file is read back with summary --input
+- **THEN** renders the summary the run rendered, with its exit code
+
+#### Scenario: Nothing else changes
+- **WHEN** a summary with annotations and coverage is run with and without --events-file
+- **THEN** prints, annotates, covers and exits the same
+
+#### Scenario: A path that cannot be written
+- **WHEN** --events-file names a path that cannot be written
+- **THEN** exits 2 naming the flag before any package is built
+
+#### Scenario: A run that does not pass
+- **WHEN** a -json run that does not pass is given --events-file
+- **THEN** writes its stream to the file, verdict included, and exits as without it
+
+#### Scenario: A stopped run
+- **WHEN** a -json run with --events-file is stopped while a suite holds
+- **THEN** keeps the events of the suites that ended before the stop, each line whole
+- **AND** writes the stopped suite's events too, as -json prints them
+
+#### Scenario: A killed run
+- **WHEN** a -json run with --events-file is killed while a suite holds
+- **THEN** keeps the events of the suites that ended before the kill, each line whole

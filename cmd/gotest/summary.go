@@ -43,7 +43,20 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if input != "" {
+		if own.Given("--events-file") {
+			fmt.Fprintln(os.Stderr, "FAIL: --events-file saves a run's event stream, and --input runs nothing")
+			return 2
+		}
 		return runSummaryFromInput(input, format, output, coverageProfile, noColor, github, renderOnly, badgePath)
+	}
+
+	eventsFile, err := openEventsFile(own)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	if eventsFile != nil {
+		defer eventsFile.Close()
 	}
 
 	minCoverage, err := parseMinFlag(own)
@@ -111,6 +124,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		Parallel:        cfg.Parallel,
 		CompileParallel: cfg.CompileParallel,
 		OutputMode:      gotestrunner.RunCaptureJSON,
+		Events:          eventsWriter(eventsFile),
 		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,

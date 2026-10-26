@@ -1118,6 +1118,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
 | `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
 | `fuzz-cache` | Carry Go's fuzz cache between runs so each session resumes where the last stopped; `false` for a from-seeds run (default `true`) |
+| `events-file` | Also save the run's go test `-json` event stream to this path (`--events-file`); prefer one under `runner.temp`; needs gotest v1.35.0 or newer, and the step fails naming it with an older CLI; default empty saves nothing |
 | `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
 
 ### Outputs
@@ -1127,9 +1128,29 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `exit-code` | Test process exit code |
 | `coverage` | Coverage percentage (empty if coverage not enabled) |
 | `badge` | Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran) |
+| `events-file` | Absolute path of the saved event stream (empty unless `events-file` is set and the file was written) |
 | `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
 | `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
 | `fuzz-crashers` | Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or fuzz not enabled) |
+
+### Event Stream
+
+`events-file` keeps the run's go test `-json` event stream, per-test timings of passing tests included, without a second run. Upload it for later analysis, `gotestsum --raw-command -- cat events.json` for JUnit, or `gotest summary --input` to render it again:
+
+```yaml
+- uses: mvrahden/go-test@v1
+  id: test
+  with:
+    events-file: ${{ runner.temp }}/test-events.json
+- uses: actions/upload-artifact@v7
+  if: ${{ always() && steps.test.outputs.events-file != '' }}
+  with:
+    name: test-events-${{ matrix.os }}
+    path: ${{ steps.test.outputs.events-file }}
+    retention-days: 14
+```
+
+`always()` keeps the stream of a failed or timed-out job, the one most worth reading. GitHub masks secrets in job logs, not in artifacts: the stream holds every line a test printed, so a test that logs a token publishes it to everyone who can read the run's artifacts.
 
 ### Coverage Badge
 

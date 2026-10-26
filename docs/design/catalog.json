@@ -3055,6 +3055,599 @@
                       "children": [
                         {
                           "children": [],
+                          "display": "keeps the events of the suites that ended before the stop, each line whole",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "keeps_the_events_of_the_suites_that_ended_before_the_stop,_each_line_whole",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        },
+                        {
+                          "children": [],
+                          "display": "writes the stopped suite's events too, as -json prints them",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_the_stopped_suite's_events_too,_as_-json_prints_them",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run with --events-file is stopped while a suite holds",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_with_--events-file_is_stopped_while_a_suite_holds",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "an interrupt",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_interrupt",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "keeps the events of the suites that ended before the stop, each line whole",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "keeps_the_events_of_the_suites_that_ended_before_the_stop,_each_line_whole",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        },
+                        {
+                          "children": [],
+                          "display": "writes the stopped suite's events too, as -json prints them",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_the_stopped_suite's_events_too,_as_-json_prints_them",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run with --events-file is stopped while a suite holds",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_with_--events-file_is_stopped_while_a_suite_holds",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a forced stop",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_forced_stop",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "AStoppedRunLeavesItsEventsFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStoppedRunLeavesItsEventsFile",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "keeps the events of the suites that ended before the kill, each line whole",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "keeps_the_events_of_the_suites_that_ended_before_the_kill,_each_line_whole",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run with --events-file is killed while a suite holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-json_run_with_--events-file_is_killed_while_a_suite_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AKilledRunLeavesItsEventsFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAKilledRunLeavesItsEventsFile",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIEventsFileStop",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIEventsFileStopTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "writes the bytes it prints to the file, making its directories",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "writes_the_bytes_it_prints_to_the_file,_making_its_directories",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -json run is given --events-file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-json_run_is_given_--events-file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheFileHoldsTheStream",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheFileHoldsTheStream",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "renders the summary the run rendered, with its exit code",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "renders_the_summary_the_run_rendered,_with_its_exit_code",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a summary run's --events-file is read back with summary --input",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_summary_run's_--events-file_is_read_back_with_summary_--input",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "the summary as JSON",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_summary_as_JSON",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "renders the summary the run rendered, with its exit code",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "renders_the_summary_the_run_rendered,_with_its_exit_code",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a summary run's --events-file is read back with summary --input",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_summary_run's_--events-file_is_read_back_with_summary_--input",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "the summary as Markdown",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_summary_as_Markdown",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "renders the summary the run rendered, with its exit code",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "renders_the_summary_the_run_rendered,_with_its_exit_code",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a summary run's --events-file is read back with summary --input",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_summary_run's_--events-file_is_read_back_with_summary_--input",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "the summary for a terminal",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_summary_for_a_terminal",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "TheFileReplaysAsTheRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheFileReplaysAsTheRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints, annotates, covers and exits the same",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "prints,_annotates,_covers_and_exits_the_same",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a summary with annotations and coverage is run with and without --events-file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_summary_with_annotations_and_coverage_is_run_with_and_without_--events-file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheFileChangesNoOtherOutput",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheFileChangesNoOtherOutput",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "writes its stream to the file, verdict included, and exits as without it",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_its_stream_to_the_file,_verdict_included,_and_exits_as_without_it",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run that does not pass is given --events-file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_that_does_not_pass_is_given_--events-file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a failing run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_failing_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "writes its stream to the file, verdict included, and exits as without it",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "writes_its_stream_to_the_file,_verdict_included,_and_exits_as_without_it",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a -json run that does not pass is given --events-file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_-json_run_that_does_not_pass_is_given_--events-file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a build failure",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_build_failure",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "EveryOutcomeWritesTheFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestEveryOutcomeWritesTheFile",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming the flag before any package is built",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_the_flag_before_any_package_is_built",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when --events-file names a path that cannot be written",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--events-file_names_a_path_that_cannot_be_written",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a -json run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-json_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "exits 2 naming the flag before any package is built",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "exits_2_naming_the_flag_before_any_package_is_built",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when --events-file names a path that cannot be written",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "--events-file_names_a_path_that_cannot_be_written",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "a summary",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_summary",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "AnUnwritablePathFailsFirst",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnUnwritablePathFailsFirst",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIEventsFile",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIEventsFileTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
                           "display": "--ci guards a focused run",
                           "duration": 0,
                           "excluded": false,
@@ -9992,13 +10585,13 @@
     }
   ],
   "stats": {
-    "behaviors": 334,
+    "behaviors": 348,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 55,
+    "suites": 57,
     "tests": 0
   }
 }

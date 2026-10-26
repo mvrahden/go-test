@@ -97,6 +97,8 @@ Flags (gotest — use --double-dash):
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the test binary cache
   --min=<pct>             Fail if coverage < pct%% (0-100)
+  --events-file=<file>    With -json, also write the go test -json event stream
+                          to file as it happens
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -163,6 +165,8 @@ Flags:
   --no-cache              Disable the test binary cache
   --no-harvest            Disable fuzz seed harvesting for this run (see below)
   --min=<pct>             Fail if coverage < pct% (0-100, enables -coverprofile)
+  --events-file=<file>    With -json, also write the go test -json event stream
+                          to file as it happens
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
   --timeout=<dur>         Global pipeline deadline (default: 15m, 0 to disable)
@@ -293,6 +297,8 @@ that match no package exit 2 as well: a run of nothing is not green.
 Flags:
   --format=<fmt>          Output format: terminal (default), md, json
   --output=<file>         Write to file instead of stdout
+  --events-file=<file>    Also write the run's go test -json event stream to
+                          file as it happens; summary --input reads it back
   --input=<file>          Read from saved JSON ("-" for stdin); exits 2 if
                           it holds no test events, a package or failed build
                           never reported its verdict (a stream cut short), or

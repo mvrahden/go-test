@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / prints, annotates, covers and exits the same \(
+Clause: when a summary with annotations and coverage is run with and without --events-file → prints, annotates, covers and exits the same
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -514,7 +514,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {
+ 			w = &c.captured
+ 		}
+ 		if c.events != nil {
+-			w = io.MultiWriter(w, c.events)
++			w = c.events
+ 		}
+ 		c.starts = &startWriter{w: w, started: map[string]bool{}}
+ 	}

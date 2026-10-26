@@ -51,6 +51,9 @@ inputs:
   fuzz-cache:
     description: "Carry Go's fuzz cache (the inputs a session found interesting) between runs, so each session resumes where the last one stopped; set to false for a from-seeds run"
     default: "true"
+  events-file:
+    description: "Also save the run's go test -json event stream to this path, for upload-artifact, gotestsum or gotest summary --input; empty (the default) saves nothing. Prefer a path under runner.temp so it stays out of the checkout. Artifacts are not masked like logs: a token a test prints ends up in the file."
+    default: ""
   version:
     description: "gotest version: 'gomod' (default) runs the CLI go.mod declares; or a version tag such as v1.33.0 to install that binary. Pin the version go.mod requires: a binary that drifts from it is refused or runs the wrong runtime."
     default: "gomod"
@@ -65,6 +68,9 @@ outputs:
   badge:
     description: "Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran)"
     value: ${{ steps.test.outputs.badge }}
+  events-file:
+    description: "Absolute path of the saved event stream (empty unless events-file is set and the file was written)"
+    value: ${{ steps.test.outputs.events-file }}
   bench-report:
     description: "Path to the gotest bench --json report file (empty if bench not enabled)"
     value: ${{ steps.bench.outputs.bench-report }}
@@ -116,6 +122,7 @@ runs:
         INPUT_FLAGS: ${{ inputs.flags }}
         INPUT_GO_TEST_FLAGS: ${{ inputs.go-test-flags }}
         INPUT_BADGE: ${{ inputs.badge }}
+        INPUT_EVENTS_FILE: ${{ inputs.events-file }}
         INPUT_VERSION: ${{ inputs.version }}
       run: |
         if [ "$INPUT_VERSION" != "gomod" ]; then
@@ -125,6 +132,30 @@ runs:
         fi
 
         args=(summary --github)
+
+        events_file=""
+        if [ -n "$INPUT_EVENTS_FILE" ]; then
+          if ! "${cmd[@]}" summary --help 2>/dev/null | grep -q -- --events-file; then
+            have="$INPUT_VERSION"
+            if [ "$have" = "gomod" ]; then
+              have="$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test 2>/dev/null || true)"
+              echo "::error::events-file needs gotest v1.35.0 or newer; go.mod pins ${have:-an older version}"
+            else
+              echo "::error::events-file needs gotest v1.35.0 or newer; the version input is ${have}"
+            fi
+            exit 2
+          fi
+          events_file="$INPUT_EVENTS_FILE"
+          case "$events_file" in
+            /* | [A-Za-z]:[\\/]*) ;;
+            *) events_file="$PWD/$events_file" ;;
+          esac
+          if command -v cygpath > /dev/null; then
+            events_file="$(cygpath -m "$events_file")"
+          fi
+          rm -f "$events_file"
+          args+=("--events-file=$events_file")
+        fi
 
         gtflags=()
         if [ -n "$INPUT_GO_TEST_FLAGS" ]; then
@@ -213,6 +244,10 @@ runs:
 
         if [ -n "$badge_file" ] && [ -f "$badge_file" ]; then
           echo "badge=$badge_file" >> "$GITHUB_OUTPUT"
+        fi
+
+        if [ -n "$events_file" ] && [ -f "$events_file" ]; then
+          echo "events-file=$events_file" >> "$GITHUB_OUTPUT"
         fi
 
         exit "$exit_code"

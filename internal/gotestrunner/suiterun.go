@@ -121,8 +121,7 @@ func RunBenchSuites(ctx context.Context, targets []SuiteTarget, collector *Outpu
 		if env, giveUp := envFor(i); giveUp != "" {
 			collector.RecordGivenUp(targets[i].Package, localIdx[i], protocol.PrefixBenchmark+targets[i].SuiteName, giveUp)
 		} else {
-			r := RunSingleSuite(ctx, targets[i], env, useTest2JSON)
-			collector.RecordResult(targets[i].Package, localIdx[i], r)
+			runRecorded(ctx, collector, targets[i].Package, localIdx[i], targets[i], env, useTest2JSON)
 		}
 		if afterSlot != nil {
 			afterSlot(i)
