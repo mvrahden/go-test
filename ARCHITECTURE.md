@@ -512,15 +512,17 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │             │ emit JSON state                                         │
 │                                                                       │
 │  State to the protocol fd after BeforeAll (stdout on Windows)         │
-│  Include _teardownBudget = sum of SupervisorBudget(Timeout) + 30s     │
-│  over the fixtures whose setup was reached (teardown below is         │
-│  sequential, so the members' budgets add; the budget rides both _done │
-│  forms — a failed setup still has succeeded siblings to release under │
-│  it — and the _cmd acknowledging a start that brought one up late)    │
+│  Include _teardownBudget = 30s + the longest chain of                 │
+│  SupervisorBudget(Timeout) over the fixtures whose setup was reached  │
+│  (a fixture's share plus the longest chain of those depending on it:  │
+│  teardown below runs concurrently, each after its dependents; a share │
+│  leaves once its teardown ran; the budget rides both _done forms — a  │
+│  failed setup still has succeeded siblings to release under it — and  │
+│  the _cmd acknowledging a start or release)                           │
 │                                                                       │
 │  ═══════════ block on SIGTERM/SIGINT ═══════════                      │
 │                                                                       │
-│  for each SharedFixture (reverse DAG order):                          │
+│  every SharedFixture, concurrently, each after its dependents:        │
 │    sf.AfterAll(ctx)      timeout: SharedFixtureConfig.Timeout         │
 │                                                                       │
 └───────────────────────────────────────────────────────────────────────┘

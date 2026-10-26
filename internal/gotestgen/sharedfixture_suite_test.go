@@ -284,15 +284,12 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			code := string(src)
 
 			// A NoDeadline Timeout means "no deadline", not "takes no time",
-			// so each member's contribution goes through the shared floor. And
-			// because the generated teardown loop is strictly sequential, the
-			// budget is the SUM of the members' floored budgets — a max would
-			// force-kill a fixture set whose teardowns each obeyed their own
-			// declared Timeout.
+			// so each member's contribution goes through the shared floor, and
+			// into the chain of the fixtures released after one another.
 			gotest.Contains(it, code, "ƒshares[i] = gotestruntime.SupervisorBudget(timeout)",
 				"each member's budget must go through the shared floor")
-			gotest.Contains(it, code, "ƒbudget += ƒs",
-				"and into the sum")
+			gotest.Contains(it, code, "ƒchains[ƒi] = ƒshares[ƒi] + ƒafter",
+				"and into the chain")
 			gotest.NotContains(it, code, "func ƒsupervisorBudget(",
 				"no local copy of the floor may remain")
 			gotest.NotContains(it, code, "ƒb > ƒmaxTimeout",

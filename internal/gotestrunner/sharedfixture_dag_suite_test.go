@@ -172,3 +172,41 @@ func (s *SharedFixtureDAGTestSuite) TestReleasesRunConcurrentlyDependentsFirst(t
 		})
 	}
 }
+
+func (s *SharedFixtureDAGTestSuite) TestTheTeardownBudgetIsTheLongestChain(t *gotest.T) {
+	type row struct {
+		Desc     string
+		names    []string
+		release  []string
+		budget   time.Duration
+		released time.Duration
+	}
+	for t, r := range gotest.Each(t, []row{
+		{Desc: "four independent fixtures", names: []string{"DagA", "DagB", "DagC", "DagD"}, budget: 5*time.Minute + 30*time.Second},
+		{Desc: "a two-link chain", names: []string{"DagA", "DagChild"}, budget: 10*time.Minute + 30*time.Second},
+		{
+			Desc: "a chain and an independent fixture, the chain's dependent released", names: []string{"DagA", "DagB", "DagChild"},
+			release: []string{dagKey("DagChild")}, budget: 10*time.Minute + 30*time.Second, released: 5*time.Minute + 30*time.Second,
+		},
+	}) {
+		t.Setenv(fixtures.EnvDagTimeout, (5 * time.Minute).String())
+		proc, release := startDAG(t, dagFixtures(false, r.names...))
+		budget := gotestrunner.ExportTeardownBudget(proc)
+		var releaseErr error
+		var released time.Duration
+		if len(r.release) > 0 {
+			releaseErr = proc.TeardownKeys(t.Context(), r.release, time.Minute)
+			released = gotestrunner.ExportTeardownBudget(proc)
+		}
+		teardownErr := release()
+
+		t.When("fixtures declaring a 5m Timeout are resident", func(w *gotest.T) {
+			w.It("reports 30s plus the longest chain of their shares, less what was released", func(it *gotest.T) {
+				gotest.NoError(it, releaseErr)
+				gotest.NoError(it, teardownErr)
+				gotest.Equal(it, r.budget, budget)
+				gotest.Equal(it, r.released, released)
+			})
+		})
+	}
+}

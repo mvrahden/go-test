@@ -129,10 +129,11 @@ func main() {
   config it derived: an up-front fixture by _done, a late one by the
   acknowledgement of the start that brought it up. A late fixture not yet
   started counts at the default config, so a stop during its start still gets
-  a window for its release. Teardown is strictly sequential, so the budget is
-  the SUM of the shares: a max would force-kill a set of teardowns that each
-  obeyed its own declared Timeout. An up-front fixture skipped for a failed
-  dependency has nothing to release.
+  a window for its release. Teardowns run concurrently, each after its
+  dependents, so the budget is 30s plus the longest chain: a fixture's share
+  plus the longest chain among the fixtures depending on it. A fixture's share
+  leaves the budget once its teardown has run, and an up-front fixture skipped
+  for a failed dependency has nothing to release.
 */}}
 	var ƒshareMu sync.Mutex
 	ƒshares := make([]time.Duration, {{ len .Fixtures }})
@@ -146,13 +147,32 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+{{- range $f := .Fixtures }}
+		{ {{- range $d := $f.Dependents }}{{ $d.Index }}, {{ end -}} },
+{{- end }}
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -296,6 +316,7 @@ func main() {
 			ƒtorn[{{ $f.Index }}] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released({{ $f.Index }})
+			defer ƒunshare({{ $f.Index }})
 			if ƒskip {
 				return
 			}

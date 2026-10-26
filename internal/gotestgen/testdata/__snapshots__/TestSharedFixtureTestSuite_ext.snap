@@ -98,13 +98,31 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -221,6 +239,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -242,6 +261,7 @@ func main() {
 			ƒtorn[1] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(1)
+			defer ƒunshare(1)
 			if ƒskip {
 				return
 			}
@@ -473,13 +493,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -547,6 +584,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -743,13 +781,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -802,6 +857,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -998,13 +1054,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1070,6 +1143,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -1269,13 +1343,31 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1392,6 +1484,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -1413,6 +1506,7 @@ func main() {
 			ƒtorn[1] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(1)
+			defer ƒunshare(1)
 			if ƒskip {
 				return
 			}
@@ -1644,13 +1738,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1716,6 +1827,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -1912,13 +2024,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1984,6 +2113,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -2180,13 +2310,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2252,6 +2399,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -2448,13 +2596,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2520,6 +2685,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -2720,13 +2886,31 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2843,6 +3027,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -2864,6 +3049,7 @@ func main() {
 			ƒtorn[1] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(1)
+			defer ƒunshare(1)
 			if ƒskip {
 				return
 			}
@@ -3095,13 +3281,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -3167,6 +3370,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -3364,13 +3568,30 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -3443,6 +3664,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -3643,13 +3865,31 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Dependents come later in the dependency order, so walking it
+		// backwards finds every dependent's chain before its dependency's.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒlongest := time.Duration(0)
+		for ƒi := len(ƒshares) - 1; ƒi >= 0; ƒi-- {
+			ƒafter := time.Duration(0)
+			for _, ƒd := range ƒdependents[ƒi] {
+				ƒafter = max(ƒafter, ƒchains[ƒd])
+			}
+			ƒchains[ƒi] = ƒshares[ƒi] + ƒafter
+			ƒlongest = max(ƒlongest, ƒchains[ƒi])
 		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -3768,6 +4008,7 @@ func main() {
 			ƒtorn[0] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(0)
+			defer ƒunshare(0)
 			if ƒskip {
 				return
 			}
@@ -3789,6 +4030,7 @@ func main() {
 			ƒtorn[1] = true
 			ƒstateMu.Unlock()
 			defer ƒlife.Released(1)
+			defer ƒunshare(1)
 			if ƒskip {
 				return
 			}
