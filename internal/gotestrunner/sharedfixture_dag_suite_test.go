@@ -2,6 +2,10 @@ package gotestrunner_test
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -76,6 +80,58 @@ func (s *SharedFixtureDAGTestSuite) TestALateStartOfIndependentFixturesTakesTheS
 			gotest.NoError(it, err)
 			gotest.NoError(it, teardownErr)
 			gotest.Less(it, took, 1800*time.Millisecond)
+		})
+	})
+}
+
+// dagEvent is one line a Dag fixture logged.
+type dagEvent struct {
+	name, hook, event string
+	at                int64
+}
+
+// readDagLog parses the log the Dag fixtures appended to.
+func readDagLog(t *gotest.T, path string) []dagEvent {
+	data, err := os.ReadFile(path)
+	gotest.NoError(t, err)
+	var events []dagEvent
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var ev dagEvent
+		_, err := fmt.Sscanf(line, "%s %s %s %d", &ev.name, &ev.hook, &ev.event, &ev.at)
+		gotest.NoError(t, err, "log line %q", line)
+		events = append(events, ev)
+	}
+	return events
+}
+
+// dagAt is when name's hook logged event, or zero when it did not.
+func dagAt(events []dagEvent, name, hook, event string) int64 {
+	for _, ev := range events {
+		if ev.name == name && ev.hook == hook && ev.event == event {
+			return ev.at
+		}
+	}
+	return 0
+}
+
+func (s *SharedFixtureDAGTestSuite) TestALateStartWaitsForDependencies(t *gotest.T) {
+	log := filepath.Join(t.TempDir(), "dag.log")
+	t.Setenv(fixtures.EnvDagLog, log)
+	t.Setenv(fixtures.EnvDagSetupDelay, (300 * time.Millisecond).String())
+	proc, release := startDAG(t, dagFixtures(true, "DagA", "DagChild"))
+	err := proc.StartKeys(t.Context(), []string{dagKey("DagChild"), dagKey("DagA")}, 0)
+	teardownErr := release()
+	events := readDagLog(t, log)
+
+	t.When("a late command names a fixture before the fixture it depends on", func(w *gotest.T) {
+		w.It("starts the fixture only once its dependency is up", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.NoError(it, teardownErr)
+			parentUp := dagAt(events, "DagA", "BeforeAll", "end")
+			childBegins := dagAt(events, "DagChild", "BeforeAll", "begin")
+			gotest.NotZero(it, parentUp, "log: %v", events)
+			gotest.NotZero(it, childBegins, "log: %v", events)
+			gotest.Less(it, parentUp, childBegins, "log: %v", events)
 		})
 	})
 }
