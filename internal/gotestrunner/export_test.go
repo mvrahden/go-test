@@ -311,3 +311,9 @@ func ExportTeardownVerdict(teardownErr error, reports []string) ([]string, error
 	}
 	return nil, err
 }
+
+// ExportCommand sends one window verb as is, past what TeardownKeys leaves
+// to the final teardown.
+func ExportCommand(ctx context.Context, p *SharedFixtureProcess, verb string, keys []string, timeout time.Duration) error {
+	return p.command(ctx, verb, keys, timeout)
+}

@@ -7016,6 +7016,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given",
@@ -7066,6 +7079,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "never_runs_the_benchmark_reading_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -10986,7 +11012,7 @@
     }
   ],
   "stats": {
-    "behaviors": 357,
+    "behaviors": 359,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

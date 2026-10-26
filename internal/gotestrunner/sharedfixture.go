@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 
@@ -96,6 +97,10 @@ type SharedFixtureProcess struct {
 	cmdMu      sync.Mutex
 	cmdNext    uint64
 	cmdWaiters map[uint64]chan string
+	// unstarted are the keys of starts given up before their ack: their
+	// BeforeAll may still run, and only Teardown's shutdown ends one that
+	// ignores its context. Under cmdMu.
+	unstarted map[string]bool
 
 	// failures keeps what the process reported on stderr about fixtures
 	// that failed.
@@ -433,14 +438,33 @@ func (p *SharedFixtureProcess) StartKeys(ctx context.Context, keys []string, fla
 
 // TeardownKeys asks the setup subprocess to tear down the given fixtures now,
 // in reverse dependency order — the releasing half of a window boundary.
-// Teardown (the terminal owner) later skips keys already released here.
-// Blocks until the acknowledgement, ctx ending, or timeout; timeout 0 or less
-// means no deadline.
+// Teardown (the terminal owner) later skips keys already released here. A key
+// whose start was given up is left to it: the process would release it only
+// once its BeforeAll returns. Blocks until the acknowledgement, ctx ending,
+// or timeout; timeout 0 or less means no deadline.
 func (p *SharedFixtureProcess) TeardownKeys(ctx context.Context, keys []string, timeout time.Duration) error {
 	if timeout <= 0 {
 		timeout = -1
 	}
+	p.cmdMu.Lock()
+	keys = slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return p.unstarted[k] })
+	p.cmdMu.Unlock()
 	return p.command(ctx, "teardown", keys, timeout)
+}
+
+// gaveUp notes the keys of a start given up before its ack.
+func (p *SharedFixtureProcess) gaveUp(verb string, keys []string) {
+	if verb != "start" {
+		return
+	}
+	p.cmdMu.Lock()
+	defer p.cmdMu.Unlock()
+	if p.unstarted == nil {
+		p.unstarted = map[string]bool{}
+	}
+	for _, k := range keys {
+		p.unstarted[k] = true
+	}
 }
 
 // command sends one window verb and waits for the ack carrying its id. The
@@ -500,8 +524,10 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		case <-p.done:
 			return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
 		case <-ctx.Done():
+			p.gaveUp(verb, keys)
 			return fmt.Errorf("shared fixture %s cancelled: %w", verb, ctx.Err())
 		case <-clock.C:
+			p.gaveUp(verb, keys)
 			return fmt.Errorf("shared fixture %s timed out after %v", verb, clock.expired().After)
 		case <-p.budgetSeen:
 			clock.follow()

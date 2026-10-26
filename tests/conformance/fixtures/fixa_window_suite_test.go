@@ -25,7 +25,9 @@ func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *FixtureWindowTestSuite) TestTheExclusiveTail(t *gotest.T) {
+	began := time.Now()
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixatail/")
+	elapsed := time.Since(began)
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget and the run fails", func(it *gotest.T) {
@@ -37,11 +39,16 @@ func (s *FixtureWindowTestSuite) TestTheExclusiveTail(t *gotest.T) {
 			gotest.NotContains(it, run.Markers, "tail ran")
 			gotest.Contains(it, run.Markers, "bulk ran")
 		})
+		w.It("ends the run within 60s", func(it *gotest.T) {
+			gotest.Less(it, elapsed, 60*time.Second, "stderr: %s", run.Stderr)
+		})
 	})
 }
 
 func (s *FixtureWindowTestSuite) TestABenchSlot(t *gotest.T) {
+	began := time.Now()
 	run, err := testkit.RunCLI(t.Context(), ".", "bench", "../testdata/fixabench/")
+	elapsed := time.Since(began)
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget and the run fails", func(it *gotest.T) {
@@ -50,6 +57,9 @@ func (s *FixtureWindowTestSuite) TestABenchSlot(t *gotest.T) {
 		})
 		w.It("never runs the benchmark reading it", func(it *gotest.T) {
 			gotest.Contains(it, run.Stdout+run.Stderr, "HangTestSuite never ran: shared fixture HangSharedFixture did not come up")
+		})
+		w.It("ends the run within 60s", func(it *gotest.T) {
+			gotest.Less(it, elapsed, 60*time.Second, "stderr: %s", run.Stderr)
 		})
 	})
 }

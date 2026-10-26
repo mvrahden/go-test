@@ -139,7 +139,7 @@ A suite binding a shared fixture SHALL fail under plain go test before any metho
 - **THEN** fails naming the shared fixture it binds and go tool gotest, before any method runs
 
 ### Requirement: A shared fixture's declared setup budget
-When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them, for a setup at the start of the run and for one started later for the exclusive tail or a bench slot; a fixture that hangs past that budget SHALL fail the run and the suites that read it SHALL never run.
+When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them, for a setup at the start of the run and for one started later for the exclusive tail or a bench slot; a fixture that hangs past that budget SHALL fail the run, which SHALL end within 60s, and the suites that read it SHALL never run.
 
 #### Scenario: A container fixture slower than the default budget
 - **WHEN** a shared fixture declaring ContainerFixtureConfig takes 35s to come up and no --setup-timeout is given
@@ -158,11 +158,13 @@ When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be
 - **WHEN** a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given
 - **THEN** the wait ends at the declared budget and the run fails
 - **AND** never runs the suite reading it
+- **AND** ends the run within 60s
 
 #### Scenario: A fixture started for a bench slot
 - **WHEN** a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given
 - **THEN** the wait ends at the declared budget and the run fails
 - **AND** never runs the benchmark reading it
+- **AND** ends the run within 60s
 
 ### Requirement: A late fixture's dependencies
 Shared fixtures started late SHALL start concurrently, each after what it depends on: one started for the exclusive tail together with a dependency only the tail needs SHALL come up after that dependency, serve the suites that read it, and be torn down before it.

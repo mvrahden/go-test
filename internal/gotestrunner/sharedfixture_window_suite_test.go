@@ -58,7 +58,12 @@ func (s *SharedFixtureWindowTestSuite) TestAWindowIsHeldToTheDeclaredBudget(t *g
 		w.It("a release of the fixture sent meanwhile waits for its setup to end", func(it *gotest.T) {
 			ctx, cancel := context.WithTimeout(it.Context(), time.Second)
 			defer cancel()
-			gotest.ErrorIs(it, proc.TeardownKeys(ctx, []string{slowSetupKey}, time.Minute), context.DeadlineExceeded)
+			gotest.ErrorIs(it, gotestrunner.ExportCommand(ctx, proc, "teardown", []string{slowSetupKey}, time.Minute), context.DeadlineExceeded)
+		})
+		w.It("the run sends no such release: the final teardown owns the fixture", func(it *gotest.T) {
+			began := time.Now()
+			gotest.NoError(it, proc.TeardownKeys(it.Context(), []string{slowSetupKey}, time.Minute))
+			gotest.Less(it, time.Since(began), time.Second)
 		})
 	})
 }
