@@ -150,6 +150,9 @@ runs:
             /* | [A-Za-z]:[\\/]*) ;;
             *) events_file="$PWD/$events_file" ;;
           esac
+          if command -v cygpath > /dev/null; then
+            events_file="$(cygpath -m "$events_file")"
+          fi
           rm -f "$events_file"
           args+=("--events-file=$events_file")
         fi

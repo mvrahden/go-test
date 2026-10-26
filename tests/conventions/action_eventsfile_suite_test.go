@@ -82,9 +82,12 @@ type stepRun struct {
 
 // runStep runs the test step as GitHub runs a bash step, in a fresh working
 // directory, with the stand-in as gotest.
-func (s *ActionEventsFileTestSuite) runStep(t *gotest.T, eventsFile string, old bool) stepRun {
+func (s *ActionEventsFileTestSuite) runStep(t *gotest.T, eventsFile string, old bool, extra ...string) stepRun {
 	bin, dir := t.TempDir(), t.TempDir()
 	gotest.NoError(t, os.WriteFile(filepath.Join(bin, "gotest"), []byte(standIn), 0o700)) //nolint:gosec // G306: an executable
+	for i := 0; i+1 < len(extra); i += 2 {
+		gotest.NoError(t, os.WriteFile(filepath.Join(bin, extra[i]), []byte(extra[i+1]), 0o700)) //nolint:gosec // G306: an executable
+	}
 	log, output := filepath.Join(bin, "calls"), filepath.Join(bin, "output")
 	cmd := exec.CommandContext(t.Context(), "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", s.script) //nolint:gosec // G204: the action's own script
 	cmd.Dir = dir
@@ -123,6 +126,20 @@ func (s *ActionEventsFileTestSuite) TestSetPassesTheFlagAndReturnsTheAbsolutePat
 	gotest.Contains(t, run.output, "events-file="+want+"\n")
 	_, err := os.Stat(want)
 	gotest.NoError(t, err)
+}
+
+// cygpathStandIn prints the path it is given as Git Bash's cygpath -m would
+// print a Windows one: drive letter first.
+const cygpathStandIn = `#!/usr/bin/env bash
+echo "W:$2"
+`
+
+func (s *ActionEventsFileTestSuite) TestUnderGitBashTheOutputIsAWindowsPath(t *gotest.T) {
+	run := s.runStep(t, "out/events.json", false, "cygpath", cygpathStandIn)
+	want := "W:" + filepath.Join(run.dir, "out", "events.json")
+	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
+	gotest.Contains(t, run.calls[len(run.calls)-1], "--events-file="+want)
+	gotest.Contains(t, run.output, "events-file="+want+"\n")
 }
 
 func (s *ActionEventsFileTestSuite) TestAnOlderCLIFailsBeforeRunning(t *gotest.T) {
