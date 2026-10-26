@@ -217,12 +217,15 @@ func logSlowBuild(w io.Writer, what string, threshold time.Duration) (done func(
 		fmt.Fprintf(w, "gotest: %s has been building for %s and is still running\n", what, threshold)
 	})
 	return func() {
-		if !timer.Stop() {
+		notified := !timer.Stop()
+		if notified {
 			// The notice is firing on the timer goroutine; wait it out so the
 			// two writes never overlap on a non-concurrent-safe writer.
 			<-fired
 		}
-		if d := time.Since(start); d >= threshold {
+		// A notice is always closed: Windows' clock moves in ticks, so
+		// time.Since can read below a threshold the timer has passed.
+		if d := time.Since(start); notified || d >= threshold {
 			fmt.Fprintf(w, "gotest: %s finished building after %s\n", what, d.Round(time.Second))
 		}
 	}
