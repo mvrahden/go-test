@@ -115,6 +115,12 @@ func main() {
 {{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
+{{- /*
+  Starts and teardowns run on goroutines of their own, so the flags saying
+  which fixtures came up, held resources and were released are read and
+  written under one lock.
+*/}}
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, {{ len .Fixtures }})
 	ƒattempted := make([]bool, {{ len .Fixtures }})
 	ƒtorn := make([]bool, {{ len .Fixtures }})
@@ -162,10 +168,13 @@ func main() {
 */}}
 {{ range $i, $f := .Fixtures }}
 	ƒsetup_{{ $f.VarName }} := func() {
-		if ƒstarted[{{ $i }}] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[{{ $i }}]
+		ƒstarted[{{ $i }}] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[{{ $i }}] = true
 		defer close(ƒdone_{{ $f.VarName }})
 {{- if $f.HasConfig }}
 {{- /*
@@ -213,7 +222,11 @@ func main() {
 {{- if $f.HasAfterAll }}
 			AfterAll:   {{ $f.VarName }}.AfterAll,
 {{- end }}
-			Held:       func(ƒheld bool) { ƒattempted[{{ $i }}] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[{{ $i }}] = ƒheld
+			},
 		}
 		ƒshare({{ $i }}, ƒsetup.Timeout)
 		ƒlife.SetupBegins({{ $i }}, ƒsetup)
@@ -260,12 +273,14 @@ func main() {
 */}}
 {{ range $f := .Fixtures }}
 	ƒteardown_{{ $f.VarName }} := func() bool {
-		if ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}] {
-			ƒtorn[{{ $f.Index }}] = true
+		ƒstateMu.Lock()
+		ƒskip := ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}]
+		ƒtorn[{{ $f.Index }}] = true
+		ƒstateMu.Unlock()
+		if ƒskip {
 			ƒlife.Released({{ $f.Index }})
 			return false
 		}
-		ƒtorn[{{ $f.Index }}] = true
 		defer ƒlife.Released({{ $f.Index }})
 		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
 			Name:     "{{ $f.Identifier }}",
@@ -280,9 +295,7 @@ func main() {
 
 {{- /*
   Up-front phase: every non-deferred fixture, concurrently, gated by the
-  dependency channels. Deferred fixtures wait for their StartKeys window —
-  their dependencies are non-deferred or ordered earlier in the same command,
-  so their channel waits can never deadlock.
+  dependency channels. Deferred fixtures wait for their StartKeys window.
 */}}
 	var ƒwg sync.WaitGroup
 {{ range $f := .Fixtures }}
@@ -322,9 +335,10 @@ func main() {
   Window commands until shutdown. The runner owns shutdown TIMING — only it
   knows when every suite has stopped using the fixtures — so even a failed
   setup reports and then serves commands until the signal instead of tearing
-  down on its own; this process owns shutdown EXECUTION. StartKeys runs in
-  DAG order and TeardownKeys in reverse-DAG order because the fixture lists
-  below are generated in topological order. Each command is acknowledged on
+  down on its own; this process owns shutdown EXECUTION. StartKeys starts its
+  fixtures concurrently, each after its dependencies; TeardownKeys runs in
+  reverse-DAG order because the fixture lists below are generated in
+  topological order. Each command is acknowledged on
   the protocol stream with a _cmd line carrying the joined per-fixture
   failures and the teardown budget, which now covers what the command brought
   up. A SIGTERM that already arrived (canceling setup above) has ƒctx closed
@@ -342,12 +356,24 @@ func main() {
 			var ƒcmdErrs []string
 			switch ƒc.Verb {
 			case "start":
+{{- /*
+  Every requested fixture starts on a goroutine of its own, as in the up-front
+  phase: the dependency channels order them, whatever order the keys came in.
+*/}}
+				var ƒstarting sync.WaitGroup
 {{- range $f := .Fixtures }}
 				if ƒhasKey(ƒc.Keys, "{{ $f.StateKey }}") {
-					ƒsetup_{{ $f.VarName }}()
-					if ƒerrs[{{ $f.Index }}] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "{{ $f.Identifier }}: "+ƒerrs[{{ $f.Index }}].Error())
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_{{ $f.VarName }}()
+					}()
+				}
+{{- end }}
+				ƒstarting.Wait()
+{{- range $f := .Fixtures }}
+				if ƒhasKey(ƒc.Keys, "{{ $f.StateKey }}") && ƒerrs[{{ $f.Index }}] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "{{ $f.Identifier }}: "+ƒerrs[{{ $f.Index }}].Error())
 				}
 {{- end }}
 			case "teardown":

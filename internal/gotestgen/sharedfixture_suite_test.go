@@ -427,7 +427,7 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 				"no second copy of the teardown policy may remain")
 			gotest.Contains(it, code, "Budget:   ƒbudget_sf0,",
 				"a declared Timeout must become a teardown verdict")
-			gotest.Contains(it, code, "if ƒtorn[0] || !ƒattempted[0] {",
+			gotest.Contains(it, code, "ƒskip := ƒtorn[0] || !ƒattempted[0]",
 				"a fixture whose BeforeAll never ran has nothing to release")
 			gotest.NotContains(it, code, "if ƒerrs[0] == nil",
 				"a fixture whose BeforeAll ran is released however it came out: a failed attempt may hold what it reached")
@@ -450,7 +450,8 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// A shutdown that cancels setup before BeforeAll runs leaves
 			// nothing to release, and neither does one cancelling it right
 			// after a release between attempts.
-			gotest.Contains(it, code, "Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },")
+			gotest.Contains(it, code, "Held: func(ƒheld bool) {")
+			gotest.Contains(it, code, "ƒattempted[0] = ƒheld\n")
 			gotest.Equal(it, 1, strings.Count(code, "ƒattempted[0] ="))
 		})
 
