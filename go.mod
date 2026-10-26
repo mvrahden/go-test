@@ -14,5 +14,5 @@ require (
 require golang.org/x/sync v0.23.0 // indirect
 
 // The v1.34.0 tag was moved after the module proxy recorded it, so the proxy and
-// GitHub serve different code; v1.34.1 is the same everywhere.
+// GitHub serve different code. Use v1.35.0 or later.
 retract v1.34.0
