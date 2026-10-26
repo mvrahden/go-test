@@ -1,0 +1,32 @@
+Expect: ^FAIL .*conformance/fixtures .* / releases the fixture only after its dependent, once neither is needed \(
+Clause: when the suite binding a shared fixture directly finishes while a suite reading a dependent of it still runs → releases the fixture only after its dependent, once neither is needed
+--- a/internal/gotestrunner/fixtureledger.go
++++ b/internal/gotestrunner/fixtureledger.go
+@@ -3,6 +3,7 @@ package gotestrunner
+ import (
+ 	"context"
+ 	"errors"
++	"slices"
+ 	"sort"
+ 	"sync"
+ 
+@@ -28,6 +29,19 @@ func newFixtureLedger(planned []map[string][]string, reqKeys map[string]map[stri
+ 		for pkg, suites := range phase {
+ 			for _, suite := range suites {
+ 				keys := sortedKeys(aliveFixtureKeys(map[string][]string{pkg: {suite}}, reqKeys, fixtures))
++				var direct []string
++				for _, k := range keys {
++					dependedOn := false
++					for i := range fixtures {
++						if slices.Contains(fixtures[i].Dependencies, k) && slices.Contains(keys, sharedFixtureKey(&fixtures[i])) {
++							dependedOn = true
++						}
++					}
++					if !dependedOn {
++						direct = append(direct, k)
++					}
++				}
++				keys = direct
+ 				if l.needs[pkg] == nil {
+ 					l.needs[pkg] = map[string][]string{}
+ 				}
