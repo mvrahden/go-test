@@ -134,13 +134,13 @@ type stoppedRun struct {
 }
 
 // stopWhileHolding runs the passing and the stopping package with
-// --events-file and stops the run with stop once the passing package's
-// events are in the file.
-func (s *CLIEventsFileStopTestSuite) stopWhileHolding(t *gotest.T, stop func(cmd *exec.Cmd, tree *proctree.Tree) error) stoppedRun {
+// --events-file, env added to the run's environment, and stops the run with
+// stop once the passing package's events are in the file.
+func (s *CLIEventsFileStopTestSuite) stopWhileHolding(t *gotest.T, stop func(cmd *exec.Cmd, tree *proctree.Tree) error, env ...string) stoppedRun {
 	markerDir := t.TempDir()
 	path := filepath.Join(t.TempDir(), "events.json")
 	cmd := exec.Command(s.cli, "-json", "--events-file="+path, "../testdata/passing/", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
-	cmd.Env = testkit.ChildEnv(markerDir)
+	cmd.Env = testkit.ChildEnv(markerDir, env...)
 	tree := holding(t, cmd, markerDir)
 	var r stoppedRun
 	r.before, r.streamed = streamed(path)
@@ -172,10 +172,13 @@ func (s *CLIEventsFileStopTestSuite) TestAStoppedRunLeavesItsEventsFile(t *gotes
 	type row struct {
 		Desc string
 		stop func(cmd *exec.Cmd, tree *proctree.Tree) error
+		env  []string
 	}
 	for t, row := range gotest.Each(t, []row{
 		{Desc: "an interrupt", stop: testkit.Interrupt},
-		{Desc: "a forced stop", stop: func(cmd *exec.Cmd, tree *proctree.Tree) error {
+		// The method ignores the first stop, so the run is still holding
+		// when the second one comes; one that honours it is gone by then.
+		{Desc: "a forced stop", env: []string{"STOPPING_IGNORE_CONTEXT=1"}, stop: func(cmd *exec.Cmd, tree *proctree.Tree) error {
 			if err := testkit.Interrupt(cmd, tree); err != nil {
 				return err
 			}
@@ -183,7 +186,7 @@ func (s *CLIEventsFileStopTestSuite) TestAStoppedRunLeavesItsEventsFile(t *gotes
 			return testkit.Interrupt(cmd, tree)
 		}},
 	}) {
-		r := s.stopWhileHolding(t, row.stop)
+		r := s.stopWhileHolding(t, row.stop, row.env...)
 
 		t.When("a -json run with --events-file is stopped while a suite holds", func(w *gotest.T) {
 			w.It("keeps the events of the suites that ended before the stop, each line whole", func(it *gotest.T) {
