@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lifecycle .* / skips the later group's suites with the reason run stopping \(
+Clause: when a run is stopped while a suite of the e2e group runs → skips the later group's suites with the reason run stopping
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -350,6 +350,10 @@
+ 	defer c.mu.Unlock()
+ 	skip := "--- SKIP: " + suite + " (0.00s)\n"
+ 	r := SuiteResult{ExitCode: 1}
++	if true {
++		c.recordResultLocked(pkg, idx, r)
++		return
++	}
+ 	if c.mode == RunBatchText {
+ 		r.Stdout = []byte(skip + "    run stopping\n")
+ 	} else {

@@ -310,6 +310,10 @@ shards of one run do not add up to every mutant exactly once.
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |
 | `snapshot-always-matches` | `MatchSnapshot` never reports a differing value | canary: the `snapshotting` fixture's `fail` row vanishes from the golden list |
 | `exclusive-runs-in-bulk` | the dispatcher never defers an Exclusive suite past the bulk | canary: the `exclusive` fixture's window stamps overlap |
+| `group-streams-with-the-default` | a named group's suites stream with the default group's | lifecycle conformance: an e2e suite runs beside a default suite |
+| `group-bulk-one-at-a-time` | a later group runs its suites one after another | lifecycle conformance: two 1s e2e suites do not overlap |
+| `group-exclusive-in-the-bulk` | a named group's Exclusive suites run beside its other suites | lifecycle conformance: the e2e Exclusive suite starts before the others end |
+| `group-fixture-up-front` | every shared fixture starts up front, a later group's included | lifecycle conformance: the e2e fixture is up before the default group ends |
 | `teardown-error-dropped-after-setup-failure` | a teardown that returned no error is not failed by an `AfterAll` report, as when another fixture's setup failure claimed the process's exit status | gotestrunner `TeardownVerdict`: the `AfterAll` report fails nothing |
 | `teardown-reports-dropped-from-the-verdict` | a teardown error goes out without the `AfterAll` reports that say why | teardown verdict unit test: a teardown error comes back without the reports |
 | `bench-gate-passes-on-nothing` | a bench gate with no benchmark in both the baseline and the run passes | canary: the gate against a foreign baseline exits 0 instead of 1 |
@@ -452,6 +456,8 @@ shards of one run do not add up to every mutant exactly once.
 | `stop-grace-skips-beforeall` | a stop gives a `BeforeAll` that ignores its context no grace, so the run waits out the release bound | canary: the stopgrace hung `BeforeAll` is not cut short after 5s |
 | `stop-grace-skips-late-bodies` | a body that starts after the stop gets no grace and is never cut short | canary: the stopgrace late body is not cut short 5s after it began |
 | `stop-ends-the-aftereach-context` | a method's AfterEach gets the method's context, which the stop has ended | canary: the stopgrace AfterEach sees its context end instead of running to its end |
+| `stopped-suite-fails-silently` | a suite a stop kept from starting is booked as failed, with no skip and no reason | lifecycle conformance: the later group's suite is not skipped with `run stopping` |
+| `group-starts-after-a-stop` | a group's shared fixtures start at its turn even after a stop | lifecycle conformance: the later group's fixture comes up after the stop |
 | `forced-release-gets-no-time` | a forced stop leaves the release none of the bound, so the fixtures are cut off mid-teardown | canary: the stopgrace slow release never ends |
 | `second-signal-waits-out-the-grace` | a second stop signal is ignored while the grace runs | canary: the stopgrace fixture is not released at once on the second signal |
 | `stop-runs-the-benchmarks-not-started` | a stopped benchmark run still starts the benchmarks not started | canary: the stopbench second benchmark runs |

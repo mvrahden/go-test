@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / runs no suite of e2e beside a suite outside it \(
+Clause: when suites of the default group, of a group e2e and of a later group run → runs no suite of e2e beside a suite outside it
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -843,7 +843,7 @@
+ 
+ 		for i := range targets { //nolint:gocritic // hugeParam: stable API
+ 			target := targets[i]
+-			if target.Exclusive || target.Group != streamed {
++			if target.Exclusive || target.Group != streamed && false {
+ 				// Deferred past the stream: exclusive suites run strictly
+ 				// alone, after every concurrent suite of their group has
+ 				// drained, and a later group after the one before it. Their

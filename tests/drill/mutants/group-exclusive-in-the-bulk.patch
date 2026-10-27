@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / runs e2e's Exclusive suite alone, after the group's other suites and before the next group \(
+Clause: when suites of the default group, of a group e2e and of a later group run → runs e2e's Exclusive suite alone, after the group's other suites and before the next group
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -850,7 +850,7 @@
+ 				// slot in the collector's per-package count is already
+ 				// registered above; the index travels with them.
+ 				d := deferredTarget{t: target, idx: i}
+-				if target.Exclusive {
++				if target.Exclusive && target.Group == "" {
+ 					deferredTail[target.Group] = append(deferredTail[target.Group], d)
+ 				} else {
+ 					deferredBulk[target.Group] = append(deferredBulk[target.Group], d)
