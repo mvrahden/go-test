@@ -35,6 +35,8 @@ type OverlayResult struct {
 	// GroupsByPkg is, per package, the named group of each suite declaring
 	// one (SuiteConfig.ExclusiveGroup); a suite absent is in the default group.
 	GroupsByPkg map[string]map[string]string
+	// groups is the run's --group and --skip-group selection.
+	groups groupSelection
 	// TestlessSuitesByPkg marks the suites with no Test function: they run
 	// for their fuzz seeds alone.
 	TestlessSuitesByPkg map[string]map[string]bool

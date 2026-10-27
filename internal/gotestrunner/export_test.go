@@ -100,6 +100,17 @@ var ExportPlanFixtureWindows = planFixtureWindows
 var ExportPlanBenchFixtureWindows = planBenchFixtureWindows
 var ExportBenchSlotPlan = benchSlotPlan
 var ExportPlanSuitePhases = planSuitePhases
+
+// ExportScope is one planned scope: its group and its two phases.
+type ExportScope = suiteScope
+
+var ExportPlanSuiteScopes = planSuiteScopes
+
+// ExportSelectGroups narrows o to --group and --skip-group.
+func ExportSelectGroups(o *OverlayResult, only, skip []string) error {
+	return o.selectGroups(only, skip)
+}
+
 var ExportAliveFixtureKeys = aliveFixtureKeys
 
 var ExportSortTargetIndices = sortTargetIndices

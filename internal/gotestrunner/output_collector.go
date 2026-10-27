@@ -343,6 +343,26 @@ func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason strin
 	c.recordResultLocked(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
 
+// RecordStopped books a suite a stop kept from starting: skipped with the
+// reason run stopping. Its package fails, as one whose suites did not run.
+func (c *OutputCollector) RecordStopped(pkg string, idx int, suite string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	skip := "--- SKIP: " + suite + " (0.00s)\n"
+	r := SuiteResult{ExitCode: 1}
+	if c.mode == RunBatchText {
+		r.Stdout = []byte(skip + "    run stopping\n")
+	} else {
+		w := c.jsonWriter()
+		now := time.Now()
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": skip})
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    run stopping\n"})
+		writeJSONLine(w, map[string]any{"Time": now, "Action": "skip", "Package": pkg, "Test": suite, "Elapsed": 0})
+	}
+	c.recordResultLocked(pkg, idx, r)
+}
+
 // Finalize closes a text run: it drains the packages still waiting for an
 // earlier one that never reported and emits a trailing FAIL. JSON modes have
 // written every verdict as it came.

@@ -398,6 +398,10 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 		fmt.Fprintln(c.stderr, "note: census skipped under -run/-skip/-list/-bench")
 		return code
 	}
+	if len(cfg.Groups)+len(cfg.SkipGroups) > 0 {
+		fmt.Fprintln(c.stderr, "note: census skipped under --group/--skip-group")
+		return code
+	}
 
 	var booked []streamEvent
 	for _, g := range groups {

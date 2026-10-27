@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -89,6 +90,9 @@ type PipelineConfig struct {
 	// Events receives a copy of the run's go test -json event stream as it
 	// is written; nil for none.
 	Events io.Writer
+	// Groups and SkipGroups are --group and --skip-group: the named groups
+	// the run is narrowed to, and those it leaves out.
+	Groups, SkipGroups []string
 }
 
 // flushOrder is the order a text run prints its verdicts in: the matched
@@ -121,6 +125,8 @@ func bookNoSuites(c *OutputCollector, overlay *OverlayResult, noSuite, order []s
 type PipelineResult struct {
 	ExitCode     int
 	CapturedJSON []byte
+	// Groups is what each named group that ran took, by name.
+	Groups []GroupRun
 }
 
 // sharedFixturesPkg names the synthetic package a shared fixture failure is
@@ -294,6 +300,9 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 		if protocol.SwitchOn(os.Getenv("CI")) {
 			cfg.CI = true
 		}
+	}
+	if err := overlay.selectGroups(cfg.Groups, cfg.SkipGroups); err != nil {
+		return PipelineResult{}, err
 	}
 	pf := ParseExecFlags(cfg.GoTestArgs)
 
@@ -643,16 +652,24 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	win := planFixtureWindows(overlay, pf.UserRunFilter, pf.UserSkipFilter)
 	win.reportSkipped()
+	scopes := planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)
 	// A shared fixture is released once no planned suite left needs it.
-	plannedBulk, plannedTail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, pf.UserRunFilter, pf.UserSkipFilter)
-	ledger := newFixtureLedger([]map[string][]string{plannedBulk, plannedTail}, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
-
-	// Exclusive suites collected during the stream, run serially after it.
-	type deferredTarget struct {
-		t   SuiteTarget
-		idx int
+	planned := make([]map[string][]string, 0, 2*len(scopes))
+	for _, sc := range scopes {
+		planned = append(planned, sc.Bulk, sc.Tail)
 	}
-	var deferredExclusive []deferredTarget
+	ledger := newFixtureLedger(planned, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+
+	// The first scope's bulk streams with the compile. Every other suite is
+	// collected during the stream and runs after it, scope by scope: a
+	// group's bulk, then its exclusive suites one at a time.
+	streamed := ""
+	if len(scopes) > 0 {
+		streamed = scopes[0].Group
+	}
+	deferredBulk := map[string][]deferredTarget{}
+	deferredTail := map[string][]deferredTarget{}
+	var clock groupClock
 
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
@@ -795,6 +812,7 @@ loop:
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
 		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter, pf.UserSkipFilter)
+		targets = inSelectedGroups(targets, overlay)
 		withExec(targets, pf.Exec)
 		// The planned suites the package produced no target for never run.
 		produced := make(map[string]bool, len(targets))
@@ -821,15 +839,22 @@ loop:
 		}
 
 		collector.Register(cr.Package, len(targets))
+		clock.count(targets)
 
 		for i := range targets { //nolint:gocritic // hugeParam: stable API
 			target := targets[i]
-			if target.Exclusive {
+			if target.Exclusive || target.Group != streamed {
 				// Deferred past the stream: exclusive suites run strictly
-				// alone, after every concurrent suite has drained. Their
+				// alone, after every concurrent suite of their group has
+				// drained, and a later group after the one before it. Their
 				// slot in the collector's per-package count is already
 				// registered above; the index travels with them.
-				deferredExclusive = append(deferredExclusive, deferredTarget{t: target, idx: i})
+				d := deferredTarget{t: target, idx: i}
+				if target.Exclusive {
+					deferredTail[target.Group] = append(deferredTail[target.Group], d)
+				} else {
+					deferredBulk[target.Group] = append(deferredBulk[target.Group], d)
+				}
 				continue
 			}
 			wg.Add(1)
@@ -845,6 +870,8 @@ loop:
 					case recorded:
 					case missing != "":
 						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
+					case streamCtx.Err() != nil:
+						collector.RecordStopped(t.Package, idx, t.SuiteName)
 					default:
 						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
 					}
@@ -902,7 +929,7 @@ loop:
 				}
 				defer func() { <-sem }()
 
-				runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
+				clock.run(t.Group, func() { runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON()) })
 				recorded = true
 			}(target, i)
 		}
@@ -920,27 +947,34 @@ loop:
 			dispatchErr, verdictsIn = ctx.Err(), true
 		}
 	}
-	// The exclusive tail runs on slots: before each suite, the fixtures it
-	// needs that are not up yet start; the releases go through the ledger.
-	// A failed setup leaves the process serving commands, so a slot's own
-	// fixtures still start; one that timed out is still busy with the
-	// up-front phase and would answer no command.
+	// The suites past the stream start the fixtures they need that are not
+	// up yet just before they run: a later group's bulk at the group's start,
+	// an exclusive suite in its slot. The releases go through the ledger.
+	// A failed setup leaves the process serving commands, so these fixtures
+	// still start; one that timed out is still busy with the up-front phase
+	// and would answer no command.
 	fixtureWg.Wait()
-	if len(deferredExclusive) == 0 {
-		allIn()
+	left := 0
+	for _, ds := range deferredBulk {
+		left += len(ds)
 	}
-	tailTargets := make([]SuiteTarget, len(deferredExclusive))
-	tailOrder := make([]int, len(deferredExclusive))
-	for i := range deferredExclusive {
-		tailTargets[i], tailOrder[i] = deferredExclusive[i].t, i
+	for _, ds := range deferredTail {
+		left += len(ds)
+	}
+	if left == 0 {
+		allIn()
 	}
 	var slotErr error
 	started := maps.Clone(win.Bulk)
-	startSlot := func(t *SuiteTarget) {
+	startFor := func(ds []deferredTarget, what string) {
 		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
 			return
 		}
-		need := aliveFixtureKeys(map[string][]string{t.Package: {t.SuiteName}}, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+		phase := map[string][]string{}
+		for i := range ds {
+			phase[ds[i].t.Package] = append(phase[ds[i].t.Package], ds[i].t.SuiteName)
+		}
+		need := aliveFixtureKeys(phase, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
 		start := diffKeys(need, started)
 		if len(start) == 0 {
 			return
@@ -949,19 +983,14 @@ loop:
 			started[key] = true
 		}
 		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
-			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for exclusive tail: %w", err))
+			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for %s: %w", what, err))
 		}
 	}
 
-	// Exclusive suites own the machine: after the stream has fully drained,
-	// one at a time, in deterministic order. Shared fixture processes stay up
-	// — they are infrastructure the suites talk to, not competing suites —
-	// and tear down only after the last exclusive finishes.
-	sortTargetIndices(tailTargets, tailOrder)
-	runTailSlot := func(t SuiteTarget, idx int) { //nolint:gocritic // hugeParam: a copy per slot is nothing beside the process it starts
+	runDeferred := func(t SuiteTarget, idx int) { //nolint:gocritic // hugeParam: a copy per suite is nothing beside the process it starts
 		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 		if streamCtx.Err() != nil {
-			collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+			collector.RecordStopped(t.Package, idx, t.SuiteName)
 			return
 		}
 		if missing := missingFixture(setupProc, requiredKeys); missing != "" {
@@ -980,18 +1009,49 @@ loop:
 			copy(env, baseEnv)
 			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
 		}
-		runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
+		clock.run(t.Group, func() { runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON()) })
 	}
-	for n, i := range tailOrder {
-		d := &deferredExclusive[i]
-		startSlot(&d.t)
-		runTailSlot(d.t, d.idx)
-		if n == len(tailOrder)-1 {
-			allIn()
+
+	// Scopes never overlap: a later group starts once the one before it has
+	// drained. Exclusive suites own the machine: after their group's bulk,
+	// one at a time, in deterministic order. Shared fixture processes stay
+	// up — they are infrastructure the suites talk to, not competing suites.
+	for n, sc := range scopes {
+		if n > 0 {
+			bulk := sortDeferred(deferredBulk[sc.Group])
+			startFor(bulk, "group "+sc.Group)
+			var scopeWg sync.WaitGroup
+			for _, d := range bulk {
+				scopeWg.Add(1)
+				go func(t SuiteTarget, idx int) {
+					defer scopeWg.Done()
+					// Last of all, once the suite's process is gone.
+					defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)) }()
+					select {
+					case sem <- struct{}{}:
+					case <-streamCtx.Done():
+						collector.RecordStopped(t.Package, idx, t.SuiteName)
+						return
+					}
+					defer func() { <-sem }()
+					runDeferred(t, idx)
+				}(d.t, d.idx)
+			}
+			scopeWg.Wait()
+			if left -= len(bulk); left == 0 && len(bulk) > 0 {
+				allIn()
+			}
 		}
-		// The slot's process is gone. Its release runs beside the next
-		// slot, which needs none of what it frees.
-		releaser.Release(ledger.Done(d.t.Package, d.t.SuiteName))
+		for _, d := range sortDeferred(deferredTail[sc.Group]) {
+			startFor([]deferredTarget{d}, "exclusive tail")
+			runDeferred(d.t, d.idx)
+			if left--; left == 0 {
+				allIn()
+			}
+			// The slot's process is gone. Its release runs beside the next
+			// slot, which needs none of what it frees.
+			releaser.Release(ledger.Done(d.t.Package, d.t.SuiteName))
+		}
 	}
 	allIn()
 
@@ -1027,7 +1087,7 @@ loop:
 		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !sharedSetupFailed.Load() {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
-		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr)}
+		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr), Groups: clock.runs()}
 		if sharedSetupFailed.Load() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
@@ -1048,13 +1108,32 @@ loop:
 	}
 	exitCode = collector.takeCensus(cfg, overlay.Declared, exitCode, dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
-	result := PipelineResult{ExitCode: exitCode}
+	result := PipelineResult{ExitCode: exitCode, Groups: clock.runs()}
 	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
 	applyInterrupt(collector, &result, dispatchErr)
 	applySetupFailure(collector, &result, setupErr)
 	applyTeardownFailure(collector, &result, teardownErr)
 	result.CapturedJSON = collector.CapturedJSON()
 	return result, nil
+}
+
+// deferredTarget is a suite held back past the stream, with its slot in
+// its package's results.
+type deferredTarget struct {
+	t   SuiteTarget
+	idx int
+}
+
+// sortDeferred orders ds by (Package, SuiteName), the order a scope's
+// held-back suites are dispatched in.
+func sortDeferred(ds []deferredTarget) []deferredTarget {
+	sort.Slice(ds, func(a, b int) bool {
+		if ds[a].t.Package != ds[b].t.Package {
+			return ds[a].t.Package < ds[b].t.Package
+		}
+		return ds[a].t.SuiteName < ds[b].t.SuiteName
+	})
+	return ds
 }
 
 // withExec gives every target the command its binary runs under.

@@ -187,6 +187,76 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	})
 }
 
+// groupOverlay is windowOverlay with MultiSuite in group e2e and ChainSuite
+// in group load: Alpha is read by the default group and by both others,
+// Beta only by e2e and the default group's exclusive suite.
+func groupOverlay() *gotestrunner.OverlayResult {
+	o := windowOverlay()
+	o.GroupsByPkg = map[string]map[string]string{
+		"pkg/a": {"MultiSuite": "e2e"},
+		"pkg/b": {"ChainSuite": "load"},
+	}
+	return o
+}
+
+func (s *FixtureWindowTestSuite) TestGroupScopes(t *gotest.T, _ *windowCtx) {
+	t.When("suites declare named groups", func(w *gotest.T) {
+		scopes := gotestrunner.ExportPlanSuiteScopes(groupOverlay(), "", "")
+
+		w.It("plans the default group first, then each named group by name", func(it *gotest.T) {
+			gotest.Equal(it, []gotestrunner.ExportScope{
+				{Group: "", Bulk: map[string][]string{"pkg/a": {"TestAlphaSuite"}}, Tail: map[string][]string{"pkg/b": {"TestTimingSuite"}}},
+				{Group: "e2e", Bulk: map[string][]string{"pkg/a": {"TestMultiSuite"}}, Tail: map[string][]string{}},
+				{Group: "load", Bulk: map[string][]string{"pkg/b": {"TestChainSuite"}}, Tail: map[string][]string{}},
+			}, scopes)
+		})
+
+		w.It("starts up front only what the first scope's bulk needs", func(it *gotest.T) {
+			win := gotestrunner.ExportPlanFixtureWindows(groupOverlay(), "", "")
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true}, win.Bulk)
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true, winKey("Chain"): true}, win.Tail)
+		})
+	})
+
+	t.When("the selection leaves a group no suite", func(w *gotest.T) {
+		w.It("plans no scope for it", func(it *gotest.T) {
+			scopes := gotestrunner.ExportPlanSuiteScopes(groupOverlay(), "TestAlphaSuite|TestChainSuite", "")
+			gotest.Len(it, scopes, 2)
+			gotest.Equal(it, "load", scopes[1].Group)
+		})
+	})
+
+	t.When("--group names a group", func(w *gotest.T) {
+		w.It("plans that group alone and starts its fixtures up front", func(it *gotest.T) {
+			o := groupOverlay()
+			gotest.NoError(it, gotestrunner.ExportSelectGroups(o, []string{"e2e"}, nil))
+			scopes := gotestrunner.ExportPlanSuiteScopes(o, "", "")
+			gotest.Len(it, scopes, 1)
+			gotest.Equal(it, "e2e", scopes[0].Group)
+			gotest.Equal(it, map[string]bool{winKey("Alpha"): true, winKey("Beta"): true}, gotestrunner.ExportPlanFixtureWindows(o, "", "").Bulk)
+		})
+	})
+
+	t.When("--skip-group names a group", func(w *gotest.T) {
+		w.It("plans every other group", func(it *gotest.T) {
+			o := groupOverlay()
+			gotest.NoError(it, gotestrunner.ExportSelectGroups(o, nil, []string{"e2e"}))
+			var groups []string
+			for _, sc := range gotestrunner.ExportPlanSuiteScopes(o, "", "") {
+				groups = append(groups, sc.Group)
+			}
+			gotest.Equal(it, []string{"", "load"}, groups)
+		})
+	})
+
+	t.When("--group or --skip-group names a group no suite declares", func(w *gotest.T) {
+		w.It("refuses it naming the known groups", func(it *gotest.T) {
+			gotest.ErrorContains(it, gotestrunner.ExportSelectGroups(groupOverlay(), []string{"nope"}, nil), `--group=nope: no suite declares the group "nope"; known groups: e2e, load`)
+			gotest.ErrorContains(it, gotestrunner.ExportSelectGroups(groupOverlay(), nil, []string{"E2E"}), "--skip-group=E2E")
+		})
+	})
+}
+
 // TestRealOverlayFiltering runs the planner over the real tests/sharedfixture
 // packages — the same overlay the pipeline computes — so the filtering path is
 // pinned against genuine discovery output, not hand-built maps.
