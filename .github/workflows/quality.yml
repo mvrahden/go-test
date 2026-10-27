@@ -87,6 +87,7 @@ jobs:
         env:
           DRILL_SHARD: ${{ matrix.shard }}/4
           DRILL_LOGS: ${{ runner.temp }}/drill-logs
+          DRILL_TIMINGS: tests/drill/timings.json
         run: make drill
       - name: Keep drill logs and phase timings
         if: always()
