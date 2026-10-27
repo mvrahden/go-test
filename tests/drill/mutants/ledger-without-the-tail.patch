@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / keeps it up through the exclusive suite, starting and releasing it once \(
+Clause: when a shared fixture is read by a concurrent suite and by an exclusive suite after it → keeps it up through the exclusive suite, starting and releasing it once
+--- a/internal/gotestrunner/fixtureledger.go
++++ b/internal/gotestrunner/fixtureledger.go
+@@ -25,7 +25,7 @@
+ // function names, as planSuitePhases returns them.
+ func newFixtureLedger(planned []map[string][]string, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) *fixtureLedger {
+ 	l := &fixtureLedger{needs: map[string]map[string][]string{}, counts: map[string]int{}, done: map[[2]string]bool{}}
+-	for _, phase := range planned {
++	for _, phase := range planned[:1] {
+ 		for pkg, suites := range phase {
+ 			for _, suite := range suites {
+ 				keys := sortedKeys(aliveFixtureKeys(map[string][]string{pkg: {suite}}, reqKeys, fixtures))

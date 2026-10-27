@@ -485,6 +485,7 @@ shards of one run do not add up to every mutant exactly once.
 | `given-up-start-released-early` | a shared fixture whose late start timed out is released at once, so the release waits on its hung `BeforeAll` | fixtures conformance: the tail's and the bench slot's runs take 2m30s more |
 | `release-given-up-waited-again` | a shared fixture process holding nothing but releases given up at their budget is waited for that budget again at the end of the run | fixtures conformance: the tail's and the bench slot's runs take 32s more |
 | `slot-waits-for-releases` | an exclusive suite's slot waits for every release in flight before it starts its fixtures | fixtures conformance: the suite runs only after a slow release ends |
+| `ledger-without-the-tail` | the release ledger counts only the concurrent suites, so a fixture an exclusive suite still needs is released before it runs | fixtures conformance: the fixture is released before the exclusive suite reading it |
 | `release-before-dependents` | a shared fixture's release no longer waits for the fixtures depending on it | fixtures conformance: a dependent is released after its dependency |
 | `start-before-dependencies` | a shared fixture started late no longer waits for its dependencies to come up | fixtures conformance: the tail's fixture starts before the dependency it reads |
 | `teardown-budget-summed` | the setup process reports the sum of the resident fixtures' shares as its teardown budget | fixtures conformance: the hung release is force-killed after 37s, not 35s |
