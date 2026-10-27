@@ -87,6 +87,7 @@ func main() {
 	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 2)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
@@ -97,13 +98,44 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/project/tests/fixtures.PostgresFixture", "github.com/example/project/tests/redis.RedisFixture"}
+	ƒnames := []string{"PostgresFixture", "RedisFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -112,10 +144,13 @@ func main() {
 	ƒdone_sf1 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
@@ -125,7 +160,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -152,10 +191,13 @@ func main() {
 	}
 
 	ƒsetup_sf1 := func() {
-		if ƒstarted[1] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[1]
+		ƒstarted[1] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "RedisFixture",
@@ -165,7 +207,11 @@ func main() {
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
 			AfterAll:   sf1.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[1] = ƒheld
+			},
 		}
 		ƒshare(1, ƒsetup.Timeout)
 		ƒlife.SetupBegins(1, ƒsetup)
@@ -191,36 +237,55 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+	ƒtornDone_sf1 := make(chan struct{})
+	var ƒtornOnce_sf1 sync.Once
+	var ƒtornFailed_sf1 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PostgresFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒattempted[1] {
+		ƒtornOnce_sf1.Do(func() {
+			defer close(ƒtornDone_sf1)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
-			ƒlife.Released(1)
-			return false
-		}
-		ƒtorn[1] = true
-		defer ƒlife.Released(1)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "RedisFixture",
-			Timeout:  ƒcfg_sf1.Timeout,
-			Budget:   0,
-			AfterAll: sf1.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(1)
+			defer ƒunshare(1)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "RedisFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf1
 	}
 
 	var ƒwg sync.WaitGroup
@@ -265,32 +330,79 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
 					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
-					ƒsetup_sf1()
-					if ƒerrs[1] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf1()
+					}()
 				}
-			case "teardown":
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+				}
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") && ƒerrs[1] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
-					if ƒteardown_sf1() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf1()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[1] && ƒteardown_sf1() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
+				}
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -298,6 +410,19 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf1()
+	}()
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
 		ƒteardownFailed = true
@@ -395,6 +520,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -405,13 +531,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PostgresFixture"}
+	ƒnames := []string{"PostgresFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -419,10 +574,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
@@ -432,7 +590,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -460,20 +622,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PostgresFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -512,20 +684,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -533,6 +743,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -627,6 +845,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -637,13 +856,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.SetupFixture"}
+	ƒnames := []string{"SetupFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -651,10 +899,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "SetupFixture",
@@ -664,7 +915,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -677,20 +932,30 @@ func main() {
 		fmt.Fprintf(ƒproto, "{\"key\":%s,\"state\":{}}\n", ƒquote("github.com/example/fixtures.SetupFixture"))
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "SetupFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "SetupFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -729,20 +994,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -750,6 +1053,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -844,6 +1155,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -854,13 +1166,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/project/tests/fixtures.PostgresFixture"}
+	ƒnames := []string{"PostgresFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -868,10 +1209,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
@@ -881,7 +1225,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -907,20 +1255,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PostgresFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -959,20 +1317,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -980,6 +1376,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -1077,6 +1481,7 @@ func main() {
 	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 2)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
@@ -1087,13 +1492,44 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/shared.PostgresFixture", "github.com/example/shared.RedisFixture"}
+	ƒnames := []string{"PostgresFixture", "RedisFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1102,10 +1538,13 @@ func main() {
 	ƒdone_sf1 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
@@ -1115,7 +1554,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -1142,10 +1585,13 @@ func main() {
 	}
 
 	ƒsetup_sf1 := func() {
-		if ƒstarted[1] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[1]
+		ƒstarted[1] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "RedisFixture",
@@ -1155,7 +1601,11 @@ func main() {
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
 			AfterAll:   sf1.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[1] = ƒheld
+			},
 		}
 		ƒshare(1, ƒsetup.Timeout)
 		ƒlife.SetupBegins(1, ƒsetup)
@@ -1181,36 +1631,55 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+	ƒtornDone_sf1 := make(chan struct{})
+	var ƒtornOnce_sf1 sync.Once
+	var ƒtornFailed_sf1 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PostgresFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒattempted[1] {
+		ƒtornOnce_sf1.Do(func() {
+			defer close(ƒtornDone_sf1)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
-			ƒlife.Released(1)
-			return false
-		}
-		ƒtorn[1] = true
-		defer ƒlife.Released(1)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "RedisFixture",
-			Timeout:  ƒcfg_sf1.Timeout,
-			Budget:   0,
-			AfterAll: sf1.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(1)
+			defer ƒunshare(1)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "RedisFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf1
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1255,32 +1724,79 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
 					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
-					ƒsetup_sf1()
-					if ƒerrs[1] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf1()
+					}()
 				}
-			case "teardown":
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+				}
+				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") && ƒerrs[1] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
-					if ƒteardown_sf1() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf1()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[1] && ƒteardown_sf1() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
+				}
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -1288,6 +1804,19 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf1()
+	}()
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
 		ƒteardownFailed = true
@@ -1385,6 +1914,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -1395,13 +1925,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1409,10 +1968,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
@@ -1422,7 +1984,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -1448,20 +2014,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1500,20 +2076,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -1521,6 +2135,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -1615,6 +2237,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -1625,13 +2248,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1639,10 +2291,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
@@ -1652,7 +2307,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -1678,20 +2337,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1730,20 +2399,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -1751,6 +2458,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -1845,6 +2560,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -1855,13 +2571,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -1869,10 +2614,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
@@ -1882,7 +2630,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -1908,20 +2660,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -1960,20 +2722,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -1981,6 +2781,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -2075,6 +2883,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -2085,13 +2894,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2099,10 +2937,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
@@ -2112,7 +2953,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -2138,20 +2983,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2190,20 +3045,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -2211,6 +3104,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -2309,6 +3210,7 @@ func main() {
 	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 2)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
@@ -2319,13 +3221,44 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture", "github.com/example/redis.RedisFixture"}
+	ƒnames := []string{"PGFixture", "RedisFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2334,10 +3267,13 @@ func main() {
 	ƒdone_sf1 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
@@ -2347,7 +3283,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -2374,10 +3314,13 @@ func main() {
 	}
 
 	ƒsetup_sf1 := func() {
-		if ƒstarted[1] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[1]
+		ƒstarted[1] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "RedisFixture",
@@ -2387,7 +3330,11 @@ func main() {
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
 			AfterAll:   sf1.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[1] = ƒheld
+			},
 		}
 		ƒshare(1, ƒsetup.Timeout)
 		ƒlife.SetupBegins(1, ƒsetup)
@@ -2413,36 +3360,55 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+	ƒtornDone_sf1 := make(chan struct{})
+	var ƒtornOnce_sf1 sync.Once
+	var ƒtornFailed_sf1 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒattempted[1] {
+		ƒtornOnce_sf1.Do(func() {
+			defer close(ƒtornDone_sf1)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
-			ƒlife.Released(1)
-			return false
-		}
-		ƒtorn[1] = true
-		defer ƒlife.Released(1)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "RedisFixture",
-			Timeout:  ƒcfg_sf1.Timeout,
-			Budget:   0,
-			AfterAll: sf1.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(1)
+			defer ƒunshare(1)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "RedisFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf1
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2487,32 +3453,79 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
 					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
-					ƒsetup_sf1()
-					if ƒerrs[1] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf1()
+					}()
 				}
-			case "teardown":
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") && ƒerrs[1] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
-					if ƒteardown_sf1() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf1()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[1] && ƒteardown_sf1() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
+				}
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -2520,6 +3533,19 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf1()
+	}()
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
 		ƒteardownFailed = true
@@ -2617,6 +3643,7 @@ func main() {
 	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -2627,13 +3654,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2641,10 +3697,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PGFixture",
@@ -2654,7 +3713,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -2680,20 +3743,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2732,20 +3805,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -2753,6 +3864,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -2848,6 +3967,7 @@ func main() {
 	var ƒbudget_sf0 time.Duration
 
 	ƒerrs := make([]error, 1)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 1)
 	ƒattempted := make([]bool, 1)
 	ƒtorn := make([]bool, 1)
@@ -2858,13 +3978,42 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/fixtures.PGFixture"}
+	ƒnames := []string{"PGFixture"}
+	ƒdependencies := [][]int{
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -2872,10 +4021,13 @@ func main() {
 	ƒdone_sf0 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒcfg, ƒerr := gotestruntime.DeriveFixtureConfig("PGFixture", sf0.SharedFixtureConfig)
 		if ƒerr != nil {
@@ -2892,7 +4044,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -2918,20 +4074,30 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PGFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   ƒbudget_sf0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PGFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   ƒbudget_sf0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	var ƒwg sync.WaitGroup
@@ -2970,20 +4136,58 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
-			case "teardown":
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
+				}
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -2991,6 +4195,14 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
 		ƒteardownFailed = true
@@ -3089,6 +4301,7 @@ func main() {
 	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
 
 	ƒerrs := make([]error, 2)
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, 2)
 	ƒattempted := make([]bool, 2)
 	ƒtorn := make([]bool, 2)
@@ -3099,13 +4312,44 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{"github.com/example/project/tests/fixtures.PostgresFixture", "github.com/example/project/tests/gcs.GCSFixture"}
+	ƒnames := []string{"PostgresFixture", "GCSFixture"}
+	ƒdependencies := [][]int{
+		{},
+		{},
+	}
+	ƒdependents := [][]int{
+		{},
+		{},
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -3114,10 +4358,13 @@ func main() {
 	ƒdone_sf1 := make(chan struct{})
 
 	ƒsetup_sf0 := func() {
-		if ƒstarted[0] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[0]
+		ƒstarted[0] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[0] = true
 		defer close(ƒdone_sf0)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "PostgresFixture",
@@ -3127,7 +4374,11 @@ func main() {
 			RetryDelay: ƒcfg_sf0.RetryDelay,
 			BeforeAll:  sf0.BeforeAll,
 			AfterAll:   sf0.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[0] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[0] = ƒheld
+			},
 		}
 		ƒshare(0, ƒsetup.Timeout)
 		ƒlife.SetupBegins(0, ƒsetup)
@@ -3154,10 +4405,13 @@ func main() {
 	}
 
 	ƒsetup_sf1 := func() {
-		if ƒstarted[1] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[1]
+		ƒstarted[1] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[1] = true
 		defer close(ƒdone_sf1)
 		ƒsetup := gotestruntime.FixtureSetup{
 			Name:       "GCSFixture",
@@ -3167,7 +4421,11 @@ func main() {
 			RetryDelay: ƒcfg_sf1.RetryDelay,
 			BeforeAll:  sf1.BeforeAll,
 			AfterAll:   sf1.AfterAll,
-			Held:       func(ƒheld bool) { ƒattempted[1] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[1] = ƒheld
+			},
 		}
 		ƒshare(1, ƒsetup.Timeout)
 		ƒlife.SetupBegins(1, ƒsetup)
@@ -3195,36 +4453,55 @@ func main() {
 		}
 	}
 
+	ƒtornDone_sf0 := make(chan struct{})
+	var ƒtornOnce_sf0 sync.Once
+	var ƒtornFailed_sf0 bool
+	ƒtornDone_sf1 := make(chan struct{})
+	var ƒtornOnce_sf1 sync.Once
+	var ƒtornFailed_sf1 bool
+
 	ƒteardown_sf0 := func() bool {
-		if ƒtorn[0] || !ƒattempted[0] {
+		ƒtornOnce_sf0.Do(func() {
+			defer close(ƒtornDone_sf0)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
-			ƒlife.Released(0)
-			return false
-		}
-		ƒtorn[0] = true
-		defer ƒlife.Released(0)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "PostgresFixture",
-			Timeout:  ƒcfg_sf0.Timeout,
-			Budget:   0,
-			AfterAll: sf0.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(0)
+			defer ƒunshare(0)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "PostgresFixture",
+				Timeout:  ƒcfg_sf0.Timeout,
+				Budget:   0,
+				AfterAll: sf0.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf0
 	}
 
 	ƒteardown_sf1 := func() bool {
-		if ƒtorn[1] || !ƒattempted[1] {
+		ƒtornOnce_sf1.Do(func() {
+			defer close(ƒtornDone_sf1)
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
-			ƒlife.Released(1)
-			return false
-		}
-		ƒtorn[1] = true
-		defer ƒlife.Released(1)
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "GCSFixture",
-			Timeout:  ƒcfg_sf1.Timeout,
-			Budget:   0,
-			AfterAll: sf1.AfterAll,
+			ƒstateMu.Unlock()
+			defer ƒlife.Released(1)
+			defer ƒunshare(1)
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "GCSFixture",
+				Timeout:  ƒcfg_sf1.Timeout,
+				Budget:   0,
+				AfterAll: sf1.AfterAll,
+			})
 		})
+		return ƒtornFailed_sf1
 	}
 
 	var ƒwg sync.WaitGroup
@@ -3269,32 +4546,79 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒsetup_sf0()
-					if ƒerrs[0] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
 					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
+					}
+				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+				var ƒstarting sync.WaitGroup
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf0()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
-					ƒsetup_sf1()
-					if ƒerrs[1] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: "+ƒerrs[1].Error())
-					}
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_sf1()
+					}()
 				}
-			case "teardown":
+				ƒstarting.Wait()
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+				}
+				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") && ƒerrs[1] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: "+ƒerrs[1].Error())
+				}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
-					if ƒteardown_sf1() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf1()
+					}()
 				}
 				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					if ƒteardown_sf0() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_sf0()
+					}()
+				}
+				ƒreleasing.Wait()
+				if ƒreleases[1] && ƒteardown_sf1() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: teardown failed")
+				}
+				if ƒreleases[0] && ƒteardown_sf0() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
 				}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
@@ -3302,6 +4626,19 @@ func main() {
 			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
 		}
 	}
+	var ƒreleasing sync.WaitGroup
+
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf1()
+	}()
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_sf0()
+	}()
+	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
 		ƒteardownFailed = true

@@ -60,9 +60,9 @@ func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter st
 }
 
 // dependenciesFirst orders fixtures so each comes after its dependencies,
-// keeping the given order otherwise. Discovery lists them by name, and the
-// setup process starts a command's fixtures one by one in list order: a
-// dependent listed first would wait on a dependency it has not started yet.
+// keeping the given order otherwise, so the generated setup program lists
+// them the same way on every run. The setup process orders starts and
+// releases by the dependencies themselves, whatever the list order.
 func dependenciesFirst(fixtures []gotestgen.SharedFixtureInfo) []gotestgen.SharedFixtureInfo {
 	byKey := make(map[string]int, len(fixtures))
 	for i := range fixtures {

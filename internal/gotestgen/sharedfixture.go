@@ -50,6 +50,11 @@ type sharedSetupImport struct {
 	Path  string
 }
 
+type dependent struct {
+	Var   string // e.g. "sf1"
+	Index int
+}
+
 type parentAssignment struct {
 	ParentVar string // e.g. "sf0"
 	FieldName string // e.g. "Postgres"
@@ -66,6 +71,7 @@ type sharedSetupFixture struct {
 	TransferFields    []string
 	DependsOnVars     []string           // var names of fixtures this depends on (e.g. ["sf0"])
 	DependsOnIndices  []int              // indices of dependency fixtures in the Fixtures slice
+	Dependents        []dependent        // fixtures that depend on this one, released before it
 	ParentAssignments []parentAssignment // parent var → field name assignments
 	Deferred          bool               // excluded from the up-front phase; starts on StartKeys
 }
@@ -141,6 +147,12 @@ func GenerateSharedSetup(fixtures []SharedFixtureInfo) ([]byte, error) {
 			ParentAssignments: parentAssigns,
 			Deferred:          sf.Deferred,
 		})
+	}
+
+	for i := range fixtureVMs {
+		for _, dep := range fixtureVMs[i].DependsOnIndices {
+			fixtureVMs[dep].Dependents = append(fixtureVMs[dep].Dependents, dependent{Var: fixtureVMs[i].VarName, Index: i})
+		}
 	}
 
 	teardownFixtures := make([]sharedSetupFixture, len(fixtureVMs))

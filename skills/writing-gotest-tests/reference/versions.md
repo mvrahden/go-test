@@ -609,6 +609,12 @@ Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
    A harness an older gotest wrote to disk still compiles; its first such
    method panics with the fix, which ends the suite's run, until
    `gotest generate` runs again.
+
 2. **The runtime floor is v1.35.0 from v1.35.1** — a v1.35.1 CLI refuses
    a pin below v1.35.0, skipping the retracted v1.34.0; v1.35.0 still
    accepts a v1.34.0 pin. The extension from 1.35.1 needs a v1.35.0 CLI.
+3. **Shared fixtures are released concurrently** — each after the fixtures
+   holding a pointer field to it, as package fixtures already were. Two
+   shared fixtures that share something without such a field (a Docker
+   network, a port) used to be released one after another by accident; give
+   the one that must go last a pointer field to the other.

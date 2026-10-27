@@ -385,7 +385,7 @@ Each phase has an alive set — `Alive(phase)` is the DAG-closure of the union o
 
 - Fixtures in neither alive set never start.
 - `Alive(bulk)` starts up-front, concurrent with package compilation.
-- At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)` in reverse dependency order, then starts `Alive(tail) ∖ Alive(bulk)` in dependency order, under the same per-fixture retry and budget policy as the up-front phase. A fixture started there with a dependency only the tail needs comes up after it and is released before it ([A late fixture's dependencies](../../specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies)).
+- At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)`, then starts `Alive(tail) ∖ Alive(bulk)`, each set concurrently, a start after its dependencies and a release after its dependents ([Releasing shared fixtures](../../specs/fixtures/spec.md#requirement-releasing-shared-fixtures)), under the same per-fixture retry and budget policy as the up-front phase. A fixture started there with a dependency only the tail needs comes up after it and is released before it ([A late fixture's dependencies](../../specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies)).
 - Run-end teardown releases whatever is still resident. Fixtures released at the barrier are skipped there: every fixture's teardown has exactly one owner.
 
 The barrier speaks two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on the protocol stream after any late state lines.

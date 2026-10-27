@@ -115,6 +115,12 @@ func main() {
 {{- end }}
 {{ end }}
 	ƒerrs := make([]error, {{ len .Fixtures }})
+{{- /*
+  Starts and teardowns run on goroutines of their own, so the flags saying
+  which fixtures came up, held resources and were released are read and
+  written under one lock.
+*/}}
+	var ƒstateMu sync.Mutex
 	ƒstarted := make([]bool, {{ len .Fixtures }})
 	ƒattempted := make([]bool, {{ len .Fixtures }})
 	ƒtorn := make([]bool, {{ len .Fixtures }})
@@ -123,10 +129,11 @@ func main() {
   config it derived: an up-front fixture by _done, a late one by the
   acknowledgement of the start that brought it up. A late fixture not yet
   started counts at the default config, so a stop during its start still gets
-  a window for its release. Teardown is strictly sequential, so the budget is
-  the SUM of the shares: a max would force-kill a set of teardowns that each
-  obeyed its own declared Timeout. An up-front fixture skipped for a failed
-  dependency has nothing to release.
+  a window for its release. Teardowns run concurrently, each after its
+  dependents, so the budget is 30s plus the longest chain: a fixture's share
+  plus the longest chain among the fixtures depending on it. A fixture's share
+  leaves the budget once its teardown has run, and an up-front fixture skipped
+  for a failed dependency has nothing to release.
 */}}
 	var ƒshareMu sync.Mutex
 	ƒshares := make([]time.Duration, {{ len .Fixtures }})
@@ -140,13 +147,46 @@ func main() {
 		defer ƒshareMu.Unlock()
 		ƒshares[i] = gotestruntime.SupervisorBudget(timeout)
 	}
+	ƒunshare := func(i int) {
+		ƒshareMu.Lock()
+		defer ƒshareMu.Unlock()
+		ƒshares[i] = 0
+	}
+	ƒkeys := []string{ {{- range .Fixtures }}"{{ .StateKey }}", {{ end -}} }
+	ƒnames := []string{ {{- range .Fixtures }}"{{ .Identifier }}", {{ end -}} }
+	ƒdependencies := [][]int{
+{{- range $f := .Fixtures }}
+		{ {{- range $d := $f.DependsOnIndices }}{{ $d }}, {{ end -}} },
+{{- end }}
+	}
+	ƒdependents := [][]int{
+{{- range $f := .Fixtures }}
+		{ {{- range $d := $f.Dependents }}{{ $d.Index }}, {{ end -}} },
+{{- end }}
+	}
 	ƒteardownBudget := func() time.Duration {
 		ƒshareMu.Lock()
 		defer ƒshareMu.Unlock()
-		ƒbudget := 30 * time.Second
-		for _, ƒs := range ƒshares {
-			ƒbudget += ƒs
+		// Each chain once, whatever order the fixtures are listed in: the
+		// dependencies form no cycle, so the recursion ends.
+		ƒchains := make([]time.Duration, len(ƒshares))
+		ƒknown := make([]bool, len(ƒshares))
+		var ƒchain func(int) time.Duration
+		ƒchain = func(ƒi int) time.Duration {
+			if !ƒknown[ƒi] {
+				ƒafter := time.Duration(0)
+				for _, ƒd := range ƒdependents[ƒi] {
+					ƒafter = max(ƒafter, ƒchain(ƒd))
+				}
+				ƒchains[ƒi], ƒknown[ƒi] = ƒshares[ƒi]+ƒafter, true
+			}
+			return ƒchains[ƒi]
 		}
+		ƒlongest := time.Duration(0)
+		for ƒi := range ƒshares {
+			ƒlongest = max(ƒlongest, ƒchain(ƒi))
+		}
+		ƒbudget := 30*time.Second + ƒlongest
 		ƒlife.Reported(ƒbudget)
 		return ƒbudget
 	}
@@ -162,10 +202,13 @@ func main() {
 */}}
 {{ range $i, $f := .Fixtures }}
 	ƒsetup_{{ $f.VarName }} := func() {
-		if ƒstarted[{{ $i }}] {
+		ƒstateMu.Lock()
+		ƒfirst := !ƒstarted[{{ $i }}]
+		ƒstarted[{{ $i }}] = true
+		ƒstateMu.Unlock()
+		if !ƒfirst {
 			return
 		}
-		ƒstarted[{{ $i }}] = true
 		defer close(ƒdone_{{ $f.VarName }})
 {{- if $f.HasConfig }}
 {{- /*
@@ -213,7 +256,11 @@ func main() {
 {{- if $f.HasAfterAll }}
 			AfterAll:   {{ $f.VarName }}.AfterAll,
 {{- end }}
-			Held:       func(ƒheld bool) { ƒattempted[{{ $i }}] = ƒheld },
+			Held: func(ƒheld bool) {
+				ƒstateMu.Lock()
+				defer ƒstateMu.Unlock()
+				ƒattempted[{{ $i }}] = ƒheld
+			},
 		}
 		ƒshare({{ $i }}, ƒsetup.Timeout)
 		ƒlife.SetupBegins({{ $i }}, ƒsetup)
@@ -250,39 +297,59 @@ func main() {
 
 {{- /*
   One teardown body per fixture, shared by the TeardownKeys verb and the
-  epilogue: whichever fires first wins, the other finds ƒtorn set and skips —
-  the terminal teardown owns exactly the remainder. A fixture whose BeforeAll
-  never ran — never started, a config error, a dependency that failed — has
-  nothing to release; one whose BeforeAll ran is released however it came out,
-  since a failed attempt may hold what it reached. Panics are contained and a
-  declared Timeout is a verdict — the same policy the in-process DAG runs
-  under.
+  epilogue: it runs once, whoever reaches it first, and a later caller gets
+  its outcome — the terminal teardown owns exactly the remainder. Teardowns
+  run concurrently, each once every dependent holding resources has been
+  released, or is being; a dependent whose BeforeAll never ran counts as
+  released. A
+  fixture whose BeforeAll never ran — never started, a config error, a
+  dependency that failed — has nothing to release; one whose BeforeAll ran is
+  released however it came out, since a failed attempt may hold what it
+  reached. Panics are contained and a declared Timeout is a verdict — the same
+  policy the in-process DAG runs under.
 */}}
 {{ range $f := .Fixtures }}
-	ƒteardown_{{ $f.VarName }} := func() bool {
-		if ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}] {
-			ƒtorn[{{ $f.Index }}] = true
-			ƒlife.Released({{ $f.Index }})
-			return false
-		}
-		ƒtorn[{{ $f.Index }}] = true
-		defer ƒlife.Released({{ $f.Index }})
-		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
-			Name:     "{{ $f.Identifier }}",
-			Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
-			Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
-{{- if $f.HasAfterAll }}
-			AfterAll: {{ $f.VarName }}.AfterAll,
+	ƒtornDone_{{ $f.VarName }} := make(chan struct{})
+	var ƒtornOnce_{{ $f.VarName }} sync.Once
+	var ƒtornFailed_{{ $f.VarName }} bool
 {{- end }}
+{{ range $f := .Fixtures }}
+	ƒteardown_{{ $f.VarName }} := func() bool {
+		ƒtornOnce_{{ $f.VarName }}.Do(func() {
+			defer close(ƒtornDone_{{ $f.VarName }})
+{{- range $d := $f.Dependents }}
+			ƒstateMu.Lock()
+			ƒheld_{{ $d.Var }} := ƒattempted[{{ $d.Index }}] || ƒtorn[{{ $d.Index }}]
+			ƒstateMu.Unlock()
+			if ƒheld_{{ $d.Var }} {
+				<-ƒtornDone_{{ $d.Var }}
+			}
+{{- end }}
+			ƒstateMu.Lock()
+			ƒskip := ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}]
+			ƒtorn[{{ $f.Index }}] = true
+			ƒstateMu.Unlock()
+			defer ƒlife.Released({{ $f.Index }})
+			defer ƒunshare({{ $f.Index }})
+			if ƒskip {
+				return
+			}
+			ƒtornFailed_{{ $f.VarName }} = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+				Name:     "{{ $f.Identifier }}",
+				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
+				Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
+{{- if $f.HasAfterAll }}
+				AfterAll: {{ $f.VarName }}.AfterAll,
+{{- end }}
+			})
 		})
+		return ƒtornFailed_{{ $f.VarName }}
 	}
 {{ end }}
 
 {{- /*
   Up-front phase: every non-deferred fixture, concurrently, gated by the
-  dependency channels. Deferred fixtures wait for their StartKeys window —
-  their dependencies are non-deferred or ordered earlier in the same command,
-  so their channel waits can never deadlock.
+  dependency channels. Deferred fixtures wait for their StartKeys window.
 */}}
 	var ƒwg sync.WaitGroup
 {{ range $f := .Fixtures }}
@@ -322,9 +389,9 @@ func main() {
   Window commands until shutdown. The runner owns shutdown TIMING — only it
   knows when every suite has stopped using the fixtures — so even a failed
   setup reports and then serves commands until the signal instead of tearing
-  down on its own; this process owns shutdown EXECUTION. StartKeys runs in
-  DAG order and TeardownKeys in reverse-DAG order because the fixture lists
-  below are generated in topological order. Each command is acknowledged on
+  down on its own; this process owns shutdown EXECUTION. StartKeys and
+  TeardownKeys run their fixtures concurrently, a start after its
+  dependencies and a release after its dependents. Each command is acknowledged on
   the protocol stream with a _cmd line carrying the joined per-fixture
   failures and the teardown budget, which now covers what the command brought
   up. A SIGTERM that already arrived (canceling setup above) has ƒctx closed
@@ -340,23 +407,76 @@ func main() {
 			break ƒloop
 		case ƒc := <-ƒcmds:
 			var ƒcmdErrs []string
-			switch ƒc.Verb {
-			case "start":
-{{- range $f := .Fixtures }}
-				if ƒhasKey(ƒc.Keys, "{{ $f.StateKey }}") {
-					ƒsetup_{{ $f.VarName }}()
-					if ƒerrs[{{ $f.Index }}] != nil {
-						ƒcmdErrs = append(ƒcmdErrs, "{{ $f.Identifier }}: "+ƒerrs[{{ $f.Index }}].Error())
+			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+{{- /*
+  A command that could only hang is refused whole, before anything starts or
+  is released: a start waiting for a dependency that is neither up nor started
+  with it, or a release waiting for a dependent that is up and not released
+  with it.
+*/}}
+{{- /* ƒreleases: the keys this command releases; one released earlier reports nothing again. */}}
+			ƒreleases := make([]bool, len(ƒkeys))
+			ƒstateMu.Lock()
+			for ƒi := range ƒkeys {
+				if !ƒrequested(ƒi) {
+					continue
+				}
+				ƒreleases[ƒi] = !ƒtorn[ƒi]
+				switch ƒc.Verb {
+				case "start":
+					for _, ƒd := range ƒdependencies[ƒi] {
+						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+						}
+					}
+				case "teardown":
+					for _, ƒd := range ƒdependents[ƒi] {
+						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+						}
 					}
 				}
+			}
+			ƒstateMu.Unlock()
+			switch {
+			case len(ƒcmdErrs) > 0:
+			case ƒc.Verb == "start":
+{{- /*
+  Every requested fixture starts on a goroutine of its own, as in the up-front
+  phase: the dependency channels order them, whatever order the keys came in.
+*/}}
+				var ƒstarting sync.WaitGroup
+{{- range $f := .Fixtures }}
+				if ƒhasKey(ƒc.Keys, "{{ $f.StateKey }}") {
+					ƒstarting.Add(1)
+					go func() {
+						defer ƒstarting.Done()
+						ƒsetup_{{ $f.VarName }}()
+					}()
+				}
 {{- end }}
-			case "teardown":
+				ƒstarting.Wait()
+{{- range $f := .Fixtures }}
+				if ƒhasKey(ƒc.Keys, "{{ $f.StateKey }}") && ƒerrs[{{ $f.Index }}] != nil {
+					ƒcmdErrs = append(ƒcmdErrs, "{{ $f.Identifier }}: "+ƒerrs[{{ $f.Index }}].Error())
+				}
+{{- end }}
+			case ƒc.Verb == "teardown":
+				var ƒreleasing sync.WaitGroup
 {{- range .TeardownFixtures }}
 				if ƒhasKey(ƒc.Keys, "{{ .StateKey }}") {
-					if ƒteardown_{{ .VarName }}() {
-						ƒteardownFailed = true
-						ƒcmdErrs = append(ƒcmdErrs, "{{ .Identifier }}: teardown failed")
-					}
+					ƒreleasing.Add(1)
+					go func() {
+						defer ƒreleasing.Done()
+						ƒteardown_{{ .VarName }}()
+					}()
+				}
+{{- end }}
+				ƒreleasing.Wait()
+{{- range .TeardownFixtures }}
+				if ƒreleases[{{ .Index }}] && ƒteardown_{{ .VarName }}() {
+					ƒteardownFailed = true
+					ƒcmdErrs = append(ƒcmdErrs, "{{ .Identifier }}: teardown failed")
 				}
 {{- end }}
 			default:
@@ -367,10 +487,19 @@ func main() {
 	}
 
 {{- /*
-  Terminal teardown: everything still resident, in reverse-DAG order. Keys an
-  earlier TeardownKeys already released are skipped via ƒtorn — one owner per
-  fixture teardown, always.
+  Terminal teardown: everything still resident, concurrently, each after its
+  dependents. Keys an earlier TeardownKeys already released return its
+  outcome without running again — one owner per fixture teardown, always.
 */}}
+	var ƒreleasing sync.WaitGroup
+{{ range .TeardownFixtures }}
+	ƒreleasing.Add(1)
+	go func() {
+		defer ƒreleasing.Done()
+		ƒteardown_{{ .VarName }}()
+	}()
+{{- end }}
+	ƒreleasing.Wait()
 {{ range .TeardownFixtures }}
 	if ƒteardown_{{ .VarName }}() {
 		ƒteardownFailed = true

@@ -3,13 +3,13 @@ Judge: ./tests/canary CanaryTestSuite/TestAFailedSharedSetupIsReleased
 Clause: when a shared fixture's setup fails on its last attempt → runs AfterAll after each of its 2 attempts, releasing what each reached before the next
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -267,6 +267,9 @@
- 		}
- 		ƒtorn[{{ $f.Index }}] = true
- 		defer ƒlife.Released({{ $f.Index }})
-+		if ƒerrs[{{ $f.Index }}] != nil {
-+			return false
-+		}
- 		return gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
- 			Name:     "{{ $f.Identifier }}",
- 			Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
+@@ -334,6 +334,9 @@ func main() {
+ 			if ƒskip {
+ 				return
+ 			}
++			if ƒerrs[{{ $f.Index }}] != nil {
++				return
++			}
+ 			ƒtornFailed_{{ $f.VarName }} = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+ 				Name:     "{{ $f.Identifier }}",
+ 				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,

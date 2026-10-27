@@ -231,3 +231,9 @@ defaultdeadline fail TestBudgetedTestSuite/TestWaitsOnItsContext
 defaultdeadline pass TestWaitingTestSuite
 defaultdeadline pass TestWaitingTestSuite/TestEndsAtOnce
 defaultdeadline pass TestWaitingTestSuite/TestWaitsOnItsContext
+dagrelease exit 0
+dagrelease pass -
+dagrelease pass TestBulkTestSuite
+dagrelease pass TestBulkTestSuite/TestOne
+dagrelease pass TestTailTestSuite
+dagrelease pass TestTailTestSuite/TestReadsThem
