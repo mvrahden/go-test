@@ -7,10 +7,24 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// CanaryBudgetsTestSuite runs the fixtures whose verdicts are budgets and
+// deadlines: teardown budgets, the setup wait, the default deadline.
+// Sequential: each method spawns a full pipeline run whose verdict reads the clock.
+type CanaryBudgetsTestSuite struct{ canary }
+
+func (s *CanaryBudgetsTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// Slowest method ~33s locally, ~50s estimated for Windows CI, setup ~13s; budgets are twice that, rounded up.
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
+}
+
+func (s *CanaryBudgetsTestSuite) BeforeAll(t *gotest.T) { s.open(t) }
+
+func (s *CanaryBudgetsTestSuite) AfterAll(t *gotest.T) {}
+
 // A shared fixture started for the exclusive tail is released under the
 // teardown budget its declared 2s Timeout gives: its AfterAll, which never
 // returns, is force-killed once 32s have passed, not the default's 2m30s.
-func (s *CanaryTestSuite) TestALateFixtureIsReleasedUnderItsDeclaredBudget(t *gotest.T) {
+func (s *CanaryBudgetsTestSuite) TestALateFixtureIsReleasedUnderItsDeclaredBudget(t *gotest.T) {
 	// Built first, in the same canary dir, so the clock reads the release.
 	dir := t.TempDir()
 	if r := s.runWith(t, "latebudget", dir, nil, "-run=^$"); r.code != 0 {
@@ -28,14 +42,14 @@ func (s *CanaryTestSuite) TestALateFixtureIsReleasedUnderItsDeclaredBudget(t *go
 
 // A shared fixture whose attempts and the release between them each take 1.6s
 // of its 2s Timeout is waited for: the budget counts the release.
-func (s *CanaryTestSuite) TestTheSetupWaitCountsTheReleaseBetweenAttempts(t *gotest.T) {
+func (s *CanaryBudgetsTestSuite) TestTheSetupWaitCountsTheReleaseBetweenAttempts(t *gotest.T) {
 	s.check(t, "slowretry")
 }
 
 // A context the default deadline ended in a suite that declares no Timeout
 // is named once, with its method, and the method still passes; a method
 // past a declared Timeout fails by it and gets no such line.
-func (s *CanaryTestSuite) TestAContextTheDefaultDeadlineEndedIsNamed(t *gotest.T) {
+func (s *CanaryBudgetsTestSuite) TestAContextTheDefaultDeadlineEndedIsNamed(t *gotest.T) {
 	r := s.check(t, "defaultdeadline")
 	const line = "t.Context() ended at the default 30s deadline; the suite declares no Timeout"
 	waiting := streamOutput(r.stream, "TestWaitingTestSuite/TestWaitsOnItsContext")

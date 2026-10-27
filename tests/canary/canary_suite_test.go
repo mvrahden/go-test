@@ -25,16 +25,13 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// CanaryTestSuite runs one fixture package per method.
-// Sequential: it builds the CLI once and each method spawns a full pipeline run.
-type CanaryTestSuite struct {
+// canary is what every canary suite holds: the CLI it built and the golden
+// list. The canary is split into suites only so that the runner runs them
+// side by side, each in its own process; none runs its methods in parallel,
+// so the canary does not rest on the parallel machinery it guards.
+type canary struct {
 	binary   string
 	expected map[string]expectation
-}
-
-func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~50s, setup ~13s; budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
 }
 
 type expectation struct {
@@ -47,7 +44,8 @@ func fatalf(t *gotest.T, format string, args ...any) {
 	t.FailNow()
 }
 
-func (s *CanaryTestSuite) BeforeAll(t *gotest.T) {
+// open builds the CLI and reads the golden list; each suite's BeforeAll.
+func (s *canary) open(t *gotest.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		fatalf(t, "abs: %v", err)
@@ -60,6 +58,18 @@ func (s *CanaryTestSuite) BeforeAll(t *gotest.T) {
 	testkit.ScrubActionsEnv()
 	s.expected = readExpected(t, filepath.Join("testdata", "expected.txt"))
 }
+
+// CanaryTestSuite runs one fixture package per method: verdicts, assertions,
+// fixtures, goroutines, FailFast and benchmarks.
+// Sequential: it builds the CLI once and each method spawns a full pipeline run.
+type CanaryTestSuite struct{ canary }
+
+func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// Slowest method ~8s locally, setup ~13s on Windows CI; budgets are twice the Windows estimate, rounded up.
+	return gotest.SuiteConfig{Timeout: time.Minute, SetupTimeout: 30 * time.Second}
+}
+
+func (s *CanaryTestSuite) BeforeAll(t *gotest.T) { s.open(t) }
 
 func (s *CanaryTestSuite) AfterAll(t *gotest.T) {}
 
@@ -113,19 +123,19 @@ type event struct {
 }
 
 // run executes the CLI in -json mode over one fixture package.
-func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) result {
+func (s *canary) run(t *gotest.T, pkg, canaryDir string) result {
 	return s.runWith(t, pkg, canaryDir, nil)
 }
 
 // runWith is run with env on top of the child's environment and flags
 // before the package.
-func (s *CanaryTestSuite) runWith(t *gotest.T, pkg, canaryDir string, env []string, flags ...string) result {
+func (s *canary) runWith(t *gotest.T, pkg, canaryDir string, env []string, flags ...string) result {
 	return s.runIn(t, "", "./testdata/"+pkg+"/", pkg, canaryDir, env, flags...)
 }
 
 // runIn is runWith over the package at path, run from dir ("" for this
 // one); its rows are named pkg.
-func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []string, flags ...string) result {
+func (s *canary) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []string, flags ...string) result {
 	args := append(append([]string{"-json"}, flags...), path)
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
@@ -213,12 +223,12 @@ var hostOnlyEnv = []string{"CI", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"}
 
 // check runs a fixture, with flags before the package, and compares exit
 // code and rows with the golden.
-func (s *CanaryTestSuite) check(t *gotest.T, pkg string, flags ...string) result {
+func (s *canary) check(t *gotest.T, pkg string, flags ...string) result {
 	return s.checkIn(t, pkg, t.TempDir(), flags...)
 }
 
 // checkIn is check with dir as the canary dir.
-func (s *CanaryTestSuite) checkIn(t *gotest.T, pkg, dir string, flags ...string) result {
+func (s *canary) checkIn(t *gotest.T, pkg, dir string, flags ...string) result {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)
@@ -1036,7 +1046,7 @@ func (s *CanaryTestSuite) TestAFailedHydrateIsDehydrated(t *gotest.T) {
 
 // interruptAt runs pkg, interrupts the run once marker is stamped and returns
 // the markers and output the run left.
-func (s *CanaryTestSuite) interruptAt(t *gotest.T, pkg, marker string) ([]string, string) {
+func (s *canary) interruptAt(t *gotest.T, pkg, marker string) ([]string, string) {
 	dir := t.TempDir()
 	cmd := exec.Command(s.binary, "-json", "./testdata/"+pkg+"/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(dir)
@@ -1227,7 +1237,7 @@ type benchReport struct {
 
 // bench runs a capturing bench run over one fixture package and returns its
 // exit code and the benchmark names the report carries a sample for.
-func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
+func (s *canary) bench(t *gotest.T, pkg, canaryDir string) (int, []string) {
 	code, report := s.benchReport(t, pkg, canaryDir)
 	names := make([]string, 0, len(report.Baseline.Results))
 	for _, r := range report.Baseline.Results {
@@ -1239,7 +1249,7 @@ func (s *CanaryTestSuite) bench(t *gotest.T, pkg, canaryDir string) (int, []stri
 
 // benchReport runs a capturing bench run over one fixture package with extra
 // gotest flags and returns its exit code, the parsed report and stderr.
-func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra ...string) (int, benchReport) {
+func (s *canary) benchReport(t *gotest.T, pkg, canaryDir string, extra ...string) (int, benchReport) {
 	code, stdout, stderr := s.benchRaw(t, pkg, canaryDir, extra...)
 	var report benchReport
 	if err := json.Unmarshal(stdout, &report); err != nil {
@@ -1250,7 +1260,7 @@ func (s *CanaryTestSuite) benchReport(t *gotest.T, pkg, canaryDir string, extra 
 
 // benchRaw runs bench --json over one fixture package and returns the exit
 // code and both streams as they were.
-func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
+func (s *canary) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...string) (int, []byte, []byte) {
 	args := append([]string{"bench", "--json"}, extra...)
 	args = append(args, "./testdata/"+pkg+"/", "-benchtime=1x")
 	return s.invoke(t, canaryDir, args...)
@@ -1258,7 +1268,7 @@ func (s *CanaryTestSuite) benchRaw(t *gotest.T, pkg, canaryDir string, extra ...
 
 // invoke runs the CLI with the arguments as given and returns the exit code
 // and both streams as they were.
-func (s *CanaryTestSuite) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
+func (s *canary) invoke(t *gotest.T, canaryDir string, args ...string) (int, []byte, []byte) {
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(canaryDir)
 	var stdout, stderr bytes.Buffer

@@ -17,7 +17,7 @@ import (
 
 // A process a test started and never waited for does not outlive the run:
 // the suite's whole process group ends with it.
-func (s *CanaryTestSuite) TestNothingOutlivesTheRun(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestNothingOutlivesTheRun(t *gotest.T) {
 	dir := t.TempDir()
 	r := s.run(t, "orphan", dir)
 	if !slices.Contains(r.rows, "orphan pass TestOrphanTestSuite/TestLeavesAProcess") {

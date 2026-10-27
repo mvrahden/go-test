@@ -15,6 +15,20 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// CanaryLifecycleTestSuite stops runs from outside and checks what the
+// suites, fixtures and processes do: skips, grace, release, self-stop.
+// Sequential: each method signals or kills a full pipeline run it started.
+type CanaryLifecycleTestSuite struct{ canary }
+
+func (s *CanaryLifecycleTestSuite) SuiteConfig() gotest.SuiteConfig {
+	// Slowest method ~27s locally, ~40s estimated for Windows CI, setup ~13s; budgets are about twice that.
+	return gotest.SuiteConfig{Timeout: 90 * time.Second, SetupTimeout: 30 * time.Second}
+}
+
+func (s *CanaryLifecycleTestSuite) BeforeAll(t *gotest.T) { s.open(t) }
+
+func (s *CanaryLifecycleTestSuite) AfterAll(t *gotest.T) {}
+
 // liveRun is a CLI run the canary stops from outside.
 type liveRun struct {
 	cmd            *exec.Cmd
@@ -26,7 +40,7 @@ type liveRun struct {
 
 // startRun starts the CLI over args with the marker dir and extra env, as the
 // root of its own process tree.
-func (s *CanaryTestSuite) startRun(t *gotest.T, dir string, env []string, args ...string) *liveRun {
+func (s *canary) startRun(t *gotest.T, dir string, env []string, args ...string) *liveRun {
 	r := &liveRun{markers: filepath.Join(dir, testkit.MarkersFile), exited: make(chan struct{})}
 	r.cmd = exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	r.cmd.Env = childEnv(dir, env...)
@@ -88,13 +102,13 @@ func (r *liveRun) end(within time.Duration) (code int, markers []string) {
 // once, one that outlives the stop by 40s then. The time is taken before the
 // signal is sent: on Windows the interrupt returns only once its helper
 // process has exited, well after the run saw the stop.
-func (s *CanaryTestSuite) interrupted(t *gotest.T, pkg string, env []string, args ...string) (took time.Duration, code int, out string, markers []string) {
+func (s *canary) interrupted(t *gotest.T, pkg string, env []string, args ...string) (took time.Duration, code int, out string, markers []string) {
 	return s.interruptedRun(t, pkg, env, append(append([]string{"-json"}, args...), "./testdata/"+pkg+"/"), nil)
 }
 
 // interruptedRun is interrupted over the CLI's whole argument list; then,
 // when not nil, runs on the live run right after the interrupt.
-func (s *CanaryTestSuite) interruptedRun(t *gotest.T, label string, env, args []string, then func(*liveRun)) (took time.Duration, code int, out string, markers []string) {
+func (s *canary) interruptedRun(t *gotest.T, label string, env, args []string, then func(*liveRun)) (took time.Duration, code int, out string, markers []string) {
 	r := s.startRun(t, t.TempDir(), env, args...)
 	if !r.await(90*time.Second, "running") {
 		_, _ = r.end(0)
@@ -133,7 +147,7 @@ func streamVerdict(stream, path string) string {
 // runs before the fixture is released, and the CLI exits 130. Ring 0: the
 // conformance suite that states the same cannot judge its own assertion
 // engine.
-func (s *CanaryTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
 	_, code, out, markers := s.interrupted(t, "stopping", nil)
 	if code != 130 {
 		t.Errorf("stop: exit code %d, want 130\n%s", code, out)
@@ -156,7 +170,7 @@ func (s *CanaryTestSuite) TestAStopSkipsTheMethodsNotStarted(t *gotest.T) {
 
 // A stopped run cuts a body that ignores its context short after 5s, saying
 // so, and releases the fixture without running AfterAll.
-func (s *CanaryTestSuite) TestABodyIgnoringItsContextIsCutShort(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestABodyIgnoringItsContextIsCutShort(t *gotest.T) {
 	took, _, out, markers := s.interrupted(t, "stopgrace", []string{"STOPGRACE_IGNORE=1"}, "-run=TestGraceTestSuite")
 	if !strings.Contains(out, "a method did not return within 5s of its context ending; it is cut short") || took < 5*time.Second || took > 20*time.Second {
 		t.Errorf("stopgrace: the body was not cut short after 5s, saying so (the run ended %s after the stop):\n%s", took, out)
@@ -168,7 +182,7 @@ func (s *CanaryTestSuite) TestABodyIgnoringItsContextIsCutShort(t *gotest.T) {
 
 // The 5s grace bounds only the body: an AfterEach that takes longer runs to
 // its end, then AfterAll, then the fixture is released.
-func (s *CanaryTestSuite) TestASlowAfterEachRunsToItsEndAfterAStop(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestASlowAfterEachRunsToItsEndAfterAStop(t *gotest.T) {
 	_, _, out, markers := s.interrupted(t, "stopgrace", []string{"STOPGRACE_SLOW_AFTEREACH=1"}, "-run=TestGraceTestSuite")
 	if !testkit.MarkerOrderOf(markers, "context ended", "AfterEach began", "AfterEach ended", "suite.AfterAll", "fixture.AfterAll") || strings.Contains(out, "cut short") {
 		t.Errorf("stopgrace: markers %v, want AfterEach to its end, then AfterAll, then the fixture released\n%s", markers, out)
@@ -177,7 +191,7 @@ func (s *CanaryTestSuite) TestASlowAfterEachRunsToItsEndAfterAStop(t *gotest.T) 
 
 // A stopped run cuts a BeforeAll that ignores its context short after 5s,
 // saying so, and releases the fixture without running AfterAll.
-func (s *CanaryTestSuite) TestABeforeAllIgnoringItsContextIsCutShort(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestABeforeAllIgnoringItsContextIsCutShort(t *gotest.T) {
 	took, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestSetupHangTestSuite")
 	if !strings.Contains(out, "BeforeAll did not return within 5s of its context ending; it is cut short") || took < 5*time.Second || took > 20*time.Second {
 		t.Errorf("stopgrace: BeforeAll was not cut short after 5s, saying so (the run ended %s after the stop):\n%s", took, out)
@@ -189,7 +203,7 @@ func (s *CanaryTestSuite) TestABeforeAllIgnoringItsContextIsCutShort(t *gotest.T
 
 // A body that starts after the stop, its BeforeEach having outlasted it, gets
 // the grace from its own start: it is cut short 5s later, saying so.
-func (s *CanaryTestSuite) TestABodyStartingAfterTheStopIsCutShort(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestABodyStartingAfterTheStopIsCutShort(t *gotest.T) {
 	took, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestLateBodyTestSuite")
 	if !strings.Contains(out, "a method did not return within 5s of its context ending; it is cut short") || took < 5*time.Second || took > 20*time.Second {
 		t.Errorf("stopgrace: the late body was not cut short 5s after it began, saying so (the run ended %s after the stop):\n%s", took, out)
@@ -201,7 +215,7 @@ func (s *CanaryTestSuite) TestABodyStartingAfterTheStopIsCutShort(t *gotest.T) {
 
 // An AfterEach that waits on its context is not ended by the stop: it runs
 // to its end, then AfterAll, then the fixture is released.
-func (s *CanaryTestSuite) TestAContextAwareAfterEachRunsToItsEndAfterAStop(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestAContextAwareAfterEachRunsToItsEndAfterAStop(t *gotest.T) {
 	_, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestCleanupTestSuite")
 	if !testkit.MarkerOrderOf(markers, "AfterEach ran to its end", "suite.AfterAll", "fixture.AfterAll") || slices.Contains(markers, "AfterEach context ended") {
 		t.Errorf("stopgrace: markers %v, want AfterEach to its end under a context the stop left alone, then AfterAll, then the release\n%s", markers, out)
@@ -211,7 +225,7 @@ func (s *CanaryTestSuite) TestAContextAwareAfterEachRunsToItsEndAfterAStop(t *go
 // A run still going when only the fixtures' teardown time is left of its
 // release bound is forced, and the forced release still gets that time: the
 // fixture's slow AfterAll runs to its end before the process ends.
-func (s *CanaryTestSuite) TestAForcedStopLeavesTheReleaseItsTime(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestAForcedStopLeavesTheReleaseItsTime(t *gotest.T) {
 	_, _, out, markers := s.interrupted(t, "stopgrace", nil, "-run=TestStuckCleanupTestSuite")
 	if !strings.Contains(out, "the run did not stop within its budget") || !testkit.MarkerOrderOf(markers, "release began", "release ended") {
 		t.Errorf("stopgrace: markers %v, want the forced release to run to its end\n%s", markers, out)
@@ -221,7 +235,7 @@ func (s *CanaryTestSuite) TestAForcedStopLeavesTheReleaseItsTime(t *gotest.T) {
 // A stop leaves the running benchmark to finish, skips the benchmarks not
 // started with the reason run stopping, then runs AfterAll before the
 // fixture is released.
-func (s *CanaryTestSuite) TestAStopSkipsTheBenchmarksNotStarted(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestAStopSkipsTheBenchmarksNotStarted(t *gotest.T) {
 	_, _, out, markers := s.interruptedRun(t, "stopbench", nil, []string{"bench", "./testdata/stopbench/", "-args", "-test.benchtime=1x"}, nil)
 	if !testkit.MarkerOrderOf(markers, "first returned", "suite.AfterAll", "fixture.AfterAll") || slices.Contains(markers, "second ran") || !strings.Contains(out, "run stopping") {
 		t.Errorf("stopbench: markers %v, want the second benchmark skipped as run stopping, then AfterAll, then the release\n%s", markers, out)
@@ -230,7 +244,7 @@ func (s *CanaryTestSuite) TestAStopSkipsTheBenchmarksNotStarted(t *gotest.T) {
 
 // A benchmark that ignores the stop is cut short 5s after it, saying so, and
 // the fixture is released.
-func (s *CanaryTestSuite) TestABenchmarkIgnoringTheStopIsCutShort(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestABenchmarkIgnoringTheStopIsCutShort(t *gotest.T) {
 	took, _, out, markers := s.interruptedRun(t, "stopbench", []string{"STOPBENCH_IGNORE=1"}, []string{"bench", "./testdata/stopbench/", "-args", "-test.benchtime=1x"}, nil)
 	if !strings.Contains(out, "a benchmark did not return within 5s of its context ending; it is cut short") || took < 5*time.Second || took > 20*time.Second {
 		t.Errorf("stopbench: the benchmark was not cut short after 5s, saying so (the run ended %s after the stop):\n%s", took, out)
@@ -243,7 +257,7 @@ func (s *CanaryTestSuite) TestABenchmarkIgnoringTheStopIsCutShort(t *gotest.T) {
 // A stop leaves the running fuzz seed to finish, skips the seeds not started
 // with the reason run stopping, then runs AfterAll before the fixture is
 // released.
-func (s *CanaryTestSuite) TestAStopSkipsTheSeedsNotStarted(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestAStopSkipsTheSeedsNotStarted(t *gotest.T) {
 	_, _, out, markers := s.interrupted(t, "stopbench", nil)
 	if !testkit.MarkerOrderOf(markers, "first seed returned", "suite.AfterAll", "fixture.AfterAll") || slices.Contains(markers, "second seed ran") || !strings.Contains(streamOutput(out, "FuzzSeedStopTestSuite_FuzzSeeds/seed#1"), "run stopping") {
 		t.Errorf("stopbench: markers %v, want the second seed skipped as run stopping, then AfterAll, then the release\n%s", markers, out)
@@ -253,7 +267,7 @@ func (s *CanaryTestSuite) TestAStopSkipsTheSeedsNotStarted(t *gotest.T) {
 // A second stop signal while a body ignores the first skips the rest of the
 // grace: the fixtures are released at once and the process ends by the
 // signal.
-func (s *CanaryTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest.T) {
 	if !suiteSignallable {
 		t.Skipf("only Unix signals a single process")
 	}
@@ -298,7 +312,7 @@ exit $status
 // the stream and runs AfterAll before the fixture is released. A run still
 // going 15s after the stop is killed: the holding method's context would
 // otherwise end it as if stopped.
-func (s *CanaryTestSuite) TestOnlyTheStopFileStopsTheSuite(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestOnlyTheStopFileStopsTheSuite(t *gotest.T) {
 	wrap, held := stopFileWrapper(t)
 	r := s.startRun(t, t.TempDir(), nil, append(append([]string{"-json"}, wrap...), "./testdata/stopping/")...)
 	if !r.await(90*time.Second, held...) {

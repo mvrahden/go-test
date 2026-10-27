@@ -21,7 +21,7 @@ import (
 // descriptor nor the variable naming it, and the run does not wait for it.
 // Timed from the started process's first write, so the builds before it are
 // not counted.
-func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) {
+func (s *CanaryDagTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) {
 	r := s.check(t, "detachedchild")
 	dir := r.dir
 	ended := time.Now()
@@ -46,7 +46,7 @@ func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) 
 
 // The CLI killed while a shared fixture is up: the fixture process releases
 // it, its AfterAll running to its end, then exits.
-func (s *CanaryTestSuite) TestAKilledCLIsFixtureStillReleases(t *gotest.T) {
+func (s *CanaryDagTestSuite) TestAKilledCLIsFixtureStillReleases(t *gotest.T) {
 	dir := t.TempDir()
 	cmd := exec.Command(s.binary, "-json", "./testdata/killedcli/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(dir)
