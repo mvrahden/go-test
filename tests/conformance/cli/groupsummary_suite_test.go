@@ -2,6 +2,8 @@ package cli_test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,8 +16,8 @@ import (
 type CLIGroupSummaryTestSuite struct{}
 
 func (s *CLIGroupSummaryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Two runs of about 3s plus their build, twice that cold under -race.
-	return gotest.SuiteConfig{Timeout: time.Minute}
+	// Four runs of about 3s plus their build, twice that cold under -race.
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute}
 }
 
 func (s *CLIGroupSummaryTestSuite) TestTheSummaryNamesEachGroup(t *gotest.T) {
@@ -23,12 +25,26 @@ func (s *CLIGroupSummaryTestSuite) TestTheSummaryNamesEachGroup(t *gotest.T) {
 	gotest.NoError(t, err)
 	doc, err := testkit.RunCLI(t.Context(), ".", "summary", "--format=json", "../testdata/groups/")
 	gotest.NoError(t, err)
+	md, err := testkit.RunCLI(t.Context(), ".", "summary", "--format=md", "../testdata/groups/")
+	gotest.NoError(t, err)
+	stepFile := filepath.Join(t.TempDir(), "step-summary.md")
+	step, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{"GITHUB_STEP_SUMMARY=" + stepFile}, "summary", "--github", "../testdata/groups/")
+	gotest.NoError(t, err)
+	stepSummary, _ := os.ReadFile(stepFile)
 	t.When("gotest summary runs suites of named groups", func(w *gotest.T) {
 		w.It("prints one line per named group with its suites and wall time", func(it *gotest.T) {
 			gotest.Equal(it, 0, text.Exit, "stdout: %s\nstderr: %s", text.Stdout, text.Stderr)
 			gotest.Regexp(it, `(?m)^group e2e: 3 suites, [0-9.]+m?s, run apart$`, text.Stdout)
 			gotest.Regexp(it, `(?m)^group load: 1 suite, [0-9.]+m?s, run apart$`, text.Stdout)
 			gotest.Equal(it, 2, strings.Count(text.Stdout, "run apart"), "stdout: %s", text.Stdout)
+		})
+		w.It("prints the same lines in the Markdown summary and the GitHub step summary", func(it *gotest.T) {
+			gotest.Equal(it, 0, md.Exit, "stdout: %s\nstderr: %s", md.Stdout, md.Stderr)
+			gotest.Equal(it, 0, step.Exit, "stdout: %s\nstderr: %s", step.Stdout, step.Stderr)
+			for _, doc := range []string{md.Stdout, string(stepSummary)} {
+				gotest.Regexp(it, `(?m)^- group e2e: 3 suites, [0-9.]+m?s, run apart$`, doc)
+				gotest.Regexp(it, `(?m)^- group load: 1 suite, [0-9.]+m?s, run apart$`, doc)
+			}
 		})
 		w.It("puts a groups entry with each group's suites and wall time in the JSON summary", func(it *gotest.T) {
 			gotest.Equal(it, 0, doc.Exit, "stdout: %s\nstderr: %s", doc.Stdout, doc.Stderr)

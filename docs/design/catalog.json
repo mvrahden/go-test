@@ -4095,6 +4095,19 @@
                     },
                     {
                       "children": [],
+                      "display": "prints the same lines in the Markdown summary and the GitHub step summary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "prints_the_same_lines_in_the_Markdown_summary_and_the_GitHub_step_summary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
                       "display": "puts a groups entry with each group's suites and wall time in the JSON summary",
                       "duration": 0,
                       "excluded": false,
@@ -11596,7 +11609,7 @@
     }
   ],
   "stats": {
-    "behaviors": 378,
+    "behaviors": 379,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
