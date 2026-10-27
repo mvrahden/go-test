@@ -3,11 +3,11 @@ Clause: when a shared fixture started for the exclusive tail hangs past its decl
 Clause: when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given → ends the run within 60s
 --- a/internal/gotestrunner/sharedfixture.go
 +++ b/internal/gotestrunner/sharedfixture.go
-@@ -527,7 +527,6 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
- 			p.gaveUp(verb, keys)
- 			return fmt.Errorf("shared fixture %s cancelled: %w", verb, ctx.Err())
- 		case <-clock.C:
--			p.gaveUp(verb, keys)
- 			return fmt.Errorf("shared fixture %s timed out after %v", verb, clock.expired().After)
- 		case <-p.budgetSeen:
- 			clock.follow()
+@@ -489,7 +489,6 @@
+ 		return ack, true
+ 	default:
+ 	}
+-	p.gaveUp(verb, keys)
+ 	if verb == "teardown" {
+ 		if p.overdue == nil {
+ 			p.overdue = map[uint64]overdueRelease{}

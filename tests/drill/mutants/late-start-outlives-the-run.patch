@@ -4,13 +4,15 @@ Clause: when the run's --timeout expires while a shared fixture started for the 
 Clause: when the run's --timeout expires while a shared fixture started for the exclusive tail hangs with no Timeout → leaves no fixture process behind
 --- a/internal/gotestrunner/sharedfixture.go
 +++ b/internal/gotestrunner/sharedfixture.go
-@@ -523,9 +523,6 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
- 			return nil
+@@ -610,11 +610,6 @@
+ 			return ackErr(verb, msg)
  		case <-p.done:
  			return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
 -		case <-ctx.Done():
+-			p.cmdMu.Lock()
 -			p.gaveUp(verb, keys)
+-			p.cmdMu.Unlock()
 -			return fmt.Errorf("shared fixture %s cancelled: %w", verb, ctx.Err())
  		case <-clock.C:
- 			p.gaveUp(verb, keys)
- 			return fmt.Errorf("shared fixture %s timed out after %v", verb, clock.expired().After)
+ 			after := clock.expired().After
+ 			if msg, acked := p.expire(id, resp, verb, keys, after); acked {
