@@ -59,7 +59,10 @@ func startSlowSetup(t *gotest.T, timeout, delay, flat time.Duration) (proc *gote
 }
 
 func (s *SharedFixtureSetupBudgetTestSuite) TestTheWaitIsTheDeclaredBudget(t *gotest.T) {
-	_, release, took, err := startSlowSetup(t, time.Second, 15*time.Second, 0)
+	// A setup that outlasts the 1s budget, short enough that the release
+	// waits it out instead of force-killing after 5s; a wait that ignored
+	// the budget would see it come up.
+	_, release, took, err := startSlowSetup(t, time.Second, 3*time.Second, 0)
 	defer release()
 	t.When("no --setup-timeout is given and a fixture outlives the Timeout it declared", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget as a setup timeout", func(it *gotest.T) {
