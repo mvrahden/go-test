@@ -8,6 +8,13 @@ fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
 
+The checks are split by theme into four suites: `CanaryTestSuite` (verdicts,
+assertions, fixtures, goroutines, benchmarks), `CanaryBudgetsTestSuite`,
+`CanaryDagTestSuite` and `CanaryLifecycleTestSuite` (stops and process
+lifetime). Each runs its methods one after another; the runner runs the four
+side by side, each in its own process. None is `Parallel`, so the canary
+does not rest on the in-suite parallelism it guards.
+
 ## Fixtures
 
 Each directory under `testdata/` is one package with one suite:

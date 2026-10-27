@@ -1,5 +1,5 @@
 Expect: stop: markers \[[^]]*\], want \[context ended \.\.\.\]: the holding method's context did not end
-Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheMethodsNotStarted
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestAStopSkipsTheMethodsNotStarted
 Clause: when the run is interrupted while a method holds → ends the holding method's context
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go

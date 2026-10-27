@@ -1,5 +1,5 @@
 Expect: dagrelease: a fixture started before its dependency was up
-Judge: ./tests/canary CanaryTestSuite/TestSharedFixturesStartAndReleaseInDependencyOrder
+Judge: ./tests/canary CanaryDagTestSuite/TestSharedFixturesStartAndReleaseInDependencyOrder
 Clause: when a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs → both come up, the dependency first, and the suite reading them passes
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl

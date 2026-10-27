@@ -1,5 +1,5 @@
 Expect: stopbench: markers .*, want the second seed skipped as run stopping
-Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheSeedsNotStarted
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestAStopSkipsTheSeedsNotStarted
 Clause: when the run is stopped while a fuzz seed replays → skips the seeds not started with the reason run stopping, then runs AfterAll before the fixture is released
 --- a/pkg/gotest/f.go
 +++ b/pkg/gotest/f.go

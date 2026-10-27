@@ -1,5 +1,5 @@
 Expect: defaultdeadline: the default deadline was named 2 times in the run, want once
-Judge: ./tests/canary CanaryTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
 Clause: when a suite declares a Timeout and its method waits on t.Context() past it → fails the method by the Timeout and prints no line about the default deadline
 --- a/pkg/gotestruntime/methodbudget.go
 +++ b/pkg/gotestruntime/methodbudget.go

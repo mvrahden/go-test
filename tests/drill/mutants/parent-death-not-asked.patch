@@ -1,7 +1,7 @@
 Expect: parentgone: the holding method.s context never ended
 Expect: parentgone: markers .*, want context ended, suite.AfterAll, fixture.AfterAll in order
 Expect: parentgone: the suite process [0-9]+ outlived the run
-Judge: ./tests/canary CanaryTestSuite/TestASuiteWhoseParentIsKilledStops
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteWhoseParentIsKilledStops
 Clause: when the parent of a suite process under the runner is killed while a method holds → ends the holding method's context
 Clause: when the parent of a suite process under the runner is killed while a method holds → runs AfterAll before the fixture is released
 Clause: when the parent of a suite process under the runner is killed while a method holds → leaves no suite process behind

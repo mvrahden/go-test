@@ -1173,8 +1173,10 @@ guard:
    fixtures torn down and shared fixtures failing to come up or to let go),
    and compares exit codes and the raw `-json`
    verdicts with a checked-in golden list (`testdata/expected.txt`), checking
-   with plain Go. The golden list is a third source of truth that shares no
-   code with discovery or generation. That closes the census's one blind
+   with plain Go. Its four suites each run their methods one after another
+   and run side by side only as separate processes, so the canary does not
+   rest on the in-suite parallelism it guards. The golden list is a third
+   source of truth that shares no code with discovery or generation. That closes the census's one blind
    spot: `discover` and the generator both read `gotestast`, so a bug that
    broke both identically would make the census agree on the wrong set; the
    golden list would still disagree.

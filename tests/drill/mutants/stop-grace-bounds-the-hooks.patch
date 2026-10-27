@@ -1,5 +1,5 @@
 Expect: stopgrace: markers .*, want AfterEach to its end, then AfterAll, then the fixture released
-Judge: ./tests/canary CanaryTestSuite/TestASlowAfterEachRunsToItsEndAfterAStop
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASlowAfterEachRunsToItsEndAfterAStop
 Clause: when the run is stopped and a method's AfterEach outlasts the 5s grace its body gets → runs AfterEach to its end, then AfterAll, then releases the fixture: the grace bounds only the body
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go
