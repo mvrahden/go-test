@@ -64,6 +64,8 @@ type ExecConfig struct {
 	Parallel        int
 	CompileParallel int
 	HarvestSeeds    bool
+	// Groups and SkipGroups are --group and --skip-group, each occurrence.
+	Groups, SkipGroups []string
 	// Events receives the run's go test -json event stream as it is
 	// written; nil without --events-file.
 	Events io.Writer
@@ -166,6 +168,18 @@ func SplitArgs(args []string, allowed map[string]bool) (own OwnFlags, goTestArgs
 				}
 				i++
 				own.set(name, args[i])
+			case ListFlag:
+				if !hasEquals {
+					if i+1 >= len(args) {
+						return OwnFlags{}, nil, fmt.Errorf("flag %s needs a value", name)
+					}
+					i++
+					value = args[i]
+				}
+				if value == "" {
+					return OwnFlags{}, nil, fmt.Errorf("flag %s needs a value", name)
+				}
+				own.add(name, value)
 			}
 			continue
 		}

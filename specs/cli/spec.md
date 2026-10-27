@@ -149,6 +149,21 @@ gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to
 - **WHEN** a suite's ExclusiveGroup is neither a string literal nor a string constant
 - **THEN** fails with exit 2, located at the value, naming the forms it accepts
 
+### Requirement: Selecting groups
+--group=<name> SHALL narrow a run to the suites of that ExclusiveGroup and --skip-group=<name> SHALL leave that group's suites out; both repeat. Shared fixtures SHALL follow the selection: one no selected suite reads never starts. A name no suite declares SHALL exit 2 before any build, naming the known groups.
+
+#### Scenario: Only one group
+- **WHEN** --group=e2e is given
+- **THEN** runs only the e2e group's suites and starts only their fixtures
+
+#### Scenario: All but one group
+- **WHEN** --skip-group=e2e is given
+- **THEN** runs every suite outside the e2e group and starts none of its fixtures
+
+#### Scenario: A group nobody declares
+- **WHEN** --group or --skip-group names a group no suite declares
+- **THEN** exits 2 before any build, naming the known groups
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

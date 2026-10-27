@@ -303,6 +303,8 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 		Parallel:        parallel,
 		CompileParallel: compileParallel,
 		HarvestSeeds:    !own.Bool("--no-harvest") && projCfg.Fuzz.HarvestSeeds(),
+		Groups:          own.Values("--group"),
+		SkipGroups:      own.Values("--skip-group"),
 	}, nil
 }
 

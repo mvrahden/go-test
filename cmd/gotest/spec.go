@@ -127,6 +127,8 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,
+		Groups:          cfg.Groups,
+		SkipGroups:      cfg.SkipGroups,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

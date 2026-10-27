@@ -217,6 +217,21 @@ func (s *FlagParsingTestSuite) TestSplitArgs(t *gotest.T) {
 	}
 }
 
+func (s *FlagParsingTestSuite) TestRepeatedGroupFlags(t *gotest.T) {
+	t.It("keeps every --group and --skip-group, in order", func(it *gotest.T) {
+		own, goTest, err := SplitArgs([]string{"--group=e2e", "--group", "load", "--skip-group=slow", "./..."}, ExportTestAllowed)
+		gotest.NoError(it, err)
+		gotest.Equal(it, []string{"e2e", "load"}, own.Values("--group"))
+		gotest.Equal(it, []string{"slow"}, own.Values("--skip-group"))
+		gotest.Equal(it, []string{"./..."}, goTest)
+	})
+
+	t.It("refuses an empty group name", func(it *gotest.T) {
+		_, _, err := SplitArgs([]string{"--group="}, ExportTestAllowed)
+		gotest.ErrorContains(it, err, "flag --group needs a value")
+	})
+}
+
 func (s *FlagParsingTestSuite) TestVetFlag(t *gotest.T) {
 	t.It("forwards -vet to go test", func(it *gotest.T) {
 		own, goTest, err := SplitArgs([]string{"-vet=off", "./..."}, ExportTestAllowed)
