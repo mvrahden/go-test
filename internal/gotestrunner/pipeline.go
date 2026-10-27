@@ -920,16 +920,15 @@ loop:
 			dispatchErr, verdictsIn = ctx.Err(), true
 		}
 	}
-	if len(deferredExclusive) == 0 {
-		allIn()
-	}
-
 	// The exclusive tail runs on slots: before each suite, the fixtures it
 	// needs that are not up yet start; the releases go through the ledger.
 	// A failed setup leaves the process serving commands, so a slot's own
 	// fixtures still start; one that timed out is still busy with the
 	// up-front phase and would answer no command.
 	fixtureWg.Wait()
+	if len(deferredExclusive) == 0 {
+		allIn()
+	}
 	tailTargets := make([]SuiteTarget, len(deferredExclusive))
 	tailOrder := make([]int, len(deferredExclusive))
 	for i := range deferredExclusive {
