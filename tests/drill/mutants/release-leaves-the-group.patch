@@ -3,12 +3,11 @@ Judge: ./tests/canary CanaryTestSuite/TestNothingOutlivesTheRun
 Clause: when a test starts sleep 4242 and never waits for it → the test passes and no such process outlives the run
 --- a/internal/proctree/tree_unix.go
 +++ b/internal/proctree/tree_unix.go
-@@ -33,7 +33,7 @@
- // release kills whatever the root left running in its group: the group's id
+@@ -35,7 +35,6 @@
  // stays its own while any member lives, so a signal to it after the root was
  // reaped reaches no stranger.
--func (sysTree) release(pid int) { _ = signalGroup(pid, syscall.SIGKILL) }
-+func (sysTree) release(pid int) {}
- 
- // alive reports whether any process of the group led by pid is left. The
- // group's id is not reused while it has a member, so probing it after the
+ func (t sysTree) release(pid int) {
+-	_ = signalGroup(pid, syscall.SIGKILL)
+ 	// A killed process exits later: waited for, so the root being done means
+ 	// its tree is too.
+ 	for deadline := time.Now().Add(releaseWait); t.alive(pid) && time.Now().Before(deadline); {
