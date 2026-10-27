@@ -78,3 +78,20 @@ follow their window (`fixtures.md`): one both phases need stays up across
 the tail, one only the bulk needed is torn down before it, and one only
 the tail needs starts there. Exclusive is not a serialization tool for
 shared mutable state; use non-parallel suites for that.
+
+## Exclusive groups (v1.36+)
+
+`SuiteConfig{ExclusiveGroup: "e2e"}` puts a suite in a named group: the
+default group runs first, then each named group by name, and no two
+groups ever run at once. A group's suites run in parallel among
+themselves, its `Exclusive` suites alone after them. It fits E2E suites
+that must not share the machine with unit suites but may share it with
+each other. The value must be a string literal or a string constant
+(a constant from a shared package, `testgroups.E2E`, avoids typos), named
+with `A-Z`, `a-z`, `0-9`, `_`, `-`; anything else is refused at
+generation. A shared fixture only the group reads starts at the group's
+start and is released at its last use. `--group=e2e` runs the group
+alone, `--skip-group=e2e` everything else: one CI job per side, no build
+tags. `gotest summary` prints each group's suites and wall time. Group
+only what needs isolation — a group gives up its overlap with the rest
+of the run.

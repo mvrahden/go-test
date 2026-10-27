@@ -629,3 +629,9 @@ Rules and sections tagged **v1.36+** need v1.36.0 or newer. What v1.36 changes:
    exclusive suite needs starts just before that suite. A suite that reads
    a shared fixture it does not declare can find it gone; declare a pointer
    field for every fixture a suite touches.
+
+3. **`SuiteConfig.ExclusiveGroup`** — a named group of suites run apart
+   from every other suite and in parallel among themselves, the default
+   group first, then each group by name; `--group` and `--skip-group`
+   select groups (`config.md`). An unknown field before v1.36, so a suite
+   setting it does not compile against an older runtime.
