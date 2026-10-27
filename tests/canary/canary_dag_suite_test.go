@@ -18,7 +18,7 @@ func before(markers []string, a, b string) bool {
 // Shared fixtures started together come up each after what it depends on,
 // and are released concurrently, each after the fixtures depending on it.
 func (s *CanaryTestSuite) TestSharedFixturesStartAndReleaseInDependencyOrder(t *gotest.T) {
-	dir := s.check(t, "dagrelease")
+	dir := s.check(t, "dagrelease").dir
 	markers, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	if !before(markers, "a.BeforeAll ends", "child.BeforeAll begins") {
 		t.Errorf("dagrelease: a fixture started before its dependency was up: markers %v", markers)
@@ -35,11 +35,11 @@ func (s *CanaryTestSuite) TestSharedFixturesStartAndReleaseInDependencyOrder(t *
 // B (2s) resident, a release that never returns is force-killed after 30s
 // plus the longest chain still resident: 35s.
 func (s *CanaryTestSuite) TestTheTeardownBudgetIsTheLongestResidentChain(t *gotest.T) {
-	code, _ := s.runWith(t, "dagrelease", t.TempDir(), []string{"DAGRELEASE_HANG=1"})
-	if code != 1 {
-		t.Errorf("dagbudget: exit code %d, want 1", code)
+	r := s.runWith(t, "dagrelease", t.TempDir(), []string{"DAGRELEASE_HANG=1"})
+	if r.code != 1 {
+		t.Errorf("dagbudget: exit code %d, want 1", r.code)
 	}
-	if !strings.Contains(s.lastStderr, "force-killed after 35s;") {
-		t.Errorf("dagbudget: the hung release was not force-killed after 35s:\n%s", s.lastStderr)
+	if !strings.Contains(r.stderr, "force-killed after 35s;") {
+		t.Errorf("dagbudget: the hung release was not force-killed after 35s:\n%s", r.stderr)
 	}
 }

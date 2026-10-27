@@ -28,10 +28,8 @@ import (
 // CanaryTestSuite runs one fixture package per method.
 // Sequential: it builds the CLI once and each method spawns a full pipeline run.
 type CanaryTestSuite struct {
-	binary     string
-	expected   map[string]expectation
-	lastStream string // the -json stdout of the last run, for checks on what it carried
-	lastStderr string // the stderr of the last run
+	binary   string
+	expected map[string]expectation
 }
 
 func (s *CanaryTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -99,27 +97,35 @@ func readExpected(t *gotest.T, path string) map[string]expectation {
 	return out
 }
 
+// result is what one CLI run over a fixture left.
+type result struct {
+	code   int
+	rows   []string // the verdicts, in golden form
+	stream string   // the -json stdout, for checks on what it carried
+	stderr string
+	dir    string // the canary dir
+}
+
 type event struct {
 	Action  string `json:"Action"`
 	Package string `json:"Package"`
 	Test    string `json:"Test"`
 }
 
-// run executes the CLI in -json mode over one fixture package and returns
-// its exit code and the verdict rows it produced, in golden form.
-func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) (int, []string) {
+// run executes the CLI in -json mode over one fixture package.
+func (s *CanaryTestSuite) run(t *gotest.T, pkg, canaryDir string) result {
 	return s.runWith(t, pkg, canaryDir, nil)
 }
 
 // runWith is run with env on top of the child's environment and flags
 // before the package.
-func (s *CanaryTestSuite) runWith(t *gotest.T, pkg, canaryDir string, env []string, flags ...string) (int, []string) {
+func (s *CanaryTestSuite) runWith(t *gotest.T, pkg, canaryDir string, env []string, flags ...string) result {
 	return s.runIn(t, "", "./testdata/"+pkg+"/", pkg, canaryDir, env, flags...)
 }
 
 // runIn is runWith over the package at path, run from dir ("" for this
 // one); its rows are named pkg.
-func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []string, flags ...string) (int, []string) {
+func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, env []string, flags ...string) result {
 	args := append(append([]string{"-json"}, flags...), path)
 	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Dir = dir
@@ -134,7 +140,6 @@ func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, e
 		}
 		code = exitErr.ExitCode()
 	}
-	s.lastStream, s.lastStderr = stdout.String(), stderr.String()
 	seen := map[string]bool{}
 	for _, line := range bytes.Split(stdout.Bytes(), []byte("\n")) {
 		if !bytes.HasPrefix(line, []byte("{")) {
@@ -158,7 +163,7 @@ func (s *CanaryTestSuite) runIn(t *gotest.T, dir, path, pkg, canaryDir string, e
 		rows = append(rows, r)
 	}
 	sort.Strings(rows)
-	return code, rows
+	return result{code: code, rows: rows, stream: stdout.String(), stderr: stderr.String(), dir: canaryDir}
 }
 
 // childEnv is the fixture process's environment: the canary dir, its own
@@ -208,25 +213,25 @@ var hostOnlyEnv = []string{"CI", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY"}
 
 // check runs a fixture, with flags before the package, and compares exit
 // code and rows with the golden.
-func (s *CanaryTestSuite) check(t *gotest.T, pkg string, flags ...string) string {
+func (s *CanaryTestSuite) check(t *gotest.T, pkg string, flags ...string) result {
 	return s.checkIn(t, pkg, t.TempDir(), flags...)
 }
 
 // checkIn is check with dir as the canary dir.
-func (s *CanaryTestSuite) checkIn(t *gotest.T, pkg, dir string, flags ...string) string {
+func (s *CanaryTestSuite) checkIn(t *gotest.T, pkg, dir string, flags ...string) result {
 	want, ok := s.expected[pkg]
 	if !ok {
 		fatalf(t, "no golden entry for %s", pkg)
 	}
-	code, rows := s.runWith(t, pkg, dir, nil, flags...)
-	if code != want.exit {
-		t.Errorf("%s: exit code %d, want %d", pkg, code, want.exit)
+	r := s.runWith(t, pkg, dir, nil, flags...)
+	if r.code != want.exit {
+		t.Errorf("%s: exit code %d, want %d", pkg, r.code, want.exit)
 	}
-	if strings.Join(rows, "\n") != strings.Join(want.rows, "\n") {
+	if strings.Join(r.rows, "\n") != strings.Join(want.rows, "\n") {
 		t.Errorf("%s: verdicts differ from the golden list\n got:\n  %s\n want:\n  %s",
-			pkg, strings.Join(rows, "\n  "), strings.Join(want.rows, "\n  "))
+			pkg, strings.Join(r.rows, "\n  "), strings.Join(want.rows, "\n  "))
 	}
-	return dir
+	return r
 }
 
 func (s *CanaryTestSuite) TestPassingSuiteIsGreen(t *gotest.T) {
@@ -240,7 +245,7 @@ func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
 	t.Setenv("GOTEST_CACHE_DIR", host)
 	t.Setenv("CI", "true")
 	t.Setenv("GOTEST_CI", "1")
-	dir := s.check(t, "passing")
+	dir := s.check(t, "passing").dir
 	t.Setenv("TMPDIR", hostTmp)
 	if entries, err := os.ReadDir(host); err != nil || len(entries) != 0 {
 		t.Errorf("host gotest cache: %d entries (err %v), want none", len(entries), err)
@@ -269,9 +274,9 @@ func (s *CanaryTestSuite) TestAFixtureRunKeepsToItsOwnCacheAndEnv(t *gotest.T) {
 
 // The same fixture checks verdicts and diagnostic content in one run.
 func (s *CanaryTestSuite) TestEveryAssertionFamilyFails(t *gotest.T) {
-	s.check(t, "failing")
+	r := s.check(t, "failing")
 	for _, want := range []string{"is of type *fs.PathError", "[]int cannot hold a value of type string", "42 retries left", "delta is NaN", "diff (-expected +actual):", `    -c\n`, `    +C\n`, "poll still running past its deadline, abandoned 100ms after it", "must be positive", "must be one line"} {
-		if !strings.Contains(s.lastStream, want) {
+		if !strings.Contains(r.stream, want) {
 			t.Errorf("failing: no failure message says %q", want)
 		}
 	}
@@ -341,9 +346,9 @@ func (s *CanaryTestSuite) TestSnapshotsKeyOnTheExactName(t *gotest.T) {
 		if err != nil {
 			fatalf(t, "baseline: %v", err)
 		}
-		code, rows := s.runIn(t, dir, "./snapshotting/", "snapshotting", t.TempDir(), append([]string{"GOTEST_CI=1"}, c.env...), c.flags...)
-		if code != want.exit || strings.Join(rows, "\n") != strings.Join(want.rows, "\n") {
-			t.Errorf("snapshotting %s: verdicts differ (exit %d)\n got:\n  %s", c.how, code, strings.Join(rows, "\n  "))
+		r := s.runIn(t, dir, "./snapshotting/", "snapshotting", t.TempDir(), append([]string{"GOTEST_CI=1"}, c.env...), c.flags...)
+		if r.code != want.exit || strings.Join(r.rows, "\n") != strings.Join(want.rows, "\n") {
+			t.Errorf("snapshotting %s: verdicts differ (exit %d)\n got:\n  %s", c.how, r.code, strings.Join(r.rows, "\n  "))
 		}
 		if after, _ := os.ReadFile(baseline); !bytes.Equal(after, before) { //nolint:gosec // G304: as above
 			t.Errorf("snapshotting %s: the baseline was rewritten", c.how)
@@ -395,8 +400,8 @@ func (s *CanaryTestSuite) TestOldSnapshotKeysAreMigrated(t *gotest.T) {
 			map[string]string{"TestIssue/issue_#42": "pass", "TestRows/#0": "pass", "TestTwins/x": "pass", "TestTwins/x#01": "pass", "TestStale/issue_#7": "fail"},
 			""},
 	} {
-		_, rows := s.runIn(t, dir, "./snapshotlegacy/", "snapshotlegacy", t.TempDir(), []string{c.env})
-		got := legacyRows(rows)
+		r := s.runIn(t, dir, "./snapshotlegacy/", "snapshotlegacy", t.TempDir(), []string{c.env})
+		got := legacyRows(r.rows)
 		for name, verdict := range c.want {
 			if got[name] != verdict {
 				t.Errorf("snapshotlegacy %s: %s got %q, want %q", c.how, name, got[name], verdict)
@@ -412,7 +417,7 @@ func (s *CanaryTestSuite) TestOldSnapshotKeysAreMigrated(t *gotest.T) {
 // suite has drained (AGENTS.md). The fixture's three suites stamp their
 // windows; the exclusive one must open after both bulk windows closed.
 func (s *CanaryTestSuite) TestAnExclusiveSuiteRunsAfterTheBulk(t *gotest.T) {
-	dir := s.check(t, "exclusive")
+	dir := s.check(t, "exclusive").dir
 	windows := readWindows(t, filepath.Join(dir, "windows"))
 	exclusiveStart := windows["start ExclusiveTestSuite"]
 	for _, bulk := range []string{"BulkOneTestSuite", "BulkTwoTestSuite"} {
@@ -444,21 +449,21 @@ func readWindows(t *gotest.T, path string) map[string]int64 {
 }
 
 func (s *CanaryTestSuite) TestAnAssertionHaltsTheMethod(t *gotest.T) {
-	dir := s.check(t, "failnow")
+	dir := s.check(t, "failnow").dir
 	if _, err := os.Stat(filepath.Join(dir, "after-failnow")); err == nil {
 		t.Errorf("the statement after a failed assertion ran: the assertion did not halt")
 	}
 }
 
 func (s *CanaryTestSuite) TestAfterEachRunsWhenTheTestFailed(t *gotest.T) {
-	dir := s.check(t, "aftereach")
+	dir := s.check(t, "aftereach").dir
 	if _, err := os.Stat(filepath.Join(dir, "aftereach-ran")); err != nil {
 		t.Errorf("AfterEach did not run after a failing test: %v", err)
 	}
 }
 
 func (s *CanaryTestSuite) TestLifecycleRunsInOrder(t *gotest.T) {
-	dir := s.check(t, "lifecycle")
+	dir := s.check(t, "lifecycle").dir
 	got, err := os.ReadFile(filepath.Join(dir, "lifecycle"))
 	if err != nil {
 		fatalf(t, "lifecycle record: %v", err)
@@ -499,7 +504,7 @@ func streamOutput(stream, path string) string {
 // Two suites share one package fixture; each runs in its own process with
 // its own copy of the DAG, so each process must tear its copy down.
 func (s *CanaryTestSuite) TestPackageFixtureTearsDownAfterEverySuite(t *gotest.T) {
-	dir := s.check(t, "fixtureteardown")
+	dir := s.check(t, "fixtureteardown").dir
 	expectTeardowns(t, dir, 2)
 }
 
@@ -546,11 +551,11 @@ func (s *CanaryTestSuite) TestATeardownFailureReachesTheStream(t *gotest.T) {
 // run has two failures and the stream must carry both: a leak reported only on
 // stderr is a leak a -json consumer never sees.
 func (s *CanaryTestSuite) TestATeardownFailureBesideASetupFailureReachesTheStream(t *gotest.T) {
-	s.check(t, "teardownaftersetup")
-	if !strings.Contains(s.lastStream, "would not release what it holds") {
+	r := s.check(t, "teardownaftersetup")
+	if !strings.Contains(r.stream, "would not release what it holds") {
 		t.Errorf("teardownaftersetup: the stream carries no word of the teardown failure")
 	}
-	if !strings.Contains(s.lastStream, "would not come up") {
+	if !strings.Contains(r.stream, "would not come up") {
 		t.Errorf("teardownaftersetup: the stream carries no word of the setup failure")
 	}
 }
@@ -593,9 +598,9 @@ func (s *CanaryTestSuite) TestAGuardRunsBeforeTheFixtures(t *gotest.T) {
 func (s *CanaryTestSuite) TestAGoroutineFromBeforeAllIsWaitedForAfterAfterAll(t *gotest.T) {
 	// go test's own alarm bounds a deadlocked wait, which the runner's graceful
 	// stop cannot end; a passing run never reaches it.
-	code, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s")
-	if !slices.Contains(rows, "goroutines pass TestServerTestSuite") {
-		t.Errorf("goroutines: the suite whose BeforeAll started a goroutine did not pass (exit %d): %v", code, rows)
+	r := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s")
+	if !slices.Contains(r.rows, "goroutines pass TestServerTestSuite") {
+		t.Errorf("goroutines: the suite whose BeforeAll started a goroutine did not pass (exit %d): %v", r.code, r.rows)
 	}
 }
 
@@ -604,9 +609,9 @@ func (s *CanaryTestSuite) TestAGoroutineFromBeforeAllIsWaitedForAfterAfterAll(t 
 // them.
 func (s *CanaryTestSuite) TestADerivedTsGoroutineIsWaitedForAfterAfterAll(t *gotest.T) {
 	// go test's own alarm bounds a deadlocked wait; a passing run never reaches it.
-	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestDerivedTestSuite")
-	if !slices.Contains(rows, "setupwaits pass TestDerivedTestSuite") {
-		t.Errorf("setupwaits: the suite whose BeforeAll started goroutines on derived Ts did not pass: %v", rows)
+	r := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestDerivedTestSuite")
+	if !slices.Contains(r.rows, "setupwaits pass TestDerivedTestSuite") {
+		t.Errorf("setupwaits: the suite whose BeforeAll started goroutines on derived Ts did not pass: %v", r.rows)
 	}
 }
 
@@ -614,15 +619,15 @@ func (s *CanaryTestSuite) TestADerivedTsGoroutineIsWaitedForAfterAfterAll(t *got
 // suite fails and every other one is waited for before the fixture goes.
 func (s *CanaryTestSuite) TestEveryGoroutineBeforeAllStartedIsWaitedFor(t *gotest.T) {
 	dir := t.TempDir()
-	_, rows := s.runWith(t, "setupwaits", dir, nil, "-timeout=20s", "-run=TestFailLastTestSuite|TestPanicLastTestSuite")
+	r := s.runWith(t, "setupwaits", dir, nil, "-timeout=20s", "-run=TestFailLastTestSuite|TestPanicLastTestSuite")
 	data, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
 	got := strings.Split(strings.TrimSpace(string(data)), "\n")
 	for _, c := range []struct{ suite, prefix string }{
 		{"TestFailLastTestSuite", "fail: "},
 		{"TestPanicLastTestSuite", "panic: "},
 	} {
-		if !slices.Contains(rows, "setupwaits fail "+c.suite) {
-			t.Errorf("setupwaits: %s did not fail: %v", c.suite, rows)
+		if !slices.Contains(r.rows, "setupwaits fail "+c.suite) {
+			t.Errorf("setupwaits: %s did not fail: %v", c.suite, r.rows)
 		}
 		ended, released := slices.Index(got, c.prefix+"first goroutine ended"), slices.Index(got, c.prefix+"fixture.AfterAll")
 		if ended < 0 || released < ended {
@@ -634,11 +639,11 @@ func (s *CanaryTestSuite) TestEveryGoroutineBeforeAllStartedIsWaitedFor(t *gotes
 // A goroutine started by gotest.Go that fails fatally fails the method at the
 // wait: nothing after the wait runs.
 func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T) {
-	_, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s")
-	if !slices.Contains(rows, "goroutines fail TestGoexitTestSuite/TestGoexit") {
-		t.Errorf("goroutines: the method whose goroutine failed did not fail: %v", rows)
+	r := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s")
+	if !slices.Contains(r.rows, "goroutines fail TestGoexitTestSuite/TestGoexit") {
+		t.Errorf("goroutines: the method whose goroutine failed did not fail: %v", r.rows)
 	}
-	if strings.Contains(s.lastStream, "the method went on after the wait") {
+	if strings.Contains(r.stream, "the method went on after the wait") {
 		t.Errorf("goroutines: the method went on after the wait on its failed goroutine")
 	}
 }
@@ -646,7 +651,7 @@ func (s *CanaryTestSuite) TestAFatalGoroutineFailsTheMethodAtTheWait(t *gotest.T
 // A loop that breaks out of an Each table stops at the break: no later row
 // runs, and the method goes on after the loop.
 func (s *CanaryTestSuite) TestABreakOutOfEachStopsTheRows(t *gotest.T) {
-	dir := s.check(t, "eachbreak")
+	dir := s.check(t, "eachbreak").dir
 	data, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
 	got := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if slices.ContainsFunc(got, func(m string) bool { return strings.HasPrefix(m, "row ") && m != "row first" }) {
@@ -663,7 +668,7 @@ func (s *CanaryTestSuite) TestABreakOutOfEachStopsTheRows(t *gotest.T) {
 // A fuzz execution whose BeforeEach fails or panics still runs its AfterEach,
 // as a test method does.
 func (s *CanaryTestSuite) TestAFuzzExecutionsAfterEachRunsWhenBeforeEachLeaves(t *gotest.T) {
-	dir := s.check(t, "fuzzhooks")
+	dir := s.check(t, "fuzzhooks").dir
 	got, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
 	for _, want := range []string{"after broken", "after panic"} {
 		if !strings.Contains(string(got), want+"\n") {
@@ -683,7 +688,8 @@ func (s *CanaryTestSuite) TestASharedFixturesStdoutIsNotTheProtocol(t *gotest.T)
 // into the setup, not 15. Timed from the setup's start, so the build of the
 // setup program before it is not counted.
 func (s *CanaryTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
-	dir := s.check(t, "setupbudget")
+	r := s.check(t, "setupbudget")
+	dir := r.dir
 	markers, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	var began time.Time
 	for _, m := range markers {
@@ -693,7 +699,7 @@ func (s *CanaryTestSuite) TestTheSetupWaitIsTheFixturesBudget(t *gotest.T) {
 			}
 		}
 	}
-	failed := verdictTime(s.lastStream, "TestSlowTestSuite", "fail")
+	failed := verdictTime(r.stream, "TestSlowTestSuite", "fail")
 	if began.IsZero() || failed.IsZero() {
 		fatalf(t, "setupbudget: no setup start (markers %v) or no fail verdict for TestSlowTestSuite in the stream", markers)
 	}
@@ -721,7 +727,7 @@ func verdictTime(stream, test, action string) time.Time {
 // A fuzz execution whose BeforeEach skips is skipped: its body never runs and
 // its AfterEach still does.
 func (s *CanaryTestSuite) TestAFuzzExecutionSkippedByBeforeEachStillTearsDown(t *gotest.T) {
-	dir := s.check(t, "fuzzskiphook")
+	dir := s.check(t, "fuzzskiphook").dir
 	got, _ := os.ReadFile(filepath.Join(dir, testkit.MarkersFile))
 	if strings.Contains(string(got), "body ran\n") {
 		t.Errorf("fuzzskiphook: the body ran after BeforeEach skipped:\n%s", got)
@@ -734,20 +740,20 @@ func (s *CanaryTestSuite) TestAFuzzExecutionSkippedByBeforeEachStillTearsDown(t 
 // A goroutine started by gotest.Go that skips the test skips the method at
 // the wait, without failing it.
 func (s *CanaryTestSuite) TestAGoroutineThatSkipsSkipsTheMethod(t *gotest.T) {
-	_, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s", "-run=TestSkipTestSuite")
-	if !slices.Contains(rows, "goroutines skip TestSkipTestSuite/TestSkip") {
-		t.Errorf("goroutines: the method whose goroutine skipped was not skipped: %v", rows)
+	r := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s", "-run=TestSkipTestSuite")
+	if !slices.Contains(r.rows, "goroutines skip TestSkipTestSuite/TestSkip") {
+		t.Errorf("goroutines: the method whose goroutine skipped was not skipped: %v", r.rows)
 	}
 }
 
 // A goroutine started by gotest.Go that leaves through runtime.Goexit with
 // no verdict fails the method, saying so.
 func (s *CanaryTestSuite) TestAGoroutineLeavingWithoutAVerdictSaysSo(t *gotest.T) {
-	_, rows := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s", "-run=TestRawGoexitTestSuite")
-	if !slices.Contains(rows, "goroutines fail TestRawGoexitTestSuite/TestRawGoexit") {
-		t.Errorf("goroutines: the method whose goroutine left through Goexit did not fail: %v", rows)
+	r := s.runWith(t, "goroutines", t.TempDir(), nil, "-timeout=20s", "-run=TestRawGoexitTestSuite")
+	if !slices.Contains(r.rows, "goroutines fail TestRawGoexitTestSuite/TestRawGoexit") {
+		t.Errorf("goroutines: the method whose goroutine left through Goexit did not fail: %v", r.rows)
 	}
-	if !strings.Contains(s.lastStream, "goroutine started by gotest.Go exited via runtime.Goexit") {
+	if !strings.Contains(r.stream, "goroutine started by gotest.Go exited via runtime.Goexit") {
 		t.Errorf("goroutines: no failure says the goroutine exited via runtime.Goexit")
 	}
 }
@@ -756,35 +762,35 @@ func (s *CanaryTestSuite) TestAGoroutineLeavingWithoutAVerdictSaysSo(t *gotest.T
 // and NewTWithDeadline(t) has them waited for after AfterAll.
 func (s *CanaryTestSuite) TestATestingTHooksGoroutineIsWaitedForAfterAfterAll(t *gotest.T) {
 	// go test's own alarm bounds a deadlocked wait; a passing run never reaches it.
-	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestStdTestSuite")
-	if !slices.Contains(rows, "setupwaits pass TestStdTestSuite") {
-		t.Errorf("setupwaits: the suite whose *testing.T BeforeAll started goroutines did not pass: %v", rows)
+	r := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestStdTestSuite")
+	if !slices.Contains(r.rows, "setupwaits pass TestStdTestSuite") {
+		t.Errorf("setupwaits: the suite whose *testing.T BeforeAll started goroutines did not pass: %v", r.rows)
 	}
 }
 
 // A goroutine started from one BeforeAll started, once AfterAll stopped it,
 // is waited for too: its panic fails the suite.
 func (s *CanaryTestSuite) TestAGoroutineStartedDuringTheWaitIsWaitedFor(t *gotest.T) {
-	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestLateTestSuite")
-	if !slices.Contains(rows, "setupwaits fail TestLateTestSuite") || !strings.Contains(s.lastStream, "LATE-GOROUTINE-PANIC") {
-		t.Errorf("setupwaits: the goroutine started during the wait was not waited for: %v", rows)
+	r := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestLateTestSuite")
+	if !slices.Contains(r.rows, "setupwaits fail TestLateTestSuite") || !strings.Contains(r.stream, "LATE-GOROUTINE-PANIC") {
+		t.Errorf("setupwaits: the goroutine started during the wait was not waited for: %v", r.rows)
 	}
 }
 
 // The wait on BeforeAll's goroutines is held to a declared SetupTimeout.
 func (s *CanaryTestSuite) TestTheWaitOnSetupGoroutinesIsHeldToTheSetupTimeout(t *gotest.T) {
-	_, rows := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestSlowTestSuite")
-	if !slices.Contains(rows, "setupwaits fail TestSlowTestSuite") ||
-		!strings.Contains(s.lastStream, "the wait on a goroutine BeforeAll started with gotest.Go exceeded its configured SetupTimeout") {
-		t.Errorf("setupwaits: no SetupTimeout verdict names the wait on the slow goroutine: %v", rows)
+	r := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestSlowTestSuite")
+	if !slices.Contains(r.rows, "setupwaits fail TestSlowTestSuite") ||
+		!strings.Contains(r.stream, "the wait on a goroutine BeforeAll started with gotest.Go exceeded its configured SetupTimeout") {
+		t.Errorf("setupwaits: no SetupTimeout verdict names the wait on the slow goroutine: %v", r.rows)
 	}
 }
 
 // A row that skips skips itself and the method; a row that ends the method's
 // own T ends the method with that verdict alone.
 func (s *CanaryTestSuite) TestEachRowsEndTheMethodWithTheirVerdict(t *gotest.T) {
-	s.check(t, "eachskip")
-	if strings.Contains(s.lastStream, "without a verdict") {
+	r := s.check(t, "eachskip")
+	if strings.Contains(r.stream, "without a verdict") {
 		t.Errorf("eachskip: a row that ended the method's own T was reported as leaving without a verdict")
 	}
 }
@@ -792,15 +798,15 @@ func (s *CanaryTestSuite) TestEachRowsEndTheMethodWithTheirVerdict(t *gotest.T) 
 // A panic in BeforeEach is reported even when AfterEach then fails a fatal
 // assertion, for a test method and for a fuzz execution.
 func (s *CanaryTestSuite) TestAPanicAheadOfAFailingAfterEachIsReported(t *gotest.T) {
-	s.runWith(t, "hookpanics", t.TempDir(), nil)
+	r := s.runWith(t, "hookpanics", t.TempDir(), nil)
 	for _, c := range []struct{ what, panic, mark string }{
 		{"test method", "panic: TEST-BEFORE-EACH-PANIC", "MARK after the panic"},
 		{"fuzz execution", "panic: FUZZ-BEFORE-EACH-PANIC", "MARK after the fuzz panic"},
 	} {
-		if !strings.Contains(s.lastStream, c.panic) {
+		if !strings.Contains(r.stream, c.panic) {
 			t.Errorf("hookpanics: the %s's panic was not reported", c.what)
 		}
-		if !strings.Contains(s.lastStream, c.mark) {
+		if !strings.Contains(r.stream, c.mark) {
 			t.Errorf("hookpanics: the %s's AfterEach did not run", c.what)
 		}
 	}
@@ -813,13 +819,13 @@ func (s *CanaryTestSuite) TestAPanicAheadOfAFailingAfterEachIsReported(t *gotest
 // it end, after the verdict.
 func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 	dir := t.TempDir()
-	code, rows := s.run(t, "hookoverrun", dir)
-	if code != 1 {
-		t.Errorf("hookoverrun: exit code %d, want 1", code)
+	r := s.run(t, "hookoverrun", dir)
+	if r.code != 1 {
+		t.Errorf("hookoverrun: exit code %d, want 1", r.code)
 	}
 	for _, method := range []string{"TestOverrunTestSuite/TestSlow", "TestReleaseOverrunTestSuite/TestSlowRelease", "TestWaitingTestSuite/TestWaitedFor", "TestWaitingBeforeEachTestSuite/TestAfterTheWait", "TestLaterOverrunTestSuite/TestAfterTheSlowOne"} {
-		if !slices.Contains(rows, "hookoverrun fail "+method) {
-			t.Errorf("hookoverrun: %s did not fail: %v", method, rows)
+		if !slices.Contains(r.rows, "hookoverrun fail "+method) {
+			t.Errorf("hookoverrun: %s did not fail: %v", method, r.rows)
 		}
 	}
 	// fixture.go:30 and :41 are time.Sleep lines, fixture.go:53 and
@@ -830,12 +836,12 @@ func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 		"fixture.go:53: WaitingFixture.BeforeEach exceeded its configured Timeout",
 		"hookoverrun_suite_test.go:55: BeforeEach exceeded its configured Timeout",
 	} {
-		if !strings.Contains(s.lastStream, want) {
+		if !strings.Contains(r.stream, want) {
 			t.Errorf("hookoverrun: no %q in the stream", want)
 		}
 	}
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
-	if strings.Contains(s.lastStream, "LaterFixture.BeforeEach failed") {
+	if strings.Contains(r.stream, "LaterFixture.BeforeEach failed") {
 		t.Errorf("hookoverrun: the fixture after the one that overran was blamed too")
 	}
 	for _, never := range []string{"later fixture BeforeEach", "body", "suite BeforeEach", "body after the wait", "fixture gave up", "suite gave up"} {
@@ -855,19 +861,19 @@ func (s *CanaryTestSuite) TestAHookOverrunFailsTheMethod(t *gotest.T) {
 // reported at the hook's own file, not inside the runtime's.
 func (s *CanaryTestSuite) TestAFailedFixtureBeforeEachPairsWithNothing(t *gotest.T) {
 	dir := t.TempDir()
-	code, _ := s.run(t, "fixturehookfail", dir)
-	if code != 1 {
-		t.Errorf("fixturehookfail: exit code %d, want 1", code)
+	r := s.run(t, "fixturehookfail", dir)
+	if r.code != 1 {
+		t.Errorf("fixturehookfail: exit code %d, want 1", r.code)
 	}
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	want := []string{"fixture.BeforeAll", "fixture.BeforeEach", "fixture.BeforeEach", "second", "fixture.AfterEach", "fixture.AfterAll"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("fixturehookfail: hooks ran %v, want %v", got, want)
 	}
-	if !strings.Contains(s.lastStream, "fixture.go:") {
+	if !strings.Contains(r.stream, "fixture.go:") {
 		t.Errorf("fixturehookfail: the failure is not reported at the hook's file")
 	}
-	if strings.Contains(s.lastStream, "methods.go:") {
+	if strings.Contains(r.stream, "methods.go:") {
 		t.Errorf("fixturehookfail: the failure is reported inside the runtime's file")
 	}
 }
@@ -875,11 +881,11 @@ func (s *CanaryTestSuite) TestAFailedFixtureBeforeEachPairsWithNothing(t *gotest
 // An error a fixture AfterEach returns is reported at the hook's own file,
 // not inside the runtime's.
 func (s *CanaryTestSuite) TestAFixtureAfterEachErrorIsReportedAtTheHook(t *gotest.T) {
-	s.check(t, "fixtureafterfail")
-	if !strings.Contains(s.lastStream, "fixture.go:") {
+	r := s.check(t, "fixtureafterfail")
+	if !strings.Contains(r.stream, "fixture.go:") {
 		t.Errorf("fixtureafterfail: the failure is not reported at the hook's file")
 	}
-	if strings.Contains(s.lastStream, "methods.go:") {
+	if strings.Contains(r.stream, "methods.go:") {
 		t.Errorf("fixtureafterfail: the failure is reported inside the runtime's file")
 	}
 }
@@ -889,13 +895,13 @@ func (s *CanaryTestSuite) TestAFixtureAfterEachErrorIsReportedAtTheHook(t *gotes
 // behind it it does not.
 func (s *CanaryTestSuite) TestAnAfterEachOnlyFixtureRunsWhenItsTurnCame(t *gotest.T) {
 	dir := t.TempDir()
-	code, rows := s.run(t, "fixtureorder", dir)
-	if code != 1 {
-		t.Errorf("fixtureorder: exit code %d, want 1", code)
+	r := s.run(t, "fixtureorder", dir)
+	if r.code != 1 {
+		t.Errorf("fixtureorder: exit code %d, want 1", r.code)
 	}
 	for _, method := range []string{"TestAheadTestSuite/TestBody", "TestBehindTestSuite/TestBody"} {
-		if !slices.Contains(rows, "fixtureorder fail "+method) {
-			t.Errorf("fixtureorder: %s did not fail: %v", method, rows)
+		if !slices.Contains(r.rows, "fixtureorder fail "+method) {
+			t.Errorf("fixtureorder: %s did not fail: %v", method, r.rows)
 		}
 	}
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
@@ -922,16 +928,16 @@ func (s *CanaryTestSuite) TestAFixtureHookElsewhereIsLocatedAtIt(t *gotest.T) {
 		flags []string
 		file  string
 	}{{nil, "elsewhere.go"}, {[]string{"-fullpath"}, full}} {
-		code, _ := s.runWith(t, "fixtureelsewhere", t.TempDir(), nil, c.flags...)
-		if code != 1 {
-			t.Errorf("fixtureelsewhere %v: exit code %d, want 1", c.flags, code)
+		r := s.runWith(t, "fixtureelsewhere", t.TempDir(), nil, c.flags...)
+		if r.code != 1 {
+			t.Errorf("fixtureelsewhere %v: exit code %d, want 1", c.flags, r.code)
 		}
 		// elsewhere.go:15 declares RemoteFixture.BeforeEach, :22 Hooks.AfterEach.
 		for _, want := range []string{
 			c.file + ":15: elsewhere_RemoteFixture.BeforeEach failed: the remote fixture is not ready",
 			c.file + ":22: PromotedFixture.AfterEach failed: the embedded hook did not let go",
 		} {
-			if !strings.Contains(s.lastStream, " "+want+"\\n") {
+			if !strings.Contains(r.stream, " "+want+"\\n") {
 				t.Errorf("fixtureelsewhere %v: no %q in the stream", c.flags, want)
 			}
 		}
@@ -942,12 +948,12 @@ func (s *CanaryTestSuite) TestAFixtureHookElsewhereIsLocatedAtIt(t *gotest.T) {
 // reached is released, and the suite that binds it never opens.
 func (s *CanaryTestSuite) TestAFixtureThatFailedToStartIsReleased(t *gotest.T) {
 	dir := t.TempDir()
-	code, rows := s.run(t, "fixturesetupfail", dir)
-	if code != 1 {
-		t.Errorf("fixturesetupfail: exit code %d, want 1", code)
+	r := s.run(t, "fixturesetupfail", dir)
+	if r.code != 1 {
+		t.Errorf("fixturesetupfail: exit code %d, want 1", r.code)
 	}
-	if slices.Contains(rows, "fixturesetupfail pass TestNeverOpensTestSuite/TestNever") {
-		t.Errorf("fixturesetupfail: the suite ran without its fixture: %v", rows)
+	if slices.Contains(r.rows, "fixturesetupfail pass TestNeverOpensTestSuite/TestNever") {
+		t.Errorf("fixturesetupfail: the suite ran without its fixture: %v", r.rows)
 	}
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	if want := []string{"fixture.BeforeAll", "fixture.AfterAll"}; !slices.Equal(got, want) {
@@ -958,7 +964,7 @@ func (s *CanaryTestSuite) TestAFixtureThatFailedToStartIsReleased(t *gotest.T) {
 // A shared fixture whose setup failed is still released: what the attempt
 // reached would otherwise leak, as it would not for a package fixture.
 func (s *CanaryTestSuite) TestAFailedSharedSetupIsReleased(t *gotest.T) {
-	dir := s.check(t, "failingshared")
+	dir := s.check(t, "failingshared").dir
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	if !testkit.MarkerOrderOf(got, "leak.BeforeAll", "leak.AfterAll") {
 		t.Errorf("failingshared: markers %v, want leak.BeforeAll then leak.AfterAll", got)
@@ -973,8 +979,8 @@ func (s *CanaryTestSuite) TestAFailedReleaseBetweenAttemptsFailsTheRun(t *gotest
 		{"packagerelease", "the package release leaked"},
 		{"sharedrelease", "the shared release leaked"},
 	} {
-		s.check(t, c.pkg)
-		if !strings.Contains(s.lastStream, c.says) {
+		r := s.check(t, c.pkg)
+		if !strings.Contains(r.stream, c.says) {
 			t.Errorf("%s: the run does not report the release's error %q", c.pkg, c.says)
 		}
 	}
@@ -1013,15 +1019,15 @@ func (s *CanaryTestSuite) TestAStopDuringTheReleaseBetweenAttemptsLetsItFinish(t
 // A package fixture whose release between attempts outlives its declared
 // Timeout fails the run, though its second attempt comes up.
 func (s *CanaryTestSuite) TestAReleaseThatOutlivesItsTimeoutFailsTheRun(t *gotest.T) {
-	s.check(t, "releaseslow")
-	if !strings.Contains(s.lastStream, "exceeded its configured Timeout of 200ms") {
+	r := s.check(t, "releaseslow")
+	if !strings.Contains(r.stream, "exceeded its configured Timeout of 200ms") {
 		t.Errorf("releaseslow: the run does not report the release's overrun")
 	}
 }
 
 // A shared fixture whose Hydrate fails partway still gets its Dehydrate.
 func (s *CanaryTestSuite) TestAFailedHydrateIsDehydrated(t *gotest.T) {
-	dir := s.check(t, "hydratefail")
+	dir := s.check(t, "hydratefail").dir
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	if want := []string{"pool.Hydrate", "pool.Dehydrate"}; !slices.Equal(got, want) {
 		t.Errorf("hydratefail: markers %v, want %v", got, want)
@@ -1138,19 +1144,19 @@ func (s *CanaryTestSuite) TestAPanickingBenchmarkStillTearsDown(t *gotest.T) {
 // After the first failure a FailFast suite reports the methods it did not
 // run: each is skipped, naming the method that stopped the suite.
 func (s *CanaryTestSuite) TestFailFastReportsWhatItSkipped(t *gotest.T) {
-	code, rows := s.run(t, "failfast", t.TempDir())
-	if code != 1 {
-		t.Errorf("failfast: exit code %d, want 1", code)
+	r := s.run(t, "failfast", t.TempDir())
+	if r.code != 1 {
+		t.Errorf("failfast: exit code %d, want 1", r.code)
 	}
 	for _, want := range []string{"failfast fail TestFailFastTestSuite/TestFirst", "failfast skip TestFailFastTestSuite/TestSecond", "failfast skip TestFailFastTestSuite/TestThird"} {
-		if !slices.Contains(rows, want) {
-			t.Errorf("failfast: missing %q in %v", want, rows)
+		if !slices.Contains(r.rows, want) {
+			t.Errorf("failfast: missing %q in %v", want, r.rows)
 		}
 	}
-	if !strings.Contains(s.lastStream, "FailFast: TestFirst") {
+	if !strings.Contains(r.stream, "FailFast: TestFirst") {
 		t.Errorf("failfast: the skipped methods do not name TestFirst as the reason")
 	}
-	if strings.Contains(s.lastStream, "methods.go:") {
+	if strings.Contains(r.stream, "methods.go:") {
 		t.Errorf("failfast: a skip names a runtime file")
 	}
 }
@@ -1158,9 +1164,9 @@ func (s *CanaryTestSuite) TestFailFastReportsWhatItSkipped(t *gotest.T) {
 // A parallel method that fails only in its cleanup still stops the methods
 // of a FailFast suite that have not started.
 func (s *CanaryTestSuite) TestFailFastSeesACleanupFailure(t *gotest.T) {
-	_, rows := s.runWith(t, "failfastcleanup", t.TempDir(), nil, "-parallel=1")
+	r := s.runWith(t, "failfastcleanup", t.TempDir(), nil, "-parallel=1")
 	var failed, skipped int
-	for _, row := range rows {
+	for _, row := range r.rows {
 		switch {
 		case strings.HasPrefix(row, "failfastcleanup fail TestCleanupFailFastTestSuite/"):
 			failed++
@@ -1169,17 +1175,17 @@ func (s *CanaryTestSuite) TestFailFastSeesACleanupFailure(t *gotest.T) {
 		}
 	}
 	if failed != 1 || skipped != 1 {
-		t.Errorf("failfastcleanup: %d methods failed and %d were skipped, want 1 and 1: %v", failed, skipped, rows)
+		t.Errorf("failfastcleanup: %d methods failed and %d were skipped, want 1 and 1: %v", failed, skipped, r.rows)
 	}
 }
 
 // FailFast reads each method's own verdict: a failure BeforeAll recorded
 // without stopping does not stop the methods.
 func (s *CanaryTestSuite) TestFailFastIgnoresASoftSuiteFailure(t *gotest.T) {
-	_, rows := s.run(t, "failfastsoft", t.TempDir())
+	r := s.run(t, "failfastsoft", t.TempDir())
 	for _, want := range []string{"failfastsoft pass TestSoftFailFastTestSuite/TestFirst", "failfastsoft pass TestSoftFailFastTestSuite/TestSecond"} {
-		if !slices.Contains(rows, want) {
-			t.Errorf("failfastsoft: missing %q in %v", want, rows)
+		if !slices.Contains(r.rows, want) {
+			t.Errorf("failfastsoft: missing %q in %v", want, r.rows)
 		}
 	}
 }
@@ -1189,9 +1195,9 @@ func (s *CanaryTestSuite) TestFailFastIgnoresASoftSuiteFailure(t *gotest.T) {
 // sibling's AfterEach never runs.
 func (s *CanaryTestSuite) TestAParallelPanicEndsTheSuiteAroundItsSiblings(t *gotest.T) {
 	dir := t.TempDir()
-	code, rows := s.run(t, "parallelpanic", dir)
-	if code != 1 || !slices.Contains(rows, "parallelpanic fail TestParallelPanicTestSuite/TestPanics") {
-		t.Errorf("parallelpanic: the panicking method did not fail the run (exit %d): %v", code, rows)
+	r := s.run(t, "parallelpanic", dir)
+	if r.code != 1 || !slices.Contains(r.rows, "parallelpanic fail TestParallelPanicTestSuite/TestPanics") {
+		t.Errorf("parallelpanic: the panicking method did not fail the run (exit %d): %v", r.code, r.rows)
 	}
 	got, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
 	for _, want := range []string{"slow started", "afterall", "fixture down"} {

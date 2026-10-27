@@ -22,7 +22,8 @@ import (
 // Timed from the started process's first write, so the builds before it are
 // not counted.
 func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) {
-	dir := s.check(t, "detachedchild")
+	r := s.check(t, "detachedchild")
+	dir := r.dir
 	ended := time.Now()
 	if data, err := os.ReadFile(filepath.Join(dir, "detached-pid")); err == nil {
 		if pid, err := strconv.Atoi(string(data)); err == nil {
@@ -33,7 +34,7 @@ func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) 
 	if !slices.Contains(got, "env=") {
 		t.Errorf("detachedchild: the started process saw the protocol variable: markers %v", got)
 	}
-	if strings.Contains(s.lastStream, "written by a process the fixture started") {
+	if strings.Contains(r.stream, "written by a process the fixture started") {
 		t.Errorf("detachedchild: what the started process wrote to descriptor 3 was read")
 	}
 	if ready, err := os.Stat(filepath.Join(dir, "detached-ready")); err == nil {
