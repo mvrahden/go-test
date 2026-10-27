@@ -144,13 +144,16 @@ func (c *groupClock) run(group string, fn func()) {
 	}
 }
 
-// runs is every named group's GroupRun, by name.
+// runs is the GroupRun of every named group a suite of which ran, by name.
 func (c *groupClock) runs() []GroupRun {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	out := make([]GroupRun, 0, len(c.groups))
 	for _, name := range slices.Sorted(maps.Keys(c.groups)) {
 		s := c.groups[name]
+		if s.first.IsZero() {
+			continue
+		}
 		out = append(out, GroupRun{Name: name, Suites: s.suites, Wall: s.last.Sub(s.first)})
 	}
 	return out

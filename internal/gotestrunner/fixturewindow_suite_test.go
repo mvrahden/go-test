@@ -257,6 +257,23 @@ func (s *FixtureWindowTestSuite) TestGroupScopes(t *gotest.T, _ *windowCtx) {
 	})
 }
 
+func (s *FixtureWindowTestSuite) TestGroupRuns(t *gotest.T, _ *windowCtx) {
+	targets := []gotestrunner.SuiteTarget{
+		{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: "TestA"}, Group: "e2e"},
+		{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: "TestB"}, Group: "e2e"},
+		{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: "TestC"}, Group: "load"},
+		{SuiteSpec: gotestrunner.SuiteSpec{SuiteName: "TestD"}},
+	}
+	t.When("a named group's suites never ran, stopped or given up", func(w *gotest.T) {
+		runs := gotestrunner.ExportGroupRuns(targets, map[string]bool{"TestA": true, "TestD": true})
+		w.It("reports only the groups that ran, each with all its suites", func(it *gotest.T) {
+			gotest.Len(it, runs, 1)
+			gotest.Equal(it, "e2e", runs[0].Name)
+			gotest.Equal(it, 2, runs[0].Suites)
+		})
+	})
+}
+
 // TestRealOverlayFiltering runs the planner over the real tests/sharedfixture
 // packages — the same overlay the pipeline computes — so the filtering path is
 // pinned against genuine discovery output, not hand-built maps.

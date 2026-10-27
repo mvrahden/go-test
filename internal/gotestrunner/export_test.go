@@ -341,3 +341,16 @@ func ExportTeardownVerdict(teardownErr error, reports []string) ([]string, error
 func ExportCommand(ctx context.Context, p *SharedFixtureProcess, verb string, keys []string, timeout time.Duration) error {
 	return p.command(ctx, verb, keys, timeout)
 }
+
+// ExportGroupRuns books targets under a fresh group clock, runs those named
+// in ran, and returns what the clock reports.
+func ExportGroupRuns(targets []SuiteTarget, ran map[string]bool) []GroupRun {
+	var c groupClock
+	c.count(targets)
+	for i := range targets {
+		if ran[targets[i].SuiteName] {
+			c.run(targets[i].Group, func() {})
+		}
+	}
+	return c.runs()
+}

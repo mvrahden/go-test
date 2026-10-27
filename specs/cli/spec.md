@@ -165,7 +165,7 @@ gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to
 - **THEN** exits 2 before any build, naming the known groups
 
 ### Requirement: Groups in the summary
-gotest summary SHALL print one line per named ExclusiveGroup that ran, with its suites and its wall time from its first suite's start to its last suite's end, in its terminal and Markdown summaries and the GitHub step summary, and its JSON document SHALL carry a matching groups entry.
+gotest summary SHALL print one line per named ExclusiveGroup that ran, with its suites and its wall time from its first suite's start to its last suite's end, in its terminal and Markdown summaries and the GitHub step summary, and its JSON document SHALL carry a matching groups entry. A group none of whose suites ran, all stopped or given up, SHALL have neither.
 
 #### Scenario: A summary of grouped suites
 - **WHEN** gotest summary runs suites of named groups
