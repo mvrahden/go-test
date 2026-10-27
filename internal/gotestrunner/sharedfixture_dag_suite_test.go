@@ -456,3 +456,25 @@ func (s *SharedFixtureDAGTestSuite) TestAGivenUpStartLeavesEveryReleaseToTheEnd(
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAFailedReleaseHoldsNothing(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagPanic, "DagB")
+	t.Setenv(fixtures.EnvDagSlow, "DagA")
+	t.Setenv(fixtures.EnvDagTimeout, time.Second.String())
+	t.Setenv(fixtures.EnvDagTeardownDelay, (10 * time.Minute).String())
+	proc, release := startDAG(t, dagFixtures(false, "DagA", "DagB"))
+	failed := proc.TeardownKeys(t.Context(), []string{dagKey("DagB")}, time.Minute)
+	givenUp := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, 300*time.Millisecond)
+	began := time.Now()
+	teardownErr := release()
+	took := time.Since(began)
+
+	t.When("one fixture's release failed and the other's was given up at its budget", func(w *gotest.T) {
+		w.It("force-kills the process at once: the failed release holds nothing", func(it *gotest.T) {
+			gotest.ErrorContains(it, failed, "teardown failed")
+			gotest.ErrorContains(it, givenUp, "timed out after 300ms")
+			gotest.ErrorContains(it, teardownErr, "force-killed after 300ms;")
+			gotest.Less(it, took, 5*time.Second)
+		})
+	})
+}

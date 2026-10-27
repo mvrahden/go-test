@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -504,10 +505,12 @@ func (p *SharedFixtureProcess) expire(id uint64, resp chan string, verb string, 
 	return "", false
 }
 
-// acked notes what an ack says: a release acknowledged without an error
-// holds nothing any more. Under cmdMu.
+// acked notes what an ack says: a release that ran holds nothing any more,
+// whether its AfterAll failed or not; one refused whole ran nothing (the
+// setup program's refusal of a release names a dependent still up). Under
+// cmdMu.
 func (p *SharedFixtureProcess) acked(verb string, keys []string, ack string) {
-	if verb != "teardown" || ack != "" {
+	if verb != "teardown" || strings.Contains(ack, "is up and not released with it") {
 		return
 	}
 	for _, k := range keys {
