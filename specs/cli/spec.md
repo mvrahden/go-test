@@ -150,7 +150,7 @@ gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to
 - **THEN** fails with exit 2, located at the value, naming the forms it accepts
 
 ### Requirement: Selecting groups
---group=<name> SHALL narrow a run to the suites of that ExclusiveGroup and --skip-group=<name> SHALL leave that group's suites out; both repeat. Shared fixtures SHALL follow the selection: one no selected suite reads never starts. A name no suite declares SHALL exit 2 before any build, naming the known groups.
+--group=<name> SHALL narrow a run to the suites of that ExclusiveGroup and --skip-group=<name> SHALL leave that group's suites out; both repeat. Shared fixtures SHALL follow the selection: one no selected suite reads never starts. A name no suite declares SHALL exit 2 before any build, naming the known groups; summary and spec with --input, and spec --static, SHALL refuse both flags with exit 2.
 
 #### Scenario: Only one group
 - **WHEN** --group=e2e is given
@@ -163,6 +163,10 @@ gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to
 #### Scenario: A group nobody declares
 - **WHEN** --group or --skip-group names a group no suite declares
 - **THEN** exits 2 before any build, naming the known groups
+
+#### Scenario: A command that runs nothing
+- **WHEN** --group or --skip-group is given to a command that runs no suite
+- **THEN** exits 2, saying the command runs nothing
 
 ### Requirement: Groups in the summary
 gotest summary SHALL print one line per named ExclusiveGroup that ran, with its suites and its wall time from its first suite's start to its last suite's end, in its terminal and Markdown summaries and the GitHub step summary, and its JSON document SHALL carry a matching groups entry. A group none of whose suites ran, all stopped or given up, SHALL have neither.

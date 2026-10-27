@@ -43,6 +43,9 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if input != "" {
+		if refuseGroups(own, "--input") {
+			return 2
+		}
 		if own.Given("--events-file") {
 			fmt.Fprintln(os.Stderr, "FAIL: --events-file saves a run's event stream, and --input runs nothing")
 			return 2

@@ -1,6 +1,10 @@
 package main
 
-import "maps"
+import (
+	"fmt"
+	"maps"
+	"os"
+)
 
 // FlagKind indicates how a flag consumes arguments.
 type FlagKind int
@@ -127,6 +131,16 @@ func (f *OwnFlags) add(name, value string) {
 		f.lists = map[string][]string{}
 	}
 	f.lists[name] = append(f.lists[name], value)
+}
+
+// refuseGroups reports, on stderr, --group or --skip-group given where mode
+// runs no suite.
+func refuseGroups(own OwnFlags, mode string) bool {
+	if !own.Given("--group") && !own.Given("--skip-group") {
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "FAIL: --group and --skip-group select the suites a run runs, and %s runs nothing\n", mode)
+	return true
 }
 
 // Values is every value a repeatable flag was given, in order.

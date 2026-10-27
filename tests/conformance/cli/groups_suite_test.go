@@ -76,3 +76,23 @@ func (s *CLIGroupsTestSuite) TestAnUnknownGroup(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIGroupsTestSuite) TestGroupsWhereNothingRuns(t *gotest.T) {
+	t.When("--group or --skip-group is given to a command that runs no suite", func(w *gotest.T) {
+		w.It("exits 2, saying the command runs nothing", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []struct {
+				Desc, flag string
+				args       []string
+			}{
+				{Desc: "summary --input", flag: "--input", args: []string{"summary", "--input=events.json", "--group=e2e"}},
+				{Desc: "spec --input", flag: "--input", args: []string{"spec", "--input=events.json", "--skip-group=e2e"}},
+				{Desc: "spec --static", flag: "--static", args: []string{"spec", "--static", "--group=e2e", "../testdata/groupfixtures/"}},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, "--group and --skip-group select the suites a run runs, and "+row.flag+" runs nothing")
+			}
+		})
+	})
+}
