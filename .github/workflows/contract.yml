@@ -19,6 +19,9 @@ on:
       - go.sum
       - vscode-gotest/**
       - .github/workflows/contract.yml
+      - .github/actions/setup-go/**
+      - .github/actions/save-go-cache/**
+      - ci/gate.env
   push:
     branches: [main]
     paths:
@@ -29,6 +32,9 @@ on:
       - go.sum
       - vscode-gotest/**
       - .github/workflows/contract.yml
+      - .github/actions/setup-go/**
+      - .github/actions/save-go-cache/**
+      - ci/gate.env
 
 permissions:
   contents: read

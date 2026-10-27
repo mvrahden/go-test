@@ -47,7 +47,8 @@ gate_path() {
 		;;
 	contract.yml)
 		case $f in
-		cmd/* | internal/* | pkg/* | go.mod | go.sum | vscode-gotest/* | .github/workflows/contract.yml) return 0 ;;
+		cmd/* | internal/* | pkg/* | go.mod | go.sum | vscode-gotest/* | .github/workflows/contract.yml | \
+		.github/actions/setup-go/* | .github/actions/save-go-cache/* | ci/gate.env) return 0 ;;
 		*) return 1 ;;
 		esac
 		;;
