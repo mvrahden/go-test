@@ -1118,7 +1118,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 | `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
 | `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
 | `fuzz-cache` | Carry Go's fuzz cache between runs so each session resumes where the last stopped; `false` for a from-seeds run (default `true`) |
-| `events-file` | Also save the run's go test `-json` event stream to this path (`--events-file`); prefer one under `runner.temp`; needs gotest v1.35.0 or newer, and the step fails naming it with an older CLI; default empty saves nothing |
+| `events-file` | Also save the run's go test `-json` event stream to this path (`--events-file`); prefer one under `runner.temp`; needs gotest v1.36.0 or newer, and the step fails naming it with an older CLI; default empty saves nothing |
 | `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
 
 ### Outputs
