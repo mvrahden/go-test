@@ -22,10 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
-          check-latest: true
+      - uses: ./.github/actions/setup-go
       - name: Format check
         run: make fmt-check
       - name: Vuln check
@@ -70,6 +67,8 @@ jobs:
         run: |
           go build ./... && go vet ./...
           go tool gotest ./...
+      - if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-go-cache
 
   drill:
     runs-on: ubuntu-latest
@@ -79,10 +78,7 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
-          check-latest: true
+      - uses: ./.github/actions/setup-go
       - name: Drill
         env:
           DRILL_SHARD: ${{ matrix.shard }}/4
@@ -95,6 +91,8 @@ jobs:
           name: drill-${{ matrix.shard }}
           path: ${{ runner.temp }}/drill-logs
           if-no-files-found: ignore
+      - if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-go-cache
 
   drill-shards:
     needs: drill
@@ -106,9 +104,6 @@ jobs:
         with:
           pattern: drill-*
           path: ${{ runner.temp }}/drill-logs
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
-          check-latest: true
+      - uses: ./.github/actions/setup-go
       - name: Shards agree on one assignment
         run: bash tests/drill/drill.sh --check-shards "${{ runner.temp }}/drill-logs"
