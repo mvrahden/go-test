@@ -24,12 +24,14 @@ defaults:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/extension-check
 
   package:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: check
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -52,6 +54,7 @@ jobs:
 
   publish-github:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: package
     permissions:
       contents: write

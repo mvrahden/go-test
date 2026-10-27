@@ -40,6 +40,7 @@ concurrency:
 jobs:
   contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     defaults:
       run:
         working-directory: vscode-gotest
@@ -77,6 +78,7 @@ jobs:
   # LF), so the diff would fail for line endings rather than for drift.
   contract-windows:
     runs-on: windows-latest
+    timeout-minutes: 6
     defaults:
       run:
         working-directory: vscode-gotest
