@@ -373,6 +373,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -756,6 +759,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -1095,6 +1101,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -1447,6 +1456,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -1891,6 +1903,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -2272,6 +2287,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -2624,6 +2642,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -2976,6 +2997,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -3328,6 +3352,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -3773,6 +3800,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -4154,6 +4184,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -4514,6 +4547,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -4961,6 +4997,9 @@ func main() {
 					ƒreleases[ƒi] = !ƒtorn[ƒi]
 					switch ƒc.Verb {
 					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
 						for _, ƒd := range ƒdependencies[ƒi] {
 							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")

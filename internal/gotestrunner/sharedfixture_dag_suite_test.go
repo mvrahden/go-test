@@ -381,3 +381,32 @@ func (s *SharedFixtureDAGTestSuite) TestAReleaseGivenUpIsNotWaitedForAgain(t *go
 		})
 	}
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAReleasedFixtureIsNeverRestarted(t *gotest.T) {
+	log := filepath.Join(t.TempDir(), "dag.log")
+	t.Setenv(fixtures.EnvDagLog, log)
+	proc, release := startDAG(t, dagFixtures(true, "DagA"))
+	first := proc.StartKeys(t.Context(), []string{dagKey("DagA")}, 0)
+	released := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute)
+	again := proc.StartKeys(t.Context(), []string{dagKey("DagA")}, 0)
+	teardownErr := release()
+	events := readDagLog(t, log)
+
+	t.When("a fixture released earlier in the run is started again", func(w *gotest.T) {
+		w.It("refuses the start, naming the fixture", func(it *gotest.T) {
+			gotest.NoError(it, first)
+			gotest.NoError(it, released)
+			gotest.ErrorContains(it, again, "DagASharedFixture: released earlier in this run; shared fixtures are never restarted")
+			gotest.NoError(it, teardownErr)
+		})
+		w.It("runs its BeforeAll once", func(it *gotest.T) {
+			began := 0
+			for _, e := range events {
+				if e.name == "DagA" && e.hook == "BeforeAll" && e.event == "begin" {
+					began++
+				}
+			}
+			gotest.Equal(it, 1, began, "log: %v", events)
+		})
+	})
+}

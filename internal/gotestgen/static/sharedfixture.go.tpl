@@ -440,7 +440,8 @@ func main() {
   A command that could only hang is refused whole, before anything starts or
   is released: a start waiting for a dependency that is neither up nor started
   with it, or a release waiting for a dependent that is up and not released
-  with it.
+  with it. So is a start of a fixture released earlier: its state is gone, and
+  a second BeforeAll would bring it up twice in one run.
 */}}
 {{- /* ƒreleases: the keys this command releases; one released earlier reports nothing again. */}}
 			ƒreleases := make([]bool, len(ƒkeys))
@@ -452,6 +453,9 @@ func main() {
 				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
+					if ƒtorn[ƒi] {
+						ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+					}
 					for _, ƒd := range ƒdependencies[ƒi] {
 						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")

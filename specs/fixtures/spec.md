@@ -175,7 +175,7 @@ Shared fixtures started late SHALL start concurrently, each after what it depend
 - **AND** both are torn down, the dependent first
 
 ### Requirement: A shared fixture released at its last use
-A shared fixture SHALL be released once no remaining planned suite needs it, while unrelated suites still run, and SHALL be started for a serial slot just before it.
+A shared fixture SHALL be released once no remaining planned suite needs it, while unrelated suites still run, and SHALL be started for a serial slot just before it. It SHALL be started at most once in a run: a fixture a later suite still needs SHALL stay up until that suite has run, and the setup process SHALL refuse to start one it already released.
 
 #### Scenario: The last reader finishes first
 - **WHEN** the only suite reading a shared fixture finishes while an unrelated suite still runs
@@ -196,6 +196,10 @@ A shared fixture SHALL be released once no remaining planned suite needs it, whi
 #### Scenario: A fixture only a later exclusive suite reads
 - **WHEN** only the second of two exclusive suites reads a shared fixture
 - **THEN** starts the fixture after the first suite ran, and releases it after the second
+
+#### Scenario: A fixture the exclusive tail still needs
+- **WHEN** a shared fixture is read by a concurrent suite and by an exclusive suite after it
+- **THEN** keeps it up through the exclusive suite, starting and releasing it once
 
 #### Scenario: A slow release beside a slot
 - **WHEN** a shared fixture's release takes its time while an exclusive suite needs a fixture of its own
