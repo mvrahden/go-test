@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli .* / fails with exit 2, located at the value, naming the forms it accepts \(
+Clause: when a suite's ExclusiveGroup is neither a string literal nor a string constant → fails with exit 2, located at the value, naming the forms it accepts
+--- a/internal/gotestast/suiteconfig.go
++++ b/internal/gotestast/suiteconfig.go
+@@ -143,8 +143,8 @@
+ 			return fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", field)
+ 		}
+ 	case "ExclusiveGroup":
+-		name, ok := stringConstant(info, value)
+-		if !ok {
++		name, _ := stringConstant(info, value)
++		if false {
+ 			return errors.New("SuiteConfig: ExclusiveGroup must be a string literal or a string constant, of this package or another — the generator resolves it statically")
+ 		}
+ 		if name != "" && !groupName.MatchString(name) {
