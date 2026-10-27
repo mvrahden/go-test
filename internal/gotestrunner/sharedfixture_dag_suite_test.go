@@ -441,7 +441,8 @@ func (s *SharedFixtureDAGTestSuite) TestAStartBesideAReleaseFollowsItsBudget(t *
 func (s *SharedFixtureDAGTestSuite) TestAGivenUpStartLeavesEveryReleaseToTheEnd(t *gotest.T) {
 	log := filepath.Join(t.TempDir(), "dag.log")
 	t.Setenv(fixtures.EnvDagLog, log)
-	t.Setenv(fixtures.EnvDagSetupDelay, (2 * time.Second).String())
+	// Each setup takes 1s: the start is given up at 500ms, while DagChild's runs.
+	t.Setenv(fixtures.EnvDagSetupDelay, time.Second.String())
 	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagChild")...)
 	proc, release := startDAG(t, infos)
 	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagChild")}, 500*time.Millisecond)
