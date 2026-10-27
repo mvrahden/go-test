@@ -601,6 +601,12 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 
 	clock := p.startSetupClock(flat)
 	defer clock.stop()
+	// Only a start follows the setup budgets the process reports: a release
+	// beside it taking a report would leave the start at the floor.
+	budgets := p.budgetSeen
+	if verb != "start" {
+		budgets = nil
+	}
 	for {
 		select {
 		case msg := <-resp:
@@ -621,7 +627,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 				return ackErr(verb, msg)
 			}
 			return fmt.Errorf("shared fixture %s timed out after %v", verb, after)
-		case <-p.budgetSeen:
+		case <-budgets:
 			clock.follow()
 		}
 	}

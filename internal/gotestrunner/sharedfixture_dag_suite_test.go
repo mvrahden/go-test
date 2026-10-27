@@ -410,3 +410,28 @@ func (s *SharedFixtureDAGTestSuite) TestAReleasedFixtureIsNeverRestarted(t *gote
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAStartBesideAReleaseFollowsItsBudget(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagSlow, "DagA")
+	t.Setenv(fixtures.EnvDagSetupDelay, (2 * time.Second).String())
+	t.Setenv(fixtures.EnvDagTeardownDelay, (3 * time.Second).String())
+	t.Setenv(fixtures.EnvDagTimeout, (10 * time.Second).String())
+	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
+	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagB")...)
+	proc, release := startDAG(t, infos)
+	released := make(chan error, 1)
+	go func() { released <- proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute) }()
+	time.Sleep(200 * time.Millisecond)
+	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagB")}, 0)
+	releaseErr := <-released
+	teardownErr := release()
+	restore()
+
+	t.When("a fixture taking 2s under a declared 10s Timeout starts while another's release still runs", func(w *gotest.T) {
+		w.It("waits by the budget the fixture reports, not the floor before any report", func(it *gotest.T) {
+			gotest.NoError(it, startErr)
+			gotest.NoError(it, releaseErr)
+			gotest.NoError(it, teardownErr)
+		})
+	})
+}
