@@ -334,6 +334,7 @@ shards of one run do not add up to every mutant exactly once.
 | `json-summary-annotated` | summary writes GitHub annotations after a JSON document too | cli conformance: the JSON summary inside GitHub Actions carries `::error` |
 | `group-line-dropped` | the terminal summary prints no line for a named group | cli conformance: no `group e2e: …, run apart` line |
 | `group-json-entry-dropped` | the JSON summary carries no groups entry | cli conformance: the document has no group |
+| `group-markdown-lines-dropped` | the Markdown and GitHub step summaries list no named group | cli conformance: no `- group e2e: …, run apart` line in either |
 | `summary-accepts-json-flag` | summary takes `-json` beside its terminal format | cli conformance: `summary -json` is not refused with exit 2 |
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
