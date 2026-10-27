@@ -350,8 +350,10 @@ func (s *SharedFixtureDAGTestSuite) TestAReleaseGivenUpIsNotWaitedForAgain(t *go
 		t.Setenv(fixtures.EnvDagTeardownDelay, r.delay.String())
 		proc, release := startDAG(t, dagFixtures(false, r.names...))
 		releaseErr := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, 300*time.Millisecond)
-		// Past the 800ms AfterAll: its late ack is in.
-		time.Sleep(1500 * time.Millisecond)
+		if r.delay < time.Second {
+			// Past the 800ms AfterAll: its late ack is in.
+			time.Sleep(1500 * time.Millisecond)
+		}
 		began := time.Now()
 		teardownErr := release()
 		took := time.Since(began)
