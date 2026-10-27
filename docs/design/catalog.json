@@ -5613,6 +5613,59 @@
               "name": "TestStopDuringTheReleaseBetweenAttempts",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lets that release finish and releases each fixture once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lets_that_release_finish_and_releases_each_fixture_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no fixture process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_no_fixture_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is stopped while a shared fixture's release runs and another fixture is still held",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_is_stopped_while_a_shared_fixture's_release_runs_and_another_fixture_is_still_held",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStopWhileAReleaseRuns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStopWhileAReleaseRuns",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureCancel",
@@ -11078,7 +11131,7 @@
     }
   ],
   "stats": {
-    "behaviors": 362,
+    "behaviors": 364,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
