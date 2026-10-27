@@ -487,6 +487,7 @@ shards of one run do not add up to every mutant exactly once.
 | `slot-waits-for-releases` | an exclusive suite's slot waits for every release in flight before it starts its fixtures | fixtures conformance: the suite runs only after a slow release ends |
 | `ledger-without-the-tail` | the release ledger counts only the concurrent suites, so a fixture an exclusive suite still needs is released before it runs | fixtures conformance: the fixture is released before the exclusive suite reading it |
 | `teardown-kills-instead-of-asking` | the end of the run kills the shared fixture process instead of asking it to shut down, cutting short a release still running | fixtures conformance: a stopped run's release never finishes |
+| `release-blocks-its-suite` | a suite goroutine waits for the releases it freed before it ends, so a slow release holds up the exclusive tail | fixtures conformance: the tail suite runs only after the slow release ends |
 | `release-before-dependents` | a shared fixture's release no longer waits for the fixtures depending on it | fixtures conformance: a dependent is released after its dependency |
 | `start-before-dependencies` | a shared fixture started late no longer waits for its dependencies to come up | fixtures conformance: the tail's fixture starts before the dependency it reads |
 | `teardown-budget-summed` | the setup process reports the sum of the resident fixtures' shares as its teardown budget | fixtures conformance: the hung release is force-killed after 37s, not 35s |

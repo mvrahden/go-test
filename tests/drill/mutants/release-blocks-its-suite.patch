@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / starts that fixture and runs the suite while the release still runs \(
+Clause: when a shared fixture's release takes its time while an exclusive suite needs a fixture of its own → starts that fixture and runs the suite while the release still runs
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -836,7 +836,7 @@
+ 			go func(t SuiteTarget, idx int) {
+ 				defer wg.Done()
+ 				// Last of all, once the suite's process is gone.
+-				defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)) }()
++				defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)); releaser.Drain() }()
+ 				recorded := false
+ 				// missing names the shared fixture the suite is given up for.
+ 				missing := ""
