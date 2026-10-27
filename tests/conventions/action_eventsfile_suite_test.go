@@ -147,7 +147,7 @@ func (s *ActionEventsFileTestSuite) TestUnderGitBashTheOutputIsAWindowsPath(t *g
 func (s *ActionEventsFileTestSuite) TestAnOlderCLIFailsBeforeRunning(t *gotest.T) {
 	run := s.runStep(t, "out/events.json", true)
 	gotest.Equal(t, 2, run.exit, "stdout: %s", run.stdout)
-	gotest.Contains(t, run.stdout, "::error::events-file needs gotest v1.35.0 or newer; the version input is v1.33.0")
+	gotest.Contains(t, run.stdout, "::error::events-file needs gotest v1.36.0 or newer; the version input is v1.33.0")
 	gotest.Len(t, run.calls, 1)
 	gotest.Contains(t, run.calls[0], "--help")
 	gotest.NotContains(t, run.output, "events-file=")

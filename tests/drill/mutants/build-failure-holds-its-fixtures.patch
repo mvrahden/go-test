@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/fixtures .* / releases the fixture once its readers that can run have finished, before the unrelated suite ends \(
+Clause: when a shared fixture's reader is in a package that never links, while an unrelated suite still runs → releases the fixture once its readers that can run have finished, before the unrelated suite ends
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -808,7 +808,6 @@ loop:
+ 			}
+ 			buildFailed = true
+ 			bookBuildFailures(collector, nil, []BuildFailure{{Package: outcome.Package, Err: outcome.Err}})
+-			releaser.Release(ledger.DoneExcept(outcome.Package, nil))
+ 			continue
+ 		}
+ 		cr := outcome.Result

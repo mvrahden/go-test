@@ -299,3 +299,182 @@ func (s *SharedFixtureDAGTestSuite) TestAReleaseIsReportedByTheCommandThatRanIt(
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAHungReleaseHoldsUpNoLaterStart(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagSlow, "DagA")
+	t.Setenv(fixtures.EnvDagTeardownDelay, (3 * time.Second).String())
+	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagB")...)
+	proc, release := startDAG(t, infos)
+	released := make(chan error, 1)
+	go func() { released <- proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute) }()
+	time.Sleep(200 * time.Millisecond)
+	began := time.Now()
+	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagB")}, 0)
+	took := time.Since(began)
+	releaseErr := <-released
+	teardownErr := release()
+
+	t.When("a fixture is started while another's release still runs", func(w *gotest.T) {
+		w.It("comes up without waiting for the release", func(it *gotest.T) {
+			gotest.NoError(it, startErr)
+			gotest.NoError(it, releaseErr)
+			gotest.NoError(it, teardownErr)
+			gotest.Less(it, took, 1500*time.Millisecond)
+		})
+	})
+}
+
+func (s *SharedFixtureDAGTestSuite) TestAReleaseGivenUpIsNotWaitedForAgain(t *gotest.T) {
+	type row struct {
+		Desc     string
+		delay    time.Duration // DagA's AfterAll; its Timeout is 1s
+		names    []string
+		teardown string // what the teardown reports; empty for nothing
+		atOnce   bool
+	}
+	for t, r := range gotest.Each(t, []row{
+		{
+			Desc: "its AfterAll never returns", delay: 10 * time.Minute, names: []string{"DagA"},
+			teardown: "force-killed after 300ms;", atOnce: true,
+		},
+		{Desc: "its AfterAll returns after the release was given up", delay: 800 * time.Millisecond, names: []string{"DagA"}},
+		{
+			Desc: "another fixture is still held", delay: 3 * time.Second, names: []string{"DagA", "DagB"},
+			teardown: "teardown failed",
+		},
+	}) {
+		log := filepath.Join(t.TempDir(), "dag.log")
+		t.Setenv(fixtures.EnvDagLog, log)
+		t.Setenv(fixtures.EnvDagSlow, "DagA")
+		t.Setenv(fixtures.EnvDagTimeout, time.Second.String())
+		t.Setenv(fixtures.EnvDagTeardownDelay, r.delay.String())
+		proc, release := startDAG(t, dagFixtures(false, r.names...))
+		releaseErr := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, 300*time.Millisecond)
+		// Past the 800ms AfterAll: its late ack is in.
+		time.Sleep(1500 * time.Millisecond)
+		began := time.Now()
+		teardownErr := release()
+		took := time.Since(began)
+		events := readDagLog(t, log)
+
+		t.When("a fixture's release is given up at its budget and "+r.Desc, func(w *gotest.T) {
+			w.It("reports the release timed out", func(it *gotest.T) {
+				gotest.ErrorContains(it, releaseErr, "timed out after 300ms")
+			})
+			w.It("ends the process as what it still holds allows", func(it *gotest.T) {
+				if r.teardown == "" {
+					gotest.NoError(it, teardownErr)
+					return
+				}
+				gotest.ErrorContains(it, teardownErr, r.teardown)
+			})
+			if r.atOnce {
+				w.It("does not wait out a budget again once nothing else is held", func(it *gotest.T) {
+					gotest.Less(it, took, 5*time.Second)
+				})
+			}
+			if len(r.names) > 1 {
+				w.It("still releases what else is held", func(it *gotest.T) {
+					gotest.NotZero(it, dagAt(events, "DagB", "AfterAll", "end"), "log: %v", events)
+				})
+			}
+		})
+	}
+}
+
+func (s *SharedFixtureDAGTestSuite) TestAReleasedFixtureIsNeverRestarted(t *gotest.T) {
+	log := filepath.Join(t.TempDir(), "dag.log")
+	t.Setenv(fixtures.EnvDagLog, log)
+	proc, release := startDAG(t, dagFixtures(true, "DagA"))
+	first := proc.StartKeys(t.Context(), []string{dagKey("DagA")}, 0)
+	released := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute)
+	again := proc.StartKeys(t.Context(), []string{dagKey("DagA")}, 0)
+	teardownErr := release()
+	events := readDagLog(t, log)
+
+	t.When("a fixture released earlier in the run is started again", func(w *gotest.T) {
+		w.It("refuses the start, naming the fixture", func(it *gotest.T) {
+			gotest.NoError(it, first)
+			gotest.NoError(it, released)
+			gotest.ErrorContains(it, again, "DagASharedFixture: released earlier in this run; shared fixtures are never restarted")
+			gotest.NoError(it, teardownErr)
+		})
+		w.It("runs its BeforeAll once", func(it *gotest.T) {
+			began := 0
+			for _, e := range events {
+				if e.name == "DagA" && e.hook == "BeforeAll" && e.event == "begin" {
+					began++
+				}
+			}
+			gotest.Equal(it, 1, began, "log: %v", events)
+		})
+	})
+}
+
+func (s *SharedFixtureDAGTestSuite) TestAStartBesideAReleaseFollowsItsBudget(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagSlow, "DagA")
+	t.Setenv(fixtures.EnvDagSetupDelay, (2 * time.Second).String())
+	t.Setenv(fixtures.EnvDagTeardownDelay, (3 * time.Second).String())
+	t.Setenv(fixtures.EnvDagTimeout, (10 * time.Second).String())
+	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
+	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagB")...)
+	proc, release := startDAG(t, infos)
+	released := make(chan error, 1)
+	go func() { released <- proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute) }()
+	time.Sleep(200 * time.Millisecond)
+	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagB")}, 0)
+	releaseErr := <-released
+	teardownErr := release()
+	restore()
+
+	t.When("a fixture taking 2s under a declared 10s Timeout starts while another's release still runs", func(w *gotest.T) {
+		w.It("waits by the budget the fixture reports, not the floor before any report", func(it *gotest.T) {
+			gotest.NoError(it, startErr)
+			gotest.NoError(it, releaseErr)
+			gotest.NoError(it, teardownErr)
+		})
+	})
+}
+
+func (s *SharedFixtureDAGTestSuite) TestAGivenUpStartLeavesEveryReleaseToTheEnd(t *gotest.T) {
+	log := filepath.Join(t.TempDir(), "dag.log")
+	t.Setenv(fixtures.EnvDagLog, log)
+	t.Setenv(fixtures.EnvDagSetupDelay, (2 * time.Second).String())
+	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagChild")...)
+	proc, release := startDAG(t, infos)
+	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagChild")}, 500*time.Millisecond)
+	releaseErr := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute)
+	teardownErr := release()
+	events := readDagLog(t, log)
+
+	t.When("a start is given up while its fixture still sets up on a dependency, and that dependency's last reader finishes", func(w *gotest.T) {
+		w.It("sends no release, leaving the dependency to the end, after its dependent", func(it *gotest.T) {
+			gotest.ErrorContains(it, startErr, "timed out")
+			gotest.NoError(it, releaseErr)
+			gotest.NoError(it, teardownErr)
+			gotest.Less(it, dagAt(events, "DagChild", "BeforeAll", "end"), dagAt(events, "DagA", "AfterAll", "begin"), "log: %v", events)
+		})
+	})
+}
+
+func (s *SharedFixtureDAGTestSuite) TestAFailedReleaseHoldsNothing(t *gotest.T) {
+	t.Setenv(fixtures.EnvDagPanic, "DagB")
+	t.Setenv(fixtures.EnvDagSlow, "DagA")
+	t.Setenv(fixtures.EnvDagTimeout, time.Second.String())
+	t.Setenv(fixtures.EnvDagTeardownDelay, (10 * time.Minute).String())
+	proc, release := startDAG(t, dagFixtures(false, "DagA", "DagB"))
+	failed := proc.TeardownKeys(t.Context(), []string{dagKey("DagB")}, time.Minute)
+	givenUp := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, 300*time.Millisecond)
+	began := time.Now()
+	teardownErr := release()
+	took := time.Since(began)
+
+	t.When("one fixture's release failed and the other's was given up at its budget", func(w *gotest.T) {
+		w.It("force-kills the process at once: the failed release holds nothing", func(it *gotest.T) {
+			gotest.ErrorContains(it, failed, "teardown failed")
+			gotest.ErrorContains(it, givenUp, "timed out after 300ms")
+			gotest.ErrorContains(it, teardownErr, "force-killed after 300ms;")
+			gotest.Less(it, took, 5*time.Second)
+		})
+	})
+}

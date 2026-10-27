@@ -139,9 +139,9 @@ runs:
             have="$INPUT_VERSION"
             if [ "$have" = "gomod" ]; then
               have="$(go list -m -f '{{.Version}}' github.com/mvrahden/go-test 2>/dev/null || true)"
-              echo "::error::events-file needs gotest v1.35.0 or newer; go.mod pins ${have:-an older version}"
+              echo "::error::events-file needs gotest v1.36.0 or newer; go.mod pins ${have:-an older version}"
             else
-              echo "::error::events-file needs gotest v1.35.0 or newer; the version input is ${have}"
+              echo "::error::events-file needs gotest v1.36.0 or newer; the version input is ${have}"
             fi
             exit 2
           fi

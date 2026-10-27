@@ -28,7 +28,6 @@ func (reportingStdin) Close() error { return nil }
 func ExportNewReportingProcess(budget, delay, lag time.Duration) *SharedFixtureProcess {
 	p := ExportNewSilentProcess()
 	p.done = make(chan struct{})
-	p.cmdResp = make(chan string, 1)
 	p.stdin = reportingStdin{p: p, budget: budget, delay: delay, lag: lag}
 	return p
 }

@@ -5613,6 +5613,59 @@
               "name": "TestStopDuringTheReleaseBetweenAttempts",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lets that release finish and releases each fixture once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lets_that_release_finish_and_releases_each_fixture_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no fixture process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_no_fixture_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is stopped while a shared fixture's release runs and another fixture is still held",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_run_is_stopped_while_a_shared_fixture's_release_runs_and_another_fixture_is_still_held",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStopWhileAReleaseRuns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAStopWhileAReleaseRuns",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureCancel",
@@ -5915,6 +5968,394 @@
           "focused": false,
           "kind": "suite",
           "name": "TestFixtureHooksTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the fixture before the unrelated suite ends",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_before_the_unrelated_suite_ends",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the only suite reading a shared fixture finishes while an unrelated suite still runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_only_suite_reading_a_shared_fixture_finishes_while_an_unrelated_suite_still_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasedAfterItsLastSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasedAfterItsLastSuite",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "releases the fixture once its readers that can run have finished, before the unrelated suite ends",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "releases_the_fixture_once_its_readers_that_can_run_have_finished,_before_the_unrelated_suite_ends",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a shared fixture's reader is in a package that never links, while an unrelated suite still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_shared_fixture's_reader_is_in_a_package_that_never_links,_while_an_unrelated_suite_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "one of its two readers never links",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "one_of_its_two_readers_never_links",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "releases the fixture once its readers that can run have finished, before the unrelated suite ends",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "releases_the_fixture_once_its_readers_that_can_run_have_finished,_before_the_unrelated_suite_ends",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        }
+                      ],
+                      "display": "when a shared fixture's reader is in a package that never links, while an unrelated suite still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_shared_fixture's_reader_is_in_a_package_that_never_links,_while_an_unrelated_suite_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "when"
+                    }
+                  ],
+                  "display": "its only reader never links",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "its_only_reader_never_links",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "each"
+                }
+              ],
+              "display": "SuitesThatNeverRunHoldNothing",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSuitesThatNeverRunHoldNothing",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the fixture only after its dependent, once neither is needed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_only_after_its_dependent,_once_neither_is_needed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the suite binding a shared fixture directly finishes while a suite reading a dependent of it still runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_suite_binding_a_shared_fixture_directly_finishes_while_a_suite_reading_a_dependent_of_it_still_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ADependencyOutlastsItsDependents",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestADependencyOutlastsItsDependents",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "starts the fixture after the first suite ran, and releases it after the second",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_the_fixture_after_the_first_suite_ran,_and_releases_it_after_the_second",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when only the second of two exclusive suites reads a shared fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "only_the_second_of_two_exclusive_suites_reads_a_shared_fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATailFixtureComesUpForItsSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATailFixtureComesUpForItsSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "starts that fixture and runs the suite while the release still runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "starts_that_fixture_and_runs_the_suite_while_the_release_still_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's release takes its time while an exclusive suite needs a fixture of its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_release_takes_its_time_while_an_exclusive_suite_needs_a_fixture_of_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASlowReleaseHoldsUpNoSlot",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASlowReleaseHoldsUpNoSlot",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "keeps it up through the exclusive suite, starting and releasing it once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "keeps_it_up_through_the_exclusive_suite,_starting_and_releasing_it_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture is read by a concurrent suite and by an exclusive suite after it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture_is_read_by_a_concurrent_suite_and_by_an_exclusive_suite_after_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFixtureTheTailStillNeedsIsHeld",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFixtureTheTailStillNeedsIsHeld",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the other beside it, not after it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_other_beside_it,_not_after_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's release still runs as the run ends and another fixture is still held",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_release_still_runs_as_the_run_ends_and_another_fixture_is_still_held",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasesAtTheEndRunTogether",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasesAtTheEndRunTogether",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the fixture only once that process is gone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_fixture_only_once_that_process_is_gone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the last suite reading a shared fixture returns while a process it started still runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_last_suite_reading_a_shared_fixture_returns_while_a_process_it_started_still_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasedOnceTheSuitesProcessesAreGone",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasedOnceTheSuitesProcessesAreGone",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureLastUse",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureLastUseTestSuite",
           "output": [],
           "status": "none"
         },
@@ -6708,6 +7149,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given",
@@ -6761,6 +7215,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given",
@@ -6801,6 +7268,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s, without a second wait for the release given up",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s,_without_a_second_wait_for_the_release_given_up",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns",
@@ -6838,6 +7318,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "the_slot's_release_is_given_up_once_its_32s_teardown_budget_has_passed,_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s, without a second wait for the release given up",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s,_without_a_second_wait_for_the_release_given_up",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -10678,13 +11171,13 @@
     }
   ],
   "stats": {
-    "behaviors": 350,
+    "behaviors": 365,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 58,
+    "suites": 59,
     "tests": 0
   }
 }

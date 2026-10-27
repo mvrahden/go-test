@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / lets that release finish and releases each fixture once \(
+Clause: when a run is stopped while a shared fixture's release runs and another fixture is still held → lets that release finish and releases each fixture once
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -681,7 +681,7 @@
+ 	}
+ 
+ 	if !diedEarly {
+-		_ = p.tree.Interrupt()
++		_ = p.tree.Kill()
+ 	}
+ 	var forceKilled bool
+ 	var allowed time.Duration

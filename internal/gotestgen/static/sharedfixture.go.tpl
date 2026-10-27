@@ -30,6 +30,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -317,6 +318,14 @@ func main() {
 	ƒteardown_{{ $f.VarName }} := func() bool {
 		ƒtornOnce_{{ $f.VarName }}.Do(func() {
 			defer close(ƒtornDone_{{ $f.VarName }})
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[{{ $f.Index }}]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_{{ $f.VarName }}
+			}
 {{- range $d := $f.Dependents }}
 			ƒstateMu.Lock()
 			ƒheld_{{ $d.Var }} := ƒattempted[{{ $d.Index }}] || ƒtorn[{{ $d.Index }}]
@@ -384,6 +393,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 {{- /*
   Window commands until shutdown. The runner owns shutdown TIMING — only it
@@ -391,8 +409,10 @@ func main() {
   setup reports and then serves commands until the signal instead of tearing
   down on its own; this process owns shutdown EXECUTION. StartKeys and
   TeardownKeys run their fixtures concurrently, a start after its
-  dependencies and a release after its dependents. Each command is acknowledged on
-  the protocol stream with a _cmd line carrying the joined per-fixture
+  dependencies and a release after its dependents, and commands run
+  concurrently too, so a release that hangs holds up no later start. Each
+  command is acknowledged on the protocol stream with a _cmd line carrying
+  its id, the joined per-fixture
   failures and the teardown budget, which now covers what the command brought
   up. A SIGTERM that already arrived (canceling setup above) has ƒctx closed
   and falls straight through, as does the end of stdin.
@@ -406,13 +426,22 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
+{{- /* Each command is served on a goroutine of its own and acknowledged with its id. */}}
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+			if ƒc.Verb == "start" {
+				defer ƒstartsInFlight.Done()
+			}
 			var ƒcmdErrs []string
 			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
 {{- /*
   A command that could only hang is refused whole, before anything starts or
   is released: a start waiting for a dependency that is neither up nor started
   with it, or a release waiting for a dependent that is up and not released
-  with it.
+  with it. So is a start of a fixture released earlier: its state is gone, and
+  a second BeforeAll would bring it up twice in one run.
 */}}
 {{- /* ƒreleases: the keys this command releases; one released earlier reports nothing again. */}}
 			ƒreleases := make([]bool, len(ƒkeys))
@@ -424,6 +453,9 @@ func main() {
 				ƒreleases[ƒi] = !ƒtorn[ƒi]
 				switch ƒc.Verb {
 				case "start":
+					if ƒtorn[ƒi] {
+						ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+					}
 					for _, ƒd := range ƒdependencies[ƒi] {
 						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
 							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
@@ -475,16 +507,18 @@ func main() {
 				ƒreleasing.Wait()
 {{- range .TeardownFixtures }}
 				if ƒreleases[{{ .Index }}] && ƒteardown_{{ .VarName }}() {
-					ƒteardownFailed = true
+					ƒfailed()
 					ƒcmdErrs = append(ƒcmdErrs, "{{ .Identifier }}: teardown failed")
 				}
 {{- end }}
 			default:
 				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 
 {{- /*
   Terminal teardown: everything still resident, concurrently, each after its
@@ -502,9 +536,11 @@ func main() {
 	ƒreleasing.Wait()
 {{ range .TeardownFixtures }}
 	if ƒteardown_{{ .VarName }}() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
 {{- end }}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 
 {{- /*
   Exit 1 for a lifecycle failure of either kind. The runner reads a teardown

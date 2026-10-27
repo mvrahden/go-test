@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / ends the run within 60s \(
+Clause: when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given → ends the run within 60s
+Clause: when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given → ends the run within 60s
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -489,7 +489,6 @@
+ 		return ack, true
+ 	default:
+ 	}
+-	p.gaveUp(verb, keys)
+ 	if verb == "teardown" {
+ 		if p.overdue == nil {
+ 			p.overdue = map[uint64]overdueRelease{}

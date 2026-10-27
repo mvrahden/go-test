@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,6 +91,27 @@ func (s *FixtureCancelTestSuite) TestStopDuringTheReleaseBetweenAttempts(t *gote
 		w.It("starts no further attempt and releases the fixture once", func(it *gotest.T) {
 			gotest.Equal(it, 1, count(run.Markers, "retry.BeforeAll"), "markers: %v", run.Markers)
 			gotest.Equal(it, 1, count(run.Markers, "retry.AfterAll"), "markers: %v", run.Markers)
+		})
+	})
+}
+
+func (s *FixtureCancelTestSuite) TestAStopWhileAReleaseRuns(t *gotest.T) {
+	t.When("a run is stopped while a shared fixture's release runs and another fixture is still held", func(w *gotest.T) {
+		run := interruptedAt(w, s.cli, "../testdata/fixastoprelease/", "slow.AfterAll begins")
+		w.It("lets that release finish and releases each fixture once", func(it *gotest.T) {
+			gotest.Equal(it, 1, count(run.Markers, "slow.AfterAll begins"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
+			gotest.Equal(it, 1, count(run.Markers, "slow.AfterAll ends"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
+			gotest.Equal(it, 1, count(run.Markers, "held.AfterAll"), "markers: %v\nstderr: %s", run.Markers, run.Stderr)
+		})
+		w.It("leaves no fixture process behind", func(it *gotest.T) {
+			pid := 0
+			for _, m := range run.Markers {
+				if n, ok := strings.CutPrefix(m, "setup pid "); ok {
+					pid, _ = strconv.Atoi(n)
+				}
+			}
+			gotest.NotZero(it, pid, "markers: %v", run.Markers)
+			gotest.True(it, testkit.EndedWithin(pid, time.Second), "the shared fixture process %d still runs", pid)
 		})
 	})
 }

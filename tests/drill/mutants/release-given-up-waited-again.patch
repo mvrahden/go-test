@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/fixtures .* / ends the run within 60s, without a second wait for the release given up \(
+Clause: when a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns → ends the run within 60s, without a second wait for the release given up
+Clause: when a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns → ends the run within 60s, without a second wait for the release given up
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -685,7 +685,7 @@
+ 	}
+ 	var forceKilled bool
+ 	var allowed time.Duration
+-	if given, ok := p.onlyOverdue(); ok && !diedEarly {
++	if given, ok := p.onlyOverdue(); ok && !diedEarly && false {
+ 		// What the process holds was given its whole budget already; waiting
+ 		// that out again would only hold the run.
+ 		forceKilled, allowed = true, given

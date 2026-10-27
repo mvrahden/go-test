@@ -380,17 +380,18 @@ When fixtures are skipped this way, the runner emits one debug line to stderr: `
 
 ### Window scheduling
 
-A run dispatches in two phases: the parallel bulk, then the serial tail of `Exclusive` suites.
-Each phase has an alive set — `Alive(phase)` is the DAG-closure of the union of the shared fixture keys the phase's suites require — and a shared fixture is resident exactly for the phases that need it:
+A run dispatches in two phases: the parallel bulk, then the serial tail of `Exclusive` suites, one slot at a time.
+Each phase has an alive set — `Alive(phase)` is the DAG-closure of the union of the shared fixture keys the phase's suites require — and a shared fixture is resident only while a planned suite still needs it ([A shared fixture released at its last use](../../specs/fixtures/spec.md#requirement-a-shared-fixture-released-at-its-last-use)):
 
 - Fixtures in neither alive set never start.
 - `Alive(bulk)` starts up-front, concurrent with package compilation.
-- At the bulk→tail barrier — every parallel suite drained, no exclusive suite dispatched yet — the runner tears down `Alive(bulk) ∖ Alive(tail)`, then starts `Alive(tail) ∖ Alive(bulk)`, each set concurrently, a start after its dependencies and a release after its dependents ([Releasing shared fixtures](../../specs/fixtures/spec.md#requirement-releasing-shared-fixtures)), under the same per-fixture retry and budget policy as the up-front phase. A fixture started there with a dependency only the tail needs comes up after it and is released before it ([A late fixture's dependencies](../../specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies)).
-- Run-end teardown releases whatever is still resident. Fixtures released at the barrier are skipped there: every fixture's teardown has exactly one owner.
+- Before each exclusive suite, the runner starts the fixtures it needs that are not up yet, under the same per-fixture retry and budget policy as the up-front phase; a start that fails gives up that slot's suite. A fixture started there with a dependency only the tail needs comes up after it and is released before it ([A late fixture's dependencies](../../specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies)).
+- A ledger counts, for each fixture, the planned suites whose DAG-closed needs contain it. A suite counts down once its process group is gone, or as soon as it is known never to run (its package failed to build, or it produced no target); a fixture at zero is released, concurrently with its fellows and each after its dependents ([Releasing shared fixtures](../../specs/fixtures/spec.md#requirement-releasing-shared-fixtures)), by one releaser that sends one command at a time and never blocks dispatch.
+- Run-end teardown releases whatever is still resident. A fixture released earlier is skipped there: every fixture's teardown has exactly one owner.
 
-The barrier speaks two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on the protocol stream after any late state lines.
-`Alive(tail)` is computed from the tail suites that actually became runnable, so a fixture whose only exclusive suite failed to compile is released at the barrier, not started for nothing.
-On cancellation the barrier is skipped entirely and run-end teardown owns everything.
+Slot starts and releases speak two verbs to the setup subprocess over its stdin — start and teardown, each naming a set of state keys — acknowledged on the protocol stream after any late state lines.
+A fixture whose only exclusive suite failed to compile is never started.
+On cancellation no further slot starts, and run-end teardown owns everything still resident.
 Window scheduling is always on; there is no configuration.
 
 ### Lifetime: one hold per top-level function
@@ -440,7 +441,7 @@ A `bench` run waits for its first window of shared fixtures instead, and for eve
   In-test-process package-fixture setup failure is a `t.Fatalf` (exit 1).
 - A retried setup releases each failed attempt with `AfterAll` before the next ([A failed release between attempts](../../specs/fixtures/spec.md#requirement-a-failed-release-between-attempts)). That release runs as the final teardown does: under the fixture's `Timeout`, held to a declared one by verdict, and not cut short by a stop; a stop that arrives meanwhile ends the setup once the release returns, with no further attempt and no second `AfterAll` ([A stop during the release between attempts](../../specs/fixtures/spec.md#requirement-a-stop-during-the-release-between-attempts)). An `AfterAll` that never returns is bounded by `--setup-timeout` or `go test -timeout`, not by its `Timeout`.
 - Fixture teardown failure flips an otherwise passing run to a failure. For a shared fixture it is booked as the failed package `shared fixtures`, carrying the `<fixture>.AfterAll failed: …` lines. For a package fixture it fails the function that held it (`fixture teardown failed`).
-- Barrier-time failures — an early teardown or a tail-phase start — fail the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
+- An early release or a slot start that fails fails the run through the same aggregation as run-end teardown failures; the terminal teardown still runs and owns the remainder.
 
 A per-method hook's error is the method's failure, located at the hook's declaration ([Where a fixture hook failure is reported](../../specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)). The fixtures take their turns in dependency order, a turn coming only once every `BeforeEach` before it returned without an error inside the `Timeout`; a fixture's `AfterEach` runs exactly when its turn came and its own `BeforeEach`, if it has one, returned without an error ([Fixture per-method hooks in dependency order](../../specs/fixtures/spec.md#requirement-fixture-per-method-hooks-in-dependency-order)). A `BeforeEach` that returns an error or panics gets no `AfterEach`, so it releases what it acquired before returning.
 

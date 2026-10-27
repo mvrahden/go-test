@@ -31,6 +31,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -247,6 +248,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -269,6 +278,14 @@ func main() {
 	ƒteardown_sf1 := func() bool {
 		ƒtornOnce_sf1.Do(func() {
 			defer close(ƒtornDone_sf1)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[1]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf1
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
@@ -320,6 +337,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -329,87 +355,99 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf1()
+						}()
+					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") && ƒerrs[1] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf1()
+						}()
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[1] && ƒteardown_sf1() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
+					}
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf1()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") && ƒerrs[1] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/redis.RedisFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf1()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[1] && ƒteardown_sf1() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
-				}
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -425,11 +463,13 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -467,6 +507,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -629,6 +670,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -674,6 +723,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -683,66 +741,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PostgresFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -753,8 +823,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -792,6 +864,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -939,6 +1012,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -984,6 +1065,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -993,66 +1083,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.SetupFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "SetupFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -1063,8 +1165,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -1102,6 +1206,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -1262,6 +1367,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -1307,6 +1420,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -1316,66 +1438,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -1386,8 +1520,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -1425,6 +1561,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -1641,6 +1778,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -1663,6 +1808,14 @@ func main() {
 	ƒteardown_sf1 := func() bool {
 		ƒtornOnce_sf1.Do(func() {
 			defer close(ƒtornDone_sf1)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[1]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf1
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
@@ -1714,6 +1867,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -1723,87 +1885,99 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf1()
+						}()
+					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") && ƒerrs[1] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf1()
+						}()
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[1] && ƒteardown_sf1() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
+					}
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf1()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") && ƒerrs[1] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.RedisFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf1()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/shared.PostgresFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[1] && ƒteardown_sf1() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
-				}
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -1819,11 +1993,13 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -1861,6 +2037,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -2021,6 +2198,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -2066,6 +2251,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -2075,66 +2269,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -2145,8 +2351,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -2184,6 +2392,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -2344,6 +2553,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -2389,6 +2606,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -2398,66 +2624,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -2468,8 +2706,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -2507,6 +2747,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -2667,6 +2908,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -2712,6 +2961,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -2721,66 +2979,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -2791,8 +3061,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -2830,6 +3102,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -2990,6 +3263,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -3035,6 +3316,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -3044,66 +3334,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -3114,8 +3416,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -3154,6 +3458,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -3370,6 +3675,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -3392,6 +3705,14 @@ func main() {
 	ƒteardown_sf1 := func() bool {
 		ƒtornOnce_sf1.Do(func() {
 			defer close(ƒtornDone_sf1)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[1]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf1
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
@@ -3443,6 +3764,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -3452,87 +3782,99 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf1()
+						}()
+					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") && ƒerrs[1] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf1()
+						}()
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[1] && ƒteardown_sf1() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
+					}
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf1()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") && ƒerrs[1] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: "+ƒerrs[1].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/redis.RedisFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf1()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[1] && ƒteardown_sf1() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "RedisFixture: teardown failed")
-				}
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -3548,11 +3890,13 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -3590,6 +3934,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -3750,6 +4095,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -3795,6 +4148,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -3804,66 +4166,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -3874,8 +4248,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -3913,6 +4289,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -4081,6 +4458,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -4126,6 +4511,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -4135,66 +4529,78 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: "+ƒerrs[0].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/fixtures.PGFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PGFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -4205,8 +4611,10 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -4245,6 +4653,7 @@ func ƒquote(s string) string {
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
+	ID   uint64   `json:"id"`
 }
 
 func ƒhasKey(keys []string, key string) bool {
@@ -4463,6 +4872,14 @@ func main() {
 	ƒteardown_sf0 := func() bool {
 		ƒtornOnce_sf0.Do(func() {
 			defer close(ƒtornDone_sf0)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[0]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf0
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[0] || !ƒattempted[0]
 			ƒtorn[0] = true
@@ -4485,6 +4902,14 @@ func main() {
 	ƒteardown_sf1 := func() bool {
 		ƒtornOnce_sf1.Do(func() {
 			defer close(ƒtornDone_sf1)
+			// A release sent while the fixture's start still runs waits for
+			// that setup to end: no AfterAll beside its own BeforeAll.
+			ƒstateMu.Lock()
+			ƒbegun := ƒstarted[1]
+			ƒstateMu.Unlock()
+			if ƒbegun {
+				<-ƒdone_sf1
+			}
 			ƒstateMu.Lock()
 			ƒskip := ƒtorn[1] || !ƒattempted[1]
 			ƒtorn[1] = true
@@ -4536,6 +4961,15 @@ func main() {
 	}
 
 	ƒteardownFailed := false
+	var ƒfailMu sync.Mutex
+	ƒfailed := func() {
+		ƒfailMu.Lock()
+		defer ƒfailMu.Unlock()
+		ƒteardownFailed = true
+	}
+	// Starts still in flight when the loop ends: the terminal teardown waits
+	// for them, so no AfterAll runs beside its own BeforeAll.
+	var ƒstartsInFlight sync.WaitGroup
 
 ƒloop:
 	for {
@@ -4545,87 +4979,99 @@ func main() {
 		case <-ƒeof:
 			break ƒloop
 		case ƒc := <-ƒcmds:
-			var ƒcmdErrs []string
-			ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
-			ƒreleases := make([]bool, len(ƒkeys))
-			ƒstateMu.Lock()
-			for ƒi := range ƒkeys {
-				if !ƒrequested(ƒi) {
-					continue
+			if ƒc.Verb == "start" {
+				ƒstartsInFlight.Add(1)
+			}
+			go func(ƒc ƒcommand) {
+				if ƒc.Verb == "start" {
+					defer ƒstartsInFlight.Done()
 				}
-				ƒreleases[ƒi] = !ƒtorn[ƒi]
-				switch ƒc.Verb {
-				case "start":
-					for _, ƒd := range ƒdependencies[ƒi] {
-						if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+				var ƒcmdErrs []string
+				ƒrequested := func(i int) bool { return ƒhasKey(ƒc.Keys, ƒkeys[i]) }
+				ƒreleases := make([]bool, len(ƒkeys))
+				ƒstateMu.Lock()
+				for ƒi := range ƒkeys {
+					if !ƒrequested(ƒi) {
+						continue
+					}
+					ƒreleases[ƒi] = !ƒtorn[ƒi]
+					switch ƒc.Verb {
+					case "start":
+						if ƒtorn[ƒi] {
+							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": released earlier in this run; shared fixtures are never restarted")
+						}
+						for _, ƒd := range ƒdependencies[ƒi] {
+							if !ƒstarted[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": its dependency "+ƒnames[ƒd]+" is neither up nor started with it")
+							}
+						}
+					case "teardown":
+						for _, ƒd := range ƒdependents[ƒi] {
+							if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
+								ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
+							}
 						}
 					}
-				case "teardown":
-					for _, ƒd := range ƒdependents[ƒi] {
-						if ƒattempted[ƒd] && !ƒtorn[ƒd] && !ƒrequested(ƒd) {
-							ƒcmdErrs = append(ƒcmdErrs, ƒnames[ƒi]+": "+ƒnames[ƒd]+", which depends on it, is up and not released with it")
-						}
+				}
+				ƒstateMu.Unlock()
+				switch {
+				case len(ƒcmdErrs) > 0:
+				case ƒc.Verb == "start":
+					var ƒstarting sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf0()
+						}()
 					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
+						ƒstarting.Add(1)
+						go func() {
+							defer ƒstarting.Done()
+							ƒsetup_sf1()
+						}()
+					}
+					ƒstarting.Wait()
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") && ƒerrs[1] != nil {
+						ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: "+ƒerrs[1].Error())
+					}
+				case ƒc.Verb == "teardown":
+					var ƒreleasing sync.WaitGroup
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf1()
+						}()
+					}
+					if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
+						ƒreleasing.Add(1)
+						go func() {
+							defer ƒreleasing.Done()
+							ƒteardown_sf0()
+						}()
+					}
+					ƒreleasing.Wait()
+					if ƒreleases[1] && ƒteardown_sf1() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: teardown failed")
+					}
+					if ƒreleases[0] && ƒteardown_sf0() {
+						ƒfailed()
+						ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
+					}
+				default:
+					ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
 				}
-			}
-			ƒstateMu.Unlock()
-			switch {
-			case len(ƒcmdErrs) > 0:
-			case ƒc.Verb == "start":
-				var ƒstarting sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf0()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
-					ƒstarting.Add(1)
-					go func() {
-						defer ƒstarting.Done()
-						ƒsetup_sf1()
-					}()
-				}
-				ƒstarting.Wait()
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") && ƒerrs[0] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: "+ƒerrs[0].Error())
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") && ƒerrs[1] != nil {
-					ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: "+ƒerrs[1].Error())
-				}
-			case ƒc.Verb == "teardown":
-				var ƒreleasing sync.WaitGroup
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/gcs.GCSFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf1()
-					}()
-				}
-				if ƒhasKey(ƒc.Keys, "github.com/example/project/tests/fixtures.PostgresFixture") {
-					ƒreleasing.Add(1)
-					go func() {
-						defer ƒreleasing.Done()
-						ƒteardown_sf0()
-					}()
-				}
-				ƒreleasing.Wait()
-				if ƒreleases[1] && ƒteardown_sf1() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "GCSFixture: teardown failed")
-				}
-				if ƒreleases[0] && ƒteardown_sf0() {
-					ƒteardownFailed = true
-					ƒcmdErrs = append(ƒcmdErrs, "PostgresFixture: teardown failed")
-				}
-			default:
-				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
-			}
-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+				fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
+			}(ƒc)
 		}
 	}
+	ƒstartsInFlight.Wait()
 	var ƒreleasing sync.WaitGroup
 
 	ƒreleasing.Add(1)
@@ -4641,11 +5087,13 @@ func main() {
 	ƒreleasing.Wait()
 
 	if ƒteardown_sf1() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
 	if ƒteardown_sf0() {
-		ƒteardownFailed = true
+		ƒfailed()
 	}
+	ƒfailMu.Lock()
+	defer ƒfailMu.Unlock()
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}

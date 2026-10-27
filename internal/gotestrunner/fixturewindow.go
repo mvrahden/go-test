@@ -89,17 +89,6 @@ func dependenciesFirst(fixtures []gotestgen.SharedFixtureInfo) []gotestgen.Share
 	return out
 }
 
-// aliveFromTargets computes the alive set for one phase's actual targets —
-// the plan narrowed by compile results. Targets carry test function names in
-// SuiteName, matching the required-keys maps.
-func aliveFromTargets(targets []SuiteTarget, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) map[string]bool {
-	phase := map[string][]string{}
-	for i := range targets {
-		phase[targets[i].Package] = append(phase[targets[i].Package], targets[i].SuiteName)
-	}
-	return aliveFixtureKeys(phase, reqKeys, fixtures)
-}
-
 // diffKeys returns set ∖ minus, sorted for deterministic commands and
 // messages. Execution order is the subprocess's job — it applies its
 // generated (reverse-)topological order regardless of the order sent.

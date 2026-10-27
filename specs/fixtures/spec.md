@@ -139,7 +139,7 @@ A suite binding a shared fixture SHALL fail under plain go test before any metho
 - **THEN** fails naming the shared fixture it binds and go tool gotest, before any method runs
 
 ### Requirement: A shared fixture's declared setup budget
-When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them, for a setup at the start of the run and for one started later for the exclusive tail or a bench slot; a fixture that hangs past that budget SHALL fail the run and the suites that read it SHALL never run.
+When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be the budget the fixture declares, counting every attempt and every release between them, for a setup at the start of the run and for one started later for the exclusive tail or a bench slot; a fixture that hangs past that budget SHALL fail the run, which SHALL end within 60s, and the suites that read it SHALL never run.
 
 #### Scenario: A container fixture slower than the default budget
 - **WHEN** a shared fixture declaring ContainerFixtureConfig takes 35s to come up and no --setup-timeout is given
@@ -158,11 +158,13 @@ When no --setup-timeout is given, the wait for a shared fixture's setup SHALL be
 - **WHEN** a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given
 - **THEN** the wait ends at the declared budget and the run fails
 - **AND** never runs the suite reading it
+- **AND** ends the run within 60s
 
 #### Scenario: A fixture started for a bench slot
 - **WHEN** a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given
 - **THEN** the wait ends at the declared budget and the run fails
 - **AND** never runs the benchmark reading it
+- **AND** ends the run within 60s
 
 ### Requirement: A late fixture's dependencies
 Shared fixtures started late SHALL start concurrently, each after what it depends on: one started for the exclusive tail together with a dependency only the tail needs SHALL come up after that dependency, serve the suites that read it, and be torn down before it.
@@ -171,6 +173,49 @@ Shared fixtures started late SHALL start concurrently, each after what it depend
 - **WHEN** a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs
 - **THEN** both come up, the dependency first, and the suite reading them passes
 - **AND** both are torn down, the dependent first
+
+### Requirement: A shared fixture released at its last use
+A shared fixture SHALL be released once no remaining planned suite needs it, while unrelated suites still run, and SHALL be started for a serial slot just before it. It SHALL be started at most once in a run: a fixture a later suite still needs SHALL stay up until that suite has run, and the setup process SHALL refuse to start one it already released.
+
+#### Scenario: The last reader finishes first
+- **WHEN** the only suite reading a shared fixture finishes while an unrelated suite still runs
+- **THEN** releases the fixture before the unrelated suite ends
+
+#### Scenario: A reader that never runs
+- **WHEN** a shared fixture's reader is in a package that never links, while an unrelated suite still runs
+- **THEN** releases the fixture once its readers that can run have finished, before the unrelated suite ends
+
+#### Scenario: A dependency outlasts its dependents
+- **WHEN** the suite binding a shared fixture directly finishes while a suite reading a dependent of it still runs
+- **THEN** releases the fixture only after its dependent, once neither is needed
+
+#### Scenario: A suite that leaves a process running
+- **WHEN** the last suite reading a shared fixture returns while a process it started still runs
+- **THEN** releases the fixture only once that process is gone
+
+#### Scenario: A fixture only a later exclusive suite reads
+- **WHEN** only the second of two exclusive suites reads a shared fixture
+- **THEN** starts the fixture after the first suite ran, and releases it after the second
+
+#### Scenario: A fixture the exclusive tail still needs
+- **WHEN** a shared fixture is read by a concurrent suite and by an exclusive suite after it
+- **THEN** keeps it up through the exclusive suite, starting and releasing it once
+
+#### Scenario: A slow release beside a slot
+- **WHEN** a shared fixture's release takes its time while an exclusive suite needs a fixture of its own
+- **THEN** starts that fixture and runs the suite while the release still runs
+
+### Requirement: Releases as a run ends
+A stop SHALL let a shared fixture's release in flight finish, release each fixture once, and leave no fixture process behind. Releases still pending when the run ends SHALL go to the final teardown, which releases them all at once.
+
+#### Scenario: A stop while a release runs
+- **WHEN** a run is stopped while a shared fixture's release runs and another fixture is still held
+- **THEN** lets that release finish and releases each fixture once
+- **AND** leaves no fixture process behind
+
+#### Scenario: Releases pending as the run ends
+- **WHEN** a shared fixture's release still runs as the run ends and another fixture is still held
+- **THEN** releases the other beside it, not after it
 
 ### Requirement: Releasing shared fixtures
 Shared fixtures SHALL be released concurrently, each after the fixtures that depend on it, under a teardown budget of 30s plus the longest chain still resident: a fixture's share, its declared Timeout or the default, plus the longest chain among the fixtures depending on it. A fixture's share SHALL leave the budget once it is released.
@@ -184,15 +229,17 @@ Shared fixtures SHALL be released concurrently, each after the fixtures that dep
 - **THEN** their process is force-killed after 30s plus the longest chain still resident, 35s, and the run fails
 
 ### Requirement: A late fixture's teardown budget
-A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run.
+A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run. A process holding nothing but releases given up that way SHALL be force-killed at the end of the run without waiting a budget out again.
 
 #### Scenario: A tail fixture whose AfterAll never returns
 - **WHEN** a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns
 - **THEN** its process is force-killed once its 32s teardown budget has passed, and the run fails
+- **AND** ends the run within 60s, without a second wait for the release given up
 
 #### Scenario: A bench slot's fixture whose AfterAll never returns
 - **WHEN** a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns
 - **THEN** the slot's release is given up once its 32s teardown budget has passed, and the run fails
+- **AND** ends the run within 60s, without a second wait for the release given up
 
 ### Requirement: A stopped run ends the wait for a late fixture
 A run whose --timeout expires while a shared fixture started for the exclusive tail hangs SHALL end the wait, fail, and leave no fixture process behind.

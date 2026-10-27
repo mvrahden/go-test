@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/fixtures .* / releases the fixture only once that process is gone \(
+Clause: when the last suite reading a shared fixture returns while a process it started still runs → releases the fixture only once that process is gone
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -902,6 +902,7 @@ loop:
+ 				}
+ 				defer func() { <-sem }()
+ 
++				releaser.Release(ledger.Done(t.Package, t.SuiteName))
+ 				runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
+ 				recorded = true
+ 			}(target, i)

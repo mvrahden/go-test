@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 )
 
 type sysTree struct{}
@@ -33,7 +34,18 @@ func (sysTree) kill(pid int) error { return signalGroup(pid, syscall.SIGKILL) }
 // release kills whatever the root left running in its group: the group's id
 // stays its own while any member lives, so a signal to it after the root was
 // reaped reaches no stranger.
-func (sysTree) release(pid int) { _ = signalGroup(pid, syscall.SIGKILL) }
+func (t sysTree) release(pid int) {
+	_ = signalGroup(pid, syscall.SIGKILL)
+	// A killed process exits later: waited for, so the root being done means
+	// its tree is too.
+	for deadline := time.Now().Add(releaseWait); t.alive(pid) && time.Now().Before(deadline); {
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// releaseWait bounds the wait for a killed group to exit: one stuck in the
+// kernel is left behind rather than holding the caller.
+const releaseWait = 2 * time.Second
 
 // alive reports whether any process of the group led by pid is left. The
 // group's id is not reused while it has a member, so probing it after the

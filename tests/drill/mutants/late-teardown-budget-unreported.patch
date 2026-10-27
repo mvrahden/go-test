@@ -4,12 +4,12 @@ Clause: when a shared fixture started for the exclusive tail declares a 2s Timeo
 Clause: when a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns → the slot's release is given up once its 32s teardown budget has passed, and the run fails
 --- a/internal/gotestgen/static/sharedfixture.go.tpl
 +++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -314,7 +314,7 @@
+@@ -510,7 +510,7 @@ func main() {
  			default:
  				ƒcmdErrs = append(ƒcmdErrs, "unknown verb: "+ƒc.Verb)
  			}
--			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s,\"teardownBudget\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
-+			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"error\":%s}\n", ƒquote(strings.Join(ƒcmdErrs, "; ")))
+-			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s,\"teardownBudget\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")), ƒquote(ƒteardownBudget().String()))
++			fmt.Fprintf(ƒproto, "{\"key\":\"_cmd\",\"id\":%d,\"error\":%s}\n", ƒc.ID, ƒquote(strings.Join(ƒcmdErrs, "; ")))
+ 			}(ƒc)
  		}
  	}
- 

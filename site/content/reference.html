@@ -867,7 +867,7 @@ FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
           <tr><td><code>fuzz</code></td><td><code>false</code></td><td>Run a budgeted fuzz session after the tests (<code>gotest fuzz --for</code>); a new crasher fails the step.</td></tr>
           <tr><td><code>fuzz-for</code></td><td><em>none</em></td><td>Approximate wall-clock budget for the fuzz session; empty uses the CLI's default of one minute.</td></tr>
           <tr><td><code>fuzz-cache</code></td><td><code>true</code></td><td>Carry Go's fuzz cache between runs, so each session resumes where the last one stopped.</td></tr>
-          <tr><td><code>events-file</code></td><td></td><td>Also save the run's <code>go test -json</code> event stream to this path, for <code>upload-artifact</code>, gotestsum or <code>gotest summary --input</code>; prefer a path under <code>runner.temp</code>. Needs gotest v1.35.0 or newer. Artifacts are not masked like logs: a token a test prints ends up in the file.</td></tr>
+          <tr><td><code>events-file</code></td><td></td><td>Also save the run's <code>go test -json</code> event stream to this path, for <code>upload-artifact</code>, gotestsum or <code>gotest summary --input</code>; prefer a path under <code>runner.temp</code>. Needs gotest v1.36.0 or newer. Artifacts are not masked like logs: a token a test prints ends up in the file.</td></tr>
           <tr><td><code>version</code></td><td><code>gomod</code></td><td>Version to install, or <code>gomod</code> to resolve from <code>go.mod</code>.</td></tr>
         </tbody>
       </table>

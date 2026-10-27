@@ -621,9 +621,10 @@ non-exclusive suite through the semaphore. Suites with
 `SuiteConfig{Exclusive: true}` are held back and run strictly after the bulk
 drains — one at a time, in deterministic order — because their verdicts
 measure wall-clock behavior (timing budgets, contended resources) that
-concurrently running suites would corrupt. At the bulk→tail barrier the
-runner re-windows shared fixtures for the tail (see Per-Suite Fixture
-Readiness).
+concurrently running suites would corrupt. Before each tail slot the
+runner starts the shared fixtures it needs that are not up yet, and a
+fixture no remaining planned suite needs is released (see Per-Suite
+Fixture Readiness).
 
 Level 3 is sized from a budget of concurrent test methods, `--parallel`,
 2×GOMAXPROCS by default: at most GOMAXPROCS suite processes run at a time,
@@ -1312,7 +1313,7 @@ Project-specific terms, one definition each; the section named elaborates.
 - **ptest / pxtest** — the two test-package variants `packages.Load` returns for one directory: the in-package tests (`package foo`) and the external ones (`package foo_test`). Each gets its own generated file. (Discovery)
 - **Bound / budget** — a *bound* is the deadline on a phase's context; a *budget* is the duration the phase is held to by verdict, which applies only when the suite or fixture declared a config of its own. (Timeout Architecture; spec.md, Generated Behavior)
 - **Teardown budget** — the grace period a suite subprocess computes for itself and writes to a sidecar file; the runner waits that long after SIGTERM before SIGKILL. (Timeout Architecture)
-- **Bulk / tail / barrier** — the two dispatch phases: the parallel bulk of ordinary suites, then the serial tail of `Exclusive` suites; the barrier between them is where shared fixtures are re-windowed. (Dispatch Phases)
+- **Bulk / tail** — the two dispatch phases: the parallel bulk of ordinary suites, then the serial tail of `Exclusive` suites, each slot starting the shared fixtures it needs. (Dispatch Phases)
 - **Exclusive** — a suite dispatched strictly alone in the tail, for verdicts that measure wall-clock behavior or contend for a resource. (Dispatch Phases)
 - **Fixture window** — the span during which a shared fixture is resident: from the first phase that needs it to the last, never speculatively. (Per-Suite Fixture Readiness; fixtures.md, Execution Model)
 - **Transfer field / local field / hydrate** — a shared fixture's exported, JSON-serialized fields cross the process boundary; fields assigned in `Hydrate` are local and rebuilt in each test process. (SharedFixture Lifecycle)
