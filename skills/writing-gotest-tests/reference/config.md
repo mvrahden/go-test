@@ -90,7 +90,9 @@ each other. The value must be a string literal or a string constant
 (a constant from a shared package, `testgroups.E2E`, avoids typos), named
 with `A-Z`, `a-z`, `0-9`, `_`, `-`; anything else is refused at
 generation. A shared fixture only the group reads starts at the group's
-start and is released at its last use. `--group=e2e` runs the group
+start and is released at its last use; a group that runs first (the only
+one `--group` selects, or all suites grouped) starts it beside
+compilation, as the default group does. `--group=e2e` runs the group
 alone, `--skip-group=e2e` everything else: one CI job per side, no build
 tags. `gotest summary` prints each group's suites and wall time. Group
 only what needs isolation — a group gives up its overlap with the rest

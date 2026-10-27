@@ -947,7 +947,7 @@ Use it for suites whose verdicts depend on wall-clock behavior or contended reso
 Like `Parallel`, it is resolved statically by the generator and affects scheduling only.
 
 `ExclusiveGroup: "e2e"` puts the suite in a named group that runs apart from every other suite, its members in parallel among themselves: the default group runs first, then each named group by name, and `Exclusive` then means alone within the group ([Exclusive groups](specs/lifecycle/spec.md#requirement-exclusive-groups)).
-A shared fixture only the group reads is up only while the group runs.
+A shared fixture only the group reads starts when the group starts and is released at its last use; a group that runs first, such as the one `--group` selects, starts it beside compilation, as the default group does.
 The value must be a string literal or a string constant, possibly from another package (`testgroups.E2E`), using `A-Z`, `a-z`, `0-9`, `_` and `-`.
 `gotest ./... --skip-group=e2e` and `gotest ./... --group=e2e` split a run along the same lines, for example into two CI jobs ([Selecting groups](specs/cli/spec.md#requirement-selecting-groups)); `gotest summary` prints each group's suites and wall time.
 Group only what needs isolation: a grouped suite gives up the overlap it had with the rest of the run.
