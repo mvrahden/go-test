@@ -613,13 +613,18 @@ Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
 2. **The runtime floor is v1.35.0 from v1.35.1** — a v1.35.1 CLI refuses
    a pin below v1.35.0, skipping the retracted v1.34.0; v1.35.0 still
    accepts a v1.34.0 pin. The extension from 1.35.1 needs a v1.35.0 CLI.
-3. **Shared fixtures are released concurrently** — each after the fixtures
+
+## v1.36
+
+Rules and sections tagged **v1.36+** need v1.36.0 or newer. What v1.36 changes:
+
+1. **Shared fixtures are released concurrently** — each after the fixtures
    holding a pointer field to it, as package fixtures already were. Two
    shared fixtures that share something without such a field (a Docker
    network, a port) used to be released one after another by accident; give
    the one that must go last a pointer field to the other.
 
-4. **A shared fixture is released at its last use** — once no remaining
+2. **A shared fixture is released at its last use** — once no remaining
    planned suite declares it, not at the end of the run, and one only an
    exclusive suite needs starts just before that suite. A suite that reads
    a shared fixture it does not declare can find it gone; declare a pointer
