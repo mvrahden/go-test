@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / runs only the e2e group's suites and starts only their fixtures \(
+Clause: when --group=e2e is given → runs only the e2e group's suites and starts only their fixtures
+--- a/internal/gotestrunner/groups.go
++++ b/internal/gotestrunner/groups.go
+@@ -16,9 +16,6 @@
+ }
+ 
+ func (g groupSelection) selects(group string) bool {
+-	if len(g.only) > 0 && !g.only[group] {
+-		return false
+-	}
+ 	return !g.skip[group]
+ }
+ 

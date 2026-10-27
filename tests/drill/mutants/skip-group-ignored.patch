@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / runs every suite outside the e2e group and starts none of its fixtures \(
+Clause: when --skip-group=e2e is given → runs every suite outside the e2e group and starts none of its fixtures
+--- a/internal/gotestrunner/groups.go
++++ b/internal/gotestrunner/groups.go
+@@ -19,7 +19,7 @@
+ 	if len(g.only) > 0 && !g.only[group] {
+ 		return false
+ 	}
+-	return !g.skip[group]
++	return true
+ }
+ 
+ func (g groupSelection) active() bool { return len(g.only)+len(g.skip) > 0 }

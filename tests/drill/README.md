@@ -407,6 +407,9 @@ shards of one run do not add up to every mutant exactly once.
 | `skip-of-every-wrapper-keeps-a-testless-suite` | a `-skip` naming every fuzz wrapper never drops a suite without test methods, judged by a Test function it lacks | fuzz conformance: the suite's shared fixture starts |
 | `skip-of-the-test-function-drops-the-seeds` | a `-skip` naming a suite's Test function drops the suite, fuzz seeds included | fuzz conformance: the seed replay has no pass verdict |
 | `skip-pattern-left-unchecked` | a `-skip` pattern is not checked before the run, so one go test rejects runs nothing and passes | cli conformance: the pattern is not refused with exit 2 |
+| `group-flag-ignored` | `--group` selects nothing, so every group runs | cli conformance: `--group=e2e` runs the default and load groups and starts their fixtures |
+| `skip-group-ignored` | `--skip-group` leaves nothing out | cli conformance: `--skip-group=e2e` runs the e2e suites and starts their fixture |
+| `unknown-group-checked-after-build` | an unknown group name is refused only after the run built and ran | cli conformance: the run leaves test binaries in its work dir before exit 2 |
 | `suite-ended-on-its-own-left-running` | what a suite process that ended on its own left open stays counted as running | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `sync-internals-shown` | values of package sync render their bookkeeping fields | ring-0 equal suite |
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |

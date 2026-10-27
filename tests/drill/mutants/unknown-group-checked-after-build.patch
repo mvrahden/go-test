@@ -1,0 +1,27 @@
+Expect: ^FAIL .*conformance/cli .* / exits 2 before any build, naming the known groups / --group=nope \(
+Clause: when --group or --skip-group names a group no suite declares → exits 2 before any build, naming the known groups
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -301,9 +301,6 @@
+ 			cfg.CI = true
+ 		}
+ 	}
+-	if err := overlay.selectGroups(cfg.Groups, cfg.SkipGroups); err != nil {
+-		return PipelineResult{}, err
+-	}
+ 	pf := ParseExecFlags(cfg.GoTestArgs)
+ 
+ 	// Only when seed corpora actually replay in this run: a stale entry is
+@@ -318,7 +315,11 @@
+ 	if cfg.Bench {
+ 		return runBench(ctx, cfg, overlay, pf)
+ 	}
+-	return runStreaming(ctx, cfg, overlay, pf)
++	result, err := runStreaming(ctx, cfg, overlay, pf)
++	if err := overlay.selectGroups(cfg.Groups, cfg.SkipGroups); err != nil {
++		return PipelineResult{}, err
++	}
++	return result, err
+ }
+ 
+ func buildBaseEnv(cfg PipelineConfig) []string { //nolint:gocritic // hugeParam: stable API
