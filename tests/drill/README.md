@@ -413,6 +413,7 @@ shards of one run do not add up to every mutant exactly once.
 | `group-flag-ignored` | `--group` selects nothing, so every group runs | cli conformance: `--group=e2e` runs the default and load groups and starts their fixtures |
 | `skip-group-ignored` | `--skip-group` leaves nothing out | cli conformance: `--skip-group=e2e` runs the e2e suites and starts their fixture |
 | `unknown-group-checked-after-build` | an unknown group name is refused only after the run built and ran | cli conformance: the run leaves test binaries in its work dir before exit 2 |
+| `group-flags-ignored-where-nothing-runs` | `--group` and `--skip-group` are taken silently by `summary --input`, `spec --input` and `spec --static` | cli conformance: `summary --input --group=e2e` does not exit 2 saying it runs nothing |
 | `suite-ended-on-its-own-left-running` | what a suite process that ended on its own left open stays counted as running | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `sync-internals-shown` | values of package sync render their bookkeeping fields | ring-0 equal suite |
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
