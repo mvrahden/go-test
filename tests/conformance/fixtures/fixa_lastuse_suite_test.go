@@ -105,3 +105,14 @@ func (s *FixtureLastUseTestSuite) TestAFixtureTheTailStillNeedsIsHeld(t *gotest.
 		})
 	})
 }
+
+func (s *FixtureLastUseTestSuite) TestReleasesAtTheEndRunTogether(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixaendrelease/")
+	gotest.NoError(t, err)
+	t.When("a shared fixture's release still runs as the run ends and another fixture is still held", func(w *gotest.T) {
+		w.It("releases the other beside it, not after it", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.True(it, run.MarkerOrder("a.AfterAll begins", "b.AfterAll begins", "a.AfterAll ends"), "markers: %v", run.Markers)
+		})
+	})
+}

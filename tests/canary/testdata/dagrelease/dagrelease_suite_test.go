@@ -21,7 +21,10 @@ func (s *TailTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return cfg
 }
 
+// TestReadsThem ends once the bulk's fixture is released, so that release
+// has left the teardown budget when the run ends.
 func (s *TailTestSuite) TestReadsThem(t *gotest.T) {
 	gotest.NotZero(t, s.Child.A)
+	gotest.True(t, marked("bulk.AfterAll ends"))
 	mark("tail ran")
 }

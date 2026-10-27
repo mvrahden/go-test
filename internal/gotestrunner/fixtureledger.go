@@ -97,12 +97,11 @@ func sortedKeys(set map[string]bool) []string {
 // own, one teardown command at a time, so a suite that frees a fixture never
 // waits for its release, and neither does a start: the process serves
 // commands concurrently. Keys freed while a command is in flight go out
-// together in the next.
+// together in the next. What is still queued or in flight when it stops is
+// left to the terminal teardown.
 type fixtureReleaser struct {
 	mu      sync.Mutex
 	pending []string
-	busy    bool
-	idle    *sync.Cond
 	wake    chan struct{}
 	errs    []error
 	stopped chan struct{}
@@ -113,15 +112,8 @@ type fixtureReleaser struct {
 // teardown. It stops when ctx ends.
 func startFixtureReleaser(ctx context.Context, ready func() *SharedFixtureProcess) *fixtureReleaser {
 	r := &fixtureReleaser{wake: make(chan struct{}, 1), stopped: make(chan struct{})}
-	r.idle = sync.NewCond(&r.mu)
 	go func() {
 		defer close(r.stopped)
-		defer func() {
-			r.mu.Lock()
-			r.pending, r.busy = nil, false
-			r.idle.Broadcast()
-			r.mu.Unlock()
-		}()
 		var proc *SharedFixtureProcess
 		resolved := false
 		for {
@@ -133,7 +125,6 @@ func startFixtureReleaser(ctx context.Context, ready func() *SharedFixtureProces
 			r.mu.Lock()
 			batch := r.pending
 			r.pending = nil
-			r.busy = len(batch) > 0
 			r.mu.Unlock()
 			if len(batch) == 0 {
 				continue
@@ -149,11 +140,9 @@ func startFixtureReleaser(ctx context.Context, ready func() *SharedFixtureProces
 				}
 			}
 			r.mu.Lock()
-			r.busy = false
 			if len(r.pending) > 0 {
 				r.signal()
 			}
-			r.idle.Broadcast()
 			r.mu.Unlock()
 		}
 	}()
@@ -175,20 +164,6 @@ func (r *fixtureReleaser) signal() {
 	select {
 	case r.wake <- struct{}{}:
 	default:
-	}
-}
-
-// Drain waits until no key is queued or in flight.
-func (r *fixtureReleaser) Drain() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for len(r.pending) > 0 || r.busy {
-		select {
-		case <-r.stopped:
-			return
-		default:
-		}
-		r.idle.Wait()
 	}
 }
 

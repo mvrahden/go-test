@@ -1,5 +1,5 @@
 // Package fixadag releases shared fixtures together: the bulk suite's fixture
-// at the barrier, then the tail's three at the end of the run, Child depending
+// once the bulk is done, then the tail's three at the end of the run, Child depending
 // on A and B independent of both. With FIXADAG_HANG set, Child's AfterAll
 // never returns.
 package fixadag
@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +29,20 @@ func mark(event string) {
 	_, _ = f.WriteString(event + "\n")
 }
 
+// marked waits up to 20s for event in the markers file.
+func marked(event string) bool {
+	path := filepath.Join(os.Getenv("GOTEST_CANARY_DIR"), "markers")
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		data, _ := os.ReadFile(path)
+		for _, line := range strings.Split(string(data), "\n") {
+			if line == event {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // release marks the AfterAll of name around half a second of work.
 func release(name string) error {
 	mark(name + ".AfterAll begins")
@@ -36,7 +51,7 @@ func release(name string) error {
 	return nil
 }
 
-// BulkSharedFixture is the bulk suite's alone, released at the barrier.
+// BulkSharedFixture is the bulk suite's alone, released once the bulk is done.
 type BulkSharedFixture struct{}
 
 func (f *BulkSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {

@@ -1000,8 +1000,10 @@ loop:
 	// waits out the configured teardown budget. Cancelling streamCtx first
 	// would signal the process behind Teardown's back, leaving two owners for
 	// one shutdown — and Teardown could no longer tell a process that died on
-	// its own from one that simply obeyed the signal it never sent.
-	releaser.Drain()
+	// its own from one that simply obeyed the signal it never sent. Releases
+	// still queued or in flight go to the terminal teardown, which releases
+	// everything at once: sending them one after another would end the run
+	// later.
 	releaseCancel()
 	releaseErr := releaser.Err()
 	var teardownErr error

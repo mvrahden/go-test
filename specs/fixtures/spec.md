@@ -175,7 +175,7 @@ Shared fixtures started late SHALL start concurrently, each after what it depend
 - **AND** both are torn down, the dependent first
 
 ### Requirement: A shared fixture released at its last use
-A shared fixture SHALL be released once no remaining planned suite needs it, while unrelated suites still run, and SHALL be started for a serial slot just before it. It SHALL be started at most once in a run: a fixture a later suite still needs SHALL stay up until that suite has run, and the setup process SHALL refuse to start one it already released. A stop SHALL let a release in flight finish, release each fixture once, and leave no fixture process behind.
+A shared fixture SHALL be released once no remaining planned suite needs it, while unrelated suites still run, and SHALL be started for a serial slot just before it. It SHALL be started at most once in a run: a fixture a later suite still needs SHALL stay up until that suite has run, and the setup process SHALL refuse to start one it already released.
 
 #### Scenario: The last reader finishes first
 - **WHEN** the only suite reading a shared fixture finishes while an unrelated suite still runs
@@ -197,11 +197,6 @@ A shared fixture SHALL be released once no remaining planned suite needs it, whi
 - **WHEN** only the second of two exclusive suites reads a shared fixture
 - **THEN** starts the fixture after the first suite ran, and releases it after the second
 
-#### Scenario: A stop while a release runs
-- **WHEN** a run is stopped while a shared fixture's release runs and another fixture is still held
-- **THEN** lets that release finish and releases each fixture once
-- **AND** leaves no fixture process behind
-
 #### Scenario: A fixture the exclusive tail still needs
 - **WHEN** a shared fixture is read by a concurrent suite and by an exclusive suite after it
 - **THEN** keeps it up through the exclusive suite, starting and releasing it once
@@ -209,6 +204,18 @@ A shared fixture SHALL be released once no remaining planned suite needs it, whi
 #### Scenario: A slow release beside a slot
 - **WHEN** a shared fixture's release takes its time while an exclusive suite needs a fixture of its own
 - **THEN** starts that fixture and runs the suite while the release still runs
+
+### Requirement: Releases as a run ends
+A stop SHALL let a shared fixture's release in flight finish, release each fixture once, and leave no fixture process behind. Releases still pending when the run ends SHALL go to the final teardown, which releases them all at once.
+
+#### Scenario: A stop while a release runs
+- **WHEN** a run is stopped while a shared fixture's release runs and another fixture is still held
+- **THEN** lets that release finish and releases each fixture once
+- **AND** leaves no fixture process behind
+
+#### Scenario: Releases pending as the run ends
+- **WHEN** a shared fixture's release still runs as the run ends and another fixture is still held
+- **THEN** releases the other beside it, not after it
 
 ### Requirement: Releasing shared fixtures
 Shared fixtures SHALL be released concurrently, each after the fixtures that depend on it, under a teardown budget of 30s plus the longest chain still resident: a fixture's share, its declared Timeout or the default, plus the longest chain among the fixtures depending on it. A fixture's share SHALL leave the budget once it is released.

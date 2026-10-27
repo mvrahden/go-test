@@ -6274,6 +6274,46 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "releases the other beside it, not after it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "releases_the_other_beside_it,_not_after_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's release still runs as the run ends and another fixture is still held",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_release_still_runs_as_the_run_ends_and_another_fixture_is_still_held",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ReleasesAtTheEndRunTogether",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestReleasesAtTheEndRunTogether",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "releases the fixture only once that process is gone",
                       "duration": 0,
                       "excluded": false,
@@ -11131,7 +11171,7 @@
     }
   ],
   "stats": {
-    "behaviors": 364,
+    "behaviors": 365,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
