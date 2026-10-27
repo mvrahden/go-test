@@ -435,3 +435,24 @@ func (s *SharedFixtureDAGTestSuite) TestAStartBesideAReleaseFollowsItsBudget(t *
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAGivenUpStartLeavesEveryReleaseToTheEnd(t *gotest.T) {
+	log := filepath.Join(t.TempDir(), "dag.log")
+	t.Setenv(fixtures.EnvDagLog, log)
+	t.Setenv(fixtures.EnvDagSetupDelay, (2 * time.Second).String())
+	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagChild")...)
+	proc, release := startDAG(t, infos)
+	startErr := proc.StartKeys(t.Context(), []string{dagKey("DagChild")}, 500*time.Millisecond)
+	releaseErr := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute)
+	teardownErr := release()
+	events := readDagLog(t, log)
+
+	t.When("a start is given up while its fixture still sets up on a dependency, and that dependency's last reader finishes", func(w *gotest.T) {
+		w.It("sends no release, leaving the dependency to the end, after its dependent", func(it *gotest.T) {
+			gotest.ErrorContains(it, startErr, "timed out")
+			gotest.NoError(it, releaseErr)
+			gotest.NoError(it, teardownErr)
+			gotest.Less(it, dagAt(events, "DagChild", "BeforeAll", "end"), dagAt(events, "DagA", "AfterAll", "begin"), "log: %v", events)
+		})
+	})
+}

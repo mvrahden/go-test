@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"sync"
 	"time"
 
@@ -444,17 +443,23 @@ func (p *SharedFixtureProcess) StartKeys(ctx context.Context, keys []string, fla
 
 // TeardownKeys asks the setup subprocess to tear down the given fixtures now,
 // in reverse dependency order — the releasing half of a window boundary.
-// Teardown (the terminal owner) later skips keys already released here. A key
-// whose start was given up is left to it: the process would release it only
-// once its BeforeAll returns. Blocks until the acknowledgement, ctx ending,
+// Teardown (the terminal owner) later skips keys already released here. After
+// a start was given up, nothing is sent: Teardown releases it all. Blocks until the acknowledgement, ctx ending,
 // or timeout; timeout 0 or less means no deadline.
 func (p *SharedFixtureProcess) TeardownKeys(ctx context.Context, keys []string, timeout time.Duration) error {
 	if timeout <= 0 {
 		timeout = -1
 	}
+	// Once a start was given up, a fixture it is still bringing up may rest
+	// on any key a release would take away, and the runner cannot tell
+	// which: the terminal teardown, which releases in dependency order once
+	// the starts have ended, owns every release from then on.
 	p.cmdMu.Lock()
-	keys = slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return p.unstarted[k] })
+	gaveUp := len(p.unstarted) > 0
 	p.cmdMu.Unlock()
+	if gaveUp {
+		return nil
+	}
 	return p.command(ctx, "teardown", keys, timeout)
 }
 
