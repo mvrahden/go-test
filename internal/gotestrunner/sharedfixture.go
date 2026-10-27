@@ -101,6 +101,12 @@ type SharedFixtureProcess struct {
 	// BeforeAll may still run, and only Teardown's shutdown ends one that
 	// ignores its context. Under cmdMu.
 	unstarted map[string]bool
+	// held are the keys the process was asked to bring up and has not
+	// acknowledged releasing. overdue are the releases given up at their
+	// budget, by command id: their AfterAll has had what Teardown would give
+	// it. Under cmdMu.
+	held    map[string]bool
+	overdue map[uint64]overdueRelease
 
 	// failures keeps what the process reported on stderr about fixtures
 	// that failed.
@@ -452,19 +458,92 @@ func (p *SharedFixtureProcess) TeardownKeys(ctx context.Context, keys []string, 
 	return p.command(ctx, "teardown", keys, timeout)
 }
 
-// gaveUp notes the keys of a start given up before its ack.
+// overdueRelease is a release given up once its budget had passed.
+type overdueRelease struct {
+	keys   []string
+	budget time.Duration
+}
+
+// gaveUp notes the keys of a start given up before its ack. Under cmdMu.
 func (p *SharedFixtureProcess) gaveUp(verb string, keys []string) {
 	if verb != "start" {
 		return
 	}
-	p.cmdMu.Lock()
-	defer p.cmdMu.Unlock()
 	if p.unstarted == nil {
 		p.unstarted = map[string]bool{}
 	}
 	for _, k := range keys {
 		p.unstarted[k] = true
 	}
+}
+
+// expire gives up command id at its deadline, unless its ack came with it:
+// a start's keys are left to Teardown, a release's have had their budget.
+func (p *SharedFixtureProcess) expire(id uint64, resp chan string, verb string, keys []string, budget time.Duration) (ack string, acked bool) {
+	p.cmdMu.Lock()
+	defer p.cmdMu.Unlock()
+	delete(p.cmdWaiters, id)
+	select {
+	case ack := <-resp:
+		p.acked(verb, keys, ack)
+		return ack, true
+	default:
+	}
+	p.gaveUp(verb, keys)
+	if verb == "teardown" {
+		if p.overdue == nil {
+			p.overdue = map[uint64]overdueRelease{}
+		}
+		p.overdue[id] = overdueRelease{keys: keys, budget: budget}
+	}
+	return "", false
+}
+
+// acked notes what an ack says: a release acknowledged without an error
+// holds nothing any more. Under cmdMu.
+func (p *SharedFixtureProcess) acked(verb string, keys []string, ack string) {
+	if verb != "teardown" || ack != "" {
+		return
+	}
+	for _, k := range keys {
+		delete(p.held, k)
+	}
+}
+
+// lateAck takes the ack of a release given up: it finished after all.
+// Under cmdMu.
+func (p *SharedFixtureProcess) lateAck(id uint64, ack string) {
+	r, ok := p.overdue[id]
+	if !ok {
+		return
+	}
+	delete(p.overdue, id)
+	p.acked("teardown", r.keys, ack)
+}
+
+// onlyOverdue says whether every key the process holds is in a release given
+// up, and the longest budget such a release had: the process has nothing
+// left to finish but what already ran out its budget.
+func (p *SharedFixtureProcess) onlyOverdue() (time.Duration, bool) {
+	p.cmdMu.Lock()
+	defer p.cmdMu.Unlock()
+	if len(p.overdue) == 0 {
+		return 0, false
+	}
+	given := map[string]bool{}
+	var budget time.Duration
+	for _, r := range p.overdue {
+		for _, k := range r.keys {
+			given[k] = true
+		}
+		budget = max(budget, r.budget)
+	}
+	for k := range p.held {
+		if !given[k] {
+			return 0, false
+		}
+	}
+	return budget, true
 }
 
 // command sends one window verb and waits for the ack carrying its id. The
@@ -485,6 +564,14 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		p.cmdWaiters = map[uint64]chan string{}
 	}
 	p.cmdWaiters[id] = resp
+	if verb == "start" {
+		if p.held == nil {
+			p.held = map[string]bool{}
+		}
+		for _, k := range keys {
+			p.held[k] = true
+		}
+	}
 	p.cmdMu.Unlock()
 	defer func() {
 		p.cmdMu.Lock()
@@ -517,22 +604,35 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	for {
 		select {
 		case msg := <-resp:
-			if msg != "" {
-				return fmt.Errorf("shared fixture %s: %s", verb, msg)
-			}
-			return nil
+			p.cmdMu.Lock()
+			p.acked(verb, keys, msg)
+			p.cmdMu.Unlock()
+			return ackErr(verb, msg)
 		case <-p.done:
 			return fmt.Errorf("shared fixture process exited before acknowledging %s", verb)
 		case <-ctx.Done():
+			p.cmdMu.Lock()
 			p.gaveUp(verb, keys)
+			p.cmdMu.Unlock()
 			return fmt.Errorf("shared fixture %s cancelled: %w", verb, ctx.Err())
 		case <-clock.C:
-			p.gaveUp(verb, keys)
-			return fmt.Errorf("shared fixture %s timed out after %v", verb, clock.expired().After)
+			after := clock.expired().After
+			if msg, acked := p.expire(id, resp, verb, keys, after); acked {
+				return ackErr(verb, msg)
+			}
+			return fmt.Errorf("shared fixture %s timed out after %v", verb, after)
 		case <-p.budgetSeen:
 			clock.follow()
 		}
 	}
+}
+
+// ackErr is the error an ack reports, nil for none.
+func ackErr(verb, ack string) error {
+	if ack == "" {
+		return nil
+	}
+	return fmt.Errorf("shared fixture %s: %s", verb, ack)
 }
 
 // RefreshStateFile rewrites the global state file (the one WaitAllReady wrote
@@ -583,7 +683,18 @@ func (p *SharedFixtureProcess) Teardown() error {
 	if !diedEarly {
 		_ = p.tree.Interrupt()
 	}
-	forceKilled, allowed := p.awaitExit(budget)
+	var forceKilled bool
+	var allowed time.Duration
+	if given, ok := p.onlyOverdue(); ok && !diedEarly {
+		// What the process holds was given its whole budget already; waiting
+		// that out again would only hold the run.
+		forceKilled, allowed = true, given
+		fmt.Fprintf(os.Stderr, "WARN: shared fixture release did not finish within %v, forcing termination\n", given)
+		_ = p.tree.Kill()
+		<-p.done
+	} else {
+		forceKilled, allowed = p.awaitExit(budget)
+	}
 	if p.sharedDir != "" {
 		os.RemoveAll(p.sharedDir)
 	}
@@ -672,10 +783,19 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}
 
 	keys := make([]string, len(fixtures))
+	held := map[string]bool{}
 	for i := range fixtures {
 		keys[i] = fixtures[i].PkgPath + "." + fixtures[i].Identifier
+		if !fixtures[i].Deferred {
+			held[keys[i]] = true
+		}
 	}
-	return launchSharedFixtures(exec.CommandContext(ctx, setupBin), sharedDir, keys, setupTimeout)
+	proc, err := launchSharedFixtures(exec.CommandContext(ctx, setupBin), sharedDir, keys, setupTimeout)
+	if err != nil {
+		return nil, err
+	}
+	proc.held = held
+	return proc, nil
 }
 
 // launchSharedFixtures starts cmd as the shared fixture process serving the
@@ -841,14 +961,19 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 				default:
 				}
 			}
-			// An ack no one waits for any more (the command was given up)
-			// is dropped.
+			// Handed over under cmdMu, so a command giving up at its deadline
+			// sees an ack that came with it. An ack no one waits for any more
+			// is dropped, but a release's still says it finished.
 			p.cmdMu.Lock()
-			resp := p.cmdWaiters[entry.ID]
-			p.cmdMu.Unlock()
-			if resp != nil {
-				resp <- entry.Error
+			if resp := p.cmdWaiters[entry.ID]; resp != nil {
+				select {
+				case resp <- entry.Error:
+				default:
+				}
+			} else {
+				p.lateAck(entry.ID, entry.Error)
 			}
+			p.cmdMu.Unlock()
 			continue
 		}
 		p.mu.Lock()

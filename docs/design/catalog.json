@@ -7135,6 +7135,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s, without a second wait for the release given up",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s,_without_a_second_wait_for_the_release_given_up",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns",
@@ -7172,6 +7185,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "the_slot's_release_is_given_up_once_its_32s_teardown_budget_has_passed,_and_the_run_fails",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the run within 60s, without a second wait for the release given up",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "ends_the_run_within_60s,_without_a_second_wait_for_the_release_given_up",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -11012,7 +11038,7 @@
     }
   ],
   "stats": {
-    "behaviors": 359,
+    "behaviors": 361,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -213,15 +213,17 @@ Shared fixtures SHALL be released concurrently, each after the fixtures that dep
 - **THEN** their process is force-killed after 30s plus the longest chain still resident, 35s, and the run fails
 
 ### Requirement: A late fixture's teardown budget
-A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run.
+A shared fixture started for the exclusive tail or a bench slot SHALL be released under the teardown budget its declared Timeout gives, that Timeout and 30s more, not the default's; an AfterAll that never returns SHALL be given up once that budget has passed and SHALL fail the run. A process holding nothing but releases given up that way SHALL be force-killed at the end of the run without waiting a budget out again.
 
 #### Scenario: A tail fixture whose AfterAll never returns
 - **WHEN** a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns
 - **THEN** its process is force-killed once its 32s teardown budget has passed, and the run fails
+- **AND** ends the run within 60s, without a second wait for the release given up
 
 #### Scenario: A bench slot's fixture whose AfterAll never returns
 - **WHEN** a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns
 - **THEN** the slot's release is given up once its 32s teardown budget has passed, and the run fails
+- **AND** ends the run within 60s, without a second wait for the release given up
 
 ### Requirement: A stopped run ends the wait for a late fixture
 A run whose --timeout expires while a shared fixture started for the exclusive tail hangs SHALL end the wait, fail, and leave no fixture process behind.

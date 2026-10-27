@@ -323,3 +323,61 @@ func (s *SharedFixtureDAGTestSuite) TestAHungReleaseHoldsUpNoLaterStart(t *gotes
 		})
 	})
 }
+
+func (s *SharedFixtureDAGTestSuite) TestAReleaseGivenUpIsNotWaitedForAgain(t *gotest.T) {
+	type row struct {
+		Desc     string
+		delay    time.Duration // DagA's AfterAll; its Timeout is 1s
+		names    []string
+		teardown string // what the teardown reports; empty for nothing
+		atOnce   bool
+	}
+	for t, r := range gotest.Each(t, []row{
+		{
+			Desc: "its AfterAll never returns", delay: 10 * time.Minute, names: []string{"DagA"},
+			teardown: "force-killed after 300ms;", atOnce: true,
+		},
+		{Desc: "its AfterAll returns after the release was given up", delay: 800 * time.Millisecond, names: []string{"DagA"}},
+		{
+			Desc: "another fixture is still held", delay: 3 * time.Second, names: []string{"DagA", "DagB"},
+			teardown: "teardown failed",
+		},
+	}) {
+		log := filepath.Join(t.TempDir(), "dag.log")
+		t.Setenv(fixtures.EnvDagLog, log)
+		t.Setenv(fixtures.EnvDagSlow, "DagA")
+		t.Setenv(fixtures.EnvDagTimeout, time.Second.String())
+		t.Setenv(fixtures.EnvDagTeardownDelay, r.delay.String())
+		proc, release := startDAG(t, dagFixtures(false, r.names...))
+		releaseErr := proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, 300*time.Millisecond)
+		// Past the 800ms AfterAll: its late ack is in.
+		time.Sleep(1500 * time.Millisecond)
+		began := time.Now()
+		teardownErr := release()
+		took := time.Since(began)
+		events := readDagLog(t, log)
+
+		t.When("a fixture's release is given up at its budget and "+r.Desc, func(w *gotest.T) {
+			w.It("reports the release timed out", func(it *gotest.T) {
+				gotest.ErrorContains(it, releaseErr, "timed out after 300ms")
+			})
+			w.It("ends the process as what it still holds allows", func(it *gotest.T) {
+				if r.teardown == "" {
+					gotest.NoError(it, teardownErr)
+					return
+				}
+				gotest.ErrorContains(it, teardownErr, r.teardown)
+			})
+			if r.atOnce {
+				w.It("does not wait out a budget again once nothing else is held", func(it *gotest.T) {
+					gotest.Less(it, took, 5*time.Second)
+				})
+			}
+			if len(r.names) > 1 {
+				w.It("still releases what else is held", func(it *gotest.T) {
+					gotest.NotZero(it, dagAt(events, "DagB", "AfterAll", "end"), "log: %v", events)
+				})
+			}
+		})
+	}
+}
