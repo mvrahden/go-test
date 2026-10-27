@@ -10,4 +10,4 @@ Clause: when --skip-group=e2e is given → runs every suite outside the e2e grou
 +	return true
  }
  
- func (g groupSelection) active() bool { return len(g.only)+len(g.skip) > 0 }
+ // knownGroups lists the named groups the overlay's suites declare, sorted.

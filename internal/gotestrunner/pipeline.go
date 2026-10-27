@@ -1021,7 +1021,8 @@ loop:
 			bulk := sortDeferred(deferredBulk[sc.Group])
 			startFor(bulk, "group "+sc.Group)
 			var scopeWg sync.WaitGroup
-			for _, d := range bulk {
+			for i := range bulk {
+				d := &bulk[i]
 				scopeWg.Add(1)
 				go func(t SuiteTarget, idx int) {
 					defer scopeWg.Done()
@@ -1042,8 +1043,10 @@ loop:
 				allIn()
 			}
 		}
-		for _, d := range sortDeferred(deferredTail[sc.Group]) {
-			startFor([]deferredTarget{d}, "exclusive tail")
+		tail := sortDeferred(deferredTail[sc.Group])
+		for i := range tail {
+			d := &tail[i]
+			startFor(tail[i:i+1], "exclusive tail")
 			runDeferred(d.t, d.idx)
 			if left--; left == 0 {
 				allIn()

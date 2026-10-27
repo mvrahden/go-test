@@ -27,18 +27,18 @@ func (s *CLIGroupsTestSuite) TestSelection(t *gotest.T) {
 	gotest.NoError(t, err)
 	t.When("--group=e2e is given", func(w *gotest.T) {
 		w.It("runs only the e2e group's suites and starts only their fixtures", func(it *gotest.T) {
-			ranOnly(it, only, []string{"stack.BeforeAll", "e2e stack ran", "e2e slow ends"}, []string{"default begins", "load.BeforeAll", "load ran"})
+			ranOnly(it, &only, []string{"stack.BeforeAll", "e2e stack ran", "e2e slow ends"}, []string{"default begins", "load.BeforeAll", "load ran"})
 		})
 	})
 	t.When("--skip-group=e2e is given", func(w *gotest.T) {
 		w.It("runs every suite outside the e2e group and starts none of its fixtures", func(it *gotest.T) {
-			ranOnly(it, others, []string{"default ends", "load.BeforeAll", "load ran"}, []string{"stack.BeforeAll", "e2e stack ran", "e2e slow begins"})
+			ranOnly(it, &others, []string{"default ends", "load.BeforeAll", "load ran"}, []string{"stack.BeforeAll", "e2e stack ran", "e2e slow begins"})
 		})
 	})
 }
 
 // ranOnly checks that run passed, stamping every marker of ran and none of notRan.
-func ranOnly(t *gotest.T, run testkit.Run, ran, notRan []string) {
+func ranOnly(t *gotest.T, run *testkit.Run, ran, notRan []string) {
 	gotest.Equal(t, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 	gotest.Subset(t, run.Markers, ran)
 	for _, m := range notRan {

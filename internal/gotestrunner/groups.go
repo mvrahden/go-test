@@ -22,8 +22,6 @@ func (g groupSelection) selects(group string) bool {
 	return !g.skip[group]
 }
 
-func (g groupSelection) active() bool { return len(g.only)+len(g.skip) > 0 }
-
 // knownGroups lists the named groups the overlay's suites declare, sorted.
 func (o *OverlayResult) knownGroups() []string {
 	set := map[string]bool{}
