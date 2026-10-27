@@ -117,10 +117,11 @@ func marker(dir, name string) bool {
 // the CLI at once, the way a terminal's Ctrl-C ends any other program, rather
 // than being swallowed for the length of the teardown budget. Under spec the
 // suite runs through go tool test2json, which ignores SIGINT, and the CLI
-// inherits that: the exit must not depend on the default disposition.
+// inherits that: the exit must not depend on the default disposition. The
+// method ends with its context, so the teardown starts without a grace.
 func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	markers := t.TempDir()
-	run := s.rig.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./slow/")
+	run := s.rig.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./stoppable/")
 	interruptWhen(t, run, markers, "test-running")
 	first := time.Now()
 	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
