@@ -1,8 +1,82 @@
 Expect: ^FAIL .*conformance/fixtures .* / starts that fixture and runs the suite while the release still runs \(
 Clause: when a shared fixture's release takes its time while an exclusive suite needs a fixture of its own → starts that fixture and runs the suite while the release still runs
+--- a/internal/gotestrunner/fixtureledger.go
++++ b/internal/gotestrunner/fixtureledger.go
+@@ -97,11 +97,12 @@
+ // own, one teardown command at a time, so a suite that frees a fixture never
+ // waits for its release, and neither does a start: the process serves
+ // commands concurrently. Keys freed while a command is in flight go out
+-// together in the next. What is still queued or in flight when it stops is
+-// left to the terminal teardown.
++// together in the next.
+ type fixtureReleaser struct {
+ 	mu      sync.Mutex
+ 	pending []string
++	busy    bool
++	idle    *sync.Cond
+ 	wake    chan struct{}
+ 	errs    []error
+ 	stopped chan struct{}
+@@ -112,8 +113,15 @@
+ // teardown. It stops when ctx ends.
+ func startFixtureReleaser(ctx context.Context, ready func() *SharedFixtureProcess) *fixtureReleaser {
+ 	r := &fixtureReleaser{wake: make(chan struct{}, 1), stopped: make(chan struct{})}
++	r.idle = sync.NewCond(&r.mu)
+ 	go func() {
+ 		defer close(r.stopped)
++		defer func() {
++			r.mu.Lock()
++			r.pending, r.busy = nil, false
++			r.idle.Broadcast()
++			r.mu.Unlock()
++		}()
+ 		var proc *SharedFixtureProcess
+ 		resolved := false
+ 		for {
+@@ -125,6 +133,7 @@
+ 			r.mu.Lock()
+ 			batch := r.pending
+ 			r.pending = nil
++			r.busy = len(batch) > 0
+ 			r.mu.Unlock()
+ 			if len(batch) == 0 {
+ 				continue
+@@ -140,9 +149,11 @@
+ 				}
+ 			}
+ 			r.mu.Lock()
++			r.busy = false
+ 			if len(r.pending) > 0 {
+ 				r.signal()
+ 			}
++			r.idle.Broadcast()
+ 			r.mu.Unlock()
+ 		}
+ 	}()
+@@ -167,6 +178,20 @@
+ 	}
+ }
+ 
++// Drain waits until no key is queued or in flight.
++func (r *fixtureReleaser) Drain() {
++	r.mu.Lock()
++	defer r.mu.Unlock()
++	for len(r.pending) > 0 || r.busy {
++		select {
++		case <-r.stopped:
++			return
++		default:
++		}
++		r.idle.Wait()
++	}
++}
++
+ // Err is every release that failed, once the releaser has stopped.
+ func (r *fixtureReleaser) Err() error {
+ 	<-r.stopped
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -939,6 +939,7 @@ loop:
+@@ -937,6 +937,7 @@
  	var slotErr error
  	started := maps.Clone(win.Bulk)
  	startSlot := func(t *SuiteTarget) {
