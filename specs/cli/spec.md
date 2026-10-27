@@ -142,6 +142,13 @@ gotest SHALL refuse with exit 2 a shared fixture that declares BeforeEach or Aft
 - **WHEN** a shared fixture declares BeforeEach or AfterEach, in the suite's package or another
 - **THEN** fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead
 
+### Requirement: A group that is not a constant
+gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to anything but a string literal or a string constant, of its own package or another: the runner schedules by the group before anything runs. The error is located at the value and names the forms it accepts.
+
+#### Scenario: A group read at run time
+- **WHEN** a suite's ExclusiveGroup is neither a string literal nor a string constant
+- **THEN** fails with exit 2, located at the value, naming the forms it accepts
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

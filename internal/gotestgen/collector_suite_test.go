@@ -403,6 +403,46 @@ func (s *CollectorTestSuite) TestSuiteConfig(t *gotest.T) {
 		})
 	})
 
+	t.When("ExclusiveGroup is a string literal", func(w *gotest.T) {
+		w.It("is resolved statically", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_GroupLiteral")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			gotest.Equal(it, "e2e", result.Suites[0].ExclusiveGroup())
+		})
+	})
+
+	t.When("ExclusiveGroup is a string constant of the package or of another", func(w *gotest.T) {
+		w.It("is resolved through the type checker", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_GroupConstant")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs, "expected no errors, got: %v", result.Errs)
+			groups := map[string]string{}
+			for _, s := range result.Suites {
+				groups[s.Identifier()] = s.ExclusiveGroup()
+			}
+			gotest.Equal(it, map[string]string{"LocalTestSuite": "local-1", "ForeignTestSuite": "e2e"}, groups)
+		})
+	})
+
+	t.When("ExclusiveGroup is not a constant", func(w *gotest.T) {
+		w.It("is refused naming the accepted forms", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_GroupNonConstant_Error")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs)
+			gotest.ErrorContains(it, result.Errs[0].Err, "ExclusiveGroup must be a string literal or a string constant")
+		})
+	})
+
+	t.When("ExclusiveGroup holds a character outside the name alphabet", func(w *gotest.T) {
+		w.It("is refused naming the alphabet", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_GroupBadName_Error")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.NotEmpty(it, result.Errs)
+			gotest.ErrorContains(it, result.Errs[0].Err, `ExclusiveGroup "e2e suites" may use only A-Z, a-z, 0-9, _ and -`)
+		})
+	})
+
 	t.When("Parallel is overridden back to false", func(w *gotest.T) {
 		w.It("reports not parallel", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_SuiteConfig_ParallelFalseOverride")

@@ -57,6 +57,14 @@ type SuiteConfig struct {
 	// like Parallel; scheduling-only, no effect inside the suite process.
 	// Default: false.
 	Exclusive bool
+	// ExclusiveGroup names the group the suite runs in: the suites of a group
+	// run in parallel with each other and never beside a suite outside it.
+	// The default group ("") runs first, then each named group in name
+	// order; Exclusive then means alone within the group. Names use
+	// [A-Za-z0-9_-]. Resolved statically: a string literal or a string
+	// constant, from any package. Scheduling-only, no effect inside the
+	// suite process. Default: "".
+	ExclusiveGroup string
 }
 
 // DefaultFixtureConfig returns a baseline configuration for package fixtures:

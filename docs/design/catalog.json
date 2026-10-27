@@ -5020,6 +5020,46 @@
               "name": "TestSharedFixtureEachHooks",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails with exit 2, located at the value, naming the forms it accepts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_with_exit_2,_located_at_the_value,_naming_the_forms_it_accepts",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite's ExclusiveGroup is neither a string literal nor a string constant",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite's_ExclusiveGroup_is_neither_a_string_literal_nor_a_string_constant",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGroupThatIsNotAConstant",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAGroupThatIsNotAConstant",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIRejections",
@@ -11171,7 +11211,7 @@
     }
   ],
   "stats": {
-    "behaviors": 365,
+    "behaviors": 366,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
