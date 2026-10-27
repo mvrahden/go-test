@@ -4082,6 +4082,72 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "prints one line per named group with its suites and wall time",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "prints_one_line_per_named_group_with_its_suites_and_wall_time",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "puts a groups entry with each group's suites and wall time in the JSON summary",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "puts_a_groups_entry_with_each_group's_suites_and_wall_time_in_the_JSON_summary",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary runs suites of named groups",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "gotest_summary_runs_suites_of_named_groups",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheSummaryNamesEachGroup",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheSummaryNamesEachGroup",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIGroupSummary",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLIGroupSummaryTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "runs only the e2e group's suites and starts only their fixtures",
                       "duration": 0,
                       "excluded": false,
@@ -11530,13 +11596,13 @@
     }
   ],
   "stats": {
-    "behaviors": 376,
+    "behaviors": 378,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 61,
+    "suites": 62,
     "tests": 0
   }
 }

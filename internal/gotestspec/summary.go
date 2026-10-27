@@ -97,6 +97,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
 			c.green, stats.Total(), c.reset,
 			formatDuration(effectiveDuration(&cfg, packages)))
+		renderGroups(w, cfg.groups, c)
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 		}
@@ -140,11 +141,19 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	}
 
 	fmt.Fprintln(w)
+	renderGroups(w, cfg.groups, c)
 	if cfg.coverage != nil {
 		fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 	}
 	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	renderSummary(w, stats, c)
+}
+
+// renderGroups prints one line per named group.
+func renderGroups(w io.Writer, groups []GroupRun, c colors) { //nolint:gocritic // hugeParam: as renderSummary
+	for _, g := range groups {
+		fmt.Fprintf(w, "%s%s%s\n", c.dim, groupLine(g), c.reset)
+	}
 }
 
 func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOption) {

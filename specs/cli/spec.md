@@ -164,6 +164,14 @@ gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to
 - **WHEN** --group or --skip-group names a group no suite declares
 - **THEN** exits 2 before any build, naming the known groups
 
+### Requirement: Groups in the summary
+gotest summary SHALL print one line per named ExclusiveGroup that ran, with its suites and its wall time from its first suite's start to its last suite's end, and its JSON document SHALL carry a matching groups entry.
+
+#### Scenario: A summary of grouped suites
+- **WHEN** gotest summary runs suites of named groups
+- **THEN** prints one line per named group with its suites and wall time
+- **AND** puts a groups entry with each group's suites and wall time in the JSON summary
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

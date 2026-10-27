@@ -289,3 +289,33 @@ func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_WithBenchDeltas(t *go
 func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_NoBenchDeltas(t *gotest.T, _ *summaryRenderCtx) {
 	gotest.NotContains(t, renderMarkdownSummary(singlePassingTest()), "| Benchmark |", "no delta table without deltas")
 }
+
+func (s *SummaryRenderTestSuite) TestRenderSummary_Groups(t *gotest.T, _ *summaryRenderCtx) {
+	pkgs := []*gotestspec.Package{{
+		Path:  "example.com/pkg",
+		Nodes: []*gotestspec.Node{{Kind: gotestspec.KindTest, Display: "Foo", Status: gotestspec.StatusPass, Duration: time.Second}},
+	}}
+	groups := gotestspec.WithGroups([]gotestspec.GroupRun{
+		{Name: "e2e", Suites: 6, Wall: 72 * time.Second},
+		{Name: "load", Suites: 1, Wall: 300 * time.Millisecond},
+	})
+
+	t.It("prints one line per named group with its suites and wall time", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderSummary(&buf, pkgs, gotestspec.WithNoColor(), groups)
+		gotest.Contains(it, buf.String(), "group e2e: 6 suites, 72.0s, run apart\n")
+		gotest.Contains(it, buf.String(), "group load: 1 suite, 300ms, run apart\n")
+	})
+
+	t.It("puts a groups entry in the JSON document, wall time in seconds", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderJSON(&buf, pkgs, groups)
+		gotest.Contains(it, buf.String(), `"groups":[{"name":"e2e","suites":6,"wall":72},{"name":"load","suites":1,"wall":0.3}]`)
+	})
+
+	t.It("leaves the groups entry out without a named group", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderJSON(&buf, pkgs)
+		gotest.NotContains(it, buf.String(), `"groups"`)
+	})
+}

@@ -33,9 +33,32 @@ type renderConfig struct {
 	benchDeltas     []BenchDelta
 	benchEnvWarning string
 	benchGate       *BenchGate
+	groups          []GroupRun
 }
 
 type RenderOption func(*renderConfig)
+
+// GroupRun is what a named ExclusiveGroup took in a run: its suites and the
+// wall time from its first suite's start to its last suite's end.
+type GroupRun struct {
+	Name   string
+	Suites int
+	Wall   time.Duration
+}
+
+// WithGroups adds one line per named group to a summary.
+func WithGroups(groups []GroupRun) RenderOption {
+	return func(c *renderConfig) { c.groups = groups }
+}
+
+// groupLine is a group's summary line: "group e2e: 6 suites, 1m12s, run apart".
+func groupLine(g GroupRun) string {
+	unit := "suites"
+	if g.Suites == 1 {
+		unit = "suite"
+	}
+	return fmt.Sprintf("group %s: %d %s, %s, run apart", g.Name, g.Suites, unit, formatDuration(g.Wall))
+}
 
 func WithNoColor() RenderOption {
 	return func(c *renderConfig) { c.color = false }
