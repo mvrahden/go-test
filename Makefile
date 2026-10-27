@@ -6,13 +6,16 @@ GOLANGCI_VERSION := v2.14.0
 
 SPECS_DIR ?= specs
 
+include ci/gate.env
+export $(shell sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' ci/gate.env)
+
 # The whole Go gate, spelled once; the workflows run these same targets.
 ci: checks lint test drill
 
 test:
 	go build ./...
 	go vet ./...
-	go run ./cmd/gotest spec $(SPEC_FLAGS) --min=70 ./... ./examples/... -race
+	go run ./cmd/gotest spec --parallel=$(GATE_PARALLEL) $(SPEC_FLAGS) --min=$(GATE_MIN_COVERAGE) ./... ./examples/... -race
 
 lint: vet
 	go run ./cmd/gotest lint ./... ./examples/...
