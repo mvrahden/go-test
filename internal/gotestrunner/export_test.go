@@ -113,7 +113,20 @@ func ExportSelectGroups(o *OverlayResult, only, skip []string) error {
 
 var ExportAliveFixtureKeys = aliveFixtureKeys
 
-var ExportSortTargetIndices = sortTargetIndices
+// ExportSortDeferred orders targets as a scope dispatches its held-back suites.
+func ExportSortDeferred(targets []SuiteTarget) []SuiteTarget {
+	ds := make([]deferredTarget, len(targets))
+	for i := range targets {
+		ds[i] = deferredTarget{t: targets[i], idx: i}
+	}
+	sortDeferred(ds)
+	out := make([]SuiteTarget, len(ds))
+	for i := range ds {
+		out[i] = ds[i].t
+	}
+	return out
+}
+
 var ExportLogSlowBuild = logSlowBuild
 var ExportSlowBuildThreshold = slowBuildThreshold
 

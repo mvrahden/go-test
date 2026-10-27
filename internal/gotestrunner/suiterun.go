@@ -85,7 +85,7 @@ func SortTargetsSerial(targets []SuiteTarget) {
 			return targets[a].Package < targets[b].Package
 		}
 		return targets[a].SuiteName < targets[b].SuiteName
-	}) //nolint:gocritic // mirror of sortTargetIndices over the targets themselves
+	}) //nolint:gocritic // mirror of sortDeferred over the targets themselves
 }
 
 // RunBenchSuites executes bench targets strictly one at a time, in slice
@@ -535,18 +535,6 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 		}
 	}
 	return targets
-}
-
-// sortTargetIndices orders target indices by (Package, SuiteName) so
-// exclusive dispatch is deterministic run over run.
-func sortTargetIndices(targets []SuiteTarget, idx []int) {
-	sort.Slice(idx, func(a, b int) bool {
-		ta, tb := targets[idx[a]], targets[idx[b]]
-		if ta.Package != tb.Package {
-			return ta.Package < tb.Package
-		}
-		return ta.SuiteName < tb.SuiteName
-	})
 }
 
 // quoteAll returns regexp.QuoteMeta applied to each name, preserving order.
