@@ -213,8 +213,9 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 
 // globalBudget is the first --timeout TestGlobalTimeout gives a run; a run
 // it ends before TestSleeps starts is retried with double, budgetTries in all.
+// A warm run reaches TestSleeps in under a second.
 const (
-	globalBudget = 15 * time.Second
+	globalBudget = 5 * time.Second
 	budgetTries  = 3
 )
 
