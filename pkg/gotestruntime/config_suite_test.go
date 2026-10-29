@@ -48,7 +48,7 @@ func (s *ConfigDefaultsTestSuite) TestWithSuiteDefaults(t *gotest.T) {
 		},
 		{Desc: "a preset passes through", declared: gotest.IntegrationSuiteConfig(), want: gotest.IntegrationSuiteConfig()},
 	}) {
-		gotest.Equal(it, tc.want, gotestruntime.WithSuiteDefaults(tc.declared))
+		gotest.Equal(it, gotestruntime.ExportScaleSuite(tc.want), gotestruntime.WithSuiteDefaults(tc.declared))
 	}
 }
 
@@ -72,6 +72,6 @@ func (s *ConfigDefaultsTestSuite) TestWithFixtureDefaults(t *gotest.T) {
 		},
 		{Desc: "a preset passes through", declared: gotest.ContainerFixtureConfig(), want: gotest.ContainerFixtureConfig()},
 	}) {
-		gotest.Equal(it, tc.want, gotestruntime.WithFixtureDefaults(tc.declared))
+		gotest.Equal(it, gotestruntime.ExportScaleFixture(tc.want), gotestruntime.WithFixtureDefaults(tc.declared))
 	}
 }

@@ -122,7 +122,7 @@ var ƒ_ServiceFixture *ServiceFixture
 func ƒ_node_CacheFixture() *gotestruntime.FixtureNode {
 	return &gotestruntime.FixtureNode{
 		Name:   "CacheFixture",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
 		Init: func() {
 			ƒ_CacheFixture = &CacheFixture{}
 		},
@@ -138,7 +138,7 @@ func ƒ_node_CacheFixture() *gotestruntime.FixtureNode {
 func ƒ_node_DatabaseFixture() *gotestruntime.FixtureNode {
 	return &gotestruntime.FixtureNode{
 		Name:   "DatabaseFixture",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
 		Init: func() {
 			ƒ_DatabaseFixture = &DatabaseFixture{}
 		},
@@ -154,7 +154,7 @@ func ƒ_node_DatabaseFixture() *gotestruntime.FixtureNode {
 func ƒ_node_ServiceFixture() *gotestruntime.FixtureNode {
 	return &gotestruntime.FixtureNode{
 		Name:   "ServiceFixture",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
 		Init: func() {
 			ƒ_ServiceFixture = &ServiceFixture{
 				Cache: ƒ_CacheFixture,
@@ -201,7 +201,7 @@ func TestMultiFixtureTestSuite(t *testing.T) {
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
 		Fixtures: func(tb testing.TB) {
 			ƒ_holdFixtures(tb, func() time.Duration {
-				return gotest.DefaultSuiteConfig().SetupTimeout
+				return gotestruntime.WithSuiteDefaults(gotest.SuiteConfig{}).SetupTimeout
 			}, ƒ_node_CacheFixture, ƒ_node_DatabaseFixture)
 			s.MultiFixtureTestSuite.DB = ƒ_DatabaseFixture
 			s.MultiFixtureTestSuite.Cache = ƒ_CacheFixture
@@ -244,7 +244,7 @@ func TestServiceTestSuite(t *testing.T) {
 	ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
 		Fixtures: func(tb testing.TB) {
 			ƒ_holdFixtures(tb, func() time.Duration {
-				return gotest.DefaultSuiteConfig().SetupTimeout
+				return gotestruntime.WithSuiteDefaults(gotest.SuiteConfig{}).SetupTimeout
 			}, ƒ_node_CacheFixture, ƒ_node_DatabaseFixture, ƒ_node_ServiceFixture)
 			s.ServiceTestSuite.Svc = ƒ_ServiceFixture
 		},
@@ -418,7 +418,7 @@ var ƒ_GuardFixture *GuardFixture
 func ƒ_node_GuardFixture() *gotestruntime.FixtureNode {
 	return &gotestruntime.FixtureNode{
 		Name:   "GuardFixture",
-		Config: gotest.DefaultFixtureConfig(),
+		Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
 		Init: func() {
 			ƒ_GuardFixture = &GuardFixture{}
 		},
@@ -491,7 +491,7 @@ func TestGuardedFixtureBoundTestSuite(t *testing.T) {
 		Guard: s.GuardedFixtureBoundTestSuite.SuiteGuard,
 		Fixtures: func(tb testing.TB) {
 			ƒ_holdFixtures(tb, func() time.Duration {
-				return gotest.DefaultSuiteConfig().SetupTimeout
+				return gotestruntime.WithSuiteDefaults(gotest.SuiteConfig{}).SetupTimeout
 			}, ƒ_node_GuardFixture)
 			s.GuardedFixtureBoundTestSuite.Fixture = ƒ_GuardFixture
 		},

@@ -33,7 +33,7 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 {{- if $ts.HasConfig }}
         return gotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
 {{- else }}
-        return gotest.DefaultSuiteConfig().SetupTimeout
+        return gotestruntime.WithSuiteDefaults(gotest.SuiteConfig{}).SetupTimeout
 {{- end }}
       }{{ range $n := $fx.Nodes }}, ƒ_node_{{ $n }}{{ end }})
 {{- range $f := $fx.Fields }}

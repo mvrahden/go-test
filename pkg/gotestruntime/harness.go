@@ -70,13 +70,17 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		openSuites.Add(-1)
 		stopWatch()
 	})
+	if _, err := timeoutScale(); err != nil {
+		tb.Fatal(err)
+	}
 	if s.Fixtures != nil {
 		s.Fixtures(tb)
 	}
-	cfg = gotest.DefaultSuiteConfig()
+	cfg = WithSuiteDefaults(gotest.SuiteConfig{})
 	if s.Config != nil {
 		budget = s.Config()
 		cfg = WithSuiteDefaults(budget)
+		budget = scaleSuite(budget)
 	}
 	// Never wait on the suite's subtests here: on panic, testing runs ancestor
 	// cleanups from the panicking goroutine, and the wait would deadlock.

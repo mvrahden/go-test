@@ -70,7 +70,7 @@ func runFixtureTeardown(ctx context.Context, td FixtureTeardown) (err error) {
 		// but teardown only by a context it is free to ignore. Only a declared
 		// budget, though — failing a fixture against a default its author
 		// never wrote is not a verdict they could act on.
-		err = fmt.Errorf("exceeded its configured Timeout of %s", td.Budget)
+		err = fmt.Errorf("exceeded its configured Timeout of %s", scaleTimeout(td.Budget))
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s.AfterAll failed: %v\n", td.Name, err)

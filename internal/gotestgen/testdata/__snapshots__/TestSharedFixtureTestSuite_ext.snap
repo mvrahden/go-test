@@ -82,10 +82,10 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	sf1 := &sfpkg1.RedisFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 2)
 	var ƒstateMu sync.Mutex
@@ -558,7 +558,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -915,7 +915,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.SetupFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -1257,7 +1257,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -1612,10 +1612,10 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	sf1 := &sfpkg0.RedisFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 2)
 	var ƒstateMu sync.Mutex
@@ -2088,7 +2088,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -2443,7 +2443,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -2798,7 +2798,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -3153,7 +3153,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -3509,10 +3509,10 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	sf1 := &sfpkg1.RedisFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 2)
 	var ƒstateMu sync.Mutex
@@ -3985,7 +3985,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 1)
 	var ƒstateMu sync.Mutex
@@ -4340,7 +4340,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PGFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 	var ƒbudget_sf0 time.Duration
 
 	ƒerrs := make([]error, 1)
@@ -4704,10 +4704,10 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 
 	sf0 := &sfpkg0.PostgresFixture{}
-	ƒcfg_sf0 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf0 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	sf1 := &sfpkg1.GCSFixture{}
-	ƒcfg_sf1 := gotest.DefaultFixtureConfig()
+	ƒcfg_sf1 := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 
 	ƒerrs := make([]error, 2)
 	var ƒstateMu sync.Mutex
