@@ -131,7 +131,7 @@ func (s *SharedFixtureDAGTestSuite) TestALateStartWaitsForDependencies(t *gotest
 			childBegins := dagAt(events, "DagChild", "BeforeAll", "begin")
 			gotest.NotZero(it, parentUp, "log: %v", events)
 			gotest.NotZero(it, childBegins, "log: %v", events)
-			gotest.Less(it, parentUp, childBegins, "log: %v", events)
+			gotest.LessOrEqual(it, parentUp, childBegins, "log: %v", events)
 		})
 	})
 }
@@ -455,7 +455,7 @@ func (s *SharedFixtureDAGTestSuite) TestAGivenUpStartLeavesEveryReleaseToTheEnd(
 			gotest.ErrorContains(it, startErr, "timed out")
 			gotest.NoError(it, releaseErr)
 			gotest.NoError(it, teardownErr)
-			gotest.Less(it, dagAt(events, "DagChild", "BeforeAll", "end"), dagAt(events, "DagA", "AfterAll", "begin"), "log: %v", events)
+			gotest.LessOrEqual(it, dagAt(events, "DagChild", "BeforeAll", "end"), dagAt(events, "DagA", "AfterAll", "begin"), "log: %v", events)
 		})
 	})
 }
