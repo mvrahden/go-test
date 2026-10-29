@@ -59,5 +59,13 @@ func (s *DiscoveryFocusTestSuite) TestRunWide(t *gotest.T) {
 			gotest.Equal(it, "skip", run.Verdict("TestOtherTestSuite"), "stdout: %s", run.Stdout)
 			gotest.Empty(it, run.Verdict("TestOtherTestSuite/TestRuns"))
 		})
+		w.It("a focused fuzz method in one package skips every unfocused suite in the others", func(it *gotest.T) {
+			run, err := testkit.RunPackage(it.Context(), it.TempDir(), "../testdata/shapes/focusfuzz/...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "pass", run.Verdict("FuzzSeedsTestSuite_F_FuzzSeeds"), "stdout: %s", run.Stdout)
+			gotest.Empty(it, run.Verdict("TestSeedsTestSuite/TestPlain"))
+			gotest.Empty(it, run.Verdict("TestOtherTestSuite/TestFails"))
+		})
 	})
 }

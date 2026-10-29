@@ -6609,6 +6609,19 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a focused fuzz method in one package skips every unfocused suite in the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_focused_fuzz_method_in_one_package_skips_every_unfocused_suite_in_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a run holds a focused method",
@@ -14020,7 +14033,7 @@
     }
   ],
   "stats": {
-    "behaviors": 468,
+    "behaviors": 469,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

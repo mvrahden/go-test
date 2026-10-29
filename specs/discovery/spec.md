@@ -78,6 +78,7 @@ Focus SHALL be decided over the whole run: a focused suite or a focused method o
 #### Scenario: A focused method in the run
 - **WHEN** a run holds a focused method
 - **THEN** a focused method in one package skips every unfocused suite in the others
+- **AND** a focused fuzz method in one package skips every unfocused suite in the others
 
 ### Requirement: The generated harness
 The generated harness SHALL compile beside whatever names the package declares, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites and files of variants without suites, and SHALL NOT rewrite a file whose content is unchanged.

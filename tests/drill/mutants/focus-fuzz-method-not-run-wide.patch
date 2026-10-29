@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryFocus .* / a focused fuzz method in one package skips every unfocused suite in the others \(
+Clause: when a run holds a focused method → a focused fuzz method in one package skips every unfocused suite in the others
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -81,7 +81,7 @@
+ 		return false
+ 	}
+ 	focused := func(m *TestSuiteMethod, _ int) bool { return m.IsFocused() }
+-	return slices.Any(ts.th.TestCases, focused) || slices.Any(ts.th.Benchmarks, focused) || slices.Any(ts.th.Fuzzers, focused)
++	return slices.Any(ts.th.TestCases, focused) || slices.Any(ts.th.Benchmarks, focused)
+ }
+ 
+ // ReduceInRun splits ts into the suites that run, the suites skipped and the
