@@ -1,6 +1,8 @@
 package cli_test
 
 import (
+	"time"
+
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -12,7 +14,9 @@ import (
 type CLIPassthroughTestSuite struct{}
 
 func (s *CLIPassthroughTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	// Measured on Windows CI: the slowest method takes up to ~16s alone and
+	// went past the 30s default beside other suites' builds; the budget is twice that.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
 func (s *CLIPassthroughTestSuite) TestUnknownFlagsReachTheBinary(t *gotest.T) {
