@@ -19,6 +19,9 @@ on:
       - go.sum
       - vscode-gotest/**
       - .github/workflows/contract.yml
+      - .github/actions/setup-go/**
+      - .github/actions/save-go-cache/**
+      - .github/gate.env
   push:
     branches: [main]
     paths:
@@ -29,6 +32,9 @@ on:
       - go.sum
       - vscode-gotest/**
       - .github/workflows/contract.yml
+      - .github/actions/setup-go/**
+      - .github/actions/save-go-cache/**
+      - .github/gate.env
 
 permissions:
   contents: read
@@ -40,14 +46,13 @@ concurrency:
 jobs:
   contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 6
     defaults:
       run:
         working-directory: vscode-gotest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
@@ -66,6 +71,8 @@ jobs:
         run: npm run contract:verify
       - name: Cross the process boundary for real
         run: npm run test:integration
+      - if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-go-cache
 
   # The unit suite mocks node:child_process, so nothing in it crosses a real
   # process boundary. This job is the only place the extension spawns the actual
@@ -77,14 +84,13 @@ jobs:
   # LF), so the diff would fail for line endings rather than for drift.
   contract-windows:
     runs-on: windows-latest
+    timeout-minutes: 6
     defaults:
       run:
         working-directory: vscode-gotest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22

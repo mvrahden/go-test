@@ -1,4 +1,4 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
@@ -6,13 +6,16 @@ GOLANGCI_VERSION := v2.14.0
 
 SPECS_DIR ?= specs
 
+include .github/gate.env
+export $(shell sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' .github/gate.env)
+
 # The whole Go gate, spelled once; the workflows run these same targets.
 ci: checks lint test drill
 
 test:
 	go build ./...
 	go vet ./...
-	go run ./cmd/gotest spec $(SPEC_FLAGS) --min=70 ./... ./examples/... -race
+	go run ./cmd/gotest spec --parallel=$(GATE_PARALLEL) $(SPEC_FLAGS) --min=$(GATE_MIN_COVERAGE) ./... ./examples/... -race
 
 lint: vet
 	go run ./cmd/gotest lint ./... ./examples/...
@@ -70,5 +73,10 @@ runtime-api:
 
 runtime-floor:
 	bash tests/runtimecompat/floor.sh
+
+# Before tagging: may VERSION be released from SHA (default origin/main)?
+release-check:
+	@test -n "$(VERSION)" || { echo "usage: make release-check VERSION=vX.Y.Z [SHA=<commit>]"; exit 2; }
+	bash .github/scripts/release-preflight.sh $(VERSION) $(SHA)
 
 checks: fmt-check vuln golangci-lint runtime-compat

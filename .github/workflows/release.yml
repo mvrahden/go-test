@@ -12,32 +12,44 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  preflight:
     runs-on: ubuntu-latest
-    env:
-      GORACE: atexit_sleep_ms=0
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - name: The release may be published from this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: bash .github/scripts/release-preflight.sh --tagged "$TAG" "$GITHUB_SHA"
+
+  test:
+    runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # Pinned, not "stable": a release must never be the first
-          # place a new toolchain runs. Keep in step with quality.yml.
-          go-version: "1.27"
-      - run: make checks lint test SPEC_FLAGS="--no-color --parallel=16"
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go
+      - run: make checks lint test SPEC_FLAGS="--no-color"
 
   drill:
     runs-on: ubuntu-latest
+    needs: preflight
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - name: Drill
         env:
           DRILL_SHARD: ${{ matrix.shard }}/4
@@ -54,21 +66,21 @@ jobs:
   drill-shards:
     needs: drill
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: drill-*
           path: ${{ runner.temp }}/drill-logs
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - name: Shards agree on one assignment
         run: bash tests/drill/drill.sh --check-shards "${{ runner.temp }}/drill-logs"
 
   build:
     runs-on: ubuntu-latest
-    needs: [test, drill-shards]
+    timeout-minutes: 5
+    needs: [preflight, test, drill-shards]
     permissions:
       contents: write
     strategy:
@@ -88,11 +100,7 @@ jobs:
             goarch: arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          # Pinned, not "stable": a release must never be the first
-          # place a new toolchain runs. Keep in step with quality.yml.
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
@@ -114,6 +122,7 @@ jobs:
   update-major-tag:
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: build
     permissions:
       contents: write

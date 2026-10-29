@@ -1,0 +1,69 @@
+name: "Setup Go"
+description: "Install the Go version .github/gate.env pins, export the gate's settings and restore the Go build and module cache"
+
+inputs:
+  go:
+    description: "Which version from .github/gate.env: 'pinned' (GO_VERSION) or 'min' (GO_MIN_VERSION)"
+    required: false
+    default: "pinned"
+  cache-key:
+    description: "Names this job's cache entry, so jobs that build different things keep apart"
+    required: false
+    default: ${{ github.job }}
+
+outputs:
+  go-version:
+    description: "The version requested from .github/gate.env"
+    value: ${{ steps.gate.outputs.go-version }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Read .github/gate.env
+      id: gate
+      shell: bash
+      env:
+        WHICH: ${{ inputs.go }}
+      run: |
+        grep -E '^[A-Z_][A-Z0-9_]*=' "$GITHUB_WORKSPACE/.github/gate.env" >> "$GITHUB_ENV"
+        case "$WHICH" in
+          pinned) key=GO_VERSION ;;
+          min) key=GO_MIN_VERSION ;;
+          *) echo "::error::go must be 'pinned' or 'min', not '$WHICH'"; exit 1 ;;
+        esac
+        version=$(sed -n "s/^$key=//p" "$GITHUB_WORKSPACE/.github/gate.env")
+        test -n "$version" || { echo "::error::.github/gate.env has no $key"; exit 1; }
+        echo "go-version=$version" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      with:
+        go-version: ${{ steps.gate.outputs.go-version }}
+        cache: false
+    - name: Name the Go cache
+      id: cache
+      shell: bash
+      env:
+        KEY: ${{ inputs.cache-key }}
+        SUM: ${{ hashFiles('**/go.sum') }}
+      run: |
+        prefix="go-${RUNNER_OS}-$(go env GOVERSION)"
+        {
+          echo "GO_CACHE_KEY=${prefix}-${KEY}-${SUM}-${GITHUB_SHA}"
+          echo "GO_CACHE_PATHS<<GO_CACHE_PATHS_END"
+          echo "$(go env GOCACHE)"
+          echo "!$(go env GOCACHE)/fuzz"
+          echo "$(go env GOMODCACHE)"
+          echo "GO_CACHE_PATHS_END"
+        } >> "$GITHUB_ENV"
+        {
+          echo "restore-keys<<RESTORE_KEYS_END"
+          echo "${prefix}-${KEY}-${SUM}-"
+          echo "${prefix}-${KEY}-"
+          echo "${prefix}-"
+          echo "RESTORE_KEYS_END"
+        } >> "$GITHUB_OUTPUT"
+    - name: Restore the Go cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ env.GO_CACHE_PATHS }}
+        key: ${{ env.GO_CACHE_KEY }}
+        restore-keys: ${{ steps.cache.outputs.restore-keys }}

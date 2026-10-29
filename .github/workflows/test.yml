@@ -23,9 +23,6 @@ on:
 permissions:
   contents: read
 
-env:
-  GORACE: atexit_sleep_ms=0
-
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -33,37 +30,20 @@ concurrency:
 jobs:
   platform-test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
         shard: [cli, core]
         include:
-          - os: windows-latest
-            parallel: 16
           - os: macos-latest
             parallel: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: ./.github/actions/setup-go
         with:
-          go-version: "1.27"
-          cache: false
-      - name: Locate the Go build cache
-        id: gocache
-        shell: bash
-        run: |
-          echo "dir=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-      - name: Restore the Go build cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: |
-            ${{ steps.gocache.outputs.dir }}
-            !${{ steps.gocache.outputs.dir }}/fuzz
-            ${{ steps.gocache.outputs.mod }}
-          key: gobuild-${{ github.job }}-${{ runner.os }}-go1.27-${{ matrix.shard }}-${{ github.sha }}
-          restore-keys: gobuild-${{ github.job }}-${{ runner.os }}-go1.27-${{ matrix.shard }}-
+          cache-key: platform-test-${{ matrix.shard }}
       - name: Select the shard's packages
         id: shard
         shell: bash
@@ -80,7 +60,7 @@ jobs:
         with:
           packages: ${{ steps.shard.outputs.packages }}
           race: true
-          flags: "--parallel=${{ matrix.parallel }}"
+          flags: "--parallel=${{ matrix.parallel || env.GATE_PARALLEL }}"
           events-file: ${{ runner.temp }}/test-events.json
       - name: Upload the test event stream
         if: ${{ always() && steps.test.outputs.events-file != '' }}
@@ -89,23 +69,15 @@ jobs:
           name: test-events-${{ runner.os }}-${{ matrix.shard }}
           path: ${{ steps.test.outputs.events-file }}
           retention-days: 14
-      - name: Save the Go build cache
-        if: ${{ !cancelled() }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: |
-            ${{ steps.gocache.outputs.dir }}
-            !${{ steps.gocache.outputs.dir }}/fuzz
-            ${{ steps.gocache.outputs.mod }}
-          key: gobuild-${{ github.job }}-${{ runner.os }}-go1.27-${{ matrix.shard }}-${{ github.sha }}
+      - if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-go-cache
 
   bench-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - name: Bench (examples, single iteration)
         uses: ./
         with:
@@ -115,11 +87,10 @@ jobs:
 
   fuzz-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: "1.27"
+      - uses: ./.github/actions/setup-go
       - name: Fuzz (examples, ten seconds)
         uses: ./
         with:
@@ -129,6 +100,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     # The coverage badge is pushed to ci/badges; the action publishes it from
     # main only, so pull-request runs never use the write scope.
     permissions:
@@ -136,28 +108,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.26", "1.27"]
+        go: [min, pinned]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: ./.github/actions/setup-go
         with:
-          go-version: ${{ matrix.go-version }}
-          cache: false
-      - name: Locate the Go build cache
-        id: gocache
-        shell: bash
-        run: |
-          echo "dir=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-      - name: Restore the Go build cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: |
-            ${{ steps.gocache.outputs.dir }}
-            !${{ steps.gocache.outputs.dir }}/fuzz
-            ${{ steps.gocache.outputs.mod }}
-          key: gobuild-${{ github.job }}-${{ runner.os }}-go${{ matrix.go-version }}-${{ github.sha }}
-          restore-keys: gobuild-${{ github.job }}-${{ runner.os }}-go${{ matrix.go-version }}-
+          go: ${{ matrix.go }}
       # gotest tests itself with one runner. The census, the ring-0 suites,
       # the canary and the drill (quality.yml) replace the stdlib step; see
       # ARCHITECTURE.md, "Testing gotest".
@@ -166,17 +122,10 @@ jobs:
         with:
           packages: "./... ./examples/..."
           race: true
-          min-coverage: 70
+          min-coverage: ${{ env.GATE_MIN_COVERAGE }}
           # One matrix cell publishes the badge; the others would only race
           # it for the same number.
-          badge: ${{ matrix.go-version == '1.27' }}
-          flags: "--parallel=16"
-      - name: Save the Go build cache
-        if: ${{ !cancelled() }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: |
-            ${{ steps.gocache.outputs.dir }}
-            !${{ steps.gocache.outputs.dir }}/fuzz
-            ${{ steps.gocache.outputs.mod }}
-          key: gobuild-${{ github.job }}-${{ runner.os }}-go${{ matrix.go-version }}-${{ github.sha }}
+          badge: ${{ matrix.go == 'pinned' }}
+          flags: "--parallel=${{ env.GATE_PARALLEL }}"
+      - if: ${{ !cancelled() }}
+        uses: ./.github/actions/save-go-cache
