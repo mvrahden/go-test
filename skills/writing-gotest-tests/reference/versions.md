@@ -635,3 +635,8 @@ Rules and sections tagged **v1.36+** need v1.36.0 or newer. What v1.36 changes:
    group first, then each group by name; `--group` and `--skip-group`
    select groups (`config.md`). An unknown field before v1.36, so a suite
    setting it does not compile against an older runtime.
+
+4. **`GOTEST_TIMEOUT_SCALE`** — set to a number above zero, it multiplies
+   every suite and fixture budget, declared or default, deadline and verdict
+   alike; set it on a CI runner slower than the machine the budgets were
+   written on instead of raising them in code. Earlier versions ignore it.

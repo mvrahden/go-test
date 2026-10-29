@@ -379,6 +379,8 @@ A suite with no `SuiteConfig` method, or a duration its marker leaves at zero, i
 to a budget: being failed against a number you did not choose is not a verdict you can act on; a context the default ends is only named, in one line that fails nothing ([A context the default deadline ended](specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended)). Bounding the process remains
 `go test -timeout`'s job either way.
 
+On a machine slower than the one the budgets were written on, `GOTEST_TIMEOUT_SCALE=2` doubles every suite and fixture budget, declared or default, deadline and verdict alike; processes the tests start do not inherit it ([Budgets scaled for a slow machine](specs/lifecycle/spec.md#requirement-budgets-scaled-for-a-slow-machine)).
+
 `SetupTimeout` works the same way for `BeforeAll`, `AfterAll` and the wait on the goroutines
 `BeforeAll` started with `gotest.Go`, including for a setup that hangs and never returns. A declared fixture `Timeout` is judged when the hook
 returns: a `BeforeAll` that succeeds only after it fails the fixture without a retry
