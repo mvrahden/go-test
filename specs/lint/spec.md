@@ -70,7 +70,7 @@ Lint -fix SHALL drop and name a fix that does not compile and SHALL still apply 
 - **AND** the other fixes are applied
 
 ### Requirement: The focus fix
-Lint -fix SHALL remove a focus prefix at every reference to the focused suite in its package, the receivers and uses in other files, generic receivers, aliases and the external test package included, so that the package still compiles.
+Lint -fix SHALL remove a focus prefix, of a suite or of a Test, Benchmark or Fuzz method, at every reference to the focused suite or method in its package, the receivers and uses in other files, generic receivers, aliases and the external test package included, so that the package still compiles.
 
 #### Scenario: Methods and uses in several files
 - **WHEN** lint -fix removes the focus of a suite whose methods and uses are spread over several files
@@ -83,6 +83,10 @@ Lint -fix SHALL remove a focus prefix at every reference to the focused suite in
 #### Scenario: The external test package
 - **WHEN** lint -fix removes the focus of a suite the external test package refers to
 - **THEN** lint -fix renames the external test package's references too
+
+#### Scenario: Benchmark and fuzz methods
+- **WHEN** lint -fix removes the focus of a benchmark or fuzz method
+- **THEN** lint -fix renames the focused benchmark and fuzz methods, and the package still compiles
 
 ### Requirement: A target that does not compile
 Lint SHALL report each compile error of a target package once, with its path relative to the module.

@@ -20,6 +20,19 @@ func (s *UserServiceTestSuite) BeforreAll()                                  {} 
 func (s UserServiceTestSuite) TestByValue()                                  {} // want `suite method UserServiceTestSuite.TestByValue should use a pointer receiver` `test method UserServiceTestSuite.TestByValue has wrong signature`
 func (s *UserServiceTestSuite) F_TestFocused()                               {} // want `focused method UserServiceTestSuite.F_TestFocused should not be committed` `test method UserServiceTestSuite.F_TestFocused has wrong signature`
 
+// A focused benchmark or fuzz method focuses the run as a test method does.
+func (s *UserServiceTestSuite) F_BenchmarkCreate(b *gotest.B) { // want `focused method UserServiceTestSuite.F_BenchmarkCreate should not be committed`
+	for b.Loop() {
+	}
+}
+
+func (s *UserServiceTestSuite) F_FuzzName(f *gotest.F) { // want `focused method UserServiceTestSuite.F_FuzzName should not be committed`
+	f.Add("a")
+	f.Fuzz(func(t *gotest.T, name string) {
+		gotest.Equal(t, name, string([]byte(name)))
+	})
+}
+
 // go test's name rule: a lowercase rune after Test makes a helper, not a case.
 func (s *UserServiceTestSuite) Testify(x int)    {}
 func (s *UserServiceTestSuite) F_Testable(x int) {}

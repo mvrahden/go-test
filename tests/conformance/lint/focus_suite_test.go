@@ -109,3 +109,17 @@ var _ = lintfocusgeneric.ContractTestSuite[float64]{}
 		})
 	})
 }
+
+func (s *LinterFocusFixTestSuite) TestMethodKinds(t *gotest.T) {
+	t.When("lint -fix removes the focus of a benchmark or fuzz method", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocuskinds")
+		w.It("lint -fix renames the focused benchmark and fuzz methods, and the package still compiles", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			src := c.read(it, "suite_test.go")
+			gotest.Empty(it, focusPrefix.FindAllString(src, -1), src)
+			gotest.Contains(it, src, "func (s *KindsTestSuite) BenchmarkUpper(b *gotest.B) {")
+			gotest.Contains(it, src, "func (s *KindsTestSuite) FuzzUpper(f *gotest.F) {")
+			c.vet(it)
+		})
+	})
+}

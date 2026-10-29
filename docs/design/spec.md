@@ -1444,7 +1444,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 
 | Rule ID | Detects |
 |---------|---------|
-| `focus` | Committed `F_` prefixes on suites or methods; the fix renames every reference ([The focus fix](../../specs/lint/spec.md#requirement-the-focus-fix)) |
+| `focus` | Committed `F_` prefixes on suites or Test, Benchmark and Fuzz methods; the fix renames every reference ([The focus fix](../../specs/lint/spec.md#requirement-the-focus-fix)) |
 | `receiver` | Suite methods with value receivers instead of pointer receivers |
 | `lifecycle-typo` | Method names within Levenshtein distance ≤ 2 of a lifecycle hook (`BeforAll`, `AfterEeach`) |
 | `lifecycle-pair` | `BeforeAll` without `AfterAll` — resources may leak |

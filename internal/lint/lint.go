@@ -533,15 +533,16 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		}
 
 		stripped := strings.TrimPrefix(strings.TrimPrefix(methodName, protocol.PrefixFocused), protocol.PrefixExcluded)
+		// A focused method of any kind focuses the run.
+		if strings.HasPrefix(methodName, protocol.PrefixFocused) && isCaseName(stripped) {
+			reportWithFix(pass, Focus, fd.Pos(),
+				[]analysis.SuggestedFix{{
+					Message:   fmt.Sprintf("rename %s to %s", methodName, stripped),
+					TextEdits: unfocusEdits(pass, fd.Name.Pos()),
+				}},
+				"focused method %s.%s should not be committed", recvName, methodName)
+		}
 		if strings.HasPrefix(stripped, "Test") && gotestast.IsGoTestName(stripped) {
-			if strings.HasPrefix(methodName, protocol.PrefixFocused) {
-				reportWithFix(pass, Focus, fd.Pos(),
-					[]analysis.SuggestedFix{{
-						Message:   fmt.Sprintf("rename %s to %s", methodName, strings.TrimPrefix(methodName, protocol.PrefixFocused)),
-						TextEdits: unfocusEdits(pass, fd.Name.Pos()),
-					}},
-					"focused method %s.%s should not be committed", recvName, methodName)
-			}
 			if !hasValidTestSignature(pass, fd) {
 				report(pass, TestSignature, fd.Pos(), "test method %s.%s has wrong signature — must accept *gotest.T (or *testing.T)", recvName, methodName)
 			}
@@ -559,6 +560,17 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			report(pass, LifecycleTypo, fd.Pos(), "%s", gotestast.MisspelledHookMessage(recvName, methodName, hook))
 		}
 	})
+}
+
+// isCaseName reports whether name, its prefixes stripped, names a Test,
+// Benchmark or Fuzz case as go test would.
+func isCaseName(name string) bool {
+	for _, prefix := range []string{"Test", protocol.PrefixBenchmark, protocol.PrefixFuzz} {
+		if strings.HasPrefix(name, prefix) {
+			return gotestast.IsGoTestName(name)
+		}
+	}
+	return false
 }
 
 // Only the All pair is checked: BeforeAll holds shared resources for the

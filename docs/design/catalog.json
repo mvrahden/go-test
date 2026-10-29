@@ -14677,6 +14677,46 @@
               "name": "TestExternal",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint -fix renames the focused benchmark and fuzz methods, and the package still compiles",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_-fix_renames_the_focused_benchmark_and_fuzz_methods,_and_the_package_still_compiles",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -fix removes the focus of a benchmark or fuzz method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "lint_-fix_removes_the_focus_of_a_benchmark_or_fuzz_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "MethodKinds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestMethodKinds",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterFocusFix",
@@ -15820,7 +15860,7 @@
     }
   ],
   "stats": {
-    "behaviors": 523,
+    "behaviors": 524,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterFocusFix .* / lint -fix renames the focused benchmark and fuzz methods, and the package still compiles \(
+Clause: when lint -fix removes the focus of a benchmark or fuzz method → lint -fix renames the focused benchmark and fuzz methods, and the package still compiles
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -565,7 +565,7 @@
+ // isCaseName reports whether name, its prefixes stripped, names a Test,
+ // Benchmark or Fuzz case as go test would.
+ func isCaseName(name string) bool {
+-	for _, prefix := range []string{"Test", protocol.PrefixBenchmark, protocol.PrefixFuzz} {
++	for _, prefix := range []string{"Test"} {
+ 		if strings.HasPrefix(name, prefix) {
+ 			return gotestast.IsGoTestName(name)
+ 		}
