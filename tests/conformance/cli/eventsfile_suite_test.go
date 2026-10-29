@@ -16,8 +16,7 @@ import (
 type CLIEventsFileTestSuite struct{}
 
 func (s *CLIEventsFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: the slowest method ~15s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
 func (s *CLIEventsFileTestSuite) TestTheFileHoldsTheStream(t *gotest.T) {

@@ -1,6 +1,8 @@
 package cli_test
 
 import (
+	"time"
+
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -12,7 +14,7 @@ import (
 type CLIPassthroughTestSuite struct{}
 
 func (s *CLIPassthroughTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
 func (s *CLIPassthroughTestSuite) TestUnknownFlagsReachTheBinary(t *gotest.T) {

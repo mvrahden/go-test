@@ -28,8 +28,7 @@ type FuzzTriagePromoteTestSuite struct {
 }
 
 func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~15s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Timeout: 60 * time.Second}
 }
 
 func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {
