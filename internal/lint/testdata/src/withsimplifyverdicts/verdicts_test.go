@@ -1,0 +1,102 @@
+package withsimplifyverdicts //nolint:stdlib-test
+
+import (
+	"errors"
+	"testing"
+	"unsafe"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type myErr struct{}
+
+func (*myErr) Error() string { return "boom" }
+
+// === a concrete pointer to an error type: nil as a pointer ===
+
+func TestConcreteErrorPointer(t *testing.T) {
+	var p *myErr
+	gotest.True(t, p == nil)   // want `use Zero instead of True for nil check`
+	gotest.False(t, p == nil)  // want `use NotZero instead of False for nil check`
+	gotest.Equal(t, nil, p)    // want `use Zero instead of Equal for nil comparison`
+	gotest.NotEqual(t, p, nil) // want `use NotZero instead of NotEqual for nil comparison`
+	gotest.Nil(t, p)           // want `use Zero instead of Nil for nil check`
+	gotest.NotNil(t, p)        // want `use NotZero instead of NotNil for nil check`
+	gotest.Zero(t, p)          // a pointer is no error: no NoError
+	gotest.NotZero(t, p)       // nor Error
+	gotest.Empty(t, p)         // nor for Empty
+	gotest.NotEmpty(t, p)      // nor NotEmpty
+}
+
+// === interfaces: Nil and Empty look through them to a nil pointer ===
+
+func TestInterfaces(t *testing.T) {
+	var err error
+	gotest.Zero(t, err)        // want `use NoError instead of Zero for error zero check`
+	gotest.True(t, err != nil) // want `use Error instead of True for error nil check`
+	gotest.Nil(t, err)         // want `use NoError instead of Nil for error nil check — Nil looks through the error to a nil pointer it holds`
+	gotest.NotNil(t, err)      // want `use Error instead of NotNil for error nil check — NotNil looks through the error to a nil pointer it holds`
+	gotest.Empty(t, err)       // want `use NoError instead of Empty for error empty check — Empty looks through the error to the value it holds`
+	gotest.NotEmpty(t, err)    // want `use Error instead of NotEmpty for error empty check — NotEmpty looks through the error to the value it holds`
+	var v any
+	gotest.Nil(t, v)         // want `use Zero instead of Nil for nil check — Nil looks through the interface to a nil pointer it holds`
+	gotest.True(t, v == nil) // want `use Zero instead of True for nil check`
+}
+
+func TestUnsafePointer(t *testing.T) {
+	var up unsafe.Pointer
+	gotest.Nil(t, up)         // want `use Zero instead of Nil for nil check`
+	gotest.True(t, up == nil) // want `use Zero instead of True for nil check`
+}
+
+// === type parameters: their values decide ===
+
+func errorParam[E error](t *testing.T, e E) {
+	gotest.Nil(t, e)
+	gotest.True(t, any(e) == nil) // want `use Zero instead of True for nil check`
+}
+
+func pointerParam[P ~*int](t *testing.T, p P) {
+	gotest.Nil(t, p)         // want `use Zero instead of Nil for nil check`
+	gotest.True(t, p == nil) // want `use Zero instead of True for nil check`
+}
+
+// === errors.Is: ErrorIs fails a nil target ===
+
+func TestErrorsIs(t *testing.T) {
+	err, target := errors.New("x"), error(nil)
+	gotest.True(t, errors.Is(err, target)) // want `use ErrorIs instead of True for errors.Is call — ErrorIs fails a nil target, which errors.Is matches to a nil error`
+	gotest.True(t, errors.Is(err, nil))    // want `use NoError instead of True for errors.Is nil check`
+}
+
+// === orderings: cmp.Compare puts NaN below every number ===
+
+func floatParam[F ~float64](t *testing.T, x, y F) {
+	gotest.False(t, x > y)
+}
+
+func TestOrderings(t *testing.T) {
+	i, j := 1, 2
+	gotest.False(t, i > j) // want `use LessOrEqual instead of False for > comparison`
+	gotest.True(t, i < j)  // want `use Less instead of True for < comparison`
+	x, y := 1.0, 2.0
+	gotest.False(t, x > y)  // NaN: !(x > y) is not x <= y
+	gotest.False(t, x >= y) // nor x < y
+	gotest.True(t, x < y)   // cmp.Compare orders NaN below every number
+	gotest.True(t, x <= y)  // and the operators order it nowhere
+	s, u := "a", "b"
+	gotest.True(t, s < u) // want `use Less instead of True for < comparison`
+}
+
+// === redundancy: the first must fail wherever the second does ===
+
+func TestRedundancy(t *testing.T) {
+	n := 3
+	gotest.NotNil(t, n) // want `type int is not nilable`
+	gotest.Len(t, n, 3)
+	s, needle := "abc", ""
+	gotest.NotEmpty(t, s) // Contains finds an empty needle in an empty string
+	gotest.Contains(t, s, needle)
+	gotest.NotEmpty(t, s) // want `NotEmpty is redundant before Contains`
+	gotest.Contains(t, s, "b")
+}

@@ -23,7 +23,7 @@ func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl 
 			if !sameExprText(pass, first.guardedArg, second.guardedArg) {
 				continue
 			}
-			reason := isRedundantBefore(first.name, second.name, second.call)
+			reason := isRedundantBefore(pass, first, second)
 			if reason == "" {
 				continue
 			}
@@ -68,7 +68,17 @@ func sameExprText(pass *analysis.Pass, a, b ast.Expr) bool {
 	return renderExpr(pass.Fset, a) == renderExpr(pass.Fset, b)
 }
 
-func isRedundantBefore(weaker, stronger string, strongerCall *ast.CallExpr) string {
+// isRedundantBefore says why first may go: the second fails on every input
+// the first fails. NotNil fails its type guard on what cannot be nil, and
+// Contains finds an empty string in an empty one.
+func isRedundantBefore(pass *analysis.Pass, first, second *parsedAssertion) string {
+	weaker, stronger, strongerCall := first.name, second.name, second.call
+	if weaker == "NotNil" && nilKindOf(pass, first.guardedArg) == notNilable {
+		return ""
+	}
+	if weaker == "NotEmpty" && stronger == "Contains" && mayBeEmptyString(pass, strongerCall.Args[2]) {
+		return ""
+	}
 	switch {
 	case weaker == "Error" && stronger == "ErrorIs":
 		return "ErrorIs already checks for non-nil error"

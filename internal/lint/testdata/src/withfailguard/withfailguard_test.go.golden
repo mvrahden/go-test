@@ -58,8 +58,10 @@ func TestPredicateGuards(t *testing.T) {
 	s := "hello"
 	gotest.NotContains(t, s, "bye", "unexpected substring") // want `use NotContains instead of if\+Fail for strings.Contains call`
 	err := errors.New("boom")
-	gotest.ErrorIs(t, err, errSentinel, "wrong error") // want `use ErrorIs instead of if\+Fail for errors.Is call`
-	gotest.NotEmpty(t, s, "expected content")          // want `use NotEmpty instead of if\+Fail for empty string check`
+	if !errors.Is(err, errSentinel) { // want `use ErrorIs instead of if\+Fail for errors.Is call`
+		gotest.Fail(t, "wrong error")
+	}
+	gotest.NotEmpty(t, s, "expected content") // want `use NotEmpty instead of if\+Fail for empty string check`
 }
 
 // === message args containing calls: report, but no autofix — the if body
