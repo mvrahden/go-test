@@ -21,7 +21,7 @@ on:
       - .github/workflows/contract.yml
       - .github/actions/setup-go/**
       - .github/actions/save-go-cache/**
-      - ci/gate.env
+      - .github/gate.env
   push:
     branches: [main]
     paths:
@@ -34,7 +34,7 @@ on:
       - .github/workflows/contract.yml
       - .github/actions/setup-go/**
       - .github/actions/save-go-cache/**
-      - ci/gate.env
+      - .github/gate.env
 
 permissions:
   contents: read

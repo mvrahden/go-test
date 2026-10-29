@@ -1,9 +1,9 @@
 name: "Setup Go"
-description: "Install the Go version ci/gate.env pins, export the gate's settings and restore the Go build and module cache"
+description: "Install the Go version .github/gate.env pins, export the gate's settings and restore the Go build and module cache"
 
 inputs:
   go:
-    description: "Which version from ci/gate.env: 'pinned' (GO_VERSION) or 'min' (GO_MIN_VERSION)"
+    description: "Which version from .github/gate.env: 'pinned' (GO_VERSION) or 'min' (GO_MIN_VERSION)"
     required: false
     default: "pinned"
   cache-key:
@@ -13,26 +13,26 @@ inputs:
 
 outputs:
   go-version:
-    description: "The version requested from ci/gate.env"
+    description: "The version requested from .github/gate.env"
     value: ${{ steps.gate.outputs.go-version }}
 
 runs:
   using: "composite"
   steps:
-    - name: Read ci/gate.env
+    - name: Read .github/gate.env
       id: gate
       shell: bash
       env:
         WHICH: ${{ inputs.go }}
       run: |
-        grep -E '^[A-Z_][A-Z0-9_]*=' "$GITHUB_WORKSPACE/ci/gate.env" >> "$GITHUB_ENV"
+        grep -E '^[A-Z_][A-Z0-9_]*=' "$GITHUB_WORKSPACE/.github/gate.env" >> "$GITHUB_ENV"
         case "$WHICH" in
           pinned) key=GO_VERSION ;;
           min) key=GO_MIN_VERSION ;;
           *) echo "::error::go must be 'pinned' or 'min', not '$WHICH'"; exit 1 ;;
         esac
-        version=$(sed -n "s/^$key=//p" "$GITHUB_WORKSPACE/ci/gate.env")
-        test -n "$version" || { echo "::error::ci/gate.env has no $key"; exit 1; }
+        version=$(sed -n "s/^$key=//p" "$GITHUB_WORKSPACE/.github/gate.env")
+        test -n "$version" || { echo "::error::.github/gate.env has no $key"; exit 1; }
         echo "go-version=$version" >> "$GITHUB_OUTPUT"
     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
       with:

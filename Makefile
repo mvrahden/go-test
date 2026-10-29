@@ -6,8 +6,8 @@ GOLANGCI_VERSION := v2.14.0
 
 SPECS_DIR ?= specs
 
-include ci/gate.env
-export $(shell sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' ci/gate.env)
+include .github/gate.env
+export $(shell sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' .github/gate.env)
 
 # The whole Go gate, spelled once; the workflows run these same targets.
 ci: checks lint test drill
@@ -77,6 +77,6 @@ runtime-floor:
 # Before tagging: may VERSION be released from SHA (default origin/main)?
 release-check:
 	@test -n "$(VERSION)" || { echo "usage: make release-check VERSION=vX.Y.Z [SHA=<commit>]"; exit 2; }
-	bash scripts/ci/release-preflight.sh $(VERSION) $(SHA)
+	bash .github/scripts/release-preflight.sh $(VERSION) $(SHA)
 
 checks: fmt-check vuln golangci-lint runtime-compat

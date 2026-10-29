@@ -26,7 +26,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
-        run: bash scripts/ci/release-preflight.sh --tagged "$TAG" "$GITHUB_SHA"
+        run: bash .github/scripts/release-preflight.sh --tagged "$TAG" "$GITHUB_SHA"
 
   test:
     runs-on: ubuntu-latest
