@@ -17,16 +17,16 @@ import (
 )
 
 // ShutdownTestSuite proves that a run which ends early still tears its
-// shared fixtures down: an interrupt exits 130 and a FailFast trip skips the
-// remaining methods, and the fixture's AfterAll runs either way. Exclusive:
-// it spawns full CLI runs and times a signal.
+// shared fixtures down, where the verdict takes the wall clock: a second
+// interrupt ends the run at once, an interrupt during teardown keeps the
+// verdict, and a --timeout names what it cut short. Exclusive: it spawns full
+// CLI runs and times a signal.
 // Sequential: each test times a full CLI run against the wall clock.
 //
 //nolint:lifecycle-pair // BeforeAll's module lives under t.TempDir(), which the framework removes; the binary is the shared fixture's
 type ShutdownTestSuite struct {
-	CLI    *gotestcli.BinarySharedFixture
-	binary string
-	module string
+	CLI *gotestcli.BinarySharedFixture
+	rig rig
 }
 
 func (s *ShutdownTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -35,16 +35,27 @@ func (s *ShutdownTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *ShutdownTestSuite) BeforeAll(t *gotest.T) {
+	// The --timeout runs must not race a cold build, which on a loaded
+	// runner outlasts them.
+	s.rig = stageRig(t, s.CLI, "./slow/")
+}
+
+// rig is the staged shutdownmod module and the CLI that runs it.
+type rig struct {
+	binary string
+	module string
+}
+
+// stageRig stages the module under a temp dir and compiles warm once, so a
+// run of those packages starts without a build.
+func stageRig(t *gotest.T, cli *gotestcli.BinarySharedFixture, warm ...string) rig {
 	testkit.ScrubActionsEnv()
-	s.binary = s.CLI.Binary
-	s.module = t.TempDir()
-	src := filepath.Join(s.CLI.RepoRoot, "tests", "sharedfixture", "testdata", "shutdownmod")
-	gotest.NoError(t, testkit.StageModule(s.CLI.RepoRoot, src, s.module))
-	// Compile the slow package once: the --timeout runs must not race a
-	// cold build, which on a loaded runner outlasts them.
-	warm := s.command(t.TempDir(), nil, []string{"-run=^$", "./slow/"})
-	out, err := warm.CombinedOutput()
+	r := rig{binary: cli.Binary, module: t.TempDir()}
+	src := filepath.Join(cli.RepoRoot, "tests", "sharedfixture", "testdata", "shutdownmod")
+	gotest.NoError(t, testkit.StageModule(cli.RepoRoot, src, r.module))
+	out, err := r.command(t.TempDir(), nil, append([]string{"-run=^$"}, warm...)).CombinedOutput()
 	gotest.NoError(t, err, string(out))
+	return r
 }
 
 // cliRun is a CLI started as the root of its own process tree.
@@ -55,24 +66,24 @@ type cliRun struct {
 
 // start launches the CLI over one package of the staged module with the
 // marker directory in its environment.
-func (s *ShutdownTestSuite) start(t *gotest.T, markers, pkg string) *cliRun {
-	return s.startWith(t, markers, nil, "./"+pkg+"/")
+func (r rig) start(t *gotest.T, markers, pkg string) *cliRun {
+	return r.startWith(t, markers, nil, "./"+pkg+"/")
 }
 
 // startWith launches the CLI with the given arguments and extra environment.
-func (s *ShutdownTestSuite) startWith(t *gotest.T, markers string, env []string, args ...string) *cliRun {
-	return s.launch(t, s.command(markers, env, args))
+func (r rig) startWith(t *gotest.T, markers string, env []string, args ...string) *cliRun {
+	return r.launch(t, r.command(markers, env, args))
 }
 
-func (s *ShutdownTestSuite) command(markers string, env, args []string) *exec.Cmd {
-	cmd := exec.Command(s.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
-	cmd.Dir = s.module
+func (r rig) command(markers string, env, args []string) *exec.Cmd {
+	cmd := exec.Command(r.binary, args...) //nolint:gosec // G204: controlled binary with fixed args
+	cmd.Dir = r.module
 	cmd.Env = append(append(os.Environ(), "GOTEST_SHUTDOWN_DIR="+markers, "GOTEST_CI=0"), env...)
 	return cmd
 }
 
 // launch starts cmd as the root of its own process tree.
-func (s *ShutdownTestSuite) launch(t *gotest.T, cmd *exec.Cmd) *cliRun {
+func (r rig) launch(t *gotest.T, cmd *exec.Cmd) *cliRun {
 	tree, err := testkit.StartCLI(cmd)
 	gotest.NoError(t, err)
 	return &cliRun{cmd: cmd, tree: tree}
@@ -102,42 +113,15 @@ func marker(dir, name string) bool {
 	return err == nil
 }
 
-func (s *ShutdownTestSuite) TestInterrupt(t *gotest.T) {
-	markers := t.TempDir()
-	run := s.start(t, markers, "slow")
-	interruptWhen(t, run, markers, "test-running")
-	code := exitCode(t, run)
-
-	t.It("exits 130", func(it *gotest.T) {
-		gotest.Equal(it, 130, code)
-	})
-	t.It("tears the shared fixture down before exiting", func(it *gotest.T) {
-		gotest.True(it, marker(markers, "fixture-up"), "the fixture never started")
-		gotest.True(it, marker(markers, "fixture-down"), "AfterAll did not run")
-	})
-}
-
-func (s *ShutdownTestSuite) TestFailFastTrip(t *gotest.T) {
-	markers := t.TempDir()
-	code := exitCode(t, s.start(t, markers, "failfast"))
-
-	t.It("exits 1 and skips the methods after the failure", func(it *gotest.T) {
-		gotest.Equal(it, 1, code)
-		gotest.False(it, marker(markers, "second-ran"), "the method after the failure ran")
-	})
-	t.It("tears the shared fixture down", func(it *gotest.T) {
-		gotest.True(it, marker(markers, "fixture-down"), "AfterAll did not run")
-	})
-}
-
 // The first interrupt starts the graceful shutdown; a second one must end
 // the CLI at once, the way a terminal's Ctrl-C ends any other program, rather
 // than being swallowed for the length of the teardown budget. Under spec the
 // suite runs through go tool test2json, which ignores SIGINT, and the CLI
-// inherits that: the exit must not depend on the default disposition.
+// inherits that: the exit must not depend on the default disposition. The
+// method ends with its context, so the teardown starts without a grace.
 func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	markers := t.TempDir()
-	run := s.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./slow/")
+	run := s.rig.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./stoppable/")
 	interruptWhen(t, run, markers, "test-running")
 	first := time.Now()
 	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
@@ -179,7 +163,7 @@ func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 // and its AfterAll runs before the CLI exits.
 func (s *ShutdownTestSuite) TestSecondInterruptDuringAMethod(t *gotest.T) {
 	markers := t.TempDir()
-	run := s.start(t, markers, "held")
+	run := s.rig.start(t, markers, "held")
 	interruptWhen(t, run, markers, "test-running")
 	first := time.Now()
 	// Past the window of a repeat, well inside the method's 5s grace.
@@ -211,27 +195,11 @@ func (s *ShutdownTestSuite) TestSecondInterruptDuringAMethod(t *gotest.T) {
 	})
 }
 
-// The spec, summary and bench commands run the batch pipeline, not the
-// streaming one; an interrupt must mean 130 on both.
-func (s *ShutdownTestSuite) TestInterruptDuringSpec(t *gotest.T) {
-	markers := t.TempDir()
-	run := s.startWith(t, markers, nil, "spec", "./slow/")
-	interruptWhen(t, run, markers, "test-running")
-	code := exitCode(t, run)
-
-	t.It("exits 130", func(it *gotest.T) {
-		gotest.Equal(it, 130, code)
-	})
-	t.It("tears the shared fixture down before exiting", func(it *gotest.T) {
-		gotest.True(it, marker(markers, "fixture-down"), "AfterAll did not run")
-	})
-}
-
 // Once every verdict is in, an interrupt has nothing left to cut short: a
 // green run that is interrupted while its fixture tears down is still green.
 func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 	markers := t.TempDir()
-	run := s.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=3s"}, "./quick/")
+	run := s.rig.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=3s"}, "./quick/")
 	interruptWhen(t, run, markers, "fixture-tearing-down")
 	code := exitCode(t, run)
 
@@ -245,8 +213,9 @@ func (s *ShutdownTestSuite) TestInterruptDuringTeardown(t *gotest.T) {
 
 // globalBudget is the first --timeout TestGlobalTimeout gives a run; a run
 // it ends before TestSleeps starts is retried with double, budgetTries in all.
+// A warm run reaches TestSleeps in under a second.
 const (
-	globalBudget = 15 * time.Second
+	globalBudget = 5 * time.Second
 	budgetTries  = 3
 )
 
@@ -301,10 +270,10 @@ func (s *ShutdownTestSuite) TestGlobalTimeout(t *gotest.T) {
 			// The flag goes before the package: a subcommand comes first.
 			pkg := len(c.args) - 1
 			args := append(append(slices.Clone(c.args[:pkg]), "--timeout="+c.budget.String()), c.args[pkg])
-			cmd := s.command(c.markers, nil, args)
+			cmd := s.rig.command(c.markers, nil, args)
 			c.out = new(bytes.Buffer)
 			cmd.Stdout, cmd.Stderr = c.out, c.out
-			c.run = s.launch(t, cmd)
+			c.run = s.rig.launch(t, cmd)
 		}
 		var inconclusive []*timeoutCase
 		for _, c := range pending {
