@@ -14,8 +14,6 @@ import (
 type CLIPassthroughTestSuite struct{}
 
 func (s *CLIPassthroughTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on Windows CI: the slowest method takes up to ~16s alone and
-	// went past the 30s default beside other suites' builds; the budget is twice that.
 	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
