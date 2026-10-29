@@ -17,7 +17,7 @@ import (
 type HoldsTestSuite struct{ root string }
 
 func (s *HoldsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 var plainPackages = []string{"./testdata/holds/", "./testdata/panics/"}

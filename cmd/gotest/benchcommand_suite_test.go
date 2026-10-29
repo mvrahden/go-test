@@ -25,7 +25,7 @@ type BenchCommandTestSuite struct {
 }
 
 func (s *BenchCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 30 * time.Second}
 }
 
 func (s *BenchCommandTestSuite) BeforeAll(t *gotest.T) {

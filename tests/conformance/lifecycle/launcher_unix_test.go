@@ -28,7 +28,7 @@ type LauncherSignalTestSuite struct {
 }
 
 func (s *LauncherSignalTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 45 * time.Second}
 }
 
 func (s *LauncherSignalTestSuite) BeforeAll(t *gotest.T) {

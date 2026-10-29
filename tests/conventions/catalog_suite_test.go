@@ -20,8 +20,7 @@ type CatalogTestSuite struct {
 
 func (s *CatalogTestSuite) SuiteConfig() gotest.SuiteConfig {
 	// Setup builds the CLI and runs it: just over 30s on a cold Windows
-	// runner, so twice that.
-	return gotest.SuiteConfig{SetupTimeout: time.Minute}
+	return gotest.SuiteConfig{SetupTimeout: 45 * time.Second}
 }
 
 func (s *CatalogTestSuite) BeforeAll(t *gotest.T) {

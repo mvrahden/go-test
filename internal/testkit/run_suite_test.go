@@ -21,8 +21,7 @@ type RunOraclesTestSuite struct {
 }
 
 func (s *RunOraclesTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: setup ~54s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{SetupTimeout: time.Minute}
 }
 
 func (s *RunOraclesTestSuite) BeforeAll(t *gotest.T) {
@@ -127,8 +126,7 @@ type UserCacheTestSuite struct {
 }
 
 func (s *UserCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: setup ~56s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{SetupTimeout: time.Minute}
 }
 
 func (s *UserCacheTestSuite) BeforeAll(t *gotest.T) {

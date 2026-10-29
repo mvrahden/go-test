@@ -29,7 +29,7 @@ type InterruptTestSuite struct {
 }
 
 func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: time.Minute}
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {

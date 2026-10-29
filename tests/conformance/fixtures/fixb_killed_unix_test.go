@@ -25,7 +25,7 @@ type KilledCLITestSuite struct {
 // slower; BeforeAll builds the CLI, 8.5s cold, so twice that seven times
 // slower is 2m.
 func (s *KilledCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *KilledCLITestSuite) BeforeAll(t *gotest.T) {

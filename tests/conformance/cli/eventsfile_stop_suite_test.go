@@ -23,7 +23,7 @@ type CLIEventsFileStopTestSuite struct {
 }
 
 func (s *CLIEventsFileStopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *CLIEventsFileStopTestSuite) BeforeAll(t *gotest.T) {

@@ -19,8 +19,7 @@ type PlainGoTestTestSuite struct {
 }
 
 func (s *PlainGoTestTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: setup ~17s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{SetupTimeout: 45 * time.Second}
+	return gotest.SuiteConfig{SetupTimeout: 30 * time.Second}
 }
 
 // BeforeAll stages a package binding a shared fixture into a module of its

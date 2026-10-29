@@ -26,7 +26,7 @@ type FixTestSuite struct {
 }
 
 func (s *FixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 45 * time.Second}
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
 }
 
 func (s *FixTestSuite) BeforeAll(t *gotest.T) {

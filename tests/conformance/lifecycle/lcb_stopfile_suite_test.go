@@ -25,8 +25,7 @@ func (s *StopFileTestSuite) SuiteGuard() string {
 }
 
 func (s *StopFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: setup ~45s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{SetupTimeout: 45 * time.Second}
 }
 
 func (s *StopFileTestSuite) BeforeAll(t *gotest.T) {

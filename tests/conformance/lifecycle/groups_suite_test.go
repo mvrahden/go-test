@@ -21,7 +21,7 @@ type GroupsTestSuite struct {
 }
 
 func (s *GroupsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Exclusive: true, Timeout: 30 * time.Second, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Exclusive: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *GroupsTestSuite) BeforeAll(t *gotest.T) {
