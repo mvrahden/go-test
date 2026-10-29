@@ -23,8 +23,9 @@ var (
 type BenchFuzzFrameTestSuite struct{}
 
 func (s *BenchFuzzFrameTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~25s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
+	// Measured on Windows CI: the slowest methods take 20–48s, and passed 57s
+	// beside other suites' builds.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 func (s *BenchFuzzFrameTestSuite) TestBenchmarkLifecycleContexts(t *gotest.T) {
