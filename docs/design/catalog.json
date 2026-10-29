@@ -11681,6 +11681,165 @@
           "name": "TestSuiteHooksTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "passes a method that runs for 1.5s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "passes_a_method_that_runs_for_1.5s",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "fails a method that runs past 2s by a 2s Timeout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_a_method_that_runs_past_2s_by_a_2s_Timeout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves the scale out of the environment of a process a test starts",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "leaves_the_scale_out_of_the_environment_of_a_process_a_test_starts",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when GOTEST_TIMEOUT_SCALE is 2 and a suite declares a 1s Timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "GOTEST_TIMEOUT_SCALE_is_2_and_a_suite_declares_a_1s_Timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "sets up a fixture whose BeforeAll takes 1.5s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "sets_up_a_fixture_whose_BeforeAll_takes_1.5s",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "fails a fixture whose BeforeAll runs past 2s by a 2s Timeout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_a_fixture_whose_BeforeAll_runs_past_2s_by_a_2s_Timeout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when GOTEST_TIMEOUT_SCALE is 2 and a fixture declares a 1s Timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "GOTEST_TIMEOUT_SCALE_is_2_and_a_fixture_declares_a_1s_Timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BudgetsScaledForASlowMachine",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBudgetsScaledForASlowMachine",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails every suite before its fixtures, naming the value",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_every_suite_before_its_fixtures,_naming_the_value",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when GOTEST_TIMEOUT_SCALE is not a number above zero",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "GOTEST_TIMEOUT_SCALE_is_not_a_number_above_zero",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AScaleThatIsNoNumber",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAScaleThatIsNoNumber",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "TimeoutScale",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestTimeoutScaleTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -11689,13 +11848,13 @@
     }
   ],
   "stats": {
-    "behaviors": 382,
+    "behaviors": 388,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 62,
+    "suites": 63,
     "tests": 0
   }
 }
