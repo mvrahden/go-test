@@ -55,7 +55,7 @@ Each directory under `testdata/` is one package with one suite:
 | `fixturehookfail` | a package fixture whose `BeforeEach` fails for one method runs no `AfterEach` for it, and the failure is reported at the hook's file |
 | `fixtureafterfail` | a package fixture whose `AfterEach` returns an error is reported at the hook's file, not inside the runtime's |
 | `fixtureorder` | a fixture with only an `AfterEach` runs it when it comes before a fixture whose `BeforeEach` fails, and not when it comes after |
-| `fixtureelsewhere` | a failing fixture hook another package declares, a fixture's of that package or one promoted from its type, is located at its declaration: by base name, and by full path under `-fullpath` |
+| `fixtureelsewhere` | a failing hook of a fixture another package declares is located at its declaration: by base name, and by full path under `-fullpath` |
 | `benchpanic` | a panicking benchmark turns the run red, the next benchmark still reports, and `AfterAll` runs before the fixture is released |
 | `failfast` | a FailFast suite skips the methods after its first failure, each naming the method that stopped it |
 | `failfastsoft` | a failure `BeforeAll` records without stopping does not stop a FailFast suite's methods |

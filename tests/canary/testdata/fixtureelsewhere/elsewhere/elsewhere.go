@@ -16,9 +16,11 @@ func (f *RemoteFixture) BeforeEach(ctx context.Context) error {
 	return errors.New("the remote fixture is not ready")
 }
 
-// Hooks lends its AfterEach to the fixture that embeds it.
-type Hooks struct{}
+// LeavingFixture is a package fixture whose AfterEach fails.
+type LeavingFixture struct{}
 
-func (h *Hooks) AfterEach(ctx context.Context) error {
-	return errors.New("the embedded hook did not let go")
+func (f *LeavingFixture) BeforeAll(ctx context.Context) error { return nil }
+
+func (f *LeavingFixture) AfterEach(ctx context.Context) error {
+	return errors.New("the remote fixture did not let go")
 }

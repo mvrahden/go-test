@@ -83,7 +83,7 @@ func (s *CLIRejectionsTestSuite) TestSharedFixtureEachHooks(t *gotest.T) {
 			for sub, row := range gotest.Each(it, []struct {
 				Desc, pkg, at, fixture, hook string
 			}{
-				{Desc: "in the suite's package", pkg: "../testdata/clisharedlocal/", at: "sharedlocal_suite_test.go:16:", fixture: "QueueSharedFixture", hook: "AfterEach"},
+				{Desc: "in the suite's package", pkg: "../testdata/clisharedlocal/", at: "fixture.go:12:", fixture: "QueueSharedFixture", hook: "AfterEach"},
 				{Desc: "in another package", pkg: "../testdata/clisharedeach/", at: "shared/shared.go:17:", fixture: "CacheSharedFixture", hook: "BeforeEach"},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.pkg)

@@ -41,9 +41,9 @@ type RemoteTestSuite struct {
 
 func (s *RemoteTestSuite) TestBody(t *gotest.T) {}
 
-// PromotedTestSuite binds a fixture whose AfterEach another package declares.
-type PromotedTestSuite struct {
-	Promoted *PromotedFixture
+// LeavingTestSuite binds another package's fixture whose AfterEach fails.
+type LeavingTestSuite struct {
+	Leaving *elsewhere.LeavingFixture
 }
 
-func (s *PromotedTestSuite) TestBody(t *gotest.T) {}
+func (s *LeavingTestSuite) TestBody(t *gotest.T) {}

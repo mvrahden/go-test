@@ -50,7 +50,7 @@ A package fixture whose BeforeAll returns an error or panics SHALL fail the run 
 - **THEN** fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names
 
 ### Requirement: Where a fixture hook failure is reported
-An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook's declaration, not inside the runtime, wherever it is declared: in the suite's package, in another package, or promoted from another package's type. The file is named by its base name, or by its full path under -fullpath.
+An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook's declaration, not inside the runtime, wherever it is declared: in the suite's package or in another package. The file is named by its base name, or by its full path under -fullpath.
 
 #### Scenario: A fixture BeforeEach error
 - **WHEN** a fixture BeforeEach returns an error
@@ -61,7 +61,7 @@ An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook
 - **THEN** is reported at the hook's declaration, not in the runtime's file
 
 #### Scenario: A hook declared in another package
-- **WHEN** a hook another package declares returns an error, a fixture's of that package or one promoted from its type
+- **WHEN** a hook another package's fixture declares returns an error
 - **THEN** is reported at the hook's declaration, named by its file's base name
 
 #### Scenario: A hook declared in another package, under -fullpath

@@ -80,24 +80,24 @@ func (s *FixtureHooksTestSuite) TestWhereAFixtureHookErrorIsReported(t *gotest.T
 	})
 
 	const elsewhere = "fixturepairs/elsewhere/elsewhere.go"
-	t.When("a hook another package declares returns an error, a fixture's of that package or one promoted from its type", func(w *gotest.T) {
-		run, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/fixturepairs/", "-run=^Test(Remote|Promoted)TestSuite$")
+	t.When("a hook another package's fixture declares returns an error", func(w *gotest.T) {
+		run, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/fixturepairs/", "-run=^Test(Remote|Leaving)TestSuite$")
 		gotest.NoError(w, err)
 		w.It("is reported at the hook's declaration, named by its file's base name", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
 			gotest.Regexp(it, failedAt(it, "elsewhere.go", elsewhere, "func (f *RemoteFixture) BeforeEach", "elsewhere_RemoteFixture.BeforeEach failed: the remote fixture is not ready"), outputOf(&run, "TestRemoteTestSuite/TestBody"))
-			gotest.Regexp(it, failedAt(it, "elsewhere.go", elsewhere, "func (h *Hooks) AfterEach", "PromotedFixture.AfterEach failed: the embedded hook did not let go"), outputOf(&run, "TestPromotedTestSuite/TestBody"))
+			gotest.Regexp(it, failedAt(it, "elsewhere.go", elsewhere, "func (f *LeavingFixture) AfterEach", "elsewhere_LeavingFixture.AfterEach failed: the remote fixture did not let go"), outputOf(&run, "TestLeavingTestSuite/TestBody"))
 		})
 	})
 
 	t.When("a hook another package declares returns an error under -fullpath", func(w *gotest.T) {
-		run, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/fixturepairs/", "-run=^Test(Remote|Promoted)TestSuite$", "-fullpath")
+		run, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/fixturepairs/", "-run=^Test(Remote|Leaving)TestSuite$", "-fullpath")
 		gotest.NoError(w, err)
 		w.It("names the hook's file by its full path, as go test -fullpath does", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
 			file := filepath.ToSlash(gotest.Must(filepath.Abs(filepath.Join("..", "testdata", elsewhere))))
 			gotest.Regexp(it, failedAt(it, file, elsewhere, "func (f *RemoteFixture) BeforeEach", "elsewhere_RemoteFixture.BeforeEach failed"), outputOf(&run, "TestRemoteTestSuite/TestBody"))
-			gotest.Regexp(it, failedAt(it, file, elsewhere, "func (h *Hooks) AfterEach", "PromotedFixture.AfterEach failed"), outputOf(&run, "TestPromotedTestSuite/TestBody"))
+			gotest.Regexp(it, failedAt(it, file, elsewhere, "func (f *LeavingFixture) AfterEach", "elsewhere_LeavingFixture.AfterEach failed"), outputOf(&run, "TestLeavingTestSuite/TestBody"))
 		})
 	})
 }

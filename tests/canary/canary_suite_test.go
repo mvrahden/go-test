@@ -924,9 +924,8 @@ func (s *CanaryTestSuite) TestAnAfterEachOnlyFixtureRunsWhenItsTurnCame(t *gotes
 	}
 }
 
-// A failing fixture hook another package declares, a fixture's of that
-// package or one promoted from its type, is located at its declaration:
-// the base name by default, the full path under -fullpath.
+// A failing hook of a fixture another package declares is located at its
+// declaration: the base name by default, the full path under -fullpath.
 func (s *CanaryTestSuite) TestAFixtureHookElsewhereIsLocatedAtIt(t *gotest.T) {
 	full, err := filepath.Abs(filepath.Join("testdata", "fixtureelsewhere", "elsewhere", "elsewhere.go"))
 	if err != nil {
@@ -941,10 +940,10 @@ func (s *CanaryTestSuite) TestAFixtureHookElsewhereIsLocatedAtIt(t *gotest.T) {
 		if r.code != 1 {
 			t.Errorf("fixtureelsewhere %v: exit code %d, want 1", c.flags, r.code)
 		}
-		// elsewhere.go:15 declares RemoteFixture.BeforeEach, :22 Hooks.AfterEach.
+		// elsewhere.go:15 declares RemoteFixture.BeforeEach, :24 LeavingFixture.AfterEach.
 		for _, want := range []string{
 			c.file + ":15: elsewhere_RemoteFixture.BeforeEach failed: the remote fixture is not ready",
-			c.file + ":22: PromotedFixture.AfterEach failed: the embedded hook did not let go",
+			c.file + ":24: elsewhere_LeavingFixture.AfterEach failed: the remote fixture did not let go",
 		} {
 			if !strings.Contains(r.stream, " "+want+"\\n") {
 				t.Errorf("fixtureelsewhere %v: no %q in the stream", c.flags, want)

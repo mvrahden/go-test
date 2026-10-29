@@ -1,4 +1,4 @@
-Expect: fixtureelsewhere \[-fullpath\]: no ".*/fixtureelsewhere/elsewhere/elsewhere\.go:22: PromotedFixture\.AfterEach failed
+Expect: fixtureelsewhere \[-fullpath\]: no ".*/fixtureelsewhere/elsewhere/elsewhere\.go:24: elsewhere_LeavingFixture\.AfterEach failed
 Judge: ./tests/canary CanaryTestSuite/TestAFixtureHookElsewhereIsLocatedAtIt
 Clause: when a hook another package declares returns an error under -fullpath → names the hook's file by its full path, as go test -fullpath does
 --- a/internal/gotestgen/binding.go

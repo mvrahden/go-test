@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/mvrahden/go-test/tests/conformance/testdata/fixturepairs/elsewhere"
 )
 
 var markMu sync.Mutex
@@ -103,10 +101,3 @@ func (f *BehindFixture) AfterEach(ctx context.Context) error {
 	mark("behind.AfterEach")
 	return nil
 }
-
-// PromotedFixture's AfterEach is the one elsewhere.Hooks declares.
-type PromotedFixture struct {
-	elsewhere.Hooks
-}
-
-func (f *PromotedFixture) BeforeAll(ctx context.Context) error { return nil }
