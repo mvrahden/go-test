@@ -87,7 +87,7 @@ type SharedFixtureProcess struct {
 	setupUnbounded bool
 	budgetSeen     chan struct{}
 	// teardownSeen wakes a waiting teardown when a command's acknowledgement
-	// reports a new teardown budget: a fixture started late came up.
+	// reports a longer teardown budget: a fixture started late came up.
 	teardownSeen chan struct{}
 
 	stdin io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
@@ -1011,17 +1011,20 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 }
 
 // noteTeardownBudget takes a teardown budget the process reported and says
-// whether there was one. Under p.mu: an interrupted run can reach Teardown
-// while the stream is still being read.
+// whether it is longer than the last one: a release's ack that reports the
+// same budget again gives a teardown already waiting no more time. Under
+// p.mu: an interrupted run can reach Teardown while the stream is still
+// being read.
 func (p *SharedFixtureProcess) noteTeardownBudget(reported string) bool {
 	d, err := time.ParseDuration(reported)
 	if err != nil || d <= 0 {
 		return false
 	}
 	p.mu.Lock()
+	defer p.mu.Unlock()
+	longer := d > p.teardownTimeout
 	p.teardownTimeout = d
-	p.mu.Unlock()
-	return true
+	return longer
 }
 
 // protocolError records a stream the process got wrong after its setup was
