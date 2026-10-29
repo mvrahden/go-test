@@ -265,7 +265,9 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 
 - Name must end with `TestSuite`
 - All methods must use pointer receivers
-- A suite that should run needs at least one `Test*`, `Benchmark*` or `Fuzz*` method; a `*TestSuite` type with none is a helper the generator emits nothing for. Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
+- A suite that should run needs at least one `Test*`, `Benchmark*` or `Fuzz*` method; a `*TestSuite` type with none is a helper the generator emits nothing for ([Case-less suites](specs/discovery/spec.md#requirement-case-less-suites)). Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
+- One `type` declaration per suite or fixture: inside a grouped `type ( … )` block it is rejected at its declaration ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
+- Never embed a suite (a base suite) in another: it is rejected at the field. Share tests through a generic contract suite instead; embed only plain types, and bind fixtures through named pointer fields ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
 
 ### Test methods
 
@@ -418,7 +420,7 @@ func (s *MyTestSuite) F_TestSpecific(t *gotest.T) {}  // FOCUSED test case
 func (s *MyTestSuite) X_TestBroken(t *gotest.T) {}    // EXCLUDED test case
 ```
 
-- `F_` — focus. If any `F_` suite or test case exists anywhere in the run, only focused items run; every other suite, in any package, is skipped and starts no fixture. Causes CI failure with `gotest --ci`.
+- `F_` — focus. Focus is run-wide: if any `F_` suite or method exists anywhere in the run, only focused items run; every other suite, in any package and in the internal or external test package alike, is skipped and starts no fixture. Causes CI failure with `gotest --ci` ([Focus across a run](specs/discovery/spec.md#requirement-focus-across-a-run)).
 - `X_` — exclude. Always skipped. Compile-time decision (AST level). Use for permanently/temporarily disabled tests.
 
 Focus and exclude apply independently at both suite and test case levels.

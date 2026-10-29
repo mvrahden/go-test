@@ -241,10 +241,12 @@ type MyTestSuite struct {
 
 Requirements:
 - Name matches `^(?!ƒƒ_GOTEST_|_)(?:X_|F_)?.+TestSuite$`
-- Methods use pointer receivers (`*MyTestSuite`, not `MyTestSuite`)
-- Each suite must be its own `type` declaration (not block-style)
+- Methods use pointer receivers (`*MyTestSuite`, not `MyTestSuite`); an alias of the suite stands for it, a defined type over it does not ([Aliases and signatures](../../specs/discovery/spec.md#requirement-aliases-and-signatures))
+- Each suite and fixture is a `type` declaration of its own (not block-style) and composes through named fields, never by embedding a suite or fixture; tests are shared through Generic Suites instead ([Suite and fixture declarations](../../specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
+- A suite binds each fixture once, through a pointer field ([Fixture fields and case names](../../specs/discovery/spec.md#requirement-fixture-fields-and-case-names)); a fixture from another package is held to the same signature rules ([Declarations from other packages](../../specs/discovery/spec.md#requirement-declarations-from-other-packages))
 - Type names must be exported when the suite has test cases — otherwise a generation error (`go test` would never run its generated `Test` function).
-  Unexported case-less `*TestSuite` helper types are allowed, but may not be embedded in a suite
+  Unexported case-less `*TestSuite` helper types are allowed, but may not be embedded in a suite.
+  A `*TestSuite` type that declares no case is such a helper, whatever its name ([Case-less suites](../../specs/discovery/spec.md#requirement-case-less-suites))
 
 ### Lifecycle Hooks
 
@@ -307,7 +309,7 @@ When `BeforeEach` returns a value, the following rules are enforced at generatio
 
 ### Test Cases
 
-Any exported method matching `^(?:X_|F_)?Test.+$` is a test case.
+Any exported method matching `^(?:X_|F_)?Test.+$` is a test case, provided go test would run its name: `Testify` is none ([Fixture fields and case names](../../specs/discovery/spec.md#requirement-fixture-fields-and-case-names)).
 Each becomes a `t.Run` subtest in the generated code.
 
 ```go
@@ -334,7 +336,9 @@ Rules:
 3. `X_`-prefixed items are always skipped, regardless of focus state
 4. Exclude takes precedence over focus: an `F_` method of an `X_` suite focuses nothing
 
-Skipped suites produce a `t.Skipf("test suite was excluded by user")` stub, which starts no fixture.
+That focus spans packages and test package variants is stated in [Focus across a run](../../specs/discovery/spec.md#requirement-focus-across-a-run).
+
+Skipped suites produce a `t.Skipf("test suite was excluded by user")` stub, which starts no fixture ([Focus across a run](../../specs/discovery/spec.md#requirement-focus-across-a-run)).
 
 Skipped test *cases* are simply omitted from the generated code — no per-case skip stub appears in the output.
 
@@ -1370,6 +1374,8 @@ Per package directory, up to two files:
 
 The `gotest_` prefix prevents naming collisions with user code.
 Files contain a `// Code generated` header.
+The harness compiles beside any name the package declares, and `generate` keeps it in step with the suites ([The generated harness](../../specs/discovery/spec.md#requirement-the-generated-harness)).
+A generated file an earlier `generate` left on disk is read past, never compiled into a run, and `--tags` selects the suite files built with a tag ([Stale generated files and build constraints](../../specs/discovery/spec.md#requirement-stale-generated-files-and-build-constraints)).
 
 ### Generated Structure
 

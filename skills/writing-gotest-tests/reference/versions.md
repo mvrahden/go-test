@@ -664,3 +664,35 @@ Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 chang
 
 5. **`bench --json` carries `failures`** — what a failed benchmark printed,
    a panic's message and stack included.
+
+5. **Suites and fixtures are read from their own declarations** — a suite or
+   fixture inside a grouped `type ( … )` block, an embedded suite or
+   fixture, an embedded type with a method gotest reads, a field of suite
+   type, a fixture field by value and two fields of one fixture type are
+   each refused where they are written, naming the alternative
+   ([declarations](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suite-and-fixture-declarations),
+   [fields](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-fixture-fields-and-case-names)).
+   Before v1.37 an embedded fixture was bound and an embedded type's
+   hooks were promoted; give each fixture a named pointer field and
+   share tests through a generic contract suite.
+
+6. **Focus is run-wide** — one `F_` suite or method of any kind, in any
+   package or test package variant, skips every unfocused suite of the
+   run, which then starts no fixture
+   ([focus](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-focus-across-a-run)).
+   Before v1.37 focus held per package and test package variant.
+
+7. **Aliases and generics work everywhere** — an alias of an alias, a
+   method on a pointer to an alias, and an alias of a generic suite from
+   another package or declared in the external test package all run
+   ([other packages](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-declarations-from-other-packages)).
+
+8. **A suite with no case is a helper** — nothing is generated, run or
+   discovered for a `*TestSuite` type declaring no `Test*`, `Benchmark*`
+   or `Fuzz*` method, and a testify suite is left to `go test`.
+
+9. **The harness imports under its own names** and every load reads past a
+   generated file left on disk, so a package declaring `context` or
+   `testing`, or a suite renamed since the last `gotest generate`, still
+   runs
+   ([generated harness](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-the-generated-harness)).

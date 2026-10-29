@@ -1007,7 +1007,7 @@ func (s *MySuite) F_TestCreate(t *gotest.T) {} // focus a single test
 func (s *MySuite) X_TestFlaky(t *gotest.T)  {} // exclude a single test
 ```
 
-Focus spans the whole run: a focused suite or method in any package skips every unfocused suite in every package of the run.
+Focus spans the whole run: a focused suite or method in any package skips every unfocused suite in every package of the run ([Focus across a run](specs/discovery/spec.md#requirement-focus-across-a-run)).
 
 Use `--ci` in CI to fail the build if any `F_` prefix slipped through and to enable snapshot read-only mode (missing baselines fail instead of being generated):
 
