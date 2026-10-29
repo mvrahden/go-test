@@ -2473,6 +2473,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the report's failures name the benchmark with the panic's message",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_report's_failures_name_the_benchmark_with_the_panic's_message",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a benchmark panics in a --json bench run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_benchmark_panics_in_a_--json_bench_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APanickingBenchmark",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAPanickingBenchmark",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "BenchFailures",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestBenchFailuresTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "is refused before anything runs, since the run would be compared against itself",
                       "duration": 0,
                       "excluded": false,
@@ -12839,13 +12892,13 @@
     }
   ],
   "stats": {
-    "behaviors": 420,
+    "behaviors": 421,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 68,
+    "suites": 69,
     "tests": 0
   }
 }

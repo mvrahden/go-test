@@ -158,7 +158,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`, and saving to the configured baseline promotes the run without comparing it) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged. What the comparison does with benchmarks on one side alone, with few samples and with one file for both flags is pinned below |
 | `--gate=<pct>` | Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (`bench`); needs `-count=4` or more, the samples a significance test takes (pinned below) |
-| `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict, environment mismatch — instead of human output (`bench`; for tooling) |
+| `--json` | Emit one versioned JSON report to stdout — results, deltas, gate verdict, environment mismatch, failures — instead of human output (`bench`; for tooling) |
 | `--for=<dur>` | Approximate wall-clock fuzz budget for the session, split jobs-aware across targets (`fuzz`; default 1m or half of a shorter `--timeout`; `0` removes the budget; per-target share floors at 10s) |
 | `--target=<name>` | Fuzz exactly one generated wrapper by name; unmatched names error with the available list (`fuzz`) |
 | `--jobs=<n>` | Max concurrent fuzz targets (`fuzz`; default: max(1, GOMAXPROCS/2)) |

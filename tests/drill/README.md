@@ -260,6 +260,7 @@ shards of one run do not add up to every mutant exactly once.
 | Patch | Bug it plants | Check that must catch it |
 |---|---|---|
 | `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
+| `bench-json-drops-failures` | `bench --json` leaves out what a failed benchmark printed | bench conformance: the report's failures name the panicking benchmark with its message |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture reports no result for the benchmark after it, and neither AfterAll runs |
 | `bench-panic-taken-for-skip` | a benchmark's recovered panic skips the benchmark instead of failing it | canary: the panicking benchmark fixture's run exits 0 instead of 1 |
 | `bench-stderr-dropped` | a plain bench run never prints a benchmark suite's stderr | lifecycle conformance: the panic and its stack are missing from stderr |

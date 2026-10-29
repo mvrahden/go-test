@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/mvrahden/go-test/internal/gotestbench"
+	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -104,6 +105,31 @@ func (s *ReportTestSuite) TestGateVerdict(t *gotest.T) {
 			gotest.Zero(it, verdict.WorstPct)
 			gotest.Zero(it, verdict.WorstKey)
 			gotest.False(it, verdict.Breached)
+		})
+	})
+}
+
+func (s *ReportTestSuite) TestFailuresOf(t *gotest.T) {
+	fail := func(name string, output []string, children ...*gotestspec.Node) *gotestspec.Node {
+		return &gotestspec.Node{Name: name, Kind: gotestspec.KindBenchmark, Status: gotestspec.StatusFail, Output: output, Children: children}
+	}
+	pkgs := []*gotestspec.Package{
+		{Path: "pkg", Status: gotestspec.StatusFail, Nodes: []*gotestspec.Node{
+			fail("BenchmarkCacheTestSuite", []string{"BenchmarkCacheTestSuite\n"},
+				fail("BenchmarkGet", []string{"BenchmarkCacheTestSuite/BenchmarkGet\n", "panic: boom\n"})),
+			fail("BenchmarkBare", []string{"    bare_test.go:9: off\n"}),
+		}},
+		{Path: "crashed", Status: gotestspec.StatusFail, Output: []string{"fatal error: all goroutines are asleep\n"}},
+	}
+
+	t.When("benchmarks, a bare one and a package failed", func(w *gotest.T) {
+		failures := gotestbench.FailuresOf(pkgs)
+		w.It("keys each as its result is keyed, with what it printed", func(it *gotest.T) {
+			gotest.Equal(it, []gotestbench.Failure{
+				{Package: "pkg", Suite: "CacheTestSuite", Name: "BenchmarkGet", Output: "panic: boom"},
+				{Package: "pkg", Name: "BenchmarkBare", Output: "bare_test.go:9: off"},
+				{Package: "crashed", Output: "fatal error: all goroutines are asleep"},
+			}, failures)
 		})
 	})
 }

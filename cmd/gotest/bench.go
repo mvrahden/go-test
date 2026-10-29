@@ -137,7 +137,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if len(overlay.BenchesByPkg) == 0 {
 		if jsonRequested {
 			// Machine consumers get a valid empty document, not prose.
-			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil, nil, nil, nil)
+			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil, nil, nil, nil, nil)
 		}
 		fmt.Println("no benchmarks found")
 		return 0
@@ -278,7 +278,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if jsonRequested {
-		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, gateVerdict, envMismatch); jsonCode != 0 {
+		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, gateVerdict, envMismatch, gotestbench.FailuresOf(tree)); jsonCode != 0 {
 			return jsonCode
 		}
 	}
@@ -355,9 +355,9 @@ func toSpecDeltas(deltas []gotestbench.Delta) []gotestspec.BenchDelta {
 
 // emitBenchReport writes the versioned --json document to stdout. It returns
 // a non-zero exit code only when the document itself cannot be produced.
-func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, missing, added []string, gate *gotestbench.Gate, envMismatch []gotestbench.EnvDiff) int { //nolint:gocritic // hugeParam: stable API
+func emitBenchReport(b gotestbench.Baseline, deltas []gotestbench.Delta, missing, added []string, gate *gotestbench.Gate, envMismatch []gotestbench.EnvDiff, failures []gotestbench.Failure) int { //nolint:gocritic // hugeParam: stable API
 	report := gotestbench.NewReport(b, deltas, gate, envMismatch)
-	report.Missing, report.Added = missing, added
+	report.Missing, report.Added, report.Failures = missing, added, failures
 	data, err := gotestbench.MarshalReport(report)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

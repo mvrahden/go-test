@@ -1,6 +1,11 @@
 package gotestbench
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+
+	"github.com/mvrahden/go-test/internal/gotestspec"
+)
 
 // reportSchemaVersion is the version stamped on every Report this package
 // writes. It is independent of the Baseline schemaVersion: the report is the
@@ -27,6 +32,77 @@ type Report struct {
 	// delta suspect. Present as data, not as a verdict: nothing refuses the
 	// comparison, and consumers decide how loudly to say so.
 	EnvMismatch []EnvDiff `json:"envMismatch,omitempty"`
+	// Failures are the benchmarks, suites and packages that failed, with the
+	// text they failed with: a failed benchmark has no samples to show.
+	Failures []Failure `json:"failures,omitempty"`
+}
+
+// Failure is one failure of the run, keyed as Result is: a benchmark by its
+// suite and name, a suite's own failure by its suite alone, a package's by
+// its package alone. Output is what it printed, go test's framing lines
+// left out.
+type Failure struct {
+	Package string `json:"package"`
+	Suite   string `json:"suite,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Output  string `json:"output"`
+}
+
+// FailuresOf lists the failures in pkgs, keyed as FromPackages keys results.
+// The lines go test prints with a benchmark's name are left out, and with
+// them a suite's failure that says nothing but carries its benchmark's.
+func FailuresOf(pkgs []*gotestspec.Package) []Failure {
+	var out []Failure
+	for _, f := range gotestspec.Failures(pkgs) {
+		var lines []string
+		for _, line := range f.Lines {
+			if !isBenchNameLine(f.Path, line) {
+				lines = append(lines, line)
+			}
+		}
+		if len(lines) == 0 && !f.Origin {
+			continue
+		}
+		failure := Failure{Package: f.Package, Output: strings.Join(lines, "\n")}
+		switch {
+		case len(f.Path) == 0:
+		case len(f.Path) == 1 && !isSuiteWrapper(pkgs, f.Package, f.Path[0]):
+			failure.Name = f.Path[0]
+		default:
+			failure.Suite = strings.TrimPrefix(f.Path[0], "Benchmark")
+			failure.Name = strings.Join(f.Path[1:], "/")
+		}
+		out = append(out, failure)
+	}
+	return out
+}
+
+// isBenchNameLine reports whether line is the name go test prints for the
+// benchmark at path or one above it.
+func isBenchNameLine(path []string, line string) bool {
+	line = strings.TrimSpace(line)
+	for i := range path {
+		if line == strings.Join(path[:i+1], "/") {
+			return true
+		}
+	}
+	return false
+}
+
+// isSuiteWrapper reports whether the top node name in package path holds
+// benchmarks of its own: a suite, not a bare benchmark.
+func isSuiteWrapper(pkgs []*gotestspec.Package, path, name string) bool {
+	for _, pkg := range pkgs {
+		if pkg.Path != path {
+			continue
+		}
+		for _, n := range pkg.Nodes {
+			if n.Name == name {
+				return len(n.Children) > 0
+			}
+		}
+	}
+	return false
 }
 
 // Gate is the report's gate verdict: the configured threshold, the worst
