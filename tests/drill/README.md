@@ -285,7 +285,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-beforeeach-after-a-fixture-overran` | a fixture's `BeforeEach` starts after an earlier fixture's overran the `Timeout` | canary: the hookoverrun later fixture's `BeforeEach` runs |
 | `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
-| `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is located through that package's own FileSet | canary: the fixtureelsewhere remote failure is unlocated |
+| `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is left unlocated | canary: the fixtureelsewhere remote failure is unlocated |
 | `fixture-report-in-runtime` | an error a fixture's `BeforeEach` returns is located in the runtime's `methods.go` | canary: the fixturehookfail failure names a runtime file, not the hook's |
 | `focus-ci-guard-tests-only` | `--ci` checks only test methods for the `F_` prefix, so a focused benchmark or fuzz method passes | cli conformance: `--ci` fails a run whose only focused method is a benchmark or a fuzz target |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
@@ -574,7 +574,8 @@ shards of one run do not add up to every mutant exactly once.
 | `shapes-every-field-rejected` | every field of a suite or fixture is refused | canary: the `shapes/plain` package exits 2 instead of 0 |
 | `alias-receiver-unresolved` | a method whose receiver names the suite through an alias is not read | canary: the `shapes/aliasrecv` package exits 2 instead of 0 |
 | `alias-of-alias-skipped` | an alias of an alias is not unwrapped to the suite it names | canary: the `shapes/aliasalias` alias of an alias has no pass verdict |
-| `defined-over-suite-accepted` | a defined type over a suite is not refused | canary: the `shapes/sigdefined` run has no line naming the defined type |
+| `defined-over-suite-accepted` | a defined type over a suite, or over any type that declares a case, is read as a helper with no case | canary: the `shapes/sigdefined` and `shapes/recvdefined` packages exit 0 instead of 2 |
+| `receiver-matched-by-name` | a suite's methods are found by the receiver's name, not its type | canary: the `shapes/recvcollide` alias, named like another type of the aliased package, exits 2 instead of 0 |
 | `method-results-accepted` | a Test method that returns a value is not refused | canary: the `shapes/sigresult` run has no line naming the returning method |
 | `shared-fixture-in-test-file-accepted` | a shared fixture declared in a `_test.go` file is not refused | canary: the `shapes/sharedintest` package exits 1 instead of 2 |
 | `cross-package-alias-methods-dropped` | an alias of another package's generic suite is read in its own package only | canary: the `shapes/xpkgcontract` package exits 2 instead of 0 |
@@ -584,6 +585,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-field-duplicate-accepted` | a second field of the same fixture type is not refused | canary: the `shapes/fielddup` and `shapes/fielddupparent` packages exit 0 instead of 2 |
 | `unreached-fixture-validated` | every type named like a fixture is checked, bound or not | canary: the `shapes/fieldunreferenced` package exits 2 instead of 0 |
 | `lowercase-after-test-is-a-case` | a method continuing `Test` with a lowercase letter is read as a case | canary: the `shapes/nameistest` package exits 2 instead of 0 |
+| `lowercase-case-taking-t-accepted` | a method taking its case's T under a name go test would not run passes as a helper | canary: the `shapes/namelower` package exits 0 instead of 2 |
 | `caseless-suite-rendered` | no suite is treated as declaring no case | canary: `discover` lists the `shapes/caseless` helper suite |
 | `caseless-suite-discovered` | `discover` lists a suite that declares no case | canary: `discover` lists the `shapes/caseless` helper suite |
 | `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package exits 2, its helper field refused as a nested suite |

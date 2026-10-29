@@ -6,12 +6,12 @@ import "github.com/mvrahden/go-test/pkg/gotest"
 type NameTestSuite struct{ checks int }
 
 func (s *NameTestSuite) TestRuns(t *gotest.T) {
-	s.Testify(t)
+	s.Testify()
 	s.Benchmarked(t)
 	s.Fuzzy(t)
 	gotest.Equal(t, 3, s.checks)
 }
 
-func (s *NameTestSuite) Testify(t *gotest.T)     { s.checks++ }
+func (s *NameTestSuite) Testify()                { s.checks++ }
 func (s *NameTestSuite) Benchmarked(t *gotest.T) { s.checks++ }
 func (s *NameTestSuite) Fuzzy(t *gotest.T)       { s.checks++ }

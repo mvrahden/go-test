@@ -6362,6 +6362,32 @@
                     },
                     {
                       "children": [],
+                      "display": "a defined type over a type that declares a case is rejected at its declaration and pointed to an alias",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_defined_type_over_a_type_that_declares_a_case_is_rejected_at_its_declaration_and_pointed_to_an_alias",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an alias runs the methods of the type it names, not those of a type named like the alias",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_alias_runs_the_methods_of_the_type_it_names,_not_those_of_a_type_named_like_the_alias",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
                       "display": "a Test method that returns a value is rejected at the method",
                       "duration": 0,
                       "excluded": false,
@@ -6487,6 +6513,19 @@
                       "focused": false,
                       "kind": "block",
                       "name": "a_method_whose_name_continues_Test_with_a_lowercase_letter_is_not_a_case,_as_under_go_test",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a method taking a T whose name continues Test with a lowercase letter is rejected at the method, as go vet rejects such a test",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_method_taking_a_T_whose_name_continues_Test_with_a_lowercase_letter_is_rejected_at_the_method,_as_go_vet_rejects_such_a_test",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -14033,7 +14072,7 @@
     }
   ],
   "stats": {
-    "behaviors": 469,
+    "behaviors": 472,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

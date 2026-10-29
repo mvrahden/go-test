@@ -28,6 +28,13 @@ func (s *DiscoveryAliasesTestSuite) TestAliasesAndSignatures(t *gotest.T) {
 			checkShape(it, shape{pkg: "sigdefined", exit: 2,
 				shows: `sigdefined_suite_test\.go:10:6: suite CopyTestSuite is defined over suite ATestSuite and carries none of its methods; declare an alias \(= ATestSuite\) or a struct of its own`})
 		})
+		w.It("a defined type over a type that declares a case is rejected at its declaration and pointed to an alias", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "recvdefined", exit: 2,
+				shows: `recvdefined_suite_test\.go:10:6: suite DefinedTestSuite is defined over cases and carries none of its methods; declare an alias \(= cases\) or a struct of its own`})
+		})
+		w.It("an alias runs the methods of the type it names, not those of a type named like the alias", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "recvcollide", verdict: "TestThingTestSuite/TestRemote"})
+		})
 		w.It("a Test method that returns a value is rejected at the method", func(it *gotest.T) {
 			checkShape(it, shape{pkg: "sigresult", exit: 2,
 				shows: `sigresult_suite_test\.go:9:22: TestBad on XTestSuite returns a value; a Test method returns nothing`})

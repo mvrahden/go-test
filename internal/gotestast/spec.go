@@ -193,6 +193,7 @@ type TestSuiteSpec struct {
 	ts                 *ast.TypeSpec
 	typ                *types.Struct
 	underlyingTypeName string // non-empty for aliases of generic types (e.g. "GenericTestSuite")
+	recvKey            string // the receiver type its methods are declared on, as typeKey spells it
 	th                 *TestSuiteHarness
 	fixture            *FixtureSpec
 	fixtureFieldName   string // field name used in the suite struct to hold the fixture pointer
@@ -578,12 +579,18 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 		typ = t
 	} else if named, ok := rawType.(*types.Named); ok {
 		// a defined type has an empty method set: it would run nothing
-		if !ts.Assign.IsValid() && IS_TEST_SUITE.MatchString(named.Obj().Name()) {
-			return nil, ts.Pos(), At(ts.Pos(), fmt.Errorf("suite %s is defined over suite %s and carries none of its methods; declare an alias (= %s) or a struct of its own", ts.Name.Name, named.Obj().Name(), named.Obj().Name()))
+		if !ts.Assign.IsValid() && declaresCase(named) {
+			over := named.Obj().Name()
+			if IS_TEST_SUITE.MatchString(over) {
+				over = "suite " + over
+			}
+			return nil, ts.Pos(), At(ts.Pos(), fmt.Errorf("suite %s is defined over %s and carries none of its methods; declare an alias (= %s) or a struct of its own", ts.Name.Name, over, named.Obj().Name()))
 		}
 		if t, ok := named.Underlying().(*types.Struct); ok {
 			typ = t
-			underlyingTypeName = named.Obj().Name()
+			if ts.Assign.IsValid() {
+				underlyingTypeName = named.Obj().Name()
+			}
 		}
 	}
 	if typ == nil {
@@ -594,7 +601,40 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 		return nil, -1, nil
 	}
 
-	return &TestSuiteSpec{pkg: pkg, n: n, ts: ts, typ: typ, underlyingTypeName: underlyingTypeName, th: &TestSuiteHarness{}}, -1, nil
+	// an alias's methods are declared on the type it names, a defined type's
+	// on itself
+	recvKey := pkg.PkgPath + "." + ts.Name.Name
+	if obj, ok := pkg.TypesInfo.Defs[ts.Name].(*types.TypeName); ok && obj.Pkg() != nil {
+		recvKey = obj.Pkg().Path() + "." + obj.Name()
+	}
+	if named, ok := rawType.(*types.Named); ok && ts.Assign.IsValid() {
+		recvKey = typeKey(named)
+	}
+
+	return &TestSuiteSpec{pkg: pkg, n: n, ts: ts, typ: typ, underlyingTypeName: underlyingTypeName, recvKey: recvKey, th: &TestSuiteHarness{}}, -1, nil
+}
+
+// typeKey names a named type by its package path and the name of its
+// origin, so a type read from two loads of one package is the same type.
+func typeKey(named *types.Named) string {
+	obj := named.Origin().Obj()
+	if obj.Pkg() == nil {
+		return obj.Name()
+	}
+	return obj.Pkg().Path() + "." + obj.Name()
+}
+
+// declaresCase reports whether named declares a Test, Benchmark or Fuzz
+// method of its own.
+func declaresCase(named *types.Named) bool {
+	origin := named.Origin()
+	for i := range origin.NumMethods() {
+		name := origin.Method(i).Name()
+		if IS_TEST_CASE.MatchString(name) || IS_BENCHMARK.MatchString(name) || IS_FUZZ.MatchString(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // isDoneFunc reports whether t is func(), through aliases.
@@ -641,6 +681,36 @@ func detectParamF(sig *types.Signature) bool {
 	return strings.HasPrefix(pF, "*"+about.Repo) && strings.HasSuffix(pF, "/gotest.F")
 }
 
+// caseParamOf returns the case prefix of a name go test would not run, Test,
+// Benchmark or Fuzz, when the method takes that case's T, B or F first.
+func caseParamOf(name string, sig *types.Signature) (string, bool) {
+	stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
+	for prefix, param := range map[string]string{"Test": "T", protocol.PrefixBenchmark: "B", protocol.PrefixFuzz: "F"} {
+		if !strings.HasPrefix(stripped, prefix) || sig.Params().Len() == 0 {
+			continue
+		}
+		ptr, ok := types.Unalias(sig.Params().At(0).Type()).(*types.Pointer)
+		if !ok {
+			return "", false
+		}
+		named, ok := types.Unalias(ptr.Elem()).(*types.Named)
+		if !ok || named.Obj().Name() != param || named.Obj().Pkg() == nil {
+			return "", false
+		}
+		if path := named.Obj().Pkg().Path(); path == "testing" || path == about.Repo+"/pkg/gotest" {
+			return prefix, true
+		}
+	}
+	return "", false
+}
+
+// goTestName is name with the letter after its case prefix upper-cased.
+func goTestName(name, prefix string) string {
+	i := strings.Index(name, prefix) + len(prefix)
+	r, size := utf8.DecodeRuneInString(name[i:])
+	return name[:i] + string(unicode.ToUpper(r)) + name[i+size:]
+}
+
 func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSpec) (token.Pos, error) {
 	decl, ok := n.(*ast.FuncDecl)
 	if !ok {
@@ -657,7 +727,10 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	// methodID is a readable name, e.g. "MyTestSuite.BeforeAll" for improved debug output
 	methodID := s.ts.Name.Name + "." + m.Name()
 
-	if ok := IS_TEST_SUITE_METHOD.MatchString(m.Name()); !ok {
+	// a case name go test would not run is no case, and one that takes the
+	// case's T is refused below, as go vet refuses such a test
+	misnamed := !IsGoTestName(m.Name())
+	if ok := IS_TEST_SUITE_METHOD.MatchString(m.Name()); !ok && !misnamed {
 		return -1, nil
 	}
 
@@ -673,8 +746,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		// usage of value type receivers for test-suites is discouraged.
 		namedRecvr, ok := types.Unalias(recv.Type()).(*types.Named)
 		if ok {
-			str := namedRecvr.Obj().Name()
-			if str == s.ts.Name.Name || (s.underlyingTypeName != "" && str == s.underlyingTypeName) {
+			if typeKey(namedRecvr) == s.recvKey && !misnamed {
 				return decl.Name.Pos(), fmt.Errorf("signature of %q has unsupported value type receiver", decl.Name)
 			}
 			return -1, nil
@@ -690,9 +762,14 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	if !ok {
 		return -1, nil
 	}
-	recvName := recvType.Obj().Name()
-	if recvName != s.ts.Name.Name && (s.underlyingTypeName == "" || recvName != s.underlyingTypeName) {
+	if typeKey(recvType) != s.recvKey {
 		return decl.Name.Pos(), nil
+	}
+	if misnamed {
+		if prefix, ok := caseParamOf(m.Name(), sig); ok {
+			return m.Pos(), fmt.Errorf("%s on %s is no %s: go test runs no %s whose next letter is lowercase; rename it %s, or give the helper a name that does not begin with %s", m.Name(), s.ts.Name.Name, prefix, prefix, goTestName(m.Name(), prefix), prefix)
+		}
+		return -1, nil
 	}
 
 	if m.Name() == "SuiteConfig" {

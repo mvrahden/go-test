@@ -1,15 +1,16 @@
-Expect: shapes sigdefined: no line matches
+Expect: shapes sigdefined: exit code 0, want 2
+Expect: shapes recvdefined: exit code 0, want 2
 Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
 Clause: when a suite is declared through an alias or with an unusual signature → a defined type over a suite is rejected at its declaration and pointed to an alias
+Clause: when a suite is declared through an alias or with an unusual signature → a defined type over a type that declares a case is rejected at its declaration and pointed to an alias
 --- a/internal/gotestast/spec.go
 +++ b/internal/gotestast/spec.go
-@@ -528,9 +528,6 @@
+@@ -579,7 +579,7 @@
  		typ = t
  	} else if named, ok := rawType.(*types.Named); ok {
  		// a defined type has an empty method set: it would run nothing
--		if !ts.Assign.IsValid() && IS_TEST_SUITE.MatchString(named.Obj().Name()) {
--			return nil, ts.Pos(), At(ts.Pos(), fmt.Errorf("suite %s is defined over suite %s and carries none of its methods; declare an alias (= %s) or a struct of its own", ts.Name.Name, named.Obj().Name(), named.Obj().Name()))
--		}
- 		if t, ok := named.Underlying().(*types.Struct); ok {
- 			typ = t
- 			underlyingTypeName = named.Obj().Name()
+-		if !ts.Assign.IsValid() && declaresCase(named) {
++		if false && declaresCase(named) {
+ 			over := named.Obj().Name()
+ 			if IS_TEST_SUITE.MatchString(over) {
+ 				over = "suite " + over

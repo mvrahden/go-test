@@ -112,13 +112,15 @@ type IntAgainTestSuite = IntTestSuite
 	t.When("a suite is a defined type over another suite", func(w *gotest.T) {
 		w.It("is rejected at its declaration and pointed to an alias", func(it *gotest.T) {
 			fm := loadNamedSource(it.T(), "s_test.go", `package testpkg
+import "testing"
 type ATestSuite struct{}
+func (s *ATestSuite) TestA(t *testing.T) {}
 type CopyTestSuite ATestSuite
 `)
 			spec, pos, err := gotestast.DetermineTestSuite(fm.genDecls[1], fm.pkg)
 			gotest.Zero(it, spec)
 			gotest.ErrorContains(it, err, "suite CopyTestSuite is defined over suite ATestSuite and carries none of its methods; declare an alias (= ATestSuite) or a struct of its own")
-			gotest.Equal(it, "s_test.go:3:6", fm.pkg.Fset.Position(pos).String())
+			gotest.Equal(it, "s_test.go:5:6", fm.pkg.Fset.Position(pos).String())
 		})
 	})
 }

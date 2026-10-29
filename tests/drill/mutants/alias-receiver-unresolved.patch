@@ -1,4 +1,4 @@
-Expect: shapes aliasrecv: exit code 2, want 0
+Expect: shapes aliasrecv: TestRealTestSuite/TestViaAlias did not pass
 Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
 Clause: when a suite is declared through an alias or with an unusual signature → a method declared on a pointer to an alias of the suite runs
 --- a/internal/gotestast/spec.go

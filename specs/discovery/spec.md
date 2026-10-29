@@ -21,18 +21,20 @@ A suite or fixture SHALL be read only from a type declaration of its own that co
 - **AND** a fixture embedding a fixture is rejected at the field and pointed to a named pointer field
 
 ### Requirement: Aliases and signatures
-An alias of a suite, at any depth and as a method receiver, SHALL stand for the suite it names; a defined type over a suite, a Test method that returns a value and a shared fixture declared in a _test.go file SHALL be rejected where they are written.
+An alias of a suite, at any depth and as a method receiver, SHALL stand for the type it names, whose own methods alone it runs; a defined type over a suite or over a type that declares a case, a Test method that returns a value and a shared fixture declared in a _test.go file SHALL be rejected where they are written.
 
 #### Scenario: Aliases and unusual signatures
 - **WHEN** a suite is declared through an alias or with an unusual signature
 - **THEN** a method declared on a pointer to an alias of the suite runs
 - **AND** an alias of an alias of a generic suite runs its methods
 - **AND** a defined type over a suite is rejected at its declaration and pointed to an alias
+- **AND** a defined type over a type that declares a case is rejected at its declaration and pointed to an alias
+- **AND** an alias runs the methods of the type it names, not those of a type named like the alias
 - **AND** a Test method that returns a value is rejected at the method
 - **AND** a shared fixture declared in a _test.go file is rejected at its declaration
 
 ### Requirement: Fixture fields and case names
-A suite SHALL bind each fixture once, through a pointer field or an alias of one, and a fixture-named type no suite reaches SHALL NOT fail the package, and a method SHALL be a case only by a name go test would run.
+A suite SHALL bind each fixture once, through a pointer field or an alias of one, and a fixture-named type no suite reaches SHALL NOT fail the package, and a method SHALL be a case only by a name go test would run; one taking the T, B or F of its case under a name go test would not run SHALL be rejected at the method.
 
 #### Scenario: Fields and method names
 - **WHEN** a suite names its fixtures and methods
@@ -41,6 +43,7 @@ A suite SHALL bind each fixture once, through a pointer field or an alias of one
 - **AND** two fields of the same fixture type are rejected at the second field
 - **AND** a fixture-named type no suite reaches cannot fail the package
 - **AND** a method whose name continues Test with a lowercase letter is not a case, as under go test
+- **AND** a method taking a T whose name continues Test with a lowercase letter is rejected at the method, as go vet rejects such a test
 
 ### Requirement: Case-less suites
 A type named like a suite that declares no case SHALL be treated as a helper: nothing SHALL be generated, run, reported or discovered for it.

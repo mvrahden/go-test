@@ -1010,6 +1010,17 @@ func (s *CollectorTestSuite) TestMethodNames(t *gotest.T) {
 			gotest.Empty(it, result.Suites[0].Fuzzers())
 		})
 	})
+
+	t.When("such a method takes the T, B or F of its case", func(w *gotest.T) {
+		w.It("rejects each at the method, as go vet rejects such a test", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_LowercaseTakesT")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.Len(it, result.Errs, 2)
+			gotest.ErrorContains(it, result.Errs[0].Err, "Testcreate on NameTestSuite is no Test: go test runs no Test whose next letter is lowercase; rename it TestCreate, or give the helper a name that does not begin with Test")
+			gotest.Equal(it, 12, pkg.Fset.Position(result.Errs[0].Pos).Line, "reported at the method")
+			gotest.ErrorContains(it, result.Errs[1].Err, "F_Benchmarkfast on NameTestSuite is no Benchmark: go test runs no Benchmark whose next letter is lowercase; rename it F_BenchmarkFast")
+		})
+	})
 }
 
 func (s *CollectorTestSuite) TestUnreachedFixtures(t *gotest.T) {

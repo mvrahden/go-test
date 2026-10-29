@@ -50,5 +50,9 @@ func (s *DiscoveryFieldsTestSuite) TestFieldsAndNames(t *gotest.T) {
 			}
 			gotest.Empty(it, listed)
 		})
+		w.It("a method taking a T whose name continues Test with a lowercase letter is rejected at the method, as go vet rejects such a test", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "namelower", exit: 2,
+				shows: `namelower_suite_test\.go:10:26: Testcreate on LowerTestSuite is no Test: go test runs no Test whose next letter is lowercase; rename it TestCreate`})
+		})
 	})
 }
