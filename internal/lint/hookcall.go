@@ -26,7 +26,8 @@ func checkFixtureHookCall(pass *analysis.Pass, insp *inspector.Inspector) {
 		if fd.Recv == nil || len(fd.Recv.List) != 1 || len(fd.Recv.List[0].Names) != 1 || fd.Body == nil {
 			return
 		}
-		if name := receiverTypeName(fd.Recv); !harnessType(name) || isTestifySuite(pass, name) {
+		name := receiverTypeName(fd.Recv)
+		if !harnessType(name) || isTestifySuite(pass, name) {
 			return
 		}
 		recv := pass.TypesInfo.Defs[fd.Recv.List[0].Names[0]]
@@ -45,12 +46,29 @@ func checkFixtureHookCall(pass *analysis.Pass, insp *inspector.Inspector) {
 			if s := pass.TypesInfo.Selections[sel]; s == nil || s.Kind() != types.MethodVal || !harnessType(recvNamed(s.Obj())) {
 				return true
 			}
+			if ownConnect(name, fd.Name.Name, sel, pass, recv) {
+				return true
+			}
 			if rootIdent(pass, sel.X) == recv {
 				report(pass, FixtureHookCall, call.Pos(), "%s is called by the harness; calling it here runs it twice", sel.Sel.Name)
 			}
 			return true
 		})
 	})
+}
+
+// ownConnect reports whether a shared fixture's BeforeAll or AfterAll calls
+// its own Hydrate or Dehydrate: the process that owns a shared fixture never
+// runs those, so nothing runs twice.
+func ownConnect(recvType, method string, sel *ast.SelectorExpr, pass *analysis.Pass, recv types.Object) bool {
+	if !strings.HasSuffix(recvType, protocol.SuffixSharedFixture) || (method != "BeforeAll" && method != "AfterAll") {
+		return false
+	}
+	if sel.Sel.Name != "Hydrate" && sel.Sel.Name != "Dehydrate" {
+		return false
+	}
+	id, ok := ast.Unparen(sel.X).(*ast.Ident)
+	return ok && pass.TypesInfo.Uses[id] == recv
 }
 
 // harnessType reports whether name is a suite or fixture type name.

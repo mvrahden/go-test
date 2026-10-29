@@ -756,7 +756,7 @@ percentage = covered / total</div>
           <tr><td><code>generation-rejects</code></td><td>Every shape the generator rejects, at the place and with the message it gives — such a package does not run at all.</td></tr>
           <tr><td><code>suite-declaration</code></td><td>A suite or fixture declared inside a <code>type ( … )</code> block — the fix gives it its own declaration, doc comment kept.</td></tr>
           <tr><td><code>no-embedding</code></td><td>An embedded suite, fixture or type carrying a method gotest reads, or a suite-typed field — reported at the field with the alternative.</td></tr>
-          <tr><td><code>fixture-hook-call</code></td><td>A suite or fixture method calling a lifecycle hook of its own or of a fixture it holds — the harness calls it too, so it runs twice.</td></tr>
+          <tr><td><code>fixture-hook-call</code></td><td>A suite or fixture method calling a lifecycle hook of its own or of a fixture it holds — the harness calls it too, so it runs twice; a shared fixture's <code>BeforeAll</code> or <code>AfterAll</code> may call its own <code>Hydrate</code> or <code>Dehydrate</code>, which its process never runs.</td></tr>
           <tr><td><code>nolint-unknown</code></td><td>A <code>//nolint</code> id that names no gotest rule and no golangci-lint linter — it suppresses nothing, and the comment cannot suppress this finding.</td></tr>
           <tr><td><code>fuzz-struct-corpus</code></td><td>On-disk corpus entries for a struct-typed fuzz target — bound to the field order; <code>gotest fuzz promote</code> turns them into typed seeds.</td></tr>
         </tbody>

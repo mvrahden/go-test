@@ -65,6 +65,16 @@ func (s *LinterDeclarationsTestSuite) TestHookCalls(t *gotest.T) {
 	})
 }
 
+func (s *LinterDeclarationsTestSuite) TestOwnConnect(t *gotest.T) {
+	t.When("a shared fixture's BeforeAll or AfterAll calls its own Hydrate or Dehydrate", func(w *gotest.T) {
+		w.It("lint leaves the call unreported, since the process that owns the fixture runs neither", func(it *gotest.T) {
+			for _, f := range declFindings(it, "../testdata/lintdeclhookcall/") {
+				gotest.NotContains(it, f, "shared.go:")
+			}
+		})
+	})
+}
+
 // declFindings lints pkg with -json and returns each gotest finding as
 // "<rule> <file>:<line>:<col>: <message>".
 func declFindings(t *gotest.T, pkg string) []string {

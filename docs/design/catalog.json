@@ -14145,6 +14145,46 @@
               "name": "TestHookCalls",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint leaves the call unreported, since the process that owns the fixture runs neither",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_leaves_the_call_unreported,_since_the_process_that_owns_the_fixture_runs_neither",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's BeforeAll or AfterAll calls its own Hydrate or Dehydrate",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_BeforeAll_or_AfterAll_calls_its_own_Hydrate_or_Dehydrate",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "OwnConnect",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestOwnConnect",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterDeclarations",
@@ -15780,7 +15820,7 @@
     }
   ],
   "stats": {
-    "behaviors": 522,
+    "behaviors": 523,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

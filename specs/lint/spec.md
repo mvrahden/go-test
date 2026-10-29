@@ -6,7 +6,7 @@ What `gotest lint` reports, where it reports it, what its fixes change and what 
 ## Requirements
 
 ### Requirement: Suite and fixture declarations
-Lint SHALL report a suite declared inside a type block, a suite that embeds a fixture and a direct call of a fixture's lifecycle hook, each at the position where it is written, and lint -fix SHALL move a grouped suite into its own declaration that still generates.
+Lint SHALL report a suite declared inside a type block, a suite that embeds a fixture and a direct call of a fixture's lifecycle hook, except a shared fixture's own Hydrate or Dehydrate called from its BeforeAll or AfterAll, each at the position where it is written, and lint -fix SHALL move a grouped suite into its own declaration that still generates.
 
 #### Scenario: A suite in a type block
 - **WHEN** a suite is declared inside a type block
@@ -20,6 +20,10 @@ Lint SHALL report a suite declared inside a type block, a suite that embeds a fi
 #### Scenario: A hook called by hand
 - **WHEN** a suite method calls a fixture's lifecycle hook
 - **THEN** lint reports a direct call of a fixture's lifecycle hook at the call
+
+#### Scenario: A shared fixture connecting in its own setup
+- **WHEN** a shared fixture's BeforeAll or AfterAll calls its own Hydrate or Dehydrate
+- **THEN** lint leaves the call unreported, since the process that owns the fixture runs neither
 
 ### Requirement: Nolint comments
 A nolint comment with no rule or with all SHALL suppress every rule on its line; one naming a rule lint does not have SHALL be reported, and SHALL not suppress that report; one naming only another linter's rule SHALL suppress none of lint's own.

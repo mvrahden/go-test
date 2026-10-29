@@ -616,6 +616,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-suite-declaration-fix-drops-comment` | the `suite-declaration` fix moves the suite without its doc comment | conformance: the lint `-fix` It finds the doc comment left behind in the block |
 | `lint-no-embedding-silent` | `no-embedding` never reports a field | conformance: the lint It for an embedded fixture finds no `no-embedding` finding |
 | `lint-fixture-hook-call-silent` | `fixture-hook-call` never reports a call | conformance: the lint It for a hook call finds no `fixture-hook-call` finding |
+| `lint-fixture-hook-call-own-connect` | a shared fixture's `BeforeAll` calling its own `Hydrate` is reported as a hook called twice | conformance: the lint It for a shared fixture connecting in its own setup finds the call reported |
 | `lint-error-mapping-accepts-implementers` | a nil check maps to `NoError`/`Error` for any type implementing error, a concrete pointer included | conformance: the lint It for a concrete pointer's nil comparison sees a typed nil fail `NoError` |
 | `lint-nil-check-of-interface-fixed` | `Nil`/`NotNil` of an error is fixed into `NoError`/`Error` | conformance: the lint It for a Nil check of an interface sees an error holding a nil pointer flip its verdict |
 | `lint-type-parameter-read-as-constraint` | a type parameter's operand is read as its constraint interface, not its core type | conformance: the lint It for type parameters finds no `Zero` fix and a `Zero` that does not compile |
