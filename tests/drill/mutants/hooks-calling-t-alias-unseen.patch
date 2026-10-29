@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIRejectionsTestSuite/TestHooksCallingT/several_hooks_call_t.T()_where_their_wrapper_makes_it_nil/fails_with_exit_2_and_one_error_on_stderr_that_names_every_such_hook_in_source_order,_located_at_the_first/a_generic_suite_another_package_declares
+Expect: ^FAIL .*conformance/cli .* / fails with exit 2 and one error on stderr that names every such hook in source order, located at the first / a generic suite another package declares \(
+Clause: when several hooks call t.T() where their wrapper makes it nil → fails with exit 2 and one error on stderr that names every such hook in source order, located at the first
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -718,7 +718,7 @@
+ 		return -1, nil
+ 	}
+ 
+-	tm := &TestSuiteMethod{n: n, info: pkg.TypesInfo, m: m, sig: sig}
++	tm := &TestSuiteMethod{n: n, info: s.pkg.TypesInfo, m: m, sig: sig}
+ 
+ 	isTestCase := IS_TEST_CASE.MatchString(m.Name())
+ 	isBenchmark := IS_BENCHMARK.MatchString(m.Name())

@@ -1,7 +1,7 @@
 # Fuzz Specification
 
 ## Purpose
-How each fuzz execution's BeforeEach and AfterEach pair when BeforeEach fails, skips or panics, which fuzz seed replays a run keeps when -run or -skip names some of a suite's Test and Fuzz functions, how gotest fuzz and its triage give a target the shared fixtures its suite binds, where a seed of the wrong type is reported, what a fuzz session warns about before it starts, and which crashers `gotest fuzz promote` turns into seeds.
+How each fuzz execution's BeforeEach and AfterEach pair when BeforeEach fails, skips or panics, which fuzz seed replays a run keeps when -run or -skip names some of a suite's Test and Fuzz functions, how an alias of another package's generic suite fuzzes, how gotest fuzz and its triage give a target the shared fixtures its suite binds, where a seed of the wrong type is reported, what a fuzz session warns about before it starts, and which crashers `gotest fuzz promote` turns into seeds.
 
 ## Requirements
 
@@ -35,6 +35,15 @@ A -skip filter SHALL drop a suite's fuzz seed replays only when it names every T
 #### Scenario: Skipping every function of a suite
 - **WHEN** -skip names every Test and Fuzz function of a suite
 - **THEN** the suite does not run: its shared fixture never starts and the run passes
+
+### Requirement: Fuzz methods of a suite another package declares
+An alias of a generic suite declared in another package SHALL run that suite's fuzz methods, replaying their seeds as the declaring package's source states them, with the suite's type parameters read as the types the alias instantiates and the declaring package's named types as they are declared.
+
+#### Scenario: An alias of another package's generic suite
+- **WHEN** a suite aliases a generic suite another package declares with a fuzz method
+- **THEN** the fuzz method's seeds replay and pass
+- **AND** a callback that takes the suite's type parameter fuzzes the type the alias instantiates
+- **AND** a callback that takes a named type of the declaring package fuzzes that type
 
 ### Requirement: A suite without test methods
 A suite with fuzz methods and no test method SHALL have no Test function to select or skip: -skip SHALL drop it when it names every fuzz wrapper, and a -run naming only its Test function SHALL replay none of its seeds.

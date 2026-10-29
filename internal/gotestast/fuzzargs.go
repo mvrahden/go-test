@@ -85,12 +85,12 @@ func FuzzCorpusShapeBound(t types.Type) bool {
 }
 
 // IsFFuzzCall reports whether ce is a call of (*gotest.F).Fuzz.
-func IsFFuzzCall(pkg *packages.Package, ce *ast.CallExpr) bool {
+func IsFFuzzCall(info *types.Info, ce *ast.CallExpr) bool {
 	sel, ok := ce.Fun.(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Fuzz" {
 		return false
 	}
-	recv := pkg.TypesInfo.TypeOf(sel.X)
+	recv := info.TypeOf(sel.X)
 	if recv == nil {
 		return false
 	}
@@ -128,13 +128,13 @@ func CollectFuzzCalls(pkg *packages.Package, suites TestSuiteSpecSet) ([]FuzzCal
 // source. ok is false for a method without a body.
 func CollectFuzzCall(pkg *packages.Package, ts *TestSuiteSpec, fz *TestSuiteMethod) (call FuzzCall, ok bool, err error) {
 	decl, isDecl := fz.n.(*ast.FuncDecl)
-	if !isDecl || decl.Body == nil {
+	if !isDecl || decl.Body == nil || fz.info == nil {
 		return FuzzCall{}, false, nil
 	}
 	method := ts.Identifier() + "." + fz.Identifier()
 	var calls []*ast.CallExpr
 	ast.Inspect(decl.Body, func(n ast.Node) bool {
-		if ce, ok := n.(*ast.CallExpr); ok && IsFFuzzCall(pkg, ce) {
+		if ce, ok := n.(*ast.CallExpr); ok && IsFFuzzCall(fz.info, ce) {
 			calls = append(calls, ce)
 		}
 		return true
@@ -150,9 +150,14 @@ func CollectFuzzCall(pkg *packages.Package, ts *TestSuiteSpec, fz *TestSuiteMeth
 	if len(ce.Args) != 1 {
 		return FuzzCall{}, false, At(ce.Pos(), fmt.Errorf("fuzz method %s: f.Fuzz takes exactly one callback", method))
 	}
-	typs, err := fuzzCallbackTypes(pkg.TypesInfo.TypeOf(ce.Args[0]))
+	typs, err := fuzzCallbackTypes(fz.info.TypeOf(ce.Args[0]))
 	if err != nil {
 		return FuzzCall{}, false, At(ce.Pos(), fmt.Errorf("fuzz method %s: %w", method, err))
+	}
+	// a generic alias fuzzes with the types it instantiates
+	args := instanceArgs(ts, fz)
+	for i, t := range typs {
+		typs[i] = substitute(t, args)
 	}
 	return FuzzCall{
 		FuncName: fmt.Sprintf("Fuzz%s_%s", ts.Identifier(), fz.Identifier()),

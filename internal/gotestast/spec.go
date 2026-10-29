@@ -419,6 +419,7 @@ type TestSuiteHarness struct {
 
 type TestSuiteMethod struct {
 	n            ast.Node
+	info         *types.Info // the declaring package's, for a suite another package declares
 	m            *types.Func
 	sig          *types.Signature
 	usesStdlibT  bool
@@ -588,6 +589,10 @@ func DetermineTestSuite(n ast.Node, pkg *packages.Package) (*TestSuiteSpec, toke
 	if typ == nil {
 		return nil, -1, nil
 	}
+	// testify runs its own suites, through the package's go test runner
+	if IsTestifySuite(rawType) {
+		return nil, -1, nil
+	}
 
 	return &TestSuiteSpec{pkg: pkg, n: n, ts: ts, typ: typ, underlyingTypeName: underlyingTypeName, th: &TestSuiteHarness{}}, -1, nil
 }
@@ -669,7 +674,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		namedRecvr, ok := types.Unalias(recv.Type()).(*types.Named)
 		if ok {
 			str := namedRecvr.Obj().Name()
-			if IS_TEST_SUITE.MatchString(str) { // no receiver
+			if str == s.ts.Name.Name || (s.underlyingTypeName != "" && str == s.underlyingTypeName) {
 				return decl.Name.Pos(), fmt.Errorf("signature of %q has unsupported value type receiver", decl.Name)
 			}
 			return -1, nil
@@ -721,7 +726,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		return -1, nil
 	}
 
-	tm := &TestSuiteMethod{n: n, m: m, sig: sig}
+	tm := &TestSuiteMethod{n: n, info: pkg.TypesInfo, m: m, sig: sig}
 
 	isTestCase := IS_TEST_CASE.MatchString(m.Name())
 	isBenchmark := IS_BENCHMARK.MatchString(m.Name())
@@ -996,7 +1001,7 @@ func hooksCallingT(ts *TestSuiteSpec) error {
 		if h.perInput && !bench {
 			continue
 		}
-		if pos := h.m.callsT(ts.pkg); pos.IsValid() {
+		if pos := h.m.callsT(); pos.IsValid() {
 			found = append(found, offender{h.name, pos})
 			perInput = perInput || h.perInput
 		}
@@ -1028,12 +1033,12 @@ func hooksCallingT(ts *TestSuiteSpec) error {
 // parameter, or an alias of it, that is not proven non-nil where it is used;
 // or token.NoPos. It reads the method's body, closures included, not the
 // helpers it calls. A nil method has none.
-func (m *TestSuiteMethod) callsT(pkg *packages.Package) token.Pos {
+func (m *TestSuiteMethod) callsT() token.Pos {
 	decl, ok := m.node().(*ast.FuncDecl)
-	if !ok || decl.Body == nil || m.sig.Params().Len() == 0 || m.usesStdlibT {
+	if !ok || decl.Body == nil || m.info == nil || m.sig.Params().Len() == 0 || m.usesStdlibT {
 		return token.NoPos
 	}
-	w := &hookWalk{info: pkg.TypesInfo, parents: parentsOf(decl.Body), self: map[types.Object]bool{m.sig.Params().At(0): true}}
+	w := &hookWalk{info: m.info, parents: parentsOf(decl.Body), self: map[types.Object]bool{m.sig.Params().At(0): true}}
 	w.followAliases(decl.Body)
 	found := token.NoPos
 	ast.Inspect(decl.Body, func(n ast.Node) bool {

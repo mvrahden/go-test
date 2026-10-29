@@ -71,7 +71,10 @@ func HarvestSeeds(pkg *packages.Package, suites TestSuiteSpecSet) (map[string][]
 			}
 			fuzzBodies[decl] = true
 			funcName := fmt.Sprintf("Fuzz%s_%s", ts.Identifier(), fz.Identifier())
-			targets = append(targets, findHarvestTargets(pkg, decl, funcName)...)
+			if fz.info == nil {
+				continue
+			}
+			targets = append(targets, findHarvestTargets(fz.info, decl, funcName)...)
 		}
 	}
 	if len(targets) == 0 {
@@ -130,21 +133,21 @@ func isTestFile(pkg *packages.Package, file *ast.File) bool {
 // invokes by forwarding ALL of its own data parameters as plain identifier
 // arguments (one level of indirection — no deeper dataflow analysis), builds
 // a harvestTarget describing the position mapping.
-func findHarvestTargets(pkg *packages.Package, fuzzDecl *ast.FuncDecl, funcName string) []harvestTarget {
+func findHarvestTargets(info *types.Info, fuzzDecl *ast.FuncDecl, funcName string) []harvestTarget {
 	var targets []harvestTarget
 	ast.Inspect(fuzzDecl.Body, func(n ast.Node) bool {
 		ce, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
-		if !IsFFuzzCall(pkg, ce) || len(ce.Args) == 0 {
+		if !IsFFuzzCall(info, ce) || len(ce.Args) == 0 {
 			return true
 		}
 		funcLit, ok := ce.Args[len(ce.Args)-1].(*ast.FuncLit)
 		if !ok {
 			return true
 		}
-		sig, ok := pkg.TypesInfo.TypeOf(funcLit).(*types.Signature)
+		sig, ok := info.TypeOf(funcLit).(*types.Signature)
 		if !ok || sig.Params().Len() < 1 {
 			return true
 		}
@@ -166,11 +169,11 @@ func findHarvestTargets(pkg *packages.Package, fuzzDecl *ast.FuncDecl, funcName 
 			if !ok {
 				return true
 			}
-			callee := calleeFuncOf(pkg, ce2.Fun)
+			callee := calleeFuncOf(info, ce2.Fun)
 			if callee == nil || isExcludedCalleePkg(callee) || seenCallee[callee] {
 				return true
 			}
-			posToCbIdx, ok := coversAllParams(pkg, ce2, cbParamObjs)
+			posToCbIdx, ok := coversAllParams(info, ce2, cbParamObjs)
 			if !ok {
 				return true
 			}
@@ -191,7 +194,7 @@ func findHarvestTargets(pkg *packages.Package, fuzzDecl *ast.FuncDecl, funcName 
 // coversAllParams reports whether ce's arguments forward every param in
 // cbParamObjs exactly once as a bare identifier, returning the callee
 // argument-position -> callback-param-index mapping if so.
-func coversAllParams(pkg *packages.Package, ce *ast.CallExpr, cbParamObjs []*types.Var) (map[int]int, bool) {
+func coversAllParams(info *types.Info, ce *ast.CallExpr, cbParamObjs []*types.Var) (map[int]int, bool) {
 	if ce.Ellipsis != token.NoPos {
 		return nil, false // variadic call-site forwarding — out of scope
 	}
@@ -202,7 +205,7 @@ func coversAllParams(pkg *packages.Package, ce *ast.CallExpr, cbParamObjs []*typ
 		if !ok {
 			continue
 		}
-		obj := pkg.TypesInfo.Uses[ident]
+		obj := info.Uses[ident]
 		for cbIdx, p := range cbParamObjs {
 			if obj == p {
 				posToCbIdx[pos] = cbIdx
@@ -231,18 +234,18 @@ func isExcludedCalleePkg(fn *types.Func) bool {
 
 // calleeFuncOf resolves the *types.Func a call expression's Fun operand
 // refers to, unwrapping explicit generic instantiations.
-func calleeFuncOf(pkg *packages.Package, fun ast.Expr) *types.Func {
+func calleeFuncOf(info *types.Info, fun ast.Expr) *types.Func {
 	switch e := fun.(type) {
 	case *ast.Ident:
-		fn, _ := pkg.TypesInfo.Uses[e].(*types.Func)
+		fn, _ := info.Uses[e].(*types.Func)
 		return fn
 	case *ast.SelectorExpr:
-		fn, _ := pkg.TypesInfo.Uses[e.Sel].(*types.Func)
+		fn, _ := info.Uses[e.Sel].(*types.Func)
 		return fn
 	case *ast.IndexExpr:
-		return calleeFuncOf(pkg, e.X)
+		return calleeFuncOf(info, e.X)
 	case *ast.IndexListExpr:
-		return calleeFuncOf(pkg, e.X)
+		return calleeFuncOf(info, e.X)
 	default:
 		return nil
 	}
@@ -256,7 +259,7 @@ func harvestDirectLiteralCalls(pkg *packages.Package, fd *ast.FuncDecl, targets 
 		if !ok {
 			return true
 		}
-		callee := calleeFuncOf(pkg, ce.Fun)
+		callee := calleeFuncOf(pkg.TypesInfo, ce.Fun)
 		if callee == nil {
 			return true
 		}
@@ -303,7 +306,7 @@ func harvestEachTableRows(pkg *packages.Package, fd *ast.FuncDecl, targets []har
 		if !ok || len(ce.Args) < 2 {
 			return true
 		}
-		eachFn := calleeFuncOf(pkg, ce.Fun)
+		eachFn := calleeFuncOf(pkg.TypesInfo, ce.Fun)
 		if eachFn == nil || eachFn.Pkg() == nil || eachFn.Pkg().Path() != about.Repo+"/pkg/gotest" || eachFn.Name() != "Each" {
 			return true
 		}
@@ -336,7 +339,7 @@ func harvestEachTableRows(pkg *packages.Package, fd *ast.FuncDecl, targets []har
 			if !ok {
 				return true
 			}
-			callee := calleeFuncOf(pkg, ce2.Fun)
+			callee := calleeFuncOf(pkg.TypesInfo, ce2.Fun)
 			if callee == nil {
 				return true
 			}

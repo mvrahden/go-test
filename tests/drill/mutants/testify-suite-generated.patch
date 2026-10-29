@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0 \(
+Clause: when a package holds a testify suite beside a gotest suite → runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -582,7 +582,7 @@
+ 		return nil, -1, nil
+ 	}
+ 	// testify runs its own suites, through the package's go test runner
+-	if IsTestifySuite(rawType) {
++	if false && IsTestifySuite(rawType) {
+ 		return nil, -1, nil
+ 	}
+ 

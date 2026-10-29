@@ -600,6 +600,10 @@ shards of one run do not add up to every mutant exactly once.
 | `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
 | `external-generic-alias-dropped` | an alias of a generic suite in the external test package is read as a suite without cases | canary: none of the `shapes/pxgenericalias` aliases' methods passes |
 | `focus-method-not-run-wide` | only a focused suite, never a focused method, focuses the whole run | canary: the `shapes/focusmethod` unfocused suite in the other package is not skipped |
+| `hooks-calling-t-alias-unseen` | the hooks of a generic suite another package declares are read with the alias's package's types | cli conformance: the cross-package alias row runs instead of failing with exit 2 |
+| `fuzz-alias-methods-read-in-alias-package` | a fuzz method of a generic suite another package declares is read with the alias's package's types | conformance: the fuzz It for a cross-package alias sees the method refused as never calling `f.Fuzz` |
+| `fuzz-alias-type-parameter-unread` | a fuzz callback's type parameter is not read as the type the alias instantiates | conformance: the fuzz It for a type-parameter callback sees the target refused as not fuzzable |
+| `testify-suite-generated` | the generator reads a testify suite as a gotest suite | cli conformance: the package holding a testify suite beside a gotest suite fails with exit 2 |
 
 ## Adding a mutant
 

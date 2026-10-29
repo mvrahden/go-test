@@ -5276,6 +5276,19 @@
                           "output": [],
                           "status": "none",
                           "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a generic suite another package declares",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_generic_suite_another_package_declares",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
                         }
                       ],
                       "display": "fails with exit 2 and one error on stderr that names every such hook in source order, located at the first",
@@ -5974,6 +5987,59 @@
           "focused": false,
           "kind": "suite",
           "name": "TestCLIStreamsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "runs_the_gotest_suite,_notes_the_testify_runner_as_a_stdlib_test_go_test_runs,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package holds a testify suite beside a gotest suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_holds_a_testify_suite_beside_a_gotest_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BesideGotestSuites",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBesideGotestSuites",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLITestify",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestCLITestifyTestSuite",
           "output": [],
           "status": "none"
         },
@@ -9570,6 +9636,85 @@
     {
       "duration": 0,
       "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fuzz method's seeds replay and pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_fuzz_method's_seeds_replay_and_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a callback that takes the suite's type parameter fuzzes the type the alias instantiates",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_callback_that_takes_the_suite's_type_parameter_fuzzes_the_type_the_alias_instantiates",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a callback that takes a named type of the declaring package fuzzes that type",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_callback_that_takes_a_named_type_of_the_declaring_package_fuzzes_that_type",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite aliases a generic suite another package declares with a fuzz method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_aliases_a_generic_suite_another_package_declares_with_a_fuzz_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GenericAlias",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGenericAlias",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FuzzCrossPackage",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFuzzCrossPackageTestSuite",
+          "output": [],
+          "status": "none"
+        },
         {
           "children": [
             {
@@ -13875,13 +14020,13 @@
     }
   ],
   "stats": {
-    "behaviors": 463,
+    "behaviors": 468,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 77,
+    "suites": 79,
     "tests": 0
   }
 }

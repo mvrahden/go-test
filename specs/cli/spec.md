@@ -40,6 +40,13 @@ gotest SHALL note on stderr, in every mode, that a package has only stdlib tests
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
 
+### Requirement: Packages with testify suites
+gotest SHALL run the gotest suites of a package that holds a testify suite and SHALL leave the testify suite to go test, noting its runner as a stdlib test.
+
+#### Scenario: A testify suite beside a gotest suite
+- **WHEN** a package holds a testify suite beside a gotest suite
+- **THEN** runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0
+
 ### Requirement: Boolean flags
 Every boolean flag SHALL take --x, --x=true and --x=false, the last occurrence SHALL win, and any other value SHALL be a usage error. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
 

@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/fuzz .* / the fuzz method's seeds replay and pass \(
+Expect: ^FAIL .*conformance/fuzz .* / a callback that takes a named type of the declaring package fuzzes that type \(
+Clause: when a suite aliases a generic suite another package declares with a fuzz method → the fuzz method's seeds replay and pass
+Clause: when a suite aliases a generic suite another package declares with a fuzz method → a callback that takes a named type of the declaring package fuzzes that type
+--- a/internal/gotestast/fuzzargs.go
++++ b/internal/gotestast/fuzzargs.go
+@@ -134,7 +134,7 @@
+ 	method := ts.Identifier() + "." + fz.Identifier()
+ 	var calls []*ast.CallExpr
+ 	ast.Inspect(decl.Body, func(n ast.Node) bool {
+-		if ce, ok := n.(*ast.CallExpr); ok && IsFFuzzCall(fz.info, ce) {
++		if ce, ok := n.(*ast.CallExpr); ok && IsFFuzzCall(pkg.TypesInfo, ce) {
+ 			calls = append(calls, ce)
+ 		}
+ 		return true
