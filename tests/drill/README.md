@@ -301,6 +301,7 @@ shards of one run do not add up to every mutant exactly once.
 | `hooks-calling-t-guard-ignored` | a `t.T()` checked for nil before use is refused like an unchecked one | cli conformance: the fuzz suite with guarded hooks exits 2 instead of running |
 | `hooks-calling-t-named-last-first` | the error for hooks calling `t.T()` lists them last first and is located at the last | cli conformance: the fuzz row's error names the hooks out of source order |
 | `late-goroutine-left-unwaited` | the drain waits once for what BeforeAll registered, so a goroutine started meanwhile is never waited for | canary: the setupwaits late suite passes and its panic is lost |
+| `list-pattern-left-unchecked` | a `-list` pattern is not checked before the run, so each package's binary refuses it in turn | cli conformance: the pattern is not refused with exit 2 |
 | `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
 | `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
 | `method-panic-discarded-by-aftereach` | `gotestruntime.AfterEach` runs AfterEach in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics test method's panic is never reported |

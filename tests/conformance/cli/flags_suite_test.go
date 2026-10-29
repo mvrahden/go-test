@@ -82,4 +82,13 @@ func (s *CLIFlagsTestSuite) TestTestNamePatterns(t *gotest.T) {
 			gotest.Empty(it, run.Events)
 		})
 	})
+	t.When("a -list pattern does not compile", func(w *gotest.T) {
+		run, err := testkit.RunCLI(w.Context(), ".", "-json", "../testdata/passing/", "-list=(")
+		gotest.NoError(w, err)
+		w.It("is refused with exit 2 before anything runs, naming the pattern as go test does", func(it *gotest.T) {
+			gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stderr, `invalid regexp in -list ("(")`)
+			gotest.Empty(it, run.Events)
+		})
+	})
 }

@@ -3972,6 +3972,33 @@
                   "output": [],
                   "status": "none",
                   "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is refused with exit 2 before anything runs, naming the pattern as go test does",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "is_refused_with_exit_2_before_anything_runs,_naming_the_pattern_as_go_test_does",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a -list pattern does not compile",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_-list_pattern_does_not_compile",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
                 }
               ],
               "display": "TestNamePatterns",
@@ -12905,7 +12932,7 @@
     }
   ],
   "stats": {
-    "behaviors": 422,
+    "behaviors": 423,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
