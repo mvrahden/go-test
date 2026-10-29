@@ -102,6 +102,21 @@ func (s *SpecMarkdownTestSuite) TestLabels(t *gotest.T) {
 	})
 }
 
+func (s *SpecMarkdownTestSuite) TestLinkSyntax(t *gotest.T) {
+	t.When("a label holds brackets, asterisks, underscores or an ampersand", func(w *gotest.T) {
+		w.It("renders the label as written, with no link, emphasis or entity", func(it *gotest.T) {
+			for _, md := range []string{s.live.Stdout, s.static.Stdout} {
+				gotest.Contains(it, md, "**when a label holds a \\[link\\](http://x)**")
+				gotest.Contains(it, md, "keeps \\*stars\\*, \\_underscores\\_ and &amp;#124; as written")
+				gotest.NotContains(it, md, "[link](")
+				gotest.NotContains(it, md, " *stars*")
+				gotest.NotContains(it, md, " _underscores_")
+				gotest.NotContains(it, md, " &#124;")
+			}
+		})
+	})
+}
+
 func (s *SpecMarkdownTestSuite) TestSlashes(t *gotest.T) {
 	t.When("an It's label holds a slash", func(w *gotest.T) {
 		w.It("a run's spec shows it as one It under its When", func(it *gotest.T) {
@@ -112,6 +127,29 @@ func (s *SpecMarkdownTestSuite) TestSlashes(t *gotest.T) {
 		w.It("the spec read from source shows it as one It under its When", func(it *gotest.T) {
 			gotest.Contains(it, s.static.Stdout, "| **when a path is read** |\n| &nbsp;&nbsp;reads a/b paths |\n")
 			gotest.NotContains(it, s.static.Stdout, "reads a**")
+		})
+	})
+
+	t.When("an It's label is an earlier It's label, a slash and more", func(w *gotest.T) {
+		w.It("a run's spec shows both as Its under their When", func(it *gotest.T) {
+			gotest.Contains(it, s.live.Stdout, "| **when a path is read after its parent** | | |\n| &nbsp;&nbsp;reads a | PASS | ")
+			gotest.Regexp(it, `\| &nbsp;&nbsp;reads a \| PASS \| [^\n]*\n\| &nbsp;&nbsp;reads a/b \| PASS \| `, s.live.Stdout)
+		})
+
+		w.It("the spec read from source shows both as Its under their When", func(it *gotest.T) {
+			gotest.Contains(it, s.static.Stdout, "| **when a path is read after its parent** |\n| &nbsp;&nbsp;reads a |\n| &nbsp;&nbsp;reads a/b |\n")
+		})
+	})
+}
+
+func (s *SpecMarkdownTestSuite) TestGroupFailure(t *gotest.T) {
+	run, err := testkit.RunCLI(t.Context(), ".", "spec", "--format=md", "../testdata/specgroupfail/")
+	gotest.NoError(t, err)
+	t.When("a group fails with every behavior under it passing", func(w *gotest.T) {
+		w.It("shows the failure and what it wrote on the group's row", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "spec: %s", run.Stderr)
+			gotest.Regexp(it, `\| \*\*when the disk \\\| is full\*\* — [^|]*no space &lt;left&gt; \| FAIL \| `, run.Stdout)
+			gotest.Contains(it, run.Stdout, "| &nbsp;&nbsp;starts | PASS | ")
 		})
 	})
 }

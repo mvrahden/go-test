@@ -4,11 +4,11 @@ Expect: specmarkdown: a label breaks its table row
 Clause: when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break → keeps each behavior on one row of its table
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -46,7 +46,6 @@
- // backslash goes first, so the escapes it adds are not escaped again.
- var markdownEscaper = strings.NewReplacer(
+@@ -60,7 +60,6 @@
+ // link, emphasis or an entity, so the spec shows it as written.
+ var labelEscaper = strings.NewReplacer(
  	`\`, `\\`,
 -	"|", `\|`,
  	"`", "\\`",
- 	"<", "&lt;",
- 	">", "&gt;",
+ 	"*", `\*`,
+ 	"_", `\_`,

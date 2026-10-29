@@ -4,10 +4,10 @@ Expect: specmarkdown: an excluded node is not marked EXCLUDED: "### Parked
 Clause: when the spec is read from source with X_ suites and methods → marks each excluded suite, method and behavior EXCLUDED
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -191,9 +191,6 @@
+@@ -216,9 +216,6 @@
  	case KindMethod, KindTest, KindFuzz:
  		heading := strings.Repeat("#", headingLevel)
- 		label := EscapeMarkdown(n.Display)
+ 		label := EscapeLabel(n.Display)
 -		if bare && n.Excluded {
 -			label += " — EXCLUDED"
 -		}

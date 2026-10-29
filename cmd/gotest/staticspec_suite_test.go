@@ -292,7 +292,7 @@ func (s *StaticSpecTestSuite) TestASlashInALabelIsNoLevel(t *gotest.T, ctx *stat
 		})
 
 		w.It("renders it as one row with no invented when", func(it *gotest.T) {
-			gotest.Contains(it, md, "| **when a path is read** |\n| &nbsp;&nbsp;reads a/b paths |\n| &nbsp;&nbsp;keeps snake_case/paths whole |\n| x/y |\n")
+			gotest.Contains(it, md, "| **when a path is read** |\n| &nbsp;&nbsp;reads a/b paths |\n| &nbsp;&nbsp;keeps snake\\_case/paths whole |\n| x/y |\n")
 			gotest.NotContains(it, md, "when reads a")
 			gotest.NotContains(it, md, "when x")
 		})
@@ -336,7 +336,7 @@ func (s *StaticSpecTestSuite) TestAReplayKeepsASlashInALabel(t *gotest.T, ctx *s
 
 	t.When("a replayed It's label holds a slash and an underscore", func(w *gotest.T) {
 		w.It("shows the declared label in one row", func(it *gotest.T) {
-			gotest.Contains(it, string(md), "| &nbsp;&nbsp;keeps snake_case/paths whole | PASS |")
+			gotest.Contains(it, string(md), "| &nbsp;&nbsp;keeps snake\\_case/paths whole | PASS |")
 		})
 	})
 }

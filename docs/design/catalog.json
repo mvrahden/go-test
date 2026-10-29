@@ -12467,6 +12467,46 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "renders the label as written, with no link, emphasis or entity",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "renders_the_label_as_written,_with_no_link,_emphasis_or_entity",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a label holds brackets, asterisks, underscores or an ampersand",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_label_holds_brackets,_asterisks,_underscores_or_an_ampersand",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LinkSyntax",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLinkSyntax",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a run's spec shows it as one It under its When",
                       "duration": 0,
                       "excluded": false,
@@ -12502,6 +12542,46 @@
                   "output": [],
                   "status": "none",
                   "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a run's spec shows both as Its under their When",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_run's_spec_shows_both_as_Its_under_their_When",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the spec read from source shows both as Its under their When",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_spec_read_from_source_shows_both_as_Its_under_their_When",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It's label is an earlier It's label, a slash and more",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "an_It's_label_is_an_earlier_It's_label,_a_slash_and_more",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
                 }
               ],
               "display": "Slashes",
@@ -12511,6 +12591,46 @@
               "focused": false,
               "kind": "method",
               "name": "TestSlashes",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "shows the failure and what it wrote on the group's row",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "shows_the_failure_and_what_it_wrote_on_the_group's_row",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a group fails with every behavior under it passing",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_group_fails_with_every_behavior_under_it_passing",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GroupFailure",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestGroupFailure",
               "output": [],
               "status": "none"
             },
@@ -12572,7 +12692,7 @@
     }
   ],
   "stats": {
-    "behaviors": 412,
+    "behaviors": 416,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -149,7 +149,8 @@ func resolveSiblings(in []*Behavior) []*Behavior {
 // insertPath places a behavior at the end of its segment path, reusing a
 // grouping node a sibling already created. Two behaviors written as "a/b" and
 // "a/c" are one node with two children at run time, not two nodes that happen
-// to share a prefix.
+// to share a prefix. A behavior a call declares is never such a node: "a/b"
+// written after an It "a" is its sibling, as go test reports it.
 func insertPath(out []*Behavior, segments, displays []string, leaf *Behavior) []*Behavior {
 	if len(segments) <= 1 {
 		return append(out, leaf)
@@ -157,7 +158,7 @@ func insertPath(out []*Behavior, segments, displays []string, leaf *Behavior) []
 	head := segments[0]
 	var node *Behavior
 	for _, existing := range out {
-		if existing.Name == head {
+		if existing.Name == head && existing.Implied {
 			node = existing
 			break
 		}

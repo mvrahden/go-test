@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when a group fails with every behavior under it passing / shows the failure and what it wrote on the group's row \(
+Clause: when a group fails with every behavior under it passing → shows the failure and what it wrote on the group's row
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -282,7 +282,7 @@
+ 					suffix = " — EXCLUDED"
+ 				}
+ 				fmt.Fprintf(w, "| %s**%s**%s |\n", indent, label, suffix)
+-			case failedOnItsOwn(n) || hasOwnDiagnostic(n):
++			case false:
+ 				// The group's verdict is its own: no row beneath it says why.
+ 				lines := filterOutput(n.Output)
+ 				if len(lines) == 0 {

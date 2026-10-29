@@ -35,15 +35,16 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 		}
 		// A build failure, a fixture that failed: no behavior carries it.
 		if !cfg.withoutVerdicts && PkgFailedOnItsOwn(pkg) {
-			fmt.Fprintf(w, "## %s — FAILED\n\n", EscapeMarkdown(pkg.Path))
+			fmt.Fprintf(w, "## %s — FAILED\n\n", EscapeLabel(pkg.Path))
 			markdownOutput(w, pkg.Output)
 		}
 	}
 }
 
-// markdownEscaper turns a label into text: no character of it may end a
-// cell, start a row, open a code span or reach the reader as HTML. The
-// backslash goes first, so the escapes it adds are not escaped again.
+// markdownEscaper keeps a name in its table cell: no character of it may end
+// the cell, start a row, open a code span or reach the reader as HTML. The
+// backslash goes first, and the replacer makes one pass, so the escapes it
+// adds are not escaped again.
 var markdownEscaper = strings.NewReplacer(
 	`\`, `\\`,
 	"|", `\|`,
@@ -55,9 +56,31 @@ var markdownEscaper = strings.NewReplacer(
 	"\r", " ",
 )
 
-// EscapeMarkdown is the one escape for every table cell and inline label a
-// Markdown document carries. A line break becomes a space: a cell is one line.
+// labelEscaper is markdownEscaper that also keeps a label from opening a
+// link, emphasis or an entity, so the spec shows it as written.
+var labelEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	"|", `\|`,
+	"`", "\\`",
+	"*", `\*`,
+	"_", `\_`,
+	"[", `\[`,
+	"]", `\]`,
+	"&", "&amp;",
+	"<", "&lt;",
+	">", "&gt;",
+	"\r\n", " ",
+	"\n", " ",
+	"\r", " ",
+)
+
+// EscapeMarkdown is the escape for a table cell of names gotest prints. A line
+// break becomes a space: a cell is one line.
 func EscapeMarkdown(s string) string { return markdownEscaper.Replace(s) }
+
+// EscapeLabel is the escape for every label and output the Markdown spec
+// writes: EscapeMarkdown, and no link, emphasis or entity either.
+func EscapeLabel(s string) string { return labelEscaper.Replace(s) }
 
 // markdownOutput renders what a failure wrote as a code block. The fence is
 // longer than any backtick run in the output, so the output cannot close it.
@@ -91,7 +114,7 @@ const incompleteNote = "this method declares further behaviors whose names or ex
 // Duration column, because a document that prints "<1ms" beside a behavior
 // nothing ran is stating a measurement that was never taken.
 func markdownRow(w io.Writer, indent, display string, n *Node, bare bool) {
-	display = EscapeMarkdown(display)
+	display = EscapeLabel(display)
 	if bare && n.Excluded {
 		display += " — EXCLUDED"
 	}
@@ -135,7 +158,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 
 	case KindSuite:
 		heading := strings.Repeat("#", headingLevel)
-		label := EscapeMarkdown(n.Display)
+		label := EscapeLabel(n.Display)
 		if n.Focused {
 			label += " — FOCUSED"
 		}
@@ -192,7 +215,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 
 	case KindMethod, KindTest, KindFuzz:
 		heading := strings.Repeat("#", headingLevel)
-		label := EscapeMarkdown(n.Display)
+		label := EscapeLabel(n.Display)
 		if bare && n.Excluded {
 			label += " — EXCLUDED"
 		}
@@ -223,16 +246,16 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		}
 		// A bare top-level benchmark node with no enclosing suite.
 		heading := strings.Repeat("#", headingLevel)
-		fmt.Fprintf(w, "%s %s\n\n", heading, EscapeMarkdown(n.Display))
+		fmt.Fprintf(w, "%s %s\n\n", heading, EscapeLabel(n.Display))
 		renderMarkdownBenchTable(w, []*Node{n})
 
 	default:
 		if len(n.Children) == 0 {
 			if bare {
-				fmt.Fprintf(w, "- %s\n", EscapeMarkdown(n.Display))
+				fmt.Fprintf(w, "- %s\n", EscapeLabel(n.Display))
 				return
 			}
-			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), EscapeMarkdown(n.Display), formatDuration(EffectiveDuration(n)))
+			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), EscapeLabel(n.Display), formatDuration(EffectiveDuration(n)))
 		}
 	}
 }
@@ -242,7 +265,7 @@ func renderMarkdownBenchTable(w io.Writer, nodes []*Node) {
 	fmt.Fprintln(w, "|-----------|-------|------|-----------|")
 	for _, c := range nodes {
 		fmt.Fprintf(w, "| %s | %s | %d | %d |\n",
-			EscapeMarkdown(c.Display), formatNs(c.NsPerOp), c.BytesPerOp, c.AllocsPerOp)
+			EscapeLabel(c.Display), formatNs(c.NsPerOp), c.BytesPerOp, c.AllocsPerOp)
 	}
 	fmt.Fprintln(w)
 }
@@ -251,14 +274,26 @@ func renderMarkdownTable(w io.Writer, nodes []*Node, depth int, bare bool) {
 	indent := strings.Repeat("&nbsp;&nbsp;", depth)
 	for _, n := range nodes {
 		if len(n.Children) > 0 {
-			label := EscapeMarkdown(n.Display)
-			if bare {
+			label := EscapeLabel(n.Display)
+			switch {
+			case bare:
 				suffix := ""
 				if n.Excluded {
 					suffix = " — EXCLUDED"
 				}
 				fmt.Fprintf(w, "| %s**%s**%s |\n", indent, label, suffix)
-			} else {
+			case failedOnItsOwn(n) || hasOwnDiagnostic(n):
+				// The group's verdict is its own: no row beneath it says why.
+				lines := filterOutput(n.Output)
+				if len(lines) == 0 {
+					lines = []string{noDiagnosticNote}
+				}
+				for i, l := range lines {
+					lines[i] = strings.TrimSpace(l)
+				}
+				fmt.Fprintf(w, "| %s**%s** — %s | %s | %s |\n", indent, label,
+					EscapeLabel(strings.Join(lines, " ")), statusText(n.Status), formatDuration(EffectiveDuration(n)))
+			default:
 				fmt.Fprintf(w, "| %s**%s** | | |\n", indent, label)
 			}
 			renderMarkdownTable(w, n.Children, depth+1, bare)

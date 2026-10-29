@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when a label holds brackets, asterisks, underscores or an ampersand / renders the label as written, with no link, emphasis or entity \(
+Clause: when a label holds brackets, asterisks, underscores or an ampersand → renders the label as written, with no link, emphasis or entity
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -80,7 +80,7 @@
+ 
+ // EscapeLabel is the escape for every label and output the Markdown spec
+ // writes: EscapeMarkdown, and no link, emphasis or entity either.
+-func EscapeLabel(s string) string { return labelEscaper.Replace(s) }
++func EscapeLabel(s string) string { return markdownEscaper.Replace(s) }
+ 
+ // markdownOutput renders what a failure wrote as a code block. The fence is
+ // longer than any backtick run in the output, so the output cannot close it.

@@ -558,6 +558,10 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-slash-splits-run` | the tree of a run reads a slash in an It's name as a level | spec conformance: the run's spec shows "reads a" as a level; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
 | `spec-slash-splits-source` | the spec read from source keeps the level a slash implies | spec conformance: the static spec shows "reads a" as a level |
 | `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `### Parked — EXCLUDED` |
+| `spec-label-link-unescaped` | the Markdown spec leaves brackets, asterisks, underscores and ampersands in a label as they are | spec conformance: a label's link, emphasis and entity reach the reader |
+| `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
+| `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
+| `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own with an empty status | spec conformance: the failed When's row carries no FAIL and no message |
 
 ## Adding a mutant
 

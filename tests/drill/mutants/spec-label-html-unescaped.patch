@@ -4,10 +4,10 @@ Expect: specmarkdown: a label reaches the reader as markup
 Clause: when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break → renders the label as text, with no HTML tag and no code span
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -48,8 +48,6 @@
- 	`\`, `\\`,
- 	"|", `\|`,
- 	"`", "\\`",
+@@ -67,8 +67,6 @@
+ 	"[", `\[`,
+ 	"]", `\]`,
+ 	"&", "&amp;",
 -	"<", "&lt;",
 -	">", "&gt;",
  	"\r\n", " ",

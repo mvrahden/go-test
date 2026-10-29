@@ -402,15 +402,15 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 }
 
 // joinUnstartedLevels keeps a slash in a subtest's own name. go test starts
-// every subtest under a parent that has already started, and reports no level
+// every subtest under a parent that is still running, and reports no level
 // for a slash in a name: "reads a/b paths" is one subtest. So the levels below
-// the deepest started ancestor are one name, not parents nothing started,
-// and the ancestor keeps the levels it was placed at. With no started
-// ancestor the path is left as split.
+// the deepest running ancestor are one name, and the ancestor keeps the
+// levels it was placed at. A finished "a" is a sibling of "a/x", not its
+// parent. With no running ancestor the path is left as split.
 func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[string][]string) []string {
 	for i := len(segments) - 1; i >= 1; i-- {
 		parent := strings.Join(segments[:i], "/")
-		if nmap[parent] == nil {
+		if n := nmap[parent]; n == nil || n.Status != StatusNone {
 			continue
 		}
 		head := segments[:i]
