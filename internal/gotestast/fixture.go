@@ -148,6 +148,46 @@ func DetermineFixtureOf(n ast.Node, pkg *packages.Package, wanted func(name stri
 // lifecycle method (BeforeAll, AfterAll, BeforeEach, AfterEach) on the given
 // fixture spec. It validates the method signature according to the fixture kind
 // and populates the corresponding field on the FixtureSpec.
+// FixtureMethodError checks the method name a fixture of kind declares with
+// signature sig: its config marker, Hydrate or Dehydrate and lifecycle hooks.
+// A fixture another package declares is held to it as a local one is.
+func FixtureMethodError(kind FixtureKind, fixture, name string, sig *types.Signature) error {
+	methodID := fixture + "." + name
+	switch name {
+	case "FixtureConfig", "SharedFixtureConfig":
+		if kind == SharedFixture && name == "FixtureConfig" {
+			return fmt.Errorf("shared fixture %q should use SharedFixtureConfig(), not FixtureConfig()", fixture)
+		}
+		if kind == PackageFixture && name == "SharedFixtureConfig" {
+			return fmt.Errorf("package fixture %q should use FixtureConfig(), not SharedFixtureConfig()", fixture)
+		}
+		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
+		}
+		if resType := sig.Results().At(0).Type().String(); !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
+			return fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
+		}
+		return nil
+	case "Hydrate", "Dehydrate":
+		if kind != SharedFixture {
+			return fmt.Errorf("package fixture %q must not have %s method; Hydrate/Dehydrate are for shared fixtures only", fixture, name)
+		}
+		return validateContextErrorSig(sig, methodID)
+	case "BeforeAll", "AfterAll", "BeforeEach", "AfterEach":
+		switch kind {
+		case PackageFixture:
+		case SharedFixture:
+			if name == "BeforeEach" || name == "AfterEach" {
+				return sharedEachHookError(fixture, name)
+			}
+		default:
+			return fmt.Errorf("unknown fixture kind for %q", methodID)
+		}
+		return validateContextErrorSig(sig, methodID)
+	}
+	return nil
+}
+
 func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) (token.Pos, error) {
 	decl, ok := n.(*ast.FuncDecl)
 	if !ok {
@@ -197,70 +237,20 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 		return -1, nil
 	}
 
-	methodID := f.ts.Name.Name + "." + name
-
-	// Config marker methods — dispatch by kind
-	if name == "FixtureConfig" {
-		if f.Kind == SharedFixture {
-			return m.Pos(), fmt.Errorf("shared fixture %q should use SharedFixtureConfig(), not FixtureConfig()", f.ts.Name.Name)
-		}
-		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
-			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
-		}
-		resType := sig.Results().At(0).Type().String()
-		if !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
-			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
-		}
+	if err := FixtureMethodError(f.Kind, f.ts.Name.Name, name, sig); err != nil {
+		return m.Pos(), err
+	}
+	switch name {
+	case "FixtureConfig", "SharedFixtureConfig":
 		f.Config = m
 		return -1, nil
-	}
-	if name == "SharedFixtureConfig" {
-		if f.Kind == PackageFixture {
-			return m.Pos(), fmt.Errorf("package fixture %q should use FixtureConfig(), not SharedFixtureConfig()", f.ts.Name.Name)
-		}
-		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
-			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
-		}
-		resType := sig.Results().At(0).Type().String()
-		if !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
-			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
-		}
-		f.Config = m
+	case "Hydrate":
+		f.Hydrate = m
+		f.HydrateDecl = decl
 		return -1, nil
-	}
-
-	// Hydrate/Dehydrate — shared fixtures only
-	if name == "Hydrate" || name == "Dehydrate" {
-		if f.Kind != SharedFixture {
-			return m.Pos(), fmt.Errorf("package fixture %q must not have %s method; Hydrate/Dehydrate are for shared fixtures only", f.ts.Name.Name, name)
-		}
-		if err := validateContextErrorSig(sig, methodID); err != nil {
-			return m.Pos(), err
-		}
-		if name == "Hydrate" {
-			f.Hydrate = m
-			f.HydrateDecl = decl
-		} else {
-			f.Dehydrate = m
-		}
+	case "Dehydrate":
+		f.Dehydrate = m
 		return -1, nil
-	}
-
-	// Lifecycle methods — validate per kind
-	switch f.Kind {
-	case PackageFixture:
-		if err := validateContextErrorSig(sig, methodID); err != nil {
-			return m.Pos(), err
-		}
-	case SharedFixture:
-		if name == "BeforeEach" || name == "AfterEach" {
-			return m.Pos(), sharedEachHookError(f.ts.Name.Name, name)
-		}
-		if err := validateContextErrorSig(sig, methodID); err != nil {
-			return m.Pos(), err
-		}
-	default:
-		return m.Pos(), fmt.Errorf("unknown fixture kind for %q", methodID)
 	}
 
 	switch name {

@@ -6214,6 +6214,32 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a package fixture from another package with a mis-signed FixtureConfig is rejected at the method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_package_fixture_from_another_package_with_a_mis-signed_FixtureConfig_is_rejected_at_the_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a package fixture from another package with Hydrate is rejected at the method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_package_fixture_from_another_package_with_Hydrate_is_rejected_at_the_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a suite reaches across packages",
@@ -14085,7 +14111,7 @@
     }
   ],
   "stats": {
-    "behaviors": 473,
+    "behaviors": 475,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

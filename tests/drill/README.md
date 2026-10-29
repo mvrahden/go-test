@@ -580,6 +580,7 @@ shards of one run do not add up to every mutant exactly once.
 | `shared-fixture-in-test-file-accepted` | a shared fixture declared in a `_test.go` file is not refused | canary: the `shapes/sharedintest` package exits 1 instead of 2 |
 | `cross-package-alias-methods-dropped` | an alias of another package's generic suite is read in its own package only | canary: the `shapes/xpkgcontract` package exits 2 instead of 0 |
 | `cross-package-fixture-hooks-unchecked` | the hook signatures of another package's fixture are not checked | canary: the `shapes/xpkgfixture` package is not refused with the signature it needs |
+| `cross-package-fixture-methods-unchecked` | a package fixture from another package is checked for its hooks alone, not its `FixtureConfig`, `Hydrate` or `Dehydrate` | canary: the `shapes/xpkgconfig` run fails to build instead of naming the method, and `shapes/xpkghydrate` runs instead of exiting 2 |
 | `fixture-field-by-value-accepted` | a fixture field held by value is not refused | canary: the `shapes/fieldvalue` and `shapes/fieldalias` packages exit 1 instead of 2 |
 | `fixture-field-alias-pointer-unbound` | a field typed by an alias of a fixture pointer is not seen as a fixture | canary: the `shapes/fieldaliasptr` package exits 1 instead of 0 |
 | `fixture-field-duplicate-accepted` | a second field of the same fixture type is not refused | canary: the `shapes/fielddup` and `shapes/fielddupparent` packages exit 0 instead of 2 |

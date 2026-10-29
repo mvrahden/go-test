@@ -84,6 +84,8 @@ func (s *CanaryDiscoveryTestSuite) TestAliasesAndCrossPackageShapes(t *gotest.T)
 		{name: "sigresult", exit: 2, shows: `sigresult_suite_test\.go:9:22: TestBad on XTestSuite returns a value; a Test method returns nothing`},
 		{name: "sharedintest", exit: 2, shows: `sharedintest_suite_test\.go:10:6: shared fixture PGSharedFixture is declared in a _test\.go file; the setup program cannot import it, move it to a non-test file`},
 		{name: "xpkgfixture", exit: 2, shows: `fix\.go:11:\d+: package fixture "BadFixture": BeforeEach must have signature \(ctx context\.Context\) error`},
+		{name: "xpkgconfig", exit: 2, shows: `fix\.go:11:\d+: unsupported return type for "ConfiguredFixture\.FixtureConfig": expected gotest\.FixtureConfig, got int`},
+		{name: "xpkghydrate", exit: 2, shows: `fix\.go:11:\d+: package fixture "HydratedFixture" must not have Hydrate method; Hydrate/Dehydrate are for shared fixtures only`},
 		{name: "recvdefined", exit: 2, shows: `recvdefined_suite_test\.go:10:6: suite DefinedTestSuite is defined over cases and carries none of its methods; declare an alias \(= cases\) or a struct of its own`},
 		{name: "recvcollide", passes: "TestThingTestSuite/TestRemote"},
 		{name: "pxgenericalias", passes: "TestIntContractTestSuite/TestRuns"},

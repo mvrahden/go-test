@@ -24,6 +24,14 @@ func (s *CrossPackageTestSuite) TestAcrossPackages(t *gotest.T) {
 			checkShape(it, shape{pkg: "xpkgfixture", exit: 2,
 				shows: `fix\.go:11:\d+: package fixture "BadFixture": BeforeEach must have signature \(ctx context\.Context\) error`})
 		})
+		w.It("a package fixture from another package with a mis-signed FixtureConfig is rejected at the method", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "xpkgconfig", exit: 2,
+				shows: `fix\.go:11:\d+: unsupported return type for "ConfiguredFixture\.FixtureConfig": expected gotest\.FixtureConfig, got int`})
+		})
+		w.It("a package fixture from another package with Hydrate is rejected at the method", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "xpkghydrate", exit: 2,
+				shows: `fix\.go:11:\d+: package fixture "HydratedFixture" must not have Hydrate method; Hydrate/Dehydrate are for shared fixtures only`})
+		})
 	})
 }
 

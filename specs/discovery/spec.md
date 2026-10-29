@@ -61,6 +61,8 @@ A suite SHALL run an alias of a generic suite another package declares, an alias
 - **WHEN** a suite reaches across packages
 - **THEN** an alias of a generic suite from another package runs that suite's methods
 - **AND** a package fixture from another package with a mis-signed hook is rejected with the signature it needs
+- **AND** a package fixture from another package with a mis-signed FixtureConfig is rejected at the method
+- **AND** a package fixture from another package with Hydrate is rejected at the method
 
 #### Scenario: Generic aliases in the external test package
 - **WHEN** the external test package declares an alias of a generic suite
