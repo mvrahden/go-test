@@ -329,8 +329,9 @@ func namedPtrType(t types.Type, pkgPath, name string) bool {
 }
 
 // gotestQualifier resolves how the file containing pos refers to the gotest
-// package. ok is false when the file does not import it — there is nothing
-// to qualify a rewritten assertion with.
+// package. ok is false when the file does not import it, or when a local
+// declaration shadows the import's name at pos: there is nothing to qualify a
+// rewritten assertion with.
 func gotestQualifier(pass *analysis.Pass, pos token.Pos) (qual string, ok bool) {
 	file := fileContaining(pass, pos)
 	if file == nil {
@@ -340,15 +341,34 @@ func gotestQualifier(pass *analysis.Pass, pos token.Pos) (qual string, ok bool) 
 		if strings.Trim(imp.Path.Value, `"`) != gotestImportPath {
 			continue
 		}
+		name := "gotest"
 		if imp.Name != nil {
 			if imp.Name.Name == "." {
 				return "", true
 			}
-			return imp.Name.Name + ".", true
+			name = imp.Name.Name
 		}
-		return "gotest.", true
+		if !namesGotest(pass, file, name, pos) {
+			continue
+		}
+		return name + ".", true
 	}
 	return "", false
+}
+
+// namesGotest reports whether name, written at pos in file, resolves to the
+// gotest import.
+func namesGotest(pass *analysis.Pass, file *ast.File, name string, pos token.Pos) bool {
+	scope := pass.TypesInfo.Scopes[file]
+	if scope == nil {
+		return false
+	}
+	if inner := scope.Innermost(pos); inner != nil {
+		scope = inner
+	}
+	_, obj := scope.LookupParent(name, pos)
+	pkgName, ok := obj.(*types.PkgName)
+	return ok && pkgName.Imported().Path() == gotestImportPath
 }
 
 // splitOr flattens a top-level chain of || operands.

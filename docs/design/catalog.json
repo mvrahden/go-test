@@ -15068,6 +15068,46 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fail-guard_leaves_a_guard_in_the_local's_scope_unreported_and_reports_one_where_gotest_names_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a local variable shadows the gotest import",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_local_variable_shadows_the_gotest_import",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ShadowedGotest",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestShadowedGotest",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "lint reports the outer t passed to a helper inside a polling callback",
                       "duration": 0,
                       "excluded": false,
@@ -15500,7 +15540,7 @@
     }
   ],
   "stats": {
-    "behaviors": 515,
+    "behaviors": 516,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

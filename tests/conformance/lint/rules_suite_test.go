@@ -57,6 +57,20 @@ func (s *LinterRulesTestSuite) TestOwnTMethod(t *gotest.T) {
 	})
 }
 
+func (s *LinterRulesTestSuite) TestShadowedGotest(t *gotest.T) {
+	t.When("a local variable shadows the gotest import", func(w *gotest.T) {
+		w.It("fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package", func(it *gotest.T) {
+			var guards []string
+			for _, f := range ruleFindings(it, ".", rulesPkg) {
+				if strings.HasPrefix(f, "fail-guard ") {
+					guards = append(guards, f)
+				}
+			}
+			gotest.Equal(it, []string{"fail-guard rules_suite_test.go:59:2: use NoError instead of if+FailNow for error nil check"}, guards)
+		})
+	})
+}
+
 func (s *LinterRulesTestSuite) TestPollHelpers(t *gotest.T) {
 	t.When("a polling callback hands the test's t to a helper", func(w *gotest.T) {
 		w.It("lint reports the outer t passed to a helper inside a polling callback", func(it *gotest.T) {

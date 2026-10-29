@@ -624,12 +624,13 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |
 | `lint-fix-all-or-nothing` | a `-fix` run with one fix that does not compile applies none | conformance: the lint `-fix` It finds the run failed and the other fixes unwritten |
 | `lint-fix-errors-repeated` | a compiler error is listed again as the go command printed it | conformance: the lint It for a target that does not compile counts its error twice |
-| `lint-rule-testify-suites-checked` | a struct embedding testify's `suite.Suite` is read as a gotest suite | conformance: the lint It for a testify suite finds gotest suite rules reporting on it |
+| `lint-rule-testify-suites-checked` | a struct embedding testify's `suite.Suite` is read as a gotest suite | conformance: the lint It for a testify suite finds gotest suite rules or generation-rejects reporting on it |
 | `lint-rule-own-t-method-escapes` | a `T()` call on any type counts as the `*gotest.T` escape | conformance: the lint It for a type with its own `T` method finds `t-escape` findings |
 | `lint-rule-poll-scope-misses-helpers` | `poll-scope` never reports the outer `t` passed to a helper | conformance: the lint It for a helper inside a polling callback finds no `poll-scope` finding |
 | `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
 | `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |
 | `lint-rule-simplify-fix-drops-comments` | the `assertion-simplify` fix drops comments between the arguments | conformance: the lint `-fix` It finds the comment gone |
+| `lint-rule-fail-guard-ignores-shadow` | `fail-guard` takes a local that shadows the `gotest` import for the package | conformance: the lint It for a local named `gotest` finds the guard in its scope reported |
 | `lint-erg-bare-nolint-reason-ignored` | a bare `//nolint` followed by a reason is not read as a nolint comment | conformance: the lint It for a bare nolint comment finds the line's finding reported |
 | `lint-erg-nolint-all-is-a-rule` | `//nolint:all` names a rule called `all` instead of every rule | conformance: the lint It for `nolint:all` finds the line's finding reported |
 | `lint-erg-unknown-nolint-silent` | a nolint comment naming an unknown rule is never reported | conformance: the lint It for an unknown rule finds no `nolint-unknown` finding |

@@ -32,8 +32,8 @@ func (s *LinterFixesTestSuite) TestFixThatDoesNotCompile(t *gotest.T) {
 
 		w.It("a fix that does not compile is dropped and named", func(it *gotest.T) {
 			gotest.Equal(it, 3, fix.Exit, "stderr: %s", fix.Stderr)
-			gotest.Contains(it, fix.Stderr, "fix for fail-guard at lintfixbad/fix_test.go:13 was not applied: it does not compile (gotest.NoError undefined (type string has no field or method NoError))")
-			gotest.Contains(it, string(src), "\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n")
+			gotest.Contains(it, fix.Stderr, "fix for receiver at lintfixbad/fix_test.go:11 was not applied: it does not compile (cannot call pointer method TestValue on ValueTestSuite)")
+			gotest.Contains(it, string(src), "\nfunc (s ValueTestSuite) TestValue(t *gotest.T) {}\n")
 		})
 		w.It("the other fixes are applied", func(it *gotest.T) {
 			gotest.Contains(it, string(src), "\tgotest.NoError(t, err)\n}\n", "stderr: %s", fix.Stderr)

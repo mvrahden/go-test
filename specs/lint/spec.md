@@ -125,7 +125,7 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 - **THEN** a float comparison is not rewritten into an ordering assertion
 
 ### Requirement: Rules skip what is not gotest's
-Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, and SHALL leave calls through a user type's own T method unreported.
+Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, and SHALL leave a failure guard unreported where a local variable shadows the gotest import.
 
 #### Scenario: A testify suite
 - **WHEN** a package holds a testify suite
@@ -134,6 +134,10 @@ Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite 
 #### Scenario: A T method of the user's own
 - **WHEN** a type of its own has a T method
 - **THEN** lint leaves calls through that T method unreported
+
+#### Scenario: A local named gotest
+- **WHEN** a local variable shadows the gotest import
+- **THEN** fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package
 
 ### Requirement: Misuse reached through a helper
 Lint SHALL report the test's outer t handed to a helper inside a polling callback.

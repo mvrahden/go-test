@@ -44,3 +44,19 @@ func (s *RulesTestSuite) TestSimplifyComment(t *gotest.T) {
 	a, b := 1, 1
 	gotest.True(t, a == /* same seed */ b, "seeded")
 }
+
+func (s *RulesTestSuite) TestShadowedGotest(t *gotest.T) {
+	err := errors.New("boom")
+	gotest := "a local"
+	if err != nil {
+		t.FailNow()
+	}
+	_ = gotest
+}
+
+func (s *RulesTestSuite) TestRealGotest(t *gotest.T) {
+	err := errors.New("boom")
+	if err != nil {
+		t.FailNow()
+	}
+}

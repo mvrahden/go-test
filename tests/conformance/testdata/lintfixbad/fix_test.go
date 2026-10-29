@@ -1,20 +1,17 @@
 package lintfixbad
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-func TestShadowed(t *testing.T) {
-	err := errors.New("boom")
-	gotest := "shadows the package"
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = gotest
-}
+type ValueTestSuite struct{}
+
+func (s ValueTestSuite) TestValue(t *gotest.T) {}
+
+// With a pointer receiver this method value no longer compiles.
+var _ = ValueTestSuite{}.TestValue
 
 func TestPlain(t *testing.T) {
 	var err error

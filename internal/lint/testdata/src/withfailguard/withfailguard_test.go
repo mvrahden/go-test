@@ -373,3 +373,14 @@ func TestIdentityGuards(t *testing.T) {
 		gotest.Fail(t, "chained")
 	}
 }
+
+// === a local that shadows gotest ===
+
+func TestShadowedGotest(t *testing.T) {
+	err := errors.New("boom")
+	gotest := "a local"
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = gotest
+}
