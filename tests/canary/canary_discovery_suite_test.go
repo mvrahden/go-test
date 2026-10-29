@@ -135,6 +135,7 @@ func (s *CanaryDiscoveryTestSuite) TestGeneratedFilesStayValid(t *gotest.T) {
 	s.checkShapes(t, []shapeRow{
 		{name: "gencontext", passes: "TestShadowsTestSuite/TestRuns"},
 		{name: "genpgpg", passes: "TestBothTestSuite/TestBoth"},
+		{name: "genpredeclared", exit: 2, shows: `genpredeclared_suite_test\.go:6:6: package genpredeclared declares any, a name Go predeclares that the generated harness uses; rename it`},
 		{name: "stalerename", passes: "TestNewTestSuite/TestRuns"},
 	})
 	code, stdout, stderr := s.invoke(t, t.TempDir(), "discover", "./testdata/shapes/stalerename/")

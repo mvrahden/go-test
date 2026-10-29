@@ -86,12 +86,13 @@ Focus SHALL be decided over the whole run: a focused suite or a focused method o
 - **AND** a focused fuzz method in one package skips every unfocused suite in the others
 
 ### Requirement: The generated harness
-The generated harness SHALL compile beside whatever names the package declares, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites, files of variants without suites and the files an older gotest generated under its legacy names, and SHALL NOT rewrite a file whose content is unchanged.
+The generated harness SHALL compile beside whatever names the package declares, except a name Go predeclares that the harness uses with Go's meaning, which SHALL be rejected at its declaration, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites, files of variants without suites and the files an older gotest generated under its legacy names, and SHALL NOT rewrite a file whose content is unchanged.
 
 #### Scenario: Names the harness imports
 - **WHEN** the package declares names the harness imports
 - **THEN** a package declaring context, testing, gotest and the other imported names runs its suite
 - **AND** a suite binding fixtures from two packages both named pg runs
+- **AND** a package declaring a name Go predeclares that the harness uses is rejected at the declaration
 
 #### Scenario: Generating again
 - **WHEN** gotest generate runs again after the suites changed

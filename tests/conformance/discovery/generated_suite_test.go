@@ -27,6 +27,10 @@ func (s *GeneratedFilesTestSuite) TestImports(t *gotest.T) {
 		w.It("a suite binding fixtures from two packages both named pg runs", func(it *gotest.T) {
 			checkShape(it, shape{pkg: "genpgpg", verdict: "TestBothTestSuite/TestBoth"})
 		})
+		w.It("a package declaring a name Go predeclares that the harness uses is rejected at the declaration", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "genpredeclared", exit: 2,
+				shows: `genpredeclared_suite_test\.go:6:6: package genpredeclared declares any, a name Go predeclares that the generated harness uses; rename it`})
+		})
 	})
 }
 

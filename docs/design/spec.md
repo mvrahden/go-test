@@ -1374,7 +1374,7 @@ Per package directory, up to two files:
 
 The `gotest_` prefix prevents naming collisions with user code.
 Files contain a `// Code generated` header.
-The harness compiles beside any name the package declares, and `generate` keeps it in step with the suites ([The generated harness](../../specs/discovery/spec.md#requirement-the-generated-harness)).
+The harness compiles beside any name the package declares, a name Go predeclares that it uses aside, and `generate` keeps it in step with the suites ([The generated harness](../../specs/discovery/spec.md#requirement-the-generated-harness)).
 A generated file an earlier `generate` left on disk is read past, never compiled into a run, and `--tags` selects the suite files built with a tag ([Stale generated files and build constraints](../../specs/discovery/spec.md#requirement-stale-generated-files-and-build-constraints)).
 
 ### Generated Structure

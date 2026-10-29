@@ -61,6 +61,12 @@ func (c collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 	if len(errs) > 0 {
 		return CollectorResult{Errs: errs}
 	}
+	// the harness compiles in the package's scope
+	if len(suites) > 0 {
+		if pos, err := gotestast.PredeclaredClash(pkg); err != nil {
+			return CollectorResult{Errs: []CollectorError{{Err: err, Pos: pos}}}
+		}
+	}
 
 	// find fixtures: a package fixture only when a suite reaches it, a shared
 	// fixture always, since suites in other packages bind it

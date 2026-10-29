@@ -21,6 +21,17 @@ var (
 
 func gotest() context { return context{name: "gotest"} }
 
+// Predeclared names the harness does not use, or uses with the meaning they
+// keep here, are the package's to declare.
+type any = interface{}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // ClockFixture is a package fixture.
 type ClockFixture struct{ Ticks int }
 
@@ -42,6 +53,7 @@ type ShadowsTestSuite struct {
 func (s *ShadowsTestSuite) TestRuns(t *gt.T) {
 	gt.Equal(t, 1, s.Clock.Ticks)
 	gt.Equal(t, "gotest", gotest().name)
+	gt.Equal(t, 1, min(1, 2))
 	gt.Equal(t, "testing", testing.name)
 	gt.NotZero(t, time.name+gotestruntime.name+gotestfuzz.name+strings.name+strconv.name+math.name)
 }
