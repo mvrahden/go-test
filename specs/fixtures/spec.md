@@ -109,6 +109,17 @@ A fixture whose AfterAll fails between two setup attempts, or outlives there the
 - **THEN** fails the run
 - **AND** reports that the release exceeded the Timeout
 
+### Requirement: A shared fixture's teardown verdict
+A shared fixture's teardown SHALL fail the run for an AfterAll that returned an error, panicked or outlived its declared Timeout, also when a sibling's setup failed, and never for what a fixture writes.
+
+#### Scenario: An AfterAll that writes a failure's words
+- **WHEN** a shared fixture's AfterAll writes the line a failed AfterAll is reported with and returns nil
+- **THEN** the run passes
+
+#### Scenario: An AfterAll that fails beside a failed setup
+- **WHEN** a shared fixture's AfterAll returns an error while a sibling's setup failed
+- **THEN** fails the run on the teardown as well, reporting that AfterAll's error
+
 ### Requirement: A stop during the release between attempts
 A fixture whose AfterAll runs between two setup attempts when the run is stopped SHALL finish that AfterAll under a context the stop does not cancel, bounded by the fixture's Timeout, and SHALL then start no further attempt and run no second AfterAll.
 

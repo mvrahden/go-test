@@ -1,13 +1,13 @@
-Judge: ./internal/gotestrunner TeardownVerdictTestSuite/TestAnAfterAllReportIsAFailure
-Expect: ^FAIL .*internal/gotestrunner TeardownVerdict .* / fails with the AfterAll reports \(
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -158,7 +158,7 @@
- 		return err
+Expect: ^FAIL .*conformance/fixtures .* / fails the run on the teardown as well, reporting that AfterAll's error \(
+Clause: when a shared fixture's AfterAll returns an error while a sibling's setup failed → fails the run on the teardown as well, reporting that AfterAll's error
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -738,7 +738,7 @@
+ 	// for it: a sibling's AfterAll that failed beside it is known from the
+ 	// process's _teardown line alone.
+ 	if setupErr != nil {
+-		return tornErr
++		return nil
  	}
- 	for _, r := range reports {
--		if strings.Contains(r, ".AfterAll ") {
-+		if false && strings.Contains(r, ".AfterAll ") {
- 			return withReports(errors.New("shared fixture teardown failed"), reports, true)
- 		}
- 	}
+ 
+ 	// A clean exit is the only proof of a completed teardown: the epilogue runs

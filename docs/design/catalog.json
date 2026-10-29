@@ -7452,6 +7452,73 @@
               "name": "TestFailedHydrateIsDehydrated",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the run passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_run_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's AfterAll writes the line a failed AfterAll is reported with and returns nil",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_AfterAll_writes_the_line_a_failed_AfterAll_is_reported_with_and_returns_nil",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the run on the teardown as well, reporting that AfterAll's error",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "fails_the_run_on_the_teardown_as_well,_reporting_that_AfterAll's_error",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture's AfterAll returns an error while a sibling's setup failed",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_shared_fixture's_AfterAll_returns_an_error_while_a_sibling's_setup_failed",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SharedTeardownVerdict",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSharedTeardownVerdict",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureTeardown",
@@ -12692,7 +12759,7 @@
     }
   ],
   "stats": {
-    "behaviors": 416,
+    "behaviors": 418,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

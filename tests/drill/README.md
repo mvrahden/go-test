@@ -322,7 +322,8 @@ shards of one run do not add up to every mutant exactly once.
 | `group-bulk-one-at-a-time` | a later group runs its suites one after another | lifecycle conformance: two 1s e2e suites do not overlap |
 | `group-exclusive-in-the-bulk` | a named group's Exclusive suites run beside its other suites | lifecycle conformance: the e2e Exclusive suite starts before the others end |
 | `group-fixture-up-front` | every shared fixture starts up front, a later group's included | lifecycle conformance: the e2e fixture is up before the default group ends |
-| `teardown-error-dropped-after-setup-failure` | a teardown that returned no error is not failed by an `AfterAll` report, as when another fixture's setup failure claimed the process's exit status | gotestrunner `TeardownVerdict`: the `AfterAll` report fails nothing |
+| `teardown-error-dropped-after-setup-failure` | a shared fixture's `AfterAll` that failed while a sibling's setup failure claimed the process's exit status passes unreported | fixtures conformance: the run fails on the teardown as well, reporting that `AfterAll`'s error |
+| `shared-teardown-reads-stderr` | a line a shared fixture writes that reads like an `AfterAll` failure fails the teardown | fixtures conformance: the run passes |
 | `teardown-reports-dropped-from-the-verdict` | a teardown error goes out without the `AfterAll` reports that say why | teardown verdict unit test: a teardown error comes back without the reports |
 | `bench-gate-passes-on-nothing` | a bench gate with no benchmark in both the baseline and the run passes | canary: the gate against a foreign baseline exits 0 instead of 1 |
 | `bench-unmatched-dropped` | a bench comparison reports no benchmark as missing or added | canary: the report against a foreign baseline lists no missing benchmark |

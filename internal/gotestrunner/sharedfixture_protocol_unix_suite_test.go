@@ -69,3 +69,41 @@ func (s *SharedFixtureProtocolProcessTestSuite) TestAnAckReportingTheSameBudgetE
 		})
 	})
 }
+
+// failedBeside reports a failed setup, then on the shutdown request a sibling
+// teardown that failed, and exits 1.
+const failedBeside = `trap 'printf "{\"key\":\"_teardown\",\"error\":\"StuckSharedFixture: teardown failed\"}\n" >&3; exit 1' TERM
+printf '{"key":"_done","error":"one or more shared fixtures failed","teardownBudget":"10s"}\n' >&3
+while :; do sleep 0.05; done`
+
+// failedAlone reports a failed setup and exits 1 on the shutdown request,
+// its teardowns all passed.
+const failedAlone = `trap 'echo "StuckSharedFixture.AfterAll failed: only words" >&2; exit 1' TERM
+printf '{"key":"_done","error":"one or more shared fixtures failed","teardownBudget":"10s"}\n' >&3
+while :; do sleep 0.05; done`
+
+func (s *SharedFixtureProtocolProcessTestSuite) TestATeardownReportedBesideAFailedSetup(t *gotest.T) {
+	type row struct {
+		Desc     string
+		Script   string
+		Teardown string
+	}
+	rows := []row{
+		{Desc: "a _teardown line names a failed teardown", Script: failedBeside, Teardown: "shared fixture teardown failed: StuckSharedFixture: teardown failed"},
+		{Desc: "stderr alone reads like a failed teardown", Script: failedAlone},
+	}
+	for t, r := range gotest.Each(t, rows) {
+		ctx, cancel := context.WithCancel(t.Context())
+		proc, err := gotestrunner.ExportLaunchSharedProcess(ctx, t.TempDir(), "sh", "-c", r.Script)
+		gotest.NoError(t, err, "starting the fake shared fixture process")
+		gotest.Error(t, proc.WaitAllReady(ctx, 10*time.Second))
+		teardownErr := proc.Teardown()
+		cancel()
+		if r.Teardown == "" {
+			gotest.NoError(t, teardownErr)
+			continue
+		}
+		gotest.Error(t, teardownErr)
+		gotest.Equal(t, r.Teardown, teardownErr.Error())
+	}
+}

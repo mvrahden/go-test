@@ -461,15 +461,20 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf1() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "RedisFixture: teardown failed")
 	}
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PostgresFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -821,12 +826,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PostgresFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -1163,12 +1172,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "SetupFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -1518,12 +1531,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PostgresFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -1991,15 +2008,20 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf1() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "RedisFixture: teardown failed")
 	}
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PostgresFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -2349,12 +2371,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -2704,12 +2730,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -3059,12 +3089,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -3414,12 +3448,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -3888,15 +3926,20 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf1() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "RedisFixture: teardown failed")
 	}
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -4246,12 +4289,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -4609,12 +4656,16 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PGFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
@@ -5085,15 +5136,20 @@ func main() {
 		ƒteardown_sf0()
 	}()
 	ƒreleasing.Wait()
-
+	var ƒtornErrs []string
 	if ƒteardown_sf1() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "GCSFixture: teardown failed")
 	}
 	if ƒteardown_sf0() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "PostgresFixture: teardown failed")
 	}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 	if ƒanyFailed || ƒteardownFailed {
 		os.Exit(1)
 	}
