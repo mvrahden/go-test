@@ -176,6 +176,7 @@ func ExportSpliceExpr(a corpusArg) (string, error) { return a.spliceExpr() }
 var (
 	ExportLintGitHubArmed       = lintGitHubArmed
 	ExportAppendLintStepSummary = appendLintStepSummary
+	ExportRelPath               = relPath
 )
 
 // ExportRunLintGitHub runs lint in-process with GitHub annotations.

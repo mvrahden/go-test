@@ -36,3 +36,16 @@ func (s *LinterGitHubTestSuite) TestAnnotationEscaping(t *gotest.T) {
 		})
 	})
 }
+
+func (s *LinterGitHubTestSuite) TestWorkspacePaths(t *gotest.T) {
+	t.When("lint --github runs in a subdirectory of the workspace", func(w *gotest.T) {
+		w.It("annotation paths are relative to the workspace", func(it *gotest.T) {
+			root, err := testkit.RepoRoot()
+			gotest.NoError(it, err)
+			run, err := testkit.RunCLIWithEnv(it.Context(), ".", []string{"GITHUB_WORKSPACE=" + root}, "lint", "--github", "../testdata/lintgh/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Regexp(it, `^::error file=tests/conformance/testdata/lintgh/fixture%2Cshared\.go,line=8,col=6,`, run.Stdout)
+		})
+	})
+}

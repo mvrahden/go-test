@@ -109,12 +109,16 @@ Lint SHALL report each shape the generator rejects at the position the generator
 - **AND** discover marks the package broken and names each rejection at its position
 
 ### Requirement: GitHub annotations
-Lint --github SHALL escape each annotation's message and properties as a workflow command needs, and SHALL cut a long annotation on a rune boundary.
+Lint --github SHALL escape each annotation's message and properties as a workflow command needs, SHALL cut a long annotation on a rune boundary, and SHALL name each file relative to the workspace.
 
 #### Scenario: Characters a workflow command escapes
 - **WHEN** a finding's message and file carry characters a workflow command escapes
 - **THEN** lint --github escapes the annotation's message and properties
 - **AND** a long annotation is cut on a rune boundary
+
+#### Scenario: A step in a subdirectory
+- **WHEN** lint --github runs in a subdirectory of the workspace
+- **THEN** annotation paths are relative to the workspace
 
 ### Requirement: Assertion rewrites keep the verdict
 An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go.

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterGitHub .* / annotation paths are relative to the workspace \(
+Clause: when lint --github runs in a subdirectory of the workspace → annotation paths are relative to the workspace
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -432,7 +432,7 @@
+ func reportLintGitHub(stdout io.Writer, dir string, findings []lint.Finding) int {
+ 	// GitHub resolves an annotation's file against the workspace, whatever
+ 	// directory the step runs in.
+-	base := os.Getenv("GITHUB_WORKSPACE")
++	base := ""
+ 	if base == "" {
+ 		base = dir
+ 	}

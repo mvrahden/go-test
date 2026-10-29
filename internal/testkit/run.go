@@ -233,6 +233,7 @@ func childEnv(markerDir string) []string {
 		switch {
 		case strings.HasPrefix(kv, "GITHUB_ACTIONS="),
 			strings.HasPrefix(kv, "GITHUB_STEP_SUMMARY="),
+			strings.HasPrefix(kv, "GITHUB_WORKSPACE="),
 			strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS="),
 			strings.HasPrefix(kv, "GOTEST_CI="),
 			strings.HasPrefix(kv, "CI="),

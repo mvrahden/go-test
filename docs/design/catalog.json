@@ -15075,6 +15075,46 @@
               "name": "TestAnnotationEscaping",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "annotation paths are relative to the workspace",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "annotation_paths_are_relative_to_the_workspace",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint --github runs in a subdirectory of the workspace",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "lint_--github_runs_in_a_subdirectory_of_the_workspace",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WorkspacePaths",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestWorkspacePaths",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterGitHub",
@@ -16086,7 +16126,7 @@
     }
   ],
   "stats": {
-    "behaviors": 531,
+    "behaviors": 532,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

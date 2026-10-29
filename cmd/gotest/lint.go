@@ -430,7 +430,12 @@ func stripFlag(args []string, name string) []string {
 // file:line:col text, and a stderr mirror would surface every finding as a
 // second, job-titled annotation.
 func reportLintGitHub(stdout io.Writer, dir string, findings []lint.Finding) int {
-	base := dir
+	// GitHub resolves an annotation's file against the workspace, whatever
+	// directory the step runs in.
+	base := os.Getenv("GITHUB_WORKSPACE")
+	if base == "" {
+		base = dir
+	}
 	if base == "" {
 		base, _ = os.Getwd()
 	}
@@ -501,7 +506,7 @@ func splitBoolFlag(arg string) (name, value string) {
 
 func relPath(base, file string) string {
 	rel, err := filepath.Rel(base, file)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return file
 	}
 	return filepath.ToSlash(rel)

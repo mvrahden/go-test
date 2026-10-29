@@ -44,6 +44,21 @@ func (s *LintGitHubTestSuite) TestArming(t *gotest.T) {
 	})
 }
 
+func (s *LintGitHubTestSuite) TestAnnotationPaths(t *gotest.T) {
+	base := filepath.Join(string(filepath.Separator), "w")
+	t.When("a file lies under the base", func(w *gotest.T) {
+		w.It("is named relative to it, a directory starting with two dots included", func(it *gotest.T) {
+			gotest.Equal(it, "..cache/a.go", ExportRelPath(base, filepath.Join(base, "..cache", "a.go")))
+		})
+	})
+	t.When("a file lies outside the base", func(w *gotest.T) {
+		w.It("is named by its own path", func(it *gotest.T) {
+			outside := filepath.Join(string(filepath.Separator), "x", "a.go")
+			gotest.Equal(it, outside, ExportRelPath(base, outside))
+		})
+	})
+}
+
 func (s *LintGitHubTestSuite) TestStepSummaryCells(t *gotest.T) {
 	t.When("a finding holds Markdown syntax", func(w *gotest.T) {
 		summaryPath := filepath.Join(w.TempDir(), "step_summary.md")
@@ -63,6 +78,7 @@ func (s *LintGitHubTestSuite) TestStepSummaryCells(t *gotest.T) {
 func (s *LintGitHubTestSuite) TestGitHubMode(t *gotest.T) {
 	t.When("the target has findings", func(w *gotest.T) {
 		w.Setenv("GOWORK", "off")
+		w.Setenv("GITHUB_WORKSPACE", "") // paths relative to the run's directory
 		summaryPath := filepath.Join(w.TempDir(), "step_summary.md")
 		w.Setenv("GITHUB_STEP_SUMMARY", summaryPath)
 		dir := w.TempDir()
