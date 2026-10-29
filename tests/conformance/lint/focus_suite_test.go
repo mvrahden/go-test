@@ -123,3 +123,21 @@ func (s *LinterFocusFixTestSuite) TestMethodKinds(t *gotest.T) {
 		})
 	})
 }
+
+func (s *LinterFocusFixTestSuite) TestEmbedded(t *gotest.T) {
+	t.When("lint -fix removes the focus of a suite another type embeds", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusembedded")
+		w.It("lint -fix renames the selectors and literal keys that name the embedded field, and the package still compiles", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			gotest.Equal(it, `package lintfocusembedded
+
+type wrapper struct{ BaseTestSuite }
+
+func (w wrapper) count() int { return w.BaseTestSuite.n }
+
+var _ = wrapper{BaseTestSuite: BaseTestSuite{n: 1}}.count
+`, c.read(it, "wrapper_test.go"))
+			c.vet(it)
+		})
+	})
+}

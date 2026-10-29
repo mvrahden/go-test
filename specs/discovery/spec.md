@@ -86,7 +86,7 @@ Focus SHALL be decided over the whole run: a focused suite or a focused method o
 - **AND** a focused fuzz method in one package skips every unfocused suite in the others
 
 ### Requirement: Toggling focus
-refactor toggle-focus SHALL add or remove the F_ prefix of a suite at every reference to it in the suite's package, the receivers in other files, generic receivers, aliases and the external test package included, so that the package still compiles, and SHALL leave a same-named identifier that refers to something else as it was.
+refactor toggle-focus SHALL add or remove the F_ prefix of a suite or method at every reference to it in its package, embedding fields, files a build constraint leaves out and the external test package included, so the package still compiles, and leave a same-named identifier for something else as it was. It SHALL refuse, at the position and writing nothing, a new name already declared, a method an interface in the package names, and a left-out file no build type-checks that spells the name.
 
 #### Scenario: Methods in several files
 - **WHEN** focus is toggled on a suite whose methods are spread over several files
@@ -103,6 +103,23 @@ refactor toggle-focus SHALL add or remove the F_ prefix of a suite at every refe
 #### Scenario: A reused name
 - **WHEN** focus is toggled on a suite whose name another scope reuses
 - **THEN** refactor toggle-focus leaves the identifiers of the other scope as they were
+
+#### Scenario: An embedded suite
+- **WHEN** focus is toggled on a suite another type embeds
+- **THEN** refactor toggle-focus renames the selectors and literal keys that name the embedded field, and the package still compiles
+
+#### Scenario: Files a build constraint leaves out
+- **WHEN** focus is toggled on a suite that files behind a build constraint refer to
+- **THEN** refactor toggle-focus renames their references too, and the package still compiles with the tag
+- **AND** a reference in such a file that cannot be resolved is refused at its position and nothing is written
+
+#### Scenario: A method an interface names
+- **WHEN** focus is toggled on a method an interface in the package names
+- **THEN** refactor toggle-focus refuses at the interface's position and writes nothing
+
+#### Scenario: A name already declared
+- **WHEN** focus is toggled on a suite or method whose new name is already declared
+- **THEN** refactor toggle-focus refuses at the declaration that holds the name and writes nothing
 
 ### Requirement: The generated harness
 The generated harness SHALL compile beside whatever names the package declares, except a name Go predeclares that the harness uses with Go's meaning, which SHALL be rejected at its declaration, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites, files of variants without suites and the files an older gotest generated under its legacy names, and SHALL NOT rewrite a file whose content is unchanged.

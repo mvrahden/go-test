@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus refuses at the declaration that holds the name and writes nothing \(
+Clause: when focus is toggled on a suite or method whose new name is already declared → refactor toggle-focus refuses at the declaration that holds the name and writes nothing
+--- a/internal/refactor/togglefocus.go
++++ b/internal/refactor/togglefocus.go
+@@ -291,7 +291,7 @@
+ 		if v.pkg == nil || v.pkg.Path() != target.PkgPath {
+ 			continue
+ 		}
+-		if obj := declared(v.pkg, target, newName); obj != nil {
++		if obj := declared(v.pkg, target, newName); obj != nil && false {
+ 			return fmt.Errorf("%s: %s is already declared; toggling focus would declare it twice", v.fset.Position(obj.Pos()), newName)
+ 		}
+ 	}

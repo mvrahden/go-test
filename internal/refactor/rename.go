@@ -88,7 +88,7 @@ func Idents(files []*ast.File, info *types.Info, target Object) []*ast.Ident {
 			// An embedded field's name is in both: Defs holds the field,
 			// Uses the type.
 			for _, obj := range []types.Object{info.Defs[id], info.Uses[id]} {
-				if o, ok := ObjectOf(obj); ok && o == target {
+				if refersTo(obj, target) {
 					out = append(out, id)
 					break
 				}
@@ -98,4 +98,27 @@ func Idents(files []*ast.File, info *types.Info, target Object) []*ast.Ident {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Pos() < out[j].Pos() })
 	return out
+}
+
+// refersTo reports whether obj is target, or a field that embeds target and
+// is named by it: selectors and literal keys spell such a field.
+func refersTo(obj types.Object, target Object) bool {
+	if o, ok := ObjectOf(obj); ok {
+		return o == target
+	}
+	v, ok := obj.(*types.Var)
+	if !ok || !v.Embedded() || target.Method != "" {
+		return false
+	}
+	t := v.Type()
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	// An alias names the field itself, so only the named type counts.
+	named, ok := t.(*types.Named)
+	if !ok {
+		return false
+	}
+	o, ok := ObjectOf(named.Origin().Obj())
+	return ok && o == target
 }

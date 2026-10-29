@@ -652,6 +652,11 @@ shards of one run do not add up to every mutant exactly once.
 | `toggle-focus-declaring-file-only` | `refactor toggle-focus` renames only the references in the file that declares the suite | conformance: the discovery It for a suite spread over several files finds receivers left unrenamed |
 | `rename-skips-instantiations` | the rename engine does not look inside a type instantiation, so `X[T]` receivers, literals and aliases keep the old name | conformance: the discovery It for a generic suite finds them unrenamed |
 | `toggle-focus-external-package-skipped` | `refactor toggle-focus` leaves the external test package out | conformance: the discovery It for the external test package finds its reference unrenamed |
+| `rename-embedded-field-skipped` | the rename engine leaves the selectors and literal keys that name an embedded suite's field | conformance: the discovery and lint Its for an embedded suite find `BaseTestSuite` left in the wrapper |
+| `toggle-constrained-files-unloaded` | `refactor toggle-focus` never type-checks a file a build constraint leaves out | conformance: the discovery It for files behind a build constraint sees the toggle refused |
+| `toggle-unresolved-reference-accepted` | a name in a file no build type-checks is left as it was without a word | conformance: the discovery It for an unresolvable reference sees exit 0 |
+| `toggle-interface-method-renamed` | a method an interface in the package names is renamed anyway | conformance: the discovery It for an interface method sees exit 0 |
+| `toggle-name-taken-ignored` | a toggle to a name already declared goes ahead | conformance: the discovery It for a taken name sees exit 0 |
 | `rename-by-spelling` | the rename engine renames every identifier spelled like the suite | conformance: the discovery It for a reused name finds the other scope's identifiers renamed |
 | `lint-focus-fix-declaring-file-only` | the `focus` fix renames only the references in the file that declares the suite | conformance: the lint `-fix` It for a suite spread over several files finds the fix dropped |
 | `rename-generic-type-unnamed` | the rename engine cannot name a generic type, so the `focus` fix renames only its declaration | conformance: the lint `-fix` It for a generic suite finds the fix dropped |

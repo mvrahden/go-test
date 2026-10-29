@@ -7040,6 +7040,179 @@
               "name": "TestReusedName",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refactor toggle-focus renames the selectors and literal keys that name the embedded field, and the package still compiles",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refactor_toggle-focus_renames_the_selectors_and_literal_keys_that_name_the_embedded_field,_and_the_package_still_compiles",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when focus is toggled on a suite another type embeds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "focus_is_toggled_on_a_suite_another_type_embeds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Embedded",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestEmbedded",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refactor toggle-focus renames their references too, and the package still compiles with the tag",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refactor_toggle-focus_renames_their_references_too,_and_the_package_still_compiles_with_the_tag",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a reference in such a file that cannot be resolved is refused at its position and nothing is written",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_reference_in_such_a_file_that_cannot_be_resolved_is_refused_at_its_position_and_nothing_is_written",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when focus is toggled on a suite that files behind a build constraint refer to",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "focus_is_toggled_on_a_suite_that_files_behind_a_build_constraint_refer_to",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ExcludedFiles",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestExcludedFiles",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refactor toggle-focus refuses at the interface's position and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refactor_toggle-focus_refuses_at_the_interface's_position_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when focus is toggled on a method an interface in the package names",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "focus_is_toggled_on_a_method_an_interface_in_the_package_names",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "InterfaceMethod",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestInterfaceMethod",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refactor toggle-focus refuses at the declaration that holds the name and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refactor_toggle-focus_refuses_at_the_declaration_that_holds_the_name_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when focus is toggled on a suite or method whose new name is already declared",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "focus_is_toggled_on_a_suite_or_method_whose_new_name_is_already_declared",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "NameTaken",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestNameTaken",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "DiscoveryToggleFocus",
@@ -14717,6 +14890,46 @@
               "name": "TestMethodKinds",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint -fix renames the selectors and literal keys that name the embedded field, and the package still compiles",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_-fix_renames_the_selectors_and_literal_keys_that_name_the_embedded_field,_and_the_package_still_compiles",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -fix removes the focus of a suite another type embeds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "lint_-fix_removes_the_focus_of_a_suite_another_type_embeds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Embedded",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestEmbedded",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterFocusFix",
@@ -15860,7 +16073,7 @@
     }
   ],
   "stats": {
-    "behaviors": 524,
+    "behaviors": 530,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

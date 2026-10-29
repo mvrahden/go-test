@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus refuses at the interface's position and writes nothing \(
+Clause: when focus is toggled on a method an interface in the package names → refactor toggle-focus refuses at the interface's position and writes nothing
+--- a/internal/refactor/togglefocus.go
++++ b/internal/refactor/togglefocus.go
+@@ -295,7 +295,7 @@
+ 			return fmt.Errorf("%s: %s is already declared; toggling focus would declare it twice", v.fset.Position(obj.Pos()), newName)
+ 		}
+ 	}
+-	if target.Method != "" {
++	if false {
+ 		for _, v := range views {
+ 			for _, f := range v.files {
+ 				if pos := interfaceNaming(f, target.Method); pos.IsValid() {
