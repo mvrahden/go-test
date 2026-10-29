@@ -66,14 +66,23 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return 0
 }
 
-// generatedFiles returns the generated files in dir.
+// generatedFiles returns the generated files in dir: named as gotest names
+// them and carrying the generated-code comment. A file only named so is
+// someone's own, and is left alone with a warning.
 func generatedFiles(dir string) []string {
 	entries, _ := os.ReadDir(dir)
 	var files []string
 	for _, e := range entries {
-		if e.Type().IsRegular() && about.PSuiteRegex.MatchString(e.Name()) {
-			files = append(files, filepath.Join(dir, e.Name()))
+		if !e.Type().IsRegular() || !about.PSuiteRegex.MatchString(e.Name()) {
+			continue
 		}
+		path := filepath.Join(dir, e.Name())
+		src, err := os.ReadFile(path) //nolint:gosec // G304: a file in a package directory clean was pointed at
+		if err != nil || !about.IsGeneratedSource(src) {
+			fmt.Fprintf(os.Stderr, "warning: %s is named like a generated file but is not one; left in place\n", path)
+			continue
+		}
+		files = append(files, path)
 	}
 	return files
 }

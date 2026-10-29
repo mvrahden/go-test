@@ -19,7 +19,8 @@ const (
 // GeneratedFileNames are every name a generated file may have on disk.
 var GeneratedFileNames = []string{PSuite, PXSuite, LegacyPSuite, LegacyPXSuite}
 
-var PSuiteRegex = regexp.MustCompile(`(gotest|ƒƒ)_p(x)?suite_test\.go$`)
+// PSuiteRegex matches a generated file's name, alone or ending a path.
+var PSuiteRegex = regexp.MustCompile(`(?:^|[/\\])(gotest|ƒƒ)_p(x)?suite_test\.go$`)
 
 const (
 	Application = "gotest"
@@ -39,6 +40,13 @@ func ParseStubbingGenerated(fset *token.FileSet, filename string, src []byte) (*
 		}
 	}
 	return parser.ParseFile(fset, filename, src, mode)
+}
+
+// IsGeneratedSource reports whether src carries Go's generated-code
+// comment before its package clause.
+func IsGeneratedSource(src []byte) bool {
+	f, err := parser.ParseFile(token.NewFileSet(), "", src, parser.PackageClauseOnly|parser.ParseComments)
+	return err == nil && ast.IsGenerated(f)
 }
 
 // PackageStub is src cut down to its package clause and what precedes it,
