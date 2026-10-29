@@ -103,6 +103,11 @@ reads every selection file under `<dir>` and fails unless all shards computed
 the same assignment, every shard wrote one selection, and each selected exactly
 its part. The output `timings-i-of-n.json` files contain successful
 observations; merge their objects to supply the next run's input.
+CI reads the committed `tests/drill/timings.json` (a path relative to the
+checkout root). `bash tests/drill/timings.sh [run-id ...]` rewrites it from
+those files in the given runs' drill artifacts, by default the last three
+successful `quality.yml` runs on main: each mutant's longest observation,
+rounded to 0.1s, and only mutants that have a patch.
 Every result also records copy, patch, build, judge and render durations. A
 `*.phase.json` file identifies the active phase if a worker times out.
 Concurrent workers divide the available CPUs through `GOMAXPROCS`, Go's `-p`,

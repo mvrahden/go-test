@@ -1,6 +1,7 @@
 package conventions_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,6 +17,11 @@ import (
 // README does not mention is a guard nobody knows exists; a row without a
 // patch guards nothing.
 type DrillCatalogTestSuite struct{}
+
+// SuiteConfig: Parallel, as its methods only read files.
+func (s *DrillCatalogTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 // catalogRowRe matches a table row whose first cell is a backticked mutant name.
 var catalogRowRe = regexp.MustCompile("(?m)^\\| `([a-z0-9-]+)` \\|")
@@ -72,4 +78,21 @@ func (s *DrillCatalogTestSuite) TestEveryMutantIsCatalogued(t *gotest.T) {
 			}
 		})
 	})
+}
+
+// CI schedules the drill shards from tests/drill/timings.json; a key whose
+// patch was renamed or removed would weigh nothing and hide the rename.
+func (s *DrillCatalogTestSuite) TestTimingsNameOnlyExistingMutants(t *gotest.T) {
+	drill, err := filepath.Abs(filepath.Join("..", "..", "tests", "drill"))
+	gotest.NoError(t, err)
+	data, err := os.ReadFile(filepath.Join(drill, "timings.json"))
+	gotest.NoError(t, err)
+	var timings map[string]float64
+	gotest.NoError(t, json.Unmarshal(data, &timings))
+	gotest.NotEmpty(t, timings)
+	for name, seconds := range timings {
+		_, err := os.Stat(filepath.Join(drill, "mutants", name+".patch"))
+		gotest.NoError(t, err, "timings.json names %s, which has no patch", name)
+		gotest.Greater(t, seconds, 0.0, "timings.json gives %s no positive seconds", name)
+	}
 }
