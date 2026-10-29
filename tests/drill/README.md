@@ -286,6 +286,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
 | `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is located through that package's own FileSet | canary: the fixtureelsewhere remote failure is unlocated |
 | `fixture-report-in-runtime` | an error a fixture's `BeforeEach` returns is located in the runtime's `methods.go` | canary: the fixturehookfail failure names a runtime file, not the hook's |
+| `focus-ci-guard-tests-only` | `--ci` checks only test methods for the `F_` prefix, so a focused benchmark or fuzz method passes | cli conformance: `--ci` fails a run whose only focused method is a benchmark or a fuzz target |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
 | `go-goexit-unexplained` | a goroutine that left through `runtime.Goexit` with no verdict fails the method without saying why | canary: no failure of the goroutines fixture names the Goexit |
 | `go-skip-reported-as-a-failure` | a goroutine that skipped the test fails the method at the wait | canary: the goroutines fixture's skipping method fails |

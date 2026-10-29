@@ -80,10 +80,12 @@ func CheckFocusViolations(suites gotestast.TestSuiteSpecSet) []FocusViolation {
 		if strings.HasPrefix(name, "F_") {
 			violations = append(violations, FocusViolation{SuiteName: name, Pos: relPosition(fset, s.TypeSpecPos())})
 		}
-		for _, tc := range s.TestCases() {
-			tcName := tc.Identifier()
-			if strings.HasPrefix(tcName, "F_") {
-				violations = append(violations, FocusViolation{SuiteName: name, MethodName: tcName, Pos: relPosition(fset, tc.Pos())})
+		// A focused method of any kind focuses the run.
+		for _, methods := range [][]*gotestast.TestSuiteMethod{s.TestCases(), s.Benchmarks(), s.Fuzzers()} {
+			for _, m := range methods {
+				if m.IsFocused() {
+					violations = append(violations, FocusViolation{SuiteName: name, MethodName: m.Identifier(), Pos: relPosition(fset, m.Pos())})
+				}
 			}
 		}
 	}

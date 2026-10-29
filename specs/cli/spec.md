@@ -47,6 +47,17 @@ Every boolean flag SHALL take --x, --x=true and --x=false, the last occurrence S
 - **WHEN** a boolean flag is spelled in each accepted form
 - **THEN** reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value
 
+### Requirement: The focus guard
+With --ci, a run SHALL fail with exit 1 before anything runs when a suite or any of its test, benchmark or fuzz methods carries the F_ prefix, naming each where it is declared.
+
+#### Scenario: A focused benchmark method
+- **WHEN** --ci runs a package whose only focused method is a benchmark
+- **THEN** fails with exit 1, naming the benchmark where it is declared
+
+#### Scenario: A focused fuzz method
+- **WHEN** --ci runs a package whose only focused method is a fuzz target
+- **THEN** fails with exit 1, naming the fuzz target where it is declared
+
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
 
