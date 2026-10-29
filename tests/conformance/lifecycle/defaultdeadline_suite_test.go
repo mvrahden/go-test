@@ -13,7 +13,6 @@ import (
 type DefaultDeadlineTestSuite struct{}
 
 func (s *DefaultDeadlineTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: the method ~45s, the default's 30s included; the budget is twice that.
 	return gotest.SuiteConfig{Timeout: 90 * time.Second}
 }
 

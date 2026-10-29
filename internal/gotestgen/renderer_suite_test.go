@@ -14,7 +14,6 @@ import (
 type RendererTestSuite struct{}
 
 func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on macOS CI: slowest method ~24s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
@@ -319,7 +318,7 @@ func (s *RendererTestSuite) TestFixtureConfig(t *gotest.T) {
 
 			// The defaults still bound the fixture's context, but no Budget field
 			// is emitted, so it is never failed against a number it did not write.
-			gotest.Contains(it, output, "Config: gotest.DefaultFixtureConfig(),",
+			gotest.Contains(it, output, "Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),",
 				"a fixture with no config falls back to the defaults")
 			gotest.NotContains(it, output, "Budget:",
 				"a fixture with no config must not be held to a budget")
@@ -613,7 +612,7 @@ func (s *RendererTestSuite) TestRenderer_BenchmarkWrapper(t *gotest.T) {
 			idx := strings.Index(out, "func BenchmarkParserTestSuite")
 			gotest.GreaterOrEqual(it, idx, 0, "bench wrapper missing from output")
 			benchFn := out[idx:]
-			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{[^}]*\}, ƒ_node_PoolFixture\)`, benchFn)
+			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{(?:[^{}]|\{\})*\}, ƒ_node_PoolFixture\)`, benchFn)
 			gotest.Contains(it, benchFn, "s.ParserTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 
@@ -675,7 +674,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			idx := strings.Index(out, "func FuzzParserFuzzTestSuite_FuzzParse")
 			gotest.GreaterOrEqual(it, idx, 0, "fuzz wrapper missing from output")
 			fuzzFn := out[idx:]
-			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{[^}]*\}, ƒ_node_PoolFixture\)`, fuzzFn)
+			gotest.Regexp(it, `Fixtures: func\(tb testing\.TB\) \{\s+ƒ_holdFixtures\(tb, func\(\) time\.Duration \{(?:[^{}]|\{\})*\}, ƒ_node_PoolFixture\)`, fuzzFn)
 			gotest.Contains(it, fuzzFn, "s.ParserFuzzTestSuite.PoolFixture = ƒ_PoolFixture\n")
 		})
 

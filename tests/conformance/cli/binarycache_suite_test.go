@@ -15,7 +15,6 @@ import (
 type CLIBinaryCacheTestSuite struct{}
 
 func (s *CLIBinaryCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: one run of the passing package ~15s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Timeout: 30 * time.Second}
 }
 

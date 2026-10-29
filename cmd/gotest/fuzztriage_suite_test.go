@@ -28,7 +28,7 @@ type FuzzTriagePromoteTestSuite struct {
 }
 
 func (s *FuzzTriagePromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 60 * time.Second}
+	return gotest.SuiteConfig{Timeout: 45 * time.Second}
 }
 
 func (s *FuzzTriagePromoteTestSuite) BeforeAll(t *gotest.T) {

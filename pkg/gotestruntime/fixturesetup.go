@@ -109,7 +109,7 @@ func RunFixtureSetup(ctx context.Context, s FixtureSetup) error {
 			// The verdict is terminal, not retried: the attempt succeeded, so a
 			// retry would create a second set of whatever it built, and the
 			// overrun would repeat deterministically.
-			err := fmt.Errorf("%w of %s", ErrSetupOverran, s.Budget)
+			err := fmt.Errorf("%w of %s", ErrSetupOverran, scaleTimeout(s.Budget))
 			fmt.Fprintf(os.Stderr, "FAIL: %s.BeforeAll %v\n", s.Name, err)
 			return errors.Join(err, releaseErr)
 		}

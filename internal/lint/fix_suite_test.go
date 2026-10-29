@@ -26,8 +26,7 @@ type FixTestSuite struct {
 }
 
 func (s *FixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on Windows CI: slowest method ~56s; estimated setup ~19s. Budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 45 * time.Second}
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
 }
 
 func (s *FixTestSuite) BeforeAll(t *gotest.T) {

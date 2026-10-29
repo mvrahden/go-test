@@ -29,8 +29,7 @@ func brokenloadDir(t *gotest.T) string {
 type BrokenLoadTestSuite struct{}
 
 func (s *BrokenLoadTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~16s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *BrokenLoadTestSuite) TestBrokenPackageVerdicts(t *gotest.T) {

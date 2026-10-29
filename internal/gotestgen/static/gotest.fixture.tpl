@@ -24,7 +24,7 @@ func ƒ_node_{{ $sf.Identifier }}() *gotestruntime.FixtureNode {
         Config: gotestruntime.WithFixtureDefaults(ƒcfg),
         Budget: ƒcfg.Timeout,
 {{- else }}
-        Config: gotest.DefaultFixtureConfig(),
+        Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
 {{- end }}
         SharedState: &gotestruntime.SharedStateNode{
             StateKey: "{{ $sf.StateKey }}",
@@ -65,7 +65,7 @@ func ƒ_node_{{ $f.Identifier }}() *gotestruntime.FixtureNode {
         Config: gotestruntime.WithFixtureDefaults(ƒcfg),
         Budget: ƒcfg.Timeout,
 {{- else }}
-        Config: gotest.DefaultFixtureConfig(),
+        Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
 {{- end }}
         Init: func() {
 {{- if or $f.ParentFieldNames $f.SharedFixtures }}

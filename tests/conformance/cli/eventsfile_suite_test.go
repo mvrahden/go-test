@@ -16,7 +16,7 @@ import (
 type CLIEventsFileTestSuite struct{}
 
 func (s *CLIEventsFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *CLIEventsFileTestSuite) TestTheFileHoldsTheStream(t *gotest.T) {

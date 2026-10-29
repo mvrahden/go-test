@@ -130,6 +130,24 @@ When the default deadline of a suite that declares no Timeout or SetupTimeout en
 - **WHEN** a suite declares a Timeout and its method waits on t.Context() past it
 - **THEN** fails the method by the Timeout and prints no line about the default deadline
 
+### Requirement: Budgets scaled for a slow machine
+GOTEST_TIMEOUT_SCALE set to a number above zero SHALL multiply every Timeout and SetupTimeout a suite runs under and every Timeout a fixture runs under, declared or default, as both the context deadline and the budget held by verdict; NoDeadline stays, and processes the tests start do not inherit it. Unset or empty, it changes nothing. Any other value SHALL fail every suite before its fixtures, naming the value.
+
+#### Scenario: A method within the scaled Timeout
+- **WHEN** GOTEST_TIMEOUT_SCALE is 2 and a suite declares a 1s Timeout
+- **THEN** passes a method that runs for 1.5s
+- **AND** fails a method that runs past 2s by a 2s Timeout
+- **AND** leaves the scale out of the environment of a process a test starts
+
+#### Scenario: A fixture within the scaled Timeout
+- **WHEN** GOTEST_TIMEOUT_SCALE is 2 and a fixture declares a 1s Timeout
+- **THEN** sets up a fixture whose BeforeAll takes 1.5s
+- **AND** fails a fixture whose BeforeAll runs past 2s by a 2s Timeout
+
+#### Scenario: A scale that is no number
+- **WHEN** GOTEST_TIMEOUT_SCALE is not a number above zero
+- **THEN** fails every suite before its fixtures, naming the value
+
 ### Requirement: What an expired --timeout names
 An expired --timeout SHALL name as running only the tests whose process it cut short, not a test whose suite process ended on its own before it.
 

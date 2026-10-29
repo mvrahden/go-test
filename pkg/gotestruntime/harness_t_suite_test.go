@@ -155,7 +155,7 @@ func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
 				BeforeAll: func(*gotest.T) {},
 				AfterAll:  func(*gotest.T) {},
 			})
-			gotest.Equal(it, gotest.DefaultSuiteConfig(), cfg)
+			gotest.Equal(it, gotestruntime.ExportScaleSuite(gotest.DefaultSuiteConfig()), cfg)
 			gotest.Zero(it, budget)
 		})
 	})
@@ -168,9 +168,8 @@ func (s *HarnessTTestSuite) TestOpenSuite(t *gotest.T) {
 				BeforeAll: func(*gotest.T) {},
 				AfterAll:  func(*gotest.T) {},
 			})
-			gotest.Equal(it, declared, budget)
-			gotest.Equal(it, time.Minute, cfg.Timeout)
-			gotest.Equal(it, gotest.DefaultSuiteConfig().SetupTimeout, cfg.SetupTimeout)
+			gotest.Equal(it, gotestruntime.ExportScaleSuite(declared), budget)
+			gotest.Equal(it, gotestruntime.ExportScaleSuite(gotest.SuiteConfig{Timeout: time.Minute, SetupTimeout: gotest.DefaultSuiteConfig().SetupTimeout}), gotest.SuiteConfig{Timeout: cfg.Timeout, SetupTimeout: cfg.SetupTimeout})
 			gotest.True(it, cfg.FailFast)
 		})
 	})

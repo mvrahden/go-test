@@ -12,8 +12,7 @@ import (
 type FixtureTeardownTestSuite struct{}
 
 func (s *FixtureTeardownTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~61s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *FixtureTeardownTestSuite) TestFailedSharedSetupIsReleased(t *gotest.T) {

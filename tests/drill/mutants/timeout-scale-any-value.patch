@@ -1,0 +1,16 @@
+Expect: timeoutscalefast: verdicts differ from the golden list
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestBudgetsScaledForASlowMachine
+Clause: when GOTEST_TIMEOUT_SCALE is not a number above zero → fails every suite before its fixtures, naming the value
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -70,9 +70,7 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
+ 		openSuites.Add(-1)
+ 		stopWatch()
+ 	})
+-	if _, err := timeoutScale(); err != nil {
+-		tb.Fatal(err)
+-	}
++	_, _ = timeoutScale()
+ 	if s.Fixtures != nil {
+ 		s.Fixtures(tb)
+ 	}

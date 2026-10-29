@@ -14,8 +14,7 @@ import (
 type BenchDeadlineTestSuite struct{}
 
 func (s *BenchDeadlineTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~66s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Timeout: 45 * time.Second}
 }
 
 func (s *BenchDeadlineTestSuite) TestAHungBenchmark(t *gotest.T) {

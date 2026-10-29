@@ -24,8 +24,7 @@ type DiscoverTestSuite struct{ repoRoot string }
 // SuiteConfig: discovery stages a module and builds it, which the
 // 30-second default does not cover on a slow machine.
 func (s *DiscoverTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~20s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 func (s *DiscoverTestSuite) BeforeAll(t *gotest.T) {

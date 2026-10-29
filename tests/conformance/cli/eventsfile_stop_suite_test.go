@@ -23,8 +23,7 @@ type CLIEventsFileStopTestSuite struct {
 }
 
 func (s *CLIEventsFileStopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: setup ~45s, the method ~45s for its three runs; the budgets are twice that.
-	return gotest.SuiteConfig{Timeout: 90 * time.Second, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *CLIEventsFileStopTestSuite) BeforeAll(t *gotest.T) {

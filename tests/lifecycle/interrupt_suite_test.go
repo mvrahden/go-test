@@ -29,8 +29,7 @@ type InterruptTestSuite struct {
 }
 
 func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~25s, setup ~47s; budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute, SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: time.Minute}
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {

@@ -65,8 +65,7 @@ type MigrateTestSuite struct {
 }
 
 func (s *MigrateTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~115s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 // migrateSource migrates src as the only test file of a package and

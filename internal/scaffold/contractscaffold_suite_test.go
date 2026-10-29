@@ -19,7 +19,6 @@ type ContractScaffoldTestSuite struct{}
 // SuiteConfig: each case builds a scratch module, which the 30-second default
 // does not cover on a slow machine.
 func (s *ContractScaffoldTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~22s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Timeout: 45 * time.Second}
 }
 

@@ -13,8 +13,7 @@ import (
 type CanaryBudgetsTestSuite struct{ canary }
 
 func (s *CanaryBudgetsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Slowest method ~33s locally, ~50s estimated for Windows CI, setup ~13s; budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
+	return gotest.SuiteConfig{Timeout: 90 * time.Second, SetupTimeout: 30 * time.Second}
 }
 
 func (s *CanaryBudgetsTestSuite) BeforeAll(t *gotest.T) { s.open(t) }
@@ -58,5 +57,33 @@ func (s *CanaryBudgetsTestSuite) TestAContextTheDefaultDeadlineEndedIsNamed(t *g
 	}
 	if n := strings.Count(r.stream, "t.Context() ended at the default "); n != 1 {
 		t.Errorf("defaultdeadline: the default deadline was named %d times in the run, want once:\n%s", n, r.stream)
+	}
+}
+
+// GOTEST_TIMEOUT_SCALE=2 doubles the 1s budgets: the method and fixture
+// taking 1.5s pass, the ones taking 2.5s fail naming 2s, and a method finds
+// the scale gone from its environment. A scale that is no number fails both
+// suites before anything runs.
+func (s *CanaryBudgetsTestSuite) TestBudgetsScaledForASlowMachine(t *gotest.T) {
+	for _, c := range []struct{ key, scale string }{{"timeoutscale", "2"}, {"timeoutscalefast", "fast"}} {
+		want := s.expected[c.key]
+		r := s.runIn(t, "", "./testdata/timeoutscale/", c.key, t.TempDir(), []string{"GOTEST_TIMEOUT_SCALE=" + c.scale})
+		if r.code != want.exit {
+			t.Errorf("%s: exit code %d, want %d", c.key, r.code, want.exit)
+		}
+		if strings.Join(r.rows, "\n") != strings.Join(want.rows, "\n") {
+			t.Errorf("%s: verdicts differ from the golden list\n got:\n  %s\n want:\n  %s",
+				c.key, strings.Join(r.rows, "\n  "), strings.Join(want.rows, "\n  "))
+		}
+		if c.scale != "2" {
+			continue
+		}
+		out := r.stream + r.stderr
+		if !strings.Contains(out, "exceeded its configured Timeout of 2s") {
+			t.Errorf("%s: no overrun names the scaled 2s Timeout", c.key)
+		}
+		if !strings.Contains(out, "SlowerFixture.BeforeAll exceeded its configured Timeout of 2s") {
+			t.Errorf("%s: the fixture's overrun does not name the scaled 2s Timeout", c.key)
+		}
 	}
 }

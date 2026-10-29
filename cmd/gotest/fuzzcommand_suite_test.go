@@ -18,7 +18,6 @@ type FuzzCommandTestSuite struct {
 }
 
 func (s *FuzzCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~52s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
 }
 

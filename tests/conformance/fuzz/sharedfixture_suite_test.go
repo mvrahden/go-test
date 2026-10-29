@@ -14,8 +14,7 @@ import (
 type FuzzSharedFixtureTestSuite struct{}
 
 func (s *FuzzSharedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~98s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 // runFuzzCLI runs the CLI with args over fzshared and returns the run and its

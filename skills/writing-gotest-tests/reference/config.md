@@ -28,6 +28,9 @@ zero behave as if the marker were absent:
   `gotest.NoDeadline` where no deadline was the intent.
 - `SetupTimeout` bounds `BeforeAll`/`AfterAll` of benchmark and fuzz
   suites too from v1.32; before, their contexts had no deadline.
+- `GOTEST_TIMEOUT_SCALE=2` doubles every suite and fixture budget, declared
+  or default, deadline and verdict alike (v1.36+): set it on a slow CI
+  runner instead of raising budgets in code.
 
 Marker bodies are parsed statically (the generator needs `Parallel` at
 generation time), so only three forms are legal:

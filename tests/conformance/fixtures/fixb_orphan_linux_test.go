@@ -25,7 +25,7 @@ type OrphanedFixtureTestSuite struct {
 // above the 90s a method waits for the exit so the wait's verdict is shown.
 // BeforeAll builds the CLI, 8.5s cold, so twice that seven times slower is 2m.
 func (s *OrphanedFixtureTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute, SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second, SetupTimeout: 2 * time.Minute}
 }
 
 func (s *OrphanedFixtureTestSuite) BeforeAll(t *gotest.T) {

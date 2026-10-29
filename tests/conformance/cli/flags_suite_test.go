@@ -14,8 +14,7 @@ import (
 type CLIFlagsTestSuite struct{}
 
 func (s *CLIFlagsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~55s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 type flagRow struct {

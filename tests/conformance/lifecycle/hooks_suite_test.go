@@ -12,8 +12,7 @@ import (
 type SuiteHooksTestSuite struct{}
 
 func (s *SuiteHooksTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~21s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
 func (s *SuiteHooksTestSuite) TestAHookOrBodyGoesWrong(t *gotest.T) {

@@ -37,8 +37,11 @@ jobs:
         os: [windows-latest, macos-latest]
         shard: [cli, core]
         include:
+          - os: windows-latest
+            timeout-scale: 2
           - os: macos-latest
             parallel: 6
+            timeout-scale: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-go
@@ -57,6 +60,8 @@ jobs:
       - name: Test (suites)
         id: test
         uses: ./
+        env:
+          GOTEST_TIMEOUT_SCALE: ${{ matrix.timeout-scale }}
         with:
           packages: ${{ steps.shard.outputs.packages }}
           race: true

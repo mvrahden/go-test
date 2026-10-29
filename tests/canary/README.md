@@ -75,6 +75,7 @@ Each directory under `testdata/` is one package with one suite:
 | `stopgrace` | a stopped run cuts a body or a `BeforeAll` that ignores its context short after 5s, counted from a late body's own start, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace, or one waiting on its context, runs to its end before `AfterAll` and the release; a forced stop still gives the fixtures' release its time; a second stop signal releases at once |
 | `stopbench` | a stopped benchmark or fuzz seed run skips what has not started with the reason run stopping and runs `AfterAll` before the release; a benchmark that ignores the stop is cut short after 5s |
 | `noisysetup` | a shared fixture that writes to stdout while coming up still hands its state to the suite whole |
+| `timeoutscale` | under `GOTEST_TIMEOUT_SCALE=2` a method and a fixture outlasting their 1s budget by half pass, those outlasting it past 2s fail naming 2s, and a method finds the scale gone from its environment; a scale that is no number fails both suites before anything runs |
 | `setupbudget` | a shared fixture slower than its declared 2s `Timeout` fails the run at that budget, not when it finishes |
 | `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
 | `killedcli` | the CLI killed while a shared fixture is up: the fixture's `AfterAll`, which logs and takes 2s, runs to its end and its process exits (Unix only) |

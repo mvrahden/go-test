@@ -15,8 +15,7 @@ import (
 type CLICoverageProfileTestSuite struct{}
 
 func (s *CLICoverageProfileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~59s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *CLICoverageProfileTestSuite) TestProfileSpellings(t *gotest.T) {

@@ -110,7 +110,7 @@ func main() {
 	go ƒlife.ExitWhenOrphaned(ƒgone)
 {{ range $f := .Fixtures }}
 	{{ $f.VarName }} := &{{ $f.QualifiedType }}{}
-	ƒcfg_{{ $f.VarName }} := gotest.DefaultFixtureConfig()
+	ƒcfg_{{ $f.VarName }} := gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{})
 {{- if $f.HasConfig }}
 	var ƒbudget_{{ $f.VarName }} time.Duration
 {{- end }}

@@ -1,6 +1,10 @@
 package gotestruntime
 
-import "context"
+import (
+	"context"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 // Shims exposing the runtime's internals to the external ring-0 suites.
 
@@ -52,3 +56,12 @@ func ExportUseBudgetFile(path string) {
 // ExportUserFrameBelowHarness reads a goroutine traceback as the overrun
 // verdict does.
 var ExportUserFrameBelowHarness = userFrameBelowHarness
+
+// ExportScaleSuite is c as GOTEST_TIMEOUT_SCALE scales it in this process.
+func ExportScaleSuite(c gotest.SuiteConfig) gotest.SuiteConfig { return scaleSuite(c) }
+
+// ExportScaleFixture is c as GOTEST_TIMEOUT_SCALE scales it in this process.
+func ExportScaleFixture(c gotest.FixtureConfig) gotest.FixtureConfig {
+	c.Timeout = scaleTimeout(c.Timeout)
+	return c
+}

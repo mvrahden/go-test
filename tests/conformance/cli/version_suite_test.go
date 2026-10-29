@@ -11,8 +11,7 @@ import (
 type CLIVersionTestSuite struct{}
 
 func (s *CLIVersionTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~44s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 90 * time.Second}
+	return gotest.SuiteConfig{Timeout: 30 * time.Second}
 }
 
 func (s *CLIVersionTestSuite) TestVersion(t *gotest.T) {

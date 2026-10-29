@@ -30,7 +30,7 @@ type ParentGoneTestSuite struct {
 // SuiteConfig: cold, BeforeAll took 7.4s locally and a method 0.7s; both
 // budgets hold twice a run seven times slower.
 func (s *ParentGoneTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *ParentGoneTestSuite) BeforeAll(t *gotest.T) {
@@ -90,7 +90,6 @@ type ForeignPidTestSuite struct {
 }
 
 func (s *ForeignPidTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: setup ~14s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Parallel: true, SetupTimeout: 30 * time.Second}
 }
 

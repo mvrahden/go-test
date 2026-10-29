@@ -25,7 +25,7 @@ type StreamReaderTestSuite struct {
 // SuiteConfig: cold, BeforeAll took 7.3s locally and a method 2.0s, most of
 // it a fixed wait; both budgets hold twice a run seven times slower.
 func (s *StreamReaderTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: time.Minute}
 }
 
 // BeforeAll builds the CLI, and the reader package's test binary the way go

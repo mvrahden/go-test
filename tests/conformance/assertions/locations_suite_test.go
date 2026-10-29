@@ -14,8 +14,7 @@ import (
 type FailureLocationsTestSuite struct{}
 
 func (s *FailureLocationsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~86s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
 func (s *FailureLocationsTestSuite) TestHelperUnderTrimpath(t *gotest.T) {

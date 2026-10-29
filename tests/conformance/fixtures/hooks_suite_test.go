@@ -17,8 +17,7 @@ import (
 type FixtureHooksTestSuite struct{}
 
 func (s *FixtureHooksTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~69s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 // runHooks runs the hooks package with the hook at told to misbehave as mode

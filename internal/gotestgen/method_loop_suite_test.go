@@ -11,8 +11,7 @@ import (
 type MethodLoopTestSuite struct{}
 
 func (s *MethodLoopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on Windows CI: slowest method ~47s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 100 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 func (s *MethodLoopTestSuite) TestHookOrder(t *gotest.T) {

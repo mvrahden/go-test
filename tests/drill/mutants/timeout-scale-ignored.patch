@@ -1,0 +1,19 @@
+Expect: timeoutscale: verdicts differ from the golden list
+Expect: timeoutscale: no overrun names the scaled 2s Timeout
+Expect: timeoutscale: the fixture's overrun does not name the scaled 2s Timeout
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestBudgetsScaledForASlowMachine
+Clause: when GOTEST_TIMEOUT_SCALE is 2 and a suite declares a 1s Timeout → passes a method that runs for 1.5s
+Clause: when GOTEST_TIMEOUT_SCALE is 2 and a suite declares a 1s Timeout → fails a method that runs past 2s by a 2s Timeout
+Clause: when GOTEST_TIMEOUT_SCALE is 2 and a fixture declares a 1s Timeout → sets up a fixture whose BeforeAll takes 1.5s
+Clause: when GOTEST_TIMEOUT_SCALE is 2 and a fixture declares a 1s Timeout → fails a fixture whose BeforeAll runs past 2s by a 2s Timeout
+--- a/pkg/gotestruntime/config.go
++++ b/pkg/gotestruntime/config.go
+@@ -34,7 +34,7 @@
+ // durations (gotest.NoDeadline) stay as they are.
+ func scaleTimeout(d time.Duration) time.Duration {
+ 	f, _ := timeoutScale()
+-	if d <= 0 || f == 1 {
++	if d <= 0 || f > 0 {
+ 		return d
+ 	}
+ 	return time.Duration(float64(d) * f)

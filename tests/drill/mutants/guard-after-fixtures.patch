@@ -2,7 +2,7 @@ Expect: guardskip: verdicts differ from the golden list
 Judge: ./tests/canary CanaryTestSuite/TestAGuardRunsBeforeTheFixtures
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -56,6 +56,9 @@
+@@ -56,6 +56,9 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
  	if runstate.StopContext().Err() != nil {
  		tb.Skip("run stopping")
  	}
@@ -12,13 +12,13 @@ Judge: ./tests/canary CanaryTestSuite/TestAGuardRunsBeforeTheFixtures
  	if s.Guard != nil {
  		if reason := s.Guard(); reason != "" {
  			tb.Skipf("suite guard: %s", reason)
-@@ -70,9 +73,6 @@
- 		openSuites.Add(-1)
- 		stopWatch()
- 	})
+@@ -73,9 +76,6 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
+ 	if _, err := timeoutScale(); err != nil {
+ 		tb.Fatal(err)
+ 	}
 -	if s.Fixtures != nil {
 -		s.Fixtures(tb)
 -	}
- 	cfg = gotest.DefaultSuiteConfig()
+ 	cfg = WithSuiteDefaults(gotest.SuiteConfig{})
  	if s.Config != nil {
  		budget = s.Config()
