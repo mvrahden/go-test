@@ -4,7 +4,7 @@ Clause: when a suite or fixture is declared → a suite declared alone, binding 
 Clause: when a suite or fixture is declared → a suite embedding a plain type runs
 --- a/internal/gotestast/shapes.go
 +++ b/internal/gotestast/shapes.go
-@@ -42,6 +42,9 @@
+@@ -43,6 +43,9 @@
  	}
  	for i := range st.NumFields() {
  		field := st.Field(i)
@@ -13,4 +13,4 @@ Clause: when a suite or fixture is declared → a suite embedding a plain type r
 +		}
  		named := namedBehind(field.Type())
  		if !field.Anonymous() {
- 			if named != nil && IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+ 			if isSuiteType(named) {

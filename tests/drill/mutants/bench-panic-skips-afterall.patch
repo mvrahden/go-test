@@ -8,8 +8,8 @@ Clause: when a benchmark panics → runs AfterAll before the fixture is released
 @@ -5,7 +5,6 @@
  {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "b" "Assign" "") }}
  {{ range $bm := $ts.Benchmarks }}
-   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
--    defer gotestruntime.ReleaseOnPanic(b)
-     gotestruntime.SkipIfStopped(b)
+   b.Run("{{ $bm.Identifier }}", func(b *ƒtesting.B) {
+-    defer ƒgotestruntime.ReleaseOnPanic(b)
+     ƒgotestruntime.SkipIfStopped(b)
      b.StopTimer()
-     ƒeachT := gotest.NewTFromTB(b)
+     ƒeachT := ƒgotest.NewTFromTB(b)

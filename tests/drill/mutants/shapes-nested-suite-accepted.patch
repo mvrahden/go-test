@@ -3,10 +3,10 @@ Judge: ./tests/canary CanaryDiscoveryTestSuite/TestDiscoveryShapesAreRejectedWhe
 Clause: when a suite or fixture is declared → a suite holding a suite in a field is rejected at the field: suites are never nested
 --- a/internal/gotestast/shapes.go
 +++ b/internal/gotestast/shapes.go
-@@ -45,7 +45,6 @@
+@@ -46,7 +46,6 @@
  		named := namedBehind(field.Type())
  		if !field.Anonymous() {
- 			if named != nil && IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+ 			if isSuiteType(named) {
 -				return field.Pos(), fmt.Errorf("%s %s has a field of suite type %s; suites are never nested — share behavior through a generic contract suite", kind, owner, named.Obj().Name())
  			}
  			continue

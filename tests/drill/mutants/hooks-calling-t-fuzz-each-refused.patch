@@ -3,7 +3,7 @@ Expect: ^FAIL .*conformance/cli .*a fuzz suite's BeforeEach and AfterEach call t
 Clause: when a fuzz suite's BeforeEach and AfterEach call t.T() → runs the suite, each input with a real *testing.T
 --- a/internal/gotestast/spec.go
 +++ b/internal/gotestast/spec.go
-@@ -920,7 +920,7 @@
+@@ -998,7 +998,7 @@
  		perInput bool
  	}{{"BeforeAll", ts.th.BeforeAll, false}, {"AfterAll", ts.th.AfterAll, false}, {"BeforeEach", ts.th.BeforeEach, true}, {"AfterEach", ts.th.AfterEach, true}} {
  		// The fuzz wrapper runs the per-input hooks with a real *testing.T.
@@ -11,4 +11,4 @@ Clause: when a fuzz suite's BeforeEach and AfterEach call t.T() → runs the sui
 +		if h.perInput && !bench && !fuzz {
  			continue
  		}
- 		if pos := h.m.callsT(ts.pkg); pos.IsValid() {
+ 		if pos := h.m.callsT(); pos.IsValid() {
