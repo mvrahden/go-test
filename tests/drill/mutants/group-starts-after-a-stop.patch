@@ -1,0 +1,22 @@
+Expect: ^FAIL .*conformance/lifecycle .* / starts none of the later group's fixtures, releases the group's and leaves no fixture process behind \(
+Clause: when a run is stopped while a suite of the e2e group runs → starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -967,7 +967,7 @@
+ 	var slotErr error
+ 	started := maps.Clone(win.Bulk)
+ 	startFor := func(ds []deferredTarget, what string) {
+-		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
++		if setupProc == nil || setupTimedOut {
+ 			return
+ 		}
+ 		phase := map[string][]string{}
+@@ -982,7 +982,7 @@
+ 		for _, key := range start {
+ 			started[key] = true
+ 		}
+-		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
++		if err := setupProc.StartKeys(context.WithoutCancel(streamCtx), start, resolvedSetupTimeout); err != nil {
+ 			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for %s: %w", what, err))
+ 		}
+ 	}

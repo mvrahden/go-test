@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / prints the same lines in the Markdown summary and the GitHub step summary \(
+Clause: when gotest summary runs suites of named groups → prints the same lines in the Markdown summary and the GitHub step summary
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -151,7 +151,7 @@
+ 
+ // renderMarkdownGroups lists one line per named group.
+ func renderMarkdownGroups(w io.Writer, groups []GroupRun) {
+-	if len(groups) == 0 {
++	if true {
+ 		return
+ 	}
+ 	fmt.Fprintln(w)

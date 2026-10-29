@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / starts it after the default group ran, and releases it once its reader finished, while the group still runs \(
+Clause: when a shared fixture only the e2e group reads, while another e2e suite outlasts its reader → starts it after the default group ran, and releases it once its reader finished, while the group still runs
+--- a/internal/gotestrunner/fixturewindow.go
++++ b/internal/gotestrunner/fixturewindow.go
+@@ -57,7 +57,7 @@
+ 	for i := range overlay.SharedFixtures {
+ 		key := sharedFixtureKey(&overlay.SharedFixtures[i])
+ 		switch {
+-		case w.Bulk[key]:
++		case w.Bulk[key] || w.Tail[key]:
+ 			w.Fixtures = append(w.Fixtures, overlay.SharedFixtures[i])
+ 		case w.Tail[key]:
+ 			// Late fixtures ride along deferred: compiled into the setup

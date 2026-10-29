@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / exits 2, saying the command runs nothing / summary --input \(
+Clause: when --group or --skip-group is given to a command that runs no suite → exits 2, saying the command runs nothing
+--- a/cmd/gotest/flags.go
++++ b/cmd/gotest/flags.go
+@@ -136,7 +136,7 @@
+ // refuseGroups reports, on stderr, --group or --skip-group given where mode
+ // runs no suite.
+ func refuseGroups(own OwnFlags, mode string) bool {
+-	if !own.Given("--group") && !own.Given("--skip-group") {
++	if true || !own.Given("--group") && !own.Given("--skip-group") {
+ 		return false
+ 	}
+ 	fmt.Fprintf(os.Stderr, "FAIL: --group and --skip-group select the suites a run runs, and %s runs nothing\n", mode)

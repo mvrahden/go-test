@@ -39,7 +39,8 @@ type SuiteTarget struct {
 	StopFile     string   // created before the process is interrupted, so it tears its fixtures down (empty = none)
 	Bench        bool     // when true, run the Benchmark<SuiteName> wrapper instead of the suite's tests
 	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
-	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite
+	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite of its group
+	Group        string   // SuiteConfig.ExclusiveGroup: the scope the suite runs in, "" for the default group
 	FuzzFuncs    []string // generated Fuzz<Suite>_<Method> wrapper names whose seed corpus replays alongside SuiteName in a plain run (ignored when Bench is true or RunFilter is set)
 	Exec         []string // go test's -exec: the command the binary runs under (empty = the binary itself)
 }
@@ -84,7 +85,7 @@ func SortTargetsSerial(targets []SuiteTarget) {
 			return targets[a].Package < targets[b].Package
 		}
 		return targets[a].SuiteName < targets[b].SuiteName
-	}) //nolint:gocritic // mirror of sortTargetIndices over the targets themselves
+	}) //nolint:gocritic // mirror of sortDeferred over the targets themselves
 }
 
 // RunBenchSuites executes bench targets strictly one at a time, in slice
@@ -534,18 +535,6 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 		}
 	}
 	return targets
-}
-
-// sortTargetIndices orders target indices by (Package, SuiteName) so
-// exclusive dispatch is deterministic run over run.
-func sortTargetIndices(targets []SuiteTarget, idx []int) {
-	sort.Slice(idx, func(a, b int) bool {
-		ta, tb := targets[idx[a]], targets[idx[b]]
-		if ta.Package != tb.Package {
-			return ta.Package < tb.Package
-		}
-		return ta.SuiteName < tb.SuiteName
-	})
 }
 
 // quoteAll returns regexp.QuoteMeta applied to each name, preserving order.

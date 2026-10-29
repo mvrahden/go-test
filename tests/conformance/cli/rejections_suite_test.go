@@ -110,3 +110,15 @@ func passes(t *gotest.T, row acceptedRow) {
 	}
 	gotest.Contains(t, passed, row.test)
 }
+
+func (s *CLIRejectionsTestSuite) TestAGroupThatIsNotAConstant(t *gotest.T) {
+	t.When("a suite's ExclusiveGroup is neither a string literal nor a string constant", func(w *gotest.T) {
+		w.It("fails with exit 2, located at the value, naming the forms it accepts", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "../testdata/cligroupexpr/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stderr, "groupexpr_suite_test.go:")
+			gotest.Contains(it, run.Stderr, "ExclusiveGroup must be a string literal or a string constant")
+		})
+	})
+}

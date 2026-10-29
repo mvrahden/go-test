@@ -145,6 +145,8 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--debounce=<dur>` | Debounce interval for watch mode (default 200ms) |
 | `--parallel=<n>` | Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan) |
 | `--compile-parallel=<n>` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
+| `--group=<name>` | Run only the suites of this `ExclusiveGroup` (repeatable; default runs, `spec`, `summary`); a name no suite declares exits 2 before any build |
+| `--skip-group=<name>` | Leave the suites of this `ExclusiveGroup` out (repeatable) |
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
 | `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back. A text run refuses it (exit 2) |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |

@@ -95,6 +95,10 @@ jobs:
   halved default wastes it (the action's `flags` input also reaches
   `gotest bench`, which rejects `--parallel`; `gotest bench` ignores the
   `.gotest.yml` width and always runs serially).
+- **v1.36+:** suites in an `ExclusiveGroup` run after the rest of the run,
+  apart from it. Split them into a CI job of their own with
+  `--group=<name>` there and `--skip-group=<name>` in the main job
+  (`config.md`); a name no suite declares exits 2.
 
 ## gotest-exclusive projects: drop the stdlib step
 

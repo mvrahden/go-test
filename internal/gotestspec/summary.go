@@ -97,6 +97,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
 			c.green, stats.Total(), c.reset,
 			formatDuration(effectiveDuration(&cfg, packages)))
+		renderGroups(w, cfg.groups, c)
 		if cfg.coverage != nil {
 			fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 		}
@@ -140,11 +141,31 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	}
 
 	fmt.Fprintln(w)
+	renderGroups(w, cfg.groups, c)
 	if cfg.coverage != nil {
 		fmt.Fprintf(w, "%sCoverage: %.1f%%%s\n", c.dim, cfg.coverage.Total, c.reset)
 	}
 	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	renderSummary(w, stats, c)
+}
+
+// renderMarkdownGroups lists one line per named group.
+func renderMarkdownGroups(w io.Writer, groups []GroupRun) {
+	if len(groups) == 0 {
+		return
+	}
+	fmt.Fprintln(w)
+	for _, g := range groups {
+		fmt.Fprintf(w, "- %s\n", groupLine(g))
+	}
+	fmt.Fprintln(w)
+}
+
+// renderGroups prints one line per named group.
+func renderGroups(w io.Writer, groups []GroupRun, c colors) { //nolint:gocritic // hugeParam: as renderSummary
+	for _, g := range groups {
+		fmt.Fprintf(w, "%s%s%s\n", c.dim, groupLine(g), c.reset)
+	}
 }
 
 func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -160,6 +181,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
 		fmt.Fprintf(w, "### All %d tests passed (%s)\n",
 			stats.Total(), formatDuration(effectiveDuration(&cfg, packages)))
+		renderMarkdownGroups(w, cfg.groups)
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
 		}
@@ -188,6 +210,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	}
 
 	fmt.Fprintln(w)
+	renderMarkdownGroups(w, cfg.groups)
 	if cfg.coverage != nil {
 		renderMarkdownCoverage(w, cfg.coverage)
 	}

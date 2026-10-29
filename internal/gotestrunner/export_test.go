@@ -100,9 +100,33 @@ var ExportPlanFixtureWindows = planFixtureWindows
 var ExportPlanBenchFixtureWindows = planBenchFixtureWindows
 var ExportBenchSlotPlan = benchSlotPlan
 var ExportPlanSuitePhases = planSuitePhases
+
+// ExportScope is one planned scope: its group and its two phases.
+type ExportScope = suiteScope
+
+var ExportPlanSuiteScopes = planSuiteScopes
+
+// ExportSelectGroups narrows o to --group and --skip-group.
+func ExportSelectGroups(o *OverlayResult, only, skip []string) error {
+	return o.selectGroups(only, skip)
+}
+
 var ExportAliveFixtureKeys = aliveFixtureKeys
 
-var ExportSortTargetIndices = sortTargetIndices
+// ExportSortDeferred orders targets as a scope dispatches its held-back suites.
+func ExportSortDeferred(targets []SuiteTarget) []SuiteTarget {
+	ds := make([]deferredTarget, len(targets))
+	for i := range targets {
+		ds[i] = deferredTarget{t: targets[i], idx: i}
+	}
+	sortDeferred(ds)
+	out := make([]SuiteTarget, len(ds))
+	for i := range ds {
+		out[i] = ds[i].t
+	}
+	return out
+}
+
 var ExportLogSlowBuild = logSlowBuild
 var ExportSlowBuildThreshold = slowBuildThreshold
 
@@ -316,4 +340,17 @@ func ExportTeardownVerdict(teardownErr error, reports []string) ([]string, error
 // to the final teardown.
 func ExportCommand(ctx context.Context, p *SharedFixtureProcess, verb string, keys []string, timeout time.Duration) error {
 	return p.command(ctx, verb, keys, timeout)
+}
+
+// ExportGroupRuns books targets under a fresh group clock, runs those named
+// in ran, and returns what the clock reports.
+func ExportGroupRuns(targets []SuiteTarget, ran map[string]bool) []GroupRun {
+	var c groupClock
+	c.count(targets)
+	for i := range targets {
+		if ran[targets[i].SuiteName] {
+			c.run(targets[i].Group, func() {})
+		}
+	}
+	return c.runs()
 }

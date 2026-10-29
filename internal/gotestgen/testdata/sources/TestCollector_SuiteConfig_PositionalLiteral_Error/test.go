@@ -9,6 +9,6 @@ import (
 type MyTestSuite struct{}
 
 func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{30 * time.Second, 30 * time.Second, false, true, false}
+	return gotest.SuiteConfig{30 * time.Second, 30 * time.Second, false, true, false, ""}
 }
 func (s *MyTestSuite) TestOne(t *gotest.T) {}

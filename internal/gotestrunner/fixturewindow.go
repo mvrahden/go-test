@@ -2,7 +2,9 @@ package gotestrunner
 
 import (
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"sort"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -11,18 +13,20 @@ import (
 // Fixture window scheduling.
 //
 // Doctrine: fixtures are never speculative — a shared fixture is resident
-// exactly while a scheduled suite needs it. A run has two dispatch phases:
-// the parallel bulk, then the exclusive serial tail (SuiteTarget.Exclusive).
-// Alive(phase) is the DAG-closure of the union of the phase targets' required
-// shared fixture keys. Fixtures in neither alive set never start — and can
-// therefore never fail the run. Alive(bulk) starts up-front, concurrent with
-// compile; run-end teardown owns everything still resident.
+// exactly while a scheduled suite needs it. A run is a sequence of scopes
+// (planSuiteScopes), each the parallel bulk of a group, then its exclusive
+// serial tail (SuiteTarget.Exclusive). The first scope's bulk streams with
+// the compile; Alive(phase) is the DAG-closure of the union of the phase
+// targets' required shared fixture keys. Fixtures in no alive set never
+// start — and can therefore never fail the run. Alive of the first bulk
+// starts up-front, concurrent with compile; every later phase starts its
+// own just before it; run-end teardown owns everything still resident.
 
 // fixtureWindows is one run's shared fixture residency plan, computed from
 // the overlay and the user's -run filter before any fixture starts.
 type fixtureWindows struct {
-	Bulk map[string]bool // Alive(bulk): state keys the parallel bulk needs
-	Tail map[string]bool // Alive(tail): state keys the exclusive tail needs
+	Bulk map[string]bool // Alive(first bulk): state keys the streamed bulk needs
+	Tail map[string]bool // Alive(later phases): state keys every phase after it needs
 	// Fixtures is Alive(bulk) ∪ Alive(tail), dependencies first — the only
 	// fixtures the setup subprocess is generated with, in the order it starts
 	// a command's fixtures and the reverse of the order it releases them.
@@ -35,10 +39,20 @@ type fixtureWindows struct {
 // selection mirrors BuildSuiteTargets minus compile results, which do not
 // exist yet: fixtures must not wait for the compiler.
 func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter string) fixtureWindows {
-	bulk, tail := planSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, userRunFilter, userSkipFilter)
+	scopes := planSuiteScopes(overlay, userRunFilter, userSkipFilter)
+	var first map[string][]string
+	later := map[string][]string{}
+	for i, sc := range scopes {
+		if i == 0 {
+			first = sc.Bulk
+		} else {
+			mergePhase(later, sc.Bulk)
+		}
+		mergePhase(later, sc.Tail)
+	}
 	w := fixtureWindows{
-		Bulk: aliveFixtureKeys(bulk, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
-		Tail: aliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
+		Bulk: aliveFixtureKeys(first, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
+		Tail: aliveFixtureKeys(later, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
 	}
 	for i := range overlay.SharedFixtures {
 		key := sharedFixtureKey(&overlay.SharedFixtures[i])
@@ -46,8 +60,8 @@ func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter st
 		case w.Bulk[key]:
 			w.Fixtures = append(w.Fixtures, overlay.SharedFixtures[i])
 		case w.Tail[key]:
-			// Tail-only fixtures ride along deferred: compiled into the setup
-			// program, started by StartKeys at the bulk→tail barrier.
+			// Late fixtures ride along deferred: compiled into the setup
+			// program, started by StartKeys just before their phase.
 			sf := overlay.SharedFixtures[i]
 			sf.Deferred = true
 			w.Fixtures = append(w.Fixtures, sf)
@@ -57,6 +71,12 @@ func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter st
 	}
 	w.Fixtures = dependenciesFirst(w.Fixtures)
 	return w
+}
+
+func mergePhase(into, phase map[string][]string) {
+	for pkg, suites := range phase {
+		into[pkg] = append(into[pkg], suites...)
+	}
 }
 
 // dependenciesFirst orders fixtures so each comes after its dependencies,
@@ -108,6 +128,41 @@ func (w *fixtureWindows) reportSkipped() {
 	if w.Skipped > 0 {
 		fmt.Fprintf(os.Stderr, "gotest: %d shared fixture(s) not started (no scheduled suite requires them)\n", w.Skipped)
 	}
+}
+
+// suiteScope is one group's share of a run: its parallel bulk, then its
+// exclusive tail, as planSuitePhases splits them. Scopes never overlap.
+type suiteScope struct {
+	Group      string // "" for the default group
+	Bulk, Tail map[string][]string
+}
+
+// planSuiteScopes splits the suites the run will dispatch into scopes: the
+// default group first, then each named group by name. A group the
+// selection leaves no suite in has no scope.
+func planSuiteScopes(overlay *OverlayResult, userRunFilter, userSkipFilter string) []suiteScope {
+	byGroup := map[string]map[string][]string{}
+	for pkg, suites := range overlay.SuitesByPkg {
+		for _, suiteName := range suites {
+			group := overlay.GroupsByPkg[pkg][suiteName]
+			if !overlay.groups.selects(group) {
+				continue
+			}
+			if byGroup[group] == nil {
+				byGroup[group] = map[string][]string{}
+			}
+			byGroup[group][pkg] = append(byGroup[group][pkg], suiteName)
+		}
+	}
+	scopes := make([]suiteScope, 0, len(byGroup))
+	for _, group := range slices.Sorted(maps.Keys(byGroup)) {
+		bulk, tail := planSuitePhases(byGroup[group], overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, userRunFilter, userSkipFilter)
+		if len(bulk) == 0 && len(tail) == 0 {
+			continue
+		}
+		scopes = append(scopes, suiteScope{Group: group, Bulk: bulk, Tail: tail})
+	}
+	return scopes
 }
 
 // planSuitePhases splits the suites the run will dispatch into the two phases:

@@ -43,6 +43,9 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if input != "" {
+		if refuseGroups(own, "--input") {
+			return 2
+		}
 		if own.Given("--events-file") {
 			fmt.Fprintln(os.Stderr, "FAIL: --events-file saves a run's event stream, and --input runs nothing")
 			return 2
@@ -129,6 +132,8 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,
+		Groups:          cfg.Groups,
+		SkipGroups:      cfg.SkipGroups,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -151,7 +156,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	elapsed := time.Since(pipelineStart)
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups)); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -181,7 +186,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events)))
 
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -191,7 +196,16 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 // writeSummaryOutput renders the summary to stdout or --output; an --output
 // it cannot create is the command's failure, exit 2 at the callers.
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string) error {
+// groupRuns converts the pipeline's group timings for the renderers.
+func groupRuns(groups []gotestrunner.GroupRun) []gotestspec.GroupRun {
+	out := make([]gotestspec.GroupRun, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, gotestspec.GroupRun{Name: g.Name, Suites: g.Suites, Wall: g.Wall})
+	}
+	return out
+}
+
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun) error {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -213,6 +227,9 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	if noColor {
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
 	}
+	if len(groups) > 0 {
+		renderOpts = append(renderOpts, gotestspec.WithGroups(groups))
+	}
 
 	if coverageProfile != "" {
 		report, err := gotestspec.ParseCoverageProfile(coverageProfile)
@@ -230,7 +247,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	case "md", "markdown":
 		gotestspec.RenderMarkdownSummary(w, tree, renderOpts...)
 	case "json":
-		gotestspec.RenderJSON(w, tree)
+		gotestspec.RenderJSON(w, tree, renderOpts...)
 	default:
 		gotestspec.RenderSummary(w, tree, renderOpts...)
 	}

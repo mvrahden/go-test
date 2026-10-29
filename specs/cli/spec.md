@@ -142,6 +142,41 @@ gotest SHALL refuse with exit 2 a shared fixture that declares BeforeEach or Aft
 - **WHEN** a shared fixture declares BeforeEach or AfterEach, in the suite's package or another
 - **THEN** fails with exit 2 and one error on stderr, located at the hook, that says shared fixtures have no per-test hooks and where the work goes instead
 
+### Requirement: A group that is not a constant
+gotest SHALL refuse with exit 2 a suite whose SuiteConfig sets ExclusiveGroup to anything but a string literal or a string constant, of its own package or another: the runner schedules by the group before anything runs. The error is located at the value and names the forms it accepts.
+
+#### Scenario: A group read at run time
+- **WHEN** a suite's ExclusiveGroup is neither a string literal nor a string constant
+- **THEN** fails with exit 2, located at the value, naming the forms it accepts
+
+### Requirement: Selecting groups
+--group=<name> SHALL narrow a run to the suites of that ExclusiveGroup and --skip-group=<name> SHALL leave that group's suites out; both repeat. Shared fixtures SHALL follow the selection: one no selected suite reads never starts. A name no suite declares SHALL exit 2 before any build, naming the known groups; summary and spec with --input, and spec --static, SHALL refuse both flags with exit 2.
+
+#### Scenario: Only one group
+- **WHEN** --group=e2e is given
+- **THEN** runs only the e2e group's suites and starts only their fixtures
+
+#### Scenario: All but one group
+- **WHEN** --skip-group=e2e is given
+- **THEN** runs every suite outside the e2e group and starts none of its fixtures
+
+#### Scenario: A group nobody declares
+- **WHEN** --group or --skip-group names a group no suite declares
+- **THEN** exits 2 before any build, naming the known groups
+
+#### Scenario: A command that runs nothing
+- **WHEN** --group or --skip-group is given to a command that runs no suite
+- **THEN** exits 2, saying the command runs nothing
+
+### Requirement: Groups in the summary
+gotest summary SHALL print one line per named ExclusiveGroup that ran, with its suites and its wall time from its first suite's start to its last suite's end, in its terminal and Markdown summaries and the GitHub step summary, and its JSON document SHALL carry a matching groups entry. A group none of whose suites ran, all stopped or given up, SHALL have neither.
+
+#### Scenario: A summary of grouped suites
+- **WHEN** gotest summary runs suites of named groups
+- **THEN** prints one line per named group with its suites and wall time
+- **AND** prints the same lines in the Markdown summary and the GitHub step summary
+- **AND** puts a groups entry with each group's suites and wall time in the JSON summary
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

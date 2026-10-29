@@ -50,10 +50,16 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	if input != "" {
+		if refuseGroups(own, "--input") {
+			return 2
+		}
 		return runSpecFromInput(input, format, output, noColor, renderOnly)
 	}
 
 	if own.Bool("--static") {
+		if refuseGroups(own, "--static") {
+			return 2
+		}
 		// The specification is written in the source; reading it should not
 		// require executing it.
 		return runStaticSpec(own, goTestArgs, &inv.Config, format, output, noColor)
@@ -127,6 +133,8 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,
+		Groups:          cfg.Groups,
+		SkipGroups:      cfg.SkipGroups,
 	}, overlay)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

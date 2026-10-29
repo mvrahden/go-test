@@ -106,6 +106,8 @@ Flags (gotest — use --double-dash):
                           halved under -race/-msan/-asan)
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
+  --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
+  --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
   --no-harvest            Disable fuzz seed harvesting for this run
 
 Flags (go test — use -single-dash, forwarded automatically):
@@ -174,6 +176,8 @@ Flags:
                           halved under -race/-msan/-asan)
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
+  --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
+  --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
 
 All standard go test flags (-single-dash) are forwarded automatically; -run also
 takes a Fuzz<Suite>_<Method> wrapper name, -p caps the suite processes, -exec wraps
@@ -259,6 +263,8 @@ Flags:
                           halved under -race/-msan/-asan)
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
+  --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
+  --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
 
 Examples:
   gotest spec ./...                                Run and render spec
@@ -324,6 +330,8 @@ Flags:
                           halved under -race/-msan/-asan)
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
+  --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
+  --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
 
 GitHub CI mode (--github):
   Emits ::error annotations for each failure, showing inline on PR diffs.

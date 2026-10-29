@@ -1,6 +1,10 @@
 package main
 
-import "maps"
+import (
+	"fmt"
+	"maps"
+	"os"
+)
 
 // FlagKind indicates how a flag consumes arguments.
 type FlagKind int
@@ -8,6 +12,8 @@ type FlagKind int
 const (
 	BoolFlag FlagKind = iota + 1
 	ValueFlag
+	// ListFlag is a value flag that may repeat: every occurrence counts.
+	ListFlag
 )
 
 // gotestFlags is the central registry of all gotest-specific flags.
@@ -46,19 +52,22 @@ var gotestFlags = map[string]FlagKind{
 	"--fuzz":       BoolFlag,
 	"--dry-run":    BoolFlag,
 	"--dir":        ValueFlag,
+
+	"--group":      ListFlag,
+	"--skip-group": ListFlag,
 }
 
 var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
-	"--no-harvest", "--events-file",
+	"--no-harvest", "--events-file", "--group", "--skip-group",
 )
 
 var specAllowed = flagSet(
 	"--debug", "--ci", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--render-only",
-	"--static",
+	"--static", "--group", "--skip-group",
 )
 
 var summaryAllowed = flagSet(
@@ -66,6 +75,7 @@ var summaryAllowed = flagSet(
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--github",
 	"--coverage", "--render-only", "--badge", "--events-file",
+	"--group", "--skip-group",
 )
 
 var watchAllowed = flagSet(
@@ -105,6 +115,7 @@ func flagSet(names ...string) map[string]bool {
 // be empty when it was given as --name=.
 type OwnFlags struct {
 	values map[string]string
+	lists  map[string][]string
 }
 
 func (f *OwnFlags) set(name, value string) {
@@ -113,6 +124,27 @@ func (f *OwnFlags) set(name, value string) {
 	}
 	f.values[name] = value
 }
+
+func (f *OwnFlags) add(name, value string) {
+	f.set(name, value)
+	if f.lists == nil {
+		f.lists = map[string][]string{}
+	}
+	f.lists[name] = append(f.lists[name], value)
+}
+
+// refuseGroups reports, on stderr, --group or --skip-group given where mode
+// runs no suite.
+func refuseGroups(own OwnFlags, mode string) bool {
+	if !own.Given("--group") && !own.Given("--skip-group") {
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "FAIL: --group and --skip-group select the suites a run runs, and %s runs nothing\n", mode)
+	return true
+}
+
+// Values is every value a repeatable flag was given, in order.
+func (f OwnFlags) Values(name string) []string { return f.lists[name] }
 
 // Given reports whether the flag appeared at all.
 func (f OwnFlags) Given(name string) bool {

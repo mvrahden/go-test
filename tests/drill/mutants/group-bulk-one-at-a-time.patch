@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/lifecycle .* / runs the suites of e2e beside each other, two 1s suites within 1.8s \(
+Clause: when suites of the default group, of a group e2e and of a later group run → runs the suites of e2e beside each other, two 1s suites within 1.8s
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -1036,6 +1036,7 @@
+ 					defer func() { <-sem }()
+ 					runDeferred(t, idx)
+ 				}(d.t, d.idx)
++				scopeWg.Wait()
+ 			}
+ 			scopeWg.Wait()
+ 			if left -= len(bulk); left == 0 && len(bulk) > 0 {

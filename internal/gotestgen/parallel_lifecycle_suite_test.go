@@ -2,6 +2,8 @@ package gotestgen_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,17 +87,7 @@ func runGeneratedSuiteEnv(t *gotest.T, name string, limit time.Duration, env []s
 	// Compile and run as two steps. A combined `go test` would fold build time
 	// into the measurement even though -timeout only governs execution, and a
 	// compile error would be indistinguishable from a failing suite.
-	bin := filepath.Join(t.TempDir(), "suite.test")
-	if runtime.GOOS == "windows" {
-		bin += ".exe"
-	}
-	buildArgs := []string{"test", "-c", "-o", bin}
-	if raceEnabled {
-		buildArgs = append(buildArgs, "-race")
-	}
-	buildArgs = append(buildArgs, ".")
-
-	buildOut, buildErr := writeAndBuild(dir, source, buildArgs)
+	bin, buildOut, buildErr := buildHarness(dir, source)
 	gotest.NoError(t, buildErr, "compiling the generated harness failed:\n%s", buildOut)
 
 	ctx, cancel := context.WithTimeout(context.Background(), childWallClock)
@@ -121,6 +113,39 @@ func runGeneratedSuiteEnv(t *gotest.T, name string, limit time.Duration, env []s
 // rewriting the file while another method compiles it hands the compiler an
 // empty file ("expected 'package', found 'EOF'").
 var harnessLocks sync.Map // dir -> *sync.Mutex
+
+// harnessBuilds holds each harness's compile, keyed by its directory and
+// source: every run of the same harness after the first reuses the binary.
+var harnessBuilds sync.Map // dir + source hash -> *harnessBuild
+
+type harnessBuild struct {
+	once sync.Once
+	bin  string
+	out  []byte
+	err  error
+}
+
+// buildHarness compiles the harness for dir once per source and returns the
+// binary, which lives beside the throwaway module's packages until TestMain
+// removes it.
+func buildHarness(dir, source string) (bin string, out []byte, err error) {
+	sum := sha256.Sum256([]byte(source))
+	key := dir + "\x00" + hex.EncodeToString(sum[:])
+	b, _ := harnessBuilds.LoadOrStore(key, &harnessBuild{})
+	build := b.(*harnessBuild)
+	build.once.Do(func() {
+		build.bin = filepath.Join(filepath.Dir(dir), ".bin", filepath.Base(dir)+"-"+hex.EncodeToString(sum[:6])+".test")
+		if runtime.GOOS == "windows" {
+			build.bin += ".exe"
+		}
+		args := []string{"test", "-c", "-o", build.bin}
+		if raceEnabled {
+			args = append(args, "-race")
+		}
+		build.out, build.err = writeAndBuild(dir, source, append(args, "."))
+	})
+	return build.bin, build.out, build.err
+}
 
 // writeAndBuild writes the harness into dir and compiles the package, holding
 // dir's lock for both.

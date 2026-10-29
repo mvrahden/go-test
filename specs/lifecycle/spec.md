@@ -1,7 +1,7 @@
 # Lifecycle Specification
 
 ## Purpose
-How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, and what the run reports about them when they do.
+How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, the order ExclusiveGroups run suites in, and what the run reports about them when they do.
 
 ## Requirements
 
@@ -197,6 +197,27 @@ A run stopped while a benchmark or a fuzz seed runs SHALL skip the benchmarks or
 #### Scenario: Stopped during a fuzz seed
 - **WHEN** the run is stopped while a fuzz seed replays
 - **THEN** skips the seeds not started with the reason run stopping, then runs AfterAll before the fixture is released
+
+### Requirement: Exclusive groups
+A run SHALL dispatch its suites in scopes that never overlap in time: the default group first, then each named ExclusiveGroup by name. A scope SHALL run its suites in parallel, up to the run's process budget, then its Exclusive suites one at a time. A shared fixture only a later group reads SHALL start at that group's start and be released at its last use. With no group declared, the run is the one-scope case of today.
+
+#### Scenario: Three groups
+- **WHEN** suites of the default group, of a group e2e and of a later group run
+- **THEN** runs no suite of e2e beside a suite outside it
+- **AND** runs the suites of e2e beside each other, two 1s suites within 1.8s
+- **AND** runs e2e's Exclusive suite alone, after the group's other suites and before the next group
+
+#### Scenario: A group's shared fixture
+- **WHEN** a shared fixture only the e2e group reads, while another e2e suite outlasts its reader
+- **THEN** starts it after the default group ran, and releases it once its reader finished, while the group still runs
+
+### Requirement: A stop during a group
+A run stopped while a group runs SHALL skip every suite not started, the later groups' included, with the reason run stopping, start none of their shared fixtures, and release the ones it started, leaving no fixture process behind.
+
+#### Scenario: Stopped while e2e runs
+- **WHEN** a run is stopped while a suite of the e2e group runs
+- **THEN** skips the later group's suites with the reason run stopping
+- **AND** starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
 
 ### Requirement: Stopping a run
 A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the signal.

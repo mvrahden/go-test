@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / puts a groups entry with each group's suites and wall time in the JSON summary \(
+Clause: when gotest summary runs suites of named groups → puts a groups entry with each group's suites and wall time in the JSON summary
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -99,7 +99,7 @@
+ 	}
+ 
+ 	for _, g := range cfg.groups {
+-		root.Groups = append(root.Groups, jsonGroup{Name: g.Name, Suites: g.Suites, Wall: g.Wall.Seconds()})
++		_ = g
+ 	}
+ 
+ 	enc := json.NewEncoder(w)

@@ -507,6 +507,7 @@ lint:
           <tr><td><code>FailFast</code></td><td>false</td><td>Stop the suite on first failure.</td></tr>
           <tr><td><code>Parallel</code></td><td>false</td><td>Run test methods concurrently.</td></tr>
           <tr><td><code>Exclusive</code></td><td>false</td><td>Schedule the suite's process strictly alone — after every non-exclusive suite has finished, one exclusive suite at a time. For wall-clock-sensitive or resource-contended suites.</td></tr>
+          <tr><td><code>ExclusiveGroup</code></td><td>""</td><td>Run the suite in a named group: the default group first, then each named group by name, never two at once; a group's suites run in parallel, its <code>Exclusive</code> suites after them. A string literal or string constant.</td></tr>
         </tbody>
       </table>
 
@@ -701,6 +702,8 @@ percentage = covered / total</div>
           <tr><td><code>--timeout=&lt;dur&gt;</code></td><td>Global pipeline deadline (default: 15m, <code>0</code> to disable).</td></tr>
           <tr><td><code>--parallel=&lt;n&gt;</code></td><td>Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
           <tr><td><code>--compile-parallel=&lt;n&gt;</code></td><td>Concurrent compilation processes (default: NumCPU, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
+          <tr><td><code>--group=&lt;name&gt;</code></td><td>Run only the suites of this <code>ExclusiveGroup</code>; repeatable. An unknown name exits 2 before any build.</td></tr>
+          <tr><td><code>--skip-group=&lt;name&gt;</code></td><td>Leave the suites of this <code>ExclusiveGroup</code> out; repeatable.</td></tr>
           <tr><td><code>--save=&lt;path&gt;</code></td><td>Save a benchmark run as a JSON baseline (<code>bench</code>).</td></tr>
           <tr><td><code>--against=&lt;path&gt;</code></td><td>Compare a benchmark run against a saved baseline and print the delta table (<code>bench</code>).</td></tr>
           <tr><td><code>--gate=&lt;pct&gt;</code></td><td>Fail if the worst significant benchmark regression exceeds the threshold (<code>bench</code>).</td></tr>

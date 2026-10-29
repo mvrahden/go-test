@@ -279,6 +279,10 @@ func (ts *TestSuiteSpec) IsMethodParallel() bool { return ts.th.ConfigParallel }
 // then dispatches this suite strictly alone, after the parallel bulk.
 func (ts *TestSuiteSpec) IsExclusive() bool { return ts.th.ConfigExclusive }
 
+// ExclusiveGroup is SuiteConfig.ExclusiveGroup: the group the runner
+// schedules the suite in, "" for the default group.
+func (ts *TestSuiteSpec) ExclusiveGroup() string { return ts.th.ConfigGroup }
+
 // HasReturningBeforeEach returns true when BeforeEach is defined and returns a context value.
 //
 // FOR RENDERING
@@ -368,6 +372,8 @@ type TestSuiteHarness struct {
 	// ConfigExclusive mirrors SuiteConfig.Exclusive, resolved statically so
 	// the runner can schedule the suite outside the parallel bulk.
 	ConfigExclusive bool
+	// ConfigGroup mirrors SuiteConfig.ExclusiveGroup, resolved statically.
+	ConfigGroup string
 }
 
 type TestSuiteMethod struct {
@@ -443,6 +449,7 @@ const suiteConfigBodyErr = "SuiteConfig method body must return a gotest.SuiteCo
 type staticSuiteConfig struct {
 	Parallel  bool
 	Exclusive bool
+	Group     string
 }
 
 func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (cfg staticSuiteConfig, err error) {
@@ -457,6 +464,8 @@ func parseSuiteConfigAST(pkg *packages.Package, funcDecl *ast.FuncDecl) (cfg sta
 			cfg.Parallel, _ = boolLiteral(value)
 		case "Exclusive":
 			cfg.Exclusive, _ = boolLiteral(value)
+		case "ExclusiveGroup":
+			cfg.Group, _ = stringConstant(pkg.TypesInfo, value)
 		}
 	}
 	for _, kv := range body.Fields {
@@ -639,6 +648,7 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		}
 		s.th.ConfigParallel = staticCfg.Parallel
 		s.th.ConfigExclusive = staticCfg.Exclusive
+		s.th.ConfigGroup = staticCfg.Group
 		return -1, nil
 	}
 

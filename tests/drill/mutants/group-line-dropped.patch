@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / prints one line per named group with its suites and wall time \(
+Clause: when gotest summary runs suites of named groups → prints one line per named group with its suites and wall time
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -151,9 +151,6 @@
+ 
+ // renderGroups prints one line per named group.
+ func renderGroups(w io.Writer, groups []GroupRun, c colors) { //nolint:gocritic // hugeParam: as renderSummary
+-	for _, g := range groups {
+-		fmt.Fprintf(w, "%s%s%s\n", c.dim, groupLine(g), c.reset)
+-	}
+ }
+ 
+ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOption) {

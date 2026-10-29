@@ -43,9 +43,12 @@ func (s *ConcurrencyTestSuite) TestExclusiveDispatch(t *gotest.T) {
 				{SuiteSpec: gotestrunner.SuiteSpec{Package: "a", SuiteName: "TestB"}},
 				{SuiteSpec: gotestrunner.SuiteSpec{Package: "a", SuiteName: "TestA"}},
 			}
-			idx := []int{0, 1, 2}
-			gotestrunner.ExportSortTargetIndices(targets, idx)
-			gotest.Equal(it, []int{2, 1, 0}, idx)
+			sorted := gotestrunner.ExportSortDeferred(targets)
+			var names []string
+			for i := range sorted {
+				names = append(names, sorted[i].Package+"."+sorted[i].SuiteName)
+			}
+			gotest.Equal(it, []string{"a.TestA", "a.TestB", "b.TestZ"}, names)
 		})
 	})
 }

@@ -340,8 +340,14 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite; go test's `-p N` caps how many suite processes run at once — for suites whose verdicts measure wall-clock behavior or contend for resources).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite of its group; go test's `-p N` caps how many suite processes run at once — for suites whose verdicts measure wall-clock behavior or contend for resources), `ExclusiveGroup` (a named group run apart from every other suite).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
+
+`ExclusiveGroup: "e2e"` is for suites that must not share the machine with the rest of the run but may share it with each other, such as E2E suites against one stack.
+The default group runs first, then each named group by name; a group's suites run in parallel, its `Exclusive` suites after them, and a shared fixture only the group reads starts at the group's start and is released at its last use; the group that runs first, such as the only one `--group` selects, starts its fixtures beside compilation, as the default group does ([Exclusive groups](specs/lifecycle/spec.md#requirement-exclusive-groups)).
+The value is a string literal or a string constant, from any package; the generator refuses anything else ([A group that is not a constant](specs/cli/spec.md#requirement-a-group-that-is-not-a-constant)).
+`--group=<name>` and `--skip-group=<name>` run a group alone or leave it out, so CI can give each group a job of its own ([Selecting groups](specs/cli/spec.md#requirement-selecting-groups)).
+Group only what needs isolation: a group no longer overlaps the rest of the run, so the run takes longer.
 
 A duration the returned config leaves at zero (omitted or explicit) behaves as if the
 marker were absent: it gets the default. `gotest.NoDeadline` (any negative duration)

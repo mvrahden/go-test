@@ -310,6 +310,10 @@ shards of one run do not add up to every mutant exactly once.
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |
 | `snapshot-always-matches` | `MatchSnapshot` never reports a differing value | canary: the `snapshotting` fixture's `fail` row vanishes from the golden list |
 | `exclusive-runs-in-bulk` | the dispatcher never defers an Exclusive suite past the bulk | canary: the `exclusive` fixture's window stamps overlap |
+| `group-streams-with-the-default` | a named group's suites stream with the default group's | lifecycle conformance: an e2e suite runs beside a default suite |
+| `group-bulk-one-at-a-time` | a later group runs its suites one after another | lifecycle conformance: two 1s e2e suites do not overlap |
+| `group-exclusive-in-the-bulk` | a named group's Exclusive suites run beside its other suites | lifecycle conformance: the e2e Exclusive suite starts before the others end |
+| `group-fixture-up-front` | every shared fixture starts up front, a later group's included | lifecycle conformance: the e2e fixture is up before the default group ends |
 | `teardown-error-dropped-after-setup-failure` | a teardown that returned no error is not failed by an `AfterAll` report, as when another fixture's setup failure claimed the process's exit status | gotestrunner `TeardownVerdict`: the `AfterAll` report fails nothing |
 | `teardown-reports-dropped-from-the-verdict` | a teardown error goes out without the `AfterAll` reports that say why | teardown verdict unit test: a teardown error comes back without the reports |
 | `bench-gate-passes-on-nothing` | a bench gate with no benchmark in both the baseline and the run passes | canary: the gate against a foreign baseline exits 0 instead of 1 |
@@ -328,6 +332,9 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-skips-stdlib-note` | spec runs without noting the stdlib tests it left to go test | cli conformance: spec's stderr lacks the stdlib note |
 | `color-codes-into-pipe` | color follows only `--no-color` and `NO_COLOR`, never the terminal | cli conformance: summary into a pipe prints color codes |
 | `json-summary-annotated` | summary writes GitHub annotations after a JSON document too | cli conformance: the JSON summary inside GitHub Actions carries `::error` |
+| `group-line-dropped` | the terminal summary prints no line for a named group | cli conformance: no `group e2e: …, run apart` line |
+| `group-json-entry-dropped` | the JSON summary carries no groups entry | cli conformance: the document has no group |
+| `group-markdown-lines-dropped` | the Markdown and GitHub step summaries list no named group | cli conformance: no `- group e2e: …, run apart` line in either |
 | `summary-accepts-json-flag` | summary takes `-json` beside its terminal format | cli conformance: `summary -json` is not refused with exit 2 |
 | `misspelled-command-runs` | a word one edit from a subcommand is not suggested | cli conformance: `sumary` runs instead of suggesting `summary` |
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
@@ -403,6 +410,10 @@ shards of one run do not add up to every mutant exactly once.
 | `skip-of-every-wrapper-keeps-a-testless-suite` | a `-skip` naming every fuzz wrapper never drops a suite without test methods, judged by a Test function it lacks | fuzz conformance: the suite's shared fixture starts |
 | `skip-of-the-test-function-drops-the-seeds` | a `-skip` naming a suite's Test function drops the suite, fuzz seeds included | fuzz conformance: the seed replay has no pass verdict |
 | `skip-pattern-left-unchecked` | a `-skip` pattern is not checked before the run, so one go test rejects runs nothing and passes | cli conformance: the pattern is not refused with exit 2 |
+| `group-flag-ignored` | `--group` selects nothing, so every group runs | cli conformance: `--group=e2e` runs the default and load groups and starts their fixtures |
+| `skip-group-ignored` | `--skip-group` leaves nothing out | cli conformance: `--skip-group=e2e` runs the e2e suites and starts their fixture |
+| `unknown-group-checked-after-build` | an unknown group name is refused only after the run built and ran | cli conformance: the run leaves test binaries in its work dir before exit 2 |
+| `group-flags-ignored-where-nothing-runs` | `--group` and `--skip-group` are taken silently by `summary --input`, `spec --input` and `spec --static` | cli conformance: `summary --input --group=e2e` does not exit 2 saying it runs nothing |
 | `suite-ended-on-its-own-left-running` | what a suite process that ended on its own left open stays counted as running | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `sync-internals-shown` | values of package sync render their bookkeeping fields | ring-0 equal suite |
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
@@ -452,6 +463,8 @@ shards of one run do not add up to every mutant exactly once.
 | `stop-grace-skips-beforeall` | a stop gives a `BeforeAll` that ignores its context no grace, so the run waits out the release bound | canary: the stopgrace hung `BeforeAll` is not cut short after 5s |
 | `stop-grace-skips-late-bodies` | a body that starts after the stop gets no grace and is never cut short | canary: the stopgrace late body is not cut short 5s after it began |
 | `stop-ends-the-aftereach-context` | a method's AfterEach gets the method's context, which the stop has ended | canary: the stopgrace AfterEach sees its context end instead of running to its end |
+| `stopped-suite-fails-silently` | a suite a stop kept from starting is booked as failed, with no skip and no reason | lifecycle conformance: the later group's suite is not skipped with `run stopping` |
+| `group-starts-after-a-stop` | a group's shared fixtures start at its turn even after a stop | lifecycle conformance: the later group's fixture comes up after the stop |
 | `forced-release-gets-no-time` | a forced stop leaves the release none of the bound, so the fixtures are cut off mid-teardown | canary: the stopgrace slow release never ends |
 | `second-signal-waits-out-the-grace` | a second stop signal is ignored while the grace runs | canary: the stopgrace fixture is not released at once on the second signal |
 | `stop-runs-the-benchmarks-not-started` | a stopped benchmark run still starts the benchmarks not started | canary: the stopbench second benchmark runs |
@@ -522,6 +535,7 @@ shards of one run do not add up to every mutant exactly once.
 | `events-file-replaces-output` | the `--events-file` file takes the event stream instead of sharing it with the run's own output | cli conformance: the summary, annotations and step summary differ from a run without the flag |
 | `events-file-held-until-exit` | the `--events-file` file is buffered in memory and written only when the CLI exits | cli conformance: a CLI killed mid-run leaves the events of the suites that had ended out of the file |
 | `events-file-open-error-ignored` | a `--events-file` path that cannot be created is ignored and the run goes on | cli conformance: the run builds its packages instead of exiting 2 at once |
+| `group-expr-accepted` | an `ExclusiveGroup` the generator cannot resolve is read as the default group | cli conformance: the suite runs instead of exit 2 naming the accepted forms |
 
 ## Adding a mutant
 

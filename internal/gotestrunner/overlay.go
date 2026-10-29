@@ -32,6 +32,11 @@ type OverlayResult struct {
 	StdlibTestsByPkg     map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
 	SuitesByPkg          map[string][]string
 	ExclusiveSuitesByPkg map[string]map[string]bool
+	// GroupsByPkg is, per package, the named group of each suite declaring
+	// one (SuiteConfig.ExclusiveGroup); a suite absent is in the default group.
+	GroupsByPkg map[string]map[string]string
+	// groups is the run's --group and --skip-group selection.
+	groups groupSelection
 	// TestlessSuitesByPkg marks the suites with no Test function: they run
 	// for their fuzz seeds alone.
 	TestlessSuitesByPkg map[string]map[string]bool
@@ -100,6 +105,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	dirsByPkg := map[string]string{}
 	skippedSuitesByPkg := map[string][]string{}
 	exclusiveSuitesByPkg := map[string]map[string]bool{}
+	groupsByPkg := map[string]map[string]string{}
 	testlessSuitesByPkg := map[string]map[string]bool{}
 	fixtureDepSuites := map[string]map[string]bool{}
 	suiteReqKeys := map[string]map[string][]string{}
@@ -141,6 +147,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 			}
 			exclusiveSuitesByPkg[r.PkgPath] = ex
 		}
+		if len(r.GroupBySuite) > 0 {
+			groupsByPkg[r.PkgPath] = r.GroupBySuite
+		}
 		if len(r.TestlessSuiteNames) > 0 {
 			tl := make(map[string]bool, len(r.TestlessSuiteNames))
 			for _, name := range r.TestlessSuiteNames {
@@ -172,6 +181,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		StdlibTestsByPkg:               stdlibByPkg,
 		SuitesByPkg:                    suitesByPkg,
 		ExclusiveSuitesByPkg:           exclusiveSuitesByPkg,
+		GroupsByPkg:                    groupsByPkg,
 		TestlessSuitesByPkg:            testlessSuitesByPkg,
 		BenchesByPkg:                   benchesByPkg,
 		FuzzFuncsByPkg:                 fuzzFuncsByPkg,

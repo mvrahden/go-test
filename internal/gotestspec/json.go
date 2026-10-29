@@ -14,6 +14,15 @@ type jsonRoot struct {
 	Version  string        `json:"version"`
 	Packages []jsonPackage `json:"packages"`
 	Stats    jsonStats     `json:"stats"`
+	// Groups is what each named ExclusiveGroup took; absent without one.
+	Groups []jsonGroup `json:"groups,omitempty"`
+}
+
+type jsonGroup struct {
+	Name   string `json:"name"`
+	Suites int    `json:"suites"`
+	// Wall is seconds from the group's first suite start to its last end.
+	Wall float64 `json:"wall"`
 }
 
 type jsonPackage struct {
@@ -62,7 +71,11 @@ type jsonStats struct {
 	FailedPackages int `json:"failedPackages,omitempty"`
 }
 
-func RenderJSON(w io.Writer, packages []*Package) {
+func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
+	var cfg renderConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
 	stats := CollectStats(packages)
 
 	root := jsonRoot{
@@ -83,6 +96,10 @@ func RenderJSON(w io.Writer, packages []*Package) {
 			Nodes:    convertNodes(pkg.Nodes),
 			Output:   output,
 		}
+	}
+
+	for _, g := range cfg.groups {
+		root.Groups = append(root.Groups, jsonGroup{Name: g.Name, Suites: g.Suites, Wall: g.Wall.Seconds()})
 	}
 
 	enc := json.NewEncoder(w)

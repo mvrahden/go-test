@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
+	"regexp"
 )
 
 // SuiteConfigBody is the shape of a SuiteConfig method body the generator
@@ -40,7 +42,7 @@ func (b *SuiteConfigBody) AssignedFields() []string {
 
 // ParseSuiteConfigBody reads the body of a SuiteConfig method. It returns the
 // generator's error for any body the generator rejects, including a
-// non-literal Parallel or Exclusive value.
+// non-literal Parallel or Exclusive value or a non-constant ExclusiveGroup.
 func ParseSuiteConfigBody(info *types.Info, fd *ast.FuncDecl) (*SuiteConfigBody, error) {
 	if fd.Body == nil || len(fd.Body.List) == 0 {
 		return nil, errors.New(suiteConfigBodyErr)
@@ -94,7 +96,7 @@ func ParseSuiteConfigBody(info *types.Info, fd *ast.FuncDecl) (*SuiteConfigBody,
 		if base, ok := sel.X.(*ast.Ident); !ok || base.Name != cfgIdent.Name {
 			return nil, errors.New(suiteConfigBodyErr)
 		}
-		if err := checkStaticValue(sel.Sel.Name, assign.Rhs[0]); err != nil {
+		if err := checkStaticValue(info, sel.Sel.Name, assign.Rhs[0]); err != nil {
 			return nil, err
 		}
 		body.Assigns = append(body.Assigns, assign)
@@ -114,7 +116,7 @@ func (b *SuiteConfigBody) readBase(info *types.Info) error {
 				return fmt.Errorf("SuiteConfig literal must use keyed fields (Field: value) — Parallel and Exclusive are resolved statically from their keys")
 			}
 			if key, ok := kv.Key.(*ast.Ident); ok {
-				if err := checkStaticValue(key.Name, kv.Value); err != nil {
+				if err := checkStaticValue(info, key.Name, kv.Value); err != nil {
 					return err
 				}
 			}
@@ -132,15 +134,45 @@ func (b *SuiteConfigBody) readBase(info *types.Info) error {
 	}
 }
 
-// checkStaticValue requires a boolean literal for Parallel and Exclusive.
-func checkStaticValue(field string, value ast.Expr) error {
-	if field != "Parallel" && field != "Exclusive" {
-		return nil
-	}
-	if _, ok := boolLiteral(value); !ok {
-		return fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", field)
+// checkStaticValue requires a boolean literal for Parallel and Exclusive,
+// and a string constant naming a valid group for ExclusiveGroup.
+func checkStaticValue(info *types.Info, field string, value ast.Expr) error {
+	switch field {
+	case "Parallel", "Exclusive":
+		if _, ok := boolLiteral(value); !ok {
+			return fmt.Errorf("SuiteConfig: %s must be assigned a boolean literal — the generator resolves it statically", field)
+		}
+	case "ExclusiveGroup":
+		name, ok := stringConstant(info, value)
+		if !ok {
+			return errors.New("SuiteConfig: ExclusiveGroup must be a string literal or a string constant, of this package or another — the generator resolves it statically")
+		}
+		if name != "" && !groupName.MatchString(name) {
+			return fmt.Errorf("SuiteConfig: ExclusiveGroup %q may use only A-Z, a-z, 0-9, _ and -", name)
+		}
 	}
 	return nil
+}
+
+// groupName is the alphabet of a named group.
+var groupName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// stringConstant reads a constant string expression: a literal, or a
+// constant the type checker evaluated, imported ones included.
+func stringConstant(info *types.Info, value ast.Expr) (string, bool) {
+	if info != nil {
+		if tv, ok := info.Types[value]; ok && tv.Value != nil && tv.Value.Kind() == constant.String {
+			return constant.StringVal(tv.Value), true
+		}
+		return "", false
+	}
+	if lit, ok := value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+		v := constant.MakeFromLiteral(lit.Value, token.STRING, 0)
+		if v.Kind() == constant.String {
+			return constant.StringVal(v), true
+		}
+	}
+	return "", false
 }
 
 // boolLiteral reads a `true` or `false` identifier.

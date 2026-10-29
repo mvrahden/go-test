@@ -33,6 +33,7 @@ type GenerateResult struct {
 	FuzzParamsByFunc               map[string][]string // generated fuzz func name → corpus type of each value the engine feeds it
 	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	ExclusiveSuiteNames            []string            // identifiers of suites with SuiteConfig{Exclusive: true} — dispatched alone, after the parallel bulk
+	GroupBySuite                   map[string]string   // suite identifier → SuiteConfig.ExclusiveGroup, for suites in a named group
 	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
 	SuiteRequiredSharedFixtureKeys map[string][]string // test func name → required state keys
 	StdlibTestCount                int                 // stdlib func TestX(*testing.T) declarations — reported, never run by gotest
@@ -544,6 +545,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		var testlessNames []string
 		var caselessSkipped []string
 		exclusiveSeen := map[string]bool{}
+		var groupBySuite map[string]string
 		for _, effective := range []gotestast.TestSuiteSpecSet{ptestSpec.EffectiveTestSuites, pxtestSpec.EffectiveTestSuites} {
 			for _, s := range effective {
 				id := s.Identifier()
@@ -566,6 +568,12 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 				if s.IsExclusive() && !exclusiveSeen[id] {
 					exclusiveSeen[id] = true
 					exclusiveNames = append(exclusiveNames, id)
+				}
+				if g := s.ExclusiveGroup(); g != "" {
+					if groupBySuite == nil {
+						groupBySuite = map[string]string{}
+					}
+					groupBySuite[id] = g
 				}
 			}
 		}
@@ -674,6 +682,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			FuzzParamsByFunc:               fuzzParamsResult,
 			SkippedSuiteNames:              skippedNames,
 			ExclusiveSuiteNames:            exclusiveNames,
+			GroupBySuite:                   groupBySuite,
 			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
 			SuiteRequiredSharedFixtureKeys: mergedReqKeys,
 			StdlibTestCount:                countStdlibTests(lr.Ptest, lr.Pxtest),
