@@ -21,8 +21,6 @@ type GroupsTestSuite struct {
 }
 
 func (s *GroupsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// A run of about 3s plus its build, twice that cold under -race; the CLI
-	// build takes ~45s on Windows CI.
 	return gotest.SuiteConfig{Exclusive: true, Timeout: time.Minute, SetupTimeout: 90 * time.Second}
 }
 

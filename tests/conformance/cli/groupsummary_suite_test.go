@@ -16,7 +16,6 @@ import (
 type CLIGroupSummaryTestSuite struct{}
 
 func (s *CLIGroupSummaryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Three runs of about 3s plus their build, twice that cold under -race.
 	return gotest.SuiteConfig{Timeout: 2 * time.Minute}
 }
 
