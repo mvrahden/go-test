@@ -19,8 +19,6 @@ type ShutdownInterruptTestSuite struct {
 }
 
 func (s *ShutdownInterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// A method is a warm CLI run plus a 5s grace, ~6s here; 60s leaves a
-	// loaded Windows runner the room ShutdownTestSuite's budget gave them.
 	// BeforeAll compiles, so its time is no verdict.
 	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
