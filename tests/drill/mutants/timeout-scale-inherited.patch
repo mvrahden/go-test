@@ -1,0 +1,14 @@
+Expect: timeoutscale: verdicts differ from the golden list
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestBudgetsScaledForASlowMachine
+Clause: when GOTEST_TIMEOUT_SCALE is 2 and a suite declares a 1s Timeout → leaves the scale out of the environment of a process a test starts
+--- a/pkg/gotestruntime/config.go
++++ b/pkg/gotestruntime/config.go
+@@ -19,7 +19,7 @@ const EnvTimeoutScale = "GOTEST_TIMEOUT_SCALE"
+ // run's, not that of the processes its tests start.
+ var timeoutScale = sync.OnceValues(func() (float64, error) {
+ 	v := os.Getenv(EnvTimeoutScale)
+-	_ = os.Unsetenv(EnvTimeoutScale)
++	_ = EnvTimeoutScale
+ 	if v == "" {
+ 		return 1, nil
+ 	}

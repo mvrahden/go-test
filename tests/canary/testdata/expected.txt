@@ -237,3 +237,17 @@ dagrelease pass TestBulkTestSuite
 dagrelease pass TestBulkTestSuite/TestOne
 dagrelease pass TestTailTestSuite
 dagrelease pass TestTailTestSuite/TestReadsThem
+timeoutscale exit 1
+timeoutscale fail -
+timeoutscale fail TestBudgetedTestSuite
+timeoutscale fail TestBudgetedTestSuite/TestRunsPastTwiceItsTimeout
+timeoutscale fail TestSlowerFixtureBoundTestSuite
+timeoutscale pass TestBudgetedTestSuite/TestRunsHalfPastItsTimeout
+timeoutscale pass TestBudgetedTestSuite/TestStartsAProcess
+timeoutscale pass TestFixtureBoundTestSuite
+timeoutscale pass TestFixtureBoundTestSuite/TestRuns
+timeoutscalefast exit 1
+timeoutscalefast fail -
+timeoutscalefast fail TestBudgetedTestSuite
+timeoutscalefast fail TestFixtureBoundTestSuite
+timeoutscalefast fail TestSlowerFixtureBoundTestSuite

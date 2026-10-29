@@ -308,6 +308,9 @@ shards of one run do not add up to every mutant exactly once.
 | `shared-fixture-each-hooks-accepted` | a shared fixture another package declares with a `BeforeEach` passes generation, and the hook never runs | cli conformance: the cross-package shared fixture row exits 0 instead of 2 |
 | `suite-beforeeach-after-a-fixture-overran` | the suite's `BeforeEach` runs after a fixture's `BeforeEach` overran the `Timeout` | canary: the slow fixture's suite marks its `BeforeEach` |
 | `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a cleanup before AfterAll | canary: the setupwaits `*testing.T` suite does not pass |
+| `timeout-scale-any-value` | a `GOTEST_TIMEOUT_SCALE` that is no number runs the suites unscaled instead of failing them | canary: the `fast` run's methods run instead of failing their suites |
+| `timeout-scale-ignored` | `GOTEST_TIMEOUT_SCALE` multiplies no budget | canary: a 1.5s method and fixture fail their 1s budgets, and the overruns name 1s |
+| `timeout-scale-inherited` | the scale stays in the environment of the processes the tests start | canary: the method reading the environment fails |
 | `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixtures' methods pass instead of failing their budget |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
