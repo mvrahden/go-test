@@ -266,7 +266,7 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 - Name must end with `TestSuite`
 - All methods must use pointer receivers
 - A suite that should run needs at least one `Test*`, `Benchmark*` or `Fuzz*` method; a `*TestSuite` type with none is a helper the generator emits nothing for ([Case-less suites](specs/discovery/spec.md#requirement-case-less-suites)). Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
-- One `type` declaration per suite or fixture: inside a grouped `type ( … )` block it is rejected at its declaration ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
+- One `type` declaration per suite or fixture: inside a grouped `type ( … )` block it is rejected at its declaration; `gotest lint -fix` moves it out ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
 - Never embed a suite (a base suite) in another: it is rejected at the field. Share tests through a generic contract suite instead; embed only plain types, and bind fixtures through named pointer fields ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
 
 ### Test methods
