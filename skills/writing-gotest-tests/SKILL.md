@@ -216,8 +216,8 @@ those are your job, below.
    and fan out per field; the refused
    shapes and the crasher loop are in `reference/fuzzing.md`. Search with
    `go tool gotest fuzz --for=30s ./...`; a crasher becomes a seed through
-   `gotest fuzz promote` right after that session (v1.34+: promote takes
-   only the crashers the latest session wrote), never a hand-committed
+   `gotest fuzz promote` right after that session (v1.36+: promote takes
+   only the crashers the latest session of their target wrote), never a hand-committed
    corpus file for a struct target. Benchmarks are suite methods too:
    `func (s *XTestSuite) BenchmarkParse(b *gotest.B)` with the measured
    work inside `for b.Loop() { … }` (`reference/cli.md`).
