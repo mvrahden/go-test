@@ -291,6 +291,11 @@ func (s *ArgsTestSuite) TestHasVerboseFlag(t *gotest.T) {
 		{"-v=true present", []string{"-v=true", "-timeout=10m"}, true},
 		{"-v=false is not verbose", []string{"-v=false"}, false},
 		{"-verbose is not -v", []string{"-verbose"}, false},
+		{"the last -v wins over an earlier one", []string{"-v", "-v=false"}, false},
+		{"a later -v wins over -v=false", []string{"-v=false", "-v"}, true},
+		{"-v after -args is the binary's", []string{"-args", "-v"}, false},
+		{"-test.v is -v", []string{"-test.v=true"}, true},
+		{"-v=test2json is verbose", []string{"-v=test2json"}, true},
 	}) {
 		got := gotestrunner.HasVerboseFlag(tc.flags)
 		gotest.Equal(sub, tc.expect, got)

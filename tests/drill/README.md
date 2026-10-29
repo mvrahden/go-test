@@ -430,6 +430,7 @@ shards of one run do not add up to every mutant exactly once.
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
 | `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |
 | `unsigned-as-hex` | unsigned integers render in hex | ring-0 format suite |
+| `verbose-first-v-sticks` | the first `-v` decides verbosity, so `-v -v=false` still prints verbose output | cli conformance: the last `-v` wins |
 | `waiting-test-named-by-the-timeout` | a parallel test still waiting for a slot counts as running | lifecycle conformance: the `--timeout` names the queued methods besides the one holding the slot |
 | `watch-ends-before-fixture-aftereach` | a method's budget watch ends before its fixtures' `AfterEach` hooks run | canary: the method whose fixture `AfterEach` sleeps past the `Timeout` passes |
 | `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |

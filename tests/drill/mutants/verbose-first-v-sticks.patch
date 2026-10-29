@@ -1,0 +1,13 @@
+Judge: ./tests/conformance/cli CLIGoTestFlagsTestSuite/TestOwnedGoTestFlags/a_go_test_flag_gotest_implements_itself_is_given/keeps_the_meaning_go_test_gives_the_flag,_or_refuses_it_with_a_reason/the_last_-v_wins
+Expect: ^FAIL .*conformance/cli .* / keeps the meaning go test gives the flag, or refuses it with a reason / the last -v wins \(
+--- a/internal/gotestrunner/args.go
++++ b/internal/gotestrunner/args.go
+@@ -390,7 +390,7 @@
+ 			continue
+ 		}
+ 		b, err := strconv.ParseBool(value)
+-		verbose = b || err != nil
++		verbose = verbose || b || err != nil
+ 	}
+ 	return verbose
+ }

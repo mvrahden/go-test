@@ -4160,6 +4160,19 @@
                           "output": [],
                           "status": "none",
                           "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the last -v wins",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_last_-v_wins",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
                         }
                       ],
                       "display": "keeps the meaning go test gives the flag, or refuses it with a reason",
@@ -12892,7 +12905,7 @@
     }
   ],
   "stats": {
-    "behaviors": 421,
+    "behaviors": 422,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
