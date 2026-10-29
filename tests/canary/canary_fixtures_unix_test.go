@@ -21,8 +21,9 @@ import (
 // descriptor nor the variable naming it, and the run does not wait for it.
 // Timed from the started process's first write, so the builds before it are
 // not counted.
-func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) {
-	dir := s.check(t, "detachedchild")
+func (s *CanaryDagTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) {
+	r := s.check(t, "detachedchild")
+	dir := r.dir
 	ended := time.Now()
 	if data, err := os.ReadFile(filepath.Join(dir, "detached-pid")); err == nil {
 		if pid, err := strconv.Atoi(string(data)); err == nil {
@@ -33,7 +34,7 @@ func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) 
 	if !slices.Contains(got, "env=") {
 		t.Errorf("detachedchild: the started process saw the protocol variable: markers %v", got)
 	}
-	if strings.Contains(s.lastStream, "written by a process the fixture started") {
+	if strings.Contains(r.stream, "written by a process the fixture started") {
 		t.Errorf("detachedchild: what the started process wrote to descriptor 3 was read")
 	}
 	if ready, err := os.Stat(filepath.Join(dir, "detached-ready")); err == nil {
@@ -45,7 +46,7 @@ func (s *CanaryTestSuite) TestAProcessTheSetupStartsGetsNoProtocol(t *gotest.T) 
 
 // The CLI killed while a shared fixture is up: the fixture process releases
 // it, its AfterAll running to its end, then exits.
-func (s *CanaryTestSuite) TestAKilledCLIsFixtureStillReleases(t *gotest.T) {
+func (s *CanaryDagTestSuite) TestAKilledCLIsFixtureStillReleases(t *gotest.T) {
 	dir := t.TempDir()
 	cmd := exec.Command(s.binary, "-json", "./testdata/killedcli/") //nolint:gosec // G204: controlled binary with fixed args
 	cmd.Env = childEnv(dir)

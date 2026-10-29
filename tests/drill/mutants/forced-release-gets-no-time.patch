@@ -1,5 +1,5 @@
 Expect: stopgrace: markers .*, want the forced release to run to its end
-Judge: ./tests/canary CanaryTestSuite/TestAForcedStopLeavesTheReleaseItsTime
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestAForcedStopLeavesTheReleaseItsTime
 Clause: when the run is stopped and an AfterEach ignores its context until only the fixtures' teardown time is left of the release bound → forces the stop, saying so, and runs the fixture teardown to its end
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go

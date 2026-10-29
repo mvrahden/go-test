@@ -1,5 +1,5 @@
 Expect: stopbench: markers .*, want the second benchmark skipped as run stopping
-Judge: ./tests/canary CanaryTestSuite/TestAStopSkipsTheBenchmarksNotStarted
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestAStopSkipsTheBenchmarksNotStarted
 Clause: when the run is stopped while a benchmark runs → skips the benchmarks not started with the reason run stopping, then runs AfterAll before the fixture is released
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go

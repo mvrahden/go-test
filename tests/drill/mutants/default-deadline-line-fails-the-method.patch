@@ -1,5 +1,5 @@
 Expect: defaultdeadline: verdicts differ from the golden list
-Judge: ./tests/canary CanaryTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestAContextTheDefaultDeadlineEndedIsNamed
 Clause: when a method of a suite that declares no Timeout waits on t.Context() past the default 30s deadline → leaves the method's verdict as it is
 --- a/pkg/gotestruntime/defaultdeadline.go
 +++ b/pkg/gotestruntime/defaultdeadline.go

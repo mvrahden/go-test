@@ -1,5 +1,5 @@
 Expect: stopgrace: markers .*, want the fixture released at once on the second signal
-Judge: ./tests/canary CanaryTestSuite/TestASecondStopSignalReleasesAtOnce
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASecondStopSignalReleasesAtOnce
 Clause: when a second stop signal reaches the suite while a stopped method body ignores its context → releases the fixture at once, saying so, and the process ends by the signal
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go

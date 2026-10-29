@@ -1,5 +1,5 @@
 Expect: stopgrace: BeforeAll was not cut short after 5s, saying so
-Judge: ./tests/canary CanaryTestSuite/TestABeforeAllIgnoringItsContextIsCutShort
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestABeforeAllIgnoringItsContextIsCutShort
 Alone: its check bounds how long the stopped run takes
 Clause: when the run is stopped while a suite's BeforeAll ignores its context → cuts BeforeAll short after 5s, saying so, and releases the fixture without running AfterAll
 --- a/pkg/gotestruntime/harness.go

@@ -1,5 +1,5 @@
 Expect: stopbench: the benchmark was not cut short after 5s, saying so
-Judge: ./tests/canary CanaryTestSuite/TestABenchmarkIgnoringTheStopIsCutShort
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestABenchmarkIgnoringTheStopIsCutShort
 Clause: when the run is stopped while a benchmark runs → cuts a benchmark that ignores the stop short after 5s, saying so, and releases the fixture
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go

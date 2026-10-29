@@ -1,5 +1,5 @@
 Expect: stopgrace: the late body was not cut short 5s after it began, saying so
-Judge: ./tests/canary CanaryTestSuite/TestABodyStartingAfterTheStopIsCutShort
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestABodyStartingAfterTheStopIsCutShort
 Clause: when the run is stopped while a method's BeforeEach runs and its body then ignores its context → cuts the body short 5s after it began, saying so
 --- a/internal/runstate/bodies.go
 +++ b/internal/runstate/bodies.go

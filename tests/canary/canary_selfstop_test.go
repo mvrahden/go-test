@@ -89,7 +89,7 @@ func selfStopped(t *gotest.T, name string, markers []string) {
 
 // A suite process under the runner whose parent is killed while a method
 // holds stops by itself.
-func (s *CanaryTestSuite) TestASuiteWhoseParentIsKilledStops(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestASuiteWhoseParentIsKilledStops(t *gotest.T) {
 	dir := t.TempDir()
 	// sh stays the suite's parent: it waits for the command it runs.
 	wrap := execWrapper(t, `echo "wrapper=$$" >> "$GOTEST_CANARY_DIR/markers"
@@ -110,7 +110,7 @@ func (s *CanaryTestSuite) TestASuiteWhoseParentIsKilledStops(t *gotest.T) {
 
 // A suite process whose runner and converter are killed under -json, while
 // an -exec wrapper keeps it running, stops by itself: nobody reads its stream.
-func (s *CanaryTestSuite) TestASuiteWhoseStreamNobodyReadsStops(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestASuiteWhoseStreamNobodyReadsStops(t *gotest.T) {
 	dir := t.TempDir()
 	// The wrapper stays between the converter and the suite, and outlives both.
 	wrap := execWrapper(t, `echo "converter=$PPID" >> "$GOTEST_CANARY_DIR/markers"
@@ -132,7 +132,7 @@ func (s *CanaryTestSuite) TestASuiteWhoseStreamNobodyReadsStops(t *gotest.T) {
 
 // Outside the runner a suite whose stdout nobody reads any more runs on: its
 // method's context does not end.
-func (s *CanaryTestSuite) TestAPlainRunKeepsItsMethodWhenTheReaderGoes(t *gotest.T) {
+func (s *CanaryLifecycleTestSuite) TestAPlainRunKeepsItsMethodWhenTheReaderGoes(t *gotest.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		fatalf(t, "abs: %v", err)

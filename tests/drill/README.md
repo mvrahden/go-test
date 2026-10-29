@@ -169,7 +169,7 @@ worst it turns one into a failure of the drill.
   conformance package without starting `^FAIL .*conformance/<capability> `,
   and one that names another check while the patch has no `Judge:` line.
 - A mutant whose runs reach a suite whose `SuiteConfig` sets `Exclusive`
-  (the canary's timing suite) runs alone, after the others: its verdicts
+  runs alone, after the others: its verdicts
   read the wall clock, so no other mutant may load the machine meanwhile.
   So does a patch with an `Alone: <why>` line, for a check that races the
   clock in a suite that does not declare `Exclusive`.
