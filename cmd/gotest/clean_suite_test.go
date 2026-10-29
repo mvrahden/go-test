@@ -36,8 +36,11 @@ func (s *CleanTestSuite) TestGeneratedFiles(t *gotest.T) {
 func (s *CleanTestSuite) TestOwnFilesNamedLikeGenerated(t *gotest.T) {
 	t.When("a file is named like a generated file but carries no generated-code comment", func(w *gotest.T) {
 		dir := w.TempDir()
-		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "gotest_psuite_test.go"), []byte("package p\n"), 0o600))
-		gotest.Empty(w, ExportGeneratedFiles(dir))
+		path := filepath.Join(dir, "gotest_psuite_test.go")
+		gotest.NoError(w, os.WriteFile(path, []byte("package p\n"), 0o600))
+		gotest.False(w, ExportIsGenerated(path))
+		gotest.NoError(w, os.WriteFile(path, []byte(generatedSource), 0o600))
+		gotest.True(w, ExportIsGenerated(path))
 	})
 }
 

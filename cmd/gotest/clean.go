@@ -51,6 +51,10 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			continue
 		}
 		for _, path := range generated {
+			if !isGenerated(path) {
+				fmt.Fprintf(os.Stderr, "warning: %s is named like a generated file but is not one; left in place\n", path)
+				continue
+			}
 			if err := os.Remove(path); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: %s\n", err)
 				continue
@@ -66,23 +70,22 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	return 0
 }
 
-// generatedFiles returns the generated files in dir: named as gotest names
-// them and carrying the generated-code comment. A file only named so is
-// someone's own, and is left alone with a warning.
+// generatedFiles returns the files in dir named as gotest names generated
+// ones.
 func generatedFiles(dir string) []string {
 	entries, _ := os.ReadDir(dir)
 	var files []string
 	for _, e := range entries {
-		if !e.Type().IsRegular() || !about.PSuiteRegex.MatchString(e.Name()) {
-			continue
+		if e.Type().IsRegular() && about.PSuiteRegex.MatchString(e.Name()) {
+			files = append(files, filepath.Join(dir, e.Name()))
 		}
-		path := filepath.Join(dir, e.Name())
-		src, err := os.ReadFile(path) //nolint:gosec // G304: a file in a package directory clean was pointed at
-		if err != nil || !about.IsGeneratedSource(src) {
-			fmt.Fprintf(os.Stderr, "warning: %s is named like a generated file but is not one; left in place\n", path)
-			continue
-		}
-		files = append(files, path)
 	}
 	return files
+}
+
+// isGenerated reports whether the file at path carries the generated-code
+// comment; a file only named like one is someone's own.
+func isGenerated(path string) bool {
+	src, err := os.ReadFile(path) //nolint:gosec // G304: a file in a package directory clean was pointed at
+	return err == nil && about.IsGeneratedSource(src)
 }

@@ -21,6 +21,7 @@ var ExportRunBench = runBench
 
 // clean.go
 var ExportGeneratedFiles = generatedFiles
+var ExportIsGenerated = isGenerated
 
 // cli.go
 var (
