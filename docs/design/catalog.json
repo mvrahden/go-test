@@ -6927,6 +6927,19 @@
                     },
                     {
                       "children": [],
+                      "display": "a generated file an older gotest left under its legacy name is removed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_generated_file_an_older_gotest_left_under_its_legacy_name_is_removed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
                       "display": "an unchanged generated file is not written again",
                       "duration": 0,
                       "excluded": false,
@@ -14072,7 +14085,7 @@
     }
   ],
   "stats": {
-    "behaviors": 472,
+    "behaviors": 473,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -594,6 +594,7 @@ shards of one run do not add up to every mutant exactly once.
 | `generate-loads-stale-files` | the go command compiles the generated files on disk while packages load | canary: the second generate of the staged `shapes/genrename` and the `shapes/stalerename` run exit 2 |
 | `discover-reads-stale-files` | a load parses the generated files on disk as written | canary: `discover` does not list `shapes/stalerename`'s NewTestSuite alone |
 | `generate-rewrites-unchanged` | `generate` writes a generated file whose content did not change | conformance: the discovery It for an unchanged generated file finds a new mtime |
+| `generate-keeps-legacy-files` | `generate` leaves the files an older gotest generated under the `ƒƒ_` names | conformance: the discovery It for a legacy file finds it still there |
 | `compile-overlay-keeps-stale-files` | a run's overlay stubs no generated file it does not regenerate | conformance: the discovery It for a legacy generated file name fails to build |
 | `legacy-generated-names-forgotten` | the `ƒƒ_` names are not among the generated file names | conformance: the discovery It for a legacy generated file name fails to build |
 | `tags-flag-unnormalized` | `--tags` is not spelled as go's `-tags` | conformance: the discovery It for `--tags=` sees `--tags` refused as an unknown flag with exit 2 |

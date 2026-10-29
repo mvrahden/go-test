@@ -78,9 +78,30 @@ func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 				fmt.Println(dst)
 			}
 		}
+		// An older gotest's file would redeclare the harness for go vet,
+		// go test and gopls.
+		for _, name := range []string{about.LegacyPSuite, about.LegacyPXSuite} {
+			if err := removeGenerated(filepath.Join(r.AbsPath, name)); err != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: removing %s: %s\n", filepath.Join(r.AbsPath, name), err)
+				return 2
+			}
+		}
 	}
 
 	return 0
+}
+
+// removeGenerated removes the file at path when it carries the
+// generated-code comment; a file of that name that does not is left alone.
+func removeGenerated(path string) error {
+	src, err := os.ReadFile(path) //nolint:gosec // G304: a generated file name in the package's own directory
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && !about.IsGeneratedSource(src)) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return os.Remove(path)
 }
 
 // syncGenerated brings the generated file at dst in line with src: written

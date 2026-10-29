@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery GeneratedFiles .* / a generated file an older gotest left under its legacy name is removed \(
+Clause: when gotest generate runs again after the suites changed → a generated file an older gotest left under its legacy name is removed
+--- a/cmd/gotest/generate.go
++++ b/cmd/gotest/generate.go
+@@ -80,7 +80,7 @@
+ 		}
+ 		// An older gotest's file would redeclare the harness for go vet,
+ 		// go test and gopls.
+-		for _, name := range []string{about.LegacyPSuite, about.LegacyPXSuite} {
++		for _, name := range []string{} {
+ 			if err := removeGenerated(filepath.Join(r.AbsPath, name)); err != nil {
+ 				fmt.Fprintf(os.Stderr, "FAIL: removing %s: %s\n", filepath.Join(r.AbsPath, name), err)
+ 				return 2
