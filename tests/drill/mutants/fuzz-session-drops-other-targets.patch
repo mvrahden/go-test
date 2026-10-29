@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz FuzzSession / AnotherCheckout / .* / promote still takes the crashers of the targets it did not fuzz \(
+Clause: when a later session sharing the cache fuzzes another checkout's target → promote still takes the crashers of the targets it did not fuzz
+--- a/internal/gotestrunner/fuzzsession.go
++++ b/internal/gotestrunner/fuzzsession.go
+@@ -178,7 +178,7 @@
+ 	}
+ 	var s FuzzSession
+ 	for _, c := range prev.Crashers {
+-		if !fuzzedNow(c, targets) {
++		if false {
+ 			s.Crashers = append(s.Crashers, c)
+ 		}
+ 	}

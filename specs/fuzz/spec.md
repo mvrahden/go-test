@@ -85,7 +85,7 @@ A fuzz session SHALL warn about each recorded corpus entry whose values no longe
 - **AND** no crasher of the run is promoted and every crasher file stays
 
 ### Requirement: Promote takes the latest session's crashers only
-`gotest fuzz promote` SHALL take only the crasher files the latest `gotest fuzz` session wrote, unchanged since, and SHALL leave every other corpus file and its target's source as they are.
+`gotest fuzz promote` SHALL take only the crasher files written by the latest `gotest fuzz` session that fuzzed their target, unchanged since, and SHALL leave every other corpus file and its target's source as they are. A session SHALL NOT drop the crashers recorded for targets it did not fuzz, though it shares the gotest cache with other modules and checkouts.
 
 #### Scenario: A session's crasher
 - **WHEN** a fuzz session finds a crasher
@@ -94,6 +94,22 @@ A fuzz session SHALL warn about each recorded corpus entry whose values no longe
 #### Scenario: A file the session did not write
 - **WHEN** a corpus file was not written by the latest fuzz session
 - **THEN** promote leaves the file and its target's source untouched
+
+#### Scenario: A session of another checkout
+- **WHEN** a later session sharing the cache fuzzes another checkout's target
+- **THEN** promote still takes the crashers of the targets it did not fuzz
+
+### Requirement: Promoted seeds hold the crasher's values
+`gotest fuzz promote` SHALL write each seed so its target receives exactly the values the crasher holds, a negative zero, the bits of a NaN and the integer limits included, and a decoding target's crasher as one seed of all its arguments.
+
+#### Scenario: Edge values of a decoding target
+- **WHEN** a crasher of a decoding target holds a value at the edge of its Go spelling
+- **THEN** the promoted seed fails the target as the crasher did
+
+#### Scenario: A decoding target of several arguments
+- **WHEN** a decoding target takes several arguments
+- **THEN** promote adds its crasher as one seed of all of them
+- **AND** the promoted seed fails the target as the crasher did
 
 ### Requirement: Promoting a decoded target's crasher
 For a fuzz target that decodes its input from the engine's leaves, `gotest fuzz promote` SHALL build the seed from the value the target's codec decodes, and SHALL refuse a crasher it cannot decode that way instead of splicing raw leaf values.

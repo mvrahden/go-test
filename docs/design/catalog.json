@@ -8813,6 +8813,99 @@
               "name": "TestDecodedWithoutEcho",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the promoted seed fails the target as the crasher did",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_promoted_seed_fails_the_target_as_the_crasher_did",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a crasher of a decoding target holds a value at the edge of its Go spelling",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_crasher_of_a_decoding_target_holds_a_value_at_the_edge_of_its_Go_spelling",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "DecodedValues",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestDecodedValues",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "promote adds its crasher as one seed of all of them",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "promote_adds_its_crasher_as_one_seed_of_all_of_them",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the promoted seed fails the target as the crasher did",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_promoted_seed_fails_the_target_as_the_crasher_did",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a decoding target takes several arguments",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_decoding_target_takes_several_arguments",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "DecodedArguments",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestDecodedArguments",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FuzzPromote",
@@ -9090,6 +9183,46 @@
               "focused": false,
               "kind": "method",
               "name": "TestSessionCrasher",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "promote still takes the crashers of the targets it did not fuzz",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "promote_still_takes_the_crashers_of_the_targets_it_did_not_fuzz",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a later session sharing the cache fuzzes another checkout's target",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_later_session_sharing_the_cache_fuzzes_another_checkout's_target",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnotherCheckout",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnotherCheckout",
               "output": [],
               "status": "none"
             },
@@ -12272,7 +12405,7 @@
     }
   ],
   "stats": {
-    "behaviors": 403,
+    "behaviors": 407,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

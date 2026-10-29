@@ -551,6 +551,8 @@ shards of one run do not add up to every mutant exactly once.
 | `promote-splices-raw-leaves` | a decoding target's crasher whose re-run echoes nothing is spliced from its raw leaves | conformance: the fuzz promote It for a decoding target finds the raw leaf spliced |
 | `stale-corpus-suggests-promote` | the stale-corpus warning tells the user to run promote | conformance: the fuzz session It finds promote in the warning |
 | `fuzz-seed-error-at-flush` | a seed of the wrong type is reported where gotest flushes the seeds, not at its `f.Add` call | canary: the `fuzzseedtype` failure does not name the fixture's `f.Add` line |
+| `promote-splices-the-echo-whole` | a decoding target's echo of several arguments is spliced as one value | conformance: the fuzz promote It for a decoding target of several arguments finds no seed added |
+| `fuzz-session-drops-other-targets` | a fuzz session's record drops the crashers of targets it did not fuzz | conformance: the fuzz session It for another checkout finds its crasher not promoted |
 
 ## Adding a mutant
 

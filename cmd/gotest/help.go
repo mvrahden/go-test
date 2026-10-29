@@ -556,9 +556,9 @@ Triage:
 
 Promote:
   "gotest fuzz promote" splices each crasher the latest "gotest fuzz"
-  session wrote into its FuzzX method as a permanent f.Add(...) seed,
-  after the method's last f.Add, and deletes the file; the seed then
-  replays on every ordinary run:
+  session of its target wrote into its FuzzX method as a permanent
+  f.Add(...) seed of the crasher's exact values, after the method's last
+  f.Add, and deletes the file; the seed then replays on every ordinary run:
     promoted FuzzParserTestSuite_FuzzParse/1a2b3c -> f.Add("a@\x00") in parser_test.go:42
   Other corpus files are left in place. A session crasher that is not in
   Go's corpus format, or changed since the session, promotes nothing and

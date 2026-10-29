@@ -2,21 +2,17 @@ Expect: ^FAIL .*conformance/fuzz FuzzPromote / DecodedWithoutEcho / .* / promote
 Clause: when a decoding target's crasher re-run echoes no decoded value → promote refuses it with exit 1 and splices no raw leaf
 --- a/cmd/gotest/fuzztriage.go
 +++ b/cmd/gotest/fuzztriage.go
-@@ -578,12 +578,13 @@
- 	if overlay.FuzzDecodedByFunc[target.Package][target.Func] {
- 		out, _, _ := rerunCrasher(overlay, target, hashBase)
+@@ -708,9 +708,10 @@
+ 		out, _, _ := rerunCrasher(overlay, target, hashBase, env)
  		lit := extractDecodedInput(out)
-+		spliceArgs = []string{lit}
  		if lit == "" {
 -			leaves := len(overlay.FuzzParamsByFunc[target.Package][target.Func])
 -			return fmt.Sprintf("promote: %s/%s: skipped: %s decodes its input from %d lea%s, and the re-run echoed no decoded value; raw leaves are not its input",
 -				target.Func, hashBase, target.Func, leaves, leafSuffix(leaves)), false
-+			spliceArgs = nil
 +			for _, a := range corpusArgs {
-+				spliceArgs = append(spliceArgs, a.spliceExpr())
++				lit += ", " + a.display()
 +			}
++			lit = strings.TrimPrefix(lit, ", ")
  		}
--		spliceArgs = []string{lit}
- 	} else {
- 		spliceArgs = make([]string, len(corpusArgs))
- 		for i, a := range corpusArgs {
+ 		args, err := splitSeedArgs(lit)
+ 		if err != nil {

@@ -3,12 +3,18 @@ package main
 import (
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/constant"
+	"go/parser"
+	"go/token"
 	"go/types"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -99,18 +105,85 @@ func (a corpusArg) display() string {
 }
 
 // spliceExpr renders the arg the way it should appear inside a spliced
-// `f.Add(...)` call. For string and bool, Go's own untyped-constant
-// defaulting already produces the exact declared type, so the bare literal
-// is used (matching how such seeds are idiomatically hand-written, e.g.
-// `f.Add("stale")` rather than `f.Add(string("stale"))`). Every other
-// primitive type keeps its explicit conversion, since an untyped literal's
-// default type (e.g. plain `5` defaults to `int`, not `int64`) would
-// otherwise silently change the argument's static type.
-func (a corpusArg) spliceExpr() string {
-	if !a.Bits && (a.TypeName == "string" || a.TypeName == "bool") {
-		return a.SourceExpr
+// `f.Add(...)` call, as a Go expression that evaluates to exactly the value
+// Go's decoder reads from the corpus line. For string and bool, Go's own
+// untyped-constant defaulting already produces the exact declared type, so
+// the bare literal is used (matching how such seeds are idiomatically
+// hand-written, e.g. `f.Add("stale")` rather than `f.Add(string("stale"))`).
+// Every other primitive type keeps its explicit conversion, since an untyped
+// literal's default type (e.g. plain `5` defaults to `int`, not `int64`)
+// would otherwise silently change the argument's static type. A float whose
+// literal Go source reads differently, a negative zero, is spelled by its
+// bits.
+func (a corpusArg) spliceExpr() (string, error) {
+	if a.Bits {
+		return a.display(), nil
 	}
-	return a.display()
+	switch a.TypeName {
+	case "string", "bool":
+		return a.SourceExpr, nil
+	case "float32", "float64":
+		return a.floatExpr()
+	}
+	return a.display(), nil
+}
+
+// floatExpr spells a float corpus value so Go reads back its exact bits:
+// as written when the literal's constant value has them, else by its bits.
+func (a corpusArg) floatExpr() (string, error) {
+	size := 64
+	if a.TypeName == "float32" {
+		size = 32
+	}
+	v, err := strconv.ParseFloat(a.SourceExpr, size)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", a.display(), err)
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		// float64(NaN) and float64(±Inf) are spelled as math.NaN() and
+		// math.Inf(±1) on the splice, as Go's decoder reads them.
+		return a.display(), nil
+	}
+	c, ok := constantOf(a.SourceExpr)
+	if !ok {
+		return "", fmt.Errorf("%s is not a numeric constant", a.display())
+	}
+	if size == 32 {
+		f, _ := constant.Float32Val(constant.ToFloat(c))
+		if math.Float32bits(f) != math.Float32bits(float32(v)) {
+			return fmt.Sprintf("math.Float32frombits(0x%x)", math.Float32bits(float32(v))), nil
+		}
+		return a.display(), nil
+	}
+	f, _ := constant.Float64Val(constant.ToFloat(c))
+	if math.Float64bits(f) != math.Float64bits(v) {
+		return fmt.Sprintf("math.Float64frombits(0x%x)", math.Float64bits(v)), nil
+	}
+	return a.display(), nil
+}
+
+// constantOf is the constant value of a corpus numeric literal, negated or not.
+func constantOf(src string) (constant.Value, bool) {
+	expr, err := parser.ParseExpr(src)
+	if err != nil {
+		return nil, false
+	}
+	neg := false
+	if u, ok := expr.(*ast.UnaryExpr); ok && u.Op == token.SUB {
+		neg, expr = true, u.X
+	}
+	lit, ok := expr.(*ast.BasicLit)
+	if !ok {
+		return nil, false
+	}
+	c := constant.MakeFromLiteral(lit.Value, lit.Kind, 0)
+	if c.Kind() == constant.Unknown {
+		return nil, false
+	}
+	if neg {
+		c = constant.UnaryOp(token.SUB, c, 0)
+	}
+	return c, true
 }
 
 // displayArgs joins a crasher's decoded arguments for the triage "input:"
@@ -639,11 +712,19 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 			return fmt.Sprintf("promote: %s/%s: skipped: %s decodes its input from %d lea%s, and the re-run echoed no decoded value; raw leaves are not its input",
 				target.Func, hashBase, target.Func, leaves, leafSuffix(leaves)), false
 		}
-		spliceArgs = []string{lit}
+		args, err := splitSeedArgs(lit)
+		if err != nil {
+			return fmt.Sprintf("promote: %s/%s: skipped: the re-run echoed %s: %s", target.Func, hashBase, lit, err), false
+		}
+		spliceArgs = args
 	} else {
 		spliceArgs = make([]string, len(corpusArgs))
 		for i, a := range corpusArgs {
-			spliceArgs[i] = a.spliceExpr()
+			expr, err := a.spliceExpr()
+			if err != nil {
+				return fmt.Sprintf("promote: %s/%s: skipped: %s cannot be written as an exact Go value", target.Func, hashBase, err), false
+			}
+			spliceArgs[i] = expr
 		}
 	}
 
@@ -659,6 +740,24 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	return fmt.Sprintf("promoted %s/%s -> f.Add(%s) in %s:%d", target.Func, hashBase, strings.Join(spliceArgs, ", "), displayPath(editedFile), line), true
 }
 
+// splitSeedArgs splits a codec's echo, a complete f.Add argument list, into
+// its arguments as written.
+func splitSeedArgs(list string) ([]string, error) {
+	src := "f(" + list + ")"
+	expr, err := parser.ParseExpr(src)
+	if err != nil {
+		return nil, err
+	}
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || call.Ellipsis.IsValid() || len(call.Args) == 0 {
+		return nil, errors.New("not an argument list")
+	}
+	args := make([]string, len(call.Args))
+	for i, a := range call.Args {
+		args[i] = src[a.Pos()-1 : a.End()-1]
+	}
+	return args, nil
+}
 
 func leafSuffix(n int) string {
 	if n == 1 {

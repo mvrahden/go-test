@@ -49,12 +49,34 @@ func (s *FuzzSessionTestSuite) TestRecord(t *gotest.T) {
 		gotest.NoError(it, os.WriteFile(c.Path(), []byte("go test fuzz v1\nstring(\"z\")\n"), 0o600))
 		gotest.ErrorContains(it, c.Check(), "changed since the fuzz session wrote it")
 	})
-	t.It("is replaced whole by the next session", func(it *gotest.T) {
+	t.It("is replaced by the next session of the same targets", func(it *gotest.T) {
 		gotest.NoError(it, gotestrunner.RecordFuzzSession(record, targets, gotestrunner.FuzzRunResult{Outcomes: []gotestrunner.FuzzTargetOutcome{{Func: "FuzzA"}, {Func: "FuzzB"}}}))
 		next, ok, err := gotestrunner.ReadFuzzSession(record)
 		gotest.NoError(it, err)
 		gotest.True(it, ok)
 		gotest.Empty(it, next.Crashers)
+	})
+}
+
+func (s *FuzzSessionTestSuite) TestOtherTargets(t *gotest.T) {
+	record := gotestrunner.FuzzSessionFile(t.TempDir())
+	one, other := t.TempDir(), t.TempDir()
+	plantCrasher(t, one, "FuzzA", "a", "go test fuzz v1\nstring(\"a\")\n")
+	plantCrasher(t, other, "FuzzA", "b", "go test fuzz v1\nstring(\"b\")\n")
+	first := gotestrunner.FuzzTarget{Package: "p", Dir: one, Func: "FuzzA"}
+	second := gotestrunner.FuzzTarget{Package: "p", Dir: other, Func: "FuzzA"}
+	crashed := func(name string) gotestrunner.FuzzRunResult {
+		return gotestrunner.FuzzRunResult{Outcomes: []gotestrunner.FuzzTargetOutcome{{Func: "FuzzA", NewCrashers: []string{name}}}}
+	}
+	gotest.NoError(t, gotestrunner.RecordFuzzSession(record, []gotestrunner.FuzzTarget{first}, crashed("a")))
+	gotest.NoError(t, gotestrunner.RecordFuzzSession(record, []gotestrunner.FuzzTarget{second}, crashed("b")))
+	session, _, err := gotestrunner.ReadFuzzSession(record)
+	gotest.NoError(t, err)
+	t.When("a session fuzzes a target of another checkout sharing the cache", func(w *gotest.T) {
+		w.It("keeps the crashers recorded for every target it did not fuzz", func(it *gotest.T) {
+			gotest.Len(it, session.For(first), 1)
+			gotest.Len(it, session.For(second), 1)
+		})
 	})
 }
 

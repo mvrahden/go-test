@@ -1,6 +1,9 @@
 package fuzz_test
 
 import (
+	"encoding/binary"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,6 +170,86 @@ func (s *FuzzPromoteTestSuite) TestDecodedWithoutEcho(t *gotest.T) {
 	})
 }
 
+// promotion is what promote did with one planted session crasher, and how
+// the package's seeds ran after it.
+type promotion struct {
+	promote, after testkit.Run
+	crasher        string
+	src, edited    string
+}
+
+func promoteOne(t *gotest.T, target string, values ...string) promotion {
+	p := stagePromote(t)
+	crasher := p.plant(t, target, "crasher", "go test fuzz v1\n"+strings.Join(values, "\n")+"\n")
+	p.record(t, crasher)
+	promote := p.run(t, "fuzz", "promote", ".")
+	after := p.run(t, ".")
+	return promotion{promote: promote, after: after, crasher: crasher, src: p.src, edited: p.source(t)}
+}
+
+// edgeCase is a crasher whose values sit at the edge of their Go spelling,
+// and the failure its target reports on them.
+type edgeCase struct {
+	Desc   string
+	target string
+	values []string
+	fails  string
+}
+
+// failsAsTheCrasherDid checks the promoted seed made the target fail as the
+// crasher did, and that it was promoted at all.
+func failsAsTheCrasherDid(t *gotest.T, cases []edgeCase) {
+	for sub, c := range gotest.Each(t, cases) {
+		r := promoteOne(sub, c.target, c.values...)
+		gotest.Equal(sub, 0, r.promote.Exit, "stdout: %s\nstderr: %s", r.promote.Stdout, r.promote.Stderr)
+		gotest.False(sub, exists(r.crasher), "the crasher file stays")
+		gotest.Equal(sub, 1, r.after.Exit, "the promoted seed passes\nseed: %s\nstdout: %s", r.promote.Stdout, r.after.Stdout)
+		gotest.Contains(sub, r.after.Stdout+r.after.Stderr, c.fails)
+	}
+}
+
+// leaf spells a fixed-width number leaf of a decoding target's corpus file:
+// its little-endian bytes, as the codec reads them.
+func leaf(width int, bits uint64) string {
+	b := binary.LittleEndian.AppendUint64(nil, bits)
+	return fmt.Sprintf("[]byte(%q)", b[:width])
+}
+
+func (s *FuzzPromoteTestSuite) TestDecodedValues(t *gotest.T) {
+	const point, edge = "FuzzPromoteTestSuite_FuzzPoint", "FuzzPromoteTestSuite_FuzzEdge"
+	one64, one32 := leaf(8, math.Float64bits(1)), leaf(4, uint64(math.Float32bits(1)))
+	t.When("a crasher of a decoding target holds a value at the edge of its Go spelling", func(w *gotest.T) {
+		w.It("the promoted seed fails the target as the crasher did", func(it *gotest.T) {
+			failsAsTheCrasherDid(it, []edgeCase{
+				{Desc: "a negative zero", target: point, values: []string{leaf(8, 1<<63), one32}, fails: "a lossy float"},
+				{Desc: "a NaN of other bits", target: point, values: []string{leaf(8, 0x7ff8000000000002), one32}, fails: "a lossy float"},
+				{Desc: "a float32 negative zero", target: point, values: []string{one64, leaf(4, 1<<31)}, fails: "a lossy float"},
+				{Desc: "a float32 NaN of other bits", target: point, values: []string{one64, leaf(4, 0x7fc00001)}, fails: "a lossy float"},
+				{Desc: "a float32 signaling NaN", target: point, values: []string{one64, leaf(4, 0x7f800001)}, fails: "a lossy float"},
+				{Desc: "integer limits, a non-character rune and invalid UTF-8", target: edge, values: []string{
+					leaf(8, math.MaxUint64), leaf(8, 1<<63), leaf(4, math.MaxUint32), `string("\xff\xfe")`, `[]byte("\x00\xff")`,
+				}, fails: "the edge values"},
+			})
+		})
+	})
+}
+
+func (s *FuzzPromoteTestSuite) TestDecodedArguments(t *gotest.T) {
+	r := promoteOne(t, "FuzzPromoteTestSuite_FuzzPointAt",
+		leaf(8, 1<<63), leaf(4, uint64(math.Float32bits(1))), leaf(4, math.MaxUint32), leaf(1, 0xff))
+	t.When("a decoding target takes several arguments", func(w *gotest.T) {
+		w.It("promote adds its crasher as one seed of all of them", func(it *gotest.T) {
+			gotest.Equal(it, 0, r.promote.Exit, "stdout: %s\nstderr: %s", r.promote.Stdout, r.promote.Stderr)
+			gotest.Equal(it, strings.Count(r.src, "f.Add(")+1, strings.Count(r.edited, "f.Add("))
+			gotest.False(it, exists(r.crasher), "the crasher file stays")
+		})
+		w.It("the promoted seed fails the target as the crasher did", func(it *gotest.T) {
+			gotest.Equal(it, 1, r.after.Exit, "the promoted seed passes\nseed: %s\nstdout: %s", r.promote.Stdout, r.after.Stdout)
+			gotest.Contains(it, r.after.Stdout+r.after.Stderr, "a lossy point at the edge")
+		})
+	})
+}
+
 // FuzzSessionTestSuite runs real fuzz sessions: Exclusive, because the
 // engine's workers take the machine.
 type FuzzSessionTestSuite struct{}
@@ -189,6 +272,24 @@ func (s *FuzzSessionTestSuite) TestSessionCrasher(t *gotest.T) {
 			gotest.Equal(it, strings.Count(p.src, "f.Add(")+1, strings.Count(p.source(it), "f.Add("))
 			entries, _ := os.ReadDir(corpus)
 			gotest.Empty(it, entries)
+		})
+	})
+}
+
+func (s *FuzzSessionTestSuite) TestAnotherCheckout(t *gotest.T) {
+	p := stagePromote(t)
+	crasher := p.plant(t, promoteTrim, "crasher", "go test fuzz v1\nstring(\"kept\")\n")
+	p.record(t, crasher)
+	other := stagePromote(t)
+	other.cache = p.cache
+	session := other.run(t, "fuzz", "--for=1s", "--target="+promoteTrim, ".")
+	gotest.Equal(t, 0, session.Exit, "stdout: %s\nstderr: %s", session.Stdout, session.Stderr)
+	promote := p.run(t, "fuzz", "promote", ".")
+	t.When("a later session sharing the cache fuzzes another checkout's target", func(w *gotest.T) {
+		w.It("promote still takes the crashers of the targets it did not fuzz", func(it *gotest.T) {
+			gotest.Equal(it, 0, promote.Exit, "stdout: %s\nstderr: %s", promote.Stdout, promote.Stderr)
+			gotest.Equal(it, strings.Count(p.src, "f.Add(")+1, strings.Count(p.source(it), "f.Add("))
+			gotest.False(it, exists(crasher), "the crasher file stays")
 		})
 	})
 }

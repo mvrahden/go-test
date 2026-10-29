@@ -145,10 +145,12 @@ func ReadFuzzSession(path string) (s FuzzSession, ok bool, err error) {
 	return s, true, nil
 }
 
-// RecordFuzzSession writes the crashers res found to the record at path, as
-// the latest session's. res's outcomes line up with targets.
+// RecordFuzzSession makes the crashers res found the latest session's for
+// the targets it fuzzed, in the record at path. The record is shared by
+// every module and checkout this cache serves, so the crashers recorded for
+// any other target are kept. res's outcomes line up with targets.
 func RecordFuzzSession(path string, targets []FuzzTarget, res FuzzRunResult) error {
-	var s FuzzSession
+	var found []SessionCrasher
 	for i, o := range res.Outcomes {
 		if i >= len(targets) {
 			break
@@ -158,8 +160,38 @@ func RecordFuzzSession(path string, targets []FuzzTarget, res FuzzRunResult) err
 			if err != nil {
 				return err
 			}
+			found = append(found, c)
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return err
+	}
+	// Sessions that end together each keep the other's crashers.
+	unlock, err := lockFile(path + ".lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	prev, _, err := ReadFuzzSession(path)
+	if err != nil {
+		prev = FuzzSession{} // an unreadable record holds nothing promote could take
+	}
+	var s FuzzSession
+	for _, c := range prev.Crashers {
+		if !fuzzedNow(c, targets) {
 			s.Crashers = append(s.Crashers, c)
 		}
 	}
+	s.Crashers = append(s.Crashers, found...)
 	return WriteFuzzSession(path, s)
+}
+
+// fuzzedNow reports whether c belongs to one of targets.
+func fuzzedNow(c SessionCrasher, targets []FuzzTarget) bool {
+	for _, t := range targets { //nolint:gocritic // rangeValCopy: intentional
+		if c.Func == t.Func && sameDir(c.Dir, t.Dir) {
+			return true
+		}
+	}
+	return false
 }

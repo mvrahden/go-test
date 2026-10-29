@@ -89,8 +89,16 @@ func (s *FuzzCorpusTestSuite) TestSpliceExpr(t *gotest.T) {
 		{Desc: "bool stays a literal", arg: main.ExportCorpusArg{TypeName: "bool", SourceExpr: "true"}, want: "true"},
 		{Desc: "int64 is converted", arg: main.ExportCorpusArg{TypeName: "int64", SourceExpr: "-3"}, want: "int64(-3)"},
 		{Desc: "[]byte is converted", arg: main.ExportCorpusArg{TypeName: "[]byte", SourceExpr: `"abc"`}, want: `[]byte("abc")`},
+		{Desc: "a float is converted", arg: main.ExportCorpusArg{TypeName: "float64", SourceExpr: "-0.1"}, want: "float64(-0.1)"},
+		{Desc: "a float32 is converted", arg: main.ExportCorpusArg{TypeName: "float32", SourceExpr: "0.1"}, want: "float32(0.1)"},
+		{Desc: "a negative zero is spelled by its bits", arg: main.ExportCorpusArg{TypeName: "float64", SourceExpr: "-0"}, want: "math.Float64frombits(0x8000000000000000)"},
+		{Desc: "a float32 negative zero is spelled by its bits", arg: main.ExportCorpusArg{TypeName: "float32", SourceExpr: "-0"}, want: "math.Float32frombits(0x80000000)"},
+		{Desc: "NaN stays for the splice to spell", arg: main.ExportCorpusArg{TypeName: "float64", SourceExpr: "NaN"}, want: "float64(NaN)"},
+		{Desc: "bits stay bits", arg: main.ExportCorpusArg{TypeName: "float32", SourceExpr: "0x7fc00001", Bits: true}, want: "math.Float32frombits(0x7fc00001)"},
 	}) {
-		gotest.Equal(sub, tc.want, main.ExportSpliceExpr(tc.arg))
+		got, err := main.ExportSpliceExpr(tc.arg)
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, tc.want, got)
 	}
 }
 
