@@ -619,6 +619,12 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-error-mapping-accepts-implementers` | a nil check maps to `NoError`/`Error` for any type implementing error, a concrete pointer included | conformance: the lint It for a concrete pointer's nil comparison sees a typed nil fail `NoError` |
 | `lint-nil-check-of-interface-fixed` | `Nil`/`NotNil` of an error is fixed into `NoError`/`Error` | conformance: the lint It for a Nil check of an interface sees an error holding a nil pointer flip its verdict |
 | `lint-type-parameter-read-as-constraint` | a type parameter's operand is read as its constraint interface, not its core type | conformance: the lint It for type parameters finds no `Zero` fix and a `Zero` that does not compile |
+| `lint-len-rewrite-any-operand` | a length rewrite is offered whatever the operand's type, a pointer to an array or an interface included | conformance: the lint It for lengths finds a rewritten row whose verdict changed |
+| `lint-equality-structure-reaching-pointers` | `True(a == b)` on values that reach a pointer is rewritten into `Equal` | conformance: the lint It for equalities finds the struct row's verdict changed |
+| `lint-type-argument-ignored` | `Equal` under an explicit type argument is rewritten by the operand's own type | conformance: the lint It for type arguments finds a rewritten row whose verdict changed |
+| `lint-errors-is-fixed` | `True(errors.Is(err, target))` gets an `ErrorIs` fix | conformance: the lint It for `errors.Is` finds the nil-target row's verdict changed |
+| `lint-guard-fixed` | `ErrorIs` with a nil target is rewritten into `NoError` | conformance: the lint It for guards finds the row's verdict changed |
+| `lint-redundant-notnil-unguarded` | a `NotNil` that fails its type guard is removed as redundant | conformance: the lint It for redundant assertions finds the string row's verdict changed |
 | `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |
 | `lint-error-contains-any-receiver` | `Contains(t, v.Error(), s)` becomes `ErrorContains` on a receiver that does not implement error | conformance: the lint It for Error searches sees the fix fail to compile |
 | `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |

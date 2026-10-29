@@ -418,12 +418,12 @@ func TestEmptyTypeGuard(t *testing.T) {
 
 func TestErrorIsTypeGuard(t *testing.T) {
 	var err error
-	gotest.NoError(t, err) // want `use NoError instead of ErrorIs for nil target`
+	gotest.ErrorIs(t, err, nil) // want `use NoError instead of ErrorIs for nil target`
 }
 
 func TestErrorContainsTypeGuard(t *testing.T) {
 	var err error
-	gotest.Error(t, err) // want `use Error instead of ErrorContains for empty contains string`
+	gotest.ErrorContains(t, err, "") // want `use Error instead of ErrorContains for empty contains string`
 }
 
 // === With message args — preserved in fix ===

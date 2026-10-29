@@ -124,6 +124,30 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 - **WHEN** an assertion states an ordering comparison
 - **THEN** a float comparison is not rewritten into an ordering assertion
 
+#### Scenario: Lengths
+- **WHEN** an assertion checks a length
+- **THEN** a length check is rewritten only for an operand of a string, slice, map, channel or array type
+
+#### Scenario: Equalities
+- **WHEN** True or False asserts an == or != comparison
+- **THEN** pointers are compared with Same, values that reach no pointer with Equal, and nothing else is rewritten
+
+#### Scenario: Explicit type arguments
+- **WHEN** Equal compares an operand with nil under an explicit type argument
+- **THEN** Equal is not rewritten, since the type argument decides what it compares
+
+#### Scenario: errors.Is
+- **WHEN** True asserts an errors.Is call
+- **THEN** ErrorIs is named without a fix unless the target is the nil literal
+
+#### Scenario: Guards that fail every input
+- **WHEN** ErrorIs is given a nil target or ErrorContains an empty substring
+- **THEN** the assertion the guard names is offered without a fix
+
+#### Scenario: Redundant assertions
+- **WHEN** an assertion is followed by one that checks the same operand
+- **THEN** the first is removed only where the second fails on every input the first fails
+
 ### Requirement: Rules skip what is not gotest's
 Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, and SHALL leave a failure guard unreported where a local variable shadows the gotest import.
 

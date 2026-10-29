@@ -45,6 +45,8 @@ type rewriteRow struct {
 	rules []string
 	// want is the assertion line after lint -fix; empty when no fix applies.
 	want string
+	// gone is an assertion line lint -fix removes.
+	gone string
 	// verdict is the test's verdict before the fix, and after it.
 	verdict string
 }
@@ -56,9 +58,19 @@ const (
 	groupBool      = "bool"
 	groupErrorMsg  = "errormsg"
 	groupOrdering  = "ordering"
+	groupLen       = "len"
+	groupEquality  = "equality"
+	groupTypeArgs  = "typeargs"
+	groupErrorsIs  = "errorsis"
+	groupGuards    = "guards"
+	groupRedundant = "redundant"
 )
 
-const simplify = "assertion-simplify"
+const (
+	simplify  = "assertion-simplify"
+	typeGuard = "assertion-type-guard"
+	redundant = "assertion-redundant"
+)
 
 const myErr = "type myErr struct{}\n\nfunc (*myErr) Error() string { return \"boom\" }\n"
 
@@ -98,6 +110,8 @@ var rewriteRows = []rewriteRow{
 		body: "check[*int](t, nil)", rules: []string{simplify}, want: "gotest.Zero(t, p)", verdict: "pass"},
 	{Desc: "True of a type parameter over []int == nil", group: groupCore, decls: "func check[P ~[]int](t *testing.T, p P) {\n\tgotest.True(t, p == nil)\n}\n",
 		body: "check[[]int](t, nil)", rules: []string{simplify}, want: "gotest.Nil(t, p)", verdict: "pass"},
+	{Desc: "Empty of a type parameter over []E", group: groupCore, decls: "func check[S ~[]E, E any](t *testing.T, s S) {\n\tgotest.Empty(t, s)\n}\n",
+		body: "check[[]int](t, nil)", verdict: "pass"},
 	{Desc: "Nil of an unsafe.Pointer", group: groupCore, imports: []string{"unsafe"},
 		body: "var up unsafe.Pointer\n\tgotest.Nil(t, up)", rules: []string{simplify}, want: "gotest.Zero(t, up)", verdict: "pass"},
 
@@ -122,6 +136,71 @@ var rewriteRows = []rewriteRow{
 		body: "x, y := 1.0, math.NaN()\n\tgotest.False(t, x > y)", verdict: "pass"},
 	{Desc: "True of NaN < a float", group: groupOrdering, imports: []string{"math"},
 		body: "x, y := math.NaN(), 1.0\n\tgotest.True(t, x < y)", verdict: "fail"},
+
+	// len of a pointer to an array is its array's length, nil or not; Len and
+	// Empty follow no pointer to an array and Empty follows every pointer.
+	{Desc: "True of len of a *[3]int == 3", group: groupLen,
+		body: "p := &[3]int{}\n\tgotest.True(t, len(p) == 3)", rules: []string{simplify}, want: "gotest.Equal(t, len(p), 3)", verdict: "pass"},
+	{Desc: "True of len of a nil *[3]int > 0", group: groupLen,
+		body: "var p *[3]int\n\tgotest.True(t, len(p) > 0)", rules: []string{simplify}, want: "gotest.Greater(t, len(p), 0)", verdict: "pass"},
+	{Desc: "Equal of 0 and len of a nil *[3]int", group: groupLen,
+		body: "var p *[3]int\n\tgotest.Equal(t, 0, len(p))", verdict: "fail"},
+	{Desc: "Greater of len of a nil *[3]int and 0", group: groupLen,
+		body: "var p *[3]int\n\tgotest.Greater(t, len(p), 0)", verdict: "pass"},
+	{Desc: "Len of a pointer to an empty slice and 0", group: groupLen,
+		body: "s := []int{}\n\tgotest.Len(t, &s, 0)", verdict: "fail"},
+	{Desc: "Len of a nil any and 0", group: groupLen,
+		body: "var v any\n\tgotest.Len(t, v, 0)", verdict: "fail"},
+	{Desc: "True of len of a slice == 3", group: groupLen,
+		body: "s := []int{1, 2, 3}\n\tgotest.True(t, len(s) == 3)", rules: []string{simplify}, want: "gotest.Len(t, s, 3)", verdict: "pass"},
+	{Desc: "Empty of an any holding an empty slice", group: groupLen,
+		body: "var v any = []int{}\n\tgotest.Empty(t, v)", verdict: "pass"},
+	{Desc: "Len of a nil slice and 0", group: groupLen,
+		body: "var s []int\n\tgotest.Len(t, s, 0)", rules: []string{simplify}, want: "gotest.Empty(t, s)", verdict: "pass"},
+
+	// == is identity on pointers; Equal is structure.
+	{Desc: "True of two distinct pointers ==", group: groupEquality,
+		body: "a, b := new(int), new(int)\n\tgotest.True(t, a == b)", rules: []string{simplify}, want: "gotest.Same(t, a, b)", verdict: "fail"},
+	{Desc: "True of two ints ==", group: groupEquality,
+		body: "x, y := 1, 1\n\tgotest.True(t, x == y)", rules: []string{simplify}, want: "gotest.Equal(t, x, y)", verdict: "pass"},
+	{Desc: "False of two structs holding distinct pointers ==", group: groupEquality, decls: "type box struct{ p *int }\n",
+		body: "a, b := box{new(int)}, box{new(int)}\n\tgotest.False(t, a == b)", verdict: "pass"},
+	{Desc: "True of an any holding 1 == 1", group: groupEquality,
+		body: "var v any = 1\n\tgotest.True(t, v == 1)", rules: []string{simplify}, want: "gotest.Equal(t, 1, v)", verdict: "pass"},
+
+	// An explicit type argument converts the operand before Equal compares it.
+	{Desc: "Equal[any] of nil and a nil *myErr", group: groupTypeArgs, decls: myErr,
+		body: "var p *myErr\n\tgotest.Equal[any](t, nil, p)", verdict: "fail"},
+	{Desc: "Equal[error] of nil and a nil *myErr", group: groupTypeArgs, decls: myErr,
+		body: "var p *myErr\n\tgotest.Equal[error](t, nil, p)", verdict: "fail"},
+	{Desc: "Equal[any] of nil and a nil slice", group: groupTypeArgs,
+		body: "var s []int\n\tgotest.Equal[any](t, nil, s)", verdict: "fail"},
+	{Desc: "Equal of nil and a nil slice", group: groupTypeArgs,
+		body: "var s []int\n\tgotest.Equal(t, nil, s)", rules: []string{simplify}, want: "gotest.Nil(t, s)", verdict: "pass"},
+
+	// errors.Is matches a nil target to a nil error; ErrorIs fails it.
+	{Desc: "True of errors.Is with a target holding nil", group: groupErrorsIs, imports: []string{"errors"},
+		body: "var err, target error\n\tgotest.True(t, errors.Is(err, target))", rules: []string{simplify}, verdict: "pass"},
+	{Desc: "True of errors.Is with a nil target", group: groupErrorsIs, imports: []string{"errors"},
+		body: "var err error\n\tgotest.True(t, errors.Is(err, nil))", rules: []string{simplify}, want: "gotest.NoError(t, err)", verdict: "pass"},
+
+	// A guard fails the assertion on every input; its replacement would not.
+	{Desc: "ErrorIs with a nil target", group: groupGuards,
+		body: "var err error\n\tgotest.ErrorIs(t, err, nil)", rules: []string{simplify}, verdict: "fail"},
+	{Desc: "ErrorContains with an empty substring", group: groupGuards, imports: []string{"errors"},
+		body: "err := errors.New(\"boom\")\n\tgotest.ErrorContains(t, err, \"\")", rules: []string{simplify}, verdict: "fail"},
+
+	// A removed assertion must fail wherever the one after it does.
+	{Desc: "NotNil of a string before Contains", group: groupRedundant,
+		body: "s := \"abc\"\n\tgotest.NotNil(t, s)\n\tgotest.Contains(t, s, \"b\")", rules: []string{typeGuard}, verdict: "fail"},
+	{Desc: "NotNil of a string before NotEmpty", group: groupRedundant,
+		body: "s := \"abc\"\n\tgotest.NotNil(t, s)\n\tgotest.NotEmpty(t, s)", rules: []string{typeGuard}, verdict: "fail"},
+	{Desc: "NotEmpty of an empty string before Contains of an empty needle", group: groupRedundant,
+		body: "s := \"\"\n\tgotest.NotEmpty(t, s)\n\tgotest.Contains(t, s, \"\")", verdict: "fail"},
+	{Desc: "NotNil of a slice before Contains", group: groupRedundant,
+		body: "s := []int{1}\n\tgotest.NotNil(t, s)\n\tgotest.Contains(t, s, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, s)", verdict: "pass"},
+	{Desc: "NotEmpty of a string before Contains of a non-empty needle", group: groupRedundant,
+		body: "s := \"abc\"\n\tgotest.NotEmpty(t, s)\n\tgotest.Contains(t, s, \"b\")", rules: []string{redundant}, gone: "gotest.NotEmpty(t, s)", verdict: "pass"},
 }
 
 // rowPkg names the package row i is staged in.
@@ -227,6 +306,54 @@ func (s *LinterRewritesTestSuite) TestOrderings(t *gotest.T) {
 	})
 }
 
+func (s *LinterRewritesTestSuite) TestLengths(t *gotest.T) {
+	t.When("an assertion checks a length", func(w *gotest.T) {
+		w.It("a length check is rewritten only for an operand of a string, slice, map, channel or array type", func(it *gotest.T) {
+			s.checkRows(it, groupLen)
+		})
+	})
+}
+
+func (s *LinterRewritesTestSuite) TestEqualities(t *gotest.T) {
+	t.When("True or False asserts an == or != comparison", func(w *gotest.T) {
+		w.It("pointers are compared with Same, values that reach no pointer with Equal, and nothing else is rewritten", func(it *gotest.T) {
+			s.checkRows(it, groupEquality)
+		})
+	})
+}
+
+func (s *LinterRewritesTestSuite) TestTypeArguments(t *gotest.T) {
+	t.When("Equal compares an operand with nil under an explicit type argument", func(w *gotest.T) {
+		w.It("Equal is not rewritten, since the type argument decides what it compares", func(it *gotest.T) {
+			s.checkRows(it, groupTypeArgs)
+		})
+	})
+}
+
+func (s *LinterRewritesTestSuite) TestErrorsIs(t *gotest.T) {
+	t.When("True asserts an errors.Is call", func(w *gotest.T) {
+		w.It("ErrorIs is named without a fix unless the target is the nil literal", func(it *gotest.T) {
+			s.checkRows(it, groupErrorsIs)
+		})
+	})
+}
+
+func (s *LinterRewritesTestSuite) TestGuards(t *gotest.T) {
+	t.When("ErrorIs is given a nil target or ErrorContains an empty substring", func(w *gotest.T) {
+		w.It("the assertion the guard names is offered without a fix", func(it *gotest.T) {
+			s.checkRows(it, groupGuards)
+		})
+	})
+}
+
+func (s *LinterRewritesTestSuite) TestRedundancies(t *gotest.T) {
+	t.When("an assertion is followed by one that checks the same operand", func(w *gotest.T) {
+		w.It("the first is removed only where the second fails on every input the first fails", func(it *gotest.T) {
+			s.checkRows(it, groupRedundant)
+		})
+	})
+}
+
 // checkRows holds each row of group to its findings, its fix, and a verdict
 // the fix leaves as it was.
 func (s *LinterRewritesTestSuite) checkRows(t *gotest.T, group string) {
@@ -249,9 +376,12 @@ func (s *LinterRewritesTestSuite) checkRows(t *gotest.T, group string) {
 		fixed := s.fixed[pkg]
 		gotest.Empty(t, s.fixErr[pkg], "fixed source:\n%s", fixed)
 		gotest.Equal(t, s.before[pkg], s.after[pkg], "fixed source:\n%s", fixed)
-		if r.row.want == "" {
+		switch {
+		case r.row.gone != "":
+			gotest.NotContains(t, fixed, "\t"+r.row.gone+"\n")
+		case r.row.want == "":
 			gotest.Equal(t, src, fixed)
-		} else {
+		default:
 			gotest.Contains(t, fixed, "\t"+r.row.want+"\n")
 		}
 		gotest.Equal(t, r.row.rules, s.findings[pkg], "source:\n%s", src)

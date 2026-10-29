@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / the assertion the guard names is offered without a fix( / .*)? \(
+Clause: when ErrorIs is given a nil target or ErrorContains an empty substring → the assertion the guard names is offered without a fix
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -655,8 +655,7 @@
+ 	if !isNilIdent(call.Args[2]) {
+ 		return
+ 	}
+-	// No fix: the guard fails ErrorIs on every input, NoError passes some.
+-	report(pass, AssertionSimplify, call.Pos(), "use NoError instead of ErrorIs for nil target — ErrorIs fails a nil target")
++	emitSimplify(pass, call, "ErrorIs", "NoError", []ast.Expr{call.Args[0], call.Args[1]}, call.Args[3:], "nil target")
+ }
+ 
+ // --- ErrorContains type guard ---

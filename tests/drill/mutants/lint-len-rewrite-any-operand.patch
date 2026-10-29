@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / a length check is rewritten only for an operand of a string, slice, map, channel or array type( / .*)? \(
+Clause: when an assertion checks a length → a length check is rewritten only for an operand of a string, slice, map, channel or array type
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -942,7 +942,7 @@
+ 	case *types.Basic:
+ 		return u.Info()&types.IsString != 0
+ 	}
+-	return false
++	return true
+ }
+ 
+ // isBoolType reports whether expr is a bool, the one type True and False take.

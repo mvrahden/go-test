@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / the first is removed only where the second fails on every input the first fails( / .*)? \(
+Clause: when an assertion is followed by one that checks the same operand → the first is removed only where the second fails on every input the first fails
+--- a/internal/lint/redundant.go
++++ b/internal/lint/redundant.go
+@@ -107,9 +107,6 @@
+ // Contains finds an empty string in an empty one.
+ func isRedundantBefore(pass *analysis.Pass, first, second *parsedAssertion) string {
+ 	weaker, stronger, strongerCall := first.name, second.name, second.call
+-	if weaker == "NotNil" && nilKindOf(pass, first.guardedArg) == notNilable {
+-		return ""
+-	}
+ 	if weaker == "NotEmpty" && stronger == "Contains" && mayBeEmptyString(pass, strongerCall.Args[2]) {
+ 		return ""
+ 	}
