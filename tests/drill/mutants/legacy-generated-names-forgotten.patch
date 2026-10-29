@@ -9,5 +9,5 @@ Clause: when a package holds a generated file from an earlier generate → a leg
 -var GeneratedFileNames = []string{PSuite, PXSuite, LegacyPSuite, LegacyPXSuite}
 +var GeneratedFileNames = []string{PSuite, PXSuite}
  
- var PSuiteRegex = regexp.MustCompile(`(gotest|ƒƒ)_p(x)?suite_test\.go$`)
- 
+ // PSuiteRegex matches a generated file's name, alone or ending a path.
+ var PSuiteRegex = regexp.MustCompile(`(?:^|[/\\])(gotest|ƒƒ)_p(x)?suite_test\.go$`)
