@@ -12,8 +12,7 @@ import (
 type FuzzSelectionTestSuite struct{}
 
 func (s *FuzzSelectionTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~63s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 // runSelect runs the fzselect package with args and returns the run and its

@@ -15,8 +15,7 @@ import (
 type SnapshotKeysTestSuite struct{}
 
 func (s *SnapshotKeysTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~89s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *SnapshotKeysTestSuite) TestKeys(t *gotest.T) {

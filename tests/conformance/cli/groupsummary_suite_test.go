@@ -16,7 +16,7 @@ import (
 type CLIGroupSummaryTestSuite struct{}
 
 func (s *CLIGroupSummaryTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Timeout: 45 * time.Second}
 }
 
 func (s *CLIGroupSummaryTestSuite) TestTheSummaryNamesEachGroup(t *gotest.T) {

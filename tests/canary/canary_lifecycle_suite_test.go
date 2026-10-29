@@ -21,8 +21,7 @@ import (
 type CanaryLifecycleTestSuite struct{ canary }
 
 func (s *CanaryLifecycleTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Slowest method ~27s locally, ~40s estimated for Windows CI, setup ~13s; budgets are about twice that.
-	return gotest.SuiteConfig{Timeout: 90 * time.Second, SetupTimeout: 30 * time.Second}
+	return gotest.SuiteConfig{Timeout: time.Minute, SetupTimeout: 30 * time.Second}
 }
 
 func (s *CanaryLifecycleTestSuite) BeforeAll(t *gotest.T) { s.open(t) }

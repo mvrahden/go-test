@@ -19,8 +19,7 @@ import (
 type BenchGateTestSuite struct{}
 
 func (s *BenchGateTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~39s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 // foreignBaseline is a baseline whose only benchmark lives in a package this

@@ -300,8 +300,7 @@ func FuzzAddAfterFuzz(f *testing.F) {
 type FWrapperTestSuite struct{}
 
 func (s *FWrapperTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~19s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *FWrapperTestSuite) TestAssertionContract(t *gotest.T) {

@@ -12,7 +12,6 @@ import (
 type CLIGoTestFlagsTestSuite struct{}
 
 func (s *CLIGoTestFlagsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~14s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 

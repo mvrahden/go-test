@@ -15,7 +15,6 @@ import (
 type BenchSaveTestSuite struct{}
 
 func (s *BenchSaveTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~14s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 

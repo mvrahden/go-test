@@ -25,9 +25,7 @@ type BenchCommandTestSuite struct {
 }
 
 func (s *BenchCommandTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: a bench run takes up to ~20s there and no
-	// method makes more than one; each budget is about twice that.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second, SetupTimeout: 45 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *BenchCommandTestSuite) BeforeAll(t *gotest.T) {

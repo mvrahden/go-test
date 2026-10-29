@@ -19,8 +19,7 @@ type MigratePackageTestSuite struct {
 }
 
 func (s *MigratePackageTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~98s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 // migrateDir migrates the module files make up with patterns.

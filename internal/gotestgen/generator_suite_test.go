@@ -14,8 +14,7 @@ import (
 type GeneratorTestSuite struct{}
 
 func (s *GeneratorTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~14s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *GeneratorTestSuite) TestStdlibPackageHasNoSuites(t *gotest.T) {

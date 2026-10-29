@@ -25,9 +25,7 @@ const deadPID = "999999999"
 type CLIDirTestSuite struct{}
 
 func (s *CLIDirTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Two methods build the CLI: past 30s on a cold Windows runner, so twice
-	// that.
-	return gotest.SuiteConfig{Timeout: time.Minute}
+	return gotest.SuiteConfig{Timeout: 30 * time.Second}
 }
 
 func (s *CLIDirTestSuite) TestStaleCLIDirsAreSwept(t *gotest.T) {

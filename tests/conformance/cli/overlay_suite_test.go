@@ -17,9 +17,7 @@ import (
 type CLIOverlayTestSuite struct{}
 
 func (s *CLIOverlayTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on linux: the 16-run method ~6s. Not yet measured on Windows
-	// CI, whose process starts and file writes are far slower; 2m leaves room.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 func (s *CLIOverlayTestSuite) TestConcurrentRunsSharingACache(t *gotest.T) {

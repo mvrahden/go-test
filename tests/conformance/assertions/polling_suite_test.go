@@ -171,8 +171,7 @@ func (s *PollingTestSuite) TestArguments(t *gotest.T) {
 type AbandonedPollTestSuite struct{}
 
 func (s *AbandonedPollTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~50s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Timeout: 45 * time.Second}
 }
 
 func (s *AbandonedPollTestSuite) TestLatePanic(t *gotest.T) {

@@ -15,9 +15,7 @@ import (
 type CLIStreamsTestSuite struct{}
 
 func (s *CLIStreamsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on Windows CI: slowest method ~12s, over 30s on a loaded
-	// runner. The CLI runs end with the method's context.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 type streamRow struct {

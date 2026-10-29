@@ -17,8 +17,7 @@ import (
 type HoldsTestSuite struct{ root string }
 
 func (s *HoldsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~16s, setup ~38s; budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 90 * time.Second}
 }
 
 var plainPackages = []string{"./testdata/holds/", "./testdata/panics/"}

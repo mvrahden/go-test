@@ -14,8 +14,7 @@ import (
 type DeadlineNamingTestSuite struct{}
 
 func (s *DeadlineNamingTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~35s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 // runUntilTimeout runs pkg until a short --timeout ends it. A first run with

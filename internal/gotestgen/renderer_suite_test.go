@@ -14,7 +14,6 @@ import (
 type RendererTestSuite struct{}
 
 func (s *RendererTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on macOS CI: slowest method ~24s; the budget is twice that, rounded up.
 	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 

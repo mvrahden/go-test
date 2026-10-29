@@ -20,7 +20,7 @@ type ShutdownInterruptTestSuite struct {
 
 func (s *ShutdownInterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
 	// BeforeAll compiles, so its time is no verdict.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *ShutdownInterruptTestSuite) BeforeAll(t *gotest.T) {

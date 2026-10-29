@@ -13,8 +13,7 @@ import (
 type CanaryBudgetsTestSuite struct{ canary }
 
 func (s *CanaryBudgetsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Slowest method ~33s locally, ~50s estimated for Windows CI, setup ~13s; budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 30 * time.Second}
+	return gotest.SuiteConfig{Timeout: 90 * time.Second, SetupTimeout: 30 * time.Second}
 }
 
 func (s *CanaryBudgetsTestSuite) BeforeAll(t *gotest.T) { s.open(t) }

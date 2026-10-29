@@ -28,8 +28,7 @@ type LauncherSignalTestSuite struct {
 }
 
 func (s *LauncherSignalTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~75s, setup ~45s; budgets are twice that, rounded up.
-	return gotest.SuiteConfig{Timeout: 3 * time.Minute, SetupTimeout: 90 * time.Second}
+	return gotest.SuiteConfig{Timeout: 2 * time.Minute, SetupTimeout: 90 * time.Second}
 }
 
 func (s *LauncherSignalTestSuite) BeforeAll(t *gotest.T) {

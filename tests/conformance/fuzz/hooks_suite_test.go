@@ -12,8 +12,7 @@ import (
 type FuzzHooksTestSuite struct{}
 
 func (s *FuzzHooksTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~62s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *FuzzHooksTestSuite) TestBeforeEachLeaves(t *gotest.T) {

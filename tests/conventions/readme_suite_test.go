@@ -18,8 +18,7 @@ import (
 type ReadmeExampleTestSuite struct{}
 
 func (s *ReadmeExampleTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~32s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 // durations replaces every "(12ms)", "(<1ms)" or "(0.01s)" so two runs compare.

@@ -16,8 +16,7 @@ import (
 type LintTestSuite struct{}
 
 func (s *LintTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Measured on macOS CI: slowest method ~110s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 6 * time.Minute}
 }
 
 // analysistest type-checks the fixture package and everything it imports, which

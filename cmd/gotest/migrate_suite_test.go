@@ -26,8 +26,7 @@ type MigrateCLITestSuite struct {
 }
 
 func (s *MigrateCLITestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~53s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 2 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 func (s *MigrateCLITestSuite) BeforeAll(t *gotest.T) {

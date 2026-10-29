@@ -19,8 +19,7 @@ type MigrateFileTestSuite struct {
 }
 
 func (s *MigrateFileTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// Estimated for Windows CI: slowest method ~96s; the budget is twice that, rounded up.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 4 * time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 90 * time.Second}
 }
 
 type migrateFileCtx struct{}

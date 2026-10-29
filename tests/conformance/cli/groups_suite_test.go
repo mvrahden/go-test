@@ -16,7 +16,7 @@ import (
 type CLIGroupsTestSuite struct{}
 
 func (s *CLIGroupsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *CLIGroupsTestSuite) TestSelection(t *gotest.T) {
