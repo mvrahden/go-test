@@ -644,6 +644,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-erg-unknown-nolint-suppressible` | the unknown-rule finding goes through nolint suppression | conformance: the lint It for `nolint:all,not-a-rule` finds the comment silencing its own finding |
 | `lint-erg-foreign-nolint-unknown` | a golangci-lint linter's id counts as an unknown rule | conformance: the lint It for another linter's rule finds a `nolint-unknown` finding |
 | `lint-erg-generated-untracked-reported` | `generated-file` reports a generated file git does not track | conformance: the lint It for an untracked generated file finds it reported |
+| `lint-erg-git-failure-reads-as-outside` | `generated-file` reads every git failure as lying outside a repository | conformance: the lint It for an unreadable repository finds the plain checked-in finding |
 | `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
 | `lint-erg-generated-no-git-dropped` | `generated-file` reads a failed `git ls-files` as untracked | conformance: the lint It outside a git repository finds no finding |
 | `lint-erg-integrity-skip-usage` | `-skip-<integrity rule>` falls through to the driver's usage text | conformance: the lint It for `-skip-focus` finds the usage text instead of the refusal |

@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/lint LinterErgonomics .* / outside a git repository 
 Clause: when a generated file is on disk → outside a git repository a generated file is a finding
 --- a/internal/lint/lint.go
 +++ b/internal/lint/lint.go
-@@ -1190,7 +1190,7 @@
- 	cmd := exec.Command("git", "ls-files", "-z", "--", filepath.Base(path)) //nolint:gosec // G204: git with a file the load read
- 	cmd.Dir = filepath.Dir(path)
- 	out, err := cmd.Output()
--	return err == nil && len(out) == 0
-+	return err != nil || len(out) == 0
- }
- 
- func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
+@@ -1169,7 +1169,7 @@
+ 	case err == nil:
+ 		return len(out) > 0, nil
+ 	case strings.Contains(stderr.String(), "not a git repository"):
+-		return true, nil
++		return false, nil
+ 	}
+ 	if msg := strings.TrimSpace(stderr.String()); msg != "" {
+ 		return false, errors.New(msg)

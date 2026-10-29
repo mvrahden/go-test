@@ -1,6 +1,8 @@
 package lint
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -1142,19 +1144,37 @@ func isTMethodCall(info *types.Info, expr ast.Expr) bool {
 func checkOrphanedFiles(pass *analysis.Pass) {
 	for _, file := range pass.Files {
 		name := filepath.Base(pass.Fset.File(file.Pos()).Name())
-		if about.PSuiteRegex.MatchString(name) && !untracked(pass.Fset.File(file.Pos()).Name()) {
+		if !about.PSuiteRegex.MatchString(name) {
+			continue
+		}
+		switch tracked, err := gitTracks(pass.Fset.File(file.Pos()).Name()); {
+		case err != nil:
+			report(pass, GeneratedFile, file.Pos(), "generated file %s may be checked into version control: git cannot tell (%v)", name, err)
+		case tracked:
 			report(pass, GeneratedFile, file.Pos(), "generated file %s should not be checked into version control", name)
 		}
 	}
 }
 
-// untracked reports whether git says it does not track path; outside a
-// repository, or without git, nothing is known to be untracked.
-func untracked(path string) bool {
+// gitTracks reports whether path may be in version control: true when git
+// tracks it or when it lies outside a git repository. err says why git could
+// not tell, git missing or its repository unreadable.
+func gitTracks(path string) (bool, error) {
 	cmd := exec.Command("git", "ls-files", "-z", "--", filepath.Base(path)) //nolint:gosec // G204: git with a file the load read
 	cmd.Dir = filepath.Dir(path)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
-	return err == nil && len(out) == 0
+	switch {
+	case err == nil:
+		return len(out) > 0, nil
+	case strings.Contains(stderr.String(), "not a git repository"):
+		return true, nil
+	}
+	if msg := strings.TrimSpace(stderr.String()); msg != "" {
+		return false, errors.New(msg)
+	}
+	return false, err
 }
 
 func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {

@@ -71,6 +71,15 @@ func (s *LinterErgonomicsTestSuite) TestGeneratedFile(t *gotest.T) {
 			dir := stageGenerated(it)
 			gotest.Contains(it, generatedFindings(it, dir), finding)
 		})
+		w.It("where git cannot read its repository, the finding says git cannot tell whether it is tracked", func(it *gotest.T) {
+			dir := stageGenerated(it, "init")
+			index := filepath.Join(filepath.Dir(dir), ".git", "index")
+			gotest.NoError(it, os.WriteFile(index, []byte("not an index"), 0o600))
+			got := generatedFindings(it, dir)
+			gotest.NotContains(it, got, finding)
+			gotest.Len(it, onLine(got, "gotest_psuite_test.go:1:1"), 1, got)
+			gotest.Regexp(it, `^generated-file gotest_psuite_test\.go:1:1: generated file gotest_psuite_test\.go may be checked into version control: git cannot tell \(.*index`, onLine(got, "gotest_psuite_test.go:1:1")[0])
+		})
 	})
 }
 

@@ -46,13 +46,14 @@ A nolint comment with no rule or with all SHALL suppress every rule on its line;
 - **THEN** lint leaves the rule to that linter and suppresses none of its own
 
 ### Requirement: Generated files
-Lint SHALL report a generated file only when git tracks it or when it lies outside a git repository.
+Lint SHALL report a generated file only when git tracks it or when it lies outside a git repository, and SHALL say so where git cannot tell.
 
 #### Scenario: A generated file on disk
 - **WHEN** a generated file is on disk
 - **THEN** an untracked generated file is not a finding
 - **AND** a generated file git tracks is a finding
 - **AND** outside a git repository a generated file is a finding
+- **AND** where git cannot read its repository, the finding says git cannot tell whether it is tracked
 
 ### Requirement: Integrity rules
 Lint SHALL refuse a command-line skip of an integrity rule, say why it cannot be skipped and exit 2.
