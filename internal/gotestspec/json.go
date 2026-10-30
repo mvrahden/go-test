@@ -29,7 +29,10 @@ type jsonPackage struct {
 	Path string `json:"path"`
 	// Dir is the package's directory, when its specification was read from
 	// source (--static, --declared).
-	Dir      string     `json:"dir,omitempty"`
+	Dir string `json:"dir,omitempty"`
+	// RunLevel marks a package the run booked for itself rather than for
+	// an import path, as its events did.
+	RunLevel bool       `json:"runLevel,omitempty"`
 	Status   string     `json:"status"`
 	Duration float64    `json:"duration"`
 	Nodes    []jsonNode `json:"nodes"`
@@ -95,17 +98,19 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 		Stats:    jsonStats(stats),
 	}
 
+	// Every package stays, with its stats: hiding leaves out rows, never a
+	// count. One whose rows are all hidden keeps no node.
 	for _, pkg := range packages {
-		if !cfg.packageShown(pkg) {
-			continue
-		}
 		output := pkg.Output
-		if output == nil {
+		if output == nil || cfg.hidden[StatusFail] {
+			// The failure a package carries on its own is a row the
+			// other formats leave out under --hide=fail.
 			output = []string{}
 		}
 		jp := jsonPackage{
 			Path:     pkg.Path,
 			Dir:      pkg.Dir,
+			RunLevel: pkg.RunLevel,
 			Status:   statusString(pkg.Status),
 			Duration: PackageDuration(pkg).Seconds(),
 			Nodes:    cfg.convertNodes(pkg.Nodes),

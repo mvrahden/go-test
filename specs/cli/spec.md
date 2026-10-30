@@ -154,7 +154,7 @@ The scaffold subcommand SHALL write only code that compiles. It SHALL refuse wit
 - **THEN** writes a file go vet passes
 
 ### Requirement: The go test -json stream
-The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. Every event of a package the run books for itself rather than for an import path (`shared fixtures`, `interrupted`, `global --timeout`, `go build`) SHALL carry `"RunLevel":true`, its start line included, and no event of another package SHALL carry it. A consumer that decodes the events with encoding/json into go test's own event type ignores the field.
+The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. Every event of a package the run books for itself rather than for an import path (`shared fixtures`, `interrupted`, `global --timeout`, `go build`) SHALL carry `"RunLevel":true`, its start line included, and no event of another package SHALL carry it; spec's JSON document SHALL mark such a package `"runLevel":true`. A consumer that decodes the events with encoding/json into go test's own event type ignores the field.
 
 #### Scenario: Asking for the stream
 - **WHEN** the go test -json stream is asked for
@@ -163,6 +163,7 @@ The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. 
 #### Scenario: A package the run books for itself
 - **WHEN** a -json run's shared fixture does not come up
 - **THEN** marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package
+- **AND** spec's JSON document of that stream marks the shared fixtures package runLevel, and no other
 
 ### Requirement: JSON documents
 A JSON document gotest is asked for SHALL be one document on stdout, with no color codes and no annotations, inside GitHub Actions too. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.

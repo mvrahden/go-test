@@ -18,6 +18,7 @@ type specPackage struct {
 	Dir    string     `json:"dir"`
 	Status string     `json:"status"`
 	Nodes  []specNode `json:"nodes"`
+	Output []string   `json:"output"`
 	Stats  *specStats `json:"stats"`
 }
 
@@ -38,6 +39,8 @@ type specStats struct {
 	Failed    int `json:"failed"`
 	Skipped   int `json:"skipped"`
 	NotRun    int `json:"notRun"`
+	// FailedPackages counts packages that failed on their own.
+	FailedPackages int `json:"failedPackages"`
 }
 
 // spec runs gotest spec from this directory and fails t unless it exits as

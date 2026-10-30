@@ -101,6 +101,31 @@ func (s *SpecDeclaredTestSuite) TestRowsOnlyARunCanName(t *gotest.T) {
 	})
 }
 
+func (s *SpecDeclaredTestSuite) TestASuiteItsGuardKeptFromRunning(t *gotest.T) {
+	const guarded = "../testdata/declaredguard/"
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), guarded)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	input := filepath.Join(t.TempDir(), "events.jsonl")
+	gotest.NoError(t, os.WriteFile(input, []byte(run.Stdout), 0o600))
+	t.When("a stream holds the skip of a suite its guard kept from running, rendered with --declared", func(w *gotest.T) {
+		w.It("reads the suite's declared methods and rows as skipped, not as not run, and counts them so", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--input="+input, "--declared", guarded)
+			gotest.Len(it, doc.Packages, 1)
+			nodes := doc.Packages[0].Nodes
+			gotest.Equal(it, "skip", node(it, nodes, "TestGuardedTestSuite").Status)
+			gotest.Equal(it, "skip", node(it, nodes, "TestGuardedTestSuite", "TestGuarded").Status)
+			for _, leaf := range []string{"passes", "passes_again"} {
+				gotest.Equal(it, "skip", node(it, nodes, "TestGuardedTestSuite", "TestGuarded", "the_guard_lets_the_suite_run", leaf).Status)
+			}
+			gotest.Equal(it, 2, doc.Stats.Skipped)
+			gotest.Zero(it, doc.Stats.NotRun)
+			plain := specJSON(it, 0, "--input="+input)
+			gotest.Equal(it, 1, plain.Stats.Skipped)
+		})
+	})
+}
+
 // discovered is what gotest discover says of a package's suites.
 type discovered struct {
 	Packages []struct {

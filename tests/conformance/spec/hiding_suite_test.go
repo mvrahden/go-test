@@ -66,13 +66,46 @@ func (s *SpecHidingTestSuite) TestHidingWhatPassed(t *gotest.T) {
 func (s *SpecHidingTestSuite) TestHidingAGreenRun(t *gotest.T) {
 	t.When("a stream in which everything passed is rendered with --hide=pass", func(w *gotest.T) {
 		w.It("renders the trailer and no row", func(it *gotest.T) {
-			doc := specJSON(it, 0, "--hide=pass", greenStream)
-			gotest.Empty(it, doc.Packages)
-			gotest.Equal(it, 4, doc.Stats.Passed)
 			terminal := spec(it, 0, "--hide=pass", greenStream)
-			gotest.Equal(it, "\n2 suites, 4 behaviors: 4 passed\n", terminal.Stdout)
+			gotest.Equal(it, "\n3 suites, 5 behaviors: 5 passed\n", terminal.Stdout)
 			markdown := spec(it, 0, "--format=md", "--hide=pass", greenStream)
-			gotest.Equal(it, "# Behavior Specification\n\n2 suites, 4 behaviors: 4 passed, 0 failed, 0 skipped.\n\n", markdown.Stdout)
+			gotest.Equal(it, "# Behavior Specification\n\n3 suites, 5 behaviors: 5 passed, 0 failed, 0 skipped.\n\n", markdown.Stdout)
+		})
+		w.It("keeps every package in the JSON document with all of its stats and none of its rows", func(it *gotest.T) {
+			hidden := specJSON(it, 0, "--hide=pass", greenStream)
+			whole := specJSON(it, 0, "--hide=", greenStream)
+			gotest.Equal(it, 5, hidden.Stats.Passed)
+			gotest.Len(it, hidden.Packages, 2)
+			gotest.Len(it, whole.Packages, 2)
+			for i, pkg := range hidden.Packages {
+				gotest.Equal(it, whole.Packages[i].Path, pkg.Path)
+				gotest.Empty(it, pkg.Nodes)
+				gotest.NotZero(it, pkg.Stats)
+				gotest.Equal(it, *whole.Packages[i].Stats, *pkg.Stats)
+				gotest.NotZero(it, pkg.Stats.Passed)
+			}
+		})
+	})
+}
+
+func (s *SpecHidingTestSuite) TestHidingAPackagesOwnFailure(t *gotest.T) {
+	const broken = "--input=../testdata/specstreams/buildfail.jsonl"
+	t.When("a stream whose package failed to build is rendered with --hide=fail", func(w *gotest.T) {
+		w.It("leaves the package's failure and its output out of every format, its stats still counting it", func(it *gotest.T) {
+			shown := spec(it, 0, "--render-only", broken)
+			gotest.Contains(it, shown.Stdout, "syntax error")
+			terminal := spec(it, 0, "--render-only", "--hide=fail", broken)
+			gotest.Equal(it, "\n0 suites: 1 failed package\n", terminal.Stdout)
+			markdown := spec(it, 0, "--render-only", "--format=md", "--hide=fail", broken)
+			gotest.NotContains(it, markdown.Stdout, "FAILED")
+			gotest.NotContains(it, markdown.Stdout, "syntax error")
+			run := spec(it, 0, "--render-only", "--format=json", "--hide=fail", broken)
+			gotest.NotContains(it, run.Stdout, "syntax error")
+			doc := specJSON(it, 0, "--render-only", "--hide=fail", broken)
+			gotest.Len(it, doc.Packages, 1)
+			gotest.Empty(it, doc.Packages[0].Output)
+			gotest.Equal(it, 1, doc.Packages[0].Stats.FailedPackages)
+			gotest.Equal(it, 1, doc.Stats.FailedPackages)
 		})
 	})
 }

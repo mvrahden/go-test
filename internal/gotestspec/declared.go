@@ -9,7 +9,8 @@ import "sort"
 // and benchmark result, and keeps what the source says of it: kind, label,
 // vocabulary, focus, exclusion, completeness and position. One the stream
 // did not report has no verdict and is NotRun, unless the X_ prefix excludes
-// it or an ancestor: the run skips those, so they read as skipped. Nodes and
+// it or an ancestor, or the run skipped an ancestor (a suite its guard kept
+// from running): those read as skipped. Nodes and
 // packages only the stream holds — rows of a table the source cannot list,
 // packages outside the declared ones, the run's own bookings — are kept as
 // observed, under their declared parent.
@@ -52,7 +53,10 @@ func Overlay(declared, observed []*Package) []*Package {
 // observed ones the source does not declare. A suite that declares neither a
 // test method nor a fuzz target (benchmarks only) states nothing a test run
 // reports, so it is left out unless the stream holds it.
-func overlayNodes(declared, observed []*Node, excluded bool) []*Node {
+//
+// skipped says a declared node the stream did not report was skipped: its
+// ancestor is excluded by the X_ prefix, or the run skipped it.
+func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
 	used := make([]bool, len(observed))
 	ordinal := map[string]int{}
 	out := make([]*Node, 0, len(declared)+len(observed))
@@ -74,7 +78,7 @@ func overlayNodes(declared, observed []*Node, excluded bool) []*Node {
 			if d.Kind == KindSuite && len(d.Children) == 0 {
 				continue
 			}
-			notRun([]*Node{d}, excluded)
+			notRun([]*Node{d}, skipped)
 			out = append(out, d)
 			continue
 		}
@@ -85,7 +89,7 @@ func overlayNodes(declared, observed []*Node, excluded bool) []*Node {
 		d.External, d.Variant = o.External, o.Variant
 		d.Iterations, d.NsPerOp, d.BytesPerOp, d.AllocsPerOp = o.Iterations, o.NsPerOp, o.BytesPerOp, o.AllocsPerOp
 		d.Metrics, d.Procs = o.Metrics, o.Procs
-		d.Children = overlayNodes(d.Children, o.Children, excluded || d.Excluded)
+		d.Children = overlayNodes(d.Children, o.Children, skipped || d.Excluded || o.Status == StatusSkip)
 		out = append(out, d)
 	}
 	for i, o := range observed {
@@ -97,10 +101,10 @@ func overlayNodes(declared, observed []*Node, excluded bool) []*Node {
 }
 
 // notRun marks declared nodes the stream did not report: NotRun, or skipped
-// where the X_ prefix excludes them.
-func notRun(nodes []*Node, excluded bool) {
+// where the X_ prefix excludes them or the run skipped an ancestor.
+func notRun(nodes []*Node, skippedAbove bool) {
 	for _, n := range nodes {
-		skipped := excluded || n.Excluded
+		skipped := skippedAbove || n.Excluded
 		if skipped {
 			n.Status = StatusSkip
 		} else {
