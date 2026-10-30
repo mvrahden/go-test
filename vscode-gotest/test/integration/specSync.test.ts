@@ -599,6 +599,105 @@ describe("a branch's own verdict", () => {
   });
 });
 
+describe("go to source", () => {
+  it("links every declared When and It to its line, not only suites and methods", async () => {
+    const cache = new DiscoveryCache();
+    cache.update(
+      [
+        {
+          importPath: "example.com/cart",
+          dir: "/src/cart",
+          suites: [
+            {
+              name: "CartTestSuite",
+              parallel: false,
+              focused: false,
+              excluded: false,
+              guarded: false,
+              file: "cart_test.go",
+              line: 5,
+              col: 6,
+              lifecycle: [],
+              fixtures: [],
+              methods: [
+                {
+                  name: "TestAdd",
+                  parallel: false,
+                  focused: false,
+                  excluded: false,
+                  file: "add_test.go",
+                  line: 10,
+                  col: 1,
+                  behaviors: [
+                    {
+                      name: "an_empty_cart",
+                      display: "when an empty cart",
+                      kind: "when",
+                      line: 11,
+                      children: [
+                        {
+                          name: "holds_one_item",
+                          display: "holds one item",
+                          kind: "it",
+                          line: 12,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+              benchmarks: [],
+              fuzzers: [],
+            },
+          ],
+        } as never,
+      ],
+      true,
+      "/src",
+    );
+    const nested = [
+      "TestCartTestSuite",
+      "TestCartTestSuite/TestAdd",
+      "TestCartTestSuite/TestAdd/an_empty_cart",
+      "TestCartTestSuite/TestAdd/an_empty_cart/holds_one_item",
+    ];
+    const events = [
+      ...nested.map((t) => ({
+        Action: "run",
+        Package: "example.com/cart",
+        Test: t,
+      })),
+      ...[...nested].reverse().map((t) => ({
+        Action: "pass",
+        Package: "example.com/cart",
+        Test: t,
+        Elapsed: 0.01,
+      })),
+      { Action: "pass", Package: "example.com/cart", Elapsed: 0.02 },
+    ];
+    const recorder = createRecordingChannel();
+    const panel = new SpecViewPanel(recorder.channel as never, cache);
+    await panel.show();
+    await panel.refresh({
+      stream: events.map((e) => JSON.stringify(e)).join("\n"),
+      folder: state.workspaceDir,
+    });
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    const rowOf = (display: string) => {
+      const at = html.indexOf(`data-display="${display}"`);
+      return html.slice(at, html.indexOf("\n", html.indexOf("<span", at)));
+    };
+    expect(rowOf("an empty cart")).toContain(
+      'data-loc-file="/src/cart/add_test.go" data-loc-line="11"',
+    );
+    expect(rowOf("holds one item")).toContain(
+      'data-loc-file="/src/cart/add_test.go" data-loc-line="12"',
+    );
+  });
+});
+
 describe("clearing drops the kept runs", () => {
   // Clearing has to drop what is kept, not just repaint, or the next refresh
   // would resurrect what was cleared.
