@@ -129,7 +129,7 @@ describe("fuzzSessionFile", () => {
       fuzzSessionFile({ GOTEST_CACHE_DIR: "/c", HOME: "/h" }, "linux"),
     ).toBe(path.join("/c", "fuzz-session.json"));
     expect(fuzzSessionFile({ GOTEST_CACHE_DIR: "rel" }, "linux", "/ws")).toBe(
-      path.join("/ws", "rel", "fuzz-session.json"),
+      path.resolve("/ws", "rel", "fuzz-session.json"),
     );
   });
 
