@@ -99,11 +99,12 @@ After each test run, the **Spec View** panel renders BDD-formatted output with c
 Open it with **Go Test: Show Spec View**.
 
 - **The newest verdict of everything that ran** — every package the panel has seen stays, each test with the verdict of the newest run that reported it, whichever of a run, a coverage run or a watch cycle that was; rerunning one method leaves its siblings as they were
+- **The specification under the runs** — the CLI lays a folder's runs over what the folder's source declares (`gotest spec --declared`), so a behavior no run reported is listed as *not run*, and every package and module row carries the CLI's counts
 - **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
-- **Go-to-source** — click any suite, method, When or It to navigate to its definition; `file:line` in failure output opens that line
+- **Go-to-source** — click any suite, method, fuzz target, When or It the source declares to navigate to the line the CLI names; `file:line` in failure output opens that line
 - **Run, Debug, Rerun failed** — hover a row to run or debug it; a behavior the Test Explorer does not list runs as its method
-- **Toolbar** — expand/collapse all, filter by pass/fail/skip status, search behaviors by name
-- **Copy / Clear** — copy the full spec report to clipboard or clear results
+- **Toolbar** — expand/collapse all, show or hide passed, failed, skipped and not run rows (the CLI's `--hide`; the counts stay the run's), search behaviors by name
+- **Copy / Clear** — copy what the panel shows as the CLI's Markdown, or clear results
 - **Persistence** — the panel survives editor reload and restores what it kept
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once

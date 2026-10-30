@@ -13,10 +13,19 @@ const { script, mockKill, buildCli } = vi.hoisted(() => ({
   })),
 }));
 
+const { clipboard } = vi.hoisted(() => ({ clipboard: { text: "" } }));
+
 vi.mock("vscode", () => ({
   workspace: {
     workspaceFolders: [{ uri: { fsPath: "/ws" } }],
     getConfiguration: () => ({ get: () => undefined }),
+  },
+  env: {
+    clipboard: {
+      writeText: async (t: string) => {
+        clipboard.text = t;
+      },
+    },
   },
   Uri: { file: (p: string) => ({ fsPath: p }) },
   window: {},
@@ -43,11 +52,13 @@ vi.mock("node:child_process", async () => {
 
 import { SpecViewPanel } from "./specView.js";
 
-// runSpecFromInput is private; the behaviour under test is its process handling.
+// runSpec is private; the behaviour under test is its process handling.
 function render(panel: SpecViewPanel, input: string): Promise<string> {
   return (
-    panel as unknown as { runSpecFromInput(s: string): Promise<string> }
-  ).runSpecFromInput(input);
+    panel as unknown as {
+      runSpec(s: string, folder: undefined, format: string): Promise<string>;
+    }
+  ).runSpec(input, undefined, "json");
 }
 
 const channel = {
@@ -235,5 +246,110 @@ describe("a kept-runs file of the wrong shape", () => {
         rmSync(dir, { recursive: true, force: true });
       }
     }
+  });
+});
+
+describe("what the panel asks the CLI for", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+    script.once = [];
+    script.always = undefined;
+    script.calls = [];
+  });
+
+  type Internals = {
+    runs: { merge(p: { stream: string; folder: string }): void };
+    imports: Map<string, unknown>;
+    selected: string | undefined;
+    handleMessage(msg: unknown): void;
+    renderRuns(): Promise<unknown>;
+    copy(): Promise<void>;
+  };
+  const internalsOf = (panel: SpecViewPanel) => panel as unknown as Internals;
+  const argsOfCall = (i: number) => buildCli.mock.calls[i][0];
+
+  it("lays the workspace's runs over what the folder's source declares, hiding what the toolbar hides", async () => {
+    script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
+    const patternsFor = vi.fn(async () => ["./...", "./examples/..."]);
+    const panel = new SpecViewPanel(
+      channel,
+      undefined as never,
+      undefined,
+      patternsFor,
+    );
+    const internals = internalsOf(panel);
+    internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
+    internals.handleMessage({ type: "toggleHide", status: "pass" });
+    internals.handleMessage({ type: "toggleHide", status: "none" });
+    internals.handleMessage({ type: "toggleHide", status: "pass" });
+    internals.handleMessage({ type: "toggleHide", status: "skip" });
+
+    await internals.renderRuns();
+
+    expect(patternsFor).toHaveBeenCalledWith("/ws/a");
+    expect(argsOfCall(buildCli.mock.calls.length - 1)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=json",
+      "--render-only",
+      "--hide=none,skip",
+      "--declared",
+      "./...",
+      "./examples/...",
+    ]);
+  });
+
+  it("renders an imported stream as it is, without the source under it", async () => {
+    script.always = { stdout: [doc("example.com/a", 1, 0)], code: 0 };
+    const panel = new SpecViewPanel(
+      channel,
+      undefined as never,
+      undefined,
+      async () => ["./..."],
+    );
+    const internals = internalsOf(panel);
+    const imported = new (await import("./specStore.js")).SpecStore();
+    imported.merge({ stream: runOf("example.com/a"), folder: "/ws" });
+    internals.imports.set("ci", { label: "ci.json", runs: imported });
+    internals.selected = "ci";
+
+    await internals.renderRuns();
+
+    expect(argsOfCall(0)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=json",
+      "--render-only",
+      "--hide=",
+    ]);
+  });
+
+  it("copies what it shows as the CLI's Markdown, with the same flags", async () => {
+    script.always = { stdout: ["# Behavior Specification\n"], code: 0 };
+    const panel = new SpecViewPanel(
+      channel,
+      undefined as never,
+      undefined,
+      async () => ["./..."],
+    );
+    const internals = internalsOf(panel);
+    internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
+    internals.handleMessage({ type: "toggleHide", status: "pass" });
+    await vi.waitFor(() => expect(buildCli).toHaveBeenCalled());
+    buildCli.mockClear();
+
+    await internals.copy();
+
+    expect(argsOfCall(0)).toEqual([
+      "spec",
+      "--input=-",
+      "--format=md",
+      "--render-only",
+      "--hide=pass",
+      "--declared",
+      "./...",
+    ]);
+    expect(clipboard.text).toBe("# Behavior Specification\n");
   });
 });
