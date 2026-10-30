@@ -56,7 +56,7 @@ export class SpecViewPanel implements vscode.Disposable {
   // file was read wins: the store refuses to load over newer memory.
   async load(): Promise<void> {
     const stored = await this.persisted.read();
-    if (!stored || this.runs.size > 0) return;
+    if (!stored) return;
     this.runs.restore(stored);
     this.stale = true;
   }
@@ -322,6 +322,7 @@ export class SpecViewPanel implements vscode.Disposable {
   }
 
   private persist(): void {
+    this.persisted.markMutated();
     this.persisted.save(() => this.runs.serialize());
   }
 

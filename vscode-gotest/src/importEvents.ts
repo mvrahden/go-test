@@ -76,7 +76,10 @@ export async function openEventsFile(
     vscode.window.showErrorMessage(`gotest: cannot read ${file}: ${message}`);
     return undefined;
   }
-  const events = parseTestEvents(text);
+  // A capture of gotest watch carries its cycle markers; they are not tests.
+  const events = parseTestEvents(text).filter(
+    (e) => !String(e.Action).startsWith("watch-"),
+  );
   if (events.length === 0) {
     vscode.window.showWarningMessage(
       `gotest: ${path.basename(file)} holds no go test events.`,

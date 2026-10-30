@@ -159,3 +159,32 @@ describe("which CLI renders a package", () => {
     expect(data.stats).toMatchObject({ suites: 2, passed: 3, failed: 1 });
   });
 });
+
+describe("the runs the panel keeps across a reload", () => {
+  const runs = (panel: SpecViewPanel) =>
+    (panel as unknown as { runs: { packages: string[] } }).runs.packages;
+
+  it("come back from storage, and never over a run merged first", async () => {
+    vi.useRealTimers();
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const path = await import("node:path");
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-"));
+    try {
+      const before = new SpecViewPanel(channel, undefined as never, dir);
+      await before.refresh({ stream: runOf("example.com/a"), folder: "/ws" });
+      await before.flush();
+
+      const after = new SpecViewPanel(channel, undefined as never, dir);
+      await after.load();
+      expect(runs(after)).toEqual(["example.com/a"]);
+
+      const raced = new SpecViewPanel(channel, undefined as never, dir);
+      await raced.refresh({ stream: runOf("example.com/b"), folder: "/ws" });
+      await raced.load();
+      expect(runs(raced)).toEqual(["example.com/b"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
