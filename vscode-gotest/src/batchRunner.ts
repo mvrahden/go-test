@@ -60,7 +60,7 @@ export interface BatchResult {
 
 // runPiece says which packages a filtered batch ran in part, and what of
 // them the filter asked for.
-function runPiece(
+export function runPiece(
   stdout: string,
   config: Pick<BatchConfig, "pkgInfos" | "filter" | "workspaceDir">,
 ): RunPiece {
