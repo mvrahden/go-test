@@ -77,6 +77,7 @@ export class FakeTestRun {
   readonly output: string[] = [];
   readonly coverage: unknown[] = [];
   ended = false;
+  name: string | undefined;
 
   private record(item: FakeTestItem, verdict: Verdict): void {
     this.verdicts.set(item.id, verdict);
@@ -169,8 +170,9 @@ export class FakeTestController {
     return profile;
   }
 
-  createTestRun(): FakeTestRun {
+  createTestRun(_request?: unknown, name?: string): FakeTestRun {
     const run = new FakeTestRun();
+    run.name = name;
     this.runs.push(run);
     return run;
   }

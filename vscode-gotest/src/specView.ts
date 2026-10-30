@@ -26,7 +26,14 @@ export class SpecViewPanel implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
   private lastSpecData: SpecData | undefined;
+  // The runs of this workspace, and each saved stream opened beside them.
   private readonly runs = new SpecStore();
+  private readonly imports = new Map<
+    string,
+    { label: string; runs: SpecStore }
+  >();
+  // The imported stream on show; undefined shows this workspace's runs.
+  private selected: string | undefined;
   private readonly persisted: JsonStore<StoredRecord[]>;
   private modulePaths: string[] = [];
   // Runs merged since the panel last rendered them.
@@ -191,6 +198,8 @@ export class SpecViewPanel implements vscode.Disposable {
       void this.actions.run(ids.filter((id) => typeof id === "string"));
     } else if (msg.type === "debug" && this.actions) {
       if (typeof msg.id === "string") void this.actions.debug(msg.id);
+    } else if (msg.type === "selectSource") {
+      this.select(typeof msg.id === "string" ? msg.id : undefined);
     } else if (msg.type === "runTests") {
       vscode.commands.executeCommand("testing.runAll");
     } else if (msg.type === "refresh") {
@@ -242,6 +251,8 @@ export class SpecViewPanel implements vscode.Disposable {
   clear(): void {
     this.lastSpecData = undefined;
     this.runs.clear();
+    this.imports.clear();
+    this.selected = undefined;
     this.stale = false;
     this.persist();
     if (this.panel) {
@@ -256,11 +267,50 @@ export class SpecViewPanel implements vscode.Disposable {
       this.runs.merge(piece);
     }
     this.persist();
+    // The newest change is what the panel shows.
+    this.selected = undefined;
     this.stale = true;
     if (!this.panel || this.panel.visible === false || !this.autoRefresh()) {
       return;
     }
     await this.render();
+  }
+
+  // openStream shows a saved event stream as a source of its own, beside
+  // the workspace's runs and never merged into them: it is evidence about
+  // another machine. Opening the same file again replaces it.
+  async openStream(id: string, label: string, piece: RunPiece): Promise<void> {
+    const runs = new SpecStore();
+    runs.merge(piece);
+    this.imports.set(id, { label, runs });
+    this.selected = id;
+    this.stale = true;
+    await this.show();
+  }
+
+  private select(id: string | undefined): void {
+    this.selected = id && this.imports.has(id) ? id : undefined;
+    this.stale = true;
+    void this.render();
+  }
+
+  private currentRuns(): SpecStore {
+    return (
+      (this.selected && this.imports.get(this.selected)?.runs) || this.runs
+    );
+  }
+
+  // sourcesForToolbar lists what the panel can show, once there is a choice.
+  private sourcesForToolbar(): SourceOption[] {
+    if (this.imports.size === 0) return [];
+    return [
+      { id: "", label: "Workspace runs", selected: !this.selected },
+      ...Array.from(this.imports, ([id, imp]) => ({
+        id,
+        label: `Imported: ${imp.label}`,
+        selected: id === this.selected,
+      })),
+    ];
   }
 
   private autoRefresh(): boolean {
@@ -300,12 +350,10 @@ export class SpecViewPanel implements vscode.Disposable {
 
   // renderRuns has each folder's CLI render the packages that folder ran.
   private async renderRuns(): Promise<SpecData> {
+    const runs = this.currentRuns();
     const docs: SpecData[] = [];
-    for (const folder of this.runs.folders()) {
-      const raw = await this.runSpecFromInput(
-        this.runs.compose(folder),
-        folder,
-      );
+    for (const folder of runs.folders()) {
+      const raw = await this.runSpecFromInput(runs.compose(folder), folder);
       docs.push(JSON.parse(raw) as SpecData);
     }
     return combineSpecData(docs);
@@ -400,10 +448,15 @@ export class SpecViewPanel implements vscode.Disposable {
     const body =
       msg.type === "empty"
         ? buildEmptyBody(gopherUri)
-        : buildSpecBody(msg.data, this.modulePaths, {
-            locations: locationMap,
-            dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir,
-          });
+        : buildSpecBody(
+            msg.data,
+            this.modulePaths,
+            {
+              locations: locationMap,
+              dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir,
+            },
+            this.sourcesForToolbar(),
+          );
     const stateJson =
       msg.type === "specData" ? encodeStateForScript(msg.data) : "null";
 
@@ -647,13 +700,21 @@ interface RenderEnv {
   dirOf: (pkgPath: string) => string | undefined;
 }
 
+interface SourceOption {
+  id: string;
+  label: string;
+  selected: boolean;
+}
+
 function buildSpecBody(
   data: SpecData,
   modulePaths: string[],
   env: RenderEnv,
+  sources: SourceOption[] = [],
 ): string {
   const toolbar = buildToolbar(
     data.stats.failed > 0 || (data.stats.failedPackages ?? 0) > 0,
+    sources,
   );
   const groups = groupByModule(data.packages, modulePaths);
   let tree: string;
@@ -677,9 +738,19 @@ function buildSpecBody(
 </div>`;
 }
 
-function buildToolbar(anyFailed: boolean): string {
+function buildToolbar(anyFailed: boolean, sources: SourceOption[]): string {
   const rerun = anyFailed ? "" : " disabled";
+  const picker =
+    sources.length === 0
+      ? ""
+      : `<div class="toolbar-group"><select class="source-select" id="source-select" title="Which runs to show">${sources
+          .map(
+            (o) =>
+              `<option value="${escapeAttr(o.id)}"${o.selected ? " selected" : ""}>${escapeHtml(o.label)}</option>`,
+          )
+          .join("")}</select></div>`;
   return `<div class="toolbar">
+  ${picker}
   <div class="toolbar-group">
     <button class="tool-btn" id="expand-all-btn" title="Expand all">▼ All</button>
     <button class="tool-btn" id="collapse-all-btn" title="Collapse all">▲ None</button>
@@ -1512,6 +1583,12 @@ summary.node:hover > .icon[data-loc-file] > .status-text,
 summary.node:hover > .icon[data-loc-file] > .goto-text,
 .leaf:hover > .icon[data-loc-file] > .goto-text { display: inline; color: var(--vscode-textLink-foreground); }
 
+.source-select {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  font-size: 0.85em;
+}
 .src-link { color: var(--vscode-textLink-foreground); cursor: pointer; text-decoration: underline; }
 
 /* Node actions, shown on hover */
@@ -1663,6 +1740,13 @@ function updateBranchVisibility() {
       branch.classList.remove('branch-hidden');
     }
   }
+}
+
+const sourceSelect = document.getElementById('source-select');
+if (sourceSelect) {
+  sourceSelect.addEventListener('change', () => {
+    vscode.postMessage({ type: 'selectSource', id: sourceSelect.value });
+  });
 }
 
 let searchTimeout = null;
