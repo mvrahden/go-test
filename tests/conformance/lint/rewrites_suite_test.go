@@ -400,8 +400,7 @@ func rowFindings(t *gotest.T, dir string) map[string][]string {
 			if !strings.HasPrefix(d.Category, "assertion-") {
 				continue
 			}
-			file, _, _ := strings.Cut(d.Posn, ":")
-			pkg := filepath.Base(filepath.Dir(file))
+			pkg := filepath.Base(filepath.Dir(posnFile(d.Posn)))
 			if !slices.Contains(got[pkg], d.Category) {
 				got[pkg] = append(got[pkg], d.Category)
 			}
@@ -450,4 +449,18 @@ func fixRow(t *gotest.T, dir, pkg string) string {
 		return "go vet: " + string(out)
 	}
 	return ""
+}
+
+// posnFile is the file of a "file:line:col" position; a Windows drive
+// letter's colon is not a separator.
+func posnFile(posn string) string {
+	file := posn
+	for range 2 {
+		i := strings.LastIndex(file, ":")
+		if i < 0 || strings.Trim(file[i+1:], "0123456789") != "" {
+			break
+		}
+		file = file[:i]
+	}
+	return file
 }
