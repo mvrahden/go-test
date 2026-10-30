@@ -112,6 +112,8 @@ describe("a run that fails after its last verdict", () => {
 
     expect(run.verdicts.get(testId)).toBe("passed");
     expect(run.verdicts.get(importPath)).toBe("errored");
+    // Stored as such, so a reload and Copy Test Results say it too.
+    expect(controller.getResult(importPath)?.status).toBe("errored");
   }, 300_000);
 
   it("says on the package what the run failed for", async () => {

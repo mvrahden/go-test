@@ -10,6 +10,7 @@ import {
   groupByPackage,
   buildRunFilter,
   resolveAncestorItems,
+  erroredItem,
 } from "./runnerUtils.js";
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
@@ -124,9 +125,11 @@ export class TestRunner {
         const pkg = this.cache.getPackage(importPath);
         if (!pkg) {
           for (const item of groupItems) {
-            run.errored(
+            erroredItem(
+              run,
+              this.controller,
               item,
-              new vscode.TestMessage(`Package not found: ${importPath}`),
+              `Package not found: ${importPath}`,
             );
           }
           continue;
@@ -135,11 +138,11 @@ export class TestRunner {
         const workspaceDir = this.cache.getWorkspaceDir(importPath);
         if (!workspaceDir) {
           for (const item of groupItems) {
-            run.errored(
+            erroredItem(
+              run,
+              this.controller,
               item,
-              new vscode.TestMessage(
-                `Workspace folder not found for: ${importPath}`,
-              ),
+              `Workspace folder not found for: ${importPath}`,
             );
           }
           continue;

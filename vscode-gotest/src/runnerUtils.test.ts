@@ -34,7 +34,8 @@ vi.mock("vscode", () => {
       public readonly range: unknown,
     ) {}
   }
-  return { TestTag, Position, Uri, TestMessage, Location };
+  class TestRunRequest {}
+  return { TestTag, Position, Uri, TestMessage, Location, TestRunRequest };
 });
 
 import {
@@ -56,6 +57,7 @@ import {
   resolveAncestorsOf,
   skipUnresolved,
   itemTestPath,
+  restoreStoredResults,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -1528,6 +1530,23 @@ describe("resolveAncestorItems", () => {
     expect(run.failed).toHaveBeenCalledWith(dir, []);
   });
 
+  it("leaves a package the run errored errored, and its folder failed", () => {
+    const { dir, pkg, run, controller } = makeAncestorFixture();
+    controller.getResult.mockImplementation((id: string) => {
+      if (id === "example.com/internal/auth/AuthSuite")
+        return { status: "pass" as const, duration: 500 };
+      if (id === "example.com/internal/auth")
+        return { status: "errored" as const };
+      return undefined;
+    });
+
+    resolveAncestorItems(run as any, controller as any);
+
+    expect(run.passed).not.toHaveBeenCalledWith(pkg);
+    expect(run.failed).not.toHaveBeenCalledWith(pkg, []);
+    expect(run.failed).toHaveBeenCalledWith(dir, []);
+  });
+
   it("marks dir failed when one of multiple packages failed", () => {
     const dir = createItem("dir:pkg", "pkg", undefined);
     const pkgA = createItem("example.com/pkg/a", "a", dir, [{ id: "package" }]);
@@ -2259,5 +2278,45 @@ describe("skipUnresolved", () => {
     expect(run.skipped).toHaveBeenCalledTimes(2);
     expect(run.skipped).toHaveBeenCalledWith(dynamic1);
     expect(run.skipped).toHaveBeenCalledWith(dynamic2);
+  });
+});
+
+describe("restoreStoredResults", () => {
+  it("restores an errored verdict as errored", () => {
+    const { pkg, method } = makeTree();
+    const items = new Map<string, MockTestItem>([
+      [pkg.id, pkg],
+      [method.id, method],
+    ]);
+    const run = {
+      passed: vi.fn(),
+      failed: vi.fn(),
+      skipped: vi.fn(),
+      errored: vi.fn(),
+      started: vi.fn(),
+      end: vi.fn(),
+    };
+    const results = new Map<string, { status: string }>([
+      [method.id, { status: "errored" }],
+      ["example.com/gone/Suite", { status: "pass" }],
+    ]);
+    const controller = {
+      createTestRun: vi.fn(() => run),
+      findItem: (id: string) => items.get(id),
+      getResult: (id: string) => results.get(id),
+      recordResult: vi.fn(),
+      testController: { items: new Map([[pkg.id, pkg]]) },
+    };
+    const store = {
+      forEach: (cb: (r: unknown, id: string) => void) =>
+        results.forEach((r, id) => cb(r, id)),
+    };
+
+    const applied = restoreStoredResults(controller as any, store as any);
+
+    expect(applied).toBe(1);
+    expect(run.errored).toHaveBeenCalledWith(method, expect.anything());
+    expect(run.passed).not.toHaveBeenCalledWith(method, undefined);
+    expect(run.end).toHaveBeenCalled();
   });
 });
