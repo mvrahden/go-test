@@ -590,8 +590,8 @@ describe("a branch's own verdict", () => {
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
     const summary = html.slice(
-      html.indexOf('<summary class="node suite">'),
-      html.indexOf("</summary>", html.indexOf('<summary class="node suite">')),
+      html.indexOf('<summary class="node suite"'),
+      html.indexOf("</summary>", html.indexOf('<summary class="node suite"')),
     );
     expect(summary).toContain('class="icon fail"');
     const said = /<pre class="error-output">([^<]*)<\/pre>/.exec(html)?.[1];
@@ -695,6 +695,54 @@ describe("go to source", () => {
     expect(rowOf("holds one item")).toContain(
       'data-loc-file="/src/cart/add_test.go" data-loc-line="12"',
     );
+  });
+});
+
+describe("acting on a node", () => {
+  it("names each row by its Test Explorer id and hands Run and Debug on", async () => {
+    const { panel, recorder } = newPanel();
+    const ran: string[][] = [];
+    const debugged: string[] = [];
+    panel.setActions({
+      run: async (ids) => {
+        ran.push(ids);
+      },
+      debug: async (id) => {
+        debugged.push(id);
+      },
+    });
+    await panel.show();
+    await panel.refresh(run("mixed"));
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).toContain('data-id="example.com/cart/CartTestSuite"');
+    expect(html).toContain(
+      'data-id="example.com/cart/CartTestSuite/totals_the_basket"',
+    );
+    expect(html).toMatch(/id="rerun-failed-btn"[^>]*>Rerun failed/);
+    expect(html).not.toMatch(/id="rerun-failed-btn"[^>]*disabled/);
+
+    const handle = (msg: unknown) =>
+      (panel as unknown as { handleMessage(m: unknown): void }).handleMessage(
+        msg,
+      );
+    handle({ type: "run", id: "example.com/cart/CartTestSuite/adds_an_item" });
+    handle({ type: "run", ids: ["a", "b"] });
+    handle({ type: "debug", id: "example.com/cart/CartTestSuite" });
+    expect(ran).toEqual([
+      ["example.com/cart/CartTestSuite/adds_an_item"],
+      ["a", "b"],
+    ]);
+    expect(debugged).toEqual(["example.com/cart/CartTestSuite"]);
+  });
+
+  it("offers no rerun of failures when nothing failed", async () => {
+    const { panel } = newPanel();
+    await panel.show();
+    await panel.refresh(run("all-pass"));
+
+    expect(renderedHtml()).toMatch(/id="rerun-failed-btn"[^>]*disabled/);
   });
 });
 

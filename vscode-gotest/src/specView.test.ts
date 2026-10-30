@@ -16,6 +16,8 @@ import {
   specDataToReport,
   interpretSpecExit,
   encodeStateForScript,
+  itemIdOf,
+  nearestItemId,
 } from "./specView.js";
 
 function leaf(
@@ -538,5 +540,33 @@ describe("encodeStateForScript", () => {
     expect(
       JSON.parse(encodeStateForScript({ packages: [], stats: {} })),
     ).toEqual({ packages: [], stats: {} });
+  });
+});
+
+describe("itemIdOf", () => {
+  it("names a node by the id the Test Explorer gives it", () => {
+    expect(itemIdOf("example.com/cart", "TestCartTestSuite")).toBe(
+      "example.com/cart/CartTestSuite",
+    );
+    expect(
+      itemIdOf("example.com/cart", "TestCartTestSuite/TestAdd/when_empty"),
+    ).toBe("example.com/cart/CartTestSuite/TestAdd/when_empty");
+    expect(itemIdOf("example.com/cart", "TestPlain")).toBe(
+      "example.com/cart/Plain",
+    );
+  });
+
+  it("names no item for a fixture node", () => {
+    expect(itemIdOf("example.com/cart", "Test_DBFixture")).toBeUndefined();
+  });
+});
+
+describe("nearestItemId", () => {
+  it("falls back to the closest ancestor the tree holds", () => {
+    const tree = new Set(["p/S", "p/S/TestM"]);
+    const has = (id: string) => tree.has(id);
+    expect(nearestItemId("p/S/TestM", has)).toBe("p/S/TestM");
+    expect(nearestItemId("p/S/TestM/row_101", has)).toBe("p/S/TestM");
+    expect(nearestItemId("q/T", has)).toBeUndefined();
   });
 });
