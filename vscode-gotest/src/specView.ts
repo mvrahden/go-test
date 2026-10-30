@@ -671,6 +671,8 @@ export interface SpecPackage {
   output?: string[];
   // The package's own counts; given with --hide or --declared.
   stats?: SpecStats;
+  // A package the run booked for itself (shared fixtures, an interrupt).
+  runLevel?: boolean;
 }
 
 export interface SpecNode {
@@ -899,24 +901,27 @@ function statsHtml(stats: SpecStats | undefined): string {
   return text ? ` <span class="row-stats">${escapeHtml(text)}</span>` : "";
 }
 
+// A package whose rows the CLI left out, and that says nothing of its own,
+// has no row; its counts still reach its module's.
 function buildPackageSectionHtml(
   displayPath: string,
   pkg: SpecPackage,
   env: RenderEnv,
 ): string {
+  const failure = buildPackageFailureHtml(pkg, env);
+  if (pkg.nodes.length === 0 && !failure) return "";
   const nodes = pkg.nodes
     .map((n) => buildNodeHtml(n, "", nodeCtx(env, pkg)))
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
-  ${buildPackageFailureHtml(pkg, env)}${nodes}
+  ${failure}${nodes}
 </details>`;
 }
 
 // buildPackageFailureHtml renders a verdict the CLI counts on the package
-// itself (a build failure, a death outside any test) with its diagnostics.
-// No node carries it, so without this block the package would read green
-// beside a red exit code.
+// itself (a build failure, a death outside any test) with the output the
+// CLI gives it; under --hide=fail the CLI gives none and the block goes.
 function buildPackageFailureHtml(pkg: SpecPackage, env: RenderEnv): string {
   if ((pkg.stats?.failedPackages ?? 0) === 0) return "";
   const dir = pkg.dir ?? env.dirOf(pkg.path);
@@ -925,9 +930,8 @@ function buildPackageFailureHtml(pkg: SpecPackage, env: RenderEnv): string {
     .filter(Boolean)
     .map((l) => linkSources(escapeHtml(l), dir))
     .join("\n");
-  const errorBlock = lines
-    ? `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`
-    : "";
+  if (!lines) return "";
+  const errorBlock = `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`;
   return `<div class="leaf test fail"${idAttr(pkg.path)}>
   <span class="icon fail"><span class="status-text">✗</span></span> <strong>FAIL</strong>
   ${errorBlock}
@@ -960,6 +964,8 @@ function resolveSource(
   return candidates.find((c) => existsSync(c));
 }
 
+// A module counts every package the CLI gave, rows shown or not; one with
+// no row to show has none itself.
 function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
   const only = group.entries[0].pkg;
   const inner =
@@ -969,6 +975,7 @@ function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
       : group.entries
           .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
           .join("");
+  if (!inner) return "";
   const stats = addStats(group.entries.map((e) => e.pkg.stats));
   return `<details class="module-section" open>
   <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}${statsHtml(stats)}</summary>
