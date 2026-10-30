@@ -790,17 +790,7 @@ function buildLeafHtml(
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
 
-  let errorBlock = "";
-  if (node.status === "fail" && node.output.length > 0) {
-    const lines = node.output
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("=== ") && !l.startsWith("--- "))
-      .map(escapeHtml)
-      .join("\n");
-    if (lines) {
-      errorBlock = `<details class="error-details"><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`;
-    }
-  }
+  const errorBlock = node.status === "fail" ? errorBlockHtml(node) : "";
 
   return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}">
   ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>
@@ -838,10 +828,37 @@ function buildBranchHtml(
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded) suffix += ` <span class="tag skipped">SKIPPED</span>`;
 
-  return `<details class="branch" data-display="${escapeAttr(node.display)}"${openAttr}>
+  // What the branch itself reported: a failed AfterAll, a panic booked on
+  // the suite rather than on the behavior that raised it.
+  const errorBlock = status === "fail" ? errorBlockHtml(node) : "";
+  const ownFail = failedOnItsOwn(node) ? " fail-own" : "";
+
+  return `<details class="branch${ownFail}" data-display="${escapeAttr(node.display)}"${openAttr}>
   <summary class="node ${node.kind}">${iconHtml} ${label}${suffix}</summary>
-  ${children}
+  ${errorBlock}${children}
 </details>`;
+}
+
+// ownOutput is what a node printed, without go test's RUN/PASS/FAIL frames.
+function ownOutput(node: SpecNode): string[] {
+  return node.output
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("=== ") && !l.startsWith("--- "));
+}
+
+function errorBlockHtml(node: SpecNode): string {
+  const lines = ownOutput(node).map(escapeHtml).join("\n");
+  if (!lines) return "";
+  return `<details class="error-details"><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`;
+}
+
+// failedOnItsOwn: the node's verdict is a failure no child accounts for.
+function failedOnItsOwn(node: SpecNode): boolean {
+  return (
+    node.children.length > 0 &&
+    node.status === "fail" &&
+    !node.children.some(hasFailure)
+  );
 }
 
 function hasFailure(node: SpecNode): boolean {
@@ -849,7 +866,11 @@ function hasFailure(node: SpecNode): boolean {
   return node.children.some(hasFailure);
 }
 
+// derivedStatus is the branch's own verdict when that is a failure, else the
+// worst of its children's: the kept runs can hold a child that failed in an
+// earlier run beside a parent that passed in the newest one.
 function derivedStatus(node: SpecNode): string {
+  if (node.status === "fail") return "fail";
   if (
     node.children.some(
       (c) => c.status === "fail" || derivedStatus(c) === "fail",
@@ -934,6 +955,8 @@ function countLeaves(node: SpecNode, hidden?: Set<string>): LeafAgg {
     agg.skipped += ca.skipped;
     agg.duration += ca.duration;
   }
+  // Counted as the CLI counts it: the branch is the failure.
+  if (failedOnItsOwn(node) && !hidden?.has("fail")) agg.failed++;
   return agg;
 }
 
@@ -1119,6 +1142,10 @@ function walkReportNode(
     time: fmtTime(agg.duration),
     result: fmtAgg(agg),
   });
+  if (derivedStatus(node) === "fail" && !hidden?.has("fail")) {
+    const prefix = "  ".repeat(indent + 1) + "│ ";
+    for (const line of ownOutput(node)) rows.push({ raw: prefix + line });
+  }
   for (const c of node.children) {
     walkReportNode(rows, c, indent + 1, hidden);
   }
@@ -1469,6 +1496,8 @@ document.addEventListener('click', (e) => {
 });
 
 function updateBranchVisibility() {
+  const tree = document.getElementById('spec-tree');
+  if (!tree) return;
   const branches = document.querySelectorAll('details.branch');
   const arr = Array.from(branches).reverse();
   for (const branch of arr) {
@@ -1480,7 +1509,8 @@ function updateBranchVisibility() {
       }
       return true;
     });
-    if (visibleChildren.length === 0) {
+    const ownFailShown = branch.classList.contains('fail-own') && !tree.classList.contains('hide-fail');
+    if (visibleChildren.length === 0 && !ownFailShown) {
       branch.classList.add('branch-hidden');
     } else {
       branch.classList.remove('branch-hidden');
