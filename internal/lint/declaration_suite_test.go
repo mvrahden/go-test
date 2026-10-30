@@ -1,6 +1,8 @@
 package lint_test
 
 import (
+	"time"
+
 	"github.com/mvrahden/go-test/internal/lint"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"golang.org/x/tools/go/analysis/analysistest"
@@ -14,6 +16,7 @@ type DeclarationRulesTestSuite struct{}
 func (s *DeclarationRulesTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
+	cfg.Timeout = 90 * time.Second // go/packages loads per case run long under CI load
 	return cfg
 }
 
