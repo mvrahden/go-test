@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as path from "node:path";
 
 const {
   mockSaveAll,
@@ -14,7 +15,9 @@ const {
   mockCaptureStdout: vi.fn(async (..._args: unknown[]) => ""),
 }));
 
-vi.mock("vscode", () => {
+vi.mock("vscode", async () => {
+  const path = await import("node:path");
+  const ws = path.resolve("/ws");
   class CodeAction {
     edit?: unknown;
     command?: { command: string; title: string; arguments?: unknown[] };
@@ -43,8 +46,8 @@ vi.mock("vscode", () => {
     Range,
     CodeActionKind: { QuickFix: "quickfix" },
     workspace: {
-      workspaceFolders: [{ uri: { fsPath: "/ws" } }],
-      getWorkspaceFolder: () => ({ uri: { fsPath: "/ws" } }),
+      workspaceFolders: [{ uri: { fsPath: ws } }],
+      getWorkspaceFolder: () => ({ uri: { fsPath: ws } }),
       getConfiguration: () => ({ get: () => undefined }),
       saveAll: mockSaveAll,
     },
@@ -73,7 +76,11 @@ import {
 import type { DiscoveryCache } from "./discovery.js";
 import type { DiscoverMethod, DiscoverSuite } from "./types.js";
 
-const file = "/ws/search/suite_test.go";
+// Platform paths: the provider joins a package dir and a file name with the
+// platform separator and compares the result with the document's path.
+const ws = path.resolve("/ws");
+const pkgDir = path.join(ws, "search");
+const file = path.join(pkgDir, "suite_test.go");
 
 function method(name: string, line: number): DiscoverMethod {
   return {
@@ -124,7 +131,7 @@ function provider(): FocusExcludeProvider {
     packages: [
       {
         importPath: "example.com/search",
-        dir: "/ws/search",
+        dir: pkgDir,
         suites: [
           suite("ArticleIndexTestSuite", 4, [method("TestEmpty", 3)]),
           suite("CartTestSuite", 5, [
@@ -160,7 +167,7 @@ describe("focus code actions", () => {
     const action = byTitle(5, "Focus this suite");
     expect(action.edit).toBeUndefined();
     expect(action.command?.command).toBe(TOGGLE_FOCUS_COMMAND);
-    expect(action.command?.arguments).toEqual([file, "CartTestSuite", "/ws"]);
+    expect(action.command?.arguments).toEqual([file, "CartTestSuite", ws]);
   });
 
   it("unfocus a method under its receiver type", () => {
@@ -168,7 +175,7 @@ describe("focus code actions", () => {
     expect(action.command?.arguments).toEqual([
       file,
       "CartTestSuite.F_TestAdd",
-      "/ws",
+      ws,
     ]);
   });
 
@@ -177,7 +184,7 @@ describe("focus code actions", () => {
     expect(action.command?.arguments).toEqual([
       file,
       "IndexContractTestSuite.TestEmpty",
-      "/ws",
+      ws,
     ]);
   });
 
@@ -230,12 +237,12 @@ describe("executeToggleFocus", () => {
 
     expect(mockBuildCliCommand).toHaveBeenCalledWith(
       ["refactor", "toggle-focus", file, "CartTestSuite.TestRemove"],
-      "/ws",
+      ws,
     );
     expect(mockCaptureStdout).toHaveBeenCalledWith(
       "gotest",
       ["refactor", "toggle-focus", file, "CartTestSuite.TestRemove"],
-      { cwd: "/ws" },
+      { cwd: ws },
     );
     expect(order).toEqual(["save", "cli", "discover"]);
     expect(mockShowErrorMessage).not.toHaveBeenCalled();
