@@ -188,7 +188,10 @@ type Node struct {
 type Package struct {
 	Path string
 	// Dir is the package's directory, when the tree was read from source.
-	Dir      string
+	Dir string
+	// RunLevel marks a package the run booked for itself (shared fixtures,
+	// an interrupt, …): its events said so.
+	RunLevel bool
 	Status   Status
 	Duration time.Duration
 	Nodes    []*Node
@@ -251,6 +254,9 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			nodes[ev.Package] = map[string]*Node{}
 			topRunCount[ev.Package] = map[string]int{}
 			levels[ev.Package] = map[string][]string{}
+		}
+		if ev.RunLevel {
+			pkg.RunLevel = true
 		}
 
 		if ev.Test == "" {

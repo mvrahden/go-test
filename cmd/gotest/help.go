@@ -262,8 +262,9 @@ Flags:
   --hide=<statuses>       Leave out the rows whose own status is one of pass,
                           fail, skip or none (comma-separated) and beneath which
                           no row is shown; counts and the exit code stay the
-                          whole run's. Not with --static. With --hide or
-                          --declared each JSON package carries its own stats
+                          whole run's; --hide= hides nothing. Not with
+                          --static. With --hide or --declared every JSON
+                          package carries its own stats, whatever is hidden
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep the overlay and work dir; a later run
