@@ -55,6 +55,7 @@ import {
   resolveAncestorItems,
   resolveAncestorsOf,
   skipUnresolved,
+  itemTestPath,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -288,6 +289,29 @@ function makeTreeWithDirs() {
   );
   return { dir, pkg, suite, method, dynamic };
 }
+
+describe("itemTestPath", () => {
+  it("names the go test path a filter built from the item asks for", () => {
+    const { pkg, suite, method, dynamic } = makeTree();
+    expect(itemTestPath(pkg as any)).toBeUndefined();
+    expect(itemTestPath(suite as any)).toBe("TestMySuite");
+    expect(itemTestPath(method as any)).toBe("TestMySuite/TestFoo");
+    expect(itemTestPath(dynamic as any)).toBe("TestMySuite/TestFoo/sub1");
+  });
+
+  it("names a fuzz target and its seeds by the generated wrapper", () => {
+    const { pkg } = makeTree();
+    const suite = createItem("example.com/pkg/S", "S", pkg as never);
+    const fuzz = createItem("example.com/pkg/S/FuzzParse", "FuzzParse", suite);
+    const seed = createItem(
+      "example.com/pkg/S/FuzzParse/seed#0",
+      "seed#0",
+      fuzz,
+    );
+    expect(itemTestPath(fuzz as any)).toBe("FuzzS_FuzzParse");
+    expect(itemTestPath(seed as any)).toBe("FuzzS_FuzzParse/seed#0");
+  });
+});
 
 describe("getPackageItem", () => {
   it("returns the package item from a method", () => {

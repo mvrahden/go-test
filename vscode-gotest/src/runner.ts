@@ -14,6 +14,7 @@ import {
 import type { CoverageStore } from "./coverageStore.js";
 import { executeBatch } from "./batchRunner.js";
 import type { RunRegistry } from "./runRegistry.js";
+import type { RunPiece } from "./specStore.js";
 
 export interface RunOptions {
   updateSnapshots?: boolean;
@@ -21,8 +22,9 @@ export interface RunOptions {
 
 export class TestRunner {
   private _lastJsonOutput = "";
-  private readonly _onDidComplete = new vscode.EventEmitter<string>();
-  readonly onDidComplete: vscode.Event<string> = this._onDidComplete.event;
+  private _lastPieces: RunPiece[] = [];
+  private readonly _onDidComplete = new vscode.EventEmitter<RunPiece[]>();
+  readonly onDidComplete: vscode.Event<RunPiece[]> = this._onDidComplete.event;
   private activeRun: vscode.CancellationTokenSource | undefined;
   private activeRecordId: string | undefined;
   private previousRunPromise: Promise<void> = Promise.resolve();
@@ -66,6 +68,7 @@ export class TestRunner {
     this.outputChannel.info("[runner] run started");
     const run = this.controller.createTestRun(request, "Go Test Run");
     this._lastJsonOutput = "";
+    this._lastPieces = [];
     let anyCoverOnRun = false;
 
     let resolveRun!: () => void;
@@ -272,7 +275,7 @@ export class TestRunner {
       }
       cts.dispose();
       if (this._lastJsonOutput) {
-        this._onDidComplete.fire(this._lastJsonOutput);
+        this._onDidComplete.fire(this._lastPieces);
       }
       run.end();
       this.outputChannel.info(
@@ -310,6 +313,7 @@ export class TestRunner {
       coverage: coverOnRun ? { store: this.coverageStore! } : undefined,
     });
     this._lastJsonOutput += result.stdout;
+    this._lastPieces.push(result.piece);
   }
 
   private hasSnapshotMismatch(): boolean {

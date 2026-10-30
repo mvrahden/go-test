@@ -257,7 +257,7 @@ beforeAll(async () => {
   renderErrors = panelRecorder.errors;
   const panel = new SpecViewPanel(panelRecorder.channel as never);
   await panel.show();
-  await panel.refresh(capturedStdout, "run");
+  await panel.refresh({ stream: capturedStdout, folder: repoRoot });
   html = state.panels[state.panels.length - 1].webview.html;
 
   spec = JSON.parse(

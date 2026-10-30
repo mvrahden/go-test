@@ -578,6 +578,22 @@ export function isFuzzMethodLabel(label: string): boolean {
   return /^(?:X_|F_)?Fuzz./.test(label);
 }
 
+// itemTestPath is the go test path a filter built from item asks for: the
+// suite's top-level test with the item's own segments below it, or a fuzz
+// target's generated wrapper. Undefined for a package or anything above one.
+export function itemTestPath(item: vscode.TestItem): string | undefined {
+  const depth = getPackageDepth(item);
+  if (depth <= 0) return undefined;
+  let method = item;
+  while (getPackageDepth(method) > 2) method = method.parent!;
+  if (depth >= 2 && isFuzzMethodLabel(method.label) && method.parent) {
+    const rest = item.id.slice(method.id.length);
+    return `Fuzz${method.parent.label}_${method.label}${rest}`;
+  }
+  const pkg = getPackageItem(item);
+  return `Test${item.id.slice(pkg.id.length + 1)}`;
+}
+
 export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
   if (items.some((item) => getPackageDepth(item) === 0)) {
     return undefined;

@@ -350,8 +350,8 @@ describe("the coverage entry point", () => {
       cache,
       store,
       createRecordingChannel().channel as never,
-      (json) => {
-        handedOn = json;
+      (pieces) => {
+        handedOn = pieces.map((p) => p.stream).join("");
       },
       registry,
     );

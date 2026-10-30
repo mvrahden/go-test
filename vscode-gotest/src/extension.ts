@@ -136,7 +136,11 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     runRegistry,
   );
-  const specView = new SpecViewPanel(outputChannel, cache);
+  const specView = new SpecViewPanel(
+    outputChannel,
+    cache,
+    context.storageUri?.fsPath,
+  );
   specView.setExtensionUri(context.extensionUri);
 
   const specViewSerializer = vscode.window.registerWebviewPanelSerializer(
@@ -156,8 +160,8 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     coverageStore,
     outputChannel,
-    (jsonOutput) => {
-      specView.refresh(jsonOutput, "coverage");
+    (pieces) => {
+      void specView.refresh(pieces);
     },
     runRegistry,
   );
@@ -184,16 +188,16 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(benchRunner, benchGateDiagnostics);
 
-  const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
-    specView.refresh(jsonOutput, "run");
+  const specViewRefreshDisposable = runner.onDidComplete((pieces) => {
+    void specView.refresh(pieces);
   });
 
   const watchManager = new WatchManager(
     controller,
     cache,
     outputChannel,
-    (jsonOutput, scope, cwd) => {
-      specView.refresh(jsonOutput, `watch:${scope}@${cwd}`);
+    (jsonOutput, _scope, cwd) => {
+      void specView.refresh({ stream: jsonOutput, folder: cwd });
     },
     runRegistry,
   );
@@ -260,6 +264,7 @@ export function activate(context: vscode.ExtensionContext): void {
       testResultStore.flush(),
       snapshotStore.flush(),
       processRegistry.flush(),
+      specView.flush(),
     ]);
   };
 
@@ -275,6 +280,7 @@ export function activate(context: vscode.ExtensionContext): void {
     processRegistry,
     context,
     snapshotStore,
+    specView,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
@@ -839,6 +845,7 @@ async function initializeAsync(deps: {
   processRegistry: ProcessRegistry;
   context: vscode.ExtensionContext;
   snapshotStore: DiscoverySnapshotStore;
+  specView: SpecViewPanel;
 }): Promise<void> {
   const {
     workspaceFolders,
@@ -852,6 +859,7 @@ async function initializeAsync(deps: {
     processRegistry,
     context,
     snapshotStore,
+    specView,
   } = deps;
 
   const firstDir = workspaceFolders[0].uri.fsPath;
@@ -953,6 +961,7 @@ async function initializeAsync(deps: {
   // restored tree exists precisely so runs can start during discovery.
   await coverageStore.load();
   await testResultStore.load();
+  await specView.load();
 
   const restoreStored = async () => {
     await restoreCoverage();
