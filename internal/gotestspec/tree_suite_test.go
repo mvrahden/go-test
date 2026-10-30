@@ -465,3 +465,29 @@ func (s *TreeTestSuite) TestBuildTree_BuildFailure(t *gotest.T, _ *treeCtx) {
 	mustEq(t, "ok status", ok.Status, gotestspec.StatusPass)
 	mustLen(t, "ok output", ok.Output, 0)
 }
+
+func (s *TreeTestSuite) TestBuildTree_FailureFailsEveryAncestorButSkipStays(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite/TestOne"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite/TestOne/when_x"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite/TestOne/when_x/fails"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestATestSuite/TestOne/when_x/fails","Elapsed":0.001}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestATestSuite/TestOne/when_x","Elapsed":0.001}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestATestSuite/TestOne","Elapsed":0.001}
+{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite/TestTwo"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestATestSuite/TestTwo/skips"}
+{"Action":"skip","Package":"example.com/pkg","Test":"TestATestSuite/TestTwo/skips","Elapsed":0}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestATestSuite/TestTwo","Elapsed":0}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestATestSuite","Elapsed":0.002}
+{"Action":"pass","Package":"example.com/pkg","Elapsed":0.003}`)
+	mustLen(t, "packages", tree, 1)
+	mustEq(t, "package status", tree[0].Status, gotestspec.StatusFail)
+	suite := tree[0].Nodes[0]
+	mustEq(t, "suite status", suite.Status, gotestspec.StatusFail)
+	mustEq(t, "method status", suite.Children[0].Status, gotestspec.StatusFail)
+	mustEq(t, "when status", suite.Children[0].Children[0].Status, gotestspec.StatusFail)
+	mustEq(t, "skipped method status", suite.Children[1].Status, gotestspec.StatusPass)
+	stats := gotestspec.CollectStats(tree)
+	mustEq(t, "failed", stats.Failed, 1)
+	mustEq(t, "skipped", stats.Skipped, 1)
+}

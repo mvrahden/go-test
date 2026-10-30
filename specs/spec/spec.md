@@ -1,7 +1,7 @@
 # Living Spec Specification
 
 ## Purpose
-How `gotest spec` writes the behavior specification of a run, and the one it reads from source with `--static`, as a Markdown document whose labels stay text.
+How `gotest spec` writes the behavior specification of a run, and the one it reads from source with `--static`, as a Markdown document whose labels stay text, and which verdict a branch and its package carry when a failure lies beneath them.
 
 ## Requirements
 
@@ -57,3 +57,11 @@ A behavior SHALL read the same in discover, in a run's spec, in the spec read fr
 #### Scenario: A When that opens with a connective
 - **WHEN** a When's label opens with a connective of its own
 - **THEN** discover and every spec write it with no when in front
+
+### Requirement: A failure below fails the branch
+A node SHALL be failed when a node beneath it failed, and a package SHALL be failed when one of its nodes failed, whatever the stream's own line for the node or the package says, so a stream composed from several runs renders, counts and exits as one go test failed.
+
+#### Scenario: A pass line above a failed method
+- **WHEN** a stream holds a suite's pass line above a fail line of one of its methods
+- **THEN** renders the suite and its package as failed in the terminal, Markdown and JSON formats, as when their own lines say fail
+- **AND** counts one failure and exits 1, or 0 with --render-only

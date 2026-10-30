@@ -318,6 +318,8 @@ shards of one run do not add up to every mutant exactly once.
 | `timeout-scale-inherited` | the scale stays in the environment of the processes the tests start | canary: the method reading the environment fails |
 | `timeout-watches-nothing` | a suite's `Timeout` holds nothing to a budget | canary: the slow-hook fixtures' methods pass instead of failing their budget |
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
+| `branch-keeps-a-pass-over-a-failure` | a suite whose own line says pass stays passed above a failed method | spec conformance: the composed stream's suite renders unlike the one go test failed |
+| `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
 | `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |
