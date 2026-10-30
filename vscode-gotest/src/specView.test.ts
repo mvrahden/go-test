@@ -13,7 +13,13 @@ vi.mock("vscode", () => ({
 }));
 
 import {
-  specDataToReport,
+  addStats,
+  buildSpecBody,
+  sourceOf,
+  statsText,
+  type SpecNode,
+  type SpecPackage,
+  type SpecStats,
   interpretSpecExit,
   encodeStateForScript,
   itemIdOf,
@@ -24,431 +30,218 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
-function leaf(
+type Node = SpecNode;
+
+function node(
   name: string,
   status: string,
-  duration = 0,
-  output: string[] = [],
-): {
-  name: string;
-  display: string;
-  kind: string;
-  status: string;
-  duration: number;
-  focused: boolean;
-  excluded: boolean;
-  external: boolean;
-  output: string[];
-  children: never[];
-} {
+  children: Node[] = [],
+  extra: Partial<Node> = {},
+): Node {
   return {
     name,
     display: name,
-    kind: "behavior",
+    kind: children.length > 0 ? "suite" : "block",
     status,
-    duration,
-    focused: false,
-    excluded: false,
-    external: false,
-    output,
-    children: [],
-  };
-}
-
-function suite(
-  name: string,
-  children: ReturnType<typeof leaf>[],
-): {
-  name: string;
-  display: string;
-  kind: string;
-  status: string;
-  duration: number;
-  focused: boolean;
-  excluded: boolean;
-  external: boolean;
-  output: string[];
-  children: ReturnType<typeof leaf>[];
-} {
-  return {
-    name,
-    display: name,
-    kind: "suite",
-    status: "pass",
-    duration: 0,
+    duration: 0.002,
     focused: false,
     excluded: false,
     external: false,
     output: [],
     children,
+    ...extra,
   };
 }
 
-describe("specDataToReport with a fuzz target", () => {
-  const seed = (n: number) => ({
-    kind: "block",
-    name: `seed#${n - 1}`,
-    display: `seed #${n}`,
-    status: "pass",
-    duration: 0,
-    children: [],
-    output: [],
-    focused: false,
-    excluded: false,
-    external: false,
-  });
-  const data = {
-    packages: [
-      {
-        path: "example.com/pkg",
-        status: "pass",
-        duration: 0.1,
-        nodes: [
-          suite("Parser", [
-            leaf("parses", "pass", 0.05),
-            {
-              kind: "fuzz",
-              name: "FuzzRoundTrip",
-              display: "RoundTrip",
-              status: "pass",
-              duration: 0.01,
-              children: [seed(1), seed(2), seed(3)],
-              output: [],
-              focused: false,
-              excluded: false,
-              external: false,
-            } as never,
-          ]),
-        ],
-      },
-    ],
-    stats: {
-      suites: 1,
-      behaviors: 1,
-      tests: 0,
-      fuzzers: 1,
-      passed: 2,
-      failed: 0,
-      skipped: 0,
-    },
+function stats(over: Partial<SpecStats> = {}): SpecStats {
+  return {
+    suites: 0,
+    behaviors: 0,
+    tests: 0,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    ...over,
   };
+}
 
-  it("marks the target as FUZZ with its seed count, and counts it in the trailer", () => {
-    const report = specDataToReport(data as never, []);
-    expect(report).toContain("RoundTrip — FUZZ (3 seeds)");
-    expect(report).toContain("1 suite, 1 behavior, 1 fuzz target:");
+function body(
+  packages: SpecPackage[],
+  modulePaths: string[] = [],
+  hidden: Set<string> = new Set(),
+  dirOf: (p: string) => string | undefined = () => undefined,
+): string {
+  return buildSpecBody(
+    { packages, stats: stats() },
+    modulePaths,
+    { dirOf },
+    [],
+    hidden,
+  );
+}
+
+describe("statsText", () => {
+  it("words the CLI's counts as its trailer does, not run included", () => {
+    expect(
+      statsText(stats({ passed: 3, failed: 1, skipped: 2, notRun: 4 })),
+    ).toBe("3 passed, 1 failed, 2 skipped, 4 not run");
+    expect(statsText(stats({ failedPackages: 1 }))).toBe("1 failed package");
+    expect(statsText(undefined)).toBe("");
   });
 });
 
-describe("specDataToReport with a suite that failed in its own hooks", () => {
-  const failedSuite = {
-    ...suite("Store", [leaf("saves", "pass", 0.1), leaf("loads", "pass", 0.1)]),
-    status: "fail",
-    output: [
-      "=== RUN   TestStoreTestSuite\n",
-      "    store_test.go:40: AfterAll: close db: connection reset\n",
-      "--- FAIL: TestStoreTestSuite (0.20s)\n",
-    ],
-  };
-  const data = {
-    packages: [
-      {
-        path: "example.com/store",
-        status: "fail",
-        duration: 0.2,
-        nodes: [failedSuite],
-      },
-    ],
-    stats: {
-      suites: 1,
-      behaviors: 3,
-      tests: 0,
-      passed: 2,
+describe("addStats", () => {
+  it("adds the packages' counts for a module's row", () => {
+    const sum = addStats([
+      stats({ passed: 2, notRun: 1 }),
+      undefined,
+      stats({ passed: 1, failed: 1, failedPackages: 1 }),
+    ]);
+    expect(sum).toMatchObject({
+      passed: 3,
       failed: 1,
-      skipped: 0,
-    },
-  };
-
-  it("counts the suite as the failure and quotes what it said", () => {
-    const report = specDataToReport(data as never, []);
-    expect(report).toMatch(/Store\s+\S+\s+2 passed, 1 failed/);
-    expect(report).toContain("│ store_test.go:40: AfterAll: close db");
-    expect(report).not.toContain("--- FAIL");
+      notRun: 1,
+      failedPackages: 1,
+    });
+    expect(addStats([undefined])).toBeUndefined();
   });
 });
 
-describe("specDataToReport", () => {
-  const data = {
-    packages: [
-      {
-        path: "example.com/pkg",
-        status: "fail",
-        duration: 1.5,
-        nodes: [
-          suite("MySuite", [
-            leaf("passes", "pass", 0.5),
-            leaf("fails", "fail", 0.8),
-            leaf("skipped", "skip", 0),
-          ]),
-        ],
-      },
-    ],
-    stats: {
-      suites: 1,
-      behaviors: 3,
-      tests: 0,
-      passed: 1,
-      failed: 1,
-      skipped: 1,
-    },
-  };
-
-  it("includes all statuses when no filter is set", () => {
-    const report = specDataToReport(data, []);
-    expect(report).toContain("passes");
-    expect(report).toContain("fails");
-    expect(report).toContain("skipped");
-    expect(report).toContain("1 passed");
-    expect(report).toContain("1 failed");
-    expect(report).toContain("1 skipped");
+describe("sourceOf", () => {
+  it("joins the node's file to its package's directory, at its line", () => {
+    expect(
+      sourceOf(node("x", "pass", [], { file: "a_test.go", line: 7 }), "/p"),
+    ).toEqual({ file: path.join("/p", "a_test.go"), line: 7 });
   });
 
-  it("excludes passed leaves when pass is hidden", () => {
-    const report = specDataToReport(data, [], new Set(["pass"]));
-    expect(report).not.toContain("passes");
-    expect(report).toContain("fails");
-    expect(report).toContain("skipped");
-    expect(report).not.toContain("1 passed");
-    expect(report).toContain("1 failed");
-    expect(report).toContain("1 skipped");
-  });
-
-  it("excludes failed leaves when fail is hidden", () => {
-    const report = specDataToReport(data, [], new Set(["fail"]));
-    expect(report).toContain("passes");
-    expect(report).not.toContain("  fails");
-    expect(report).toContain("skipped");
-    expect(report).toContain("1 passed");
-    expect(report).not.toContain("1 failed");
-    expect(report).toContain("1 skipped");
-  });
-
-  it("excludes skipped leaves when skip is hidden", () => {
-    const report = specDataToReport(data, [], new Set(["skip"]));
-    expect(report).toContain("passes");
-    expect(report).toContain("fails");
-    expect(report).not.toMatch(/\bskipped\b/);
-    expect(report).toContain("1 passed");
-    expect(report).toContain("1 failed");
-  });
-
-  it("hides multiple statuses at once", () => {
-    const report = specDataToReport(data, [], new Set(["pass", "skip"]));
-    expect(report).not.toContain("passes");
-    expect(report).toContain("fails");
-    expect(report).not.toMatch(/\bskipped\b/);
-    expect(report).toContain("1 failed");
-  });
-
-  it("omits branches with no visible leaves", () => {
-    const report = specDataToReport(
-      data,
-      [],
-      new Set(["pass", "fail", "skip"]),
-    );
-    expect(report).not.toContain("MySuite");
-    expect(report).not.toContain("pkg");
-  });
-
-  it("preserves package duration when unfiltered", () => {
-    const report = specDataToReport(data, []);
-    expect(report).toContain("1.500s");
-  });
-
-  it("uses leaf-aggregated duration when filtered", () => {
-    const report = specDataToReport(data, [], new Set(["pass", "skip"]));
-    expect(report).not.toContain("1.500s");
-    expect(report).toContain("0.800s");
-  });
-
-  it("preserves structural counts in summary", () => {
-    const report = specDataToReport(data, [], new Set(["pass"]));
-    expect(report).toContain("1 suite");
-    expect(report).toContain("3 behaviors");
-  });
-
-  it("includes error output for failed leaves", () => {
-    const dataWithOutput = {
-      packages: [
-        {
-          path: "example.com/pkg",
-          status: "fail",
-          duration: 1.0,
-          nodes: [
-            suite("MySuite", [
-              leaf("passes", "pass", 0.2),
-              leaf("fails", "fail", 0.8, [
-                "    file_test.go:42: Expected 1 to equal 2\n",
-              ]),
-            ]),
-          ],
-        },
-      ],
-      stats: {
-        suites: 1,
-        behaviors: 2,
-        tests: 0,
-        passed: 1,
-        failed: 1,
-        skipped: 0,
-      },
-    };
-    const report = specDataToReport(dataWithOutput, []);
-    expect(report).toContain("│ file_test.go:42: Expected 1 to equal 2");
-  });
-
-  it("filters === and --- delimiters from error output", () => {
-    const dataWithOutput = {
-      packages: [
-        {
-          path: "example.com/pkg",
-          status: "fail",
-          duration: 0.5,
-          nodes: [
-            suite("S", [
-              leaf("fails", "fail", 0.5, [
-                "=== RUN   TestFoo\n",
-                "--- FAIL: TestFoo (0.00s)\n",
-                "    foo_test.go:10: oops\n",
-              ]),
-            ]),
-          ],
-        },
-      ],
-      stats: {
-        suites: 1,
-        behaviors: 1,
-        tests: 0,
-        passed: 0,
-        failed: 1,
-        skipped: 0,
-      },
-    };
-    const report = specDataToReport(dataWithOutput, []);
-    expect(report).toContain("│ foo_test.go:10: oops");
-    expect(report).not.toContain("=== RUN");
-    expect(report).not.toContain("--- FAIL");
-  });
-
-  it("does not include error output when fail is hidden", () => {
-    const dataWithOutput = {
-      packages: [
-        {
-          path: "example.com/pkg",
-          status: "fail",
-          duration: 1.0,
-          nodes: [
-            suite("MySuite", [
-              leaf("passes", "pass", 0.2),
-              leaf("fails", "fail", 0.8, [
-                "    file_test.go:42: Expected 1 to equal 2\n",
-              ]),
-            ]),
-          ],
-        },
-      ],
-      stats: {
-        suites: 1,
-        behaviors: 2,
-        tests: 0,
-        passed: 1,
-        failed: 1,
-        skipped: 0,
-      },
-    };
-    const report = specDataToReport(dataWithOutput, [], new Set(["fail"]));
-    expect(report).not.toContain("file_test.go:42");
-    expect(report).not.toContain("Expected 1 to equal 2");
-  });
-
-  it("error output does not inflate column widths", () => {
-    const longError = "x".repeat(200);
-    const dataWithOutput = {
-      packages: [
-        {
-          path: "example.com/pkg",
-          status: "fail",
-          duration: 0.5,
-          nodes: [
-            suite("S", [
-              leaf("fails", "fail", 0.5, [
-                `    file_test.go:1: ${longError}\n`,
-              ]),
-            ]),
-          ],
-        },
-      ],
-      stats: {
-        suites: 1,
-        behaviors: 1,
-        tests: 0,
-        passed: 0,
-        failed: 1,
-        skipped: 0,
-      },
-    };
-    const report = specDataToReport(dataWithOutput, []);
-    const headerLine = report.split("\n")[0];
-    expect(headerLine.length).toBeLessThan(100);
+  it("names no source for a node only a run revealed", () => {
+    expect(sourceOf(node("x", "pass"), "/p")).toBeUndefined();
+    expect(
+      sourceOf(
+        node("x", "pass", [], { file: "a_test.go", line: 7 }),
+        undefined,
+      ),
+    ).toBeUndefined();
   });
 });
 
-describe("specDataToReport broken packages", () => {
-  const data = {
-    packages: [
+describe("buildSpecBody", () => {
+  it("shows a branch with the status the CLI gave it, deriving none from its children", () => {
+    const html = body([
       {
-        path: "example.com/healthy",
-        status: "pass",
-        duration: 0.5,
-        nodes: [suite("OkSuite", [leaf("passes", "pass", 0.5)])],
-      },
-      {
-        path: "example.com/broken",
+        path: "example.com/p",
         status: "fail",
         duration: 0,
-        nodes: [],
-        output: [
-          "# example.com/broken\n",
-          "svc.go:4:17: cannot use 42 as string value\n",
+        nodes: [
+          node("TestAsGivenTestSuite", "pass", [node("fails", "fail")]),
+          node("TestFailedTestSuite", "fail", [node("fails", "fail")]),
         ],
       },
-    ],
-    stats: {
-      suites: 1,
-      behaviors: 1,
-      tests: 0,
-      passed: 1,
-      failed: 0,
-      skipped: 0,
-      failedPackages: 1,
-    },
-  };
-
-  it("lists a package-level failure as its own row", () => {
-    const report = specDataToReport(data, ["example.com"]);
-    expect(report).toContain("broken");
-    expect(report).toContain("FAIL (package)");
+    ]);
+    expect(html).toMatch(
+      /<details class="branch pass" data-display="TestAsGivenTestSuite">/,
+    );
+    expect(html).toMatch(
+      /<details class="branch fail" data-display="TestFailedTestSuite" open>/,
+    );
   });
 
-  it("carries failed packages into the summary line", () => {
-    const report = specDataToReport(data, ["example.com"]);
-    expect(report).toContain("1 failed packages");
+  it("marks a node the run did not report NOT RUN, with no duration", () => {
+    const html = body([
+      {
+        path: "example.com/p",
+        status: "none",
+        duration: 0,
+        nodes: [node("TestLeftTestSuite", "none", [node("waits", "none")])],
+      },
+    ]);
+    expect(html).toMatch(
+      /class="leaf block none"[^>]*>\s*<span class="icon none">/,
+    );
+    expect(html).toContain('<span class="tag none">NOT RUN</span>');
+    expect(html).not.toContain("<1ms");
   });
 
-  it("does not count package failures as behavior failures", () => {
-    const report = specDataToReport(data, ["example.com"]);
-    expect(report).not.toContain("1 failed,");
-    expect(report).toContain("1 passed");
+  it("heads each package with the CLI's counts and each module with their sum", () => {
+    const pkg = (p: string, s: SpecStats): SpecPackage => ({
+      path: p,
+      status: "pass",
+      duration: 0,
+      nodes: [node("TestOneTestSuite", "pass", [node("ok", "pass")])],
+      stats: s,
+    });
+    const html = body(
+      [
+        pkg("example.com/a/x", stats({ passed: 2, notRun: 1 })),
+        pkg("example.com/a/y", stats({ passed: 1, failed: 1 })),
+        pkg("example.com/b", stats({ skipped: 1 })),
+      ],
+      ["example.com/a", "example.com/b"],
+    );
+    expect(html).toContain(
+      'example.com/a <span class="row-stats">3 passed, 1 failed, 1 not run</span>',
+    );
+    expect(html).toContain(
+      'x <span class="row-stats">2 passed, 1 not run</span>',
+    );
+    expect(html).toContain(
+      'y <span class="row-stats">1 passed, 1 failed</span>',
+    );
+  });
+
+  it("links a node to the source the CLI names, and no node without a position", () => {
+    const html = body(
+      [
+        {
+          path: "example.com/p",
+          dir: "/src/p",
+          status: "pass",
+          duration: 0,
+          nodes: [
+            node(
+              "TestPlacedTestSuite",
+              "pass",
+              [
+                node("declared", "pass", [], { file: "p_test.go", line: 12 }),
+                node("revealed", "pass"),
+              ],
+              { file: "p_test.go", line: 3 },
+            ),
+          ],
+        },
+      ],
+      [],
+      new Set(),
+      () => "/elsewhere",
+    );
+    const file = path.join("/src/p", "p_test.go");
+    expect(html).toContain(`data-loc-file="${file}" data-loc-line="3"`);
+    expect(html).toContain(`data-loc-file="${file}" data-loc-line="12"`);
+    expect(html.match(/data-loc-file=/g)).toHaveLength(2);
+  });
+
+  it("shows a package's own failure when the CLI counts it, and only then", () => {
+    const failing = (failedPackages: number): SpecPackage => ({
+      path: "example.com/p",
+      status: "fail",
+      duration: 0,
+      nodes: [],
+      output: ["# example.com/p", "p.go:3:1: syntax error"],
+      stats: stats({ failedPackages }),
+    });
+    expect(body([failing(1)])).toContain("<strong>FAIL</strong>");
+    expect(body([failing(1)])).toContain("syntax error");
+    expect(body([failing(0)])).not.toContain("<strong>FAIL</strong>");
+  });
+
+  it("offers a toggle per status the CLI hides, not run included, off for the hidden", () => {
+    const html = body([], [], new Set(["pass", "none"]));
+    expect(html).toContain('class="filter-btn pass" data-filter="pass"');
+    expect(html).toContain('class="filter-btn fail active" data-filter="fail"');
+    expect(html).toContain('class="filter-btn skip active" data-filter="skip"');
+    expect(html).toContain(
+      'class="filter-btn none" data-filter="none" title="Show or hide not run"',
+    );
   });
 });
 
