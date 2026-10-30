@@ -12,7 +12,7 @@ func countNoun(n int, singular, plural string) string {
 
 // countParts lists the populated kinds of a run in trailer order, or "0 suites"
 // when nothing was found at all.
-func countParts(stats Stats) []string {
+func countParts(stats Stats) []string { //nolint:gocritic // hugeParam: stable API
 	var counts []string
 	if stats.Suites > 0 {
 		counts = append(counts, countNoun(stats.Suites, "suite", "suites"))

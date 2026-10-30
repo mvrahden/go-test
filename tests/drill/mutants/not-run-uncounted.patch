@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/spec .* / counts the behaviors the stream did not report as not run, and exits as without --declared
+Clause: when a stream of some of a package's methods is rendered with --declared → counts the behaviors the stream did not report as not run, and exits as without --declared
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -698,7 +698,6 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
+ func countVerdict(n *Node, s *Stats) {
+ 	switch {
+ 	case n.NotRun:
+-		s.NotRun++
+ 	case n.Status == StatusPass:
+ 		s.Passed++
+ 	case n.Status == StatusFail:

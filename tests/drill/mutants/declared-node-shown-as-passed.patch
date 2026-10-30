@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / shows every method the source declares with its When and It rows, those the stream did not report with no verdict and no duration
+Clause: when a stream of some of a package's methods is rendered with --declared → shows every method the source declares with its When and It rows, those the stream did not report with no verdict and no duration
+--- a/internal/gotestspec/declared.go
++++ b/internal/gotestspec/declared.go
+@@ -96,7 +96,7 @@ func notRun(nodes []*Node, excluded bool) {
+ 		if skipped {
+ 			n.Status = StatusSkip
+ 		} else {
+-			n.NotRun = true
++			n.Status = StatusPass
+ 		}
+ 		notRun(n.Children, skipped)
+ 	}

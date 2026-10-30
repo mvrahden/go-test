@@ -57,9 +57,8 @@ func specJSON(t *gotest.T, want int, args ...string) specDoc {
 	return doc
 }
 
-// node finds the node at path, one name per level, below the package's nodes.
-func node(t *gotest.T, pkg specPackage, path ...string) specNode {
-	nodes := pkg.Nodes
+// node finds the node at path, one name per level, among nodes.
+func node(t *gotest.T, nodes []specNode, path ...string) specNode {
 	var found specNode
 	for _, name := range path {
 		ok := false

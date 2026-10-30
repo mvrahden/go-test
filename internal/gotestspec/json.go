@@ -26,11 +26,16 @@ type jsonGroup struct {
 }
 
 type jsonPackage struct {
-	Path     string     `json:"path"`
+	Path string `json:"path"`
+	// Dir is the package's directory, when its specification was read from
+	// source (--static, --declared).
+	Dir      string     `json:"dir,omitempty"`
 	Status   string     `json:"status"`
 	Duration float64    `json:"duration"`
 	Nodes    []jsonNode `json:"nodes"`
 	Output   []string   `json:"output"`
+	// Stats counts this package alone; present under WithPackageStats.
+	Stats *jsonStats `json:"stats,omitempty"`
 }
 
 type jsonNode struct {
@@ -45,8 +50,12 @@ type jsonNode struct {
 	External bool    `json:"external"`
 	// Incomplete says the children are a floor, not the whole list. Only a
 	// statically read tree can set it, so it is absent from a rendered run.
-	Incomplete  bool       `json:"incomplete,omitempty"`
-	Variant     int        `json:"variant,omitempty"`
+	Incomplete bool `json:"incomplete,omitempty"`
+	Variant    int  `json:"variant,omitempty"`
+	// File (relative to the package's dir) and Line say where the source
+	// declares the node; absent for a node only a run revealed.
+	File        string     `json:"file,omitempty"`
+	Line        int        `json:"line,omitempty"`
 	Output      []string   `json:"output"`
 	Children    []jsonNode `json:"children"`
 	Iterations  int        `json:"iterations,omitempty"`
@@ -69,6 +78,8 @@ type jsonStats struct {
 	// FailedPackages carries package-level verdicts (build failures, deaths
 	// outside any test); the packages array shows which via status "fail".
 	FailedPackages int `json:"failedPackages,omitempty"`
+	// NotRun counts declared behaviors the stream did not report (--declared).
+	NotRun int `json:"notRun,omitempty"`
 }
 
 func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
@@ -80,22 +91,31 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 
 	root := jsonRoot{
 		Version:  about.ResolvedVersion(),
-		Packages: make([]jsonPackage, len(packages)),
+		Packages: []jsonPackage{},
 		Stats:    jsonStats(stats),
 	}
 
-	for i, pkg := range packages {
+	for _, pkg := range packages {
+		if !cfg.packageShown(pkg) {
+			continue
+		}
 		output := pkg.Output
 		if output == nil {
 			output = []string{}
 		}
-		root.Packages[i] = jsonPackage{
+		jp := jsonPackage{
 			Path:     pkg.Path,
+			Dir:      pkg.Dir,
 			Status:   statusString(pkg.Status),
 			Duration: PackageDuration(pkg).Seconds(),
-			Nodes:    convertNodes(pkg.Nodes),
+			Nodes:    cfg.convertNodes(pkg.Nodes),
 			Output:   output,
 		}
+		if cfg.packageStats {
+			own := jsonStats(CollectStats([]*Package{pkg}))
+			jp.Stats = &own
+		}
+		root.Packages = append(root.Packages, jp)
 	}
 
 	for _, g := range cfg.groups {
@@ -106,7 +126,8 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 	_ = enc.Encode(root)
 }
 
-func convertNodes(nodes []*Node) []jsonNode {
+func (c *renderConfig) convertNodes(all []*Node) []jsonNode {
+	nodes := c.visible(all)
 	if len(nodes) == 0 {
 		return []jsonNode{}
 	}
@@ -124,8 +145,10 @@ func convertNodes(nodes []*Node) []jsonNode {
 			External:    n.External,
 			Incomplete:  n.Incomplete,
 			Variant:     n.Variant,
+			File:        n.File,
+			Line:        n.Line,
 			Output:      n.Output,
-			Children:    convertNodes(n.Children),
+			Children:    c.convertNodes(n.Children),
 			Iterations:  n.Iterations,
 			NsPerOp:     n.NsPerOp,
 			BytesPerOp:  n.BytesPerOp,

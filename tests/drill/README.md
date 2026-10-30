@@ -320,6 +320,14 @@ shards of one run do not add up to every mutant exactly once.
 | `tree-fail-is-pass` | `BuildTree` classifies `fail` events as `pass` | ring-0 tree suite (the canary reads raw events, not the tree) |
 | `branch-keeps-a-pass-over-a-failure` | a suite whose own line says pass stays passed above a failed method | spec conformance: the composed stream's suite renders unlike the one go test failed |
 | `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
+| `declared-node-shown-as-passed` | `--declared` gives a declared node the stream did not report a pass | spec conformance: the left-out method's rows carry a verdict |
+| `not-run-uncounted` | the behaviors the stream did not report are not counted as not run | spec conformance: the declared package counts 0 not run |
+| `excluded-read-as-not-run` | a method the X_ prefix excludes reads as not run under `--declared` | spec conformance: the parked method has no skip verdict |
+| `observed-rows-dropped` | `--declared` drops the rows only the stream names | spec conformance: the method over a table that is no literal has no rows |
+| `hidden-hook-failure` | `--hide` keeps a branch only for a row shown beneath it | spec conformance: the suite whose AfterAll failed vanishes under `--hide=pass` |
+| `hidden-package-kept` | `--hide` keeps a package none of whose rows is shown | spec conformance: the green run's package stays in the document |
+| `hide-under-static-accepted` | `--hide` is accepted beside `--static` | spec conformance: the static run exits 0 instead of 2 |
+| `hiding-recounts` | the trailer and each package's stats count only the rows `--hide` shows | spec conformance: the hidden passes are missing from the counts |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
 | `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |

@@ -205,8 +205,10 @@ var ExportRunScaffold = runScaffold
 // spec.go, staticspec.go
 var (
 	ExportRunSpec          = runSpec
-	ExportRunSpecFromInput = runSpecFromInput
-	ExportRunStaticSpec    = runStaticSpec
+	ExportRunSpecFromInput = func(input, format, output string, noColor, renderOnly bool) int {
+		return runSpecFromInput(input, format, output, noColor, renderOnly, nil, nil)
+	}
+	ExportRunStaticSpec = runStaticSpec
 )
 
 // summary.go

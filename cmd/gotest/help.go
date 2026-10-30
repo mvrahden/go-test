@@ -221,6 +221,7 @@ func printSpecHelp() {
 Usage:
   gotest spec [flags] [--] [go-test-flags] [packages...]
   gotest spec --input=<file> [--format=<fmt>] [--output=<file>]
+  gotest spec --input=<file> --declared [flags] [packages...]
 
 Runs test suites and renders a BDD-style specification tree showing
 pass/fail/skip status for each suite, method, and subtest.
@@ -248,7 +249,20 @@ Flags:
                           stream: report whether rendering succeeded, not the
                           test verdict
   --static                Read the specification from source without running
-                          the suites; nodes carry no verdict
+                          the suites; nodes carry no verdict. In JSON each
+                          package carries its dir and each node its file and
+                          line
+  --declared              With --input, lay the stream's verdicts over the
+                          specification the packages' source declares (./...
+                          when none are named): a declared node the stream did
+                          not report has no verdict and counts as not run, and
+                          what only the stream holds is kept. The exit code is
+                          that of --input
+  --hide=<statuses>       Leave out the rows whose own status is one of pass,
+                          fail, skip or none (comma-separated) and beneath which
+                          no row is shown; counts and the exit code stay the
+                          whole run's. Not with --static. With --hide or
+                          --declared each JSON package carries its own stats
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep the overlay and work dir; a later run
@@ -271,6 +285,9 @@ Examples:
   gotest spec --format=md --output=spec.md ./...   Markdown report to file
   gotest spec --no-color --output=spec.txt ./...   Plain text for CI artifacts
   gotest spec --input=- < events.json              Render from piped JSON input
+  gotest spec --input=events.json --declared ./... The source's spec, with the
+                                                   run's verdicts laid over it
+  gotest spec --input=events.json --hide=pass      Only what did not pass
   gotest spec --format=json ./...                  JSON tree
 `)
 }
