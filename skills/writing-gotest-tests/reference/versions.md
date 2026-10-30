@@ -665,7 +665,11 @@ Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 chang
 5. **`bench --json` carries `failures`** — what a failed benchmark printed,
    a panic's message and stack included.
 
-5. **Suites and fixtures are read from their own declarations** — a suite or
+## v1.37
+
+Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
+
+1. **Suites and fixtures are read from their own declarations** — a suite or
    fixture inside a grouped `type ( … )` block, an embedded suite or
    fixture, an embedded type with a method gotest reads, a field of suite
    type, a fixture field by value and two fields of one fixture type are
@@ -676,39 +680,35 @@ Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 chang
    hooks were promoted; give each fixture a named pointer field and
    share tests through a generic contract suite.
 
-6. **Focus is run-wide** — one `F_` suite or method of any kind, in any
+2. **Focus is run-wide** — one `F_` suite or method of any kind, in any
    package or test package variant, skips every unfocused suite of the
    run, which then starts no fixture
    ([focus](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-focus-across-a-run)).
    Before v1.37 focus held per package and test package variant.
 
-7. **Aliases and generics work everywhere** — an alias of an alias, a
+3. **Aliases and generics work everywhere** — an alias of an alias, a
    method on a pointer to an alias, and an alias of a generic suite from
    another package or declared in the external test package all run
    ([other packages](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-declarations-from-other-packages)).
 
-8. **A suite with no case is a helper** — nothing is generated, run or
+4. **A suite with no case is a helper** — nothing is generated, run or
    discovered for a `*TestSuite` type declaring no `Test*`, `Benchmark*`
    or `Fuzz*` method, and a testify suite is left to `go test`.
 
-9. **The harness imports under its own names** and every load reads past a
+5. **The harness imports under its own names** and every load reads past a
    generated file left on disk, so a package declaring `context` or
    `testing`, or a suite renamed since the last `gotest generate`, still
    runs
    ([generated harness](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-the-generated-harness)).
 
-## v1.37
-
-Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
-
-1. **`migrate` converts base suites** — a testify suite embedding a base
+6. **`migrate` converts base suites** — a testify suite embedding a base
    suite of the same test files migrates with it: the base becomes a helper
    held in a named field, and the child declares the hooks and tests it had
    through the base
    ([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
    Before v1.37 the files declaring both were left under a marker.
 
-2. **`migrate` keeps testify's verdicts or marks why not** — a translation
+7. **`migrate` keeps testify's verdicts or marks why not** — a translation
    that would pass or fail where testify did not, or change what runs when,
    is left under a marker naming the reason and the gotest way
    ([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)),
@@ -718,7 +718,7 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
    Before v1.37 such a translation could turn a passing testify suite red,
    or a failing one green, with exit 0.
 
-3. **`lint -fix` unfocuses files behind a build constraint** — the `focus`
+8. **`lint -fix` unfocuses files behind a build constraint** — the `focus`
    fix renames a suite in the files a build constraint leaves out too, and
    names, unapplied, a fix such a file would break
    ([the focus fix](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-the-focus-fix)).
