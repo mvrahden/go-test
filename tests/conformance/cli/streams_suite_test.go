@@ -56,6 +56,42 @@ func (s *CLIStreamsTestSuite) TestJSONOutputsStayPure(t *gotest.T) {
 	})
 }
 
+func (s *CLIStreamsTestSuite) TestRunLevelPackagesAreMarked(t *gotest.T) {
+	t.When("a -json run's shared fixture does not come up", func(w *gotest.T) {
+		w.It("marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package", func(it *gotest.T) {
+			run, err := testkit.RunPackage(it.Context(), it.TempDir(), "../testdata/failingshared/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
+			marked := map[string]int{}
+			unmarked := map[string]int{}
+			var actions []string
+			for _, line := range strings.Split(strings.TrimSpace(run.Stdout), "\n") {
+				var ev struct {
+					Action   string
+					Package  string
+					RunLevel *bool
+				}
+				gotest.NoError(it, json.Unmarshal([]byte(line), &ev), "line: %s", line)
+				if ev.RunLevel != nil {
+					gotest.True(it, *ev.RunLevel, "line: %s", line)
+					marked[ev.Package]++
+				} else {
+					unmarked[ev.Package]++
+				}
+				if ev.Package == "shared fixtures" {
+					actions = append(actions, ev.Action)
+				}
+			}
+			gotest.NotEmpty(it, actions)
+			gotest.Equal(it, "start", actions[0])
+			gotest.Equal(it, "fail", actions[len(actions)-1])
+			gotest.Equal(it, map[string]int{"shared fixtures": len(actions)}, marked)
+			gotest.NotEmpty(it, unmarked)
+			gotest.Zero(it, unmarked["shared fixtures"])
+		})
+	})
+}
+
 func (s *CLIStreamsTestSuite) TestColorFollowsTheTerminal(t *gotest.T) {
 	t.When("stdout is a pipe", func(w *gotest.T) {
 		w.It("prints no color codes, even with --no-color=false", func(it *gotest.T) {
