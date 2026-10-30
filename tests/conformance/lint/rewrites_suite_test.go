@@ -24,6 +24,9 @@ type LinterRewritesTestSuite struct {
 	findings map[string][]string
 	before   map[string]string
 	after    map[string]string
+	// what go test said of a row after the fix: its output, and how the run
+	// ended, for a row left without a verdict
+	afterOut map[string]string
 	fixErr   map[string]string
 	fixed    map[string]string
 }
@@ -233,7 +236,7 @@ func (s *LinterRewritesTestSuite) BeforeAll(t *gotest.T) {
 		gotest.NoError(t, os.WriteFile(filepath.Join(pkg, "row_test.go"), []byte(rowSource(i, &rewriteRows[i])), 0o600))
 	}
 
-	s.before = rowVerdicts(t, s.dir)
+	s.before, _ = rowVerdicts(t, s.dir)
 	s.findings = rowFindings(t, s.dir)
 
 	// Each row is fixed alone, so its verdict reads only its own fix.
@@ -258,7 +261,7 @@ func (s *LinterRewritesTestSuite) BeforeAll(t *gotest.T) {
 		s.fixed[rowPkg(i)] = sources[i]
 		s.fixErr[rowPkg(i)] = fixes[i]
 	}
-	s.after = rowVerdicts(t, s.dir)
+	s.after, s.afterOut = rowVerdicts(t, s.dir)
 }
 
 func (s *LinterRewritesTestSuite) AfterAll(t *gotest.T) {
@@ -374,7 +377,7 @@ func (s *LinterRewritesTestSuite) checkRows(t *gotest.T, group string) {
 		gotest.Equal(t, r.row.verdict, s.before[pkg], "source:\n%s", src)
 		fixed := s.fixed[pkg]
 		gotest.Empty(t, s.fixErr[pkg], "fixed source:\n%s", fixed)
-		gotest.Equal(t, s.before[pkg], s.after[pkg], "fixed source:\n%s", fixed)
+		gotest.Equal(t, s.before[pkg], s.after[pkg], "go test after the fix:\n%s\nfixed source:\n%s", s.afterOut[pkg], fixed)
 		switch {
 		case r.row.gone != "":
 			gotest.NotContains(t, fixed, "\t"+r.row.gone+"\n")
@@ -413,25 +416,34 @@ func rowFindings(t *gotest.T, dir string) map[string][]string {
 }
 
 // rowVerdicts runs every row with go test -json and returns TestRow's verdict
-// per package; a package that does not build has none.
-func rowVerdicts(t *gotest.T, dir string) map[string]string {
+// per package, with what go test printed for each package and, after it, how
+// the run ended; a package that does not build has no verdict.
+func rowVerdicts(t *gotest.T, dir string) (verdicts, output map[string]string) {
 	cmd := exec.CommandContext(t.Context(), "go", "test", "-json", "-count=1", "./...")
 	cmd.Dir = dir
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	_ = cmd.Run() // failing rows exit non-zero; their verdicts are the result
-	verdicts := map[string]string{}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	err := cmd.Run() // failing rows exit non-zero; their verdicts are the result
+	verdicts, output = map[string]string{}, map[string]string{}
 	for _, ev := range testkit.ParseEvents(stdout.Bytes()) {
+		pkg := filepath.Base(ev.Package)
+		if ev.Action == "output" {
+			output[pkg] += ev.Output
+		}
 		if ev.Test != "TestRow" {
 			continue
 		}
 		switch ev.Action {
 		case "pass", "fail", "skip":
-			verdicts[filepath.Base(ev.Package)] = ev.Action
+			verdicts[pkg] = ev.Action
 		}
 	}
-	gotest.NotEmpty(t, verdicts, "go test output:\n%s", stdout.String())
-	return verdicts
+	ended := fmt.Sprintf("\ngo test ended: %v\nstderr: %s", err, stderr.String())
+	for i := range rewriteRows {
+		output[rowPkg(i)] += ended
+	}
+	gotest.NotEmpty(t, verdicts, "go test output:\n%s%s", stdout.String(), ended)
+	return verdicts, output
 }
 
 // fixRow applies lint's fixes to pkg in dir and vets it, returning what
