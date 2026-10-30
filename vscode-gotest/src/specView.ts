@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import { existsSync } from "node:fs";
 import { buildCliCommand, offerCliUpgrade, stripGoRunExitEcho } from "./cli.js";
 import { specRenderTimeoutSeconds } from "./config.js";
 import { ManagedChild } from "./managedChild.js";
@@ -399,7 +400,10 @@ export class SpecViewPanel implements vscode.Disposable {
     const body =
       msg.type === "empty"
         ? buildEmptyBody(gopherUri)
-        : buildSpecBody(msg.data, this.modulePaths, locationMap);
+        : buildSpecBody(msg.data, this.modulePaths, {
+            locations: locationMap,
+            dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir,
+          });
     const stateJson =
       msg.type === "specData" ? encodeStateForScript(msg.data) : "null";
 
@@ -636,10 +640,17 @@ function buildEmptyBody(gopherUri: string): string {
 
 type LocationMap = Record<string, { file: string; line: number }>;
 
+// What the tree is rendered against: declarations and package directories,
+// both from discovery.
+interface RenderEnv {
+  locations: LocationMap;
+  dirOf: (pkgPath: string) => string | undefined;
+}
+
 function buildSpecBody(
   data: SpecData,
   modulePaths: string[],
-  locationMap: LocationMap,
+  env: RenderEnv,
 ): string {
   const toolbar = buildToolbar(
     data.stats.failed > 0 || (data.stats.failedPackages ?? 0) > 0,
@@ -649,16 +660,14 @@ function buildSpecBody(
   if (groups.length === 1 && groups[0].entries.length === 1) {
     const pkg = groups[0].entries[0].pkg;
     tree =
-      buildPackageFailureHtml(pkg) +
-      pkg.nodes
-        .map((n) => buildNodeHtml(n, "", nodeCtx(locationMap, pkg)))
-        .join("");
+      buildPackageFailureHtml(pkg, env) +
+      pkg.nodes.map((n) => buildNodeHtml(n, "", nodeCtx(env, pkg))).join("");
   } else if (groups.length === 1) {
     tree = groups[0].entries
-      .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap))
+      .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
       .join("");
   } else {
-    tree = groups.map((g) => buildModuleSectionHtml(g, locationMap)).join("");
+    tree = groups.map((g) => buildModuleSectionHtml(g, env)).join("");
   }
   const summary = buildSummary(data.stats);
   return `<div class="spec-container">
@@ -723,14 +732,14 @@ function groupByModule(
 function buildPackageSectionHtml(
   displayPath: string,
   pkg: SpecPackage,
-  locationMap: LocationMap,
+  env: RenderEnv,
 ): string {
   const nodes = pkg.nodes
-    .map((n) => buildNodeHtml(n, "", nodeCtx(locationMap, pkg)))
+    .map((n) => buildNodeHtml(n, "", nodeCtx(env, pkg)))
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}</summary>
-  ${buildPackageFailureHtml(pkg)}${nodes}
+  ${buildPackageFailureHtml(pkg, env)}${nodes}
 </details>`;
 }
 
@@ -745,12 +754,13 @@ function pkgFailedOnItsOwn(pkg: SpecPackage): boolean {
 // diagnostics. Such a package has no failing node to render it, so without
 // this block the spec view would show the package as an empty green section
 // beside a red exit code.
-function buildPackageFailureHtml(pkg: SpecPackage): string {
+function buildPackageFailureHtml(pkg: SpecPackage, env: RenderEnv): string {
   if (!pkgFailedOnItsOwn(pkg)) return "";
+  const dir = env.dirOf(pkg.path);
   const lines = (pkg.output ?? [])
     .map((l) => l.trimEnd())
     .filter(Boolean)
-    .map(escapeHtml)
+    .map((l) => linkSources(escapeHtml(l), dir))
     .join("\n");
   const errorBlock = lines
     ? `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`
@@ -761,22 +771,40 @@ function buildPackageFailureHtml(pkg: SpecPackage): string {
 </div>`;
 }
 
-function buildModuleSectionHtml(
-  group: ModuleGroup,
-  locationMap: LocationMap,
-): string {
+// linkSources turns the file:line tokens of an escaped output line into
+// links to the source, when the file is there to open. go test names test
+// files relative to the package, the compiler relative to where it ran.
+export function linkSources(escaped: string, dir: string | undefined): string {
+  return escaped.replace(
+    /((?:[A-Za-z]:)?[\w.\-/\\]+\.go):(\d+)(?::\d+)?/g,
+    (token: string, file: string, line: string) => {
+      const resolved = resolveSource(file, dir);
+      if (!resolved) return token;
+      return `<a class="src-link" data-loc-file="${escapeAttr(resolved)}" data-loc-line="${line}">${token}</a>`;
+    },
+  );
+}
+
+function resolveSource(
+  file: string,
+  dir: string | undefined,
+): string | undefined {
+  const candidates = path.isAbsolute(file)
+    ? [file]
+    : dir
+      ? [path.join(dir, file), path.join(dir, path.basename(file))]
+      : [];
+  return candidates.find((c) => existsSync(c));
+}
+
+function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
+  const only = group.entries[0].pkg;
   const inner =
     group.entries.length === 1
-      ? buildPackageFailureHtml(group.entries[0].pkg) +
-        group.entries[0].pkg.nodes
-          .map((n) =>
-            buildNodeHtml(n, "", nodeCtx(locationMap, group.entries[0].pkg)),
-          )
-          .join("")
+      ? buildPackageFailureHtml(only, env) +
+        only.nodes.map((n) => buildNodeHtml(n, "", nodeCtx(env, only))).join("")
       : group.entries
-          .map((e) =>
-            buildPackageSectionHtml(e.displayPath, e.pkg, locationMap),
-          )
+          .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
           .join("");
   return `<details class="module-section" open>
   <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}</summary>
@@ -789,10 +817,15 @@ function buildModuleSectionHtml(
 interface NodeCtx {
   locations: LocationMap;
   pkgPath: string;
+  pkgDir: string | undefined;
 }
 
-function nodeCtx(locations: LocationMap, pkg: SpecPackage): NodeCtx {
-  return { locations, pkgPath: pkg.path };
+function nodeCtx(env: RenderEnv, pkg: SpecPackage): NodeCtx {
+  return {
+    locations: env.locations,
+    pkgPath: pkg.path,
+    pkgDir: env.dirOf(pkg.path),
+  };
 }
 
 // itemIdOf is the Test Explorer id of a node: the package, then the go test
@@ -869,7 +902,8 @@ function buildLeafHtml(node: SpecNode, nodePath: string, ctx: NodeCtx): string {
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
 
-  const errorBlock = node.status === "fail" ? errorBlockHtml(node) : "";
+  const errorBlock =
+    node.status === "fail" ? errorBlockHtml(node, ctx.pkgDir) : "";
 
   return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}"${idAttr(id)}>
   ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>${actionsHtml(id)}
@@ -910,7 +944,7 @@ function buildBranchHtml(
 
   // What the branch itself reported: a failed AfterAll, a panic booked on
   // the suite rather than on the behavior that raised it.
-  const errorBlock = status === "fail" ? errorBlockHtml(node) : "";
+  const errorBlock = status === "fail" ? errorBlockHtml(node, ctx.pkgDir) : "";
   const ownFail = failedOnItsOwn(node) ? " fail-own" : "";
 
   return `<details class="branch${ownFail}" data-display="${escapeAttr(node.display)}"${openAttr}>
@@ -926,8 +960,10 @@ function ownOutput(node: SpecNode): string[] {
     .filter((l) => l && !l.startsWith("=== ") && !l.startsWith("--- "));
 }
 
-function errorBlockHtml(node: SpecNode): string {
-  const lines = ownOutput(node).map(escapeHtml).join("\n");
+function errorBlockHtml(node: SpecNode, dir: string | undefined): string {
+  const lines = ownOutput(node)
+    .map((l) => linkSources(escapeHtml(l), dir))
+    .join("\n");
   if (!lines) return "";
   return `<details class="error-details"><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`;
 }
@@ -1476,6 +1512,8 @@ summary.node:hover > .icon[data-loc-file] > .status-text,
 summary.node:hover > .icon[data-loc-file] > .goto-text,
 .leaf:hover > .icon[data-loc-file] > .goto-text { display: inline; color: var(--vscode-textLink-foreground); }
 
+.src-link { color: var(--vscode-textLink-foreground); cursor: pointer; text-decoration: underline; }
+
 /* Node actions, shown on hover */
 .node-actions { display: none; margin-left: 8px; }
 summary.node:hover > .node-actions,
@@ -1556,7 +1594,7 @@ document.addEventListener('click', (e) => {
     if (ids.length > 0) vscode.postMessage({ type: 'run', ids: ids });
     return;
   }
-  const iconEl = t.closest('.icon[data-loc-file]');
+  const iconEl = t.closest('.icon[data-loc-file], .src-link');
   if (iconEl) {
     const file = iconEl.dataset.locFile;
     const line = Number(iconEl.dataset.locLine);
