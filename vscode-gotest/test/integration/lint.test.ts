@@ -1,7 +1,7 @@
 // Lint findings in the editor, driven against the real CLI: what
 // `gotest lint -json` reports on the fixture corpus becomes diagnostics with
-// the rule as their code, and a suggested fix becomes an edit that lands on
-// the bytes the CLI meant.
+// the rule as their code and its tier as their severity, and a suggested fix
+// becomes an edit that lands on the bytes the CLI meant.
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import {
@@ -29,6 +29,7 @@ vi.mock("vscode", async () => {
   return buildVscodeStub(state as never);
 });
 
+import * as vscode from "vscode";
 import { DiscoveryCache } from "../../src/discovery.js";
 import { LintService, LintCodeActionProvider } from "../../src/lint.js";
 import { createRecordingChannel } from "./vscodeStub.js";
@@ -43,6 +44,7 @@ interface Diag {
   message: string;
   source: string;
   code: string;
+  severity: number;
   range: {
     start: { line: number; character: number };
     end: { line: number; character: number };
@@ -91,7 +93,14 @@ beforeAll(() => {
     true,
     fixturesDir,
   );
-  cache.update([pkg("gotest.lintfix", fixModuleDir)], true, fixModuleDir);
+  cache.update(
+    [
+      pkg("gotest.lintfix", fixModuleDir),
+      pkg("gotest.lintfix/tiers", path.join(fixModuleDir, "tiers")),
+    ],
+    true,
+    fixModuleDir,
+  );
 });
 
 afterAll(() => {
@@ -116,9 +125,15 @@ describe("lint findings in the editor", () => {
       "stdlib-test",
     ]);
     expect(diags.every((d) => d.source === "gotest")).toBe(true);
+    // An expressiveness rule and a migration one: neither is an error.
+    expect(
+      diags.every((d) => d.severity === vscode.DiagnosticSeverity.Warning),
+    ).toBe(true);
     const guard = diags.find((d) => d.message.startsWith("use Equal"))!;
-    // plain_test.go:23:2, in the editor's zero-based units.
+    // plain_test.go:23:2 to 25:3, the whole if block, in the editor's
+    // zero-based units.
     expect(guard.range.start).toEqual({ line: 22, character: 1 });
+    expect(guard.range.end).toEqual({ line: 24, character: 2 });
     lint.dispose();
   }, 300_000);
 
@@ -171,6 +186,46 @@ describe("lint findings in the editor", () => {
       'gotest.Equal(t, 1 + 1, 2, "arithmetic is broken")',
     );
     expect(fixed).not.toContain('t.Fatal("arithmetic is broken")');
+    lint.dispose();
+  }, 300_000);
+
+  it("shows an integrity rule's finding as an error and an expressiveness one as a warning, each over what it names", async () => {
+    const dir = path.join(fixModuleDir, "tiers");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "tiers_test.go");
+    writeFileSync(
+      file,
+      [
+        "package tiers",
+        "",
+        'import "github.com/mvrahden/go-test/pkg/gotest"',
+        "",
+        "type TierTestSuite struct{}",
+        "",
+        "func (s *TierTestSuite) F_TestFocused(t *gotest.T) {",
+        "\tgotest.True(t, 1+1 == 2)",
+        "}",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    const lint = new LintService(cache, recorder.channel as never);
+    await lint.lintPackage("gotest.lintfix/tiers");
+
+    const diags = lintDiagnostics(file);
+    const focus = diags.find((d) => d.code === "focus");
+    const simplify = diags.find((d) => d.code === "assertion-simplify");
+    expect(focus?.severity).toBe(vscode.DiagnosticSeverity.Error);
+    expect(simplify?.severity).toBe(vscode.DiagnosticSeverity.Warning);
+    // The focused method's signature, and the call through its closing paren.
+    expect(focus!.range).toEqual({
+      start: { line: 6, character: 0 },
+      end: { line: 6, character: 50 },
+    });
+    expect(simplify!.range).toEqual({
+      start: { line: 7, character: 1 },
+      end: { line: 7, character: 25 },
+    });
     lint.dispose();
   }, 300_000);
 
