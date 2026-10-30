@@ -50,9 +50,32 @@ export class SpecViewPanel implements vscode.Disposable {
     if (cache) {
       this.disposables.push(
         cache.onDidUpdate(() => {
+          this.pruneUndiscovered();
           this.rebuildIfVisible();
         }),
       );
+    }
+  }
+
+  // pruneUndiscovered forgets kept packages that discovery no longer reports
+  // in their folder. A folder discovery has said nothing about yet is left
+  // alone.
+  private pruneUndiscovered(): void {
+    if (!this.cache) return;
+    let removed = 0;
+    for (const folder of this.runs.folders()) {
+      const known = this.cache.packagesForWorkspace(folder);
+      if (known.length === 0) continue;
+      removed += this.runs.prune(
+        folder,
+        new Set(known.map((p) => p.importPath)),
+      ).length;
+    }
+    if (removed === 0) return;
+    this.persist();
+    this.stale = true;
+    if (this.panel && this.panel.visible !== false && this.autoRefresh()) {
+      void this.render();
     }
   }
 

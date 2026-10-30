@@ -295,3 +295,30 @@ describe("isRunLevelPackage", () => {
     expect(isRunLevelPackage("example.com/cart")).toBe(false);
   });
 });
+
+describe("SpecStore.prune", () => {
+  it("drops a folder's packages discovery no longer reports and keeps the rest", () => {
+    const store = new SpecStore();
+    store.merge({ stream: fullCart, folder: "/ws" });
+    store.merge({
+      stream: stream(
+        ...test(checkout, "TestCheckoutTestSuite", "pass"),
+        verdict(checkout, "pass"),
+        verdict("interrupted", "fail"),
+      ),
+      folder: "/ws",
+    });
+    store.merge({
+      stream: stream(...test("other.com/x", "TestXTestSuite", "pass")),
+      folder: "/other",
+    });
+
+    expect(store.prune("/ws", new Set([checkout]))).toEqual([cart]);
+
+    const composed = store.compose("/ws");
+    expect(pathsOf(composed, cart)).toEqual([]);
+    expect(pathsOf(composed, checkout)).toEqual(["TestCheckoutTestSuite"]);
+    expect(store.packages).toContain("interrupted");
+    expect(store.packages).toContain("other.com/x");
+  });
+});

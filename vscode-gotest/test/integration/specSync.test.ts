@@ -772,6 +772,34 @@ describe("failure output", () => {
   });
 });
 
+describe("packages discovery no longer reports", () => {
+  it("leave the panel when their folder's discovery comes back without them", async () => {
+    const cache = new DiscoveryCache();
+    const pkg = (importPath: string) =>
+      ({ importPath, dir: `/src/${importPath}`, suites: [] }) as never;
+    cache.update(
+      [pkg("example.com/cart"), pkg("example.com/checkout")],
+      true,
+      state.workspaceDir,
+    );
+    const recorder = createRecordingChannel();
+    const panel = new SpecViewPanel(recorder.channel as never, cache);
+    await panel.show();
+    await panel.refresh(run("all-pass"));
+    await panel.refresh(run("other-package-fail"));
+    expect(renderedHtml()).toContain("adds an item");
+
+    // cart was renamed: the next discovery of the folder no longer has it.
+    cache.update([pkg("example.com/checkout")], true, state.workspaceDir);
+    await panel.show();
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).not.toContain("adds an item");
+    expect(html).toContain("rejects an expired card");
+  });
+});
+
 describe("clearing drops the kept runs", () => {
   // Clearing has to drop what is kept, not just repaint, or the next refresh
   // would resurrect what was cleared.
