@@ -234,6 +234,46 @@ describe("buildSpecBody", () => {
     expect(body([failing(0)])).not.toContain("<strong>FAIL</strong>");
   });
 
+  it("shows no package failure when the CLI gives it no output, as under --hide=fail", () => {
+    const hidden: SpecPackage = {
+      path: "example.com/p",
+      status: "fail",
+      duration: 0,
+      nodes: [],
+      output: [],
+      stats: stats({ failedPackages: 1 }),
+    };
+    expect(body([hidden])).not.toContain("<strong>FAIL</strong>");
+  });
+
+  it("gives a package whose rows the CLI left out no row, and still adds its counts to its module", () => {
+    const pkg = (p: string, s: SpecStats, nodes: Node[]): SpecPackage => ({
+      path: p,
+      status: "pass",
+      duration: 0,
+      nodes,
+      stats: s,
+    });
+    const html = body(
+      [
+        pkg("example.com/a/green", stats({ passed: 2 }), []),
+        pkg("example.com/a/red", stats({ passed: 1, failed: 1 }), [
+          node("TestRedTestSuite", "fail", [node("breaks", "fail")]),
+        ]),
+        pkg("example.com/b", stats({ passed: 1 }), []),
+      ],
+      ["example.com/a", "example.com/b"],
+    );
+    expect(html).toContain(
+      'example.com/a <span class="row-stats">3 passed, 1 failed</span>',
+    );
+    expect(html).toContain(
+      'red <span class="row-stats">1 passed, 1 failed</span>',
+    );
+    expect(html).not.toContain(">green ");
+    expect(html).not.toContain("example.com/b");
+  });
+
   it("offers a toggle per status the CLI hides, not run included, off for the hidden", () => {
     const html = body([], [], new Set(["pass", "none"]));
     expect(html).toContain('class="filter-btn pass" data-filter="pass"');
