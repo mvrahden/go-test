@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AVendoredWorkspace / when a workspace is reached through a symlinked directory / migrate matches the files the go command names through the symlink \(
+Clause: when a workspace is reached through a symlinked directory → migrate matches the files the go command names through the symlink
+--- a/internal/migrate/migrate.go
++++ b/internal/migrate/migrate.go
+@@ -239,7 +239,7 @@
+ 	for _, dir := range dirs {
+ 		// The path as given, not resolved: the go command keeps a symlinked
+ 		// working directory's paths, and judges a go.work's modules by them.
+-		abs, err := filepath.Abs(dir)
++		abs, err := canonical(dir)
+ 		if err != nil {
+ 			return nil, err
+ 		}

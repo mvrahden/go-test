@@ -1,3 +1,5 @@
+| `migrate-workspace-dir-resolved` | migrate loads a directory by its resolved path, which the go command judges outside a go.work reached through a symlink | conformance: the migrate It for a workspace through a symlinked directory sees the file left unchecked |
+| `scaffold-working-directory-resolved` | `scaffold` loads a type's package from its directory as the go command resolves it, not as the working directory names it | conformance: the CLI scaffold It for a symlinked working directory sees the generated file named by a path through the real directory |
 # Mutation drill
 
 The drill is a test of the tests. gotest runs its own test suites, so a bug

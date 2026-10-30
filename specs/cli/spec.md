@@ -123,6 +123,10 @@ The scaffold subcommand SHALL write the scaffold beside the source file it is gi
 - **WHEN** a type is named by an absolute package path through a symlinked directory
 - **THEN** scaffolds into the package's directory
 
+#### Scenario: A symlinked working directory
+- **WHEN** a type is named by a relative package path from a symlinked working directory
+- **THEN** scaffolds into the package's directory, named relative to the working directory
+
 ### Requirement: Scaffolds that compile
 The scaffold subcommand SHALL write only code that compiles. It SHALL refuse with exit 1 a generic type, a generic function and a method of a generic type, a suite name the package already declares in any of its files or its external test package's, and a type without an exported method or a file without an exported function, whose suite would declare no case, writing nothing. The target shapes are the tables in `tests/conformance/cli/scaffold_compiles_suite_test.go`.
 

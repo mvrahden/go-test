@@ -617,16 +617,19 @@ func newUnit(j *dirJob, ls []loaded, fset *token.FileSet, srcs map[string][]byte
 			for _, f := range p.syntax {
 				path := fset.File(f.FileStart).Name()
 				u.filePkg[f] = p.types
-				if !strings.HasSuffix(path, "_test.go") || byPath[path] != nil {
+				// Under a go.work the go command names files through the
+				// workspace's own path, symlinks unresolved.
+				key := canonicalFile(path)
+				if !strings.HasSuffix(path, "_test.go") || byPath[key] != nil {
 					continue
 				}
 				uf := &unitFile{path: path, src: srcs[path], f: f}
-				byPath[path] = uf
+				byPath[key] = uf
 			}
 		}
 	}
 	for _, path := range j.tests {
-		uf := byPath[path]
+		uf := byPath[canonicalFile(path)]
 		if uf == nil {
 			src, err := os.ReadFile(path)
 			if err != nil {

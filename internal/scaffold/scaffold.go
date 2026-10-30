@@ -294,12 +294,17 @@ func toPascalCase(s string) string {
 // loadConfig returns the load config and pattern for a target's package. A
 // path is loaded from its own directory, so go finds the module and workspace
 // from there: from outside the module and through a symlinked directory too.
+// The directory is absolute: go/packages passes it to the go command as PWD,
+// which keeps a symlinked working directory's paths only when it is.
 func loadConfig(pkgPattern string, mode packages.LoadMode) (*packages.Config, string) {
 	cfg := &packages.Config{Mode: mode, Tests: false}
 	if !isPathPattern(pkgPattern) {
 		return cfg, pkgPattern
 	}
 	cfg.Dir = pkgPattern
+	if abs, err := filepath.Abs(pkgPattern); err == nil {
+		cfg.Dir = abs
+	}
 	return cfg, "."
 }
 

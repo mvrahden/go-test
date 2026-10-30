@@ -6125,6 +6125,46 @@
               "name": "TestASymlinkedPackagePath",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "scaffolds into the package's directory, named relative to the working directory",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "scaffolds_into_the_package's_directory,_named_relative_to_the_working_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a type is named by a relative package path from a symlinked working directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_type_is_named_by_a_relative_package_path_from_a_symlinked_working_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASymlinkedWorkingDirectory",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASymlinkedWorkingDirectory",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIScaffoldPaths",
@@ -17420,6 +17460,33 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "migrate matches the files the go command names through the symlink",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_matches_the_files_the_go_command_names_through_the_symlink",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a workspace is reached through a symlinked directory",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_workspace_is_reached_through_a_symlinked_directory",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "migrate loads from the workspace's vendor directory and converts the suite",
                       "duration": 0,
                       "excluded": false,
@@ -17879,7 +17946,7 @@
     }
   ],
   "stats": {
-    "behaviors": 582,
+    "behaviors": 584,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

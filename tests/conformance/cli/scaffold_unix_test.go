@@ -49,3 +49,24 @@ func (s *CLIScaffoldPathsTestSuite) TestASymlinkedPackagePath(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIScaffoldPathsTestSuite) TestASymlinkedWorkingDirectory(t *gotest.T) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	dir := t.TempDir()
+	gotest.NoError(t, testkit.WriteModule(root, dir, "example.com/scaf"))
+	gotest.NoError(t, os.MkdirAll(filepath.Join(dir, "calc"), 0o750))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "calc", "calc.go"), []byte(scafPackageSrc), 0o600))
+	link := filepath.Join(t.TempDir(), "link")
+	gotest.NoError(t, os.Symlink(dir, link))
+	run, err := testkit.RunCLI(t.Context(), link, "scaffold", "./calc.Calc")
+	gotest.NoError(t, err)
+	t.When("a type is named by a relative package path from a symlinked working directory", func(w *gotest.T) {
+		w.It("scaffolds into the package's directory, named relative to the working directory", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "Generated: calc/calc_suite_test.go\n", run.Stdout)
+			_, err := os.Stat(filepath.Join(dir, "calc", "calc_suite_test.go"))
+			gotest.NoError(it, err, "the scaffold was not written into the package's directory")
+		})
+	})
+}

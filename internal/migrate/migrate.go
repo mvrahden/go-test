@@ -237,7 +237,9 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	var jobs []*dirJob
 	shown := map[string]string{} // canonical path -> the path to show
 	for _, dir := range dirs {
-		abs, err := canonical(dir)
+		// The path as given, not resolved: the go command keeps a symlinked
+		// working directory's paths, and judges a go.work's modules by them.
+		abs, err := filepath.Abs(dir)
 		if err != nil {
 			return nil, err
 		}
@@ -576,8 +578,8 @@ func errorString(e loadErr, shown map[string]string) string {
 	return e.String()
 }
 
-// canonical is dir absolute with symlinks resolved, as the go command
-// reports the files it loads.
+// canonical is dir absolute with symlinks resolved, so overlapping patterns
+// name a directory once.
 func canonical(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -587,6 +589,15 @@ func canonical(dir string) (string, error) {
 		return resolved, nil
 	}
 	return abs, nil
+}
+
+// canonicalFile is path with symlinks resolved, so a file is matched however
+// the go command spells its directory.
+func canonicalFile(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 // moduleRoot is the directory of the go.mod enclosing dir, empty outside

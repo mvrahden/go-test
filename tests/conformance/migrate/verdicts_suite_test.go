@@ -431,6 +431,23 @@ func offline(t *gotest.T) []string {
 }
 
 func (s *MigrateVerdictsTestSuite) TestAVendoredWorkspace(t *gotest.T) {
+	t.When("a workspace is reached through a symlinked directory", func(w *gotest.T) {
+		w.It("migrate matches the files the go command names through the symlink", func(it *gotest.T) {
+			real := it.TempDir()
+			root := filepath.Join(it.TempDir(), "link")
+			if err := os.Symlink(real, root); err != nil {
+				it.Skipf("symlink: %v", err)
+			}
+			dir := filepath.Join(root, "m")
+			gotest.NoError(it, s.Mod.Write(dir, vendoredFiles()))
+			gotest.NoError(it, os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.0\n\nuse ./m\n"), 0o600))
+			work := "GOWORK=" + filepath.Join(root, "go.work")
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, []string{work}, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t, true)")
+		})
+	})
 	t.When("a workspace vendors its modules and the module cache is empty", func(w *gotest.T) {
 		w.It("migrate loads from the workspace's vendor directory and converts the suite", func(it *gotest.T) {
 			root := it.TempDir()

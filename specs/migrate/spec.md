@@ -115,7 +115,7 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 - **THEN** the migrated child declares its forwarding method between them
 
 ### Requirement: Module files
-Migrate SHALL load the packages it converts with `-mod=readonly`, or `-mod=vendor` where the build is vendored, so it never writes go.mod or go.sum, whatever GOFLAGS asks for. The vendor directory SHALL be the one beside the go.work that governs the module, as the go command resolves it from the environment and from `go env -w` alike, and beside go.mod when none does.
+Migrate SHALL load the packages it converts with `-mod=readonly`, or `-mod=vendor` where the build is vendored, so it never writes go.mod or go.sum, whatever GOFLAGS asks for. The vendor directory SHALL be the one beside the go.work that governs the module, as the go command resolves it from the environment and from `go env -w` alike, and beside go.mod when none does. A directory reached through a symlink SHALL be loaded by the path that named it.
 
 #### Scenario: GOFLAGS asking for -mod=mod
 - **WHEN** GOFLAGS asks for -mod=mod and go.sum lacks an entry the load needs
@@ -124,6 +124,10 @@ Migrate SHALL load the packages it converts with `-mod=readonly`, or `-mod=vendo
 #### Scenario: A vendored workspace
 - **WHEN** a workspace vendors its modules and the module cache is empty
 - **THEN** migrate loads from the workspace's vendor directory and converts the suite
+
+#### Scenario: A workspace through a symlinked directory
+- **WHEN** a workspace is reached through a symlinked directory
+- **THEN** migrate matches the files the go command names through the symlink
 
 #### Scenario: A workspace turned off by go env
 - **WHEN** go env -w GOWORK=off turns off a go.work above a vendored module
