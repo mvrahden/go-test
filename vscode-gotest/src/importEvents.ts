@@ -7,7 +7,6 @@ import type { SpecViewPanel } from "./specView.js";
 import type { TestResult } from "./testResultStore.js";
 import { parseTestEvents } from "./outputParser.js";
 import { StreamApplier, resolveAncestorItems } from "./runnerUtils.js";
-import { isRunLevelPackage } from "./specStore.js";
 
 export interface ImportDeps {
   controller: GoTestController;
@@ -108,15 +107,19 @@ export async function openEventsFile(
   applier.apply(events);
   resolveAncestorItems(run, controller);
 
-  // What the CLI booked for the run itself has no item; it is said in the
-  // run's output. A real package the workspace lacks is listed, not dropped.
+  // What the CLI booked for the run itself, marked RunLevel, has no item; it
+  // is said in the run's output. A real package the workspace lacks is
+  // listed, not dropped.
+  const runLevel = new Set<string>();
   for (const ev of events) {
-    if (isRunLevelPackage(ev.Package) && ev.Action === "output" && ev.Output) {
+    if (ev.RunLevel !== true) continue;
+    runLevel.add(ev.Package);
+    if (ev.Action === "output" && ev.Output) {
       run.appendOutput(`[${ev.Package}] ${ev.Output.replace(/\n$/, "")}\r\n`);
     }
   }
   const missing = Array.from(applier.unknownPackages)
-    .filter((p) => p && !isRunLevelPackage(p))
+    .filter((p) => p && !runLevel.has(p))
     .sort();
   if (missing.length > 0) {
     run.appendOutput(

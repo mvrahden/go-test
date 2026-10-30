@@ -73,8 +73,8 @@ beforeAll(async () => {
   );
   controller.rebuild();
 
-  // What CI would have saved: a run of this workspace's packages, plus one
-  // package this checkout does not have.
+  // What CI would have saved: a run of this workspace's packages, a failure
+  // that run booked for itself, and one package this checkout does not have.
   const ci = spawnSync(
     "go",
     [
@@ -94,6 +94,9 @@ beforeAll(async () => {
     eventsFile,
     '{"Action":"watch-start","Package":"./..."}\n' +
       ci.stdout +
+      '{"Action":"start","Package":"shared fixtures","RunLevel":true}\n' +
+      '{"Action":"output","Package":"shared fixtures","Output":"FAIL: shared fixture teardown failed\\n","RunLevel":true}\n' +
+      '{"Action":"fail","Package":"shared fixtures","RunLevel":true}\n' +
       readFileSync(path.join(streamDir, "all-pass.jsonl"), "utf-8") +
       '{"Action":"watch-end","Package":"./...","Exit":1}\n',
     "utf-8",
@@ -140,6 +143,11 @@ describe("opening a saved event stream", () => {
     ).toBe(true);
     // The missing package is said once, in the run.
     expect(run!.output.join("")).toContain("example.com/cart");
+    // What the run booked for itself is no package to miss; its words
+    // reach the run.
+    expect(run!.output.join("")).toContain(
+      "[shared fixtures] FAIL: shared fixture teardown failed",
+    );
   }, 300_000);
 
   it("keeps the replayed verdicts out of the result store", async () => {
