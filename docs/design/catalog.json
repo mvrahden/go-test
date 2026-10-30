@@ -16820,6 +16820,179 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "migrate leaves it unconverted under a marker naming both types",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_it_unconverted_under_a_marker_naming_both_types",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Equal or NotEqual compares an untyped constant another package declares with a value of another type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "Equal_or_NotEqual_compares_an_untyped_constant_another_package_declares_with_a_value_of_another_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnUntypedConstantOfAnotherPackage",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnUntypedConstantOfAnotherPackage",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves it unconverted under a marker naming both types",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_it_unconverted_under_a_marker_naming_both_types",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an interface compared with a value it holds is translated with Equal instantiated with the interface",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "an_interface_compared_with_a_value_it_holds_is_translated_with_Equal_instantiated_with_the_interface",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Equal or NotEqual compares values of two concrete types, one assignable to the other",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "Equal_or_NotEqual_compares_values_of_two_concrete_types,_one_assignable_to_the_other",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TwoConcreteTypes",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTwoConcreteTypes",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves it unconverted under a marker naming len",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_it_unconverted_under_a_marker_naming_len",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Len checks a pointer to an array",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "Len_checks_a_pointer_to_an_array",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LenOnAPointerToAnArray",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLenOnAPointerToAnArray",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves it unconverted under a marker naming the NaN",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_it_unconverted_under_a_marker_naming_the_NaN",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when InDelta compares two values that may both be NaN, or takes a delta that may be NaN",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "InDelta_compares_two_values_that_may_both_be_NaN,_or_takes_a_delta_that_may_be_NaN",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "InDeltaWhereANaNDecides",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestInDeltaWhereANaNDecides",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "migrate marks AfterAll, which gotest runs even after BeforeAll stopped",
                       "duration": 0,
                       "excluded": false,
@@ -16851,6 +17024,86 @@
               "focused": false,
               "kind": "method",
               "name": "TestTearDownSuiteAfterASetupSuiteThatCanStop",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate marks AfterAll, which gotest runs even after BeforeAll stopped",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_marks_AfterAll,_which_gotest_runs_even_after_BeforeAll_stopped",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares TearDownSuite and a SetupSuite that calls a function of the migrated files that can stop early, or hands its T or the suite to code declared elsewhere",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_declares_TearDownSuite_and_a_SetupSuite_that_calls_a_function_of_the_migrated_files_that_can_stop_early,_or_hands_its_T_or_the_suite_to_code_declared_elsewhere",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASetupSuiteThatStopsThroughWhatItCalls",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASetupSuiteThatStopsThroughWhatItCalls",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_marks_the_AfterAll_the_child_declares,_or_notes_on_the_child_that_the_AfterAll_it_forwards_runs_even_after_BeforeAll_stopped",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a base suite gives a child the SetupSuite that can stop early or the TearDownSuite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_base_suite_gives_a_child_the_SetupSuite_that_can_stop_early_or_the_TearDownSuite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SuiteHooksABaseGives",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSuiteHooksABaseGives",
               "output": [],
               "status": "none"
             },
@@ -17011,6 +17264,86 @@
               "focused": false,
               "kind": "method",
               "name": "TestGOFLAGSAskingForModMod",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate loads from the workspace's vendor directory and converts the suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_loads_from_the_workspace's_vendor_directory_and_converts_the_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a workspace vendors its modules and the module cache is empty",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_workspace_vendors_its_modules_and_the_module_cache_is_empty",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AVendoredWorkspace",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAVendoredWorkspace",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate loads from the module's vendor directory and converts the suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_loads_from_the_module's_vendor_directory_and_converts_the_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when go env -w GOWORK=off turns off a go.work above a vendored module",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "go_env_-w_GOWORK=off_turns_off_a_go.work_above_a_vendored_module",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AWorkspaceTurnedOffByGoEnv",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAWorkspaceTurnedOffByGoEnv",
               "output": [],
               "status": "none"
             },
@@ -17399,7 +17732,7 @@
     }
   ],
   "stats": {
-    "behaviors": 569,
+    "behaviors": 578,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

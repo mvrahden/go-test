@@ -24,7 +24,11 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 		if why := u.constMismatch(f, name, g, args); why != "" {
 			return "", nil, why
 		}
-		return u.equalCall(f, g, args), args, ""
+		call, why := u.equalCall(f, name, g, args)
+		if why != "" {
+			return "", nil, why
+		}
+		return call, args, ""
 	}
 	t := u.info.TypeOf(args[0])
 	if t == nil {
@@ -92,6 +96,20 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 		}
 		return u.zeroCompare(f, name, args, t, ts)
 
+	case "Len":
+		if p, ok := under.(*types.Pointer); ok {
+			if _, ok := p.Elem().Underlying().(*types.Array); ok {
+				return "", nil, "testify Len on " + ts + " counted the array's length, nil pointer or not; gotest.Len takes no pointer — assert on len(" + types.ExprString(args[0]) + ") with gotest.Equal"
+			}
+		}
+
+	case "InDelta":
+		if len(args) >= 3 {
+			if why := u.nanDelta(args); why != "" {
+				return "", nil, why
+			}
+		}
+
 	case "NotNil":
 		if isIface {
 			// No gotest assertion judges the value inside as testify did.
@@ -103,6 +121,28 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 		return "", nil, "NotNil on " + ts + " always passed in testify, as it can never be nil; gotest.NotNil fails on types that cannot be nil — delete it, or assert gotest.NotZero"
 	}
 	return g, args, ""
+}
+
+// nanDelta explains an InDelta whose verdict depends on a NaN, which
+// testify judged otherwise: it passed two NaN values and any difference
+// within a NaN delta, where gotest.InDelta fails both. Empty when no
+// argument can be NaN: a constant or an integer cannot.
+func (u *unit) nanDelta(args []ast.Expr) string {
+	mayBeNaN := func(e ast.Expr) bool {
+		tv, ok := u.info.Types[e]
+		if !ok || tv.Value != nil {
+			return false
+		}
+		b, ok := tv.Type.Underlying().(*types.Basic)
+		return !ok || b.Info()&types.IsInteger == 0
+	}
+	switch {
+	case mayBeNaN(args[2]):
+		return "testify InDelta passed any difference within a NaN delta; gotest.InDelta fails a NaN delta — convert by hand"
+	case mayBeNaN(args[0]) && mayBeNaN(args[1]):
+		return "testify InDelta passed when both values were NaN; gotest.InDelta fails then — check math.IsNaN for both by hand if NaN is expected, else use gotest.InDelta"
+	}
+	return ""
 }
 
 func pick(cond bool, a, b string) string {
@@ -143,14 +183,15 @@ func (u *unit) zeroCompare(f *ast.File, name string, args []ast.Expr, t types.Ty
 	return pick(name == "Zero" || name == "Empty", "Equal", "NotEqual"), append([]ast.Expr{lit}, args...), ""
 }
 
-// equalCall is gotest's Equal or NotEqual, instantiated with the type of
-// the one argument the other is assignable to when their types differ:
-// testify compared an interface and a concrete value, which gotest's
-// single type parameter does not infer.
-func (u *unit) equalCall(f *ast.File, g string, args []ast.Expr) string {
+// equalCall is gotest's Equal or NotEqual, instantiated with the interface
+// type the other argument is assignable to when their types differ: testify
+// compared an interface and a concrete value, which gotest's single type
+// parameter does not infer. Two concrete types testify never found equal,
+// which an instantiation would convert, are explained in why instead.
+func (u *unit) equalCall(f *ast.File, name, g string, args []ast.Expr) (call, why string) {
 	a, b := u.info.TypeOf(args[0]), u.info.TypeOf(args[1])
 	if a == nil || b == nil || u.untypedConst(args[0]) || u.untypedConst(args[1]) || types.Identical(a, b) {
-		return g
+		return g, ""
 	}
 	var target types.Type
 	switch {
@@ -159,12 +200,17 @@ func (u *unit) equalCall(f *ast.File, g string, args []ast.Expr) string {
 	case types.AssignableTo(a, b):
 		target = b
 	default:
-		return g // the type-check after the migration marks it
+		return g, "" // the type-check after the migration marks it
+	}
+	if !types.IsInterface(target) {
+		qual := types.RelativeTo(u.pkgOf(f))
+		as, bs := types.TypeString(a, qual), types.TypeString(b, qual)
+		return "", "testify " + name + " compared a " + as + " with a " + bs + ", types it never finds equal; gotest." + g + " would convert one to the other and compare the values — convert by hand"
 	}
 	if ts := u.typeString(f, target); ts != "" {
-		return g + "[" + ts + "]"
+		return g + "[" + ts + "]", ""
 	}
-	return g
+	return g, ""
 }
 
 // constMismatch explains an Equal or NotEqual whose untyped constant
@@ -244,27 +290,44 @@ func deepAsEqual(t types.Type, seen map[types.Type]bool) bool {
 }
 
 // untypedConst reports whether e is an untyped constant, which takes the
-// type the other argument infers.
+// type the other argument infers: a constant whose operands are all
+// untyped, nil included.
 func (u *unit) untypedConst(e ast.Expr) bool {
-	switch x := ast.Unparen(e).(type) {
+	e = ast.Unparen(e)
+	if id, ok := e.(*ast.Ident); ok {
+		if _, ok := u.info.Uses[id].(*types.Nil); ok {
+			return true
+		}
+	}
+	if tv, ok := u.info.Types[e]; !ok || tv.Value == nil {
+		return false
+	}
+	switch x := e.(type) {
 	case *ast.BasicLit:
 		return true
 	case *ast.Ident:
-		if x.Name == "nil" {
-			return true
-		}
-		c, ok := u.info.Uses[x].(*types.Const)
-		if !ok {
-			return false
-		}
-		b, ok := c.Type().(*types.Basic)
-		return ok && b.Info()&types.IsUntyped != 0
+		return untypedObj(u.info.Uses[x])
+	case *ast.SelectorExpr:
+		return untypedObj(u.info.Uses[x.Sel])
 	case *ast.UnaryExpr:
 		return u.untypedConst(x.X)
 	case *ast.BinaryExpr:
+		if x.Op == token.SHL || x.Op == token.SHR {
+			return u.untypedConst(x.X)
+		}
 		return u.untypedConst(x.X) && u.untypedConst(x.Y)
 	}
 	return false
+}
+
+// untypedObj reports whether obj is a constant declared without a type.
+func untypedObj(obj types.Object) bool {
+	c, ok := obj.(*types.Const)
+	if !ok {
+		return false
+	}
+	b, ok := c.Type().(*types.Basic)
+	return ok && b.Info()&types.IsUntyped != 0
 }
 
 // typeString spells t as f names it, empty when a package t needs is not

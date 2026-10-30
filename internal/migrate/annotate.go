@@ -82,7 +82,7 @@ func (u *unit) unconverted(f *ast.File, m *lineMarks) {
 		if fd.Body == nil {
 			continue
 		}
-		if suite != nil && fd.Name.Name == "AfterAll" && suite.setupStops && suite.testifyHooks["TearDownSuite"] {
+		if suite != nil && fd.Name.Name == "AfterAll" && suite.testifyHooks["TearDownSuite"] && suite.setupStops {
 			m.add(pos, "testify skipped TearDownSuite when SetupSuite stopped early, failed, skipped or panicked; gotest runs AfterAll even then, on whatever BeforeAll left half set up — guard what it releases")
 		}
 		tName, kind, _ := tParam(fd, u.info)
@@ -222,6 +222,9 @@ func (u *unit) unconvertedTypes(gd *ast.GenDecl, m *lineMarks) {
 		notes := []string{}
 		if s.note != "" {
 			notes = append(notes, s.note)
+		}
+		if fw := s.forward("AfterAll"); fw != nil && s.setupStops {
+			notes = append(notes, "testify skipped the TearDownSuite "+s.newName+" has from its "+fw.field+" field when SetupSuite stopped early, failed, skipped or panicked; gotest runs the AfterAll forwarding it even then, on whatever BeforeAll left half set up — guard what it releases")
 		}
 		if ok && !s.helper && st.Fields.NumFields() > 0 {
 			if note := u.orderNote(s); note != "" {

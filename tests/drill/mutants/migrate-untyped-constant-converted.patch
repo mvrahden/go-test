@@ -10,4 +10,4 @@ Clause: when Equal compares an untyped constant with a value of another type →
 +		if why := u.constMismatch(f, name, g, args); false && why != "" {
  			return "", nil, why
  		}
- 		return u.equalCall(f, g, args), args, ""
+ 		call, why := u.equalCall(f, name, g, args)

@@ -3,6 +3,7 @@ package migrate_test
 import (
 	"go/format"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -125,6 +126,78 @@ func (s *MigrateVerdictsTestSuite) TestAnUntypedConstantOfAnotherType(t *gotest.
 	})
 }
 
+func (s *MigrateVerdictsTestSuite) TestAnUntypedConstantOfAnotherPackage(t *gotest.T) {
+	t.When("Equal or NotEqual compares an untyped constant another package declares with a value of another type", func(w *gotest.T) {
+		w.It("migrate leaves it unconverted under a marker naming both types", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{
+				"x/x.go": "package x\n\nconst Port = 8080\n",
+				"p/a_test.go": suiteFile("\t\"example.com/m/x\"", "", `func (s *VSuite) TestA() {
+	var port uint16 = 8080
+	s.NotEqual(x.Port, port)
+}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotEqual compared x\.Port as int with a value of type uint16[^\n]*\n\ts\.NotEqual\(x\.Port, port\)\n`, out)
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestTwoConcreteTypes(t *gotest.T) {
+	t.When("Equal or NotEqual compares values of two concrete types, one assignable to the other", func(w *gotest.T) {
+		exit, out := s.migrated(w, map[string]string{"p/a_test.go": suiteFile("", "", `type IDs []int
+
+type failure struct{}
+
+func (*failure) Error() string { return "" }
+
+func (s *VSuite) TestA() {
+	ids := IDs{1}
+	s.NotEqual([]int{1}, ids)
+	var err error
+	s.Equal(err, err)
+	s.NotEqual(err, &failure{})
+}
+`)})
+		w.It("migrate leaves it unconverted under a marker naming both types", func(it *gotest.T) {
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify NotEqual compared a \[\]int with a IDs, types it never finds equal[^\n]*\n\ts\.NotEqual\(\[\]int\{1\}, ids\)\n`, out)
+		})
+		w.It("an interface compared with a value it holds is translated with Equal instantiated with the interface", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tgotest.NotEqual[error](t, err, &failure{})\n")
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestLenOnAPointerToAnArray(t *gotest.T) {
+	t.When("Len checks a pointer to an array", func(w *gotest.T) {
+		w.It("migrate leaves it unconverted under a marker naming len", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	var p *[3]int
+	s.Len(p, 3)
+}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify Len on \*\[3\]int counted the array's length[^\n]*len\(p\)[^\n]*\n\ts\.Len\(p, 3\)\n`, out)
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestInDeltaWhereANaNDecides(t *gotest.T) {
+	t.When("InDelta compares two values that may both be NaN, or takes a delta that may be NaN", func(w *gotest.T) {
+		w.It("migrate leaves it unconverted under a marker naming the NaN", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	want, got, eps := 1.0, 1.0, 0.1
+	s.InDelta(want, got, 0.1)
+	s.InDelta(1.0, got, eps)
+}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify InDelta passed when both values were NaN[^\n]*\n\ts\.InDelta\(want, got, 0\.1\)\n`, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify InDelta passed any difference within a NaN delta[^\n]*\n\ts\.InDelta\(1\.0, got, eps\)\n`, out)
+		})
+	})
+}
+
 func (s *MigrateVerdictsTestSuite) TestTearDownSuiteAfterASetupSuiteThatCanStop(t *gotest.T) {
 	t.When("a suite declares TearDownSuite and a SetupSuite that can stop early", func(w *gotest.T) {
 		w.It("migrate marks AfterAll, which gotest runs even after BeforeAll stopped", func(it *gotest.T) {
@@ -139,6 +212,103 @@ func (s *VSuite) TestA() {}
 `)})
 			gotest.Equal(it, 1, exit, out)
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify skipped TearDownSuite when SetupSuite stopped early[^\n]*gotest runs AfterAll even then[^\n]*\nfunc \(s \*VTestSuite\) AfterAll\(`, out)
+		})
+	})
+}
+
+// teardownMarker matches the marker above a migrated AfterAll that gotest
+// runs even after BeforeAll stopped.
+const teardownMarker = `// TODO\(gotest-migrate\): testify skipped TearDownSuite when SetupSuite stopped early[^\n]*gotest runs AfterAll even then[^\n]*\nfunc \(s \*VTestSuite\) AfterAll\(`
+
+func (s *MigrateVerdictsTestSuite) TestASetupSuiteThatStopsThroughWhatItCalls(t *gotest.T) {
+	t.When("a suite declares TearDownSuite and a SetupSuite that calls a function of the migrated files that can stop early, or hands its T or the suite to code declared elsewhere", func(w *gotest.T) {
+		w.It("migrate marks AfterAll, which gotest runs even after BeforeAll stopped", func(it *gotest.T) {
+			for _, setup := range []string{
+				"requireDocker(s.T())",
+				"s.open()",
+				"x.Check(s.T())",
+			} {
+				exit, out := s.migrated(it, map[string]string{
+					"x/x.go": "package x\n\nimport \"testing\"\n\nfunc Check(t *testing.T) { t.Helper() }\n",
+					"p/a_test.go": suiteFile("\t\"example.com/m/x\"", "\tdb *item\n", `func requireDocker(t *testing.T) {
+	if t != nil {
+		t.Skip("no docker")
+	}
+}
+
+func (s *VSuite) open() { s.Require().NotZero(1) }
+
+func (s *VSuite) SetupSuite() {
+	`+setup+`
+	s.db = &item{1}
+}
+
+func (s *VSuite) TearDownSuite() { s.db.n = 0 }
+
+func (s *VSuite) TestA() { _ = x.Check }
+`)})
+				gotest.Equal(it, 1, exit, setup+"\n"+out)
+				gotest.Regexp(it, teardownMarker, out, setup)
+			}
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestSuiteHooksABaseGives(t *gotest.T) {
+	t.When("a base suite gives a child the SetupSuite that can stop early or the TearDownSuite", func(w *gotest.T) {
+		w.It("migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "\tdb *item\n", `type BaseSuite struct{ suite.Suite }
+
+func (b *BaseSuite) SetupSuite() { b.Require().NotZero(1) }
+
+type ChildSuite struct {
+	BaseSuite
+	db *item
+}
+
+func (s *ChildSuite) TearDownSuite() { s.db.n = 0 }
+
+func (s *ChildSuite) TestA() {}
+
+func TestChild(t *testing.T) { suite.Run(t, new(ChildSuite)) }
+
+func (s *VSuite) SetupSuite() { s.Require().NotZero(1) }
+
+func (s *VSuite) TestA() {}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify skipped TearDownSuite when SetupSuite stopped early[^\n]*\nfunc \(s \*ChildTestSuite\) AfterAll\(`, out)
+
+			exit, out = s.migrated(it, map[string]string{"p/a_test.go": `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type item struct{ n int }
+
+type BaseSuite struct {
+	suite.Suite
+	db *item
+}
+
+func (b *BaseSuite) TearDownSuite() { b.db.n = 0 }
+
+type ChildSuite struct{ BaseSuite }
+
+func (s *ChildSuite) SetupSuite() {
+	s.Require().NotZero(1)
+	s.db = &item{1}
+}
+
+func (s *ChildSuite) TestA() {}
+
+func TestChild(t *testing.T) { suite.Run(t, new(ChildSuite)) }
+`})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify skipped the TearDownSuite ChildTestSuite has from its base field when SetupSuite stopped early[^\n]*gotest runs the AfterAll forwarding it even then[^\n]*\ntype ChildTestSuite struct`, out)
 		})
 	})
 }
@@ -220,6 +390,65 @@ func (s *MigrateVerdictsTestSuite) TestGOFLAGSAskingForModMod(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Equal(it, sum, readFile(it, dir, "go.sum"), "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
 			gotest.Equal(it, s.Mod.GoMod, readFile(it, dir, "go.mod"))
+		})
+	})
+}
+
+// vendoredFiles is a testify suite and a test file that keeps the gotest
+// import, so vendoring copies what the migrated suite needs.
+func vendoredFiles() map[string]string {
+	return map[string]string{
+		"p/a_test.go":    suiteFile("", "", "func (s *VSuite) TestA() { s.True(true) }\n"),
+		"p/keep_test.go": "package p\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n",
+	}
+}
+
+// goIn runs the go command in dir under env.
+func goIn(t *gotest.T, dir string, env []string, args ...string) {
+	cmd := exec.CommandContext(t.Context(), "go", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), env...)
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "go %s: %s", strings.Join(args, " "), out)
+}
+
+// offline leaves the go command an empty module cache and no proxy, so
+// only a vendor directory can serve the module's dependencies.
+func offline(t *gotest.T) []string {
+	return []string{"GOFLAGS=", "GOPROXY=off", "GOTOOLCHAIN=local", "GOMODCACHE=" + t.TempDir()}
+}
+
+func (s *MigrateVerdictsTestSuite) TestAVendoredWorkspace(t *gotest.T) {
+	t.When("a workspace vendors its modules and the module cache is empty", func(w *gotest.T) {
+		w.It("migrate loads from the workspace's vendor directory and converts the suite", func(it *gotest.T) {
+			root := it.TempDir()
+			dir := filepath.Join(root, "m")
+			gotest.NoError(it, s.Mod.Write(dir, vendoredFiles()))
+			gotest.NoError(it, os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.0\n\nuse ./m\n"), 0o600))
+			work := "GOWORK=" + filepath.Join(root, "go.work")
+			goIn(it, root, []string{work, "GOFLAGS="}, "work", "vendor")
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, append(offline(it), work), "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t, true)")
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestAWorkspaceTurnedOffByGoEnv(t *gotest.T) {
+	t.When("go env -w GOWORK=off turns off a go.work above a vendored module", func(w *gotest.T) {
+		w.It("migrate loads from the module's vendor directory and converts the suite", func(it *gotest.T) {
+			root := it.TempDir()
+			dir := filepath.Join(root, "m")
+			gotest.NoError(it, s.Mod.Write(dir, vendoredFiles()))
+			gotest.NoError(it, os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.0\n\nuse ./m\n"), 0o600))
+			goIn(it, dir, []string{"GOWORK=off", "GOFLAGS="}, "mod", "vendor")
+			goenv := filepath.Join(it.TempDir(), "env")
+			gotest.NoError(it, os.WriteFile(goenv, []byte("GOWORK=off\n"), 0o600))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, append(offline(it), "GOENV="+goenv, "GOWORK="), "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.Contains(it, readFile(it, dir, "p/a_test.go"), "gotest.True(t, true)")
 		})
 	})
 }

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AVendoredWorkspace / when a workspace vendors its modules and the module cache is empty / migrate loads from the workspace's vendor directory and converts the suite \(
+Clause: when a workspace vendors its modules and the module cache is empty → migrate loads from the workspace's vendor directory and converts the suite
+--- a/internal/migrate/load.go
++++ b/internal/migrate/load.go
+@@ -314,7 +314,7 @@
+ func modFlag(modRoot string) string {
+ 	root := modRoot
+ 	if work := workspaceFile(modRoot); work != "" {
+-		root = filepath.Dir(work)
++		root = modRoot
+ 	}
+ 	if _, err := os.Stat(filepath.Join(root, "vendor", "modules.txt")); err == nil {
+ 		return "-mod=vendor"

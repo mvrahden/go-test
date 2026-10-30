@@ -26,6 +26,7 @@ func (s *MigrateVerdictsTestSuite) SuiteConfig() gotest.SuiteConfig {
 const verdictHead = `package p
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,8 @@ type point struct{ x, y int }
 type holder struct{ p *item }
 
 var _ = assert.True
+
+var _ = http.StatusOK
 
 `
 
@@ -172,6 +175,78 @@ func (s *VSuite) TestA() {
 			Compiles: true,
 		},
 		{
+			Desc: "Equal and NotEqual with an untyped constant of another package",
+			Src: `type VSuite struct{ suite.Suite }
+
+func (s *VSuite) TestA() {
+	var port uint16 = 8080
+	s.NotEqual(http.StatusOK, port)
+	s.Equal(http.StatusOK, 200)
+}
+`,
+			Want: []string{
+				"\t// TODO(gotest-migrate): testify NotEqual compared http.StatusOK as int with a value of type uint16, types it never finds equal",
+				"\tgotest.Equal(t, http.StatusOK, 200)\n",
+			},
+		},
+		{
+			Desc: "Equal and NotEqual of two concrete types",
+			Src: `type IDs []int
+
+type VSuite struct{ suite.Suite }
+
+func (s *VSuite) TestA() {
+	ids := IDs{1}
+	s.NotEqual([]int{1}, ids)
+	var err error
+	s.Equal(err, (*myErr)(nil))
+}
+
+type myErr struct{}
+
+func (*myErr) Error() string { return "" }
+`,
+			Want: []string{
+				"\t// TODO(gotest-migrate): testify NotEqual compared a []int with a IDs, types it never finds equal; gotest.NotEqual would convert one to the other and compare the values — convert by hand\n\ts.NotEqual([]int{1}, ids)\n",
+				"\tgotest.Equal[error](t, err, (*myErr)(nil))\n",
+			},
+		},
+		{
+			Desc: "Len on a pointer to an array",
+			Src: `type VSuite struct{ suite.Suite }
+
+func (s *VSuite) TestA() {
+	var p *[3]int
+	s.Len(p, 3)
+	s.Len([]int{1}, 1)
+}
+`,
+			Want: []string{
+				"\t// TODO(gotest-migrate): testify Len on *[3]int counted the array's length, nil pointer or not; gotest.Len takes no pointer — assert on len(p) with gotest.Equal\n\ts.Len(p, 3)\n",
+				"\tgotest.Len(t, []int{1}, 1)\n",
+			},
+		},
+		{
+			Desc: "InDelta where a NaN can decide",
+			Src: `type VSuite struct{ suite.Suite }
+
+func (s *VSuite) TestA() {
+	want, got, eps := 1.0, 1.0, 0.1
+	s.InDelta(want, got, 0.1)
+	s.InDelta(1.0, got, eps)
+	s.InDelta(1.0, got, 0.1)
+	n, m := 1, 2
+	s.InDelta(n, m, 1)
+}
+`,
+			Want: []string{
+				"\t// TODO(gotest-migrate): testify InDelta passed when both values were NaN; gotest.InDelta fails then",
+				"\t// TODO(gotest-migrate): testify InDelta passed any difference within a NaN delta; gotest.InDelta fails a NaN delta — convert by hand\n\ts.InDelta(1.0, got, eps)\n",
+				"\tgotest.InDelta(t, 1.0, got, 0.1)\n",
+				"\tgotest.InDelta(t, n, m, 1)\n",
+			},
+		},
+		{
 			Desc: "TearDownSuite beside SetupSuite",
 			Src: `type VSuite struct {
 	suite.Suite
@@ -222,6 +297,121 @@ func (s *VSuite) TestA() {}
 			Want:     []string{"func (s *VTestSuite) AfterAll(t *gotest.T) { s.db = nil }\n"},
 			Absent:   []string{"TODO(gotest-migrate)"},
 			Compiles: true,
+		},
+		{
+			Desc: "TearDownSuite beside a SetupSuite that stops through a helper handed its T",
+			Src: `type VSuite struct {
+	suite.Suite
+	db *item
+}
+
+func requireDocker(t *testing.T) {
+	if t != nil {
+		t.Skip("no docker")
+	}
+}
+
+func (s *VSuite) SetupSuite() {
+	requireDocker(s.T())
+	s.db = &item{1}
+}
+
+func (s *VSuite) TearDownSuite() { s.db.n = 0 }
+
+func (s *VSuite) TestA() {}
+`,
+			Want: []string{
+				"// TODO(gotest-migrate): testify skipped TearDownSuite when SetupSuite stopped early, failed, skipped or panicked; gotest runs AfterAll even then, on whatever BeforeAll left half set up — guard what it releases\nfunc (s *VTestSuite) AfterAll(t *gotest.T) { s.db.n = 0 }\n",
+			},
+		},
+		{
+			Desc: "TearDownSuite beside a SetupSuite that stops through a suite method",
+			Src: `type VSuite struct {
+	suite.Suite
+	db *item
+}
+
+func (s *VSuite) open() *item {
+	s.Require().NotZero(1)
+	return &item{1}
+}
+
+func (s *VSuite) SetupSuite() { s.db = s.open() }
+
+func (s *VSuite) TearDownSuite() { s.db.n = 0 }
+
+func (s *VSuite) TestA() {}
+`,
+			Want: []string{
+				"// TODO(gotest-migrate): testify skipped TearDownSuite when SetupSuite stopped early",
+			},
+		},
+		{
+			Desc: "TearDownSuite beside a SetupSuite whose helpers cannot stop",
+			Src: `type VSuite struct {
+	suite.Suite
+	db *item
+}
+
+func logStart(t *testing.T) { t.Log("start") }
+
+func (s *VSuite) SetupSuite() {
+	logStart(s.T())
+	s.db = &item{1}
+}
+
+func (s *VSuite) TearDownSuite() { s.db.n = 0 }
+
+func (s *VSuite) TestA() {}
+`,
+			Want:     []string{"func (s *VTestSuite) AfterAll(t *gotest.T) { s.db.n = 0 }\n"},
+			Absent:   []string{"TODO(gotest-migrate)"},
+			Compiles: true,
+		},
+		{
+			Desc: "TearDownSuite beside a base's SetupSuite that can stop early",
+			Src: `type BaseSuite struct {
+	suite.Suite
+}
+
+func (b *BaseSuite) SetupSuite() { b.Require().NotZero(1) }
+
+type VSuite struct {
+	BaseSuite
+	db *item
+}
+
+func (s *VSuite) TearDownSuite() { s.db.n = 0 }
+
+func (s *VSuite) TestA() {}
+`,
+			Want: []string{
+				"// TODO(gotest-migrate): testify skipped TearDownSuite when SetupSuite stopped early, failed, skipped or panicked; gotest runs AfterAll even then, on whatever BeforeAll left half set up — guard what it releases\nfunc (s *VTestSuite) AfterAll(t *gotest.T) { s.db.n = 0 }\n",
+			},
+		},
+		{
+			Desc: "a base's TearDownSuite beside a SetupSuite that can stop early",
+			Src: `type BaseSuite struct {
+	suite.Suite
+	db *item
+}
+
+func (b *BaseSuite) TearDownSuite() { b.db.n = 0 }
+
+type VSuite struct {
+	BaseSuite
+}
+
+func (s *VSuite) SetupSuite() {
+	s.Require().NotZero(1)
+	s.db = &item{1}
+}
+
+func (s *VSuite) TestA() {}
+`,
+			Want: []string{
+				"// TODO(gotest-migrate): testify skipped the TearDownSuite VTestSuite has from its base field when SetupSuite stopped early, failed, skipped or panicked; gotest runs the AfterAll forwarding it even then, on whatever BeforeAll left half set up — guard what it releases\ntype VTestSuite struct {\n",
+			},
 		},
 		{
 			Desc: "s.T().Parallel() and s.T().Cleanup",

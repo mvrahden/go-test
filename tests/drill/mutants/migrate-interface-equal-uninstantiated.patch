@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / TwoConcreteTypes / when Equal or NotEqual compares values of two concrete types, one assignable to the other / an interface compared with a value it holds is translated with Equal instantiated with the interface \(
+Clause: when Equal or NotEqual compares values of two concrete types, one assignable to the other → an interface compared with a value it holds is translated with Equal instantiated with the interface
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -208,7 +208,7 @@
+ 		return "", "testify " + name + " compared a " + as + " with a " + bs + ", types it never finds equal; gotest." + g + " would convert one to the other and compare the values — convert by hand"
+ 	}
+ 	if ts := u.typeString(f, target); ts != "" {
+-		return g + "[" + ts + "]", ""
++		return g, ""
+ 	}
+ 	return g, ""
+ }

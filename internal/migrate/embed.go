@@ -326,6 +326,16 @@ func (u *unit) reachesTest(body *ast.BlockStmt, recv types.Object) bool {
 	return found
 }
 
+// forward is the forwarding method s declares under name, nil when none.
+func (s *suiteDecl) forward(name string) *forward {
+	for i := range s.forwards {
+		if s.forwards[i].name == name {
+			return &s.forwards[i]
+		}
+	}
+	return nil
+}
+
 // collectForwards lists, for each migrated suite holding a base, the hooks
 // and tests testify ran on it by promotion and it does not declare itself.
 func (u *unit) collectForwards() {

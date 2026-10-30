@@ -65,9 +65,34 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 - **WHEN** Equal compares an untyped constant with a value of another type
 - **THEN** migrate leaves it unconverted under a marker naming both types
 
+#### Scenario: An untyped constant of another package
+- **WHEN** Equal or NotEqual compares an untyped constant another package declares with a value of another type
+- **THEN** migrate leaves it unconverted under a marker naming both types
+
+#### Scenario: Two concrete types
+- **WHEN** Equal or NotEqual compares values of two concrete types, one assignable to the other
+- **THEN** migrate leaves it unconverted under a marker naming both types
+- **AND** an interface compared with a value it holds is translated with Equal instantiated with the interface
+
+#### Scenario: Len on a pointer to an array
+- **WHEN** Len checks a pointer to an array
+- **THEN** migrate leaves it unconverted under a marker naming len
+
+#### Scenario: InDelta where a NaN decides
+- **WHEN** InDelta compares two values that may both be NaN, or takes a delta that may be NaN
+- **THEN** migrate leaves it unconverted under a marker naming the NaN
+
 #### Scenario: TearDownSuite after a SetupSuite that can stop early
 - **WHEN** a suite declares TearDownSuite and a SetupSuite that can stop early
 - **THEN** migrate marks AfterAll, which gotest runs even after BeforeAll stopped
+
+#### Scenario: A SetupSuite that stops through what it calls
+- **WHEN** a suite declares TearDownSuite and a SetupSuite that calls a function of the migrated files that can stop early, or hands its T or the suite to code declared elsewhere
+- **THEN** migrate marks AfterAll, which gotest runs even after BeforeAll stopped
+
+#### Scenario: Suite hooks a base gives
+- **WHEN** a base suite gives a child the SetupSuite that can stop early or the TearDownSuite
+- **THEN** migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped
 
 #### Scenario: Parallel and Cleanup on the suite's T
 - **WHEN** a test calls s.T().Parallel() or s.T().Cleanup
@@ -82,11 +107,19 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 - **THEN** the migrated child declares its forwarding method between them
 
 ### Requirement: Module files
-Migrate SHALL load the packages it converts with `-mod=readonly`, or `-mod=vendor` for a vendored module outside a workspace, so it never writes go.mod or go.sum, whatever GOFLAGS asks for.
+Migrate SHALL load the packages it converts with `-mod=readonly`, or `-mod=vendor` where the build is vendored, so it never writes go.mod or go.sum, whatever GOFLAGS asks for. The vendor directory SHALL be the one beside the go.work that governs the module, as the go command resolves it from the environment and from `go env -w` alike, and beside go.mod when none does.
 
 #### Scenario: GOFLAGS asking for -mod=mod
 - **WHEN** GOFLAGS asks for -mod=mod and go.sum lacks an entry the load needs
 - **THEN** migrate writes neither go.mod nor go.sum
+
+#### Scenario: A vendored workspace
+- **WHEN** a workspace vendors its modules and the module cache is empty
+- **THEN** migrate loads from the workspace's vendor directory and converts the suite
+
+#### Scenario: A workspace turned off by go env
+- **WHEN** go env -w GOWORK=off turns off a go.work above a vendored module
+- **THEN** migrate loads from the module's vendor directory and converts the suite
 
 ### Requirement: Imports
 Migrate SHALL remove the testify imports nothing uses any more, with the comments that stand with them, and leave no blank line where they stood.

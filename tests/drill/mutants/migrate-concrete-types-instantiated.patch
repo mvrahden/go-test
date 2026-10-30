@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / TwoConcreteTypes / when Equal or NotEqual compares values of two concrete types, one assignable to the other / migrate leaves it unconverted under a marker naming both types \(
+Clause: when Equal or NotEqual compares values of two concrete types, one assignable to the other → migrate leaves it unconverted under a marker naming both types
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -202,7 +202,7 @@
+ 	default:
+ 		return g, "" // the type-check after the migration marks it
+ 	}
+-	if !types.IsInterface(target) {
++	if false {
+ 		qual := types.RelativeTo(u.pkgOf(f))
+ 		as, bs := types.TypeString(a, qual), types.TypeString(b, qual)
+ 		return "", "testify " + name + " compared a " + as + " with a " + bs + ", types it never finds equal; gotest." + g + " would convert one to the other and compare the values — convert by hand"

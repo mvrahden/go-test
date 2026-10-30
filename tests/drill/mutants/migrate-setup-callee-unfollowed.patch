@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ASetupSuiteThatStopsThroughWhatItCalls / when a suite declares TearDownSuite and a SetupSuite that calls a function of the migrated files that can stop early, or hands its T or the suite to code declared elsewhere / migrate marks AfterAll, which gotest runs even after BeforeAll stopped \(
+Clause: when a suite declares TearDownSuite and a SetupSuite that calls a function of the migrated files that can stop early, or hands its T or the suite to code declared elsewhere → migrate marks AfterAll, which gotest runs even after BeforeAll stopped
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -711,7 +711,7 @@
+ 				found = true
+ 			}
+ 		}
+-		found = found || u.assertionName(call) != "" || u.callMayStop(call, seen)
++		found = found || u.assertionName(call) != ""
+ 		return !found
+ 	})
+ 	return found

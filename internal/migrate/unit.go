@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/tools/go/types/typeutil"
+
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -83,8 +85,8 @@ type suiteDecl struct {
 	reserved map[string]string
 	// testifyHooks names the testify hooks the suite declares.
 	testifyHooks map[string]bool
-	// setupStops: its SetupSuite can stop early, on an assertion, a fatal
-	// call or a panic.
+	// setupStops: the SetupSuite testify ran on it, its own or a base's,
+	// can stop early, on an assertion, a fatal call or a panic.
 	setupStops bool
 	// st is the struct of a suite that embeds its base; embeds are the
 	// fields it does so through.
@@ -581,6 +583,9 @@ func (u *unit) migrate() error {
 		u.collectHooks()
 		u.collectNeedsT()
 		u.collectForwards()
+		for _, s := range u.suites {
+			s.setupStops = s.migrated() && u.setupMayStop(s)
+		}
 		u.gate()
 	}
 	for _, uf := range u.files {
@@ -647,9 +652,6 @@ func (u *unit) collectHooks() {
 					s.testifyHooks = map[string]bool{}
 				}
 				s.testifyHooks[name] = true
-				if name == "SetupSuite" && fd.Body != nil {
-					s.setupStops = u.canStop(fd.Body)
-				}
 			} else if strings.HasPrefix(name, "Test") {
 				u.hooks[methodKey(fn)] = name
 			}
@@ -672,12 +674,29 @@ func (u *unit) collectHooks() {
 	}
 }
 
-// canStop reports whether body holds a call that ends it early: a testify
-// assertion, which the migration makes fatal, a FailNow, Fatal or Skip,
-// or a panic.
-func (u *unit) canStop(body *ast.BlockStmt) bool {
+// setupMayStop reports whether the SetupSuite testify ran on s, its own
+// or one promoted from a base, can stop early.
+func (u *unit) setupMayStop(s *suiteDecl) bool {
+	obj, _, _ := types.LookupFieldOrMethod(types.NewPointer(s.obj.Type()), true, s.obj.Pkg(), "SetupSuite")
+	fn, ok := obj.(*types.Func)
+	return ok && u.mayStop(fn, map[*types.Func]bool{})
+}
+
+// mayStop reports whether calling fn can end it early: a testify assertion,
+// which the migration makes fatal, a FailNow, Fatal or Skip, a panic, or a
+// call that can. A call into code whose body these files do not hold can,
+// when it is handed a T or a suite.
+func (u *unit) mayStop(fn *types.Func, seen map[*types.Func]bool) bool {
+	fd := u.funcDecl(fn)
+	if fd == nil || fd.Body == nil {
+		return false
+	}
+	if seen[fn] {
+		return false
+	}
+	seen[fn] = true
 	found := false
-	ast.Inspect(body, func(n ast.Node) bool {
+	ast.Inspect(fd.Body, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok || found {
 			return !found
@@ -692,10 +711,66 @@ func (u *unit) canStop(body *ast.BlockStmt) bool {
 				found = true
 			}
 		}
-		found = found || u.assertionName(call) != ""
+		found = found || u.assertionName(call) != "" || u.callMayStop(call, seen)
 		return !found
 	})
 	return found
+}
+
+// callMayStop reports whether call reaches a function that can stop: one
+// these files declare and mayStop finds stopping, or one declared
+// elsewhere that is handed a T or a suite, which it may stop through.
+func (u *unit) callMayStop(call *ast.CallExpr, seen map[*types.Func]bool) bool {
+	fn, ok := typeutil.Callee(u.info, call).(*types.Func)
+	if !ok {
+		return false
+	}
+	if u.funcDecl(fn) != nil {
+		return u.mayStop(fn, seen)
+	}
+	if fn.Pkg() != nil && (fn.Pkg().Path() == "testing" || fn.Pkg().Path() == suitePkg || testifyObj(fn)) {
+		return false // the stopping ones are matched by name
+	}
+	args := call.Args
+	if sel, ok := call.Fun.(*ast.SelectorExpr); ok && u.info.Selections[sel] != nil {
+		args = append([]ast.Expr{sel.X}, args...)
+	}
+	for _, a := range args {
+		if t := u.info.TypeOf(a); t != nil && (u.suiteOfType(t) != nil || reachesT(t)) {
+			return true
+		}
+	}
+	return false
+}
+
+// reachesT reports whether t is a testing.T, B, F or TB, or a pointer to one.
+func reachesT(t types.Type) bool {
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	n, ok := types.Unalias(t).(*types.Named)
+	if !ok || n.Obj().Pkg() == nil || n.Obj().Pkg().Path() != "testing" {
+		return false
+	}
+	switch n.Obj().Name() {
+	case "T", "B", "F", "TB":
+		return true
+	}
+	return false
+}
+
+// funcDecl is the declaration of fn in these files, nil when they hold none.
+func (u *unit) funcDecl(fn *types.Func) *ast.FuncDecl {
+	uf := u.fileAt(fn.Pos())
+	if uf == nil {
+		return nil
+	}
+	for _, decl := range uf.f.Decls {
+		if fd, ok := decl.(*ast.FuncDecl); ok && fd.Name.Pos() == fn.Pos() {
+			return fd
+		}
+	}
+	return nil
 }
 
 // reservedName is the marker for a suite method gotest gives a meaning

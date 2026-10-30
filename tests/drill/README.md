@@ -693,6 +693,15 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-child-method-keeps-no-t` | a child's method calling a base method that gains t gets no t | conformance: the migrate It for a child's method calling the base finds a compile marker |
 | `migrate-interface-notnil-guarded` | `NotNil` on an interface becomes `gotest.NotZero`, which passes a typed nil testify failed | conformance: the migrate It for NotNil on an interface finds no marker |
 | `migrate-import-comment-orphaned` | a removed import leaves its comment behind | conformance: the migrate It for a comment on a removed import finds the comment in the import block |
+| `migrate-setup-callee-unfollowed` | a `SetupSuite` that stops only through a helper, a suite method or code handed its T counts as unable to stop | conformance: the migrate It for a SetupSuite stopping through what it calls finds no marker |
+| `migrate-base-setup-ignored` | a `SetupSuite` the child has from its base is not read | conformance: the migrate It for suite hooks a base gives finds no marker on the child's AfterAll |
+| `migrate-qualified-constant-converted` | an untyped constant named through its package counts as typed | conformance: the migrate It for a constant of another package finds no marker |
+| `migrate-concrete-types-instantiated` | `Equal`/`NotEqual` of two concrete types is instantiated with one of them | conformance: the migrate It for two concrete types finds no marker |
+| `migrate-interface-equal-uninstantiated` | `Equal`/`NotEqual` of an interface and a value it holds is left to inference | conformance: the migrate It for two concrete types finds the interface comparison uninstantiated |
+| `migrate-pointer-array-len-translated` | `Len` on a pointer to an array is translated | conformance: the migrate It for Len on a pointer to an array finds no marker |
+| `migrate-nan-indelta-translated` | `InDelta` is translated whatever may be NaN | conformance: the migrate It for InDelta where a NaN decides finds no marker |
+| `migrate-workspace-vendor-ignored` | the vendor directory is looked for beside go.mod even where a workspace governs | conformance: the migrate It for a vendored workspace finds the load failing offline |
+| `migrate-goenv-gowork-ignored` | the workspace is resolved without the `go env -w` settings | conformance: the migrate It for a workspace turned off by go env finds the load failing offline |
 
 ## Adding a mutant
 

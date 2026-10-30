@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / LenOnAPointerToAnArray / when Len checks a pointer to an array / migrate leaves it unconverted under a marker naming len \(
+Clause: when Len checks a pointer to an array → migrate leaves it unconverted under a marker naming len
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -97,7 +97,7 @@
+ 		return u.zeroCompare(f, name, args, t, ts)
+ 
+ 	case "Len":
+-		if p, ok := under.(*types.Pointer); ok {
++		if p, ok := under.(*types.Pointer); ok && false {
+ 			if _, ok := p.Elem().Underlying().(*types.Array); ok {
+ 				return "", nil, "testify Len on " + ts + " counted the array's length, nil pointer or not; gotest.Len takes no pointer — assert on len(" + types.ExprString(args[0]) + ") with gotest.Equal"
+ 			}

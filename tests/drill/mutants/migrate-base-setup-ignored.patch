@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / SuiteHooksABaseGives / when a base suite gives a child the SetupSuite that can stop early or the TearDownSuite / migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped \(
+Clause: when a base suite gives a child the SetupSuite that can stop early or the TearDownSuite → migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -679,7 +679,7 @@
+ func (u *unit) setupMayStop(s *suiteDecl) bool {
+ 	obj, _, _ := types.LookupFieldOrMethod(types.NewPointer(s.obj.Type()), true, s.obj.Pkg(), "SetupSuite")
+ 	fn, ok := obj.(*types.Func)
+-	return ok && u.mayStop(fn, map[*types.Func]bool{})
++	return ok && u.funcDecl(fn) != nil && u.suiteOf(u.funcDecl(fn).Recv.List[0].Type) == s && u.mayStop(fn, map[*types.Func]bool{})
+ }
+ 
+ // mayStop reports whether calling fn can end it early: a testify assertion,
