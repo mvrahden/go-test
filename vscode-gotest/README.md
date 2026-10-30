@@ -111,7 +111,7 @@ Open it with **Go Test: Show Spec View**.
 
 ### Lint
 
-Saving a `_test.go` file runs `gotest lint -json` on its package and shows the findings as problems, with the rule as their code. A finding the CLI can fix offers its fix as a Quick Fix; when the file changed since the lint read it, the fix lints again first. **Go Test: Fix lint findings in package** applies every fix through `gotest lint -fix`, and **Go Test: Lint Workspace** lints each folder. Which rules run is `.gotest.yml`'s `lint.skip`, read by the CLI itself.
+Saving a `_test.go` file runs `gotest lint -json` on its package and shows the findings as problems over the code each is about, with the rule as their code: an integrity rule's finding is an error, any other a warning, as `gotest lint -rules -json` tiers them. A finding the CLI can fix offers its fix as a Quick Fix; when the file changed since the lint read it, the fix lints again first. **Go Test: Fix lint findings in package** applies every fix through `gotest lint -fix`, and **Go Test: Lint Workspace** lints each folder. Which rules run is `.gotest.yml`'s `lint.skip`, read by the CLI itself.
 
 ### Focus and Exclude
 

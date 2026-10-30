@@ -1,7 +1,12 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import { readFile } from "node:fs/promises";
-import { buildCliCommand, offerCliUpgrade, formatCliCommand } from "./cli.js";
+import {
+  buildCliCommand,
+  offerCliUpgrade,
+  formatCliCommand,
+  stripGoRunExitEcho,
+} from "./cli.js";
 import { captureOutput } from "./capture.js";
 import { discoveryTimeoutSeconds } from "./config.js";
 import type { DiscoveryCache } from "./discovery.js";
@@ -29,6 +34,10 @@ interface Entry {
   diagnostic: vscode.Diagnostic;
 }
 
+// Each rule's tier, as `gotest lint -rules -json` states it; undefined when
+// that document could not be read.
+type RuleTiers = Map<string, string> | undefined;
+
 const DEBOUNCE_MS = 500;
 
 // LintService runs `gotest lint -json` and shows what it finds as
@@ -42,6 +51,9 @@ export class LintService implements vscode.Disposable {
   // The text each file had when the lint that reported on it read it, so a
   // fix's byte offsets are only applied to the same bytes.
   private readonly seen = new Map<string, string>();
+  // Each folder's rule tiers, read once per session; a failed read is kept,
+  // not retried.
+  private readonly tiers = new Map<string, Promise<RuleTiers>>();
 
   constructor(
     private readonly cache: DiscoveryCache,
@@ -177,6 +189,7 @@ export class LintService implements vscode.Disposable {
       return;
     }
     this.outputChannel.info(`[lint] ${formatCliCommand(cmd)}`);
+    const tiers = this.ruleTiers(scope.folder);
     const startedAt = Date.now();
 
     let out;
@@ -198,6 +211,7 @@ export class LintService implements vscode.Disposable {
         this.inFlight.delete(scope.key);
     }
     if (out.aborted) return;
+    const tierOf = await tiers;
     // A save came in while this ran; the lint it starts answers it.
     if (!fix && this.timers.has(scope.key)) return;
 
@@ -228,16 +242,65 @@ export class LintService implements vscode.Disposable {
       );
       return;
     }
-    await this.publish(scope, findings);
+    await this.publish(scope, findings, tierOf);
     this.outputChannel.info(
       `[lint] ${scope.key}: ${findings.length} finding(s) in ${ms}ms`,
     );
+  }
+
+  // ruleTiers is the folder's rule table; concurrent lints share one read.
+  private ruleTiers(folder: string): Promise<RuleTiers> {
+    let read = this.tiers.get(folder);
+    if (!read) {
+      read = this.readRuleTiers(folder);
+      this.tiers.set(folder, read);
+    }
+    return read;
+  }
+
+  private async readRuleTiers(folder: string): Promise<RuleTiers> {
+    const unread = (reason: string): RuleTiers => {
+      this.outputChannel.warn(
+        `[lint] ${folder}: rule tiers unread, every finding is a warning: ${reason}`,
+      );
+      return undefined;
+    };
+    let cmd;
+    try {
+      cmd = await buildCliCommand(
+        ["lint", "-rules", "-json"],
+        folder,
+        this.outputChannel,
+      );
+    } catch (err: unknown) {
+      offerCliUpgrade(err);
+      return unread(err instanceof Error ? err.message : String(err));
+    }
+    let out;
+    try {
+      out = await captureOutput(cmd.bin, cmd.args, {
+        cwd: folder,
+        timeoutSeconds: discoveryTimeoutSeconds(folder),
+      });
+    } catch (err: unknown) {
+      return unread(err instanceof Error ? err.message : String(err));
+    }
+    if (out.code !== 0) {
+      return unread(stripGoRunExitEcho(out.stderr) || `exit code ${out.code}`);
+    }
+    try {
+      return parseRuleTiers(out.stdout);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return unread(`unreadable JSON: ${message}`);
+    }
   }
 
   // publish replaces every diagnostic inside the scope in one step.
   private async publish(
     scope: LintScope,
     findings: LintFinding[],
+    tiers?: RuleTiers,
   ): Promise<void> {
     const texts = new Map<string, string>();
     const files = new Set<string>();
@@ -257,7 +320,10 @@ export class LintService implements vscode.Disposable {
     const next = new Map<string, Entry[]>();
     for (const f of findings) {
       const text = texts.get(f.file) ?? "";
-      const entry = { finding: f, diagnostic: toDiagnostic(f, text) };
+      const entry = {
+        finding: f,
+        diagnostic: toDiagnostic(f, text, severityOf(f.category, tiers)),
+      };
       const list = next.get(f.file);
       if (list) list.push(entry);
       else next.set(f.file, [entry]);
@@ -280,14 +346,42 @@ export class LintService implements vscode.Disposable {
   }
 }
 
-// toDiagnostic places a finding on the text the lint read. A finding that
-// names a point is drawn to the end of its line, where a point would be
-// invisible.
-function toDiagnostic(f: LintFinding, text: string): vscode.Diagnostic {
+// parseRuleTiers reads `gotest lint -rules -json` into each rule's tier.
+function parseRuleTiers(stdout: string): Map<string, string> {
+  const doc = JSON.parse(stdout) as { rules?: unknown } | null;
+  if (!Array.isArray(doc?.rules)) throw new Error("no rules list");
+  const tiers = new Map<string, string>();
+  for (const r of doc.rules as { id?: unknown; tier?: unknown }[]) {
+    if (typeof r?.id === "string" && typeof r.tier === "string") {
+      tiers.set(r.id, r.tier);
+    }
+  }
+  return tiers;
+}
+
+// severityOf makes a finding of an integrity rule an error and every other a
+// warning; a finding's category is its rule.
+function severityOf(
+  category: string,
+  tiers: RuleTiers,
+): vscode.DiagnosticSeverity {
+  return tiers?.get(category) === "integrity"
+    ? vscode.DiagnosticSeverity.Error
+    : vscode.DiagnosticSeverity.Warning;
+}
+
+// toDiagnostic places a finding on the text the lint read, from its start to
+// its end. One whose end does not lie past its start names a point and is
+// drawn to the end of its line, where a point would be invisible.
+function toDiagnostic(
+  f: LintFinding,
+  text: string,
+  severity: vscode.DiagnosticSeverity,
+): vscode.Diagnostic {
   const startLine = lineOf(text, f.line);
   const start = new vscode.Position(f.line - 1, utf16Column(startLine, f.col));
   let end: vscode.Position;
-  if (f.endLine !== f.line || f.endCol !== f.col) {
+  if (f.endLine > f.line || (f.endLine === f.line && f.endCol > f.col)) {
     end = new vscode.Position(
       f.endLine - 1,
       utf16Column(lineOf(text, f.endLine), f.endCol),
@@ -302,7 +396,7 @@ function toDiagnostic(f: LintFinding, text: string): vscode.Diagnostic {
   const d = new vscode.Diagnostic(
     new vscode.Range(start, end),
     f.message,
-    vscode.DiagnosticSeverity.Warning,
+    severity,
   );
   d.source = "gotest";
   d.code = f.category;
