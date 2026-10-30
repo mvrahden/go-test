@@ -89,9 +89,13 @@ beforeAll(async () => {
   expect(ci.error).toBeUndefined();
   expect(ci.stdout).toContain(failing);
   eventsFile = path.join(tmp, "events.jsonl");
+  // Framed as a gotest watch capture would be: its markers are no packages.
   writeFileSync(
     eventsFile,
-    ci.stdout + readFileSync(path.join(streamDir, "all-pass.jsonl"), "utf-8"),
+    '{"Action":"watch-start","Package":"./..."}\n' +
+      ci.stdout +
+      readFileSync(path.join(streamDir, "all-pass.jsonl"), "utf-8") +
+      '{"Action":"watch-end","Package":"./...","Exit":1}\n',
     "utf-8",
   );
 }, 300_000);
