@@ -587,6 +587,9 @@ func (s *startWriter) writeLine(line []byte) {
 			if len(ev.Time) == 0 {
 				start["Time"] = time.Now()
 			}
+			if runLevelPackage(ev.Package) {
+				start["RunLevel"] = true
+			}
 			writeJSONLine(s.w, start)
 		case ev.Action == "start":
 			return
@@ -613,9 +616,7 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	default:
 		summaryLine = fmt.Sprintf("ok  \t%s\t%.3fs%s\n", pkg, dur.Seconds(), ranNothingNote(s))
 	}
-	writeJSONLine(w, map[string]any{
-		"Time": now, "Action": "output", "Package": pkg, "Output": summaryLine,
-	})
+	summary := map[string]any{"Time": now, "Action": "output", "Package": pkg, "Output": summaryLine}
 	action := "pass"
 	if failed {
 		action = "fail"
@@ -624,6 +625,11 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	if s.failedBuild != "" {
 		verdict["FailedBuild"] = s.failedBuild
 	}
+	if runLevelPackage(pkg) {
+		summary["RunLevel"] = true
+		verdict["RunLevel"] = true
+	}
+	writeJSONLine(w, summary)
 	writeJSONLine(w, verdict)
 }
 
