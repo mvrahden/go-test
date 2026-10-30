@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -17,9 +18,7 @@ import (
 type DiscoveryToggleFocusTestSuite struct{}
 
 func (s *DiscoveryToggleFocusTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 // toggled is a staged copy of a shapes package after toggle-focus ran on it.

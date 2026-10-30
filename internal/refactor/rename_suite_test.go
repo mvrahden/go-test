@@ -18,7 +18,7 @@ import (
 type RenameTestSuite struct{}
 
 func (s *RenameTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
+	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

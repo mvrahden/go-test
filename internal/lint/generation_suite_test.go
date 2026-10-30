@@ -11,7 +11,7 @@ import (
 type GenerationRejectsTestSuite struct{}
 
 func (s *GenerationRejectsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
+	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

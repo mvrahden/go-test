@@ -2,6 +2,7 @@ package lint_test
 
 import (
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -13,9 +14,7 @@ import (
 type LinterGitHubTestSuite struct{}
 
 func (s *LinterGitHubTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 func (s *LinterGitHubTestSuite) TestAnnotationEscaping(t *gotest.T) {

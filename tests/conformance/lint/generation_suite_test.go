@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -14,9 +15,7 @@ import (
 type LinterGenerationTestSuite struct{}
 
 func (s *LinterGenerationTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 const genRejectPkg = "../testdata/lintgenreject/"

@@ -12,7 +12,7 @@ import (
 type DeclarationRulesTestSuite struct{}
 
 func (s *DeclarationRulesTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
+	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
 	return cfg
 }

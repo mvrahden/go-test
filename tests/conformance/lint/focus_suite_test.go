@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -15,9 +16,7 @@ import (
 type LinterFocusFixTestSuite struct{}
 
 func (s *LinterFocusFixTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.IntegrationSuiteConfig()
-	cfg.Parallel = true
-	return cfg
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
 }
 
 // unfocusedFix is a staged copy of a testdata package after lint -fix ran
