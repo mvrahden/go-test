@@ -23,7 +23,7 @@ import {
   TOGGLE_FOCUS_COMMAND,
 } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
-import { SpecViewPanel } from "./specView.js";
+import { SpecViewPanel, nearestItemId } from "./specView.js";
 import { WatchManager } from "./watch.js";
 import {
   ScaffoldCodeActionProvider,
@@ -187,6 +187,37 @@ export function activate(context: vscode.ExtensionContext): void {
     (report) => benchGateDiagnostics.apply(report),
   );
   context.subscriptions.push(benchRunner, benchGateDiagnostics);
+
+  // The Spec View's buttons act on Test Explorer items; a node the tree does
+  // not hold runs as its nearest ancestor that it does.
+  const toItem = (id: string) => {
+    const nearest = nearestItemId(id, (i) => !!controller.findItem(i));
+    if (nearest && nearest !== id) {
+      outputChannel.info(
+        `[specView] ${id} is not in the tree; using ${nearest}`,
+      );
+    }
+    return nearest ? controller.findItem(nearest) : undefined;
+  };
+  specView.setActions({
+    run: async (ids) => {
+      const items = Array.from(
+        new Set(ids.map(toItem).filter((i) => i !== undefined)),
+      );
+      if (items.length === 0) return;
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        await runner.run(new vscode.TestRunRequest(items), cts.token);
+      } finally {
+        cts.dispose();
+      }
+    },
+    debug: async (id) => {
+      const item = toItem(id);
+      if (item)
+        await vscode.commands.executeCommand("gotest.debugTest", item.id);
+    },
+  });
 
   const specViewRefreshDisposable = runner.onDidComplete((pieces) => {
     void specView.refresh(pieces);

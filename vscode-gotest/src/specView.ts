@@ -14,6 +14,12 @@ import type { DiscoverBehavior } from "./types.js";
 const RUNS_FILE = "specRuns.json";
 const RUNS_VERSION = 1;
 
+// What the panel's node buttons do, given Test Explorer item ids.
+export interface SpecViewActions {
+  run(ids: string[]): Promise<void>;
+  debug(id: string): Promise<void>;
+}
+
 export class SpecViewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
@@ -25,6 +31,7 @@ export class SpecViewPanel implements vscode.Disposable {
   // Runs merged since the panel last rendered them.
   private stale = false;
   private rendering: Promise<void> = Promise.resolve();
+  private actions: SpecViewActions | undefined;
 
   constructor(
     private readonly outputChannel: vscode.LogOutputChannel,
@@ -144,53 +151,14 @@ export class SpecViewPanel implements vscode.Disposable {
     this.wirePanel();
   }
 
+  // setActions connects the panel's Run and Debug to the Test Explorer.
+  setActions(actions: SpecViewActions): void {
+    this.actions = actions;
+  }
+
   private wirePanel(): void {
     this.panel!.webview.onDidReceiveMessage(
-      (msg) => {
-        if (msg.type === "runTests") {
-          vscode.commands.executeCommand("testing.runAll");
-        } else if (msg.type === "refresh") {
-          this.stale = true;
-          void this.render();
-        } else if (msg.type === "copySpec") {
-          if (this.lastSpecData) {
-            const hidden =
-              Array.isArray(msg.hidden) && msg.hidden.length > 0
-                ? new Set<string>(msg.hidden)
-                : undefined;
-            const text = specDataToReport(
-              this.lastSpecData,
-              this.modulePaths,
-              hidden,
-            );
-            vscode.env.clipboard.writeText(text);
-          }
-        } else if (msg.type === "clearResults") {
-          this.clear();
-        } else if (msg.type === "goToLocation" && msg.file && msg.line) {
-          const uri = vscode.Uri.file(msg.file);
-          const line = Math.max(0, msg.line - 1);
-          const specColumn = this.panel?.viewColumn;
-          const other = vscode.window.visibleTextEditors.find(
-            (e) => e.viewColumn !== undefined && e.viewColumn !== specColumn,
-          );
-          const viewColumn =
-            other?.viewColumn ??
-            (specColumn === vscode.ViewColumn.One
-              ? vscode.ViewColumn.Beside
-              : vscode.ViewColumn.One);
-          vscode.window
-            .showTextDocument(uri, {
-              viewColumn,
-              selection: new vscode.Range(line, 0, line, 0),
-            })
-            .then(undefined, (err: unknown) => {
-              this.outputChannel.error(
-                `[specView] showTextDocument failed: ${err}`,
-              );
-            });
-        }
-      },
+      (msg) => this.handleMessage(msg),
       null,
       this.disposables,
     );
@@ -213,6 +181,58 @@ export class SpecViewPanel implements vscode.Disposable {
       null,
       this.disposables,
     );
+  }
+
+  // The webview posts plain objects; each branch checks what it reads.
+  private handleMessage(msg: any): void {
+    if (msg.type === "run" && this.actions) {
+      const ids: string[] = Array.isArray(msg.ids) ? msg.ids : [msg.id];
+      void this.actions.run(ids.filter((id) => typeof id === "string"));
+    } else if (msg.type === "debug" && this.actions) {
+      if (typeof msg.id === "string") void this.actions.debug(msg.id);
+    } else if (msg.type === "runTests") {
+      vscode.commands.executeCommand("testing.runAll");
+    } else if (msg.type === "refresh") {
+      this.stale = true;
+      void this.render();
+    } else if (msg.type === "copySpec") {
+      if (this.lastSpecData) {
+        const hidden =
+          Array.isArray(msg.hidden) && msg.hidden.length > 0
+            ? new Set<string>(msg.hidden)
+            : undefined;
+        const text = specDataToReport(
+          this.lastSpecData,
+          this.modulePaths,
+          hidden,
+        );
+        vscode.env.clipboard.writeText(text);
+      }
+    } else if (msg.type === "clearResults") {
+      this.clear();
+    } else if (msg.type === "goToLocation" && msg.file && msg.line) {
+      const uri = vscode.Uri.file(msg.file);
+      const line = Math.max(0, msg.line - 1);
+      const specColumn = this.panel?.viewColumn;
+      const other = vscode.window.visibleTextEditors.find(
+        (e) => e.viewColumn !== undefined && e.viewColumn !== specColumn,
+      );
+      const viewColumn =
+        other?.viewColumn ??
+        (specColumn === vscode.ViewColumn.One
+          ? vscode.ViewColumn.Beside
+          : vscode.ViewColumn.One);
+      vscode.window
+        .showTextDocument(uri, {
+          viewColumn,
+          selection: new vscode.Range(line, 0, line, 0),
+        })
+        .then(undefined, (err: unknown) => {
+          this.outputChannel.error(
+            `[specView] showTextDocument failed: ${err}`,
+          );
+        });
+    }
   }
 
   // clear drops the kept runs and empties the panel. Called both by the
@@ -621,14 +641,18 @@ function buildSpecBody(
   modulePaths: string[],
   locationMap: LocationMap,
 ): string {
-  const toolbar = buildToolbar();
+  const toolbar = buildToolbar(
+    data.stats.failed > 0 || (data.stats.failedPackages ?? 0) > 0,
+  );
   const groups = groupByModule(data.packages, modulePaths);
   let tree: string;
   if (groups.length === 1 && groups[0].entries.length === 1) {
     const pkg = groups[0].entries[0].pkg;
     tree =
       buildPackageFailureHtml(pkg) +
-      pkg.nodes.map((n) => buildNodeHtml(n, "", locationMap)).join("");
+      pkg.nodes
+        .map((n) => buildNodeHtml(n, "", nodeCtx(locationMap, pkg)))
+        .join("");
   } else if (groups.length === 1) {
     tree = groups[0].entries
       .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, locationMap))
@@ -644,7 +668,8 @@ function buildSpecBody(
 </div>`;
 }
 
-function buildToolbar(): string {
+function buildToolbar(anyFailed: boolean): string {
+  const rerun = anyFailed ? "" : " disabled";
   return `<div class="toolbar">
   <div class="toolbar-group">
     <button class="tool-btn" id="expand-all-btn" title="Expand all">▼ All</button>
@@ -659,6 +684,7 @@ function buildToolbar(): string {
     <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." />
   </div>
   <div class="toolbar-group">
+    <button class="tool-btn" id="rerun-failed-btn" title="Run what failed again"${rerun}>Rerun failed</button>
     <button class="tool-btn" id="refresh-btn" title="Render the newest runs">Refresh</button>
     <button class="tool-btn" id="copy-spec-btn" title="Copy spec report">Copy</button>
     <button class="tool-btn" id="clear-results-btn" title="Clear results">Clear</button>
@@ -700,7 +726,7 @@ function buildPackageSectionHtml(
   locationMap: LocationMap,
 ): string {
   const nodes = pkg.nodes
-    .map((n) => buildNodeHtml(n, "", locationMap))
+    .map((n) => buildNodeHtml(n, "", nodeCtx(locationMap, pkg)))
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}</summary>
@@ -729,7 +755,7 @@ function buildPackageFailureHtml(pkg: SpecPackage): string {
   const errorBlock = lines
     ? `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`
     : "";
-  return `<div class="leaf test fail">
+  return `<div class="leaf test fail"${idAttr(pkg.path)}>
   <span class="icon fail"><span class="status-text">✗</span></span> <strong>FAIL</strong>
   ${errorBlock}
 </div>`;
@@ -743,7 +769,9 @@ function buildModuleSectionHtml(
     group.entries.length === 1
       ? buildPackageFailureHtml(group.entries[0].pkg) +
         group.entries[0].pkg.nodes
-          .map((n) => buildNodeHtml(n, "", locationMap))
+          .map((n) =>
+            buildNodeHtml(n, "", nodeCtx(locationMap, group.entries[0].pkg)),
+          )
           .join("")
       : group.entries
           .map((e) =>
@@ -756,27 +784,72 @@ function buildModuleSectionHtml(
 </details>`;
 }
 
+// What a node needs from around it: where declarations live, and the
+// package it belongs to, which with its path names its Test Explorer item.
+interface NodeCtx {
+  locations: LocationMap;
+  pkgPath: string;
+}
+
+function nodeCtx(locations: LocationMap, pkg: SpecPackage): NodeCtx {
+  return { locations, pkgPath: pkg.path };
+}
+
+// itemIdOf is the Test Explorer id of a node: the package, then the go test
+// path with the top-level test's Test prefix dropped, as discovery names
+// suites. A fuzz target sits under its suite in both trees.
+export function itemIdOf(
+  pkgPath: string,
+  nodePath: string,
+): string | undefined {
+  if (!nodePath.startsWith("Test") || nodePath.startsWith("Test_")) {
+    return undefined;
+  }
+  return `${pkgPath}/${nodePath.slice(4)}`;
+}
+
+// nearestItemId is id itself when the tree has it, else its closest
+// ancestor that it has: behaviors past the tree's per-method cap are not
+// items, and running one runs its method.
+export function nearestItemId(
+  id: string,
+  has: (id: string) => boolean,
+): string | undefined {
+  let current = id;
+  for (;;) {
+    if (has(current)) return current;
+    const cut = current.lastIndexOf("/");
+    if (cut <= 0) return undefined;
+    current = current.slice(0, cut);
+  }
+}
+
+function actionsHtml(id: string | undefined): string {
+  if (!id) return "";
+  return `<span class="node-actions"><button class="act" data-act="run" title="Run">Run</button><button class="act" data-act="debug" title="Debug">Debug</button></span>`;
+}
+
+function idAttr(id: string | undefined): string {
+  return id ? ` data-id="${escapeAttr(id)}"` : "";
+}
+
 // Nodes are rendered with their go test path: the parent's path and their
 // own name, which is how discovery keys a declaration.
 function buildNodeHtml(
   node: SpecNode,
   parentPath: string,
-  locationMap: LocationMap,
+  ctx: NodeCtx,
 ): string {
   const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
   if (node.children.length === 0) {
-    return buildLeafHtml(node, nodePath, locationMap);
+    return buildLeafHtml(node, nodePath, ctx);
   }
-  return buildBranchHtml(node, nodePath, locationMap);
+  return buildBranchHtml(node, nodePath, ctx);
 }
 
-function buildIconHtml(
-  status: string,
-  nodePath: string,
-  locationMap: LocationMap,
-): string {
+function buildIconHtml(status: string, nodePath: string, ctx: NodeCtx): string {
   const icon = statusIcon(status);
-  const loc = locationMap[nodePath];
+  const loc = ctx.locations[nodePath];
   const locAttrs = loc
     ? ` data-loc-file="${escapeAttr(loc.file)}" data-loc-line="${loc.line}"`
     : "";
@@ -786,12 +859,10 @@ function buildIconHtml(
   return `<span class="icon ${status}"${locAttrs}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
 }
 
-function buildLeafHtml(
-  node: SpecNode,
-  nodePath: string,
-  locationMap: LocationMap,
-): string {
-  const iconHtml = buildIconHtml(node.status, nodePath, locationMap);
+function buildLeafHtml(node: SpecNode, nodePath: string, ctx: NodeCtx): string {
+  const iconHtml = buildIconHtml(node.status, nodePath, ctx);
+  const id =
+    node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
   const dur = formatDuration(node.duration);
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
@@ -800,8 +871,8 @@ function buildLeafHtml(
 
   const errorBlock = node.status === "fail" ? errorBlockHtml(node) : "";
 
-  return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}">
-  ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>
+  return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}"${idAttr(id)}>
+  ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>${actionsHtml(id)}
   ${errorBlock}
 </div>`;
 }
@@ -809,14 +880,16 @@ function buildLeafHtml(
 function buildBranchHtml(
   node: SpecNode,
   nodePath: string,
-  locationMap: LocationMap,
+  ctx: NodeCtx,
 ): string {
   const shouldOpen = hasFailure(node);
   const openAttr = shouldOpen ? " open" : "";
   const status = derivedStatus(node);
-  const iconHtml = buildIconHtml(status, nodePath, locationMap);
+  const iconHtml = buildIconHtml(status, nodePath, ctx);
+  const id =
+    node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
   const children = node.children
-    .map((c) => buildNodeHtml(c, nodePath, locationMap))
+    .map((c) => buildNodeHtml(c, nodePath, ctx))
     .join("");
 
   let label = escapeHtml(node.display);
@@ -841,7 +914,7 @@ function buildBranchHtml(
   const ownFail = failedOnItsOwn(node) ? " fail-own" : "";
 
   return `<details class="branch${ownFail}" data-display="${escapeAttr(node.display)}"${openAttr}>
-  <summary class="node ${node.kind}">${iconHtml} ${label}${suffix}</summary>
+  <summary class="node ${node.kind}"${idAttr(id)}>${iconHtml} ${label}${suffix}${actionsHtml(id)}</summary>
   ${errorBlock}${children}
 </details>`;
 }
@@ -1403,6 +1476,21 @@ summary.node:hover > .icon[data-loc-file] > .status-text,
 summary.node:hover > .icon[data-loc-file] > .goto-text,
 .leaf:hover > .icon[data-loc-file] > .goto-text { display: inline; color: var(--vscode-textLink-foreground); }
 
+/* Node actions, shown on hover */
+.node-actions { display: none; margin-left: 8px; }
+summary.node:hover > .node-actions,
+.leaf:hover > .node-actions { display: inline; }
+.act {
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  border: none;
+  padding: 0 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+}
+.act:hover { text-decoration: underline; }
+.tool-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* Error output */
 .error-details { margin: 2px 0 4px 20px; }
 .error-summary {
@@ -1452,6 +1540,20 @@ document.addEventListener('click', (e) => {
 
   if (t.id === 'run-tests-btn') {
     vscode.postMessage({ type: 'runTests' });
+    return;
+  }
+  const act = t.closest('.act');
+  if (act) {
+    const owner = act.closest('[data-id]');
+    if (owner) vscode.postMessage({ type: act.dataset.act, id: owner.dataset.id });
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+  if (t.id === 'rerun-failed-btn') {
+    const ids = Array.from(document.querySelectorAll('.leaf.fail[data-id], details.branch.fail-own > summary[data-id]'))
+      .map(el => el.dataset.id);
+    if (ids.length > 0) vscode.postMessage({ type: 'run', ids: ids });
     return;
   }
   const iconEl = t.closest('.icon[data-loc-file]');
