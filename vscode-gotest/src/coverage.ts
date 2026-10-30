@@ -489,6 +489,7 @@ export class CoverageRunner implements vscode.Disposable {
       token,
       controller: this.controller,
       outputChannel: this.outputChannel,
+      knownPackages: this.cache.packages,
       label: "coverage",
       coverage: { store: this.store, testOnly },
     });

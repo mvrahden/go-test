@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import { buildCliCommand, formatCliCommand, offerCliUpgrade } from "./cli.js";
+import { captureStdout } from "./capture.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { DiscoverMethod, DiscoverSuite } from "./types.js";
+
+export const TOGGLE_FOCUS_COMMAND = "gotest.toggleFocus";
 
 export class FocusExcludeProvider
   implements vscode.CodeActionProvider, vscode.Disposable
@@ -34,7 +38,7 @@ export class FocusExcludeProvider
             path.join(pkg.dir, method.file) === docPath &&
             method.line === line
           ) {
-            return this.actionsForMethod(method, document);
+            return this.actionsForMethod(suite, method, document);
           }
         }
       }
@@ -46,15 +50,20 @@ export class FocusExcludeProvider
   dispose(): void {}
 
   private actionsForMethod(
+    suite: DiscoverSuite,
     method: DiscoverMethod,
     document: vscode.TextDocument,
   ): vscode.CodeAction[] {
     const actions: vscode.CodeAction[] = [];
+    // The receiver names the type the method is declared on, which an alias
+    // suite does not: its methods live on the generic type it instantiates.
+    const receiver =
+      receiverTypeName(document.lineAt(method.line - 1).text) ?? suite.name;
+    const identifier = `${receiver}.${method.name}`;
 
     if (method.focused) {
-      const newName = method.name.replace(/^F_/, "");
       actions.push(
-        this.createMethodAction("Unfocus this test", method, newName, document),
+        toggleFocusAction("Unfocus this test", document, identifier),
       );
     } else if (method.excluded) {
       const newName = method.name.replace(/^X_/, "");
@@ -62,14 +71,7 @@ export class FocusExcludeProvider
         this.createMethodAction("Include this test", method, newName, document),
       );
     } else {
-      actions.push(
-        this.createMethodAction(
-          "Focus this test",
-          method,
-          `F_${method.name}`,
-          document,
-        ),
-      );
+      actions.push(toggleFocusAction("Focus this test", document, identifier));
       actions.push(
         this.createMethodAction(
           "Exclude this test",
@@ -90,9 +92,8 @@ export class FocusExcludeProvider
     const actions: vscode.CodeAction[] = [];
 
     if (suite.focused) {
-      const newName = suite.name.replace(/^F_/, "");
       actions.push(
-        this.createSuiteAction("Unfocus this suite", suite, newName, document),
+        toggleFocusAction("Unfocus this suite", document, suite.name),
       );
     } else if (suite.excluded) {
       const newName = suite.name.replace(/^X_/, "");
@@ -100,14 +101,7 @@ export class FocusExcludeProvider
         this.createSuiteAction("Include this suite", suite, newName, document),
       );
     } else {
-      actions.push(
-        this.createSuiteAction(
-          "Focus this suite",
-          suite,
-          `F_${suite.name}`,
-          document,
-        ),
-      );
+      actions.push(toggleFocusAction("Focus this suite", document, suite.name));
       actions.push(
         this.createSuiteAction(
           "Exclude this suite",
@@ -203,5 +197,70 @@ export class FocusExcludeProvider
 
     action.edit = edit;
     return action;
+  }
+}
+
+// toggleFocusAction delegates the rename to the CLI, which follows the name
+// into every file of the package; an in-document edit would break a suite
+// whose methods live in other files.
+function toggleFocusAction(
+  title: string,
+  document: vscode.TextDocument,
+  identifier: string,
+): vscode.CodeAction {
+  const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+  action.command = {
+    command: TOGGLE_FOCUS_COMMAND,
+    title,
+    arguments: [
+      document.uri.fsPath,
+      identifier,
+      vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath,
+    ],
+  };
+  return action;
+}
+
+// receiverTypeName reads the receiver's type name off a method declaration
+// line, type parameters dropped.
+export function receiverTypeName(line: string): string | undefined {
+  return /^\s*func\s*\(\s*(?:\w+\s+)?\*?\s*(\w+)/.exec(line)?.[1];
+}
+
+// executeToggleFocus runs `gotest refactor toggle-focus`. The CLI edits files
+// on disk, so unsaved changes are saved first; a refusal surfaces its stderr.
+export async function executeToggleFocus(
+  file: string,
+  identifier: string,
+  outputChannel: vscode.LogOutputChannel,
+  discoverCallback: () => void,
+  workspaceDir?: string,
+): Promise<void> {
+  const effectiveDir =
+    workspaceDir ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!effectiveDir) {
+    return;
+  }
+  if (!(await vscode.workspace.saveAll(false))) {
+    vscode.window.showErrorMessage(
+      `gotest refactor toggle-focus not run: unsaved changes could not be saved`,
+    );
+    return;
+  }
+
+  try {
+    const cmd = await buildCliCommand(
+      ["refactor", "toggle-focus", file, identifier],
+      effectiveDir,
+    );
+    outputChannel.info(`[toggle-focus] ${formatCliCommand(cmd)}`);
+    await captureStdout(cmd.bin, cmd.args, { cwd: effectiveDir });
+    discoverCallback();
+  } catch (err: unknown) {
+    if (offerCliUpgrade(err)) return;
+    const message = err instanceof Error ? err.message : String(err);
+    vscode.window.showErrorMessage(
+      `gotest refactor toggle-focus failed: ${message}`,
+    );
   }
 }

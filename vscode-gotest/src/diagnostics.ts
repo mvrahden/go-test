@@ -92,7 +92,7 @@ export class FocusDiagnostics implements vscode.Disposable {
 
     if (focusCount > 0) {
       this.statusBarItem.text = `$(warning) gotest: ${focusCount} focused test(s)`;
-      this.statusBarItem.tooltip = `${focusCount} focused test(s) detected — will cause CI failure`;
+      this.statusBarItem.tooltip = `${focusCount} focused test(s) — unfocused suites in every package of the run are skipped; fails CI (gotest --ci)`;
       this.statusBarItem.show();
     } else {
       this.statusBarItem.hide();

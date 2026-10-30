@@ -43,6 +43,10 @@ export interface BatchConfig {
     testOnly?: boolean;
   };
   onResults?: (results: AppliedResult[]) => void;
+  // Every discovered package: a widened pattern reaching one outside the
+  // selection would let its focus skip the selected suites. Without it the
+  // patterns widen unchecked.
+  knownPackages?: { importPath: string; dir: string }[];
 }
 
 export interface BatchResult {
@@ -63,6 +67,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     env,
     coverage,
     onResults,
+    knownPackages,
   } = config;
 
   const importPaths = pkgInfos.map((p) => p.importPath);
@@ -72,7 +77,12 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
   } else {
     const modulePath = await readModulePath(workspaceDir);
     const wsPatterns = await readWorkspacePatterns(workspaceDir);
-    const wildcards = resolveRunPatterns(importPaths, modulePath, wsPatterns);
+    const wildcards = resolveRunPatterns(
+      importPaths,
+      modulePath,
+      wsPatterns,
+      knownPackages && { workspaceDir, packages: knownPackages },
+    );
     cliPkgArgs = wildcards ?? importPaths;
   }
   let coverFile: string | undefined;

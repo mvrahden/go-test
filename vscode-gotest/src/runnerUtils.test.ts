@@ -2018,6 +2018,75 @@ describe("resolveRunPatterns", () => {
   it("returns undefined for empty array", () => {
     expect(resolveRunPatterns([], "example.com/proj")).toBeUndefined();
   });
+
+  // Focus is run-wide: a pattern reaching an unselected package lets its F_
+  // skip the selected suites.
+  describe("against the discovered packages", () => {
+    const ws = path.resolve("/ws");
+    const pkg = (rel: string) => ({
+      importPath: rel ? `example.com/proj/${rel}` : "example.com/proj",
+      dir: path.join(ws, rel),
+    });
+
+    it("keeps the wildcard when it reaches nothing beyond the selection", () => {
+      const known = [pkg("pkg/a"), pkg("pkg/b"), pkg("other")];
+      const result = resolveRunPatterns(
+        ["example.com/proj/pkg/a", "example.com/proj/pkg/b"],
+        "example.com/proj",
+        undefined,
+        { workspaceDir: ws, packages: known },
+      );
+      expect(result).toEqual(["example.com/proj/pkg/..."]);
+    });
+
+    it("drops the wildcard when it reaches an unselected package", () => {
+      const known = [pkg("pkg/a"), pkg("pkg/b"), pkg("pkg/focused")];
+      const result = resolveRunPatterns(
+        ["example.com/proj/pkg/a", "example.com/proj/pkg/b"],
+        "example.com/proj",
+        undefined,
+        { workspaceDir: ws, packages: known },
+      );
+      expect(result).toBeUndefined();
+    });
+
+    it("keeps the go.work patterns when the selection is every package", () => {
+      const known = [pkg("pkg/a"), pkg("examples/auth")];
+      const result = resolveRunPatterns(
+        ["example.com/proj/pkg/a", "example.com/proj/examples/auth"],
+        "example.com/proj",
+        ["./...", "./examples/..."],
+        { workspaceDir: ws, packages: known },
+      );
+      expect(result).toEqual(["./...", "./examples/..."]);
+    });
+
+    it("drops the go.work patterns when they reach an unselected package", () => {
+      const known = [pkg("pkg/a"), pkg("examples/auth"), pkg("examples/cart")];
+      const result = resolveRunPatterns(
+        ["example.com/proj/pkg/a", "example.com/proj/examples/auth"],
+        "example.com/proj",
+        ["./...", "./examples/..."],
+        { workspaceDir: ws, packages: known },
+      );
+      expect(result).toBeUndefined();
+    });
+
+    it("ignores a package outside the go.work patterns' directories", () => {
+      const outside = {
+        importPath: "example.com/elsewhere",
+        dir: path.resolve("/elsewhere"),
+      };
+      const known = [pkg("pkg/a"), pkg("examples/auth"), outside];
+      const result = resolveRunPatterns(
+        ["example.com/proj/pkg/a", "example.com/proj/examples/auth"],
+        "example.com/proj",
+        ["./...", "./examples/..."],
+        { workspaceDir: ws, packages: known },
+      );
+      expect(result).toEqual(["./...", "./examples/..."]);
+    });
+  });
 });
 
 describe("applyResults records before resolving ancestors", () => {
