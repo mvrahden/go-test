@@ -31,7 +31,7 @@ func checkSuiteDeclaration(pass *analysis.Pass, insp *inspector.Inspector, reach
 			if kind == "" {
 				continue
 			}
-			reportWithFix(pass, SuiteDeclaration, ts.Pos(), moveOutOfBlock(pass, gd, ts),
+			reportWithFix(pass, SuiteDeclaration, ts.Name, moveOutOfBlock(pass, gd, ts),
 				"%s %s is declared inside a type block; give it its own type declaration", kind, ts.Name.Name)
 		}
 	})

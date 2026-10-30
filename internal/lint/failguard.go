@@ -114,18 +114,18 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 		// A non-halting body makes the rewrite a semantic strengthening, not
 		// an equivalence — say so, and never offer a fix.
 		if weakLabel != "" {
-			report(pass, FailGuard, ifStmt.Pos(), "use %s instead of %s for %s — assertions halt where %s continues", targetList, from, desc, weakLabel)
+			report(pass, FailGuard, ifStmt, "use %s instead of %s for %s — assertions halt where %s continues", targetList, from, desc, weakLabel)
 			return
 		}
 		// A plan that is no equivalence of its guard withholds the fix for
 		// the whole chain and says why.
 		if noFix != "" {
-			report(pass, FailGuard, ifStmt.Pos(), "use %s instead of %s for %s — %s", targetList, from, desc, noFix)
+			report(pass, FailGuard, ifStmt, "use %s instead of %s for %s — %s", targetList, from, desc, noFix)
 			return
 		}
 		trailing, interior := spanComments(pass, ifStmt)
 		if !fixable || interior {
-			report(pass, FailGuard, ifStmt.Pos(), "use %s instead of %s for %s", targetList, from, desc)
+			report(pass, FailGuard, ifStmt, "use %s instead of %s for %s", targetList, from, desc)
 			return
 		}
 
@@ -136,7 +136,7 @@ func checkFailGuard(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			lines = append(lines, renderAssertion(pass.Fset, p.qual, p.m.target, append([]ast.Expr{p.tArg}, p.m.args...), p.msgArgs))
 		}
 		lines[0] += trailing
-		reportWithFix(pass, FailGuard, ifStmt.Pos(),
+		reportWithFix(pass, FailGuard, ifStmt,
 			[]analysis.SuggestedFix{{
 				Message: fmt.Sprintf("use %s", targetList),
 				TextEdits: []analysis.TextEdit{{

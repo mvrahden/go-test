@@ -87,7 +87,7 @@ func simplifyBoolAssertion(pass *analysis.Pass, call *ast.CallExpr, negated bool
 	}
 	source := pick(negated, "False", "True")
 	if m.noFix != "" {
-		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for %s — %s", m.target, source, m.desc, m.noFix)
+		report(pass, AssertionSimplify, call, "use %s instead of %s for %s — %s", m.target, source, m.desc, m.noFix)
 		return
 	}
 	emitSimplify(pass, call, source, m.target, append([]ast.Expr{call.Args[0]}, m.args...), call.Args[2:], m.desc)
@@ -601,15 +601,15 @@ func guardNilNotNil(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 		target := pick(isNot, "NotZero", "Zero")
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, arg}, msgArgs, "nil check")
 	case errorIface:
-		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for error nil check — %s looks through the error to a nil pointer it holds",
+		report(pass, AssertionSimplify, call, "use %s instead of %s for error nil check — %s looks through the error to a nil pointer it holds",
 			pick(isNot, "Error", "NoError"), source, source)
 	case otherIface:
-		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for nil check — %s looks through the interface to a nil pointer it holds",
+		report(pass, AssertionSimplify, call, "use %s instead of %s for nil check — %s looks through the interface to a nil pointer it holds",
 			pick(isNot, "NotZero", "Zero"), source, source)
 	case uncomparableNil, unknownNil:
 		// OK — this is the intended use of Nil/NotNil
 	default:
-		report(pass, AssertionTypeGuard, call.Pos(),
+		report(pass, AssertionTypeGuard, call,
 			"type %s is not nilable; for zero-value checks, use %s",
 			t, pick(isNot, "NotZero", "Zero"))
 	}
@@ -631,7 +631,7 @@ func guardEmptyNotEmpty(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 
 	switch kind := nilKindOf(pass, arg); {
 	case kind == errorIface:
-		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for error empty check — %s looks through the error to the value it holds",
+		report(pass, AssertionSimplify, call, "use %s instead of %s for error empty check — %s looks through the error to the value it holds",
 			pick(isNot, "Error", "NoError"), source, source)
 	case hasLength(pass, arg):
 		// OK
@@ -640,7 +640,7 @@ func guardEmptyNotEmpty(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 	case kind == otherIface, kind == unknownNil:
 		// OK — the value it holds decides
 	default:
-		report(pass, AssertionTypeGuard, call.Pos(),
+		report(pass, AssertionTypeGuard, call,
 			"type %s cannot be empty; for nil checks, use %s; for zero-value checks, use %s",
 			t, pick(isNot, "NotNil", "Nil"), pick(isNot, "NotZero", "Zero"))
 	}
@@ -656,7 +656,7 @@ func guardErrorIs(pass *analysis.Pass, call *ast.CallExpr) {
 		return
 	}
 	// No fix: the guard fails ErrorIs on every input, NoError passes some.
-	report(pass, AssertionSimplify, call.Pos(), "use NoError instead of ErrorIs for nil target — ErrorIs fails a nil target")
+	report(pass, AssertionSimplify, call, "use NoError instead of ErrorIs for nil target — ErrorIs fails a nil target")
 }
 
 // --- ErrorContains type guard ---
@@ -669,7 +669,7 @@ func guardErrorContains(pass *analysis.Pass, call *ast.CallExpr) {
 		return
 	}
 	// No fix: the guard fails ErrorContains on every input, Error passes some.
-	report(pass, AssertionSimplify, call.Pos(), "use Error instead of ErrorContains for empty contains string — ErrorContains fails an empty string")
+	report(pass, AssertionSimplify, call, "use Error instead of ErrorContains for empty contains string — ErrorContains fails an empty string")
 }
 
 // --- reporting ---
@@ -679,7 +679,7 @@ func emitSimplify(pass *analysis.Pass, call *ast.CallExpr, from, to string, newA
 	msg := fmt.Sprintf("use %s instead of %s for %s", to, from, desc)
 	src, ok := sourceAt(pass, call.Pos())
 	if !ok {
-		reportWithFix(pass, AssertionSimplify, call.Pos(), simplifyFix(qual, to, call, renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)), "%s", msg)
+		reportWithFix(pass, AssertionSimplify, call, simplifyFix(qual, to, call, renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)), "%s", msg)
 		return
 	}
 	kept := append(append([]ast.Expr{}, newArgs...), msgArgs...)
@@ -693,12 +693,12 @@ func emitSimplify(pass *analysis.Pass, call *ast.CallExpr, from, to string, newA
 		indent, ok := src.lineIndent(call.Pos())
 		if !ok {
 			// Nowhere to keep them: no fix rather than lose them.
-			report(pass, AssertionSimplify, call.Pos(), "%s", msg)
+			report(pass, AssertionSimplify, call, "%s", msg)
 			return
 		}
 		newText = strings.Join(stray, "\n"+indent) + "\n" + indent + newText
 	}
-	reportWithFix(pass, AssertionSimplify, call.Pos(), simplifyFix(qual, to, call, newText), "%s", msg)
+	reportWithFix(pass, AssertionSimplify, call, simplifyFix(qual, to, call, newText), "%s", msg)
 }
 
 func simplifyFix(qual, to string, call *ast.CallExpr, newText string) []analysis.SuggestedFix {

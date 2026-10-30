@@ -178,7 +178,7 @@ var registry = []struct {
 	{FuzzSeed, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{"Fuzz targets with no f.Add seeds"}}},
 	{FuzzStructCorpus, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
 		"On-disk corpus entries for struct-typed targets",
-		"(field-order-bound — promote them to typed seeds)",
+		"(field-order-bound — delete them or write typed seeds)",
 	}}},
 	{FuzzHookIO, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{
 		"IO in BeforeEach/AfterEach of fuzzing suites",
@@ -325,36 +325,38 @@ func (c *claims) anyWithin(start, end token.Pos) bool {
 	return false
 }
 
-func report(pass *analysis.Pass, rule Rule, pos token.Pos, format string, args ...any) {
-	reportedLine(pass, rule, pos)
-	if skipped(rule) {
-		return
-	}
-	if !cfg.disableNolint && isSuppressed(pass, pos, rule) {
-		return
-	}
-	pass.Report(analysis.Diagnostic{
-		Pos:      pos,
-		Category: string(rule),
-		Message:  fmt.Sprintf(format, args...),
-	})
+// report reports a finding over rng, the code it is about: a call, an
+// expression, a declaration's header.
+func report(pass *analysis.Pass, rule Rule, rng analysis.Range, format string, args ...any) {
+	reportWithFix(pass, rule, rng, nil, format, args...)
 }
 
-func reportWithFix(pass *analysis.Pass, rule Rule, pos token.Pos, fixes []analysis.SuggestedFix, format string, args ...any) {
-	reportedLine(pass, rule, pos)
+func reportWithFix(pass *analysis.Pass, rule Rule, rng analysis.Range, fixes []analysis.SuggestedFix, format string, args ...any) {
+	reportedLine(pass, rule, rng.Pos())
 	if skipped(rule) {
 		return
 	}
-	if !cfg.disableNolint && isSuppressed(pass, pos, rule) {
+	if !cfg.disableNolint && isSuppressed(pass, rng.Pos(), rule) {
 		return
 	}
 	pass.Report(analysis.Diagnostic{
-		Pos:            pos,
+		Pos:            rng.Pos(),
+		End:            rng.End(),
 		Category:       string(rule),
 		Message:        fmt.Sprintf(format, args...),
 		SuggestedFixes: fixes,
 	})
 }
+
+// span is a range of source no single node covers.
+type span struct{ pos, end token.Pos }
+
+func (s span) Pos() token.Pos { return s.pos }
+func (s span) End() token.Pos { return s.end }
+
+// funcHeader is a function's declaration up to its body: what a finding
+// about the whole function covers, rather than every line of it.
+func funcHeader(fd *ast.FuncDecl) span { return span{fd.Pos(), fd.Type.End()} }
 
 // fileContaining returns the syntax file whose span contains pos, or nil.
 func fileContaining(pass *analysis.Pass, pos token.Pos) *ast.File {
@@ -489,6 +491,7 @@ func nolintIDs(text string) (ids []string, ok bool) {
 type suiteInfo struct {
 	name          string
 	pos           token.Pos
+	end           token.Pos // of the suite's type name
 	methods       map[string]token.Pos
 	fixtureFields map[string]bool // names of *...Fixture / *...SharedFixture fields (see bench-fixture-io)
 }
@@ -512,6 +515,7 @@ func discoverSuites(pass *analysis.Pass, insp *inspector.Inspector) map[string]*
 				suites[name] = &suiteInfo{
 					name:          name,
 					pos:           ts.Pos(),
+					end:           ts.Name.End(),
 					methods:       make(map[string]token.Pos),
 					fixtureFields: structFixtureFieldNames(ts.Type),
 				}
@@ -535,7 +539,7 @@ func checkFocusPrefixes(pass *analysis.Pass, suites map[string]*suiteInfo) {
 	for name, s := range suites {
 		if strings.HasPrefix(name, protocol.PrefixFocused) {
 			stripped := strings.TrimPrefix(name, protocol.PrefixFocused)
-			reportWithFix(pass, Focus, s.pos,
+			reportWithFix(pass, Focus, span{s.pos, s.end},
 				[]analysis.SuggestedFix{{
 					Message:   fmt.Sprintf("rename %s to %s", name, stripped),
 					TextEdits: unfocusEdits(pass, s.pos),
@@ -562,7 +566,7 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		suite.methods[methodName] = fd.Pos()
 
 		if !isPointerReceiver(fd.Recv) {
-			reportWithFix(pass, Receiver, fd.Pos(),
+			reportWithFix(pass, Receiver, funcHeader(fd),
 				[]analysis.SuggestedFix{{
 					Message: "use pointer receiver",
 					TextEdits: []analysis.TextEdit{{
@@ -577,7 +581,7 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		stripped := strings.TrimPrefix(strings.TrimPrefix(methodName, protocol.PrefixFocused), protocol.PrefixExcluded)
 		// A focused method of any kind focuses the run.
 		if strings.HasPrefix(methodName, protocol.PrefixFocused) && isCaseName(stripped) {
-			reportWithFix(pass, Focus, fd.Pos(),
+			reportWithFix(pass, Focus, funcHeader(fd),
 				[]analysis.SuggestedFix{{
 					Message:   fmt.Sprintf("rename %s to %s", methodName, stripped),
 					TextEdits: unfocusEdits(pass, fd.Name.Pos()),
@@ -586,20 +590,20 @@ func checkMethods(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		}
 		if strings.HasPrefix(stripped, "Test") && gotestast.IsGoTestName(stripped) {
 			if !hasValidTestSignature(pass, fd) {
-				report(pass, TestSignature, fd.Pos(), "test method %s.%s has wrong signature — must accept *gotest.T (or *testing.T)", recvName, methodName)
+				report(pass, TestSignature, funcHeader(fd), "test method %s.%s has wrong signature — must accept *gotest.T (or *testing.T)", recvName, methodName)
 			}
 			return
 		}
 
 		if isLifecycleHook(stripped) {
 			if strings.HasPrefix(methodName, protocol.PrefixExcluded) {
-				report(pass, XLifecycle, fd.Pos(), "%s", gotestast.ExcludedHookMessage(recvName, methodName))
+				report(pass, XLifecycle, funcHeader(fd), "%s", gotestast.ExcludedHookMessage(recvName, methodName))
 			}
 			return
 		}
 
 		if hook, ok := gotestast.MisspelledHook(stripped); ok {
-			report(pass, LifecycleTypo, fd.Pos(), "%s", gotestast.MisspelledHookMessage(recvName, methodName, hook))
+			report(pass, LifecycleTypo, funcHeader(fd), "%s", gotestast.MisspelledHookMessage(recvName, methodName, hook))
 		}
 	})
 }
@@ -623,7 +627,7 @@ func checkLifecyclePairs(pass *analysis.Pass, suites map[string]*suiteInfo) {
 		_, hasBeforeAll := s.methods["BeforeAll"]
 		_, hasAfterAll := s.methods["AfterAll"]
 		if hasBeforeAll && !hasAfterAll {
-			report(pass, LifecyclePair, s.pos, "suite %s has BeforeAll but no AfterAll — resources may leak", s.name)
+			report(pass, LifecyclePair, span{s.pos, s.end}, "suite %s has BeforeAll but no AfterAll — resources may leak", s.name)
 		}
 	}
 }
@@ -667,9 +671,9 @@ var escapeFixTargets = map[string]string{
 }
 
 type deferredReport struct {
-	rule    Rule
-	pos     token.Pos
-	message string
+	rule     Rule
+	pos, end token.Pos
+	message  string
 }
 
 func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo, cl *claims) {
@@ -745,7 +749,7 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 		if !reported[d.pos] {
 			reported[d.pos] = true
 			cl.add(d.rule, d.pos)
-			report(pass, d.rule, d.pos, "%s", d.message)
+			report(pass, d.rule, span{d.pos, d.end}, "%s", d.message)
 		}
 	}
 }
@@ -799,7 +803,7 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 					if to, ok := escapeFixTargets[target]; ok {
 						target = to
 					}
-					reportWithFix(pass, esc.rule, call.Pos(),
+					reportWithFix(pass, esc.rule, call,
 						[]analysis.SuggestedFix{{
 							Message: fmt.Sprintf("call %s directly", target),
 							TextEdits: []analysis.TextEdit{{
@@ -810,7 +814,7 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 						}},
 						"%s", esc.message)
 				} else {
-					report(pass, esc.rule, call.Pos(), "%s", esc.message)
+					report(pass, esc.rule, call, "%s", esc.message)
 				}
 				return
 			}
@@ -822,7 +826,7 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 		if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(pass.TypesInfo, inner) {
 			reported[inner.Pos()] = true
 			innerSel := inner.Fun.(*ast.SelectorExpr)
-			reportWithFix(pass, TEscape, inner.Pos(),
+			reportWithFix(pass, TEscape, inner,
 				[]analysis.SuggestedFix{{
 					Message: "pass gotest.T directly",
 					TextEdits: []analysis.TextEdit{{
@@ -836,7 +840,7 @@ func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isS
 		}
 		if id, ok := arg.(*ast.Ident); ok && tVars[id.Name] {
 			reported[arg.Pos()] = true
-			report(pass, TEscape, arg.Pos(),
+			report(pass, TEscape, arg,
 				"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
 			return
 		}
@@ -848,7 +852,7 @@ func collectInterproceduralEscape(call *ast.CallExpr, tVars, gotestTVars map[str
 	for method, positions := range methods {
 		esc := escapeConfigs[method]
 		for pos := range positions {
-			*results = append(*results, deferredReport{esc.rule, pos, esc.message})
+			*results = append(*results, deferredReport{esc.rule, pos, mr.ends[pos], esc.message})
 		}
 	}
 }
@@ -907,6 +911,8 @@ type methodReach struct {
 	funcDecls map[types.Object]*ast.FuncDecl
 	params    map[*ast.FuncDecl]map[int]map[string]map[token.Pos]bool
 	edges     map[*ast.FuncDecl][]callEdge
+	// ends maps a marked call's position to its end.
+	ends map[token.Pos]token.Pos
 }
 
 func buildMethodReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth int) *methodReach {
@@ -915,6 +921,7 @@ func buildMethodReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth i
 		funcDecls: map[types.Object]*ast.FuncDecl{},
 		params:    map[*ast.FuncDecl]map[int]map[string]map[token.Pos]bool{},
 		edges:     map[*ast.FuncDecl][]callEdge{},
+		ends:      map[token.Pos]token.Pos{},
 	}
 
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
@@ -1013,6 +1020,7 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 					if id, ok := sel.X.(*ast.Ident); ok && mr.isStdlibT(id) {
 						if idx, ok := aliases[id.Name]; ok {
 							mr.mark(fd, idx, method, node.Pos())
+							mr.ends[node.Pos()] = node.End()
 						}
 					}
 					if isTMethodCall(mr.pass.TypesInfo, sel.X) {
@@ -1020,6 +1028,7 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 						if id, ok := innerSel.X.(*ast.Ident); ok {
 							if idx, ok := aliases[id.Name]; ok {
 								mr.mark(fd, idx, method, node.Pos())
+								mr.ends[node.Pos()] = node.End()
 							}
 						}
 					}
@@ -1189,9 +1198,9 @@ func checkOrphanedFiles(pass *analysis.Pass) {
 		}
 		switch tracked, err := gitTracks(pass.Fset.File(file.Pos()).Name()); {
 		case err != nil:
-			report(pass, GeneratedFile, file.Pos(), "generated file %s may be checked into version control: git cannot tell (%v)", name, err)
+			report(pass, GeneratedFile, span{file.Package, file.Name.End()}, "generated file %s may be checked into version control: git cannot tell (%v)", name, err)
 		case tracked:
-			report(pass, GeneratedFile, file.Pos(), "generated file %s should not be checked into version control", name)
+			report(pass, GeneratedFile, span{file.Package, file.Name.End()}, "generated file %s should not be checked into version control", name)
 		}
 	}
 }
@@ -1240,7 +1249,7 @@ func checkStdlibTests(pass *analysis.Pass, insp *inspector.Inspector) {
 		if !isTestingT(pass, fd.Type.Params.List[0].Type) {
 			return
 		}
-		report(pass, StdlibTest, fd.Pos(), "stdlib test %s — consider using a gotest suite", name)
+		report(pass, StdlibTest, funcHeader(fd), "stdlib test %s — consider using a gotest suite", name)
 	})
 }
 
@@ -1256,7 +1265,7 @@ func checkTestifyImports(pass *analysis.Pass) {
 		for _, imp := range file.Imports {
 			path := strings.Trim(imp.Path.Value, `"`)
 			if strings.HasPrefix(path, "github.com/stretchr/testify/") {
-				report(pass, Testify, imp.Pos(), "testify import %s — consider migrating to gotest", path)
+				report(pass, Testify, imp, "testify import %s — consider migrating to gotest", path)
 			}
 		}
 	}
@@ -1383,7 +1392,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			if name != "" && len(innerCall.Args) > 0 {
 				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
 					cl.add(PollScope, innerCall.Pos())
-					report(pass, PollScope, ident.Pos(),
+					report(pass, PollScope, ident,
 						"use %s instead of %s in poll callback passed to %s",
 						pollParam, ident.Name, fnName)
 				}
@@ -1394,7 +1403,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			for _, arg := range innerCall.Args {
 				if ident, ok := arg.(*ast.Ident); ok && isTestT(pass, ident) && ident.Name != pollParam {
 					cl.add(PollScope, innerCall.Pos())
-					report(pass, PollScope, ident.Pos(),
+					report(pass, PollScope, ident,
 						"%s passed to %s in poll callback bypasses assertion recording — use %s",
 						ident.Name, pick(calleeName(innerCall.Fun) == "", "a function", calleeName(innerCall.Fun)), pollParam)
 				}
@@ -1411,7 +1420,7 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			}
 			if pollScopeMethodNames[sel.Sel.Name] && isTestT(pass, ident) && ident.Name != pollParam {
 				cl.add(PollScope, innerCall.Pos())
-				report(pass, PollScope, ident.Pos(),
+				report(pass, PollScope, ident,
 					"%s.%s in poll callback bypasses assertion recording — use %s",
 					ident.Name, sel.Sel.Name, pollParam)
 			}

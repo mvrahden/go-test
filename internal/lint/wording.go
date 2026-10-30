@@ -46,7 +46,7 @@ func checkBehaviorWording(pass *analysis.Pass, insp *inspector.Inspector) {
 		if !ok {
 			return
 		}
-		reportWithFix(pass, BehaviorWording, lit.Pos(),
+		reportWithFix(pass, BehaviorWording, lit,
 			[]analysis.SuggestedFix{{
 				Message: "drop the redundant word",
 				TextEdits: []analysis.TextEdit{{
