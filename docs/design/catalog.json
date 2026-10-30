@@ -18868,6 +18868,99 @@
           "name": "TestSpecMarkdownTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "for a terminal",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "for_a_terminal",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "as Markdown",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "as_Markdown",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "renders the suite and its package as failed in the terminal, Markdown and JSON formats, as when their own lines say fail",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "renders_the_suite_and_its_package_as_failed_in_the_terminal,_Markdown_and_JSON_formats,_as_when_their_own_lines_say_fail",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "counts one failure and exits 1, or 0 with --render-only",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "counts_one_failure_and_exits_1,_or_0_with_--render-only",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a stream holds a suite's pass line above a fail line of one of its methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_stream_holds_a_suite's_pass_line_above_a_fail_line_of_one_of_its_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFailureBelowFailsTheBranch",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFailureBelowFailsTheBranch",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecVerdicts",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSpecVerdictsTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -18876,13 +18969,13 @@
     }
   ],
   "stats": {
-    "behaviors": 614,
+    "behaviors": 617,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 96,
+    "suites": 97,
     "tests": 0
   }
 }

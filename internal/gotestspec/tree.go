@@ -381,6 +381,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 				n.External = true
 			}
 		}
+		FailBranches(pkg)
 	}
 
 	result := make([]*Package, 0, len(pkgs))
@@ -420,6 +421,32 @@ func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[st
 		return append(slices.Clone(head), strings.Join(segments[i:], "/"))
 	}
 	return segments
+}
+
+// FailBranches fails every node a failure beneath it reached, and the package
+// when any node failed, as go test fails a test with its subtest. A stream
+// composed from several runs can hold a parent's pass over a child's newer
+// fail; every renderer and the exit code then read the same verdict. A skip
+// stays where it was reported.
+func FailBranches(pkg *Package) {
+	for _, n := range pkg.Nodes {
+		if failBranch(n) {
+			pkg.Status = StatusFail
+		}
+	}
+}
+
+func failBranch(n *Node) bool {
+	failed := n.Status == StatusFail
+	for _, c := range n.Children {
+		if failBranch(c) {
+			failed = true
+		}
+	}
+	if failed {
+		n.Status = StatusFail
+	}
+	return failed
 }
 
 // resolveDuplicateSegments checks if a child path belongs to a duplicate
