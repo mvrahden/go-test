@@ -122,7 +122,7 @@ refactor toggle-focus SHALL add or remove the F_ prefix of a suite or method at 
 - **THEN** refactor toggle-focus refuses at the declaration that holds the name and writes nothing
 
 ### Requirement: The generated harness
-The generated harness SHALL compile beside whatever names the package declares, except a name Go predeclares that the harness uses with Go's meaning, which SHALL be rejected at its declaration, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites, files of variants without suites and the files an older gotest generated under its legacy names, and SHALL NOT rewrite a file whose content is unchanged.
+The generated harness SHALL compile beside whatever names the package declares, except a name Go predeclares that the harness uses with Go's meaning, which SHALL be rejected at its declaration, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites and files of variants without suites, and SHALL NOT rewrite a file whose content is unchanged.
 
 #### Scenario: Names the harness imports
 - **WHEN** the package declares names the harness imports
@@ -133,17 +133,15 @@ The generated harness SHALL compile beside whatever names the package declares, 
 #### Scenario: Generating again
 - **WHEN** gotest generate runs again after the suites changed
 - **THEN** a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes
-- **AND** a generated file an older gotest left under its legacy name is removed
 - **AND** an unchanged generated file is not written again
 
 ### Requirement: Stale generated files and build constraints
-A generated file left on disk by an earlier generate, under its current or legacy name, SHALL neither break nor be compiled into a run and SHALL be read past by discover and spec; --tags SHALL select the suite files built with that tag.
+A generated file left on disk by an earlier generate SHALL neither break nor be compiled into a run and SHALL be read past by discover and spec; --tags SHALL select the suite files built with that tag.
 
 #### Scenario: A stale generated file
 - **WHEN** a package holds a generated file from an earlier generate
 - **THEN** a stale generated file on disk neither breaks the run nor is compiled
 - **AND** discover and spec read past a stale generated file
-- **AND** a legacy generated file name is treated the same
 
 #### Scenario: A build-constrained suite file
 - **WHEN** a suite file carries a build constraint

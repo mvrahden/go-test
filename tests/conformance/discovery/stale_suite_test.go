@@ -8,8 +8,8 @@ import (
 )
 
 // StaleGeneratedTestSuite: a generated file left on disk by an earlier
-// generate, or by an older gotest under its old name, is read as a bare
-// package clause by every load and never compiled into a run.
+// generate is read as a bare package clause by every load and never
+// compiled into a run.
 type StaleGeneratedTestSuite struct{}
 
 func (s *StaleGeneratedTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -23,10 +23,6 @@ func (s *StaleGeneratedTestSuite) TestStaleFiles(t *gotest.T) {
 		})
 		w.It("discover and spec read past a stale generated file", func(it *gotest.T) {
 			checkReads(it, "stalerename")
-		})
-		w.It("a legacy generated file name is treated the same", func(it *gotest.T) {
-			checkShape(it, shape{pkg: "stalelegacy", verdict: "TestNewTestSuite/TestRuns"})
-			checkReads(it, "stalelegacy")
 		})
 	})
 }

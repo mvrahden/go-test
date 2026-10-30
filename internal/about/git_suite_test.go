@@ -25,8 +25,6 @@ func (s *GitTestSuite) TestPSuiteRegex(t *gotest.T) {
 			{"gotest_pxsuite_test.go"},
 			{"gosuite/gotest_psuite_test.go"},
 			{"gosuite/gotest_pxsuite_test.go"},
-			{"ƒƒ_psuite_test.go"},
-			{"ƒƒ_pxsuite_test.go"},
 		}) {
 			gotest.Regexp(sub, about.PSuiteRegex, tc.Name)
 		}
@@ -41,9 +39,7 @@ func (s *GitTestSuite) TestPSuiteRegex(t *gotest.T) {
 			{"simple_suite/pxtest_test.go"},
 			{"focus_suite/gotestgen_ptest.golden"},
 			{"focus_suite/gotestgen_pxtest.golden"},
-			{"ƒƒ_suite_test.go"},
 			{"foogotest_psuite_test.go"},
-			{"myƒƒ_pxsuite_test.go"},
 			{"pkg/foogotest_psuite_test.go"},
 		}) {
 			gotest.False(sub, about.PSuiteRegex.MatchString(tc.Name))
@@ -55,7 +51,7 @@ func (s *GitTestSuite) TestParseStubbingGenerated(t *gotest.T) {
 	src := []byte("package p\n\nimport \"testing\"\n\nfunc TestOld(t *testing.T) { _ = &OldTestSuite{} }\n")
 	t.When("a generated file is parsed", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct{ Name string }{
-			{about.PSuite}, {about.PXSuite}, {about.LegacyPSuite}, {about.LegacyPXSuite},
+			{about.PSuite}, {about.PXSuite},
 		}) {
 			name := filepath.Join("pkg", tc.Name)
 			fset := token.NewFileSet()
@@ -76,7 +72,7 @@ func (s *GitTestSuite) TestParseStubbingGenerated(t *gotest.T) {
 }
 
 func (s *GitTestSuite) TestGeneratedFileNames(t *gotest.T) {
-	gotest.ElementsMatch(t, []string{"gotest_psuite_test.go", "gotest_pxsuite_test.go", "ƒƒ_psuite_test.go", "ƒƒ_pxsuite_test.go"}, about.GeneratedFileNames)
+	gotest.ElementsMatch(t, []string{"gotest_psuite_test.go", "gotest_pxsuite_test.go"}, about.GeneratedFileNames)
 }
 
 func (s *GitTestSuite) TestIsGeneratedSource(t *gotest.T) {

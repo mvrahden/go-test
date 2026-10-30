@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -58,7 +59,7 @@ func scanSuites(t *gotest.T, root string) map[string]*suiteShape {
 				}
 				return nil
 			}
-			if !strings.HasSuffix(path, ".go") || strings.HasPrefix(d.Name(), "ƒƒ_") {
+			if !strings.HasSuffix(path, ".go") || about.PSuiteRegex.MatchString(d.Name()) {
 				return nil
 			}
 			f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ParseComments|parser.SkipObjectResolution)

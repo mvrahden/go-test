@@ -18,9 +18,9 @@ func (s *CleanTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *CleanTestSuite) TestGeneratedFiles(t *gotest.T) {
-	t.When("a package holds current and legacy generated files", func(w *gotest.T) {
+	t.When("a package holds generated files", func(w *gotest.T) {
 		dir := w.TempDir()
-		for _, name := range []string{"gotest_psuite_test.go", "gotest_pxsuite_test.go", "ƒƒ_psuite_test.go", "ƒƒ_pxsuite_test.go"} {
+		for _, name := range []string{"gotest_psuite_test.go", "gotest_pxsuite_test.go"} {
 			gotest.NoError(w, os.WriteFile(filepath.Join(dir, name), []byte(generatedSource), 0o600))
 		}
 		gotest.NoError(w, os.WriteFile(filepath.Join(dir, "own_test.go"), []byte(generatedSource), 0o600))
@@ -29,7 +29,7 @@ func (s *CleanTestSuite) TestGeneratedFiles(t *gotest.T) {
 		for _, path := range ExportGeneratedFiles(dir) {
 			names = append(names, filepath.Base(path))
 		}
-		gotest.ElementsMatch(w, []string{"gotest_psuite_test.go", "gotest_pxsuite_test.go", "ƒƒ_psuite_test.go", "ƒƒ_pxsuite_test.go"}, names)
+		gotest.ElementsMatch(w, []string{"gotest_psuite_test.go", "gotest_pxsuite_test.go"}, names)
 	})
 }
 

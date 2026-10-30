@@ -1,7 +1,6 @@
 // Package genstub stands a bare package clause in for every generated file
-// on disk while packages load. One left by an earlier generate, or by an
-// older gotest under its old name, may name suites since renamed; the
-// harness is generated anew anyway, so the file is never read as written.
+// on disk while packages load. One left by an earlier generate may name
+// suites since renamed; the harness is generated anew anyway, so the file is never read as written.
 package genstub
 
 import (

@@ -1362,7 +1362,7 @@ Use case: `//go:generate gotest generate ./...` for checked-in generated files.
 gotest clean ./...
 ```
 
-Removes files matching `gotest_p(x)?suite_test.go`, and the `ƒƒ_p(x)?suite_test.go` older versions wrote, from the packages the patterns match, expanded as `generate` expands them (`go list`, without loading, so a package broken by a stale generated file is cleaned too): `clean all` removes what `generate all` wrote. A package outside the main modules keeps its files, with the same note on stderr.
+Removes files matching `gotest_p(x)?suite_test.go` from the packages the patterns match, expanded as `generate` expands them (`go list`, without loading, so a package broken by a stale generated file is cleaned too): `clean all` removes what `generate all` wrote. A package outside the main modules keeps its files, with the same note on stderr.
 
 ### Generated Files
 

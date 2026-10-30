@@ -7685,19 +7685,6 @@
                     },
                     {
                       "children": [],
-                      "display": "a generated file an older gotest left under its legacy name is removed",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "a_generated_file_an_older_gotest_left_under_its_legacy_name_is_removed",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
                       "display": "an unchanged generated file is not written again",
                       "duration": 0,
                       "excluded": false,
@@ -7771,19 +7758,6 @@
                       "focused": false,
                       "kind": "block",
                       "name": "discover_and_spec_read_past_a_stale_generated_file",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "a legacy generated file name is treated the same",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "focused": false,
-                      "kind": "block",
-                      "name": "a_legacy_generated_file_name_is_treated_the_same",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -17732,7 +17706,7 @@
     }
   ],
   "stats": {
-    "behaviors": 578,
+    "behaviors": 576,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

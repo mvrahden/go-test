@@ -83,7 +83,7 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 		w.It("replaces each generated file left on disk it does not regenerate with its package clause", func(it *gotest.T) {
 			pkgDir := it.TempDir()
 			stale := "package a\n\nfunc TestOldTestSuite() { _ = OldTestSuite{} }\n"
-			for _, name := range []string{about.PSuite, about.PXSuite, about.LegacyPSuite} {
+			for _, name := range []string{about.PSuite, about.PXSuite} {
 				gotest.NoError(it, os.WriteFile(filepath.Join(pkgDir, name), []byte(stale), 0o600))
 			}
 			results := gotestgen.GenerateResults{{AbsPath: pkgDir, PTest: []byte("package a\n// fresh\n")}}
@@ -96,11 +96,10 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 			gotest.NoError(it, err)
 			var ov gotestrunner.ExportOverlayJSON
 			gotest.NoError(it, json.Unmarshal(data, &ov))
-			gotest.Len(it, ov.Replace, 3)
+			gotest.Len(it, ov.Replace, 2)
 			for name, want := range map[string]string{
-				about.PSuite:       "package a\n// fresh\n",
-				about.PXSuite:      "package a\n",
-				about.LegacyPSuite: "package a\n",
+				about.PSuite:  "package a\n// fresh\n",
+				about.PXSuite: "package a\n",
 			} {
 				got, err := os.ReadFile(ov.Replace[filepath.Join(pkgDir, name)])
 				gotest.NoError(it, err, name)

@@ -27,18 +27,18 @@ func (s *GenStubTestSuite) AfterEach(_ *gotest.T, ctx *cleanupCtx) {
 	}
 }
 
-// staleModule writes a module whose package p holds a current and a legacy
-// generated file, both naming a suite that no longer exists.
+// staleModule writes a module whose package p holds both generated files,
+// each naming a suite that no longer exists.
 func staleModule(t *gotest.T) string {
 	dir := t.TempDir()
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module stubprobe\n\ngo 1.25\n"), 0o600))
 	pkg := filepath.Join(dir, "p")
 	gotest.NoError(t, os.MkdirAll(pkg, 0o755))
 	for name, src := range map[string]string{
-		"p.go":              "package p\n",
-		"p_test.go":         "package p\n\nimport \"testing\"\n\nfunc TestP(t *testing.T) {}\n",
-		about.PSuite:        "package p\n\nvar _ = &OldTestSuite{}\n",
-		about.LegacyPXSuite: "package p_test\n\nvar _ = Old\n",
+		"p.go":        "package p\n",
+		"p_test.go":   "package p\n\nimport \"testing\"\n\nfunc TestP(t *testing.T) {}\n",
+		about.PSuite:  "package p\n\nvar _ = &OldTestSuite{}\n",
+		about.PXSuite: "package p_test\n\nvar _ = Old\n",
 	} {
 		gotest.NoError(t, os.WriteFile(filepath.Join(pkg, name), []byte(src), 0o600))
 	}
@@ -53,8 +53,8 @@ func (s *GenStubTestSuite) TestStubs(t *gotest.T, _ *cleanupCtx) {
 
 		w.It("stubs each with its package clause", func(it *gotest.T) {
 			gotest.Equal(it, map[string][]byte{
-				filepath.Join(dir, "p", about.PSuite):        []byte("package p\n"),
-				filepath.Join(dir, "p", about.LegacyPXSuite): []byte("package p_test\n"),
+				filepath.Join(dir, "p", about.PSuite):  []byte("package p\n"),
+				filepath.Join(dir, "p", about.PXSuite): []byte("package p_test\n"),
 			}, stubs)
 		})
 	})

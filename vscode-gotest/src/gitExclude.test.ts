@@ -80,40 +80,10 @@ describe("ensureGitExclude", () => {
     expect(content).toContain("gotest_pxsuite_test.go");
   });
 
-  it("covers the generated file names older gotest versions wrote", () => {
-    fs.mkdirSync(path.join(tmpDir, ".git"), { recursive: true });
-
-    ensureGitExclude(tmpDir, makeFakeOutputChannel());
-
-    const content = fs.readFileSync(
-      path.join(tmpDir, ".git", "info", "exclude"),
-      "utf-8",
-    );
-    expect(content).toContain("ƒƒ_psuite_test.go");
-    expect(content).toContain("ƒƒ_pxsuite_test.go");
-  });
-
-  it("adds the legacy names to a block written before they were covered", () => {
-    const infoDir = path.join(tmpDir, ".git", "info");
-    fs.mkdirSync(infoDir, { recursive: true });
-    const earlier =
-      "\n# gotest generated files\ngotest_psuite_test.go\ngotest_pxsuite_test.go\n";
-    fs.writeFileSync(path.join(infoDir, "exclude"), earlier);
-
-    ensureGitExclude(tmpDir, makeFakeOutputChannel());
-
-    const content = fs.readFileSync(path.join(infoDir, "exclude"), "utf-8");
-    expect(content.startsWith(earlier)).toBe(true);
-    expect(content).toContain("ƒƒ_psuite_test.go");
-    expect(content).toContain("ƒƒ_pxsuite_test.go");
-    expect(content.split("gotest_psuite_test.go").length - 1).toBe(1);
-  });
-
   it("does nothing when patterns already present", () => {
     const infoDir = path.join(tmpDir, ".git", "info");
     fs.mkdirSync(infoDir, { recursive: true });
-    const original =
-      "# manual\ngotest_psuite_test.go\ngotest_pxsuite_test.go\nƒƒ_psuite_test.go\nƒƒ_pxsuite_test.go\n";
+    const original = "# manual\ngotest_psuite_test.go\n";
     fs.writeFileSync(path.join(infoDir, "exclude"), original);
 
     ensureGitExclude(tmpDir, makeFakeOutputChannel());

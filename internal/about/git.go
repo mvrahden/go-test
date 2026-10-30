@@ -11,16 +11,13 @@ import (
 const (
 	PSuite  = "gotest_psuite_test.go"
 	PXSuite = "gotest_pxsuite_test.go"
-	// The names older gotest versions generated into.
-	LegacyPSuite  = "ƒƒ_psuite_test.go"
-	LegacyPXSuite = "ƒƒ_pxsuite_test.go"
 )
 
 // GeneratedFileNames are every name a generated file may have on disk.
-var GeneratedFileNames = []string{PSuite, PXSuite, LegacyPSuite, LegacyPXSuite}
+var GeneratedFileNames = []string{PSuite, PXSuite}
 
 // PSuiteRegex matches a generated file's name, alone or ending a path.
-var PSuiteRegex = regexp.MustCompile(`(?:^|[/\\])(gotest|ƒƒ)_p(x)?suite_test\.go$`)
+var PSuiteRegex = regexp.MustCompile(`(?:^|[/\\])gotest_p(x)?suite_test\.go$`)
 
 const (
 	Application = "gotest"

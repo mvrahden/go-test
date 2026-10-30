@@ -294,7 +294,7 @@ type stub struct {
 
 // staleStubs are the generated files on disk in result's directory that the
 // overlay does not regenerate: a run compiles each as its package clause, so
-// one left by an earlier generate or an older gotest is never compiled.
+// one left by an earlier generate is never compiled.
 func staleStubs(result *gotestgen.GenerateResult) []stub {
 	if result.AbsPath == "" {
 		return nil

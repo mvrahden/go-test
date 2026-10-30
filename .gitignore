@@ -9,10 +9,9 @@ spec.txt
 site/public/
 site/resources/
 site/.hugo_build.lock
-ƒƒ_*
 gotest_psuite_test.go
 gotest_pxsuite_test.go
 # Stale generated files are fixtures here.
 !tests/conformance/testdata/shapes/stale*/gotest_psuite_test.go
-!tests/conformance/testdata/shapes/stale*/ƒƒ_psuite_test.go
+!tests/conformance/testdata/shapes/stale*/gotest_pxsuite_test.go
 !tests/canary/testdata/shapes/stale*/gotest_psuite_test.go
