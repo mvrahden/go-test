@@ -458,19 +458,25 @@ func resolveDuplicateSegments(segments []string, nmap map[string]*Node) []string
 		return segments
 	}
 
-	// Check if any child segment has the #NN suffix indicating it belongs to
-	// the duplicate run.
+	// A child carrying the #NN suffix belongs to the duplicate run, and so
+	// does any child reported once the first run has its verdict: go test
+	// reports a test only after its subtests. A suite of the external test
+	// package names methods the internal one lacks without a suffix.
+	second := nmap[topName] != nil && nmap[topName].Status != StatusNone
 	for _, seg := range segments[1:] {
 		if hasDuplicateSuffix(seg) {
-			out := make([]string, len(segments))
-			out[0] = topName + "\x00dup"
-			for i := 1; i < len(segments); i++ {
-				out[i] = stripDuplicateSuffix(segments[i])
-			}
-			return out
+			second = true
 		}
 	}
-	return segments
+	if !second {
+		return segments
+	}
+	out := make([]string, len(segments))
+	out[0] = topName + "\x00dup"
+	for i := 1; i < len(segments); i++ {
+		out[i] = stripDuplicateSuffix(segments[i])
+	}
+	return out
 }
 
 func hasDuplicateSuffix(s string) bool {

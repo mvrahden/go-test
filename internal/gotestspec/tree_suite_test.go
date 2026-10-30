@@ -491,3 +491,25 @@ func (s *TreeTestSuite) TestBuildTree_FailureFailsEveryAncestorButSkipStays(t *g
 	mustEq(t, "failed", stats.Failed, 1)
 	mustEq(t, "skipped", stats.Skipped, 1)
 }
+
+func (s *TreeTestSuite) TestBuildTree_DuplicateSuiteMethodsWithoutSuffix(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"example.com/auth","Test":"TestTokenTestSuite"}
+{"Action":"run","Package":"example.com/auth","Test":"TestTokenTestSuite/TestValidate"}
+{"Action":"pass","Package":"example.com/auth","Test":"TestTokenTestSuite/TestValidate","Elapsed":0}
+{"Action":"pass","Package":"example.com/auth","Test":"TestTokenTestSuite","Elapsed":0}
+{"Action":"run","Package":"example.com/auth","Test":"TestTokenTestSuite"}
+{"Action":"run","Package":"example.com/auth","Test":"TestTokenTestSuite/TestSecret"}
+{"Action":"fail","Package":"example.com/auth","Test":"TestTokenTestSuite/TestSecret","Elapsed":0}
+{"Action":"fail","Package":"example.com/auth","Test":"TestTokenTestSuite","Elapsed":0}
+{"Action":"fail","Package":"example.com/auth","Elapsed":0}`)
+	mustLen(t, "packages", tree, 1)
+	mustLen(t, "root nodes", tree[0].Nodes, 2)
+	internal, external := tree[0].Nodes[0], tree[0].Nodes[1]
+	mustLen(t, "internal methods", internal.Children, 1)
+	mustEq(t, "internal method", internal.Children[0].Name, "TestValidate")
+	mustEq(t, "internal status", internal.Status, gotestspec.StatusPass)
+	mustLen(t, "external methods", external.Children, 1)
+	mustEq(t, "external method", external.Children[0].Name, "TestSecret")
+	mustEq(t, "external status", external.Status, gotestspec.StatusFail)
+	mustEq(t, "external", external.External, true)
+}
