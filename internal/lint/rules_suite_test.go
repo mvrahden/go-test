@@ -3,6 +3,9 @@ package lint_test
 import (
 	"bytes"
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"slices"
 	"strings"
 	"time"
@@ -64,6 +67,33 @@ func (s *RulesTestSuite) TestFixableMeansARuleAttachesAFix(t *gotest.T) {
 	})
 }
 
+// declaredRules reads the Rule constants from the source, apart from the
+// registry, so a constant the registry lacks shows.
+func declaredRules(t *gotest.T) []string {
+	file, err := parser.ParseFile(token.NewFileSet(), "lint.go", nil, 0)
+	gotest.NoError(t, err)
+	var ids []string
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs := spec.(*ast.ValueSpec)
+			if id, ok := vs.Type.(*ast.Ident); !ok || id.Name != "Rule" {
+				continue
+			}
+			for _, v := range vs.Values {
+				lit, ok := v.(*ast.BasicLit)
+				gotest.True(t, ok, "a Rule constant that is no literal")
+				ids = append(ids, strings.Trim(lit.Value, `"`))
+			}
+		}
+	}
+	slices.Sort(ids)
+	return ids
+}
+
 func (s *RulesTestSuite) TestTheRegistryListsEachRuleOnce(t *gotest.T) {
 	var buf bytes.Buffer
 	lint.WriteRuleTable(&buf)
@@ -78,9 +108,12 @@ func (s *RulesTestSuite) TestTheRegistryListsEachRuleOnce(t *gotest.T) {
 	for _, r := range lint.RuleIDs() {
 		ids = append(ids, string(r))
 	}
-	t.When("the rule table is read back", func(w *gotest.T) {
-		w.It("names every registered rule once", func(it *gotest.T) {
-			gotest.Equal(it, ids, listed)
+	declared := declaredRules(t)
+	t.When("the rule table and the registry are read against the Rule constants", func(w *gotest.T) {
+		w.It("names every constant once", func(it *gotest.T) {
+			gotest.NotEmpty(it, declared)
+			gotest.Equal(it, declared, listed)
+			gotest.Equal(it, declared, ids)
 		})
 	})
 }
