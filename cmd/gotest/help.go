@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/lint"
 )
 
 func containsHelpFlag(args []string) bool {
@@ -766,49 +767,9 @@ Checks for common mistakes in gotest test suites. Defaults to ./... if
 no packages are specified.
 
 Rules:
-  focus                 Focused (F_) suites/methods should not be committed
-  receiver              Suite methods should use pointer receivers
-  lifecycle-typo        Methods similar to lifecycle hooks (likely typos)
-  lifecycle-pair        BeforeAll without matching AfterAll (resource leak)
-  generated-file        Generated overlay files should not be in version control
-  stdlib-test           Stdlib test functions — consider using gotest suites
-  testify               testify imports — consider migrating to gotest
-  poll-scope            Outer t used inside Eventually/Consistently callbacks
-  test-signature        Test methods not accepting *gotest.T or *testing.T
-  x-lifecycle           X_ prefix on a lifecycle hook (a no-op)
-  suite-lifecycle       Cleanup/Parallel/Run via t.T() — bypass the suite lifecycle
-  shared-fixture-undeclared
-                        Reads of a shared fixture the suite never declared as a
-                        field (only declared fixtures are started)
-  generation-rejects    Shapes the generator rejects, where and as it rejects them
-  nolint-unknown        //nolint ids that name no gotest rule or golangci-lint linter
-  suite-declaration     Suites/fixtures declared inside a type ( … ) block
-  no-embedding          Embedded suites, fixtures or hook-carrying types, and
-                        suite-typed fields of a suite or fixture
-  fixture-hook-call     Direct calls of a lifecycle hook the harness calls
-  assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
-  assertion-type-guard  Nil/Empty on types their runtime guards reject
-  assertion-redundant   Assertions made redundant by the following assertion
-  fail-guard            if cond { Fail/Fatal(...) } guards — use assertions directly
-  t-escape              Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)
-  behavior-wording      When("when …") / It("it …") — the spec supplies those words
-  config-no-deadline    A negative SuiteConfig/FixtureConfig timeout — every
-                        negative disables the deadline; say so by name
-  bench-loop            Benchmark methods that never call b.Loop()/b.N (nothing
-                        iterates, so the numbers lie)
-  bench-fixture-io      Fixture-backed reads inside the measured loop (times the
-                        fixture, not the code)
-  bench-wait            time.Sleep/Eventually/Consistently inside the measured
-                        loop (times the wait, not the code)
-  fuzz-determinism      Fuzz targets reading time.Now/math-rand/os.Getenv
-  fuzz-no-oracle        Fuzz callbacks that assert nothing (panic-only)
-  fuzz-seed             Fuzz targets with no f.Add seeds
-  fuzz-struct-corpus    On-disk corpus entries for struct-typed targets
-                        (field-order-bound — delete them or write typed seeds)
-  fuzz-hook-io          IO in BeforeEach/AfterEach of fuzzing suites
-                        (hooks replay around every execution)
-  fuzz-raw-seed         Raw []byte seeds on positions not taking []byte
-
+`)
+	lint.WriteRuleTable(os.Stdout)
+	fmt.Print(`
 Integrity rules can only be suppressed per line with //nolint. All other
 rules also accept a project-wide skip flag (mirrored by .gotest.yml lint.skip):
 
@@ -835,6 +796,9 @@ Flags:
   -json                   Print the findings as JSON on stdout and exit 0,
                           as the go/analysis driver does (also with -fix;
                           not with -diff)
+  -rules                  Print the rules above and lint nothing; with -json,
+                          one document opening with version, then each rule's
+                          id, tier, scope, skippable, fixable and description
   --github                Print the findings as GitHub ::error annotations in
                           place of the plain-text report, and append a findings
                           table to $GITHUB_STEP_SUMMARY. Implied when
