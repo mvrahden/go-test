@@ -329,6 +329,7 @@ shards of one run do not add up to every mutant exactly once.
 | `hide-under-static-accepted` | `--hide` is accepted beside `--static` | spec conformance: the static run exits 0 instead of 2 |
 | `hiding-recounts` | the trailer and each package's stats count only the rows `--hide` shows | spec conformance: the hidden passes are missing from the counts |
 | `finding-without-extent` | a lint finding ends where it starts | lint conformance: the call's and the signature's findings end at their posn |
+| `runlevel-start-unmarked` | the start line of a package the run books for itself carries no RunLevel | cli conformance: the shared fixtures package's start line is unmarked |
 | `it-skips-body` | `gotest.T.It` opens the subtest and never runs its closure | canary: the behavior rows under every `It` vanish from the golden list |
 | `run-failure-stays-on-stderr` | `bookRunFailure` books a run-level failure only into the captured stream, never the live `-json` one | canary: the `teardownfailing` fixture's `fail` row for the synthetic package vanishes from the golden list |
 | `guard-after-fixtures` | the suite frame holds its fixtures before the guard runs | canary: the `guardskip` fixture's failing fixture turns a run its guard should leave green red, so its golden rows differ |

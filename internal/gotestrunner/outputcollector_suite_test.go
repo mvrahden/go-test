@@ -1005,3 +1005,28 @@ func (s *OutputCollectorTestSuite) TestRunLevelPackagesAreMarked(t *gotest.T) {
 		})
 	})
 }
+
+func (s *OutputCollectorTestSuite) TestAPackageNamedLikeARunLevelOneIsNotMarked(t *gotest.T) {
+	t.When("a package's import path reads like a package the run books for itself", func(w *gotest.T) {
+		w.It("carries no RunLevel on any of its events", func(it *gotest.T) {
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+			c.Register("interrupted", 1)
+			c.RecordResult("interrupted", 0, gotestrunner.SuiteResult{Stdout: []byte(
+				`{"Action":"run","Package":"interrupted","Test":"TestXTestSuite"}` + "\n" +
+					`{"Action":"pass","Package":"interrupted","Test":"TestXTestSuite"}` + "\n")})
+
+			events := 0
+			for _, line := range strings.Split(strings.TrimSpace(string(c.CapturedJSON())), "\n") {
+				var ev struct {
+					Package  string
+					RunLevel bool
+				}
+				gotest.NoError(it, json.Unmarshal([]byte(line), &ev), "line: %s", line)
+				gotest.Equal(it, "interrupted", ev.Package)
+				gotest.False(it, ev.RunLevel, "line: %s", line)
+				events++
+			}
+			gotest.Greater(it, events, 3)
+		})
+	})
+}

@@ -236,17 +236,6 @@ const stageFailurePkg = "go build"
 // booked under when no unit was running to name.
 const globalTimeoutPkg = "global --timeout"
 
-// runLevelPackage reports whether pkg is one of the packages the run books
-// for itself rather than for an import path. Each of their events carries
-// RunLevel, so a consumer tells them apart without reading the name.
-func runLevelPackage(pkg string) bool {
-	switch pkg {
-	case sharedFixturesPkg, interruptedPkg, globalTimeoutPkg, stageFailurePkg:
-		return true
-	}
-	return false
-}
-
 // brokenPackageMessage renders a load-broken package's diagnostics in the
 // `go build` shape: a `# path` header followed by one diagnostic per line.
 // The compiler's own report brings its header along.
@@ -274,6 +263,7 @@ func bookBuildFailures(c *OutputCollector, broken []gotestgen.BrokenPackage, fai
 		pkg := f.Package
 		if pkg == "" {
 			pkg = stageFailurePkg
+			c.markRunLevel(pkg)
 		}
 		c.RecordBuildFailure(pkg, f.Err.Error()+"\n")
 	}
