@@ -32,7 +32,9 @@ type LinterRewritesTestSuite struct {
 }
 
 func (s *LinterRewritesTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 60 * time.Second}
+	// BeforeAll runs go test twice over every row and lint -fix and go vet
+	// once per row: two minutes on a Windows runner.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 5 * time.Minute}
 }
 
 // rewriteRow is one operand type under one assertion, staged as a package of
@@ -424,6 +426,7 @@ func rowVerdicts(t *gotest.T, dir string) (verdicts, output map[string]string) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run() // failing rows exit non-zero; their verdicts are the result
+	gotest.NoError(t, t.Context().Err(), "go test was cut short: %v", err)
 	verdicts, output = map[string]string{}, map[string]string{}
 	for _, ev := range testkit.ParseEvents(stdout.Bytes()) {
 		pkg := filepath.Base(ev.Package)
