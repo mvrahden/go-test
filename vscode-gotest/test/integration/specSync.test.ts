@@ -52,6 +52,12 @@ const streamDir = path.join(extensionDir, "testdata", "streams");
 const stream = (name: string) =>
   readFileSync(path.join(streamDir, `${name}.jsonl`), "utf-8");
 
+// A recorded stream as a run of the workspace folder hands it to the panel.
+const run = (name: string) => ({
+  stream: stream(name),
+  folder: state.workspaceDir,
+});
+
 let realBinary = "";
 let prebuiltBinary = "";
 let brokenBinary = "";
@@ -166,7 +172,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
   it("renders a run whose tests all passed", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(stream("all-pass"), "run");
+    await panel.refresh(run("all-pass"));
 
     const html = renderedHtml();
     expect(html).toContain("adds an item");
@@ -180,7 +186,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
   it("renders a run that contained a failure", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(stream("mixed"), "run");
+    await panel.refresh(run("mixed"));
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
@@ -193,7 +199,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
   it("renders a fuzz target as a property row under its suite", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(stream("fuzz"), "run");
+    await panel.refresh(run("fuzz"));
 
     const html = renderedHtml();
     expect(html).toContain('class="node fuzz"');
@@ -253,7 +259,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     const recorder = createRecordingChannel();
     const panel = new SpecViewPanel(recorder.channel as never, cache);
     await panel.show();
-    await panel.refresh(stream("fuzz"), "run");
+    await panel.refresh(run("fuzz"));
 
     const html = renderedHtml();
     const fuzzRow = html.slice(
@@ -272,7 +278,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
   it("renders a package that failed to build, which has no failing behaviour to speak for it", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(stream("package-failure"), "run");
+    await panel.refresh(run("package-failure"));
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
@@ -286,7 +292,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
   it("renders labels as the CLI's spec does: one row per slash, escaped once", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(stream("labels"), "run");
+    await panel.refresh(run("labels"));
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
@@ -306,7 +312,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
   it("renders an empty stream as an empty spec, not as an error", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(stream("empty"), "run");
+    await panel.refresh(run("empty"));
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
@@ -331,7 +337,7 @@ describe("CLI resolution is the mode the test intends", () => {
     const panel = new SpecViewPanel(channel as never);
     state.cliPath = "";
     await panel.show();
-    await panel.refresh(stream("mixed"), "run");
+    await panel.refresh(run("mixed"));
 
     // Every go-run branch logs "<goBin> run <target>", and goBin carries the
     // executable's own name — `go` on POSIX, `go.exe` on Windows. Match the
@@ -352,7 +358,7 @@ describe("CLI resolution is the mode the test intends", () => {
       const panel = new SpecViewPanel(channel as never);
       state.cliPath = prebuiltBinary;
       await panel.show();
-      await panel.refresh(stream("mixed"), "run");
+      await panel.refresh(run("mixed"));
 
       expect(debug.some((m) => m.includes("cliPath override"))).toBe(true);
     },
@@ -375,7 +381,7 @@ describe("CLI resolution is the mode the test intends", () => {
       const panel = new SpecViewPanel(channel as never);
       state.cliPath = realBinary; // reports a working-tree pseudo-version
       await panel.show();
-      await panel.refresh(stream("mixed"), "run");
+      await panel.refresh(run("mixed"));
 
       expect(warnings.some((m) => m.includes("requires >="))).toBe(true);
       expect(debug.some((m) => m.includes("cliPath override"))).toBe(false);
@@ -394,7 +400,7 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
       const { panel, recorder } = newPanel();
       state.cliPath = brokenBinary;
       await panel.show();
-      await panel.refresh(stream("mixed"), "run");
+      await panel.refresh(run("mixed"));
 
       expect(recorder.errors.length).toBe(1);
       expect(recorder.errors[0]).toContain("simulated toolchain failure");
@@ -406,65 +412,143 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
   );
 });
 
-// Tier 2 — refresh() is stateful. jsonLayers accumulates run / coverage /
-// watch layers and re-renders their concatenation every time, so a failing
-// layer that never clears can freeze the panel long after the run that
-// produced it. No exit-code assertion reaches this.
-describe("layer accumulation across refreshes", () => {
-  it("replaces a failing run with a later passing run under the same tag", async () => {
+// Tier 2 — refresh() is stateful. The panel keeps the newest lines of every
+// test of every package it has seen and renders them as one stream, so what
+// it shows depends on every run before the last. No exit-code assertion
+// reaches this.
+
+// How many times a rendered row carries this display text.
+function rows(html: string, display: string): number {
+  return html.split(`data-display="${display}"`).length - 1;
+}
+
+// A rerun of one cart behavior that now passes, as a -run filter on it
+// produces: its parent suite and the package report again, nothing else does.
+const rerunTotals = [
+  { Action: "run", Package: "example.com/cart", Test: "TestCartTestSuite" },
+  {
+    Action: "run",
+    Package: "example.com/cart",
+    Test: "TestCartTestSuite/totals_the_basket",
+  },
+  {
+    Action: "pass",
+    Package: "example.com/cart",
+    Test: "TestCartTestSuite/totals_the_basket",
+    Elapsed: 0.02,
+  },
+  {
+    Action: "pass",
+    Package: "example.com/cart",
+    Test: "TestCartTestSuite",
+    Elapsed: 0.02,
+  },
+  { Action: "pass", Package: "example.com/cart", Elapsed: 0.03 },
+]
+  .map((e) => JSON.stringify(e))
+  .join("\n");
+
+describe("runs kept across refreshes", () => {
+  it("replaces a package's failing run with its later passing run", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
 
-    await panel.refresh(stream("mixed"), "run");
+    await panel.refresh(run("mixed"));
     expect(renderedHtml()).toContain("1 failed");
 
-    await panel.refresh(stream("all-pass"), "run");
+    await panel.refresh(run("all-pass"));
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("2 passed");
     expect(html).not.toContain("1 failed");
   });
 
-  it("keeps rendering a passing run while a stale failing layer is still held", async () => {
+  // This used to keep one layer per producer and render them all, so a
+  // coverage run's failure stayed beside a later passing run of the same
+  // package. One package is one set of verdicts, whoever reported them.
+  it("shows a package once when two producers reported it, with the newer verdict", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
 
-    await panel.refresh(stream("other-package-fail"), "coverage");
-    await panel.refresh(stream("all-pass"), "run");
+    await panel.refresh(run("mixed")); // a coverage run
+    await panel.refresh(run("all-pass")); // a test run of the same package
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
-    // Both layers are present: the panel is live, not frozen on the failure.
-    expect(html).toContain("rejects an expired card");
-    expect(html).toContain("adds an item");
+    expect(rows(html, "adds an item")).toBe(1);
+    expect(rows(html, "totals the basket")).toBe(1);
     expect(html).toContain("2 passed");
-    expect(html).toContain("1 failed");
+    expect(html).not.toContain("1 failed");
   });
 
-  it("renders every layer's package, not only the most recent one", async () => {
+  it("counts a stream fed twice once", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
 
-    await panel.refresh(stream("all-pass"), "run");
-    await panel.refresh(stream("other-package-fail"), "watch:./...@/tmp");
+    await panel.refresh(run("all-pass"));
+    await panel.refresh(run("all-pass"));
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).toContain("1 suite,");
+    expect(html).toContain("2 behaviors");
+    expect(html).toContain("2 passed");
+    expect(html).not.toContain("4 passed");
+  });
+
+  it("keeps a package when a later run reports another one", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+
+    await panel.refresh(run("all-pass"));
+    await panel.refresh(run("other-package-fail"));
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("example.com/cart");
     expect(html).toContain("example.com/checkout");
+    expect(html).toContain("adds an item");
+    expect(html).toContain("rejects an expired card");
+    expect(html).toContain("2 passed");
+    expect(html).toContain("1 failed");
+  });
+
+  it("keeps the other behaviors' verdicts when one is rerun", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+
+    await panel.refresh(run("mixed"));
+    await panel.refresh({
+      stream: rerunTotals,
+      folder: state.workspaceDir,
+      partial: new Map([
+        [
+          "example.com/cart",
+          (p: string) =>
+            p === "TestCartTestSuite/totals_the_basket" ||
+            p.startsWith("TestCartTestSuite/totals_the_basket/"),
+        ],
+      ]),
+    });
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(rows(html, "adds an item")).toBe(1);
+    expect(rows(html, "totals the basket")).toBe(1);
+    expect(html).toContain("2 passed");
+    expect(html).not.toContain("1 failed");
   });
 });
 
-describe("clearing drops the accumulated layers", () => {
-  // The panel keeps every run/coverage/watch layer and re-renders their
-  // concatenation. Clearing has to drop the layers, not just repaint, or the
-  // next refresh would resurrect what was cleared.
+describe("clearing drops the kept runs", () => {
+  // Clearing has to drop what is kept, not just repaint, or the next refresh
+  // would resurrect what was cleared.
   it("empties the panel and starts the next refresh from nothing", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
 
-    await panel.refresh(stream("mixed"), "run");
-    await panel.refresh(stream("other-package-fail"), "coverage");
+    await panel.refresh(run("mixed"));
+    await panel.refresh(run("other-package-fail"));
     expect(renderedHtml()).toContain("rejects an expired card");
 
     panel.clear();
@@ -472,8 +556,8 @@ describe("clearing drops the accumulated layers", () => {
     expect(cleared).not.toContain("rejects an expired card");
     expect(cleared).not.toContain("totals the basket");
 
-    // A later run shows only itself — the cleared layers are gone for good.
-    await panel.refresh(stream("all-pass"), "run");
+    // A later run shows only itself — the cleared runs are gone for good.
+    await panel.refresh(run("all-pass"));
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("2 passed");
@@ -488,10 +572,48 @@ describe("autoRefresh honours the user's setting", () => {
     const before = renderedHtml();
 
     state.autoRefresh = false;
-    await panel.refresh(stream("mixed"), "run");
+    await panel.refresh(run("mixed"));
 
     expect(recorder.errors).toEqual([]);
     expect(renderedHtml()).toBe(before);
+  });
+
+  it("keeps what ran meanwhile and shows it when asked", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+
+    state.autoRefresh = false;
+    await panel.refresh(run("all-pass"));
+    await panel.refresh(run("other-package-fail"));
+    await panel.show();
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).toContain("adds an item");
+    expect(html).toContain("rejects an expired card");
+  });
+});
+
+describe("a hidden panel", () => {
+  it("renders nothing until it is seen, then shows every run it missed", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+    const shown = state.panels[state.panels.length - 1] as unknown as {
+      visible: boolean;
+    };
+    const before = renderedHtml();
+
+    shown.visible = false;
+    await panel.refresh(run("all-pass"));
+    await panel.refresh(run("other-package-fail"));
+    expect(renderedHtml()).toBe(before);
+
+    shown.visible = true;
+    await panel.show();
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).toContain("adds an item");
+    expect(html).toContain("rejects an expired card");
   });
 });
 
@@ -539,7 +661,7 @@ describe("the Spec View speaks the vocabulary the tree speaks", () => {
     state.workspaceDir = fixturesDir;
     const { panel, recorder } = newPanel();
     await panel.show();
-    await panel.refresh(captured, "run");
+    await panel.refresh({ stream: captured, folder: fixturesDir });
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);

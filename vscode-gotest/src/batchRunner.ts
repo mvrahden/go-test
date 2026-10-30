@@ -16,7 +16,9 @@ import {
   readWorkspacePatterns,
   type AppliedResult,
   BuildOutputs,
+  itemTestPath,
 } from "./runnerUtils.js";
+import { coverOf, type RunPiece } from "./specStore.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -51,6 +53,26 @@ export interface BatchConfig {
 
 export interface BatchResult {
   stdout: string;
+  // The run as the Spec View keeps it.
+  piece: RunPiece;
+}
+
+// runPiece says which packages a filtered batch ran in part, and what of
+// them the filter asked for.
+function runPiece(
+  stdout: string,
+  config: Pick<BatchConfig, "pkgInfos" | "filter" | "workspaceDir">,
+): RunPiece {
+  const piece: RunPiece = { stream: stdout, folder: config.workspaceDir };
+  if (!config.filter) return piece;
+  piece.partial = new Map();
+  for (const info of config.pkgInfos) {
+    const paths = info.items
+      .map(itemTestPath)
+      .filter((p): p is string => p !== undefined);
+    if (paths.length > 0) piece.partial.set(info.importPath, coverOf(paths));
+  }
+  return piece;
 }
 
 export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
@@ -194,7 +216,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           skipUnresolved(run, item, controller);
         }
       }
-      return { stdout: result.stdout };
+      return { stdout: result.stdout, piece: runPiece(result.stdout, config) };
     }
 
     if (result.exitCode !== 0) {
@@ -294,7 +316,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
     }
 
-    return { stdout: result.stdout };
+    return { stdout: result.stdout, piece: runPiece(result.stdout, config) };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof Error && "code" in err && err.code === "ENOENT") {
@@ -307,7 +329,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         skipUnresolved(run, item, controller);
       }
     }
-    return { stdout: "" };
+    return { stdout: "", piece: runPiece("", config) };
   } finally {
     if (coverFile) {
       rm(path.dirname(coverFile), { recursive: true, force: true }).catch(

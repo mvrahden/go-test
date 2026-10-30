@@ -4,9 +4,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SpawnScript } from "./scriptedSpawn.test-support.js";
 
-const { script, mockKill } = vi.hoisted(() => ({
+const { script, mockKill, buildCli } = vi.hoisted(() => ({
   script: { once: [], always: undefined, calls: [] } as SpawnScript,
   mockKill: vi.fn(),
+  buildCli: vi.fn(async (_args: string[], _dir?: string) => ({
+    bin: "go",
+    args: ["run", "."],
+  })),
 }));
 
 vi.mock("vscode", () => ({
@@ -24,7 +28,8 @@ vi.mock("vscode", () => ({
 }));
 
 vi.mock("./cli.js", () => ({
-  buildCliCommand: async () => ({ bin: "go", args: ["run", "."] }),
+  buildCliCommand: buildCli,
+  offerCliUpgrade: () => false,
   stripGoRunExitEcho: (s: string) => s,
 }));
 
@@ -93,5 +98,64 @@ describe("spec render process handling", () => {
     await expect(render(panel, "{}")).resolves.toContain("tree");
     await vi.advanceTimersByTimeAsync(200_000);
     expect(mockKill).not.toHaveBeenCalled();
+  });
+});
+
+// A spec document as the CLI writes it for one package.
+function doc(pkg: string, passed: number, failed: number): string {
+  return JSON.stringify({
+    version: "v1.36.0",
+    packages: [
+      { path: pkg, status: "pass", duration: 0, nodes: [], output: [] },
+    ],
+    stats: {
+      suites: 1,
+      behaviors: passed + failed,
+      tests: 0,
+      fuzzers: 0,
+      passed,
+      failed,
+      skipped: 0,
+    },
+  });
+}
+
+const runOf = (pkg: string) =>
+  JSON.stringify({ Action: "pass", Package: pkg, Elapsed: 0.1 }) + "\n";
+
+describe("which CLI renders a package", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+    script.once = [];
+    script.always = undefined;
+    script.calls = [];
+  });
+
+  it("is the one of the folder that ran it, each folder rendering its own", async () => {
+    script.once = [
+      { stdout: [doc("example.com/a", 2, 0)], code: 0 },
+      { stdout: [doc("example.com/b", 1, 1)], code: 0 },
+    ];
+    const panel = new SpecViewPanel(channel, undefined as never);
+    const internals = panel as unknown as {
+      runs: { merge(p: { stream: string; folder: string }): void };
+      renderRuns(): Promise<{
+        packages: { path: string }[];
+        stats: { passed: number; failed: number; suites: number };
+      }>;
+    };
+    internals.runs.merge({ stream: runOf("example.com/a"), folder: "/ws/a" });
+    internals.runs.merge({ stream: runOf("example.com/b"), folder: "/ws/b" });
+
+    const data = await internals.renderRuns();
+
+    expect(buildCli.mock.calls.map((c) => c[1])).toEqual(["/ws/a", "/ws/b"]);
+    expect(script.calls?.map((c) => c.opts?.cwd)).toEqual(["/ws/a", "/ws/b"]);
+    expect(data.packages.map((p) => p.path)).toEqual([
+      "example.com/a",
+      "example.com/b",
+    ]);
+    expect(data.stats).toMatchObject({ suites: 2, passed: 3, failed: 1 });
   });
 });

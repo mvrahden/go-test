@@ -1,26 +1,52 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { buildCliCommand, stripGoRunExitEcho } from "./cli.js";
+import { buildCliCommand, offerCliUpgrade, stripGoRunExitEcho } from "./cli.js";
 import { specRenderTimeoutSeconds } from "./config.js";
 import { ManagedChild } from "./managedChild.js";
 import { readModulePath } from "./gomod.js";
+import { JsonStore } from "./jsonStore.js";
+import { SpecStore, type RunPiece, type StoredRecord } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
+
+// The kept runs on disk, so a reload does not forget the packages that ran
+// before it.
+const RUNS_FILE = "specRuns.json";
+const RUNS_VERSION = 1;
 
 export class SpecViewPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri | undefined;
   private lastSpecData: SpecData | undefined;
-  private jsonLayers = new Map<string, string>();
+  private readonly runs = new SpecStore();
+  private readonly persisted: JsonStore<StoredRecord[]>;
   private modulePaths: string[] = [];
+  // Runs merged since the panel last rendered them.
+  private stale = false;
+  private rendering: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly outputChannel: vscode.LogOutputChannel,
     private readonly cache?: DiscoveryCache,
+    storageDir?: string,
   ) {
+    this.persisted = new JsonStore(storageDir, RUNS_FILE, RUNS_VERSION);
     if (cache) {
       this.disposables.push(cache.onDidUpdate(() => this.rebuildIfVisible()));
     }
+  }
+
+  // load restores the runs a previous session kept. A run merged before the
+  // file was read wins: the store refuses to load over newer memory.
+  async load(): Promise<void> {
+    const stored = await this.persisted.read();
+    if (!stored || this.runs.size > 0) return;
+    this.runs.restore(stored);
+    this.stale = true;
+  }
+
+  flush(): Promise<void> {
+    return this.persisted.flush();
   }
 
   private rebuildIfVisible(): void {
@@ -38,13 +64,16 @@ export class SpecViewPanel implements vscode.Disposable {
   async show(): Promise<void> {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Beside);
+      if (this.stale) await this.render();
       return;
     }
 
     this.createPanel();
     await this.resolveModulePaths();
 
-    if (this.lastSpecData) {
+    if (this.stale) {
+      await this.render();
+    } else if (this.lastSpecData) {
       this.panel!.webview.html = this.buildHtml({
         type: "specData",
         data: this.lastSpecData,
@@ -119,6 +148,9 @@ export class SpecViewPanel implements vscode.Disposable {
       (msg) => {
         if (msg.type === "runTests") {
           vscode.commands.executeCommand("testing.runAll");
+        } else if (msg.type === "refresh") {
+          this.stale = true;
+          void this.render();
         } else if (msg.type === "copySpec") {
           if (this.lastSpecData) {
             const hidden =
@@ -162,6 +194,17 @@ export class SpecViewPanel implements vscode.Disposable {
       this.disposables,
     );
 
+    // A hidden panel is not rendered; it catches up when it is seen again.
+    this.panel!.onDidChangeViewState?.(
+      (e) => {
+        if (e.webviewPanel.visible && this.stale && this.autoRefresh()) {
+          void this.render();
+        }
+      },
+      null,
+      this.disposables,
+    );
+
     this.panel!.onDidDispose(
       () => {
         this.panel = undefined;
@@ -171,39 +214,79 @@ export class SpecViewPanel implements vscode.Disposable {
     );
   }
 
-  // clear drops the accumulated run layers and empties the panel. Called both
-  // by the panel's own Clear button and when the Test Explorer's results are
+  // clear drops the kept runs and empties the panel. Called both by the
+  // panel's own Clear button and when the Test Explorer's results are
   // cleared, so the two surfaces cannot disagree about what has been run.
   clear(): void {
     this.lastSpecData = undefined;
-    this.jsonLayers.clear();
+    this.runs.clear();
+    this.stale = false;
+    this.persist();
     if (this.panel) {
       this.panel.webview.html = this.buildHtml({ type: "empty" });
     }
   }
 
-  async refresh(jsonOutput: string, tag = "default"): Promise<void> {
-    this.jsonLayers.set(tag, jsonOutput);
-    const combined = Array.from(this.jsonLayers.values()).join("");
+  // refresh folds finished runs into what the panel keeps and renders the
+  // result: every package seen, each test with its newest verdict.
+  async refresh(pieces: RunPiece | RunPiece[]): Promise<void> {
+    for (const piece of Array.isArray(pieces) ? pieces : [pieces]) {
+      this.runs.merge(piece);
+    }
+    this.persist();
+    this.stale = true;
+    if (!this.panel || this.panel.visible === false || !this.autoRefresh()) {
+      return;
+    }
+    await this.render();
+  }
 
+  private autoRefresh(): boolean {
+    return (
+      vscode.workspace
+        .getConfiguration("gotest")
+        .get<boolean>("specView.autoRefresh") ?? true
+    );
+  }
+
+  private persist(): void {
+    this.persisted.save(() => this.runs.serialize());
+  }
+
+  // render draws the kept runs. Renders queue behind each other, and one
+  // queued behind a render that already showed the newest runs does nothing.
+  private render(): Promise<void> {
+    const next = this.rendering.then(() => this.renderNow());
+    this.rendering = next.catch(() => {});
+    return next;
+  }
+
+  private async renderNow(): Promise<void> {
+    if (!this.stale) return;
+    this.stale = false;
     try {
-      const raw = await this.runSpecFromInput(combined);
-      const data: SpecData = JSON.parse(raw);
+      const data = await this.renderRuns();
       this.lastSpecData = data;
       await this.resolveModulePaths();
-
       if (!this.panel) return;
-      const autoRefresh =
-        vscode.workspace
-          .getConfiguration("gotest")
-          .get<boolean>("specView.autoRefresh") ?? true;
-      if (!autoRefresh) return;
-
       this.panel.webview.html = this.buildHtml({ type: "specData", data });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
     }
+  }
+
+  // renderRuns has each folder's CLI render the packages that folder ran.
+  private async renderRuns(): Promise<SpecData> {
+    const docs: SpecData[] = [];
+    for (const folder of this.runs.folders()) {
+      const raw = await this.runSpecFromInput(
+        this.runs.compose(folder),
+        folder,
+      );
+      docs.push(JSON.parse(raw) as SpecData);
+    }
+    return combineSpecData(docs);
   }
 
   private async resolveModulePaths(): Promise<void> {
@@ -318,16 +401,26 @@ ${SCRIPT}
 </html>`;
   }
 
-  private async runSpecFromInput(jsonInput: string): Promise<string> {
-    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const cmd = await buildCliCommand(
-      // --render-only: this is a renderer, not a CI gate. Without it the exit
-      // code also reports whether the tests passed, which says nothing about
-      // whether a spec was produced.
-      ["spec", "--input=-", "--format=json", "--render-only"],
-      workspaceDir,
-      this.outputChannel,
-    );
+  private async runSpecFromInput(
+    jsonInput: string,
+    folder?: string,
+  ): Promise<string> {
+    const workspaceDir =
+      folder ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    let cmd;
+    try {
+      cmd = await buildCliCommand(
+        // --render-only: this is a renderer, not a CI gate. Without it the exit
+        // code also reports whether the tests passed, which says nothing about
+        // whether a spec was produced.
+        ["spec", "--input=-", "--format=json", "--render-only"],
+        workspaceDir,
+        this.outputChannel,
+      );
+    } catch (err: unknown) {
+      offerCliUpgrade(err);
+      throw err;
+    }
     const budgetSeconds = specRenderTimeoutSeconds(workspaceDir);
     const mc = new ManagedChild(cmd.bin, cmd.args, {
       cwd: workspaceDir,
@@ -414,16 +507,42 @@ export function interpretSpecExit(
   };
 }
 
+// combineSpecData joins the documents of several folders' CLIs. Each package
+// is rendered by exactly one of them and the CLI's counts are sums over
+// packages, so the joined counts are sums too.
+export function combineSpecData(docs: SpecData[]): SpecData {
+  if (docs.length === 1) return docs[0];
+  const stats: SpecStats = {
+    suites: 0,
+    behaviors: 0,
+    tests: 0,
+    fuzzers: 0,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    failedPackages: 0,
+  };
+  const packages: SpecPackage[] = [];
+  for (const doc of docs) {
+    packages.push(...doc.packages);
+    for (const key of Object.keys(stats) as (keyof SpecStats)[]) {
+      stats[key] = (stats[key] ?? 0) + (doc.stats[key] ?? 0);
+    }
+  }
+  packages.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return { version: docs[0]?.version, packages, stats };
+}
+
 // --- Types ---
 
-interface SpecData {
+export interface SpecData {
   /** The CLI that produced the document; absent before v1.30.2. */
   version?: string;
   packages: SpecPackage[];
   stats: SpecStats;
 }
 
-interface SpecPackage {
+export interface SpecPackage {
   path: string;
   status: string;
   duration: number;
@@ -431,7 +550,7 @@ interface SpecPackage {
   output?: string[];
 }
 
-interface SpecNode {
+export interface SpecNode {
   name: string;
   display: string;
   kind: string;
@@ -444,7 +563,7 @@ interface SpecNode {
   children: SpecNode[];
 }
 
-interface SpecStats {
+export interface SpecStats {
   suites: number;
   behaviors: number;
   tests: number;
@@ -523,6 +642,7 @@ function buildToolbar(): string {
     <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." />
   </div>
   <div class="toolbar-group">
+    <button class="tool-btn" id="refresh-btn" title="Render the newest runs">Refresh</button>
     <button class="tool-btn" id="copy-spec-btn" title="Copy spec report">Copy</button>
     <button class="tool-btn" id="clear-results-btn" title="Clear results">Clear</button>
   </div>
@@ -1318,6 +1438,10 @@ document.addEventListener('click', (e) => {
     if (tree && tree.classList.contains('hide-fail')) hidden.push('fail');
     if (tree && tree.classList.contains('hide-skip')) hidden.push('skip');
     vscode.postMessage({ type: 'copySpec', hidden: hidden });
+    return;
+  }
+  if (t.id === 'refresh-btn') {
+    vscode.postMessage({ type: 'refresh' });
     return;
   }
   if (t.id === 'clear-results-btn') {
