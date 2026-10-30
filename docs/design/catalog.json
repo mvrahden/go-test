@@ -15316,6 +15316,73 @@
               "name": "TestEmbedded",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint -fix renames their references too, and the package still compiles with the tag",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_-fix_renames_their_references_too,_and_the_package_still_compiles_with_the_tag",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -fix removes the focus of a suite that files behind a build constraint refer to",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "lint_-fix_removes_the_focus_of_a_suite_that_files_behind_a_build_constraint_refer_to",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint -fix leaves the focus and names the file's position",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "lint_-fix_leaves_the_focus_and_names_the_file's_position",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a file behind a build constraint spells the focused name and no build type-checks it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_file_behind_a_build_constraint_spells_the_focused_name_and_no_build_type-checks_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ConstrainedFiles",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestConstrainedFiles",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterFocusFix",
@@ -17332,7 +17399,7 @@
     }
   ],
   "stats": {
-    "behaviors": 567,
+    "behaviors": 569,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

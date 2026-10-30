@@ -70,10 +70,11 @@ func Fix(ctx context.Context, t *Targets, res *Result) (*Result, []Change, error
 		if len(res.FixFiles) == 0 {
 			break
 		}
-		p, err := f.collect(res.graph)
+		p, err := f.collect(res.graph, buildTags(t.BuildFlags))
 		if err != nil {
 			return nil, nil, err
 		}
+		unapplied = append(unapplied, p.refused...)
 		if len(p.fixes) == 0 {
 			break
 		}
@@ -193,7 +194,9 @@ type pendingFix struct {
 
 // fixPass is the fixes one pass applies and the sources they edit.
 type fixPass struct {
-	fixes     []pendingFix
+	fixes []pendingFix
+	// refused are the fixes that cannot rename every reference, named.
+	refused   []Finding
 	baselines map[string][]byte
 	filePkgs  map[string]*types.Package
 }
@@ -354,7 +357,7 @@ func affectedPatterns(t *Targets, roots []*checker.Action, changed []string) ([]
 // order, merged onto the fixes before it, skipping any that touches a
 // generated file, conflicts or did not compile before. contents then
 // formats each file with the imports the edits left unused removed.
-func (f *fixer) collect(graph *checker.Graph) (*fixPass, error) {
+func (f *fixer) collect(graph *checker.Graph, tags string) (*fixPass, error) {
 	type fixAct struct {
 		diag *analysis.Diagnostic
 		act  *checker.Action
@@ -402,7 +405,8 @@ fixes:
 		for _, e := range fix.TextEdits {
 			edits = append(edits, fileEdit{tf: fset.File(e.Pos), pkg: fa.act.Package.Types, edit: e})
 		}
-		if fa.diag.Category == string(Focus) {
+		focus := fa.diag.Category == string(Focus)
+		if focus {
 			edits = append(edits, focusReferences(graph.Roots, fa.act, fix.TextEdits)...)
 		}
 		for _, e := range edits {
@@ -424,6 +428,18 @@ fixes:
 		if skipped[key] < f.dropped[key] {
 			skipped[key]++
 			continue
+		}
+		if focus {
+			constrained, err := constrainedFocusReferences(graph.Roots, fa.act, fix.TextEdits, tags, f.current)
+			if err != nil {
+				f.dropped[key]++
+				p.refused = append(p.refused, Finding{
+					File: pos.Filename, Line: pos.Line, Col: pos.Column, EndLine: pos.Line, Rule: fa.diag.Category,
+					Message: fmt.Sprintf("fix for %s at %s:%d was not applied: %v", fa.diag.Category, (&errorPaths{module: moduleDir(fa.act)}).rel(pos.Filename), pos.Line, err),
+				})
+				continue
+			}
+			edits = append(edits, constrained...)
 		}
 		fileEdits := map[string][]edit{}
 		for _, fe := range edits {
@@ -451,17 +467,21 @@ fixes:
 			merged[file] = edits
 		}
 		maps.Copy(accumulated, merged)
-		module := ""
-		if m := fa.act.Package.Module; m != nil {
-			module = m.Dir
-		}
 		p.fixes = append(p.fixes, pendingFix{
 			edits: fileEdits, rule: fa.diag.Category,
-			file: pos.Filename, rel: (&errorPaths{module: module}).rel(pos.Filename),
+			file: pos.Filename, rel: (&errorPaths{module: moduleDir(fa.act)}).rel(pos.Filename),
 			line: pos.Line, col: pos.Column, key: key,
 		})
 	}
 	return p, nil
+}
+
+// moduleDir is the directory of act's module, "" outside one.
+func moduleDir(act *checker.Action) string {
+	if m := act.Package.Module; m != nil {
+		return m.Dir
+	}
+	return ""
 }
 
 // mergeEdits merges two sorted edit lists as a three-way merge would:

@@ -140,3 +140,36 @@ var _ = wrapper{BaseTestSuite: BaseTestSuite{n: 1}}.count
 		})
 	})
 }
+
+// vetTagged type-checks the staged module under tags, test files included.
+func (c *unfocusedFix) vetTagged(t *gotest.T, tags string) {
+	cmd := exec.CommandContext(t.Context(), "go", "vet", "-tags="+tags, "./...") //nolint:gosec // G204: the test's own tags
+	cmd.Dir = c.mod
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "go vet -tags=%s: %s", tags, out)
+}
+
+func (s *LinterFocusFixTestSuite) TestConstrainedFiles(t *gotest.T) {
+	t.When("lint -fix removes the focus of a suite that files behind a build constraint refer to", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocustagged")
+		w.It("lint -fix renames their references too, and the package still compiles with the tag", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			for _, f := range []string{"suite_test.go", "integration_test.go", "integration_ext_test.go"} {
+				src := c.read(it, f)
+				gotest.Empty(it, focusPrefix.FindAllString(src, -1), "%s:\n%s", f, src)
+				gotest.Contains(it, src, "TaggedTestSuite", f)
+			}
+			c.vet(it)
+			c.vetTagged(it, "integration")
+		})
+	})
+	t.When("a file behind a build constraint spells the focused name and no build type-checks it", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusunresolved")
+		w.It("lint -fix leaves the focus and names the file's position", func(it *gotest.T) {
+			gotest.Equal(it, 3, c.run.Exit, "stderr: %s", c.run.Stderr)
+			gotest.Regexp(it, `fix for focus at lintfocusunresolved/suite_test\.go:5 was not applied: \S*gen\.go:6:6: F_UnresolvedTestSuite cannot be resolved`, c.run.Stderr)
+			gotest.Contains(it, c.read(it, "suite_test.go"), "type F_UnresolvedTestSuite struct{}")
+			gotest.Contains(it, c.read(it, "gen.go"), "type F_UnresolvedTestSuite struct{}")
+		})
+	})
+}

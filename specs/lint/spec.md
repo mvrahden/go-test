@@ -71,7 +71,7 @@ Lint -fix SHALL drop and name a fix that does not compile and SHALL still apply 
 - **AND** the other fixes are applied
 
 ### Requirement: The focus fix
-Lint -fix SHALL remove a focus prefix, of a suite or of a Test, Benchmark or Fuzz method, at every reference to the focused suite or method in its package, the receivers and uses in other files, generic receivers, aliases, the fields that embed it and the external test package included, so that the package still compiles.
+Lint -fix SHALL remove a focus prefix, of a suite or of a Test, Benchmark or Fuzz method, at every reference to the focused suite or method in its package, the receivers and uses in other files, generic receivers, aliases, the fields that embed it, files a build constraint leaves out and the external test package included, so that the package still compiles. A fix SHALL be left unapplied and named, with the file's position, where such a file spells the name and no build type-checks it.
 
 #### Scenario: Methods and uses in several files
 - **WHEN** lint -fix removes the focus of a suite whose methods and uses are spread over several files
@@ -92,6 +92,14 @@ Lint -fix SHALL remove a focus prefix, of a suite or of a Test, Benchmark or Fuz
 #### Scenario: Benchmark and fuzz methods
 - **WHEN** lint -fix removes the focus of a benchmark or fuzz method
 - **THEN** lint -fix renames the focused benchmark and fuzz methods, and the package still compiles
+
+#### Scenario: Files a build constraint leaves out
+- **WHEN** lint -fix removes the focus of a suite that files behind a build constraint refer to
+- **THEN** lint -fix renames their references too, and the package still compiles with the tag
+
+#### Scenario: A constrained file no build type-checks
+- **WHEN** a file behind a build constraint spells the focused name and no build type-checks it
+- **THEN** lint -fix leaves the focus and names the file's position
 
 ### Requirement: A target that does not compile
 Lint SHALL report each compile error of a target package once, with its path relative to the module.

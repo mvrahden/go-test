@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/refactor"
@@ -78,4 +79,59 @@ func focusReferences(roots []*checker.Action, act *checker.Action, own []analysi
 		}
 	}
 	return out
+}
+
+// constrainedFocusReferences returns the edits a focus fix found in act
+// needs in the files of its directory that the load under tags left out for
+// their build constraint, each found in a load under that constraint's
+// tags; overlay holds the sources earlier fixes changed. It errs when such
+// a file spells the focused name and no load can resolve it.
+func constrainedFocusReferences(roots []*checker.Action, act *checker.Action, own []analysis.TextEdit, tags string, overlay map[string][]byte) ([]fileEdit, error) {
+	fset := act.Package.Fset
+	var target refactor.Object
+	var dir string
+	for _, e := range own {
+		if t, ok := refactor.DeclaredAt(act.Package.TypesInfo, e.Pos); ok {
+			target, dir = t, filepath.Dir(fset.File(e.Pos).Name())
+			break
+		}
+	}
+	if dir == "" {
+		return nil, nil
+	}
+	var loaded, ignored []string
+	for _, r := range roots {
+		loaded = append(loaded, r.Package.CompiledGoFiles...)
+		loaded = append(loaded, r.Package.GoFiles...)
+	}
+	for _, r := range roots {
+		for _, f := range r.Package.IgnoredFiles {
+			if filepath.Dir(f) == dir && strings.HasSuffix(f, ".go") && !slices.Contains(loaded, f) && !slices.Contains(ignored, f) {
+				ignored = append(ignored, f)
+			}
+		}
+	}
+	if len(ignored) == 0 {
+		return nil, nil
+	}
+	refs, err := refactor.ConstrainedRefs(dir, ignored, tags, overlay, target)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]fileEdit, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, fileEdit{tf: r.File, pkg: r.Pkg, edit: unfocus(r.Pos)})
+	}
+	return out, nil
+}
+
+// buildTags is the comma-separated -tags value of a load's build flags.
+func buildTags(flags []string) string {
+	var tags []string
+	for _, f := range flags {
+		if v, ok := strings.CutPrefix(strings.TrimLeft(f, "-"), "tags="); ok {
+			tags = append(tags, v)
+		}
+	}
+	return strings.Join(tags, ",")
 }

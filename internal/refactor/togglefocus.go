@@ -211,10 +211,17 @@ func load(filePath string) (views []checked, unchecked []parsedFile, err error) 
 
 // loadTagged loads dir's package and its test variants under tags.
 func loadTagged(dir, tags string) []*packages.Package {
+	return loadTaggedOver(dir, tags, nil)
+}
+
+// loadTaggedOver is loadTagged with overlay replacing the contents of the
+// files it names.
+func loadTaggedOver(dir, tags string, overlay map[string][]byte) []*packages.Package {
 	cfg := &packages.Config{
-		Dir:   dir,
-		Mode:  packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
-		Tests: true,
+		Dir:     dir,
+		Mode:    packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
+		Tests:   true,
+		Overlay: overlay,
 	}
 	if tags != "" {
 		cfg.BuildFlags = []string{"-tags=" + tags}
@@ -304,6 +311,12 @@ func refuse(views []checked, unchecked []parsedFile, target Object, newName stri
 			}
 		}
 	}
+	return unresolved(unchecked, target)
+}
+
+// unresolved refuses the first file of unchecked that spells target's
+// name: no load type-checks it, so what the name refers to is unknown.
+func unresolved(unchecked []parsedFile, target Object) error {
 	for _, f := range unchecked {
 		var at *ast.Ident
 		ast.Inspect(f.file, func(n ast.Node) bool {
