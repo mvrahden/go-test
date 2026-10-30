@@ -1,4 +1,4 @@
-Expect: shapes xpkgcontract: TestIntIndexTestSuite/TestZeroValue did not pass
+Expect: shapes xpkgcontract: exit code 2, want 0
 Clause: when a suite reaches across packages → an alias of a generic suite from another package runs that suite's methods
 Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
 --- a/internal/gotestgen/collector.go

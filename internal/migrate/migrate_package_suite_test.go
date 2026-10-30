@@ -390,6 +390,8 @@ type OtherSuite struct {
 
 func (s *OtherSuite) SetupSuite() {}
 
+func (s *OtherSuite) TestOther() {}
+
 func TestOtherSuite(t *testing.T) {
 	suite.Run(t, new(OtherSuite))
 }

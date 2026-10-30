@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ASuiteWithNoTest / when a testify suite declares no test, of its own or from a base / migrate leaves it unconverted under a marker saying gotest refuses a suite without a case \(
+Clause: when a testify suite declares no test, of its own or from a base → migrate leaves it unconverted under a marker saying gotest refuses a suite without a case
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -413,7 +413,7 @@
+ 		if !s.migrated() {
+ 			continue
+ 		}
+-		if !s.helper && !declaresTest(s.obj) {
++		if false && !s.helper && !declaresTest(s.obj) {
+ 			s.refusal = s.obj.Name() + " declares no test; gotest refuses a suite without a Test, Benchmark or Fuzz method — add a test, or migrate this file by hand"
+ 			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
+ 			refused[s.file] = true

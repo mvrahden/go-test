@@ -17,7 +17,7 @@ func (s *CLIScaffoldPathsTestSuite) TestASymlinkedPath(t *gotest.T) {
 	gotest.NoError(t, err)
 	dir := t.TempDir()
 	gotest.NoError(t, testkit.WriteModule(root, dir, "example.com/scaf"))
-	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "calc.go"), []byte("package scaf\n\n// Calc adds.\ntype Calc struct{}\n\n// Add returns a + b.\nfunc (c Calc) Add(a, b int) int { return a + b }\n"), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "calc.go"), []byte(scafPackageSrc), 0o600))
 	link := filepath.Join(t.TempDir(), "link")
 	gotest.NoError(t, os.Symlink(dir, link))
 	run, err := testkit.RunCLI(t.Context(), dir, "scaffold", filepath.Join(link, "calc.go"))

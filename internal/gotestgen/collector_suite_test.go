@@ -1,6 +1,12 @@
 package gotestgen_test
 
 import (
+	"fmt"
+	"go/token"
+	"path/filepath"
+
+	"golang.org/x/tools/go/packages"
+
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -749,11 +755,13 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			gotest.ErrorContains(it, result.Errs[0].Err, "must be exported")
 		})
 
-		w.It("is a helper type the suite may embed", func(it *gotest.T) {
+		w.It("is refused at its declaration when it declares no case, embedded or not", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedCaselessBase")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Errs, 1)
+			gotest.Equal(it, "suite baseTestSuite declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite", result.Errs[0].Err.Error())
+			gotest.Equal(it, "test.go:5:6", position(pkg, result.Errs[0].Pos))
 		})
 	})
 
@@ -858,6 +866,38 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			gotest.NotEmpty(it, result.Errs, "expected error for value-receiver suite method")
 			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported value type receiver")
 		})
+	})
+}
+
+func (s *CollectorTestSuite) TestCaselessSuites(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestCollector_CaselessSuites")
+	result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+	refused := map[string]string{}
+	for _, ce := range result.Errs {
+		refused[position(pkg, ce.Pos)] = ce.Err.Error()
+	}
+
+	t.It("refuses each type named like a suite that declares no case, at its declaration, naming the alternative", func(it *gotest.T) {
+		want := map[string]string{}
+		for pos, name := range map[string]string{
+			"test.go:15:6": "HelperTestSuite",
+			"test.go:19:6": "HookedTestSuite",
+			"test.go:24:6": "BoundTestSuite",
+			"test.go:28:6": "X_ExcludedTestSuite",
+			"test.go:30:6": "F_FocusedTestSuite",
+			"test.go:35:6": "IntContractTestSuite",
+		} {
+			want[pos] = "suite " + name + " declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite"
+		}
+		gotest.Equal(it, want, refused)
+	})
+
+	t.It("counts a declared case, excluded or of any kind", func(it *gotest.T) {
+		for _, msg := range refused {
+			for _, name := range []string{"PlainTestSuite", "AllExcludedTestSuite", "ExcludedBenchTestSuite", "FuzzOnlyTestSuite"} {
+				gotest.NotContains(it, msg, name)
+			}
+		}
 	})
 }
 
@@ -1034,4 +1074,10 @@ func (s *CollectorTestSuite) TestUnreachedFixtures(t *gotest.T) {
 			gotest.Equal(it, "StoreFixture", result.Fixtures[0].Identifier())
 		})
 	})
+}
+
+// position renders pos in pkg as file:line:column, the file by its base name.
+func position(pkg *packages.Package, pos token.Pos) string {
+	p := pkg.Fset.Position(pos)
+	return fmt.Sprintf("%s:%d:%d", filepath.Base(p.Filename), p.Line, p.Column)
 }

@@ -129,6 +129,41 @@ func (s *CLIScaffoldCompilesTestSuite) TestTakenSuiteNames(t *gotest.T) {
 	})
 }
 
+// caselessSrc holds targets a suite would declare no case for.
+const caselessSrc = `package shapes
+
+// Plain has no exported method.
+type Plain struct{ n int }
+
+func (p *Plain) bump() { p.n++ }
+
+// Marker has no method.
+type Marker interface{}
+`
+
+func (s *CLIScaffoldCompilesTestSuite) TestTargetsWithoutACase(t *gotest.T) {
+	t.When("a type without an exported method or a file without an exported function is scaffolded", func(w *gotest.T) {
+		w.It("refuses it on stderr with exit 1, saying its suite would declare no case, and writes nothing", func(it *gotest.T) {
+			for sub, tc := range gotest.Each(it, []struct {
+				Desc string
+				args []string
+				want string
+			}{
+				{"a type without an exported method", []string{"./shapes.Plain"}, "Plain has no exported method: PlainTestSuite would declare no case, which gotest refuses"},
+				{"an interface without a method", []string{"./shapes.Marker"}, "Marker has no exported method: MarkerContractTestSuite would declare no case, which gotest refuses"},
+				{"a file without an exported function", []string{"./shapes/plain.go"}, "plain.go declares no exported function: PlainTestSuite would declare no case, which gotest refuses"},
+			}) {
+				dir, pkgDir := stageShapes(sub, map[string]string{"plain.go": caselessSrc})
+				run, err := testkit.RunCLI(sub.Context(), dir, append([]string{"scaffold"}, tc.args...)...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, tc.want)
+				gotest.ElementsMatch(sub, []string{"shapes.go", "plain.go"}, goFiles(sub, pkgDir), "scaffold wrote a file")
+			}
+		})
+	})
+}
+
 func (s *CLIScaffoldCompilesTestSuite) TestTargetShapes(t *gotest.T) {
 	t.When("each target shape is scaffolded", func(w *gotest.T) {
 		w.It("writes a file go vet passes", func(it *gotest.T) {

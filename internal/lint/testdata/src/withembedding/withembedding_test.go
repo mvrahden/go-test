@@ -14,10 +14,10 @@ type BaseTestSuite struct{}
 
 func (s *BaseTestSuite) TestBase(t *gotest.T) {}
 
-// ToolsTestSuite declares no case: a helper, not a suite.
-type ToolsTestSuite struct{}
+// Toolbox is a helper: named otherwise than a suite.
+type Toolbox struct{}
 
-func (s *ToolsTestSuite) Do() {}
+func (s *Toolbox) Do() {}
 
 type hooks struct{}
 
@@ -32,9 +32,9 @@ type ChildTestSuite struct {
 	BaseTestSuite // want `suite ChildTestSuite embeds suite BaseTestSuite; suites are never embedded — share behavior through a generic contract suite`
 	hooks         // want `suite ChildTestSuite embeds hooks, whose method BeforeEach gotest would read; keep helpers in a named field or in functions`
 	plain
-	ToolsTestSuite
+	Toolbox
 	Inner *BaseTestSuite // want `suite ChildTestSuite has a field of suite type BaseTestSuite; suites are never nested — share behavior through a generic contract suite`
-	Tools ToolsTestSuite
+	Tools Toolbox
 	Cache *CacheFixture
 	DB    *DBFixture
 }

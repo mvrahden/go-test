@@ -950,7 +950,7 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 
 	// An unexported suite with test cases is a silent false-green: go test only
 	// runs exported Test functions, so its generated Test func would never
-	// execute. Unexported case-less types (helpers) stay legal.
+	// execute. A case-less one is refused for declaring no case.
 	if len(ts.th.TestCases) > 0 && !ts.ts.Name.IsExported() {
 		return fmt.Errorf("test suite %q must be exported — go test never runs its generated Test function", suiteName)
 	}

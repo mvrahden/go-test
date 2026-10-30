@@ -5721,6 +5721,86 @@
                       "children": [
                         {
                           "children": [],
+                          "display": "a type without an exported method",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_type_without_an_exported_method",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "an interface without a method",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "an_interface_without_a_method",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a file without an exported function",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "a_file_without_an_exported_function",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses it on stderr with exit 1, saying its suite would declare no case, and writes nothing",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "refuses_it_on_stderr_with_exit_1,_saying_its_suite_would_declare_no_case,_and_writes_nothing",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a type without an exported method or a file without an exported function is scaffolded",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_type_without_an_exported_method_or_a_file_without_an_exported_function_is_scaffolded",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TargetsWithoutACase",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTargetsWithoutACase",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
                           "display": "a type with methods",
                           "duration": 0,
                           "excluded": false,
@@ -6485,63 +6565,76 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "the run passes with the real suite's methods",
+                      "display": "the suite is refused at its declaration, told to declare a case or name the helper otherwise",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "the_run_passes_with_the_real_suite's_methods",
+                      "name": "the_suite_is_refused_at_its_declaration,_told_to_declare_a_case_or_name_the_helper_otherwise",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     },
                     {
                       "children": [],
-                      "display": "nothing is generated or reported for the case-less suite",
+                      "display": "discover reports the package broken with the refusal",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "nothing_is_generated_or_reported_for_the_case-less_suite",
+                      "name": "discover_reports_the_package_broken_with_the_refusal",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     },
                     {
                       "children": [],
-                      "display": "discover does not list the case-less suite",
+                      "display": "a suite whose only case is excluded runs as skipped",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "discover_does_not_list_the_case-less_suite",
+                      "name": "a_suite_whose_only_case_is_excluded_runs_as_skipped",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a testify base suite that declares no case is left to testify",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_testify_base_suite_that_declares_no_case_is_left_to_testify",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     }
                   ],
-                  "display": "when a suite declares no case",
+                  "display": "when a type named like a suite declares no case",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
                   "focused": false,
                   "kind": "block",
-                  "name": "a_suite_declares_no_case",
+                  "name": "a_type_named_like_a_suite_declares_no_case",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
                 }
               ],
-              "display": "HelperSuites",
+              "display": "CaselessSuites",
               "duration": 0,
               "excluded": false,
               "external": false,
               "focused": false,
               "kind": "method",
-              "name": "TestHelperSuites",
+              "name": "TestCaselessSuites",
               "output": [],
               "status": "none"
             }
@@ -16275,13 +16368,13 @@
                     },
                     {
                       "children": [],
-                      "display": "the base becomes a helper type gotest does not run as a suite",
+                      "display": "the base becomes a helper type, its TestSuite suffix turned into SuiteHelper, that gotest does not run as a suite",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "focused": false,
                       "kind": "block",
-                      "name": "the_base_becomes_a_helper_type_gotest_does_not_run_as_a_suite",
+                      "name": "the_base_becomes_a_helper_type,_its_TestSuite_suffix_turned_into_SuiteHelper,_that_gotest_does_not_run_as_a_suite",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -16574,6 +16667,46 @@
               "name": "TestABaseInANonTestFile",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves the base's file unconverted under a marker naming the collision",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_the_base's_file_unconverted_under_a_marker_naming_the_collision",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the helper name a base suite would take is already declared",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_helper_name_a_base_suite_would_take_is_already_declared",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AHelperNameTaken",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAHelperNameTaken",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "MigrateBaseSuites",
@@ -16625,6 +16758,46 @@
               "focused": false,
               "kind": "method",
               "name": "TestAnAssertionOnAGoroutine",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate leaves it unconverted under a marker saying gotest refuses a suite without a case",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "migrate_leaves_it_unconverted_under_a_marker_saying_gotest_refuses_a_suite_without_a_case",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a testify suite declares no test, of its own or from a base",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_testify_suite_declares_no_test,_of_its_own_or_from_a_base",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASuiteWithNoTest",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASuiteWithNoTest",
               "output": [],
               "status": "none"
             },
@@ -17706,7 +17879,7 @@
     }
   ],
   "stats": {
-    "behaviors": 576,
+    "behaviors": 582,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -6,12 +6,12 @@ What `gotest migrate` makes of testify suites: the code it writes, what it leave
 ## Requirements
 
 ### Requirement: Base suites
-Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets to a fresh base: the child SHALL hold the base by value in a named field and declare the hooks and tests testify ran on it through the base, the base SHALL become a helper type gotest does not run, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
+Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets to a fresh base: the child SHALL hold the base in a named field and declare the hooks and tests testify ran on it through the base, the base SHALL become a helper type gotest does not run, a TestSuite suffix renamed SuiteHelper, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
 
 #### Scenario: A child of a base suite
 - **WHEN** a testify suite embeds a base suite of the migrated test files
 - **THEN** the migrated child compiles and gotest runs the base's hooks and tests on it
-- **AND** the base becomes a helper type gotest does not run as a suite
+- **AND** the base becomes a helper type, its TestSuite suffix turned into SuiteHelper, that gotest does not run as a suite
 - **AND** migrate leaves no marker for the embedding
 - **AND** gotest lint reports no testify finding on the migrated code
 
@@ -28,7 +28,7 @@ Migrate SHALL convert a testify suite embedding a base suite of the migrated tes
 - **THEN** the method gains t, its callers pass it, and the migrated child runs without a marker
 
 ### Requirement: Base suites left as they are
-Migrate SHALL leave a suite's file unconverted under a marker giving the reason when its base cannot carry over: an embedding by any other pointer, which gotest's new leaves nil; a local or anonymous struct embedding a base, as gotest runs only package-level suites; a base in a non-test file of the suite's directory, as migrate changes only test files. A base of a package in another directory SHALL make migrate exit 2, naming its package, with nothing written.
+Migrate SHALL leave a suite's file unconverted under a marker giving the reason when its base cannot carry over: an embedding by any other pointer, which gotest's new leaves nil; a local or anonymous struct embedding a base, as gotest runs only package-level suites; a base in a non-test file of the suite's directory, as migrate changes only test files; a helper name already taken. A base of a package in another directory SHALL make migrate exit 2, naming its package, with nothing written.
 
 #### Scenario: An embedding in a local or anonymous struct
 - **WHEN** a struct declared inside a function, or an anonymous struct, embeds a base suite
@@ -37,6 +37,10 @@ Migrate SHALL leave a suite's file unconverted under a marker giving the reason 
 #### Scenario: A base in a non-test file
 - **WHEN** a testify suite embeds a base suite declared in a non-test file of its directory
 - **THEN** migrate exits 1 and leaves the child's file unconverted under a marker naming that file
+
+#### Scenario: A helper name already taken
+- **WHEN** the helper name a base suite would take is already declared
+- **THEN** migrate leaves the base's file unconverted under a marker naming the collision
 
 #### Scenario: A base outside the migrated directory
 - **WHEN** a testify suite embeds a base suite of a package in another directory
@@ -48,6 +52,10 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 #### Scenario: An assertion on a goroutine
 - **WHEN** an assertion runs on a goroutine a go statement starts
 - **THEN** migrate leaves it unconverted under a marker naming gotest.Go
+
+#### Scenario: A suite with no test
+- **WHEN** a testify suite declares no test, of its own or from a base
+- **THEN** migrate leaves it unconverted under a marker saying gotest refuses a suite without a case
 
 #### Scenario: Elements compared deeply
 - **WHEN** ElementsMatch or Subset compares pointer or interface elements

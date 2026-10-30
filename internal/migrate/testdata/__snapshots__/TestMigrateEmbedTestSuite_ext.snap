@@ -7,11 +7,11 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-type BaseTestSuiteHelpers struct{}
+type BaseSuiteHelper struct{}
 
-func (b *BaseTestSuiteHelpers) TestShared(t *gotest.T) { fmt.Println("RAN base TestShared") }
+func (b *BaseSuiteHelper) TestShared(t *gotest.T) { fmt.Println("RAN base TestShared") }
 
-type ChildTestSuite struct{ base BaseTestSuiteHelpers }
+type ChildTestSuite struct{ base BaseSuiteHelper }
 
 func (s *ChildTestSuite) TestOwn(t *gotest.T) { fmt.Println("RAN child TestOwn") }
 
@@ -22,7 +22,7 @@ func (s *ChildTestSuite) TestShared(t *gotest.T) {
 === SNAP TestBaseShapes/a_base_named_like_a_suite_that_no_runner_ran p/ref_test.go ===
 package p
 
-func newBase() *BaseTestSuiteHelpers { return &BaseTestSuiteHelpers{} }
+func newBase() *BaseSuiteHelper { return &BaseSuiteHelper{} }
 
 var _ = newBase
 

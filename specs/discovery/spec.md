@@ -45,14 +45,15 @@ A suite SHALL bind each fixture once, through a pointer field or an alias of one
 - **AND** a method whose name continues Test with a lowercase letter is not a case, as under go test
 - **AND** a method taking a T whose name continues Test with a lowercase letter is rejected at the method, as go vet rejects such a test
 
-### Requirement: Case-less suites
-A type named like a suite that declares no case SHALL be treated as a helper: nothing SHALL be generated, run, reported or discovered for it.
+### Requirement: Suites without a case
+A type named like a suite SHALL declare at least one Test, Benchmark or Fuzz method, an excluded one included; one that declares none SHALL be refused at its declaration, naming the alternative, and discover SHALL report its package broken with the refusal, while a testify suite SHALL be left to testify.
 
-#### Scenario: A suite with no case
-- **WHEN** a suite declares no case
-- **THEN** the run passes with the real suite's methods
-- **AND** nothing is generated or reported for the case-less suite
-- **AND** discover does not list the case-less suite
+#### Scenario: A type named like a suite with no case
+- **WHEN** a type named like a suite declares no case
+- **THEN** the suite is refused at its declaration, told to declare a case or name the helper otherwise
+- **AND** discover reports the package broken with the refusal
+- **AND** a suite whose only case is excluded runs as skipped
+- **AND** a testify base suite that declares no case is left to testify
 
 ### Requirement: Declarations from other packages
 A suite SHALL run an alias of a generic suite another package declares, an alias declared in the external test package SHALL be discovered and run whether the package under test, the external test package or a third package declares the generic suite, and a fixture a suite binds from another package SHALL be held to the signature rules a local fixture is held to.

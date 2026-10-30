@@ -107,7 +107,10 @@ those are your job, below.
    `gotest_pxsuite_test.go` files `gotest generate` writes; `gotest clean ./...`
    removes them). A `TestMain` of your own still runs; keep resource setup
    out of it — that is what fixtures and `BeforeAll` are for. `F_`/`X_`
-   prefixes focus/exclude. A generic suite runs only through one
+   prefixes focus/exclude. A suite declares at least one `Test*`,
+   `Benchmark*` or `Fuzz*` method (an `X_` one counts); a `*TestSuite`
+   type with none is refused, so name helper types otherwise (v1.37+).
+   A generic suite runs only through one
    type alias per concrete type
    (`type ArticleIndexTestSuite = IndexContractTestSuite[Article]`);
    without an alias it silently never runs.

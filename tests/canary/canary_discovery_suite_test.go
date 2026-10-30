@@ -95,9 +95,10 @@ func (s *CanaryDiscoveryTestSuite) TestAliasesAndCrossPackageShapes(t *gotest.T)
 }
 
 // A fixture is bound once, through a pointer field, and only a bound one is
-// checked; a method is a case only by the name go test would run, and a
-// suite with no case is a helper nothing is generated or reported for.
+// checked; a method is a case only by the name go test would run, and a type
+// named like a suite declares a case or is refused at its declaration.
 func (s *CanaryDiscoveryTestSuite) TestFieldNameAndCaselessShapes(t *gotest.T) {
+	const caselessRefusal = `suite HelperTestSuite declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite`
 	runs := s.checkShapes(t, []shapeRow{
 		{name: "fieldvalue", exit: 2, shows: `fieldvalue_suite_test\.go:16:2: suite ValueTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field \(\*StoreFixture\)`},
 		{name: "fieldalias", exit: 2, shows: `fieldalias_suite_test\.go:19:2: suite AliasTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field \(\*StoreFixture\)`},
@@ -107,24 +108,25 @@ func (s *CanaryDiscoveryTestSuite) TestFieldNameAndCaselessShapes(t *gotest.T) {
 		{name: "fieldunreferenced", passes: "TestBoundTestSuite/TestOpened"},
 		{name: "nameistest", passes: "TestNameTestSuite/TestRuns"},
 		{name: "namelower", exit: 2, shows: `namelower_suite_test\.go:10:26: Testcreate on LowerTestSuite is no Test: go test runs no Test whose next letter is lowercase; rename it TestCreate`},
-		{name: "caseless", passes: "TestRealTestSuite/TestNames"},
+		{name: "caseless", exit: 2, shows: `caseless_suite_test\.go:6:6: ` + caselessRefusal},
+		{name: "excludedonly", passes: "TestRealTestSuite/TestRuns"},
 	})
 	for _, helper := range []string{"Testify", "Benchmarked", "Fuzzy"} {
 		if strings.Contains(runs["nameistest"].stream, `"Test":"TestNameTestSuite/`+helper+`"`) {
 			t.Errorf("shapes nameistest: %s ran as a case: %v", helper, runs["nameistest"].rows)
 		}
 	}
-	if r := runs["caseless"]; strings.Contains(r.stream, "HelperTestSuite") || strings.Contains(r.stderr, "HelperTestSuite") {
-		t.Errorf("shapes caseless: the run reported HelperTestSuite: %v\n%s", r.rows, r.stderr)
+	if r := runs["excludedonly"]; !slices.Contains(r.rows, "shapes/excludedonly skip TestLaterTestSuite") {
+		t.Errorf("shapes excludedonly: TestLaterTestSuite did not run as skipped: %v\n%s", r.rows, r.stderr)
 	}
 	code, stdout, stderr := s.invoke(t, t.TempDir(), "discover", "./testdata/shapes/caseless/")
 	switch {
 	case code != 0:
 		t.Errorf("shapes caseless: discover exit code %d, want 0\n%s", code, stderr)
-	case !bytes.Contains(stdout, []byte("RealTestSuite")):
-		t.Errorf("shapes caseless: discover does not list RealTestSuite:\n%s", stdout)
-	case bytes.Contains(stdout, []byte("HelperTestSuite")):
-		t.Errorf("shapes caseless: discover lists HelperTestSuite:\n%s", stdout)
+	case !bytes.Contains(stdout, []byte(`"broken":true,"suites":[]`)):
+		t.Errorf("shapes caseless: discover does not report the package broken:\n%s", stdout)
+	case !bytes.Contains(stdout, []byte(`"line":6,"col":6,"message":"`+caselessRefusal+`"`)):
+		t.Errorf("shapes caseless: discover does not report the refusal:\n%s", stdout)
 	}
 }
 

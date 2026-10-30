@@ -207,9 +207,6 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 			}
 
 			for _, suite := range result.Suites {
-				if gotestgen.DeclaresNoCase(suite) {
-					continue
-				}
 				ds := buildDiscoverSuite(suite)
 				ds.Fixtures = discoverFixtureNames(suite)
 				pkgEntry.Suites = append(pkgEntry.Suites, ds)

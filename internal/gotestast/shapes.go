@@ -11,7 +11,7 @@ import (
 // fields. An embedded type would promote methods gotest reads from a type it
 // never discovered, and a suite inside a suite has no lifecycle of its own, so
 // both are rejected where they are written, with the alternative named. A
-// *TestSuite type that declares no case is a helper, not a suite.
+// *TestSuite type must declare a case; a helper is named otherwise.
 
 // interpretedMethod reports whether name is one gotest reads off a suite or
 // fixture: a case or a lifecycle hook.
@@ -30,6 +30,16 @@ func interpretedMethod(name string) bool {
 // field. The position is the field's.
 func ValidateSuiteShape(s *TestSuiteSpec) (token.Pos, error) {
 	return validateFields("suite", s.Identifier(), s.typ, s.pkg.Types)
+}
+
+// ValidateDeclaresCase rejects a suite that declares no Test, Benchmark or
+// Fuzz method; excluded and unfocused ones count. The position is the suite's
+// name.
+func ValidateDeclaresCase(s *TestSuiteSpec) (token.Pos, error) {
+	if s.th.DeclaresTests || len(s.th.Benchmarks) > 0 || len(s.th.Fuzzers) > 0 {
+		return token.NoPos, nil
+	}
+	return s.Pos(), fmt.Errorf("suite %s declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite", s.Identifier())
 }
 
 // ValidateFixtureShape is ValidateSuiteShape for a fixture.
@@ -75,7 +85,8 @@ func FieldShapeError(kind, owner string, field *types.Var, in *types.Package) er
 }
 
 // isSuiteType reports whether named is a suite: named *TestSuite and
-// declaring a case of its own. A case-less one is a helper type.
+// declaring a case of its own. A case-less one is refused at its own
+// declaration, which names the way out, so its field is not refused here.
 func isSuiteType(named *types.Named) bool {
 	if named == nil || !IS_TEST_SUITE.MatchString(named.Obj().Name()) {
 		return false

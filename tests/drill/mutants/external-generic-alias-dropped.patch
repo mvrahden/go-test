@@ -1,6 +1,4 @@
-Expect: shapes pxgenericalias: TestIntContractTestSuite/TestRuns did not pass
-Expect: shapes pxgenericalias: TestIntLocalTestSuite/TestLocal did not pass
-Expect: shapes pxgenericalias: TestIntIndexTestSuite/TestZeroValue did not pass
+Expect: shapes pxgenericalias: exit code 2, want 0
 Clause: when the external test package declares an alias of a generic suite → an alias of a generic suite the package under test declares runs that suite's methods
 Clause: when the external test package declares an alias of a generic suite → an alias of a generic suite the external test package declares runs that suite's methods
 Clause: when the external test package declares an alias of a generic suite → an alias of a generic suite from a third package runs that suite's methods

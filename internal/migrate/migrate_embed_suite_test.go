@@ -358,10 +358,10 @@ func (s *MigrateEmbedTestSuite) TestBaseShapes(t *gotest.T) {
 			},
 			Want: map[string][]string{
 				"p/a_test.go": {
-					"type BaseTestSuiteHelpers struct{}",
-					"type ChildTestSuite struct{ base BaseTestSuiteHelpers }",
+					"type BaseSuiteHelper struct{}",
+					"type ChildTestSuite struct{ base BaseSuiteHelper }",
 				},
-				"p/ref_test.go": {"func newBase() *BaseTestSuiteHelpers { return &BaseTestSuiteHelpers{} }"},
+				"p/ref_test.go": {"func newBase() *BaseSuiteHelper { return &BaseSuiteHelper{} }"},
 			},
 			Ran: []string{"RAN base TestShared", "RAN child TestOwn"},
 		},

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery Caseless / CaselessSuites / when a type named like a suite declares no case / a testify base suite that declares no case is left to testify \(
+Clause: when a type named like a suite declares no case → a testify base suite that declares no case is left to testify
+--- a/internal/gotestast/testify.go
++++ b/internal/gotestast/testify.go
+@@ -30,7 +30,7 @@
+ 		return false
+ 	}
+ 	for i := range st.NumFields() {
+-		if f := st.Field(i); f.Embedded() && embedsTestifySuite(f.Type(), seen) {
++		if f := st.Field(i); false && f.Embedded() && embedsTestifySuite(f.Type(), seen) {
+ 			return true
+ 		}
+ 	}

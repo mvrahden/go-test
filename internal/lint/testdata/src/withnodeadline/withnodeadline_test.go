@@ -8,11 +8,15 @@ import (
 
 type LiteralTestSuite struct{}
 
+func (s *LiteralTestSuite) TestRuns(t *gotest.T) {}
+
 func (s *LiteralTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: -1, SetupTimeout: -1 * time.Second} // want `SuiteConfig.Timeout is negative, which disables the deadline; write gotest.NoDeadline to say so` `SuiteConfig.SetupTimeout is negative`
 }
 
 type ComposeTestSuite struct{}
+
+func (s *ComposeTestSuite) TestRuns(t *gotest.T) {}
 
 func (s *ComposeTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()

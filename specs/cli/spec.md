@@ -124,7 +124,7 @@ The scaffold subcommand SHALL write the scaffold beside the source file it is gi
 - **THEN** scaffolds into the package's directory
 
 ### Requirement: Scaffolds that compile
-The scaffold subcommand SHALL write only code that compiles. It SHALL refuse with exit 1 a generic type, a generic function and a method of a generic type, and a suite name the package already declares in any of its files or its external test package's, writing nothing. The target shapes are the tables in `tests/conformance/cli/scaffold_compiles_suite_test.go`.
+The scaffold subcommand SHALL write only code that compiles. It SHALL refuse with exit 1 a generic type, a generic function and a method of a generic type, a suite name the package already declares in any of its files or its external test package's, and a type without an exported method or a file without an exported function, whose suite would declare no case, writing nothing. The target shapes are the tables in `tests/conformance/cli/scaffold_compiles_suite_test.go`.
 
 #### Scenario: A generic target
 - **WHEN** a generic type, a generic function or a method of a generic type is scaffolded
@@ -133,6 +133,10 @@ The scaffold subcommand SHALL write only code that compiles. It SHALL refuse wit
 #### Scenario: A suite name the package declares
 - **WHEN** the package already declares the suite name scaffold would write
 - **THEN** refuses it on stderr with exit 1, naming the declaration and its file, and writes nothing
+
+#### Scenario: A target without a case
+- **WHEN** a type without an exported method or a file without an exported function is scaffolded
+- **THEN** refuses it on stderr with exit 1, saying its suite would declare no case, and writes nothing
 
 #### Scenario: Each target shape
 - **WHEN** each target shape is scaffolded

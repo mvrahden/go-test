@@ -39,7 +39,7 @@ func (s *ShapesTestSuite) TestSuiteTypedFields(t *gotest.T) {
 	fm := loadNamedSource(t.T(), "shapes.go", shapesSrc)
 
 	t.When("a suite holds a *TestSuite-named type in a named field", func(w *gotest.T) {
-		w.It("accepts one that declares no case: it is a helper type", func(it *gotest.T) {
+		w.It("accepts one that declares no case: its own declaration is refused, naming the way out", func(it *gotest.T) {
 			pos, err := gotestast.ValidateSuiteShape(suiteNamed(it, fm, "HoldsHelperTestSuite"))
 			gotest.NoError(it, err)
 			gotest.False(it, pos.IsValid())

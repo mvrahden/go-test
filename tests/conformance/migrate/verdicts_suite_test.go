@@ -60,6 +60,18 @@ func (s *MigrateVerdictsTestSuite) TestAnAssertionOnAGoroutine(t *gotest.T) {
 	})
 }
 
+func (s *MigrateVerdictsTestSuite) TestASuiteWithNoTest(t *gotest.T) {
+	t.When("a testify suite declares no test, of its own or from a base", func(w *gotest.T) {
+		w.It("migrate leaves it unconverted under a marker saying gotest refuses a suite without a case", func(it *gotest.T) {
+			src := suiteFile("", "", "func (s *VSuite) SetupSuite() {}\n")
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": src})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): VSuite declares no test; gotest refuses a suite without a Test, Benchmark or Fuzz method[^\n]*\ntype VSuite struct`, out)
+			gotest.Equal(it, src, stripMarkers(out))
+		})
+	})
+}
+
 func (s *MigrateVerdictsTestSuite) TestElementsComparedDeeply(t *gotest.T) {
 	t.When("ElementsMatch or Subset compares pointer or interface elements", func(w *gotest.T) {
 		w.It("migrate leaves it unconverted under a marker saying gotest compares them with ==", func(it *gotest.T) {

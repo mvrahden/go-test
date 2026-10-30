@@ -587,9 +587,10 @@ shards of one run do not add up to every mutant exactly once.
 | `unreached-fixture-validated` | every type named like a fixture is checked, bound or not | canary: the `shapes/fieldunreferenced` package exits 2 instead of 0 |
 | `lowercase-after-test-is-a-case` | a method continuing `Test` with a lowercase letter is read as a case | canary: the `shapes/nameistest` package exits 2 instead of 0 |
 | `lowercase-case-taking-t-accepted` | a method taking its case's T under a name go test would not run passes as a helper | canary: the `shapes/namelower` package exits 0 instead of 2 |
-| `caseless-suite-rendered` | no suite is treated as declaring no case | canary: `discover` lists the `shapes/caseless` helper suite |
-| `caseless-suite-discovered` | `discover` lists a suite that declares no case | canary: `discover` lists the `shapes/caseless` helper suite |
-| `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package exits 2, its helper field refused as a nested suite |
+| `caseless-suite-accepted` | a type named like a suite that declares no case is accepted | canary: the `shapes/caseless` package exits 0 instead of 2 and `discover` does not report it broken |
+| `caseless-excluded-case-uncounted` | an excluded case does not count as a declared one | canary: the `shapes/excludedonly` package exits 2 instead of 0 |
+| `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package is refused at its helper field as a nested suite, not at the helper's declaration |
+| `caseless-testify-base-collected` | a testify suite embedding testify's suite through a base is read as a gotest suite | conformance: the discovery It for a testify base suite sees exit 2 |
 | `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
 | `harness-imports-collide-by-name` | two imported packages of the same name get the same alias | canary: the `shapes/genpgpg` package exits 2 instead of 0 |
 | `predeclared-clash-accepted` | a package redeclaring a name Go predeclares that the harness uses is generated for | conformance: the discovery It for `shapes/genpredeclared` sees a build failure instead of the located refusal |
@@ -601,6 +602,7 @@ shards of one run do not add up to every mutant exactly once.
 | `scaffold-package-path-loaded-as-pattern` | `scaffold` loads a type's or function's package path as a pattern from the working directory, not from the path itself | conformance: the CLI scaffold It for an absolute package path named from outside the module fails with exit 1 |
 | `scaffold-absolute-package-path-not-a-path` | an absolute package path is not read as a directory path | conformance: the CLI scaffold It for a package path through a symlinked directory fails with exit 1 |
 | `scaffold-generic-type-accepted` | `scaffold` writes a suite for a generic type | conformance: the CLI scaffold It for a generic type sees exit 0 and a written file |
+| `scaffold-caseless-type-written` | `scaffold` writes a suite without a case for a type without an exported method | conformance: the CLI scaffold It for such a type sees exit 0 and a written file |
 | `scaffold-suite-name-read-from-non-test-files` | the suite-name check reads only the package's non-test files | conformance: the CLI scaffold It for a suite name a test file declares sees exit 0 and a duplicate written |
 | `scaffold-subject-self-qualified` | the type scaffold names its subject through its own package | conformance: the CLI scaffold It for a type with methods sees go vet fail |
 | `scaffold-ignores-symlinks` | `scaffold` loads a file's package by its directory as a pattern, not from the directory itself | conformance: the CLI scaffold It for a file named through a symlinked directory fails with exit 1 |
@@ -671,7 +673,9 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-focus-constrained-files-skipped` | the `focus` fix leaves the files a build constraint leaves out | conformance: the lint `-fix` It for files behind a build constraint finds the focus left there |
 | `lint-focus-unresolved-accepted` | a constrained file no build type-checks is renamed past | conformance: the lint `-fix` It for such a file finds the fix applied |
 | `migrate-base-tests-not-forwarded` | a child of a base suite gets no forwarding method for the base's tests | conformance: the migrate Its for a child of a base, a base by pointer, a generic base and a base's tests among the child's find the base's test unforwarded |
-| `migrate-helper-keeps-suite-name` | a base no runner ran keeps a name gotest runs as a suite | conformance: the migrate It for the helper base finds gotest running the base as a suite |
+| `migrate-helper-keeps-suite-name` | a base no runner ran keeps a name gotest reads as a suite | conformance: the migrate It for the helper base finds the base still named BaseTestSuite |
+| `migrate-helper-name-collision-ignored` | a base's helper name already declared is taken anyway | conformance: the migrate It for a taken helper name finds no marker naming the collision |
+| `migrate-caseless-suite-migrated` | a testify suite that declares no test is migrated to a suite without a case | conformance: the migrate It for a suite with no test finds no marker |
 | `migrate-value-embedding-refused` | a child embedding its base by value is refused as before | conformance: every migrate It whose child embeds its base by value finds the child refused under the embedding marker |
 | `migrate-helper-keeps-suite-embedding` | a helper base keeps its `suite.Suite` embedding | conformance: the migrate It for a child of a base finds a testify lint finding |
 | `migrate-outside-base-ignored` | a base declared outside the migrated test files does not fail the run | conformance: the migrate It for an outside base finds an exit other than 2 |

@@ -22,6 +22,11 @@ func (s *GenerationRejectsTestSuite) TestGenerationRejects(t *gotest.T) {
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withgeneration")
 		})
 	})
+	t.When("a type named like a suite declares no case", func(w *gotest.T) {
+		w.It("reports it at its declaration, and not a suite whose only case is excluded", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withcaseless")
+		})
+	})
 }
 
 func (s *GenerationRejectsTestSuite) TestMethodNames(t *gotest.T) {

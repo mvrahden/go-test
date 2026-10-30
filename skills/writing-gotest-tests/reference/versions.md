@@ -691,9 +691,16 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
    another package or declared in the external test package all run
    ([other packages](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-declarations-from-other-packages)).
 
-4. **A suite with no case is a helper** — nothing is generated, run or
-   discovered for a `*TestSuite` type declaring no `Test*`, `Benchmark*`
-   or `Fuzz*` method, and a testify suite is left to `go test`.
+4. **A suite declares a case** — a `*TestSuite` type declaring no
+   `Test*`, `Benchmark*` or `Fuzz*` method, an excluded `X_` one counting,
+   is refused at its declaration with exit 2, and `discover` reports its
+   package broken; a testify suite is left to `go test`
+   ([suites without a case](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suites-without-a-case)).
+   `scaffold` refuses a type without an exported method or a file without
+   an exported function, and `migrate` marks a testify suite without a test.
+   Before v1.37 such a type was generated without a `Test` function, so it
+   and its hooks never ran, and `discover` listed it as a suite without
+   methods; name a helper type so it does not end in `TestSuite`.
 
 5. **The harness imports under its own names** and every load reads past a
    generated file left on disk, so a package declaring `context` or
@@ -703,8 +710,8 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
 
 6. **`migrate` converts base suites** — a testify suite embedding a base
    suite of the same test files migrates with it: the base becomes a helper
-   held in a named field, and the child declares the hooks and tests it had
-   through the base
+   held in a named field, `BaseTestSuite` renamed `BaseSuiteHelper`, and the
+   child declares the hooks and tests it had through the base
    ([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
    Before v1.37 the files declaring both were left under a marker.
 

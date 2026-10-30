@@ -2,7 +2,7 @@ package caseless
 
 import "github.com/mvrahden/go-test/pkg/gotest"
 
-// HelperTestSuite is named like a suite but declares no case: a helper.
+// HelperTestSuite is named like a suite but declares no case: refused.
 type HelperTestSuite struct{ Prefix string }
 
 func (s *HelperTestSuite) name(n string) string { return s.Prefix + n }

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldCompiles / TargetsWithoutACase / .* / refuses it on stderr with exit 1, saying its suite would declare no case, and writes nothing / a type without an exported method \(
+Clause: when a type without an exported method or a file without an exported function is scaffolded → refuses it on stderr with exit 1, saying its suite would declare no case, and writes nothing
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -166,7 +166,7 @@
+ 		info.Methods = extractStructMethods(named)
+ 	}
+ 
+-	if len(info.Methods) == 0 {
++	if false && len(info.Methods) == 0 {
+ 		return nil, fmt.Errorf("%s has no exported method: %s would declare no case, which gotest refuses, so nothing was written", typeName, suiteName)
+ 	}
+ 	sort.Slice(info.Methods, func(i, j int) bool {

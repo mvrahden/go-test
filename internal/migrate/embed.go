@@ -204,11 +204,12 @@ func (u *unit) nameEmbeds(s *suiteDecl) {
 	}
 }
 
-// helperName is the name a base no runner ran keeps: its own, or with
-// Helpers appended when gotest would take that name for a suite.
+// helperName is the name a base no runner ran takes: its own, or with its
+// TestSuite suffix turned into SuiteHelper when gotest would read the name
+// as a suite, which must declare a case.
 func helperName(name string) string {
 	if gotestast.IS_TEST_SUITE.MatchString(name) {
-		return name + "Helpers"
+		return strings.TrimSuffix(name, "TestSuite") + "SuiteHelper"
 	}
 	return name
 }

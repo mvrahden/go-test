@@ -14,11 +14,16 @@ func (s *MigratedTestSuite) TestMigrated(t *gotest.T) {
 	gotest.True(t, true)
 }
 
-type LegacyTestSuite struct {
+// BaseTestSuite declares no case: a testify base, left to testify.
+type BaseTestSuite struct {
 	suite.Suite
 }
 
-func (s *LegacyTestSuite) SetupSuite() {}
+func (s *BaseTestSuite) SetupSuite() {}
+
+type LegacyTestSuite struct {
+	BaseTestSuite
+}
 
 func (s LegacyTestSuite) TestValue() {}
 

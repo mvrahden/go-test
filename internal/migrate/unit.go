@@ -103,6 +103,18 @@ type suiteDecl struct {
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
 
+// declaresTest reports whether testify runs a test on the suite obj names:
+// a Test method of its own or one a base promotes.
+func declaresTest(obj *types.TypeName) bool {
+	mset := types.NewMethodSet(types.NewPointer(obj.Type()))
+	for i := range mset.Len() {
+		if name := mset.At(i).Obj().Name(); strings.HasPrefix(name, "Test") && name != "Test" {
+			return true
+		}
+	}
+	return false
+}
+
 // objKey names a package-level object the same in every configuration;
 // the configurations type-check apart, so their objects differ.
 func objKey(obj types.Object) string {
@@ -399,6 +411,12 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 	}
 	for _, s := range u.suites {
 		if !s.migrated() {
+			continue
+		}
+		if !s.helper && !declaresTest(s.obj) {
+			s.refusal = s.obj.Name() + " declares no test; gotest refuses a suite without a Test, Benchmark or Fuzz method — add a test, or migrate this file by hand"
+			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
+			refused[s.file] = true
 			continue
 		}
 		if !s.helper && token.IsExported(s.newName) && !runsPlain(s.newName) {

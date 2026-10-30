@@ -166,6 +166,9 @@ func IntrospectType(pkgPattern, typeName string) (*TypeInfo, error) {
 		info.Methods = extractStructMethods(named)
 	}
 
+	if len(info.Methods) == 0 {
+		return nil, fmt.Errorf("%s has no exported method: %s would declare no case, which gotest refuses, so nothing was written", typeName, suiteName)
+	}
 	sort.Slice(info.Methods, func(i, j int) bool {
 		return info.Methods[i].Name < info.Methods[j].Name
 	})
@@ -257,6 +260,9 @@ func IntrospectFile(dir, filename string) (*FileInfo, error) {
 	pkgDir := gotestgen.DeterminePkgDir(pkg)
 	if err := checkSuiteName(pkgDir, pkg.Name, suiteName); err != nil {
 		return nil, err
+	}
+	if len(funcs) == 0 {
+		return nil, fmt.Errorf("%s declares no exported function: %s would declare no case, which gotest refuses, so nothing was written", filename, suiteName)
 	}
 
 	return &FileInfo{

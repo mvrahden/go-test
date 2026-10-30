@@ -130,6 +130,16 @@ func (c collector) CollectSuiteSpecs(pkg *packages.Package) CollectorResult {
 		return CollectorResult{Errs: errs}
 	}
 
+	// a type named like a suite declares a case
+	for _, s := range suites {
+		if pos, err := gotestast.ValidateDeclaresCase(s); err != nil {
+			errs = append(errs, CollectorError{Err: err, Pos: pos})
+		}
+	}
+	if len(errs) > 0 {
+		return CollectorResult{Errs: errs}
+	}
+
 	// validate context consistency
 	for _, s := range suites {
 		if err := gotestast.ValidateContextConsistency(s); err != nil {
@@ -237,7 +247,6 @@ func (c collector) Rejections(pkg *packages.Package, result CollectorResult) []C
 	if err != nil {
 		return located(err)
 	}
-	spec = withoutCaseless(spec)
 	if len(spec.EffectiveTestSuites) == 0 {
 		return nil
 	}

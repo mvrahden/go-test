@@ -113,18 +113,18 @@ func (s *MigrateBaseSuitesTestSuite) TestChildOfABase(t *gotest.T) {
 		gotest.NoError(w, err)
 
 		w.It("the migrated child compiles and gotest runs the base's hooks and tests on it", func(it *gotest.T) {
-			gotest.Contains(it, child, "type ChildTestSuite struct {\n\tbase BaseTestSuiteHelpers\n}")
+			gotest.Contains(it, child, "type ChildTestSuite struct {\n\tbase BaseSuiteHelper\n}")
 			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.Equal(it, "pass", run.Verdict("TestChildTestSuite/TestShared"), "stdout: %s", run.Stdout)
 			gotest.Equal(it, "pass", run.Verdict("TestChildTestSuite/TestOwn"), "stdout: %s", run.Stdout)
 			gotest.Contains(it, run.Stdout, "RAN base SetupTest")
 		})
 
-		w.It("the base becomes a helper type gotest does not run as a suite", func(it *gotest.T) {
-			gotest.Contains(it, base, "type BaseTestSuiteHelpers struct {\n\trows []string\n}")
-			gotest.Contains(it, base, "func (b *BaseTestSuiteHelpers) count(t *gotest.T) int {\n\tgotest.NotEmpty(t, b.rows)")
+		w.It("the base becomes a helper type, its TestSuite suffix turned into SuiteHelper, that gotest does not run as a suite", func(it *gotest.T) {
+			gotest.Contains(it, base, "type BaseSuiteHelper struct {\n\trows []string\n}")
+			gotest.Contains(it, base, "func (b *BaseSuiteHelper) count(t *gotest.T) int {\n\tgotest.NotEmpty(t, b.rows)")
 			gotest.Empty(it, run.Verdict("TestBaseTestSuite"), "stdout: %s", run.Stdout)
-			gotest.Empty(it, run.Verdict("TestBaseTestSuiteHelpers"), "stdout: %s", run.Stdout)
+			gotest.Empty(it, run.Verdict("TestBaseSuiteHelper"), "stdout: %s", run.Stdout)
 		})
 
 		w.It("migrate leaves no marker for the embedding", func(it *gotest.T) {
@@ -386,6 +386,22 @@ func (s *MigrateBaseSuitesTestSuite) TestABaseInANonTestFile(t *gotest.T) {
 			gotest.Regexp(it, `// TODO\(gotest-migrate\): APISuite embeds BaseSuite, declared in base\.go, which is not a test file;[^\n]*\ntype APISuite struct`, out)
 			gotest.Equal(it, nonTestChildSrc, stripMarkers(out))
 			gotest.Equal(it, nonTestBaseSrc, readFile(it, dir, "p/base.go"))
+		})
+	})
+}
+
+func (s *MigrateBaseSuitesTestSuite) TestAHelperNameTaken(t *gotest.T) {
+	t.When("the helper name a base suite would take is already declared", func(w *gotest.T) {
+		w.It("migrate leaves the base's file unconverted under a marker naming the collision", func(it *gotest.T) {
+			taken := "package p\n\ntype BaseSuiteHelper struct{}\n"
+			dir := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(dir, map[string]string{"p/base_test.go": baseSrc, "p/child_test.go": childSrc, "p/taken_test.go": taken}))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			out := readFile(it, dir, "p/base_test.go")
+			gotest.Equal(it, 1, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): renaming BaseTestSuite to BaseSuiteHelper collides with another declaration[^\n]*\ntype BaseTestSuite struct`, out)
+			gotest.Equal(it, baseSrc, stripMarkers(out))
 		})
 	})
 }

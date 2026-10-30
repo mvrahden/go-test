@@ -30,7 +30,7 @@ func (s *CLIScaffoldPathsTestSuite) TestFilePaths(t *gotest.T) {
 			}) {
 				dir := sub.TempDir()
 				gotest.NoError(sub, testkit.WriteModule(root, dir, "example.com/scaf"))
-				gotest.NoError(sub, os.WriteFile(filepath.Join(dir, "calc.go"), []byte("package scaf\n\n// Calc adds.\ntype Calc struct{}\n\n// Add returns a + b.\nfunc (c Calc) Add(a, b int) int { return a + b }\n"), 0o600))
+				gotest.NoError(sub, os.WriteFile(filepath.Join(dir, "calc.go"), []byte(scafPackageSrc), 0o600))
 				target := "./calc.go"
 				if tc.absolute {
 					target = filepath.Join(dir, "calc.go")

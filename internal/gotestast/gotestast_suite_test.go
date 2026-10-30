@@ -1148,7 +1148,7 @@ func (s *SpecTestSuite) TestDetermineTestSuite(t *gotest.T) {
 	})
 
 	t.When("unexported suite type", func(w *gotest.T) {
-		w.It("is collected — the exported check moved to validation (case-less bases stay legal)", func(it *gotest.T) {
+		w.It("is collected — the exported and declares-a-case checks come later", func(it *gotest.T) {
 			pkg, genDecls := loadFixtureAST(it.T(), `
 				package testpkg
 				type myTestSuite struct{ Value string }

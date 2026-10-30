@@ -15,7 +15,8 @@ platform whose test files differ. The suite's own `s.Equal`,
 promoted mixin hooks and method values are marked. Before v1.37 a suite
 built on a base suite was marked; from v1.37 one built on a base suite of
 the same test files migrates with it, the base becoming a helper the
-child calls, and a base in another package exits 2
+child calls (`BaseTestSuite` renamed `BaseSuiteHelper`), and a base in
+another package exits 2
 ([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
 The module must require go-test first
 (`go get -tool`, see `setup.md`). `--dry-run` prints the diff without

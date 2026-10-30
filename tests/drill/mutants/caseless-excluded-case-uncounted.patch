@@ -1,0 +1,15 @@
+Expect: shapes excludedonly: exit code 2, want 0
+Expect: shapes excludedonly: TestLaterTestSuite did not run as skipped
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a type named like a suite declares no case → a suite whose only case is excluded runs as skipped
+--- a/internal/gotestast/shapes.go
++++ b/internal/gotestast/shapes.go
+@@ -36,7 +36,7 @@
+ // Fuzz method; excluded and unfocused ones count. The position is the suite's
+ // name.
+ func ValidateDeclaresCase(s *TestSuiteSpec) (token.Pos, error) {
+-	if s.th.DeclaresTests || len(s.th.Benchmarks) > 0 || len(s.th.Fuzzers) > 0 {
++	if func() bool { for _, m := range s.th.TestCases { if !m.IsExcluded() { return true } }; return false }() || len(s.th.Benchmarks) > 0 || len(s.th.Fuzzers) > 0 {
+ 		return token.NoPos, nil
+ 	}
+ 	return s.Pos(), fmt.Errorf("suite %s declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite", s.Identifier())
