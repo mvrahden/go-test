@@ -134,6 +134,43 @@ describe("specDataToReport with a fuzz target", () => {
   });
 });
 
+describe("specDataToReport with a suite that failed in its own hooks", () => {
+  const failedSuite = {
+    ...suite("Store", [leaf("saves", "pass", 0.1), leaf("loads", "pass", 0.1)]),
+    status: "fail",
+    output: [
+      "=== RUN   TestStoreTestSuite\n",
+      "    store_test.go:40: AfterAll: close db: connection reset\n",
+      "--- FAIL: TestStoreTestSuite (0.20s)\n",
+    ],
+  };
+  const data = {
+    packages: [
+      {
+        path: "example.com/store",
+        status: "fail",
+        duration: 0.2,
+        nodes: [failedSuite],
+      },
+    ],
+    stats: {
+      suites: 1,
+      behaviors: 3,
+      tests: 0,
+      passed: 2,
+      failed: 1,
+      skipped: 0,
+    },
+  };
+
+  it("counts the suite as the failure and quotes what it said", () => {
+    const report = specDataToReport(data as never, []);
+    expect(report).toMatch(/Store\s+\S+\s+2 passed, 1 failed/);
+    expect(report).toContain("│ store_test.go:40: AfterAll: close db");
+    expect(report).not.toContain("--- FAIL");
+  });
+});
+
 describe("specDataToReport", () => {
   const data = {
     packages: [

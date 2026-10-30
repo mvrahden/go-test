@@ -540,6 +540,65 @@ describe("runs kept across refreshes", () => {
   });
 });
 
+// A suite's own verdict: its hooks run outside any behavior, so a failure
+// there — or a panic go test books on the suite — is on the suite node alone.
+const suiteOwnFailure = [
+  { Action: "run", Package: "example.com/store", Test: "TestStoreTestSuite" },
+  {
+    Action: "run",
+    Package: "example.com/store",
+    Test: "TestStoreTestSuite/saves",
+  },
+  {
+    Action: "pass",
+    Package: "example.com/store",
+    Test: "TestStoreTestSuite/saves",
+    Elapsed: 0.01,
+  },
+  {
+    Action: "output",
+    Package: "example.com/store",
+    Test: "TestStoreTestSuite",
+    Output: "    store_test.go:40: AfterAll: close db: connection reset\n",
+  },
+  {
+    Action: "output",
+    Package: "example.com/store",
+    Test: "TestStoreTestSuite",
+    Output: "--- FAIL: TestStoreTestSuite (0.02s)\n",
+  },
+  {
+    Action: "fail",
+    Package: "example.com/store",
+    Test: "TestStoreTestSuite",
+    Elapsed: 0.02,
+  },
+  { Action: "fail", Package: "example.com/store", Elapsed: 0.03 },
+]
+  .map((e) => JSON.stringify(e))
+  .join("\n");
+
+describe("a branch's own verdict", () => {
+  it("shows a suite that failed with every behavior passing as failed, with what it said", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+    await panel.refresh({
+      stream: suiteOwnFailure,
+      folder: state.workspaceDir,
+    });
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    const summary = html.slice(
+      html.indexOf('<summary class="node suite">'),
+      html.indexOf("</summary>", html.indexOf('<summary class="node suite">')),
+    );
+    expect(summary).toContain('class="icon fail"');
+    const said = /<pre class="error-output">([^<]*)<\/pre>/.exec(html)?.[1];
+    expect(said).toBe("store_test.go:40: AfterAll: close db: connection reset");
+  });
+});
+
 describe("clearing drops the kept runs", () => {
   // Clearing has to drop what is kept, not just repaint, or the next refresh
   // would resurrect what was cleared.
