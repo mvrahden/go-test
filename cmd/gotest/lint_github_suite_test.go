@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
+	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -39,6 +40,22 @@ func (s *LintGitHubTestSuite) TestArming(t *gotest.T) {
 
 		w.It("auto-arms without the flag", func(it *gotest.T) {
 			gotest.True(it, ExportLintGitHubArmed([]string{"./..."}))
+		})
+	})
+}
+
+func (s *LintGitHubTestSuite) TestStepSummaryCells(t *gotest.T) {
+	t.When("a finding holds Markdown syntax", func(w *gotest.T) {
+		summaryPath := filepath.Join(w.TempDir(), "step_summary.md")
+		w.Setenv("GITHUB_STEP_SUMMARY", summaryPath)
+		ExportAppendLintStepSummary([]gotestspec.Annotation{{
+			Title: "rule|x", File: "a<b>.go", Line: 3, Message: "want `x` | <i>y</i>\nnext",
+		}})
+		content, err := os.ReadFile(summaryPath) //nolint:gosec // G304: path built in this test
+		gotest.NoError(w, err)
+
+		w.It("keeps the finding one row of three cells, as text", func(it *gotest.T) {
+			gotest.Contains(it, string(content), "| rule\\|x | a&lt;b&gt;.go:3 | want \\`x\\` \\| &lt;i&gt;y&lt;/i&gt; next |\n")
 		})
 	})
 }

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break / keeps each behavior on one row of its table \(
+Judge: ./tests/canary CanaryTestSuite/TestSpecMarkdownLabelsStayInTheirCell
+Expect: specmarkdown: a label breaks its table row
+Clause: when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break → keeps each behavior on one row of its table
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -60,7 +60,6 @@
+ // link, emphasis or an entity, so the spec shows it as written.
+ var labelEscaper = strings.NewReplacer(
+ 	`\`, `\\`,
+-	"|", `\|`,
+ 	"`", "\\`",
+ 	"*", `\*`,
+ 	"_", `\_`,

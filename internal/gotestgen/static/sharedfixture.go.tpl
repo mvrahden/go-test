@@ -534,13 +534,24 @@ func main() {
 	}()
 {{- end }}
 	ƒreleasing.Wait()
-{{ range .TeardownFixtures }}
+	var ƒtornErrs []string
+{{- range .TeardownFixtures }}
 	if ƒteardown_{{ .VarName }}() {
 		ƒfailed()
+		ƒtornErrs = append(ƒtornErrs, "{{ .Identifier }}: teardown failed")
 	}
 {{- end }}
 	ƒfailMu.Lock()
 	defer ƒfailMu.Unlock()
+
+{{- /*
+  The fixtures whose teardown failed, on the protocol stream: the runner's
+  teardown verdict when a setup failure has claimed the exit status, never
+  the fixtures' stderr, which carries whatever they write.
+*/}}
+	if len(ƒtornErrs) > 0 {
+		fmt.Fprintf(ƒproto, "{\"key\":\"_teardown\",\"error\":%s}\n", ƒquote(strings.Join(ƒtornErrs, "; ")))
+	}
 
 {{- /*
   Exit 1 for a lifecycle failure of either kind. The runner reads a teardown

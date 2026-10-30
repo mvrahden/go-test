@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when an It's label is an earlier It's label, a slash and more / a run's spec shows both as Its under their When \(
+Clause: when an It's label is an earlier It's label, a slash and more → a run's spec shows both as Its under their When
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -410,7 +410,7 @@
+ func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[string][]string) []string {
+ 	for i := len(segments) - 1; i >= 1; i-- {
+ 		parent := strings.Join(segments[:i], "/")
+-		if n := nmap[parent]; n == nil || n.Status != StatusNone {
++		if n := nmap[parent]; n == nil {
+ 			continue
+ 		}
+ 		head := segments[:i]

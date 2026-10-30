@@ -1,7 +1,7 @@
 # Fuzz Specification
 
 ## Purpose
-How each fuzz execution's BeforeEach and AfterEach pair when BeforeEach fails, skips or panics, which fuzz seed replays a run keeps when -run or -skip names some of a suite's Test and Fuzz functions, and how gotest fuzz and its triage give a target the shared fixtures its suite binds.
+How each fuzz execution's BeforeEach and AfterEach pair when BeforeEach fails, skips or panics, which fuzz seed replays a run keeps when -run or -skip names some of a suite's Test and Fuzz functions, how gotest fuzz and its triage give a target the shared fixtures its suite binds, where a seed of the wrong type is reported, what a fuzz session warns about before it starts, and which crashers `gotest fuzz promote` turns into seeds.
 
 ## Requirements
 
@@ -61,3 +61,59 @@ A suite with fuzz methods and no test method SHALL have no Test function to sele
 #### Scenario: Triaging a crasher of a target whose suite binds a shared fixture
 - **WHEN** gotest fuzz triage re-runs a crasher of a target whose suite binds a shared fixture
 - **THEN** reports the crasher's own failure, seen with the fixture's state, and tears the fixture down
+
+### Requirement: Seed-type errors
+An f.Add seed whose type does not match the fuzz target's parameters SHALL fail the target at the f.Add call's file and line, never at gotest's or the generated code's.
+
+#### Scenario: A seed of the wrong type
+- **WHEN** an f.Add seed's type does not match the fuzz target's parameters
+- **THEN** the failure is located at the f.Add call
+
+### Requirement: Stale corpus entries
+A fuzz session SHALL warn about each recorded corpus entry whose values no longer match its target before it spends the budget, naming the entry; the warning SHALL NOT suggest promote, which takes only the latest session's crashers.
+
+#### Scenario: An entry of an older shape
+- **WHEN** a fuzz session meets a corpus entry of an older shape
+- **THEN** warns, naming the entry, without suggesting promote
+
+### Requirement: Promote takes corpus literals only
+`gotest fuzz promote` SHALL read a crasher file only in Go's fuzz corpus format, the `go test fuzz v1` header and one literal per line in the grammar Go's encoder writes. Any other expression or token SHALL be refused, naming the file and line, and then no crasher of the run SHALL be promoted.
+
+#### Scenario: A crasher that is not a corpus literal
+- **WHEN** a session's crasher file holds anything but Go's corpus literals
+- **THEN** promote refuses it with exit 1, naming the file and line
+- **AND** no crasher of the run is promoted and every crasher file stays
+
+### Requirement: Promote takes the latest session's crashers only
+`gotest fuzz promote` SHALL take only the crasher files written by the latest `gotest fuzz` session that fuzzed their target, unchanged since, and SHALL leave every other corpus file and its target's source as they are. A session SHALL NOT drop the crashers recorded for targets it did not fuzz, though it shares the gotest cache with other modules and checkouts.
+
+#### Scenario: A session's crasher
+- **WHEN** a fuzz session finds a crasher
+- **THEN** promote adds it as a seed and removes its file
+
+#### Scenario: A file the session did not write
+- **WHEN** a corpus file was not written by the latest fuzz session
+- **THEN** promote leaves the file and its target's source untouched
+
+#### Scenario: A session of another checkout
+- **WHEN** a later session sharing the cache fuzzes another checkout's target
+- **THEN** promote still takes the crashers of the targets it did not fuzz
+
+### Requirement: Promoted seeds hold the crasher's values
+`gotest fuzz promote` SHALL write each seed so its target receives exactly the values the crasher holds, a negative zero, the bits of a NaN and the integer limits included, and a decoding target's crasher as one seed of all its arguments.
+
+#### Scenario: Edge values of a decoding target
+- **WHEN** a crasher of a decoding target holds a value at the edge of its Go spelling
+- **THEN** the promoted seed fails the target as the crasher did
+
+#### Scenario: A decoding target of several arguments
+- **WHEN** a decoding target takes several arguments
+- **THEN** promote adds its crasher as one seed of all of them
+- **AND** the promoted seed fails the target as the crasher did
+
+### Requirement: Promoting a decoded target's crasher
+For a fuzz target that decodes its input from the engine's leaves, `gotest fuzz promote` SHALL build the seed from the value the target's codec decodes, and SHALL refuse a crasher it cannot decode that way instead of splicing raw leaf values.
+
+#### Scenario: No decoded value
+- **WHEN** a decoding target's crasher re-run echoes no decoded value
+- **THEN** promote refuses it with exit 1 and splices no raw leaf

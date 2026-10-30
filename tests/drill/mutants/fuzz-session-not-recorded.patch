@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz FuzzSession / SessionCrasher / .* / promote adds it as a seed and removes its file \(
+Clause: when a fuzz session finds a crasher → promote adds it as a seed and removes its file
+--- a/cmd/gotest/fuzz.go
++++ b/cmd/gotest/fuzz.go
+@@ -163,7 +163,7 @@
+ 	})
+ 	code = res.ExitCode()
+ 	// The crashers this session wrote are the ones promote takes.
+-	if err := recordFuzzSession(targets, res); err != nil {
++	if err := error(nil); err != nil {
+ 		fmt.Fprintf(os.Stderr, "fuzz: could not record this session's crashers for promote: %s\n", err)
+ 	}
+ 

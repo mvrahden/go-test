@@ -68,11 +68,7 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 				return pkgNode.Nodes[a].Name < pkgNode.Nodes[b].Name
 			})
 			gotestspec.ClassifyRoots(pkgNode.Nodes)
-			for _, n := range pkgNode.Nodes {
-				if n.Excluded {
-					markExcluded(n.Children)
-				}
-			}
+			carryExcluded(pkgNode.Nodes)
 			out = append(out, pkgNode)
 		}
 	}
@@ -81,8 +77,19 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 	return out, notes
 }
 
-// markExcluded carries an excluded suite's flag down to every block under it:
-// a reader of one node must not take a parked behavior for a live one.
+// carryExcluded carries an excluded suite's or method's flag down to every
+// block under it: a reader of one node must not take a parked behavior for a
+// live one.
+func carryExcluded(nodes []*gotestspec.Node) {
+	for _, n := range nodes {
+		if n.Excluded {
+			markExcluded(n.Children)
+			continue
+		}
+		carryExcluded(n.Children)
+	}
+}
+
 func markExcluded(nodes []*gotestspec.Node) {
 	for _, n := range nodes {
 		n.Excluded = true
@@ -129,7 +136,7 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 
 func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 	var out []*gotestspec.Node
-	for _, b := range behaviors {
+	for _, b := range reportedBehaviors(behaviors) {
 		// The behavior carries the exact go test segment, "#01" and all,
 		// because that is what an observed result is keyed by. The tree shows
 		// duplicates under the name the developer wrote, so it drops the

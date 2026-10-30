@@ -44,8 +44,9 @@ var gotestTType = reflect.TypeOf((*T)(nil))
 
 // fuzzWithoutTarget binds fn by reflection — the path for a top-level
 // stdlib FuzzX using gotest as a plain library, where no wrapper generated a
-// target. fn must be func(*gotest.T, <engine-native>...); seeds pass through
-// with an arity check only, so the engine reports a bad seed type itself.
+// target. fn must be func(*gotest.T, <engine-native>...); each seed's arity
+// and value types are checked against it, so a bad seed is reported at its
+// f.Add call.
 func (f *F) fuzzWithoutTarget(fn any) {
 	fv := reflect.ValueOf(fn)
 	ft := fv.Type()
@@ -57,6 +58,11 @@ func (f *F) fuzzWithoutTarget(fn any) {
 	f.flushSeeds(func(seed []any) ([]any, error) {
 		if len(seed) != arity {
 			return nil, fmt.Errorf("f.Add was given %d value%s, but this fuzz target takes %d", len(seed), plural(len(seed)), arity)
+		}
+		for i, v := range seed {
+			if want := ft.In(i + 1); reflect.TypeOf(v) != want {
+				return nil, fmt.Errorf("value %d: f.Add was given %T, but this fuzz target takes %s", i+1, v, want)
+			}
 		}
 		return seed, nil
 	})

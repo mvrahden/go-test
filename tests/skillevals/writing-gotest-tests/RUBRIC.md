@@ -135,9 +135,9 @@ Runners split). Missing traps are in the fixture backlog (§8).
 - H9: put a gotest binary built from an older release first on PATH.
 - H10: break one line of `store/store.go` so an existing test fails.
 - C13: remove the `tool` line from go.mod (and its sums via `go mod tidy`).
-- C14: introduce an `if !errors.Is(err, want) { gotest.Fail(t, …) }` guard
-  (its rewrite strands the `errors` import — nothing else in the file may
-use `errors`) next to a
+- C14: introduce an `if !strings.Contains(got, want) { gotest.Fail(t, …) }` guard
+  (its rewrite strands the `strings` import — nothing else in the file may
+use `strings`) next to a
   `gotest.True(t, got == want)` and a `t.T().Helper()` call (no fix).
 - C20: apply C4's parallel conversion to the copy first.
 - H1–H3: add the trap suites per §8 backlog specs.

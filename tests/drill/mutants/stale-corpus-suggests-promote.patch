@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz FuzzSession / StaleEntry / .* / warns, naming the entry, without suggesting promote \(
+Clause: when a fuzz session meets a corpus entry of an older shape → warns, naming the entry, without suggesting promote
+--- a/internal/gotestrunner/fuzzpreflight.go
++++ b/internal/gotestrunner/fuzzpreflight.go
+@@ -24,7 +24,7 @@
+ // promote takes only the latest session's crashers, and one that only ever
+ // mattered to the old shape is noise.
+ func (m *CorpusMismatch) Message() string {
+-	return fmt.Sprintf("fuzz: %s: %s has %d values of [%s], but the target now takes %d [%s] — it predates a change to the fuzzed type's fields; delete it, or write its input as a typed f.Add seed",
++	return fmt.Sprintf("fuzz: %s: %s has %d values of [%s], but the target now takes %d [%s] — it predates a change to the fuzzed type's fields; run gotest fuzz promote to turn it into a typed f.Add seed, or delete it",
+ 		m.Func, m.File, len(m.Got), strings.Join(m.Got, ", "), len(m.Want), strings.Join(m.Want, ", "))
+ }
+ 

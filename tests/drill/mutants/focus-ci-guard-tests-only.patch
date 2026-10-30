@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli .* / fails with exit 1, naming the benchmark where it is declared \(
+Expect: ^FAIL .*conformance/cli .* / fails with exit 1, naming the fuzz target where it is declared \(
+Clause: when --ci runs a package whose only focused method is a benchmark → fails with exit 1, naming the benchmark where it is declared
+Clause: when --ci runs a package whose only focused method is a fuzz target → fails with exit 1, naming the fuzz target where it is declared
+--- a/cmd/gotest/focusguard.go
++++ b/cmd/gotest/focusguard.go
+@@ -81,7 +81,7 @@
+ 			violations = append(violations, FocusViolation{SuiteName: name, Pos: relPosition(fset, s.TypeSpecPos())})
+ 		}
+ 		// A focused method of any kind focuses the run.
+-		for _, methods := range [][]*gotestast.TestSuiteMethod{s.TestCases(), s.Benchmarks(), s.Fuzzers()} {
++		for _, methods := range [][]*gotestast.TestSuiteMethod{s.TestCases()} {
+ 			for _, m := range methods {
+ 				if m.IsFocused() {
+ 					violations = append(violations, FocusViolation{SuiteName: name, MethodName: m.Identifier(), Pos: relPosition(fset, m.Pos())})

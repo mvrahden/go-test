@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,8 +43,9 @@ func testFlagSet() *flag.FlagSet {
 // ValidateTestFlags checks the values of the test binary's flags in args
 // before anything is built, as go test does: a bad value is a usage error,
 // not a failing test. -run, -skip, -bench and -fuzz must be patterns the
-// testing package compiles, split as it splits them. A repeated flag is
-// judged by its last value, the one the binary keeps.
+// testing package compiles, split as it splits them, and -list one it
+// compiles whole. A repeated flag is judged by its last value, the one the
+// binary keeps.
 func ValidateTestFlags(args []string) error {
 	fs := testFlagSet()
 	var known []string
@@ -93,6 +95,11 @@ func ValidateTestFlags(args []string) error {
 			}
 			if _, err := parseNameFilter(val, "-"+name); err != nil {
 				return fmt.Errorf("invalid regexp for %v", err)
+			}
+		case "list":
+			// Compiled whole: the testing package does not split it.
+			if _, err := regexp.Compile(val); err != nil {
+				return fmt.Errorf("invalid regexp in -list (%q): %s", val, err)
 			}
 		case "shuffle":
 			if _, err := strconv.ParseInt(val, 10, 64); err != nil && val != "on" && val != "off" {

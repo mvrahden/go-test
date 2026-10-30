@@ -372,10 +372,27 @@ func insertBeforeArgs(runFlags []string, flag string) []string {
 // it is read as a flag and never as one of the test binary's own words.
 func InsertBeforeArgs(args []string, flag string) []string { return insertBeforeArgs(args, flag) }
 
+// HasVerboseFlag reports whether flags ask for verbose output, as go test
+// reads them: the last -v before -args wins, and a value that is no boolean
+// (test2json) is verbose.
 func HasVerboseFlag(flags []string) bool {
-	return slices.ContainsFunc(flags, func(f string) bool {
-		return f == "-v" || f == "-v=true"
-	})
+	verbose := false
+	for _, f := range flags {
+		if f == "-args" {
+			break
+		}
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(f, "-"), "-"), "=")
+		if name != "v" && name != "test.v" {
+			continue
+		}
+		if !hasValue {
+			verbose = true
+			continue
+		}
+		b, err := strconv.ParseBool(value)
+		verbose = b || err != nil
+	}
+	return verbose
 }
 
 // ExtractParallelValue returns the integer value of -parallel from run flags.

@@ -37,6 +37,29 @@ describe("parseBenchReport", () => {
     expect(report.gate).toBeUndefined();
   });
 
+  it("carries a failed benchmark's output through untouched", () => {
+    const doc = JSON.stringify({
+      schemaVersion: 1,
+      baseline: {
+        schemaVersion: 1,
+        goos: "linux",
+        goarch: "amd64",
+        results: [],
+      },
+      failures: [
+        {
+          package: "example.com/pkg",
+          suite: "CacheTestSuite",
+          name: "BenchmarkGetHit",
+          output: "panic: boom",
+        },
+      ],
+    });
+    const report = parseBenchReport(doc);
+    expect(report.failures).toHaveLength(1);
+    expect(report.failures?.[0].output).toBe("panic: boom");
+  });
+
   it("rejects an unknown schema version instead of guessing", () => {
     const doc = JSON.stringify({ schemaVersion: 2, baseline: {} });
     expect(() => parseBenchReport(doc)).toThrow(/schema version 2/);

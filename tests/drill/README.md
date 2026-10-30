@@ -260,6 +260,7 @@ shards of one run do not add up to every mutant exactly once.
 | Patch | Bug it plants | Check that must catch it |
 |---|---|---|
 | `assert-always-passes` | `CheckEqual` reports success for every input | ring-0 assert suite: its raw checks see the wrong verdict string |
+| `bench-json-drops-failures` | `bench --json` leaves out what a failed benchmark printed | bench conformance: the report's failures name the panicking benchmark with its message |
 | `bench-panic-skips-afterall` | the generated benchmark wrapper no longer recovers a panic | canary: the panicking benchmark fixture reports no result for the benchmark after it, and neither AfterAll runs |
 | `bench-panic-taken-for-skip` | a benchmark's recovered panic skips the benchmark instead of failing it | canary: the panicking benchmark fixture's run exits 0 instead of 1 |
 | `bench-stderr-dropped` | a plain bench run never prints a benchmark suite's stderr | lifecycle conformance: the panic and its stack are missing from stderr |
@@ -286,6 +287,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
 | `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is located through that package's own FileSet | canary: the fixtureelsewhere remote failure is unlocated |
 | `fixture-report-in-runtime` | an error a fixture's `BeforeEach` returns is located in the runtime's `methods.go` | canary: the fixturehookfail failure names a runtime file, not the hook's |
+| `focus-ci-guard-tests-only` | `--ci` checks only test methods for the `F_` prefix, so a focused benchmark or fuzz method passes | cli conformance: `--ci` fails a run whose only focused method is a benchmark or a fuzz target |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
 | `go-goexit-unexplained` | a goroutine that left through `runtime.Goexit` with no verdict fails the method without saying why | canary: no failure of the goroutines fixture names the Goexit |
 | `go-skip-reported-as-a-failure` | a goroutine that skipped the test fails the method at the wait | canary: the goroutines fixture's skipping method fails |
@@ -299,6 +301,7 @@ shards of one run do not add up to every mutant exactly once.
 | `hooks-calling-t-guard-ignored` | a `t.T()` checked for nil before use is refused like an unchecked one | cli conformance: the fuzz suite with guarded hooks exits 2 instead of running |
 | `hooks-calling-t-named-last-first` | the error for hooks calling `t.T()` lists them last first and is located at the last | cli conformance: the fuzz row's error names the hooks out of source order |
 | `late-goroutine-left-unwaited` | the drain waits once for what BeforeAll registered, so a goroutine started meanwhile is never waited for | canary: the setupwaits late suite passes and its panic is lost |
+| `list-pattern-left-unchecked` | a `-list` pattern is not checked before the run, so each package's binary refuses it in turn | cli conformance: the pattern is not refused with exit 2 |
 | `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
 | `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
 | `method-panic-discarded-by-aftereach` | `gotestruntime.AfterEach` runs AfterEach in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics test method's panic is never reported |
@@ -322,7 +325,8 @@ shards of one run do not add up to every mutant exactly once.
 | `group-bulk-one-at-a-time` | a later group runs its suites one after another | lifecycle conformance: two 1s e2e suites do not overlap |
 | `group-exclusive-in-the-bulk` | a named group's Exclusive suites run beside its other suites | lifecycle conformance: the e2e Exclusive suite starts before the others end |
 | `group-fixture-up-front` | every shared fixture starts up front, a later group's included | lifecycle conformance: the e2e fixture is up before the default group ends |
-| `teardown-error-dropped-after-setup-failure` | a teardown that returned no error is not failed by an `AfterAll` report, as when another fixture's setup failure claimed the process's exit status | gotestrunner `TeardownVerdict`: the `AfterAll` report fails nothing |
+| `teardown-error-dropped-after-setup-failure` | a shared fixture's `AfterAll` that failed while a sibling's setup failure claimed the process's exit status passes unreported | fixtures conformance: the run fails on the teardown as well, reporting that `AfterAll`'s error |
+| `shared-teardown-reads-stderr` | a line a shared fixture writes that reads like an `AfterAll` failure fails the teardown | fixtures conformance: the run passes |
 | `teardown-reports-dropped-from-the-verdict` | a teardown error goes out without the `AfterAll` reports that say why | teardown verdict unit test: a teardown error comes back without the reports |
 | `bench-gate-passes-on-nothing` | a bench gate with no benchmark in both the baseline and the run passes | canary: the gate against a foreign baseline exits 0 instead of 1 |
 | `bench-unmatched-dropped` | a bench comparison reports no benchmark as missing or added | canary: the report against a foreign baseline lists no missing benchmark |
@@ -427,6 +431,7 @@ shards of one run do not add up to every mutant exactly once.
 | `typed-long-strings-unpointed` | long single-line strings of different types show no offset of their first difference | ring-0 equal suite |
 | `types-unnamed` | values of different dynamic types are not named as such | ring-0 equal suite |
 | `unsigned-as-hex` | unsigned integers render in hex | ring-0 format suite |
+| `verbose-first-v-sticks` | the first `-v` decides verbosity, so `-v -v=false` still prints verbose output | cli conformance: the last `-v` wins |
 | `waiting-test-named-by-the-timeout` | a parallel test still waiting for a slot counts as running | lifecycle conformance: the `--timeout` names the queued methods besides the one holding the slot |
 | `watch-ends-before-fixture-aftereach` | a method's budget watch ends before its fixtures' `AfterEach` hooks run | canary: the method whose fixture `AfterEach` sleeps past the `Timeout` passes |
 | `wide-caret-narrow` | the caret counts a wide character as one column | ring-0 equal suite |
@@ -544,6 +549,24 @@ shards of one run do not add up to every mutant exactly once.
 | `events-file-held-until-exit` | the `--events-file` file is buffered in memory and written only when the CLI exits | cli conformance: a CLI killed mid-run leaves the events of the suites that had ended out of the file |
 | `events-file-open-error-ignored` | a `--events-file` path that cannot be created is ignored and the run goes on | cli conformance: the run builds its packages instead of exiting 2 at once |
 | `group-expr-accepted` | an `ExclusiveGroup` the generator cannot resolve is read as the default group | cli conformance: the suite runs instead of exit 2 naming the accepted forms |
+| `promote-refusal-unlocated` | a crasher file outside Go's corpus format is refused without its line | conformance: the fuzz promote It for a call in a crasher finds no `file:line` |
+| `promote-refusal-promotes-the-rest` | a refused crasher fails the run but the session's other crashers are still promoted | conformance: the fuzz promote It for a call in a crasher finds the valid crasher promoted |
+| `fuzz-session-not-recorded` | a fuzz session records none of the crashers it wrote | conformance: the fuzz session It finds promote adding no seed |
+| `promote-takes-every-corpus-file` | promote takes every corpus file of a target, not only the latest session's | conformance: the fuzz promote It for a file the session did not write finds it promoted |
+| `promote-splices-raw-leaves` | a decoding target's crasher whose re-run echoes nothing is spliced from its raw leaves | conformance: the fuzz promote It for a decoding target finds the raw leaf spliced |
+| `stale-corpus-suggests-promote` | the stale-corpus warning tells the user to run promote | conformance: the fuzz session It finds promote in the warning |
+| `fuzz-seed-error-at-flush` | a seed of the wrong type is reported where gotest flushes the seeds, not at its `f.Add` call | canary: the `fuzzseedtype` failure does not name the fixture's `f.Add` line |
+| `promote-splices-the-echo-whole` | a decoding target's echo of several arguments is spliced as one value | conformance: the fuzz promote It for a decoding target of several arguments finds no seed added |
+| `fuzz-session-drops-other-targets` | a fuzz session's record drops the crashers of targets it did not fuzz | conformance: the fuzz session It for another checkout finds its crasher not promoted |
+| `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: a label with a pipe breaks its table row; canary: the `specmarkdown` rows have the wrong number of cells |
+| `spec-label-html-unescaped` | the Markdown spec leaves angle brackets in a label unescaped | spec conformance: a label's tags reach the reader as HTML; canary: the `specmarkdown` spec carries `<b>` |
+| `spec-slash-splits-run` | the tree of a run reads a slash in an It's name as a level | spec conformance: the run's spec shows "reads a" as a level; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
+| `spec-slash-splits-source` | the spec read from source keeps the level a slash implies | spec conformance: the static spec shows "reads a" as a level |
+| `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `### Parked — EXCLUDED` |
+| `spec-label-link-unescaped` | the Markdown spec leaves brackets, asterisks, underscores and ampersands in a label as they are | spec conformance: a label's link, emphasis and entity reach the reader |
+| `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
+| `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
+| `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own with an empty status | spec conformance: the failed When's row carries no FAIL and no message |
 
 ## Adding a mutant
 

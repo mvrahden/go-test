@@ -46,6 +46,7 @@ type OverlayResult struct {
 	// fuzz target: the type of each value the engine feeds it. The
 	// stale-corpus pre-flight compares recorded corpus entries against it.
 	FuzzParamsByFunc               map[string]map[string][]string
+	FuzzDecodedByFunc              map[string]map[string]bool // per package, the fuzz targets whose input is decoded from the engine's leaves
 	DirsByPkg                      map[string]string
 	SkippedSuitesByPkg             map[string][]string
 	FixtureDepSuites               map[string]map[string]bool
@@ -102,6 +103,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 	benchesByPkg := map[string][]string{}
 	fuzzFuncsByPkg := map[string]map[string][]string{}
 	fuzzParamsByPkg := map[string]map[string][]string{}
+	fuzzDecodedByPkg := map[string]map[string]bool{}
 	dirsByPkg := map[string]string{}
 	skippedSuitesByPkg := map[string][]string{}
 	exclusiveSuitesByPkg := map[string]map[string]bool{}
@@ -133,6 +135,9 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 		if len(r.FuzzParamsByFunc) > 0 {
 			fuzzParamsByPkg[r.PkgPath] = r.FuzzParamsByFunc
+		}
+		if len(r.FuzzDecodedFuncs) > 0 {
+			fuzzDecodedByPkg[r.PkgPath] = r.FuzzDecodedFuncs
 		}
 		if r.AbsPath != "" {
 			dirsByPkg[r.PkgPath] = r.AbsPath
@@ -186,6 +191,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		BenchesByPkg:                   benchesByPkg,
 		FuzzFuncsByPkg:                 fuzzFuncsByPkg,
 		FuzzParamsByFunc:               fuzzParamsByPkg,
+		FuzzDecodedByFunc:              fuzzDecodedByPkg,
 		DirsByPkg:                      dirsByPkg,
 		SkippedSuitesByPkg:             skippedSuitesByPkg,
 		FixtureDepSuites:               fixtureDepSuites,

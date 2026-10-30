@@ -49,11 +49,20 @@ export interface BenchBaseline {
   results: BenchResult[];
 }
 
+/** Mirrors gotestbench.Failure: what a failed benchmark, suite or package printed. */
+export interface BenchFailure {
+  package: string;
+  suite?: string;
+  name?: string;
+  output: string;
+}
+
 export interface BenchReport {
   schemaVersion: number;
   baseline: BenchBaseline;
   deltas?: BenchDelta[];
   gate?: BenchGate;
+  failures?: BenchFailure[];
 }
 
 const SUPPORTED_SCHEMA_VERSION = 1;

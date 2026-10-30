@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
-import { countCrasherEntries } from "./fuzz.js";
+import { sessionCrasherCounts } from "./fuzz.js";
 import { hostPlatform, type BenchResultStore } from "./benchResultStore.js";
 import { formatBenchAnnotation } from "./benchReport.js";
 
@@ -77,6 +77,19 @@ export class GoTestCodeLensProvider
     }
 
     const docText = document.getText();
+    // What promote would take, per fuzz wrapper; read once per render.
+    let pendingCrashers: Promise<Map<string, number>> | undefined;
+    const pending = () =>
+      (pendingCrashers ??= sessionCrasherCounts(
+        pkg.dir,
+        new Set(
+          pkg.suites.flatMap((s) =>
+            (s.fuzzers ?? []).map((m) => `Fuzz${s.name}_${m.name}`),
+          ),
+        ),
+        { cwd: this.cache.getWorkspaceDir(importPath) },
+      ));
+
     const fileSuites = pkg.suites.filter(
       (s) => path.join(pkg.dir, s.file) === docPath,
     );
@@ -237,14 +250,10 @@ export class GoTestCodeLensProvider
           }),
         );
 
-        // Pending crashers surface exactly where the target lives. For
-        // struct-typed targets the corpus files are format-bound (the
-        // fuzz-struct-corpus lint rule's concern); promote is the durable
-        // answer either way.
-        const crasherCount = await countCrasherEntries(
-          pkg.dir,
-          `Fuzz${suite.name}_${method.name}`,
-        );
+        // The latest session's crashers surface where the target lives,
+        // counted as promote will take them; older corpus files never count.
+        const crasherCount =
+          (await pending()).get(`Fuzz${suite.name}_${method.name}`) ?? 0;
         if (crasherCount > 0) {
           lenses.push(
             new vscode.CodeLens(range, {

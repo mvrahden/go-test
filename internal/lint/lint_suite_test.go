@@ -49,6 +49,7 @@ var diagnosticFixtures = []string{
 // offers, each against its own .golden.
 var rewriteFixtures = []string{
 	"withsimplify",
+	"withsimplifyverdicts",
 	"withfailguard",
 	"withfailguard_noimport",
 	"withredundant",

@@ -54,7 +54,7 @@ func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
 		w.It("passes them", func(it *gotest.T) {
 			gotest.NoError(it, gotestrunner.ValidateTestFlags([]string{
 				"-count=2", "-parallel", "4", "-timeout=5m", "-v", "-shuffle=on", "-shuffle=7",
-				"-cpu=1,2", "-run", "TestA/(x|y)", "-skip=TestB", "-race", "./...", "-args", "-count=nope",
+				"-cpu=1,2", "-run", "TestA/(x|y)", "-skip=TestB", "-list", "[]|x]", "-race", "./...", "-args", "-count=nope",
 			}))
 		})
 	})
@@ -80,6 +80,7 @@ func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
 		{"a skip alternative cut at a top-level bar", []string{"-skip=[]|Nothing]"}, `invalid regexp for alternation 0 of element 0 of -skip ("[]")`},
 		{"a skip alternative cut inside a quoted span", []string{`-skip=\QNothing|x\E`}, `invalid regexp for alternation 1 of element 0 of -skip ("x\\E")`},
 		{"a bench alternative that is no regexp", []string{"-bench", "[]|x]"}, `invalid regexp for alternation 0 of element 0 of -bench ("[]")`},
+		{"a list pattern that is no regexp", []string{"-list=("}, `invalid regexp in -list ("("): error parsing regexp`},
 	}) {
 		gotest.ErrorContains(t, gotestrunner.ValidateTestFlags(tc.args), tc.want)
 	}
@@ -291,6 +292,11 @@ func (s *ArgsTestSuite) TestHasVerboseFlag(t *gotest.T) {
 		{"-v=true present", []string{"-v=true", "-timeout=10m"}, true},
 		{"-v=false is not verbose", []string{"-v=false"}, false},
 		{"-verbose is not -v", []string{"-verbose"}, false},
+		{"the last -v wins over an earlier one", []string{"-v", "-v=false"}, false},
+		{"a later -v wins over -v=false", []string{"-v=false", "-v"}, true},
+		{"-v after -args is the binary's", []string{"-args", "-v"}, false},
+		{"-test.v is -v", []string{"-test.v=true"}, true},
+		{"-v=test2json is verbose", []string{"-v=test2json"}, true},
 	}) {
 		got := gotestrunner.HasVerboseFlag(tc.flags)
 		gotest.Equal(sub, tc.expect, got)

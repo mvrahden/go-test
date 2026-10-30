@@ -162,19 +162,10 @@ func withReports(err error, reports []string, teardown bool) error {
 }
 
 // teardownVerdict is the teardown's error with the fixtures' AfterAll reports
-// attached. The reports are a failure on their own: a sibling's setup failure
-// has already claimed the process's exit status, and without this the AfterAll
-// that failed beside it would be known only to stderr.
+// attached. The reports are stderr, free text a fixture can write as well:
+// they explain a failure, they never make one.
 func teardownVerdict(teardownErr error, reports []string) error {
-	if err := withReports(teardownErr, reports, true); err != nil {
-		return err
-	}
-	for _, r := range reports {
-		if strings.Contains(r, ".AfterAll ") {
-			return withReports(errors.New("shared fixture teardown failed"), reports, true)
-		}
-	}
-	return nil
+	return withReports(teardownErr, reports, true)
 }
 
 // applyTeardownFailure surfaces a shared fixture teardown failure and makes a

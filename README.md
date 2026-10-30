@@ -784,9 +784,9 @@ Fields map to leaves in declaration order, so an entry on disk means whatever th
 - Adding or removing a field changes the leaf count. Go's engine rejects every old entry, and gotest names the drift first: a pre-flight check on plain runs and on `gotest fuzz` prints which entry no longer fits, what it holds and what the target now takes.
 - Swapping two fields of the same kind is silent: the entry loads and quietly becomes a different test.
 
-The rule that follows: promote crashers to `f.Add` seeds instead of committing corpus files for struct targets.
+The rule that follows: keep crashers of struct targets as `f.Add` seeds, never as committed corpus files. `gotest fuzz promote` writes the seed for each crasher the latest `gotest fuzz` session wrote; an older corpus file is deleted, or its input written as a typed `f.Add` seed by hand.
 A promoted seed is source and survives any change to the encoding.
-The `fuzz-struct-corpus` lint rule flags on-disk entries for a shape-bound target and points at `gotest fuzz promote`.
+The `fuzz-struct-corpus` lint rule flags on-disk entries for a shape-bound target: delete them or write them as typed seeds.
 
 Refused at generation time, with the alternative named in the message, because generated code that cannot round-trip faithfully would lie:
 
@@ -823,7 +823,7 @@ gotest ./...
 ```
 
 Every seed added via `f.Add`, plus any crasher corpus already discovered under `testdata/fuzz/`, replays as an ordinary subtest under a plain run — `gotest ./...`, `gotest spec`, `gotest watch`, and `gotest summary` all do this, at zero extra cost, with no `-fuzz` flag involved.
-For a **pass-through** target, committing a crasher's corpus file makes it a permanent regression test; for a **shape-bound** target, run `gotest fuzz promote` instead — its corpus files are bound to the type's field order (the `fuzz-struct-corpus` lint rule will remind you), while a promoted `f.Add` literal is ordinary Go source.
+For a **pass-through** target, committing a crasher's corpus file makes it a permanent regression test; for a **shape-bound** target, run `gotest fuzz promote` after the session that found it instead — its corpus files are bound to the type's field order (the `fuzz-struct-corpus` lint rule will remind you), while a promoted `f.Add` literal is ordinary Go source.
 A user-supplied `-run` filter wins over this widening — fuzz seeds only replay if a generated `Fuzz<Suite>_<Method>` name happens to match the filter on its own merit.
 
 In the spec view the target sits under its suite as a property beside the examples — `✓ Parse  2 seeds` — and opens up to name the entry when a seed or corpus file fails; the trailer counts it as a fuzz target, never as a stdlib test.
@@ -892,9 +892,10 @@ gotest fuzz promote ./...    # splice crashers into f.Add(...) seeds
 `gotest fuzz triage` scans each target's `testdata/fuzz/<Func>/` directory (a plain filesystem scan — no `go test -fuzz` invoked) and re-runs every corpus entry found there via `go test -run='^<Func>/<hash>$'`, printing its decoded input and either the panic/failure cause or `status: no longer failing`. A re-run that produced no exit status of its own — it was terminated, or never started — reports `status: unverified` and fails the triage: nothing was proven about that crasher.
 Exits 1 if any crasher's re-run still fails, 0 otherwise.
 
-`gotest fuzz promote` does the same discovery, then splices each crasher's input into its originating `Fuzz*` method as a permanent `f.Add(...)` seed — an AST-level source edit via `internal/refactor`, inserted after the method's last existing `f.Add` call — and deletes the crasher file once the splice succeeds.
+`gotest fuzz promote` does the same discovery, then splices each crasher the latest `gotest fuzz` session of its target wrote, with its exact values, into its originating `Fuzz*` method as a permanent `f.Add(...)` seed — an AST-level source edit via `internal/refactor`, inserted after the method's last existing `f.Add` call — and deletes the crasher file once the splice succeeds.
 The crasher is now a committed regression test that replays for free on every ordinary run, same as any seed under [Seed replay](#seed-replay).
 A crasher whose originating method can't be located with confidence is skipped with a warning and left in place; promote never partially edits source.
+Which files it takes and what it refuses is stated in [the promote requirements](specs/fuzz/spec.md#requirement-promote-takes-corpus-literals-only).
 
 Struct-typed targets work the same way: triage prints the decoded struct on the `input:` line, and promote splices it as a typed `f.Add(T{...})` seed rather than an opaque byte string.
 See [Struct arguments](#struct-arguments) for the shapes that carry a literal and the raw-bytes fallback for those that don't.
@@ -1099,7 +1100,7 @@ By default (`version: gomod`), the action runs the `gotest` your `go.mod` select
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
 
-With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` follow-up. Seed replay needs no such step, since every ordinary run already replays seeds. The step also carries Go's fuzz cache between runs: it restores the latest corpus of the branch or its base and saves this run's under its own key, so a short budget compounds into a deeper search over time, main's corpus feeds every pull request, and no pull request pollutes main. `fuzz-cache: false` runs from the seeds alone. (The build cache `actions/setup-go` keeps is not enough for this: it is keyed on go.sum and never re-saved on a hit, so a corpus would only survive a dependency bump.)
+With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` step in the same job (promote takes only the crashers the latest session in that job's gotest cache wrote). Seed replay needs no such step, since every ordinary run already replays seeds. The step also carries Go's fuzz cache between runs: it restores the latest corpus of the branch or its base and saves this run's under its own key, so a short budget compounds into a deeper search over time, main's corpus feeds every pull request, and no pull request pollutes main. `fuzz-cache: false` runs from the seeds alone. (The build cache `actions/setup-go` keeps is not enough for this: it is keyed on go.sum and never re-saved on a hit, so a corpus would only survive a dependency bump.)
 
 With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the step summary gets the benchmark count, a per-package results table (ns/op, B/op, allocs/op), the delta table when a baseline was compared, and the gate verdict when one was set; the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
 

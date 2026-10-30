@@ -47,6 +47,17 @@ Every boolean flag SHALL take --x, --x=true and --x=false, the last occurrence S
 - **WHEN** a boolean flag is spelled in each accepted form
 - **THEN** reads --x, --x=true and --x=false, lets the last occurrence win and refuses any other value
 
+### Requirement: The focus guard
+With --ci, a run SHALL fail with exit 1 before anything runs when a suite or any of its test, benchmark or fuzz methods carries the F_ prefix, naming each where it is declared.
+
+#### Scenario: A focused benchmark method
+- **WHEN** --ci runs a package whose only focused method is a benchmark
+- **THEN** fails with exit 1, naming the benchmark where it is declared
+
+#### Scenario: A focused fuzz method
+- **WHEN** --ci runs a package whose only focused method is a fuzz target
+- **THEN** fails with exit 1, naming the fuzz target where it is declared
+
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
 
@@ -55,11 +66,15 @@ Every command SHALL refuse with exit 2 a value flag given no value, a flag it do
 - **THEN** refuses a missing value, an unknown flag and another command's flag with exit 2
 
 ### Requirement: Test name patterns
-A -run, -skip or -bench pattern the testing package would reject SHALL be refused with exit 2 before anything runs: each alternative and each level is compiled on its own, as the testing package splits the pattern, and a repeated flag is judged by its last value.
+A -run, -skip, -bench or -list pattern the testing package would reject SHALL be refused with exit 2 before anything runs: each alternative and each level of a -run, -skip or -bench pattern is compiled on its own, as the testing package splits the pattern, a -list pattern is compiled whole, as the testing package reads it, and a repeated flag is judged by its last value.
 
 #### Scenario: An alternative that does not compile
 - **WHEN** a -skip pattern compiles whole but one of its alternatives does not
 - **THEN** is refused with exit 2 before anything runs, naming that alternative as go test does
+
+#### Scenario: A -list pattern that does not compile
+- **WHEN** a -list pattern does not compile
+- **THEN** is refused with exit 2 before anything runs, naming the pattern as go test does
 
 ### Requirement: Go test flags gotest implements
 A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`.

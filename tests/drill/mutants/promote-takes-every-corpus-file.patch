@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/fuzz FuzzPromote / FilesOutsideTheSession / .* / promote leaves the file and its target's source untouched \(
+Clause: when a corpus file was not written by the latest fuzz session → promote leaves the file and its target's source untouched
+--- a/cmd/gotest/fuzztriage.go
++++ b/cmd/gotest/fuzztriage.go
+@@ -456,6 +456,10 @@
+ 		suite, method, resolved := lookupSuiteMethod(overlay, target.Package, target.Func)
+ 		for _, file := range files {
+ 			c, ok := mine[filepath.Base(file)]
++			if !ok && resolved {
++				queue = append(queue, promotion{target: target, suite: suite, method: method, file: file})
++				continue
++			}
+ 			if !ok {
+ 				fmt.Printf("promote: %s: left in place: not written by the latest fuzz session\n", displayPath(file))
+ 				continue

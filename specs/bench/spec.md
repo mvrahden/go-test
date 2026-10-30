@@ -55,3 +55,10 @@ An expired --timeout SHALL name the benchmark it cut short, in a text bench run 
 #### Scenario: A benchmark that hangs
 - **WHEN** a benchmark hangs until --timeout in a text bench run
 - **THEN** names the benchmark as running when the timeout expired
+
+### Requirement: Failures in the --json report
+The --json report SHALL carry every benchmark that failed, with the text it failed with, a panic's message included.
+
+#### Scenario: A benchmark that panics
+- **WHEN** a benchmark panics in a --json bench run
+- **THEN** the report's failures name the benchmark with the panic's message

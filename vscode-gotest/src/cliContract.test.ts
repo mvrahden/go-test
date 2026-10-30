@@ -175,6 +175,14 @@ const EXPECTED: Record<
     stats: { passed: 1, failed: 0, skipped: 1 },
     packages: ["example.com/excluded:pass", "example.com/plain:pass"],
   },
+  // An It whose label holds a slash and one holding markup, beside an
+  // excluded suite: the Spec View renders this tree as the CLI built it.
+  labels: {
+    gatingExitCode: 0,
+    goRunEpilogue: "",
+    stats: { passed: 2, failed: 0, skipped: 1 },
+    packages: ["example.com/labels:pass"],
+  },
   "declared-source": {
     gatingExitCode: 0,
     goRunEpilogue: "",
@@ -304,6 +312,40 @@ describe("recorded CLI contract", () => {
       });
     });
   }
+
+  describe("labels", () => {
+    type Node = {
+      display: string;
+      excluded: boolean;
+      status: string;
+      children: Node[];
+    };
+    const spec = JSON.parse(golden.cases["labels"].gating.direct.stdout) as {
+      packages: { nodes: Node[] }[];
+    };
+    const [paths, parked] = spec.packages[0].nodes;
+    const reading = paths.children[0].children[0];
+
+    it("keeps an It with a slash as one leaf under its When", () => {
+      expect(reading.children.map((c) => c.display)).toEqual([
+        "reads a/b paths",
+        'keeps <b>&" text',
+      ]);
+      expect(reading.children[0].children).toEqual([]);
+    });
+
+    it("sends labels raw, for the Spec View to escape once", () => {
+      expect(reading.children[1].display).toBe('keeps <b>&" text');
+    });
+
+    it("marks an excluded suite excluded and skipped", () => {
+      expect(parked).toMatchObject({
+        display: "Parked",
+        excluded: true,
+        status: "skip",
+      });
+    });
+  });
 
   it("covers both a failing and a passing verdict, so a green-only fixture set cannot pass", () => {
     const codes = Object.values(EXPECTED).map((e) => e.gatingExitCode);

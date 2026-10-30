@@ -1,0 +1,14 @@
+Expect: fuzzseedtype: the seed failure is not reported at the f.Add call
+Judge: ./tests/canary CanaryTestSuite/TestASeedOfTheWrongTypeIsReportedAtItsAdd
+Clause: when an f.Add seed's type does not match the fuzz target's parameters → the failure is located at the f.Add call
+--- a/pkg/gotest/f.go
++++ b/pkg/gotest/f.go
+@@ -124,7 +124,7 @@
+ 	tuples, err := f.explodeSeeds(explode)
+ 	if err != nil {
+ 		var se *seedError
+-		if errors.As(err, &se) && se.index < len(f.seedAt) && f.seedAt[se.index] != "" {
++		if false && errors.As(err, &se) && se.index < len(f.seedAt) && f.seedAt[se.index] != "" {
+ 			// Undecorated: testing would name this line, not the f.Add call.
+ 			fmt.Fprintln(f.f.Output(), strings.ReplaceAll(f.seedAt[se.index]+": "+err.Error(), "\n", "\n    "))
+ 			f.f.FailNow()

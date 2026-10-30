@@ -15,9 +15,9 @@ import (
 var _, _ = str.ToUpper, refl.TypeOf
 
 func TestAliasedPackages(t *testing.T) {
-	gotest.Contains(t, "abc", "b")                  // want `use Contains instead of True for strings.Contains call`
-	gotest.ErrorIs(t, errs.New("x"), errs.New("y")) // want `use ErrorIs instead of True for errors.Is call`
-	gotest.Equal(t, 1, 2)                           // want `use Equal instead of True for reflect.DeepEqual call`
+	gotest.Contains(t, "abc", "b")                        // want `use Contains instead of True for strings.Contains call`
+	gotest.True(t, errs.Is(errs.New("x"), errs.New("y"))) // want `use ErrorIs instead of True for errors.Is call`
+	gotest.Equal(t, 1, 2)                                 // want `use Equal instead of True for reflect.DeepEqual call`
 }
 
 // === Lookalikes that are not those packages ===

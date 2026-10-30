@@ -162,6 +162,10 @@ func runFuzz(inv Invocation) (code int) { //nolint:gocritic // hugeParam: stable
 		Fixtures:    fixtures,
 	})
 	code = res.ExitCode()
+	// The crashers this session wrote are the ones promote takes.
+	if err := recordFuzzSession(targets, res); err != nil {
+		fmt.Fprintf(os.Stderr, "fuzz: could not record this session's crashers for promote: %s\n", err)
+	}
 
 	if err := ctx.Err(); err != nil {
 		reason := "interrupted"
@@ -193,6 +197,15 @@ func runFuzz(inv Invocation) (code int) { //nolint:gocritic // hugeParam: stable
 	}
 
 	return code
+}
+
+// recordFuzzSession makes res's crashers the latest session's.
+func recordFuzzSession(targets []gotestrunner.FuzzTarget, res gotestrunner.FuzzRunResult) error {
+	path, err := gotestrunner.CurrentFuzzSessionFile()
+	if err != nil {
+		return err
+	}
+	return gotestrunner.RecordFuzzSession(path, targets, res)
 }
 
 // collectFuzzTargets flattens overlay.FuzzFuncsByPkg (import path -> suite

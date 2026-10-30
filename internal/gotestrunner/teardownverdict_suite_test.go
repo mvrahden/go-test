@@ -11,21 +11,15 @@ import (
 // run's failure, from its error and the fixtures' reports.
 type TeardownVerdictTestSuite struct{}
 
-func (s *TeardownVerdictTestSuite) TestAnAfterAllReportIsAFailure(t *gotest.T) {
+func (s *TeardownVerdictTestSuite) TestReportsExplainAFailure(t *gotest.T) {
 	setup := "DownSharedFixture.BeforeAll failed after 1 attempt(s): the fixture would not come up"
 	teardown := "ReleaseSharedFixture.AfterAll failed: the fixture would not release what it holds"
 
 	t.When("the teardown returned no error", func(w *gotest.T) {
-		// A sibling's setup failure claimed the process's exit status: the
-		// AfterAll that failed beside it is known from its report alone, as
-		// when the run stopped before a release could say so.
-		w.It("fails with the AfterAll reports", func(it *gotest.T) {
-			reports, err := gotestrunner.ExportTeardownVerdict(nil, []string{setup, teardown})
-			gotest.Error(it, err)
-			gotest.Equal(it, []string{teardown}, reports)
-		})
-		w.It("passes when no AfterAll failed", func(it *gotest.T) {
-			_, err := gotestrunner.ExportTeardownVerdict(nil, []string{setup})
+		// The reports are stderr, which a fixture writes too: a line that
+		// reads like an AfterAll failure is not one.
+		w.It("passes, whatever the reports say", func(it *gotest.T) {
+			_, err := gotestrunner.ExportTeardownVerdict(nil, []string{setup, teardown})
 			gotest.NoError(it, err)
 		})
 	})

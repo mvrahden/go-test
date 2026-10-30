@@ -47,6 +47,10 @@ type fuzzEmitter struct {
 	needsStrconv bool
 	needsMath    bool
 
+	// decoded names the targets with a position that is not handed to the
+	// engine as declared: their input is decoded from the leaves.
+	decoded map[string]bool
+
 	// fans/fanOrder hold the fan-in/fan-out function pairs (ƒ_fuzzin_*/
 	// ƒ_fuzzout_*) keyed on the same identifiers assignName hands out;
 	// fanInfos memoises the leaf shape per unaliased type string, and
@@ -69,6 +73,7 @@ func newFuzzEmitter(pkg *packages.Package) *fuzzEmitter {
 		taken:    map[string]bool{},
 		helpers:  map[string]string{},
 		literals: map[string]string{},
+		decoded:  map[string]bool{},
 		fans:     map[string]string{},
 		fanInfos: map[string]*fanInfo{},
 		hybrids:  map[string]string{},
@@ -426,27 +431,39 @@ func isUnnamedByte(t types.Type) bool {
 	return ok && b.Kind() == types.Uint8
 }
 
-// literalFloatHelperTpl is the one shared, non-memoised helper every
-// generated file with a reachable float gets at most once. It exists
+// literalFloatHelperTpl holds the shared, non-memoised helpers every
+// generated file with a reachable float gets at most once. They exist
 // because rendering a float needs a conditional (is it NaN? +Inf? -Inf?),
 // and a Go expression cannot branch — every literal function that reaches a
-// float calls this rather than repeating the branch inline. It is purely an
-// implementation detail of the GENERATED FILE: the ƒ_* name never appears in
-// the STRING a literal function returns, which is the only thing that gets
-// spliced into a user's file, so this helper existing at all does not
-// violate the self-contained-string constraint.
+// float calls them rather than repeating the branch inline. They are purely
+// an implementation detail of the GENERATED FILE: the ƒ_* names never appear
+// in the STRING a literal function returns, which is the only thing that gets
+// spliced into a user's file, so these helpers existing at all does not
+// violate the self-contained-string constraint. A value no literal spells
+// exactly, a negative zero or a NaN other than math.NaN's, is rendered by its
+// bits.
 const literalFloatHelperTpl = `
 func ƒ_fuzzlitfloat_%[1]s(v float64) string {
-	if math.IsNaN(v) {
-		return "math.NaN()"
-	}
 	if math.IsInf(v, 1) {
 		return "math.Inf(1)"
 	}
 	if math.IsInf(v, -1) {
 		return "math.Inf(-1)"
 	}
+	if math.Float64bits(v) == math.Float64bits(math.NaN()) {
+		return "math.NaN()"
+	}
+	if math.IsNaN(v) || v == 0 && math.Signbit(v) {
+		return "math.Float64frombits(0x" + strconv.FormatUint(math.Float64bits(v), 16) + ")"
+	}
 	return strconv.FormatFloat(v, 'g', -1, 64)
+}
+
+func ƒ_fuzzlitfloat32_%[1]s(v float32) string {
+	if math.IsNaN(float64(v)) && math.Float32bits(v) != math.Float32bits(float32(math.NaN())) || v == 0 && math.Signbit(float64(v)) {
+		return "math.Float32frombits(0x" + strconv.FormatUint(uint64(math.Float32bits(v)), 16) + ")"
+	}
+	return ƒ_fuzzlitfloat_%[1]s(float64(v))
 }
 `
 
@@ -556,7 +573,10 @@ func (e *fuzzEmitter) basicLiteralExpr(b *types.Basic, src string) (string, erro
 		return fmt.Sprintf("strconv.FormatInt(int64(%s), 10)", src), nil
 	case types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64:
 		return fmt.Sprintf("strconv.FormatUint(uint64(%s), 10)", src), nil
-	case types.Float32, types.Float64:
+	case types.Float32:
+		e.needsMath = true
+		return fmt.Sprintf("ƒ_fuzzlitfloat32_%s(float32(%s))", fuzzFanVersion, src), nil
+	case types.Float64:
 		e.needsMath = true
 		return fmt.Sprintf("ƒ_fuzzlitfloat_%s(float64(%s))", fuzzFanVersion, src), nil
 	case types.String:

@@ -59,7 +59,10 @@ better.
 - `go tool gotest fuzz triage ./...` re-runs each crasher and prints the
   decoded input and the cause; `go tool gotest fuzz promote ./...` splices
   it into the method as a typed `f.Add(...)` seed and deletes the file.
-  Promote is the durable form: a struct target's corpus file is bound to
+  v1.36.1+: promote takes only the crashers the latest `gotest fuzz` session
+  of their target wrote, in Go's corpus format; it leaves every older corpus file in place,
+  and such a file is deleted or its input written as a typed `f.Add` seed
+  by hand. Promote is the durable form: a struct target's corpus file is bound to
   its field order, a promoted literal is source. After promoting, fix the
   bug the seed now reproduces; the seed stays as the regression test.
 - "New interesting inputs" in the session line live in Go's build cache

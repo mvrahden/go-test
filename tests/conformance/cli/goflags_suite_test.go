@@ -25,12 +25,16 @@ func (s *CLIGoTestFlagsTestSuite) TestOwnedGoTestFlags(t *gotest.T) {
 				{Desc: "-o is refused with a reason", args: []string{"-o", "out.test", "../testdata/passing/"}, exit: 2, stderrHas: "-o"},
 				{Desc: "-buildvcs=false reaches the build", args: []string{"-buildvcs=false", "../testdata/passing/"}, exit: 0, stdoutHas: "ok"},
 				{Desc: "-pgo=off reaches the build", args: []string{"-pgo=off", "../testdata/passing/"}, exit: 0, stdoutHas: "ok"},
+				{Desc: "the last -v wins", args: []string{"-v", "-v=false", "../testdata/passing/"}, exit: 0, stdoutHas: "ok", stdoutNot: "PASS"},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
 				gotest.NoError(sub, err)
 				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 				if row.stdoutHas != "" {
 					gotest.Contains(sub, run.Stdout, row.stdoutHas)
+				}
+				if row.stdoutNot != "" {
+					gotest.NotContains(sub, run.Stdout, row.stdoutNot)
 				}
 				if row.stderrHas != "" {
 					gotest.Contains(sub, run.Stderr, row.stderrHas)

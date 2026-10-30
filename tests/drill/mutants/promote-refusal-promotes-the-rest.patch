@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/fuzz FuzzPromote / NonLiterals / .* / no crasher of the run is promoted and every crasher file stays / a call \(
+Clause: when a session's crasher file holds anything but Go's corpus literals → no crasher of the run is promoted and every crasher file stays
+--- a/cmd/gotest/fuzztriage.go
++++ b/cmd/gotest/fuzztriage.go
+@@ -479,10 +479,7 @@
+ 		}
+ 	}
+ 
+-	if refused {
+-		fmt.Println("promote: nothing promoted: a crasher of the latest fuzz session is not one it wrote in Go's corpus format")
+-		return 1
+-	}
++	failed = failed || refused
+ 	if len(queue) == 0 && !failed {
+ 		fmt.Println("no crashers from the latest fuzz session")
+ 		return 0

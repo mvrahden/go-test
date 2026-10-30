@@ -150,18 +150,30 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 0) {
 			return conditionMapping{target: pick(negated, "Empty", "NotEmpty"), args: []ast.Expr{inner}, desc: "len > 0 check"}, true
 		}
+		if mayBeFloat(pass, left) || mayBeFloat(pass, right) {
+			return conditionMapping{}, false
+		}
 		return conditionMapping{target: pick(negated, "LessOrEqual", "Greater"), args: []ast.Expr{left, right}, desc: "> comparison"}, true
 
 	case token.GEQ:
 		if inner, ok := isLenCall(left); ok && isIntLit(right, 1) {
 			return conditionMapping{target: pick(negated, "Empty", "NotEmpty"), args: []ast.Expr{inner}, desc: "len >= 1 check"}, true
 		}
+		if mayBeFloat(pass, left) || mayBeFloat(pass, right) {
+			return conditionMapping{}, false
+		}
 		return conditionMapping{target: pick(negated, "Less", "GreaterOrEqual"), args: []ast.Expr{left, right}, desc: ">= comparison"}, true
 
 	case token.LSS:
+		if mayBeFloat(pass, left) || mayBeFloat(pass, right) {
+			return conditionMapping{}, false
+		}
 		return conditionMapping{target: pick(negated, "GreaterOrEqual", "Less"), args: []ast.Expr{left, right}, desc: "< comparison"}, true
 
 	case token.LEQ:
+		if mayBeFloat(pass, left) || mayBeFloat(pass, right) {
+			return conditionMapping{}, false
+		}
 		return conditionMapping{target: pick(negated, "Greater", "LessOrEqual"), args: []ast.Expr{left, right}, desc: "<= comparison"}, true
 	}
 	return conditionMapping{}, false
@@ -272,12 +284,12 @@ func mapNilComparison(pass *analysis.Pass, left, right ast.Expr, negated, isNeq 
 	if negated {
 		positive = !positive
 	}
-	switch {
-	case isErrorType(pass, other):
+	switch nilKindOf(pass, other) {
+	case errorIface:
 		return conditionMapping{target: pick(!positive, "Error", "NoError"), args: []ast.Expr{other}, desc: "error nil check"}, true, true
-	case isComparableType(pass, other):
+	case otherIface, comparableNil:
 		return conditionMapping{target: pick(!positive, "NotZero", "Zero"), args: []ast.Expr{other}, desc: "nil check"}, true, true
-	case isNonComparableNilableType(pass, other):
+	case uncomparableNil:
 		return conditionMapping{target: pick(!positive, "NotNil", "Nil"), args: []ast.Expr{other}, desc: "nil check"}, true, true
 	}
 	return conditionMapping{}, false, true
@@ -428,7 +440,7 @@ func mapBoolCall(pass *analysis.Pass, inner *ast.CallExpr, negated bool) (condit
 			return conditionMapping{target: pick(negated, "Error", "NoError"), args: []ast.Expr{err}, desc: "errors.Is nil check"}, true
 		}
 		if !negated {
-			return conditionMapping{target: "ErrorIs", args: []ast.Expr{err, target}, desc: "errors.Is call"}, true
+			return conditionMapping{target: "ErrorIs", args: []ast.Expr{err, target}, desc: "errors.Is call", noFix: "ErrorIs fails a nil target, which errors.Is matches to a nil error"}, true
 		}
 		return conditionMapping{}, false
 	}
@@ -482,12 +494,15 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 		if isNilIdent(expected) {
 			other = actual
 		}
-		switch {
-		case isErrorType(pass, other):
+		if hasTypeArgs(call.Fun) {
+			return // the explicit type converts the operand first
+		}
+		switch nilKindOf(pass, other) {
+		case errorIface:
 			emitSimplify(pass, call, source, pick(negated, "Error", "NoError"), []ast.Expr{tArg, other}, msgArgs, "nil error comparison")
-		case isComparableType(pass, other):
+		case otherIface, comparableNil:
 			emitSimplify(pass, call, source, pick(negated, "NotZero", "Zero"), []ast.Expr{tArg, other}, msgArgs, "nil comparison")
-		case isNonComparableNilableType(pass, other):
+		case uncomparableNil:
 			emitSimplify(pass, call, source, pick(negated, "NotNil", "Nil"), []ast.Expr{tArg, other}, msgArgs, "nil comparison")
 		}
 		return
@@ -543,7 +558,7 @@ func simplifyZeroNotZero(pass *analysis.Pass, call *ast.CallExpr, isNotZero bool
 	if len(call.Args) < 2 {
 		return
 	}
-	if !isErrorType(pass, call.Args[1]) {
+	if nilKindOf(pass, call.Args[1]) != errorIface {
 		return
 	}
 	source := pick(isNotZero, "NotZero", "Zero")
@@ -580,14 +595,17 @@ func guardNilNotNil(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 		return
 	}
 
-	switch {
-	case isErrorType(pass, arg):
-		target := pick(isNot, "Error", "NoError")
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, arg}, msgArgs, "error nil check")
-	case isConcreteComparableNilableType(pass, arg):
+	switch nilKindOf(pass, arg) {
+	case comparableNil:
 		target := pick(isNot, "NotZero", "Zero")
 		emitSimplify(pass, call, source, target, []ast.Expr{tArg, arg}, msgArgs, "nil check")
-	case isNonComparableNilableType(pass, arg):
+	case errorIface:
+		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for error nil check — %s looks through the error to a nil pointer it holds",
+			pick(isNot, "Error", "NoError"), source, source)
+	case otherIface:
+		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for nil check — %s looks through the interface to a nil pointer it holds",
+			pick(isNot, "NotZero", "Zero"), source, source)
+	case uncomparableNil, unknownNil:
 		// OK — this is the intended use of Nil/NotNil
 	default:
 		report(pass, AssertionTypeGuard, call.Pos(),
@@ -611,11 +629,9 @@ func guardEmptyNotEmpty(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 	}
 
 	switch {
-	case isErrorType(pass, arg):
-		tArg := call.Args[0]
-		msgArgs := call.Args[2:]
-		target := pick(isNot, "Error", "NoError")
-		emitSimplify(pass, call, source, target, []ast.Expr{tArg, arg}, msgArgs, "error empty check")
+	case nilKindOf(pass, arg) == errorIface:
+		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for error empty check — %s looks through the error to the value it holds",
+			pick(isNot, "Error", "NoError"), source, source)
 	case isEmptyableType(pass, arg):
 		// OK
 	case isPointerType(t):
@@ -831,40 +847,6 @@ func isEmptyableType(pass *analysis.Pass, expr ast.Expr) bool {
 	return false
 }
 
-func isComparableType(pass *analysis.Pass, expr ast.Expr) bool {
-	t := pass.TypesInfo.TypeOf(expr)
-	if t == nil || isUntypedNil(t) {
-		return false
-	}
-	return types.Comparable(t)
-}
-
-func isNonComparableNilableType(pass *analysis.Pass, expr ast.Expr) bool {
-	t := pass.TypesInfo.TypeOf(expr)
-	if t == nil || isUntypedNil(t) {
-		return false
-	}
-	switch t.Underlying().(type) {
-	case *types.Slice, *types.Map, *types.Signature:
-		return true
-	}
-	return false
-}
-
-func isConcreteComparableNilableType(pass *analysis.Pass, expr ast.Expr) bool {
-	t := pass.TypesInfo.TypeOf(expr)
-	if t == nil || isUntypedNil(t) {
-		return false
-	}
-	switch t.Underlying().(type) {
-	case *types.Pointer, *types.Chan:
-		return true
-	case *types.Interface:
-		return true
-	}
-	return false
-}
-
 func isStringType(pass *analysis.Pass, expr ast.Expr) bool {
 	t := pass.TypesInfo.TypeOf(expr)
 	if t == nil {
@@ -872,15 +854,6 @@ func isStringType(pass *analysis.Pass, expr ast.Expr) bool {
 	}
 	b, ok := t.Underlying().(*types.Basic)
 	return ok && b.Info()&types.IsString != 0
-}
-
-func isErrorType(pass *analysis.Pass, expr ast.Expr) bool {
-	t := pass.TypesInfo.TypeOf(expr)
-	if t == nil || isUntypedNil(t) {
-		return false
-	}
-	errorType := types.Universe.Lookup("error").Type()
-	return types.AssignableTo(t, errorType)
 }
 
 func isUntypedNil(t types.Type) bool {

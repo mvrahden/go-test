@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / when an It's label holds a slash / a run's spec shows it as one It under its When \(
+Judge: ./tests/canary CanaryTestSuite/TestSpecMarkdownASlashIsNoLevel
+Expect: specmarkdown: an It with a slash is split into levels
+Clause: when an It's label holds a slash → a run's spec shows it as one It under its When
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -261,7 +261,6 @@
+ 		if !placed {
+ 			segments = splitTestPath(ev.Test)
+ 			if ev.Action == ActionRun {
+-				segments = joinUnstartedLevels(segments, nmap, levels[ev.Package])
+ 				levels[ev.Package][ev.Test] = segments
+ 			}
+ 		}

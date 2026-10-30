@@ -72,6 +72,7 @@ type SharedFixtureProcess struct {
 	allDone  chan struct{}
 	setupErr error
 	protoErr error // under mu: a stream the process got wrong after its setup was read
+	tornErr  error // under mu: the teardowns the process reported failed on _teardown
 	waitErr  error // exit status of the subprocess; valid once done is closed
 
 	// Setup budgets the process reported, for the wait that has no flat
@@ -722,21 +723,22 @@ func (p *SharedFixtureProcess) Teardown() error {
 		return fmt.Errorf("shared fixture teardown was force-killed after %s; its AfterAll never finished and its resources may be leaked", allowed)
 	}
 	p.mu.Lock()
-	protoErr := p.protoErr
+	protoErr, tornErr := p.protoErr, p.tornErr
 	p.mu.Unlock()
-	return errors.Join(exitVerdict(p.setupErr, p.waitErr, diedEarly), protoErr)
+	return errors.Join(exitVerdict(p.setupErr, tornErr, p.waitErr, diedEarly), protoErr)
 }
 
 // exitVerdict judges the process's exit status once it exited unforced.
-func exitVerdict(setupErr, waitErr error, diedEarly bool) error {
+// tornErr is what the process reported about its teardowns on _teardown.
+func exitVerdict(setupErr, tornErr, waitErr error, diedEarly bool) error {
 
 	// A setup failure already surfaced through SetupErr; the subprocess ran its
 	// sibling teardowns under the runner's shutdown request and exited 1 for
 	// the setup failure. Reporting that status here again would blame teardown
-	// for it. Sibling AfterAll failures still reach the run through the
-	// fixtures' own reports, which the pipeline reads separately.
+	// for it: a sibling's AfterAll that failed beside it is known from the
+	// process's _teardown line alone.
 	if setupErr != nil {
-		return nil
+		return tornErr
 	}
 
 	// A clean exit is the only proof of a completed teardown: the epilogue runs
@@ -750,6 +752,9 @@ func exitVerdict(setupErr, waitErr error, diedEarly bool) error {
 	}
 	var exitErr *exec.ExitError
 	if errors.As(waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
+		if tornErr != nil {
+			return tornErr
+		}
 		return fmt.Errorf("shared fixture teardown failed")
 	}
 	if diedEarly {
@@ -926,7 +931,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 }
 
 // readProtocol reads the protocol stream to its end: state lines, the _done
-// sentinel and _cmd acknowledgements.
+// sentinel, _cmd acknowledgements and the _teardown report.
 func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 	closedReady := make(map[string]bool, len(p.ready))
 	doneSeen := false
@@ -959,6 +964,12 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 			p.noteTeardownBudget(entry.TeardownBudget)
 			doneSeen = true
 			close(p.allDone)
+			continue
+		}
+		if entry.Key == "_teardown" {
+			p.mu.Lock()
+			p.tornErr = fmt.Errorf("shared fixture teardown failed: %s", entry.Error)
+			p.mu.Unlock()
 			continue
 		}
 		if entry.Key == "_setup" {

@@ -1,0 +1,21 @@
+Expect: ^FAIL .*conformance/fixtures .* / the run passes \(
+Clause: when a shared fixture's AfterAll writes the line a failed AfterAll is reported with and returns nil → the run passes
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -165,7 +165,15 @@
+ // attached. The reports are stderr, free text a fixture can write as well:
+ // they explain a failure, they never make one.
+ func teardownVerdict(teardownErr error, reports []string) error {
+-	return withReports(teardownErr, reports, true)
++	if err := withReports(teardownErr, reports, true); err != nil {
++		return err
++	}
++	for _, r := range reports {
++		if strings.Contains(r, ".AfterAll ") {
++			return withReports(errors.New("shared fixture teardown failed"), reports, true)
++		}
++	}
++	return nil
+ }
+ 
+ // applyTeardownFailure surfaces a shared fixture teardown failure and makes a

@@ -166,10 +166,13 @@ var (
 	ExportClassifyRerun       = classifyRerun
 )
 
-func ExportSpliceExpr(a corpusArg) string { return a.spliceExpr() }
+func ExportSpliceExpr(a corpusArg) (string, error) { return a.spliceExpr() }
 
 // lint.go
-var ExportLintGitHubArmed = lintGitHubArmed
+var (
+	ExportLintGitHubArmed       = lintGitHubArmed
+	ExportAppendLintStepSummary = appendLintStepSummary
+)
 
 // ExportRunLintGitHub runs lint in-process with GitHub annotations.
 func ExportRunLintGitHub(stdout, stderr io.Writer, dir string, args []string) (code int, ok bool) {

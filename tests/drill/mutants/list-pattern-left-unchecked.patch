@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / is refused with exit 2 before anything runs, naming the pattern as go test does \(
+Clause: when a -list pattern does not compile → is refused with exit 2 before anything runs, naming the pattern as go test does
+--- a/internal/gotestrunner/testflags.go
++++ b/internal/gotestrunner/testflags.go
+@@ -98,7 +98,7 @@
+ 			}
+ 		case "list":
+ 			// Compiled whole: the testing package does not split it.
+-			if _, err := regexp.Compile(val); err != nil {
++			if _, err := regexp.Compile(val); false && err != nil {
+ 				return fmt.Errorf("invalid regexp in -list (%q): %s", val, err)
+ 			}
+ 		case "shuffle":

@@ -28,15 +28,17 @@ vi.mock("vscode", () => {
 });
 
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import {
   parseFuzzProgress,
   parseNewCrasher,
   parsePromotedSeed,
   isValidGoDuration,
-  countCrasherEntries,
+  fuzzSessionFile,
+  sessionCrasherCounts,
 } from "./fuzz.js";
 import { resolveTestItem } from "./runnerUtils.js";
 
@@ -121,28 +123,136 @@ describe("isValidGoDuration", () => {
   });
 });
 
-describe("countCrasherEntries", () => {
-  let dir = "";
+describe("fuzzSessionFile", () => {
+  it("lives in $GOTEST_CACHE_DIR, resolved against the CLI's cwd", () => {
+    expect(
+      fuzzSessionFile({ GOTEST_CACHE_DIR: "/c", HOME: "/h" }, "linux"),
+    ).toBe(path.join("/c", "fuzz-session.json"));
+    expect(fuzzSessionFile({ GOTEST_CACHE_DIR: "rel" }, "linux", "/ws")).toBe(
+      path.resolve("/ws", "rel", "fuzz-session.json"),
+    );
+  });
+
+  it("otherwise lives where Go's os.UserCacheDir points, under gotest", () => {
+    expect(fuzzSessionFile({ HOME: "/h" }, "linux")).toBe(
+      path.join("/h/.cache", "gotest", "fuzz-session.json"),
+    );
+    expect(fuzzSessionFile({ XDG_CACHE_HOME: "/x", HOME: "/h" }, "linux")).toBe(
+      path.join("/x", "gotest", "fuzz-session.json"),
+    );
+    expect(fuzzSessionFile({ HOME: "/h" }, "darwin")).toBe(
+      path.join("/h/Library/Caches", "gotest", "fuzz-session.json"),
+    );
+    expect(fuzzSessionFile({ LocalAppData: "L" }, "win32")).toBe(
+      path.join("L", "gotest", "fuzz-session.json"),
+    );
+  });
+
+  it("is unknown where Go's cache dir is undefined", () => {
+    expect(
+      fuzzSessionFile({ XDG_CACHE_HOME: "rel", HOME: "/h" }, "linux"),
+    ).toBe(undefined);
+    expect(fuzzSessionFile({}, "linux")).toBe(undefined);
+    expect(fuzzSessionFile({ HOME: "/h" }, "win32")).toBe(undefined);
+  });
+});
+
+describe("sessionCrasherCounts", () => {
+  const roots: string[] = [];
 
   afterEach(async () => {
-    if (dir) await rm(dir, { recursive: true, force: true });
+    for (const root of roots) await rm(root, { recursive: true, force: true });
   });
 
   // Every dir a test made is gone once they ran.
   afterAll(() => {
-    expect(dir).not.toBe("");
-    expect(existsSync(dir)).toBe(false);
+    expect(roots).not.toEqual([]);
+    for (const root of roots) expect(existsSync(root)).toBe(false);
   });
 
-  it("counts files in the wrapper's corpus dir and 0 when absent", async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "gotest-fuzz-"));
-    const corpus = path.join(dir, "testdata", "fuzz", "FuzzMySuite_FuzzParse");
-    await mkdir(corpus, { recursive: true });
-    await writeFile(path.join(corpus, "aa"), "go test fuzz v1\n");
-    await writeFile(path.join(corpus, "bb"), "go test fuzz v1\n");
+  async function setup() {
+    const root = await mkdtemp(path.join(tmpdir(), "gotest-fuzz-"));
+    roots.push(root);
+    const pkgDir = path.join(root, "pkg");
+    const cacheDir = path.join(root, "cache");
+    await mkdir(cacheDir);
+    const write = async (fn: string, name: string, input: string) => {
+      const dir = path.join(pkgDir, "testdata", "fuzz", fn);
+      await mkdir(dir, { recursive: true });
+      const content = `go test fuzz v1\nstring(${JSON.stringify(input)})\n`;
+      await writeFile(path.join(dir, name), content);
+      return createHash("sha256").update(content).digest("hex");
+    };
+    const record = (crashers: object[]) =>
+      writeFile(
+        path.join(cacheDir, "fuzz-session.json"),
+        JSON.stringify({ crashers }),
+      );
+    return {
+      root,
+      pkgDir,
+      write,
+      record,
+      env: { GOTEST_CACHE_DIR: cacheDir },
+    };
+  }
 
-    expect(await countCrasherEntries(dir, "FuzzMySuite_FuzzParse")).toBe(2);
-    expect(await countCrasherEntries(dir, "FuzzMySuite_FuzzOther")).toBe(0);
+  it("counts recorded crashers per wrapper, matching the package dir through a symlink", async () => {
+    const { root, pkgDir, write, record, env } = await setup();
+    const a = await write("FuzzS_A", "a1", "x");
+    const b = await write("FuzzS_B", "b1", "y");
+    await write("FuzzS_A", "older", "z");
+    const link = path.join(root, "link");
+    await symlink(pkgDir, link);
+    await record([
+      { dir: link, func: "FuzzS_A", name: "a1", sha256: a },
+      { dir: pkgDir, func: "FuzzS_B", name: "b1", sha256: b },
+      { dir: pkgDir, func: "FuzzS_B", name: "b1", sha256: b },
+    ]);
+
+    const counts = await sessionCrasherCounts(
+      pkgDir,
+      new Set(["FuzzS_A", "FuzzS_B"]),
+      { env },
+    );
+
+    expect(Object.fromEntries(counts)).toEqual({ FuzzS_A: 1, FuzzS_B: 1 });
+  });
+
+  it("ignores records of other packages and of wrappers the package lacks", async () => {
+    const { root, pkgDir, write, record, env } = await setup();
+    const a = await write("FuzzS_A", "a1", "x");
+    await record([
+      {
+        dir: path.join(root, "elsewhere"),
+        func: "FuzzS_A",
+        name: "a1",
+        sha256: a,
+      },
+      { dir: pkgDir, func: "FuzzS_Gone", name: "a1", sha256: a },
+    ]);
+
+    const counts = await sessionCrasherCounts(pkgDir, new Set(["FuzzS_A"]), {
+      env,
+    });
+
+    expect(counts.size).toBe(0);
+  });
+
+  it("counts nothing when the record is missing or unreadable", async () => {
+    const { pkgDir, write, env } = await setup();
+    await write("FuzzS_A", "a1", "x");
+
+    expect(
+      (await sessionCrasherCounts(pkgDir, new Set(["FuzzS_A"]), { env })).size,
+    ).toBe(0);
+    await writeFile(
+      path.join(env.GOTEST_CACHE_DIR, "fuzz-session.json"),
+      "not json",
+    );
+    expect(
+      (await sessionCrasherCounts(pkgDir, new Set(["FuzzS_A"]), { env })).size,
+    ).toBe(0);
   });
 });
 

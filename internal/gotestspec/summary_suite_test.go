@@ -319,3 +319,58 @@ func (s *SummaryRenderTestSuite) TestRenderSummary_Groups(t *gotest.T, _ *summar
 		gotest.NotContains(it, buf.String(), `"groups"`)
 	})
 }
+
+func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_NamesInHTML(t *gotest.T, _ *summaryRenderCtx) {
+	t.When("a failed test's suite and name hold HTML characters", func(w *gotest.T) {
+		out := renderMarkdownSummary([]*gotestspec.Package{{
+			Path: `pkg/<b>&"`,
+			Nodes: []*gotestspec.Node{{
+				Kind:    gotestspec.KindSuite,
+				Display: `Suite<b>&"`,
+				Children: []*gotestspec.Node{
+					failingTest(`rejects <b>&"`, "boom"),
+				},
+			}},
+		}})
+
+		w.It("escapes them in the details summary", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"<summary><b>pkg/&lt;b&gt;&amp;&#34;</b> — Suite&lt;b&gt;&amp;&#34; / rejects &lt;b&gt;&amp;&#34; (1ms)</summary>")
+			gotest.NotContains(it, out, `<b>&"`)
+		})
+	})
+
+	t.When("a package with HTML characters in its path fails on its own", func(w *gotest.T) {
+		out := renderMarkdownSummary([]*gotestspec.Package{{
+			Path:   `pkg/<b>&"`,
+			Status: gotestspec.StatusFail,
+			Output: []string{"panic: boom\n"},
+		}})
+
+		w.It("escapes the path in the details summary", func(it *gotest.T) {
+			gotest.Contains(it, out,
+				"<summary><b>pkg/&lt;b&gt;&amp;&#34;</b> — package-level failure</summary>")
+			gotest.NotContains(it, out, `<b>&"`)
+		})
+	})
+
+	t.When("a failed benchmark's name holds HTML characters", func(w *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderMarkdownBenchSummary(&buf, []*gotestspec.Package{{
+			Path: "pkg/bench",
+			Nodes: []*gotestspec.Node{{
+				Kind:     gotestspec.KindBenchmark,
+				Display:  `Bench<b>&"`,
+				Status:   gotestspec.StatusFail,
+				Duration: time.Millisecond,
+				Output:   []string{"boom\n"},
+			}},
+		}})
+		out := buf.String()
+
+		w.It("escapes it in the details summary", func(it *gotest.T) {
+			gotest.Contains(it, out, "— Bench&lt;b&gt;&amp;&#34; (1ms)</summary>")
+			gotest.NotContains(it, out, `<b>&"`)
+		})
+	})
+}

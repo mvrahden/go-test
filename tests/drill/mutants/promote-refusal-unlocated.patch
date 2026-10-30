@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz FuzzPromote / NonLiterals / .* / promote refuses it with exit 1, naming the file and line / a call \(
+Clause: when a session's crasher file holds anything but Go's corpus literals → promote refuses it with exit 1, naming the file and line
+--- a/internal/gotestrunner/corpusgrammar.go
++++ b/internal/gotestrunner/corpusgrammar.go
+@@ -50,7 +50,7 @@
+ }
+ 
+ func (e *CorpusError) Error() string {
+-	return fmt.Sprintf("%s:%d: %s", e.Path, e.Line, e.Reason)
++	return fmt.Sprintf("%s: %s", e.Path, e.Reason)
+ }
+ 
+ // ParseCorpusFile reads a Go fuzz corpus file: the "go test fuzz v1" header,

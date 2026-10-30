@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/bench .* / the report's failures name the benchmark with the panic's message \(
+Clause: when a benchmark panics in a --json bench run → the report's failures name the benchmark with the panic's message
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -278,7 +278,7 @@
+ 	}
+ 
+ 	if jsonRequested {
+-		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, gateVerdict, envMismatch, gotestbench.FailuresOf(tree)); jsonCode != 0 {
++		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, gateVerdict, envMismatch, nil); jsonCode != 0 {
+ 			return jsonCode
+ 		}
+ 	}

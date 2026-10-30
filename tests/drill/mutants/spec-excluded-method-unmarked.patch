@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/spec .* / when the spec is read from source with X_ suites and methods / marks each excluded suite, method and behavior EXCLUDED \(
+Judge: ./tests/canary CanaryTestSuite/TestSpecMarkdownMarksExclusions
+Expect: specmarkdown: an excluded node is not marked EXCLUDED: "### Parked
+Clause: when the spec is read from source with X_ suites and methods → marks each excluded suite, method and behavior EXCLUDED
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -216,9 +216,6 @@
+ 	case KindMethod, KindTest, KindFuzz:
+ 		heading := strings.Repeat("#", headingLevel)
+ 		label := EscapeLabel(n.Display)
+-		if bare && n.Excluded {
+-			label += " — EXCLUDED"
+-		}
+ 		if n.Kind == KindFuzz && len(n.Children) == 0 {
+ 			// A declared target, or one that replayed nothing.
+ 			fmt.Fprintf(w, "%s %s (fuzz target)\n\n", heading, label)

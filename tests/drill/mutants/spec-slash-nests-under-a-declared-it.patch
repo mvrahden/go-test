@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when an It's label is an earlier It's label, a slash and more / the spec read from source shows both as Its under their When \(
+Clause: when an It's label is an earlier It's label, a slash and more → the spec read from source shows both as Its under their When
+--- a/internal/gotestast/behaviors.go
++++ b/internal/gotestast/behaviors.go
+@@ -158,7 +158,7 @@
+ 	head := segments[0]
+ 	var node *Behavior
+ 	for _, existing := range out {
+-		if existing.Name == head && existing.Implied {
++		if existing.Name == head {
+ 			node = existing
+ 			break
+ 		}

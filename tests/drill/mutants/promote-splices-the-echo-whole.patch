@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz FuzzPromote / DecodedArguments / .* / promote adds its crasher as one seed of all of them \(
+Clause: when a decoding target takes several arguments → promote adds its crasher as one seed of all of them
+--- a/cmd/gotest/fuzztriage.go
++++ b/cmd/gotest/fuzztriage.go
+@@ -712,7 +712,7 @@
+ 			return fmt.Sprintf("promote: %s/%s: skipped: %s decodes its input from %d lea%s, and the re-run echoed no decoded value; raw leaves are not its input",
+ 				target.Func, hashBase, target.Func, leaves, leafSuffix(leaves)), false
+ 		}
+-		args, err := splitSeedArgs(lit)
++		args, err := []string{lit}, error(nil)
+ 		if err != nil {
+ 			return fmt.Sprintf("promote: %s/%s: skipped: the re-run echoed %s: %s", target.Func, hashBase, lit, err), false
+ 		}

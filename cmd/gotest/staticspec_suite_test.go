@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 	"github.com/mvrahden/go-test/internal/config"
@@ -262,6 +263,80 @@ func (s *StaticSpecTestSuite) TestAnExcludedSuiteIsExcludedThroughout(t *gotest.
 			gotest.True(it, doc.Packages[0].Nodes[0].Excluded)
 			gotest.NotEmpty(it, doc.Packages[0].Nodes[0].Children)
 			gotest.True(it, allExcluded(doc.Packages[0].Nodes[0].Children), "nodes: %+v", doc.Packages[0].Nodes[0].Children)
+		})
+	})
+}
+
+// A slash in a label is part of the label: go test reports one subtest for
+// it, so the static tree has no level for the text before the slash.
+func (s *StaticSpecTestSuite) TestASlashInALabelIsNoLevel(t *gotest.T, ctx *staticCtx) {
+	slashes, err := filepath.Abs(filepath.Join("testdata", "static", "slashes"))
+	gotest.NoError(t, err)
+	md := s.render(t, ctx.dir, "md", slashes)
+	var doc specDocument
+	gotest.NoError(t, json.Unmarshal([]byte(s.render(t, ctx.dir, "json", slashes)), &doc))
+	gotest.Len(t, doc.Packages, 1)
+	read := doc.Packages[0].Nodes[0].Children[0]
+	gotest.Equal(t, "TestRead", read.Name)
+
+	t.When("the static spec reads an It whose label holds a slash", func(w *gotest.T) {
+		w.It("lists it as one It under its When", func(it *gotest.T) {
+			gotest.Equal(it, []string{
+				"a_path_is_read",
+				"a_path_is_read/reads_a/b_paths",
+				"a_path_is_read/keeps_snake_case/paths_whole",
+				"x/y",
+			}, nodePaths(read.Children, ""))
+			gotest.Len(it, read.Children, 2)
+			gotest.Len(it, read.Children[0].Children, 2)
+		})
+
+		w.It("renders it as one row with no invented when", func(it *gotest.T) {
+			gotest.Contains(it, md, "| **when a path is read** |\n| &nbsp;&nbsp;reads a/b paths |\n| &nbsp;&nbsp;keeps snake\\_case/paths whole |\n| x/y |\n")
+			gotest.NotContains(it, md, "when reads a")
+			gotest.NotContains(it, md, "when x")
+		})
+	})
+
+	t.When("the static spec reads an X_ method", func(w *gotest.T) {
+		w.It("marks its heading and its behaviors EXCLUDED in markdown", func(it *gotest.T) {
+			gotest.Contains(it, md, "### Parked — EXCLUDED\n")
+			gotest.Contains(it, md, "| &nbsp;&nbsp;never runs — EXCLUDED |")
+			gotest.Contains(it, md, "### Read\n")
+		})
+	})
+}
+
+// A replay reads the declarations the source holds for the stream's subtests,
+// so a slash in a label keeps the label as the developer wrote it.
+func (s *StaticSpecTestSuite) TestAReplayKeepsASlashInALabel(t *gotest.T, ctx *staticCtx) {
+	const pkg = "github.com/mvrahden/go-test/cmd/gotest/testdata/static/slashes"
+	var stream strings.Builder
+	for _, ev := range []struct{ action, test string }{
+		{"run", "TestPathsTestSuite"},
+		{"run", "TestPathsTestSuite/TestRead"},
+		{"run", "TestPathsTestSuite/TestRead/a_path_is_read"},
+		{"run", "TestPathsTestSuite/TestRead/a_path_is_read/keeps_snake_case/paths_whole"},
+		{"pass", "TestPathsTestSuite/TestRead/a_path_is_read/keeps_snake_case/paths_whole"},
+		{"pass", "TestPathsTestSuite/TestRead/a_path_is_read"},
+		{"pass", "TestPathsTestSuite/TestRead"},
+		{"pass", "TestPathsTestSuite"},
+		{"pass", ""},
+	} {
+		line, err := json.Marshal(map[string]string{"Action": ev.action, "Package": pkg, "Test": ev.test})
+		gotest.NoError(t, err)
+		stream.Write(append(line, '\n'))
+	}
+	in := filepath.Join(ctx.dir, "events.json")
+	gotest.NoError(t, os.WriteFile(in, []byte(stream.String()), 0o600))
+	out := filepath.Join(ctx.dir, "spec.md")
+	gotest.Equal(t, 0, ExportRunSpecFromInput(in, "md", out, true, false))
+	md, err := os.ReadFile(out) //nolint:gosec // G304: path built in this test
+	gotest.NoError(t, err)
+
+	t.When("a replayed It's label holds a slash and an underscore", func(w *gotest.T) {
+		w.It("shows the declared label in one row", func(it *gotest.T) {
+			gotest.Contains(it, string(md), "| &nbsp;&nbsp;keeps snake\\_case/paths whole | PASS |")
 		})
 	})
 }

@@ -38,3 +38,22 @@ func (s *FixtureTeardownTestSuite) TestFailedHydrateIsDehydrated(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FixtureTeardownTestSuite) TestSharedTeardownVerdict(t *gotest.T) {
+	t.When("a shared fixture's AfterAll writes the line a failed AfterAll is reported with and returns nil", func(w *gotest.T) {
+		run, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/sharedteardowntext/")
+		gotest.NoError(w, err)
+		w.It("the run passes", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		})
+	})
+	t.When("a shared fixture's AfterAll returns an error while a sibling's setup failed", func(w *gotest.T) {
+		run, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/sharedteardownsibling/")
+		gotest.NoError(w, err)
+		w.It("fails the run on the teardown as well, reporting that AfterAll's error", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stdout, "shared fixture teardown failed")
+			gotest.Contains(it, run.Stdout, "StuckSharedFixture.AfterAll failed: the volume is still attached")
+		})
+	})
+}
