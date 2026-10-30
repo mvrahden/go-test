@@ -207,6 +207,19 @@ export class SpecStore {
       });
     }
   }
+
+  // prune drops a folder's packages that its discovery no longer reports:
+  // renamed or deleted. Run-level bookings are not packages and stay.
+  prune(folder: string, discovered: Set<string>): string[] {
+    const removed: string[] = [];
+    for (const [path, record] of this.records) {
+      if (record.folder !== folder || record.runLevel) continue;
+      if (discovered.has(path)) continue;
+      this.records.delete(path);
+      removed.push(path);
+    }
+    return removed;
+  }
 }
 
 const isStrings = (v: unknown): v is string[] =>
