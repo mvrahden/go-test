@@ -16,6 +16,7 @@ import {
   readWorkspacePatterns,
   type AppliedResult,
   BuildOutputs,
+  erroredItem,
   itemTestPath,
 } from "./runnerUtils.js";
 import { coverOf, type RunPiece } from "./specStore.js";
@@ -244,7 +245,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           .filter(Boolean)
           .join("\n\n");
         for (const item of info.items) {
-          run.errored(item, new vscode.TestMessage(diagnostic));
+          erroredItem(run, controller, item, diagnostic);
           skipUnresolved(run, item, controller);
         }
         attributed = true;
@@ -269,7 +270,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
             const pkgItem = getPackageItem(item);
             if (seen.has(pkgItem.id)) continue;
             seen.add(pkgItem.id);
-            run.errored(pkgItem, new vscode.TestMessage(diagnostic));
+            erroredItem(run, controller, pkgItem, diagnostic);
           }
         }
       }
@@ -325,7 +326,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     outputChannel.error(`[${label}] ${message}`);
     for (const info of pkgInfos) {
       for (const item of info.items) {
-        run.errored(item, new vscode.TestMessage(message));
+        erroredItem(run, controller, item, message);
         skipUnresolved(run, item, controller);
       }
     }

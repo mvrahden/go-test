@@ -93,6 +93,33 @@ describe("TestResultStore", () => {
       });
     });
 
+    it("keeps an errored verdict across a reload", async () => {
+      const writer = new TestResultStore({ fsPath: tmpDir });
+      writer.record("pkg", "errored");
+      writer.save();
+      await writer.flush();
+
+      const reader = new TestResultStore({ fsPath: tmpDir });
+      await reader.load();
+      expect(reader.get("pkg")).toMatchObject({ status: "errored" });
+    });
+
+    // A build that predates errored verdicts wrote version 3; a newer one
+    // must not read that file as if it could carry them, nor the reverse.
+    it("drops a store written before a verdict could be errored", async () => {
+      await writeFile(
+        path.join(tmpDir, "testResults.json"),
+        JSON.stringify({
+          version: 3,
+          data: { pkg: { status: "pass", timestamp: Date.now() } },
+        }),
+        "utf-8",
+      );
+      const reader = new TestResultStore({ fsPath: tmpDir });
+      await reader.load();
+      expect(reader.size).toBe(0);
+    });
+
     // The Test Explorer's "Clear all results" is in-memory only. Unless the
     // persisted copy is cleared too, the next window reload restores exactly
     // the results the developer just dismissed.

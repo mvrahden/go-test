@@ -5,6 +5,7 @@ import { ManagedChild } from "./managedChild.js";
 import { readFile } from "node:fs/promises";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
+import type { TestResultStore } from "./testResultStore.js";
 import {
   extractDiagnosticLocation,
   extractTestMessages,
@@ -255,6 +256,18 @@ export function resolveTestItem(
   }
 
   return parentItem;
+}
+
+// erroredItem marks an item whose run could not produce a verdict, in the
+// run and in the result store, so a reload and Copy Test Results say so too.
+export function erroredItem(
+  run: vscode.TestRun,
+  controller: GoTestController,
+  item: vscode.TestItem,
+  message: string,
+): void {
+  run.errored(item, new vscode.TestMessage(message));
+  controller.recordResult(item.id, "errored");
 }
 
 export interface AppliedResult {
@@ -930,7 +943,9 @@ export function resolveAncestorsOf(
     current.children.forEach((child) => {
       const result = controller.getResult(child.id);
       if (result) {
-        if (result.status === "fail") anyFailed = true;
+        if (result.status === "fail" || result.status === "errored") {
+          anyFailed = true;
+        }
         return;
       }
       const isStructural =
@@ -960,6 +975,50 @@ export function resolveAncestorsOf(
   }
 }
 
+// restoreStoredResults shows the stored verdicts as one run, so a reload
+// starts from what the last session saw. It returns how many landed on an
+// item: a stored id with no item is a test that no longer exists, or one the
+// tree cannot name yet.
+export function restoreStoredResults(
+  controller: GoTestController,
+  store: TestResultStore,
+): number {
+  const run = controller.createTestRun(
+    new vscode.TestRunRequest(),
+    "Restored Results",
+  );
+  let applied = 0;
+  store.forEach((result, itemId) => {
+    const item = controller.findItem(itemId);
+    if (!item) return;
+    applied++;
+    switch (result.status) {
+      case "pass":
+        run.passed(item, result.duration);
+        break;
+      case "fail":
+        run.failed(
+          item,
+          [new vscode.TestMessage("(restored from previous session)")],
+          result.duration,
+        );
+        break;
+      case "skip":
+        run.skipped(item);
+        break;
+      case "errored":
+        run.errored(
+          item,
+          new vscode.TestMessage("(errored in the previous session)"),
+        );
+        break;
+    }
+  });
+  resolveAncestorItems(run, controller);
+  run.end();
+  return applied;
+}
+
 export function resolveAncestorItems(
   run: vscode.TestRun,
   controller: GoTestController,
@@ -982,7 +1041,11 @@ function resolveItemRecursive(
     item.id.startsWith("module:");
 
   if (directResult && !isPackage && !isStructural) {
-    return { anyFailed: directResult.status === "fail", anyResolved: true };
+    return {
+      anyFailed:
+        directResult.status === "fail" || directResult.status === "errored",
+      anyResolved: true,
+    };
   }
 
   let anyFailed = false;
@@ -992,6 +1055,12 @@ function resolveItemRecursive(
     if (r.anyResolved) anyResolved = true;
     if (r.anyFailed) anyFailed = true;
   });
+
+  // A package the run errored keeps that verdict: its passing children do
+  // not make the run that failed it green.
+  if (isPackage && directResult?.status === "errored") {
+    return { anyFailed: true, anyResolved: true };
+  }
 
   if (anyResolved) {
     run.started(item);

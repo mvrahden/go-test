@@ -43,7 +43,7 @@ import { validateGoBinary, scopedConfig } from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
-  resolveAncestorItems,
+  restoreStoredResults,
 } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
 import { execFile } from "node:child_process";
@@ -1005,31 +1005,7 @@ async function initializeAsync(deps: {
   async function restoreResults(): Promise<void> {
     const resultsStartedAt = Date.now();
     if (testResultStore.size > 0) {
-      const resultRequest = new vscode.TestRunRequest();
-      const resultRun = controller.createTestRun(
-        resultRequest,
-        "Restored Results",
-      );
-      let applied = 0;
-      testResultStore.forEach((result, itemId) => {
-        const item = controller.findItem(itemId);
-        // A stored id with no item is a test that no longer exists, or one the
-        // tree cannot name yet. Counting only what landed keeps the log honest:
-        // reporting the store's size implies a restore that may not have
-        // happened.
-        if (!item) return;
-        applied++;
-        if (result.status === "pass") resultRun.passed(item, result.duration);
-        else if (result.status === "fail")
-          resultRun.failed(
-            item,
-            [new vscode.TestMessage("(restored from previous session)")],
-            result.duration,
-          );
-        else if (result.status === "skip") resultRun.skipped(item);
-      });
-      resolveAncestorItems(resultRun, controller);
-      resultRun.end();
+      const applied = restoreStoredResults(controller, testResultStore);
       outputChannel.info(
         `[results] restored ${applied} of ${testResultStore.size} result(s) from storage in ${Date.now() - resultsStartedAt}ms`,
       );
