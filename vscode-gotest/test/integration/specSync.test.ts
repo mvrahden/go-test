@@ -746,6 +746,32 @@ describe("acting on a node", () => {
   });
 });
 
+describe("failure output", () => {
+  it("links the file:line it names to the source in the package", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-cart-"));
+    try {
+      writeFileSync(path.join(dir, "cart_test.go"), "package cart\n");
+      const cache = new DiscoveryCache();
+      cache.update(
+        [{ importPath: "example.com/cart", dir, suites: [] } as never],
+        true,
+        dir,
+      );
+      const recorder = createRecordingChannel();
+      const panel = new SpecViewPanel(recorder.channel as never, cache);
+      await panel.show();
+      await panel.refresh(run("mixed"));
+
+      expect(recorder.errors).toEqual([]);
+      expect(renderedHtml()).toContain(
+        `<a class="src-link" data-loc-file="${path.join(dir, "cart_test.go")}" data-loc-line="42">cart_test.go:42</a>`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("clearing drops the kept runs", () => {
   // Clearing has to drop what is kept, not just repaint, or the next refresh
   // would resurrect what was cleared.

@@ -18,7 +18,11 @@ import {
   encodeStateForScript,
   itemIdOf,
   nearestItemId,
+  linkSources,
 } from "./specView.js";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 
 function leaf(
   name: string,
@@ -568,5 +572,34 @@ describe("nearestItemId", () => {
     expect(nearestItemId("p/S/TestM", has)).toBe("p/S/TestM");
     expect(nearestItemId("p/S/TestM/row_101", has)).toBe("p/S/TestM");
     expect(nearestItemId("q/T", has)).toBeUndefined();
+  });
+});
+
+describe("linkSources", () => {
+  it("links the file:line tokens of failure output to files that are there", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-links-"));
+    try {
+      writeFileSync(path.join(dir, "store_test.go"), "package store\n");
+      const file = path.join(dir, "store_test.go");
+
+      // As go test names it: relative to the package.
+      expect(linkSources("    store_test.go:40: boom", dir)).toBe(
+        `    <a class="src-link" data-loc-file="${file}" data-loc-line="40">store_test.go:40</a>: boom`,
+      );
+      // As the compiler names it: relative to where it ran.
+      expect(
+        linkSources("store/store_test.go:13:22: undefined: x", dir),
+      ).toContain(`data-loc-file="${file}" data-loc-line="13"`);
+      // A stack frame names the file absolutely.
+      expect(linkSources(`\t${file}:7 +0x1d`, undefined)).toContain(
+        `data-loc-line="7"`,
+      );
+      // Nothing to open, nothing to click.
+      expect(linkSources("    gone_test.go:3: boom", dir)).toBe(
+        "    gone_test.go:3: boom",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
