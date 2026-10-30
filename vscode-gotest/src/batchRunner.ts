@@ -19,7 +19,7 @@ import {
   erroredItem,
   itemTestPath,
 } from "./runnerUtils.js";
-import { coverOf, type RunPiece } from "./specStore.js";
+import { coverOf, isRunLevelPackage, type RunPiece } from "./specStore.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -157,7 +157,21 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
       if (builds.absorb(event)) return;
       const dir = pkgDirMap.get(event.Package);
-      if (!dir) return;
+      if (!dir) {
+        // The CLI books a run's own failure (shared fixtures, an interrupt,
+        // the global deadline) under a name that is no package. No item
+        // holds it, so it is said in the run's output.
+        if (
+          isRunLevelPackage(event.Package) &&
+          event.Action === "output" &&
+          event.Output
+        ) {
+          run.appendOutput(
+            `[${event.Package}] ${event.Output.replace(/\n$/, "")}\r\n`,
+          );
+        }
+        return;
+      }
 
       let outputMap = pkgOutputMaps.get(event.Package);
       if (!outputMap) {
@@ -191,6 +205,12 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
     };
 
+    // What the CLI says on stderr — a note that a package was not run, a
+    // run's failure — belongs with the run, as it arrives.
+    const handleStderrLine = (line: string) => {
+      if (!/^exit status \d+$/.test(line)) run.appendOutput(line + "\r\n");
+    };
+
     const result = await spawnTestProcess(
       cmd.bin,
       cmd.args,
@@ -200,6 +220,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       label,
       env,
       handleStdoutLine,
+      handleStderrLine,
     );
 
     if (token.isCancellationRequested) {
@@ -226,10 +247,6 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         .filter((line) => !/^exit status \d+$/.test(line.trim()))
         .join("\n")
         .trim();
-
-      if (stderrFiltered) {
-        run.appendOutput(stderrFiltered.replace(/\n/g, "\r\n") + "\r\n");
-      }
 
       let attributed = false;
       for (const info of pkgInfos) {
