@@ -7,6 +7,7 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece, type StoredRecord } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
+import type { DiscoverBehavior } from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -341,10 +342,10 @@ export class SpecViewPanel implements vscode.Disposable {
         // the spec re-homes the generated wrapper under its suite by the
         // method name, so the same key shape reaches both.
         for (const method of [...suite.methods, ...(suite.fuzzers ?? [])]) {
-          map[`${testName}/${method.name}`] = {
-            file: path.join(pkg.dir, method.file),
-            line: method.line,
-          };
+          const file = path.join(pkg.dir, method.file);
+          const methodPath = `${testName}/${method.name}`;
+          map[methodPath] = { file, line: method.line };
+          addBehaviorLocations(map, methodPath, file, method.behaviors ?? []);
         }
       }
     }
@@ -469,6 +470,22 @@ ${SCRIPT}
       clearTimeout(budget);
       mc.dispose();
     }
+  }
+}
+
+// addBehaviorLocations maps every declared When/It to its line, keyed by the
+// go test path the run reports it under. A behavior is declared in its
+// method's file.
+function addBehaviorLocations(
+  map: Record<string, { file: string; line: number }>,
+  parentPath: string,
+  file: string,
+  behaviors: DiscoverBehavior[],
+): void {
+  for (const b of behaviors) {
+    const behaviorPath = `${parentPath}/${b.name}`;
+    if (b.line > 0) map[behaviorPath] = { file, line: b.line };
+    addBehaviorLocations(map, behaviorPath, file, b.children ?? []);
   }
 }
 
@@ -739,36 +756,27 @@ function buildModuleSectionHtml(
 </details>`;
 }
 
+// Nodes are rendered with their go test path: the parent's path and their
+// own name, which is how discovery keys a declaration.
 function buildNodeHtml(
   node: SpecNode,
-  parentName: string,
+  parentPath: string,
   locationMap: LocationMap,
 ): string {
+  const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
   if (node.children.length === 0) {
-    return buildLeafHtml(node, parentName, locationMap);
+    return buildLeafHtml(node, nodePath, locationMap);
   }
-  return buildBranchHtml(node, parentName, locationMap);
-}
-
-function locationKey(node: SpecNode, parentName: string): string {
-  if (node.kind === "suite") {
-    return node.name;
-  }
-  if ((node.kind === "method" || node.kind === "fuzz") && parentName) {
-    return `${parentName}/${node.name}`;
-  }
-  return "";
+  return buildBranchHtml(node, nodePath, locationMap);
 }
 
 function buildIconHtml(
   status: string,
-  node: SpecNode,
-  parentName: string,
+  nodePath: string,
   locationMap: LocationMap,
 ): string {
   const icon = statusIcon(status);
-  const key = locationKey(node, parentName);
-  const loc = key ? locationMap[key] : undefined;
+  const loc = locationMap[nodePath];
   const locAttrs = loc
     ? ` data-loc-file="${escapeAttr(loc.file)}" data-loc-line="${loc.line}"`
     : "";
@@ -780,10 +788,10 @@ function buildIconHtml(
 
 function buildLeafHtml(
   node: SpecNode,
-  parentName: string,
+  nodePath: string,
   locationMap: LocationMap,
 ): string {
-  const iconHtml = buildIconHtml(node.status, node, parentName, locationMap);
+  const iconHtml = buildIconHtml(node.status, nodePath, locationMap);
   const dur = formatDuration(node.duration);
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
@@ -800,16 +808,15 @@ function buildLeafHtml(
 
 function buildBranchHtml(
   node: SpecNode,
-  parentName: string,
+  nodePath: string,
   locationMap: LocationMap,
 ): string {
   const shouldOpen = hasFailure(node);
   const openAttr = shouldOpen ? " open" : "";
   const status = derivedStatus(node);
-  const iconHtml = buildIconHtml(status, node, parentName, locationMap);
-  const selfName = node.name;
+  const iconHtml = buildIconHtml(status, nodePath, locationMap);
   const children = node.children
-    .map((c) => buildNodeHtml(c, selfName, locationMap))
+    .map((c) => buildNodeHtml(c, nodePath, locationMap))
     .join("");
 
   let label = escapeHtml(node.display);
