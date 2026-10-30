@@ -23,6 +23,22 @@ export interface CaptureOptions {
   onFirstByte?: (elapsedMs: number) => void;
 }
 
+export interface CaptureOutputOptions extends CaptureOptions {
+  // Ends the child: a newer request has made its answer worthless.
+  abort?: AbortSignal;
+  // A child that writes files gets the teardown grace, so a SIGKILL never
+  // lands while it is writing them.
+  grace?: "prompt" | "teardown";
+}
+
+export interface CapturedOutput {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  // The abort signal ended it; what it wrote is incomplete.
+  aborted: boolean;
+}
+
 // captureStdout runs a command and returns everything it wrote to stdout.
 //
 // execFile would be shorter, and that is the trap: its default 1 MiB cap is a
@@ -35,10 +51,24 @@ export async function captureStdout(
   args: string[],
   opts: CaptureOptions = {},
 ): Promise<string> {
+  const out = await captureOutput(bin, args, opts);
+  if (out.code === 0) return out.stdout;
+  const detail = stripGoRunExitEcho(out.stderr);
+  throw new Error(`exited with code ${out.code}${detail ? `: ${detail}` : ""}`);
+}
+
+// captureOutput is captureStdout for a command whose exit code is part of
+// its answer: it returns the code with both streams instead of throwing.
+export async function captureOutput(
+  bin: string,
+  args: string[],
+  opts: CaptureOutputOptions = {},
+): Promise<CapturedOutput> {
   const mc = new ManagedChild(bin, args, { cwd: opts.cwd, kind: "read" });
   const stdout: string[] = [];
   let stderr = "";
   let timedOut = false;
+  let aborted = false;
 
   const started = Date.now();
   let sawFirstByte = false;
@@ -62,23 +92,29 @@ export async function captureStdout(
 
   // A read: no fixtures to tear down, and past the budget the output is being
   // discarded anyway, so it gets the prompt escalation.
+  const grace = opts.grace ?? "prompt";
   const budget =
     opts.timeoutSeconds === undefined
       ? undefined
       : setTimeout(() => {
           timedOut = true;
-          void mc.terminate("prompt");
+          void mc.terminate(grace);
         }, opts.timeoutSeconds * 1000);
+  const onAbort = () => {
+    aborted = true;
+    void mc.terminate(grace);
+  };
+  if (opts.abort?.aborted) onAbort();
+  else opts.abort?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const { code } = await mc.exited;
     if (spawnError) throw spawnError;
     if (timedOut) throw new CaptureTimeoutError(opts.timeoutSeconds ?? 0);
-    if (code === 0) return stdout.join("");
-    const detail = stripGoRunExitEcho(stderr);
-    throw new Error(`exited with code ${code}${detail ? `: ${detail}` : ""}`);
+    return { code, stdout: stdout.join(""), stderr, aborted };
   } finally {
     clearTimeout(budget);
+    opts.abort?.removeEventListener("abort", onAbort);
     mc.dispose();
   }
 }

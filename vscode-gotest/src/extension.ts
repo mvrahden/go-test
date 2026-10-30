@@ -46,6 +46,12 @@ import {
   restoreStoredResults,
 } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
+import {
+  LintService,
+  LintCodeActionProvider,
+  applyFixAfterRelint,
+} from "./lint.js";
+import type { LintFinding } from "./lintFindings.js";
 import { execFile } from "node:child_process";
 import { ensureGitExclude } from "./gitExclude.js";
 
@@ -234,6 +240,18 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const diagnostics = new FocusDiagnostics(cache);
+  const lint = new LintService(cache, outputChannel);
+  context.subscriptions.push(
+    lint,
+    vscode.workspace.onDidSaveTextDocument((doc) => lint.onSaved(doc)),
+    vscode.languages.registerCodeActionsProvider(
+      { language: "go" },
+      new LintCodeActionProvider(lint),
+      {
+        providedCodeActionKinds: LintCodeActionProvider.providedCodeActionKinds,
+      },
+    ),
+  );
   debugLauncher.registerCleanupOnSessionEnd(context);
 
   const providerDisposables = registerProviders(cache, benchResultStore);
@@ -250,6 +268,7 @@ export function activate(context: vscode.ExtensionContext): void {
     testResultStore,
     cache,
     outputChannel,
+    lint,
   });
   const watcherDisposables = setupFileWatchers(
     cache,
@@ -392,6 +411,7 @@ export function registerCommands(deps: {
   testResultStore: TestResultStore;
   cache: DiscoveryCache;
   outputChannel: vscode.LogOutputChannel;
+  lint: LintService;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -406,6 +426,7 @@ export function registerCommands(deps: {
     testResultStore,
     cache,
     outputChannel,
+    lint,
   } = deps;
 
   // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
@@ -769,6 +790,46 @@ export function registerCommands(deps: {
           (id) => controller.findItem(id),
           item,
         ),
+    ),
+    ...registerLintCommands(lint, cache),
+  ];
+}
+
+function registerLintCommands(
+  lint: LintService,
+  cache: DiscoveryCache,
+): vscode.Disposable[] {
+  // The package to fix: the one named, else the active file's, else a pick.
+  const pickPackage = async (
+    importPath?: string,
+  ): Promise<string | undefined> => {
+    if (importPath) return importPath;
+    const active = vscode.window.activeTextEditor?.document.uri.fsPath;
+    const fromEditor = active ? cache.resolveFileToPackage(active) : undefined;
+    if (fromEditor) return fromEditor;
+    const picked = await vscode.window.showQuickPick(
+      cache.packages.map((p) => p.importPath),
+      { title: "Fix lint findings in package" },
+    );
+    return picked;
+  };
+  return [
+    vscode.commands.registerCommand(
+      "gotest.lintFixPackage",
+      async (importPath?: string) => {
+        const target = await pickPackage(importPath);
+        if (target) await lint.fixPackage(target);
+      },
+    ),
+    vscode.commands.registerCommand("gotest.lintWorkspace", async () => {
+      for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        await lint.lintFolder(folder.uri.fsPath);
+      }
+    }),
+    vscode.commands.registerCommand(
+      "gotest.applyLintFix",
+      (uri: vscode.Uri, finding: LintFinding, fixIndex: number) =>
+        applyFixAfterRelint(lint, cache, uri, finding, fixIndex),
     ),
   ];
 }
