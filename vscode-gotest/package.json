@@ -102,6 +102,10 @@
         }
       },
       {
+        "command": "gotest.openEventsFile",
+        "title": "Go Test: Open Events File…"
+      },
+      {
         "command": "gotest.startWatch",
         "title": "Go Test: Start Watch"
       },

@@ -52,6 +52,7 @@ import {
   applyFixAfterRelint,
 } from "./lint.js";
 import type { LintFinding } from "./lintFindings.js";
+import { openEventsFile } from "./importEvents.js";
 import { execFile } from "node:child_process";
 import { ensureGitExclude } from "./gitExclude.js";
 
@@ -653,6 +654,12 @@ export function registerCommands(deps: {
     vscode.commands.registerCommand("gotest.showSpecView", async () => {
       await specView.show();
     }),
+
+    vscode.commands.registerCommand(
+      "gotest.openEventsFile",
+      (target?: string | vscode.Uri) =>
+        openEventsFile({ controller, cache, specView, outputChannel }, target),
+    ),
 
     vscode.commands.registerCommand("gotest.startWatch", async () => {
       const defaultScope =
