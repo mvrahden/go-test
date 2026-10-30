@@ -193,8 +193,11 @@ export class SpecStore {
     }));
   }
 
-  restore(stored: StoredRecord[]): void {
+  // restore takes what serialize wrote. A file of any other shape — written
+  // by another build, or damaged — restores nothing.
+  restore(stored: unknown): void {
     this.records.clear();
+    if (!Array.isArray(stored) || !stored.every(isStoredRecord)) return;
     for (const r of stored) {
       this.records.set(r.path, {
         folder: r.folder,
@@ -204,6 +207,28 @@ export class SpecStore {
       });
     }
   }
+}
+
+const isStrings = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((s) => typeof s === "string");
+
+function isStoredRecord(v: unknown): v is StoredRecord {
+  if (!v || typeof v !== "object") return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.path === "string" &&
+    typeof r.folder === "string" &&
+    typeof r.runLevel === "boolean" &&
+    isStrings(r.pkgLines) &&
+    Array.isArray(r.tests) &&
+    r.tests.every(
+      (t) =>
+        Array.isArray(t) &&
+        t.length === 2 &&
+        typeof t[0] === "string" &&
+        isStrings(t[1]),
+    )
+  );
 }
 
 // mergeTests keeps every path the newer run neither reported nor asked for,

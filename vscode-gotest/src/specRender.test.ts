@@ -188,3 +188,52 @@ describe("the runs the panel keeps across a reload", () => {
     }
   });
 });
+
+describe("a kept-runs file of the wrong shape", () => {
+  it("loads as nothing kept, without throwing, and later runs still land", async () => {
+    vi.useRealTimers();
+    const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const path = await import("node:path");
+    const shapes = [
+      null,
+      { not: "an array" },
+      [
+        {
+          path: "example.com/a",
+          folder: "/ws",
+          pkgLines: [],
+          tests: 7,
+          runLevel: false,
+        },
+      ],
+      [
+        {
+          path: "example.com/a",
+          folder: "/ws",
+          pkgLines: [],
+          tests: [["T", null]],
+          runLevel: false,
+        },
+      ],
+    ];
+    for (const data of shapes) {
+      const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-bad-"));
+      try {
+        writeFileSync(
+          path.join(dir, "specRuns.json"),
+          JSON.stringify({ version: 1, data }),
+        );
+        const panel = new SpecViewPanel(channel, undefined as never, dir);
+        await expect(panel.load()).resolves.toBeUndefined();
+        const runs = (panel as unknown as { runs: { packages: string[] } })
+          .runs;
+        expect(runs.packages).toEqual([]);
+        await panel.refresh({ stream: runOf("example.com/b"), folder: "/ws" });
+        expect(runs.packages).toEqual(["example.com/b"]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+});

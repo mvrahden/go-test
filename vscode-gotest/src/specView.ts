@@ -6,7 +6,7 @@ import { specRenderTimeoutSeconds } from "./config.js";
 import { ManagedChild } from "./managedChild.js";
 import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
-import { SpecStore, type RunPiece, type StoredRecord } from "./specStore.js";
+import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
 import type { DiscoverBehavior } from "./types.js";
 
@@ -34,7 +34,7 @@ export class SpecViewPanel implements vscode.Disposable {
   >();
   // The imported stream on show; undefined shows this workspace's runs.
   private selected: string | undefined;
-  private readonly persisted: JsonStore<StoredRecord[]>;
+  private readonly persisted: JsonStore<unknown>;
   private modulePaths: string[] = [];
   // Runs merged since the panel last rendered them.
   private stale = false;
@@ -48,7 +48,11 @@ export class SpecViewPanel implements vscode.Disposable {
   ) {
     this.persisted = new JsonStore(storageDir, RUNS_FILE, RUNS_VERSION);
     if (cache) {
-      this.disposables.push(cache.onDidUpdate(() => this.rebuildIfVisible()));
+      this.disposables.push(
+        cache.onDidUpdate(() => {
+          this.rebuildIfVisible();
+        }),
+      );
     }
   }
 
