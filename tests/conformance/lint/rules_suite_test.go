@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -132,4 +134,89 @@ func ruleFindings(t *gotest.T, dir, pkg string) []string {
 	}
 	gotest.NotEmpty(t, got, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 	return got
+}
+
+// LintRulesTestSuite: lint names its rules without linting anything, as the
+// help lists them and as a document a program reads.
+type LintRulesTestSuite struct{}
+
+func (s *LintRulesTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
+}
+
+// helpRules is the rule list of gotest help lint, and the rules its -skip-<rule>
+// flag names as skippable.
+func helpRules(t *gotest.T) (table string, skippable []string) {
+	run, err := testkit.RunCLI(t.Context(), ".", "help", "lint")
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	_, rest, ok := strings.Cut(run.Stdout, "Rules:\n")
+	gotest.True(t, ok, "help lint has no Rules: section:\n%s", run.Stdout)
+	table, _, ok = strings.Cut(rest, "\n\n")
+	gotest.True(t, ok)
+	list := regexp.MustCompile(`(?s)-skip-<rule>.*?\((.*?)\)`).FindStringSubmatch(run.Stdout)
+	gotest.Len(t, list, 2, "help lint names no skippable rules")
+	for _, id := range strings.Split(list[1], ",") {
+		skippable = append(skippable, strings.TrimSpace(id))
+	}
+	return table + "\n", skippable
+}
+
+func (s *LintRulesTestSuite) TestTheRules(t *gotest.T) {
+	t.When("the rules are asked for with lint -rules", func(w *gotest.T) {
+		w.It("prints the rule list gotest help lint prints and exits 0, with no package to lint", func(it *gotest.T) {
+			table, _ := helpRules(it)
+			// A directory outside any module: there is nothing to lint.
+			run, err := testkit.RunCLI(it.Context(), it.TempDir(), "lint", "-rules")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Equal(it, table, run.Stdout)
+		})
+		w.It("with -json prints one document opening with version that lists every rule once with its tier, scope, skippable, fixable and description", func(it *gotest.T) {
+			table, skippable := helpRules(it)
+			run, err := testkit.RunCLI(it.Context(), it.TempDir(), "lint", "-rules", "-json")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Regexp(it, `^\{"version":"[^"]+","rules":\[`, run.Stdout)
+			var doc struct {
+				Rules []struct {
+					ID          string `json:"id"`
+					Tier        string `json:"tier"`
+					Scope       string `json:"scope"`
+					Skippable   *bool  `json:"skippable"`
+					Fixable     *bool  `json:"fixable"`
+					Description string `json:"description"`
+				} `json:"rules"`
+			}
+			gotest.NoError(it, json.Unmarshal([]byte(run.Stdout), &doc))
+			var ids, skippableIDs []string
+			helpText := strings.Join(strings.Fields(table), " ")
+			for _, r := range doc.Rules {
+				ids = append(ids, r.ID)
+				gotest.Contains(it, []string{"integrity", "expressiveness", "migration"}, r.Tier, "rule %s", r.ID)
+				gotest.NotEmpty(it, r.Scope, "rule %s", r.ID)
+				gotest.NotZero(it, r.Skippable, "rule %s has no skippable", r.ID)
+				gotest.NotZero(it, r.Fixable, "rule %s has no fixable", r.ID)
+				gotest.Equal(it, r.Tier != "integrity", *r.Skippable, "rule %s: only integrity rules are not skippable", r.ID)
+				if *r.Skippable {
+					skippableIDs = append(skippableIDs, r.ID)
+				}
+				gotest.NotContains(it, r.Description, "\n")
+				gotest.Contains(it, helpText, r.ID+" "+r.Description, "the help does not describe %s so", r.ID)
+			}
+			var listed []string
+			for _, line := range strings.Split(strings.TrimSuffix(table, "\n"), "\n") {
+				if !strings.HasPrefix(line, "    ") {
+					listed = append(listed, strings.Fields(line)[0])
+				}
+			}
+			gotest.Equal(it, listed, ids)
+			unique := slices.Clone(ids)
+			slices.Sort(unique)
+			gotest.Len(it, slices.Compact(unique), len(ids), "a rule is listed twice")
+			slices.Sort(skippable)
+			slices.Sort(skippableIDs)
+			gotest.Equal(it, skippable, skippableIDs)
+		})
+	})
 }

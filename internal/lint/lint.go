@@ -96,47 +96,72 @@ const (
 	ScopePollCallbacks
 )
 
-var ruleMeta = map[Rule]struct {
-	Tier  Tier
-	Scope Scope
+// ruleInfo is a rule as the registry states it. Help is its description as
+// gotest help lint wraps it; joined, it is the one-line description.
+type ruleInfo struct {
+	Tier    Tier
+	Scope   Scope
+	Fixable bool // the rule can attach a suggested fix
+	Help    []string
+}
+
+// registry lists every rule once, in the order the help prints them.
+var registry = []struct {
+	Rule Rule
+	ruleInfo
 }{
-	Focus:              {TierIntegrity, ScopeSuites},
-	Receiver:           {TierIntegrity, ScopeSuites},
-	LifecycleTypo:      {TierIntegrity, ScopeSuites},
-	LifecyclePair:      {TierIntegrity, ScopeSuites},
-	GeneratedFile:      {TierIntegrity, ScopeEverywhere},
-	StdlibTest:         {TierMigration, ScopeEverywhere},
-	Testify:            {TierMigration, ScopeEverywhere},
-	PollScope:          {TierIntegrity, ScopePollCallbacks},
-	TestSignature:      {TierIntegrity, ScopeSuites},
-	XLifecycle:         {TierIntegrity, ScopeSuites},
-	AssertionSimplify:  {TierExpressiveness, ScopeGotestFiles},
-	AssertionTypeGuard: {TierIntegrity, ScopeGotestFiles},
-	AssertionRedundant: {TierExpressiveness, ScopeGotestFiles},
-	TEscape:            {TierExpressiveness, ScopeSuites},
-	SuiteLifecycle:     {TierIntegrity, ScopeSuites},
-	FailGuard:          {TierExpressiveness, ScopeGotestFiles},
-	BehaviorWording:    {TierExpressiveness, ScopeGotestFiles},
+	{Focus, ruleInfo{TierIntegrity, ScopeSuites, true, []string{"Focused (F_) suites/methods should not be committed"}}},
+	{Receiver, ruleInfo{TierIntegrity, ScopeSuites, true, []string{"Suite methods should use pointer receivers"}}},
+	{LifecycleTypo, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Methods similar to lifecycle hooks (likely typos)"}}},
+	{LifecyclePair, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"BeforeAll without matching AfterAll (resource leak)"}}},
+	{GeneratedFile, ruleInfo{TierIntegrity, ScopeEverywhere, false, []string{"Generated overlay files should not be in version control"}}},
+	{StdlibTest, ruleInfo{TierMigration, ScopeEverywhere, false, []string{"Stdlib test functions — consider using gotest suites"}}},
+	{Testify, ruleInfo{TierMigration, ScopeEverywhere, false, []string{"testify imports — consider migrating to gotest"}}},
+	{PollScope, ruleInfo{TierIntegrity, ScopePollCallbacks, false, []string{"Outer t used inside Eventually/Consistently callbacks"}}},
+	{TestSignature, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Test methods not accepting *gotest.T or *testing.T"}}},
+	{XLifecycle, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"X_ prefix on a lifecycle hook (a no-op)"}}},
+	{SuiteLifecycle, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Cleanup/Parallel/Run via t.T() — bypass the suite lifecycle"}}},
+	{SharedFixtureUndeclared, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
+		"Reads of a shared fixture the suite never declared as a",
+		"field (only declared fixtures are started)",
+	}}},
+	{GenerationRejects, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Shapes the generator rejects, where and as it rejects them"}}},
+	{NolintUnknown, ruleInfo{TierIntegrity, ScopeEverywhere, false, []string{"//nolint ids that name no gotest rule or golangci-lint linter"}}},
+	{SuiteDeclaration, ruleInfo{TierIntegrity, ScopeSuites, true, []string{"Suites/fixtures declared inside a type ( … ) block"}}},
+	{NoEmbedding, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
+		"Embedded suites, fixtures or hook-carrying types, and",
+		"suite-typed fields of a suite or fixture",
+	}}},
+	{FixtureHookCall, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Direct calls of a lifecycle hook the harness calls"}}},
+	{AssertionSimplify, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"Simplifiable assertions (True(t, a == b) → Equal, …)"}}},
+	{AssertionTypeGuard, ruleInfo{TierIntegrity, ScopeGotestFiles, false, []string{"Nil/Empty on types their runtime guards reject"}}},
+	{AssertionRedundant, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"Assertions made redundant by the following assertion"}}},
+	{FailGuard, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"if cond { Fail/Fatal(...) } guards — use assertions directly"}}},
+	{TEscape, ruleInfo{TierExpressiveness, ScopeSuites, true, []string{"Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)"}}},
+	{BehaviorWording, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"When(\"when …\") / It(\"it …\") — the spec supplies those words"}}},
 	// The rewrite keeps the meaning either way, so config-no-deadline is a
 	// matter of saying it in a word: skippable.
-	ConfigNoDeadline: {TierExpressiveness, ScopeEverywhere},
+	{ConfigNoDeadline, ruleInfo{TierExpressiveness, ScopeEverywhere, true, []string{
+		"A negative SuiteConfig/FixtureConfig timeout — every",
+		"negative disables the deadline; say so by name",
+	}}},
 	// A benchmark that never iterates measures nothing — its numbers lie,
 	// so bench-loop is integrity. bench-fixture-io is a heuristic about
 	// what the timed loop includes; legitimate setups exist, so it stays
-	// skippable.
-	BenchLoop:      {TierIntegrity, ScopeSuites},
-	BenchFixtureIO: {TierExpressiveness, ScopeSuites},
-	// bench-wait sits with bench-fixture-io: a deliberate settle inside
-	// the loop can be legitimate, so it stays skippable.
-	BenchWait: {TierExpressiveness, ScopeSuites},
-
-	SharedFixtureUndeclared: {TierIntegrity, ScopeSuites},
-	SuiteDeclaration:        {TierIntegrity, ScopeSuites},
-	NoEmbedding:             {TierIntegrity, ScopeSuites},
-	FixtureHookCall:         {TierIntegrity, ScopeSuites},
-	GenerationRejects:       {TierIntegrity, ScopeSuites},
-	NolintUnknown:           {TierIntegrity, ScopeEverywhere},
-
+	// skippable. bench-wait sits with bench-fixture-io: a deliberate settle
+	// inside the loop can be legitimate, so it stays skippable.
+	{BenchLoop, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
+		"Benchmark methods that never call b.Loop()/b.N (nothing",
+		"iterates, so the numbers lie)",
+	}}},
+	{BenchFixtureIO, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{
+		"Fixture-backed reads inside the measured loop (times the",
+		"fixture, not the code)",
+	}}},
+	{BenchWait, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{
+		"time.Sleep/Eventually/Consistently inside the measured",
+		"loop (times the wait, not the code)",
+	}}},
 	// fuzz-determinism is integrity: a target reading the clock/RNG/env
 	// breaks the replayability the corpus depends on — its outcomes lie.
 	// fuzz-struct-corpus is integrity for the same reason from the other
@@ -148,13 +173,28 @@ var ruleMeta = map[Rule]struct {
 	// fuzz-raw-seed are heuristics with legitimate exceptions (a cheap
 	// file read; a seed deliberately left for a signature about to change)
 	// — all four stay skippable.
-	FuzzDeterminism:  {TierIntegrity, ScopeSuites},
-	FuzzNoOracle:     {TierExpressiveness, ScopeSuites},
-	FuzzSeed:         {TierExpressiveness, ScopeSuites},
-	FuzzStructCorpus: {TierIntegrity, ScopeSuites},
-	FuzzHookIO:       {TierExpressiveness, ScopeSuites},
-	FuzzRawSeed:      {TierExpressiveness, ScopeSuites},
+	{FuzzDeterminism, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Fuzz targets reading time.Now/math-rand/os.Getenv"}}},
+	{FuzzNoOracle, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{"Fuzz callbacks that assert nothing (panic-only)"}}},
+	{FuzzSeed, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{"Fuzz targets with no f.Add seeds"}}},
+	{FuzzStructCorpus, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
+		"On-disk corpus entries for struct-typed targets",
+		"(field-order-bound — promote them to typed seeds)",
+	}}},
+	{FuzzHookIO, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{
+		"IO in BeforeEach/AfterEach of fuzzing suites",
+		"(hooks replay around every execution)",
+	}}},
+	{FuzzRawSeed, ruleInfo{TierExpressiveness, ScopeSuites, false, []string{"Raw []byte seeds on positions not taking []byte"}}},
 }
+
+// ruleMeta indexes the registry by rule.
+var ruleMeta = func() map[Rule]ruleInfo {
+	m := make(map[Rule]ruleInfo, len(registry))
+	for _, r := range registry {
+		m[r.Rule] = r.ruleInfo
+	}
+	return m
+}()
 
 // Known reports whether the rule ID exists.
 func Known(r Rule) bool {

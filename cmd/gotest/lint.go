@@ -79,6 +79,7 @@ type lintArgs struct {
 	fix      bool
 	diff     bool
 	json     bool
+	rules    bool   // -rules: print the rules, lint nothing
 	tests    bool   // -test
 	context  int    // -c; negative prints no source lines
 	tags     string // -tags, as for go build
@@ -123,6 +124,8 @@ func parseLintArgs(args []string) (lintArgs, error) {
 			a.diff, err = strconv.ParseBool(value)
 		case name == "json":
 			a.json, err = strconv.ParseBool(value)
+		case name == "rules":
+			a.rules, err = strconv.ParseBool(value)
 		case name == "test":
 			a.tests, err = strconv.ParseBool(value)
 		case name == "c":
@@ -206,6 +209,19 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 	if err != nil {
 		fmt.Fprintf(stderr, "FAIL: %s\n", err)
 		return 2, true
+	}
+	if a.rules {
+		// The rules need no package: the table the help prints, or the
+		// document with -json.
+		if !a.json {
+			lint.WriteRuleTable(stdout)
+			return 0, true
+		}
+		if err := lint.WriteRulesJSON(stdout); err != nil {
+			fmt.Fprintf(stderr, "FAIL: %v\n", err)
+			return 1, true
+		}
+		return 0, true
 	}
 	if a.fix && a.loads() && len(a.driver) > 0 {
 		fmt.Fprintf(stderr, "FAIL: %s is a go/analysis driver flag; -fix and -diff do not take it\n", a.driver[0])
