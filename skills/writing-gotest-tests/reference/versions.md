@@ -696,3 +696,29 @@ Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 chang
    `testing`, or a suite renamed since the last `gotest generate`, still
    runs
    ([generated harness](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-the-generated-harness)).
+
+## v1.37
+
+Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
+
+1. **`migrate` converts base suites** — a testify suite embedding a base
+   suite of the same test files migrates with it: the base becomes a helper
+   held in a named field, and the child declares the hooks and tests it had
+   through the base
+   ([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
+   Before v1.37 the files declaring both were left under a marker.
+
+2. **`migrate` keeps testify's verdicts or marks why not** — a translation
+   that would pass or fail where testify did not, or change what runs when,
+   is left under a marker naming the reason and the gotest way
+   ([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)),
+   and the load never writes `go.mod` or `go.sum`, a vendored workspace
+   included
+   ([module files](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-module-files)).
+   Before v1.37 such a translation could turn a passing testify suite red,
+   or a failing one green, with exit 0.
+
+3. **`lint -fix` unfocuses files behind a build constraint** — the `focus`
+   fix renames a suite in the files a build constraint leaves out too, and
+   names, unapplied, a fix such a file would break
+   ([the focus fix](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-the-focus-fix)).

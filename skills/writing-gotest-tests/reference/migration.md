@@ -11,11 +11,13 @@ did not compile before (it is left untouched) or the files could not all
 be written (nothing is). Generated test files are skipped (named on
 stderr), and only the host OS's builds are checked: run it on each
 platform whose test files differ. The suite's own `s.Equal`,
-`s.Run` (as `t.It`), direct hook calls and most assertions are converted,
-and so is a suite built on a base suite of the same test files (the base
-becomes a helper the child calls); promoted mixin hooks and method values
-are marked, and a base suite declared outside the migrated test files
-exits 2 naming its package. The module must require go-test first
+`s.Run` (as `t.It`), direct hook calls and most assertions are converted;
+promoted mixin hooks and method values are marked. Before v1.37 a suite
+built on a base suite was marked; from v1.37 one built on a base suite of
+the same test files migrates with it, the base becoming a helper the
+child calls, and a base in another package exits 2
+([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
+The module must require go-test first
 (`go get -tool`, see `setup.md`). `--dry-run` prints the diff without
 writing (v1.30.2+). Exit 0 does not run the tests: run both runners
 afterwards, and the lint pair (`lint -fix`, then `lint`). Below v1.33 a
@@ -25,21 +27,14 @@ run, and a re-run exits 0 with markers left — grep for the markers and
 every soft form — `s.Assert().X`, the suite's own `s.X` inherited from the
 embedded `*assert.Assertions`, and `assert.X(s.T(), …)` — becomes the fatal
 `gotest.X`, exactly as `s.Require().X` and `require.X(s.T(), …)` do: a soft
-check turns into a hard stop. From v1.34, a translation that would
-change a verdict is left under a marker with its reason instead: an
-assertion inside a `go` statement (start the goroutine with `gotest.Go`),
-`ElementsMatch`/`Subset` over pointer- or interface-holding elements
-(gotest compares with `==`), `Zero`/`Empty` on an interface-typed value,
-`Equal` with an untyped constant of another type than the other value,
-the `AfterAll` from a `TearDownSuite` beside a `SetupSuite` that can stop
-early (gotest runs it anyway, so guard it), and `s.T().Parallel()` /
-`s.T().Cleanup` (use `SuiteConfig.Parallel`, `AfterEach`/`AfterAll`).
-gotest runs tests in source order where testify used name order: v1.34+
-places a base's forwarded tests in name order and notes a suite with
-fields whose order still differs. v1.34+ loads with `-mod=readonly`
-(`-mod=vendor` for a vendored module), so it never writes
-`go.mod`/`go.sum`, and leaves no blank line where testify imports
-stood. It does NOT convert bare
+check turns into a hard stop. From v1.37, a translation that would change
+a verdict, or what runs when, is left under a marker with its reason and
+the gotest way instead
+([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)):
+read each marker, it names what to write. v1.37+ never writes
+`go.mod`/`go.sum`
+([module files](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-module-files)).
+It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 
