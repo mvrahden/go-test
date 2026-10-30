@@ -22,6 +22,10 @@ export interface TestEvent {
   // its own verdict.
   ImportPath?: string;
   FailedBuild?: string;
+  // Set on every event of a package the CLI's run booked for itself (shared
+  // fixtures, an interrupt, the global deadline, the build stage) rather
+  // than for an import path.
+  RunLevel?: boolean;
 }
 
 export interface TestMessage {

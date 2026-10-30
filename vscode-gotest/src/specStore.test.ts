@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SpecStore, coverOf, isRunLevelPackage } from "./specStore.js";
+import { SpecStore, coverOf } from "./specStore.js";
 
 type Ev = Record<string, unknown>;
 
@@ -21,6 +21,17 @@ const verdict = (pkg: string, action: string): Ev => ({
   Package: pkg,
   Elapsed: 0.02,
 });
+
+// A failure the CLI books for the run itself, as it writes one: every line
+// of the package carries RunLevel.
+const booked = (pkg: string, output: string): Ev[] => [
+  { Action: "start", Package: pkg, RunLevel: true },
+  { Action: "output", Package: pkg, Output: output, RunLevel: true },
+  { Action: "fail", Package: pkg, RunLevel: true },
+];
+
+const runLevelOf = (store: SpecStore, pkg: string) =>
+  store.serialize().find((r) => r.path === pkg)?.runLevel;
 
 // The test paths of one package in the composed stream, each time it appears.
 function pathsOf(composed: string, pkg: string): string[] {
@@ -192,7 +203,7 @@ describe("SpecStore", () => {
   it("forgets a run-level booking once the folder's next run does not report it", () => {
     const store = new SpecStore();
     store.merge({
-      stream: fullCart + stream(verdict("interrupted", "fail")),
+      stream: fullCart + stream(...booked("interrupted", "FAIL: stopped\n")),
       folder: "/ws",
     });
     expect(store.packages).toContain("interrupted");
@@ -287,12 +298,40 @@ describe("coverOf", () => {
   });
 });
 
-describe("isRunLevelPackage", () => {
-  it("knows the CLI's synthetic names from import paths", () => {
-    expect(isRunLevelPackage("shared fixtures")).toBe(true);
-    expect(isRunLevelPackage("global --timeout")).toBe(true);
-    expect(isRunLevelPackage("interrupted")).toBe(true);
-    expect(isRunLevelPackage("example.com/cart")).toBe(false);
+describe("the RunLevel marker", () => {
+  it("makes a package the run's, whatever its name, until the folder's next run leaves it out", () => {
+    const store = new SpecStore();
+    store.merge({
+      stream:
+        fullCart +
+        stream(
+          ...booked("shared fixtures", "FAIL: shared fixture setup failed\n"),
+          ...booked("example.com/booked", "FAIL: booked\n"),
+        ),
+      folder: "/ws",
+    });
+    expect(runLevelOf(store, "shared fixtures")).toBe(true);
+    expect(runLevelOf(store, "example.com/booked")).toBe(true);
+    expect(runLevelOf(store, cart)).toBe(false);
+
+    store.merge({ stream: fullCart, folder: "/ws" });
+    expect(store.packages).toEqual([cart]);
+  });
+
+  it("leaves a package whose lines carry none an ordinary one, a space in its name or not", () => {
+    const store = new SpecStore();
+    store.merge({
+      stream: stream(
+        { Action: "start", Package: "shared fixtures" },
+        verdict("shared fixtures", "fail"),
+      ),
+      folder: "/ws",
+    });
+    expect(runLevelOf(store, "shared fixtures")).toBe(false);
+
+    // Kept past a run that does not report it, as a package is.
+    store.merge({ stream: fullCart, folder: "/ws" });
+    expect(store.packages).toContain("shared fixtures");
   });
 });
 
@@ -304,7 +343,7 @@ describe("SpecStore.prune", () => {
       stream: stream(
         ...test(checkout, "TestCheckoutTestSuite", "pass"),
         verdict(checkout, "pass"),
-        verdict("interrupted", "fail"),
+        ...booked("interrupted", "FAIL: stopped\n"),
       ),
       folder: "/ws",
     });

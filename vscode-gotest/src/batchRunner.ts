@@ -19,7 +19,7 @@ import {
   erroredItem,
   itemTestPath,
 } from "./runnerUtils.js";
-import { coverOf, isRunLevelPackage, type RunPiece } from "./specStore.js";
+import { coverOf, type RunPiece } from "./specStore.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -159,10 +159,10 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       const dir = pkgDirMap.get(event.Package);
       if (!dir) {
         // The CLI books a run's own failure (shared fixtures, an interrupt,
-        // the global deadline) under a name that is no package. No item
-        // holds it, so it is said in the run's output.
+        // the global deadline) under a package of its own, marked RunLevel.
+        // No item holds it, so it is said in the run's output.
         if (
-          isRunLevelPackage(event.Package) &&
+          event.RunLevel === true &&
           event.Action === "output" &&
           event.Output
         ) {
