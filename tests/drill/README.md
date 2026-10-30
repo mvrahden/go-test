@@ -605,6 +605,7 @@ shards of one run do not add up to every mutant exactly once.
 | `scaffold-generic-type-accepted` | `scaffold` writes a suite for a generic type | conformance: the CLI scaffold It for a generic type sees exit 0 and a written file |
 | `scaffold-suite-name-read-from-non-test-files` | the suite-name check reads only the package's non-test files | conformance: the CLI scaffold It for a suite name a test file declares sees exit 0 and a duplicate written |
 | `scaffold-subject-self-qualified` | the type scaffold names its subject through its own package | conformance: the CLI scaffold It for a type with methods sees go vet fail |
+| `scaffold-ignores-symlinks` | `scaffold` loads a file's package by its directory as a pattern, not from the directory itself | conformance: the CLI scaffold It for a file named through a symlinked directory fails with exit 1 |
 | `focus-decided-per-package` | the generator decides focus for each package on its own, not for the whole run | canary: the `shapes/focusacross` unfocused suite is not skipped and its fixtures start |
 | `focus-decided-per-variant` | the external test package decides its focus on its own | canary: the `shapes/focusvariants` external suite is not skipped |
 | `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
