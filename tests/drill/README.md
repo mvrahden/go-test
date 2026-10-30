@@ -671,9 +671,9 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-focus-tests-only` | the `focus` rule reports only focused suites and Test methods, not benchmark or fuzz methods | conformance: the lint `-fix` It for benchmark and fuzz methods finds their `F_` left |
 | `lint-focus-constrained-files-skipped` | the `focus` fix leaves the files a build constraint leaves out | conformance: the lint `-fix` It for files behind a build constraint finds the focus left there |
 | `lint-focus-unresolved-accepted` | a constrained file no build type-checks is renamed past | conformance: the lint `-fix` It for such a file finds the fix applied |
-| `migrate-base-tests-not-forwarded` | a child of a base suite gets no forwarding method for the base's tests | conformance: the migrate It for a child of a base finds no verdict for the base's test |
+| `migrate-base-tests-not-forwarded` | a child of a base suite gets no forwarding method for the base's tests | conformance: the migrate Its for a child of a base, a base by pointer, a generic base and a base's tests among the child's find the base's test unforwarded |
 | `migrate-helper-keeps-suite-name` | a base no runner ran keeps a name gotest runs as a suite | conformance: the migrate It for the helper base finds gotest running the base as a suite |
-| `migrate-value-embedding-refused` | a child embedding its base by value is refused as before | conformance: the migrate It for a child of a base finds the embedding marker |
+| `migrate-value-embedding-refused` | a child embedding its base by value is refused as before | conformance: every migrate It whose child embeds its base by value finds the child refused under the embedding marker |
 | `migrate-helper-keeps-suite-embedding` | a helper base keeps its `suite.Suite` embedding | conformance: the migrate It for a child of a base finds a testify lint finding |
 | `migrate-outside-base-ignored` | a base declared outside the migrated test files does not fail the run | conformance: the migrate It for an outside base finds an exit other than 2 |
 | `migrate-goroutine-assertion-translated` | an assertion inside a `go` statement is translated like any other | conformance: the migrate It for an assertion on a goroutine finds no marker |
