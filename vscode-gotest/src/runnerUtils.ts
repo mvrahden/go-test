@@ -463,6 +463,54 @@ export function applyResults(
   return applied;
 }
 
+// StreamApplier applies one run's events as they arrive in pieces. A test's
+// output and a build's diagnostics accumulate across pieces until the verdict
+// that reads them, so where a pipe happened to split the stream changes
+// nothing about the message a failure carries.
+export class StreamApplier {
+  private readonly outputMaps = new Map<string, Map<string, string>>();
+  private readonly builds = new BuildOutputs();
+  // Packages the events named that have no directory here.
+  readonly unknownPackages = new Set<string>();
+
+  constructor(
+    private readonly controller: GoTestController,
+    private readonly run: vscode.TestRun,
+    private readonly packageDir: (importPath: string) => string | undefined,
+    // Where the compiler's relative file names resolve: the CLI's cwd.
+    private readonly buildDir: string,
+  ) {}
+
+  apply(events: TestEvent[]): AppliedResult[] {
+    const applied: AppliedResult[] = [];
+    for (const event of events) {
+      if (this.builds.absorb(event)) continue;
+      if (typeof event.Package !== "string") continue;
+      const dir = this.packageDir(event.Package);
+      if (!dir) {
+        this.unknownPackages.add(event.Package);
+        continue;
+      }
+      let outputMap = this.outputMaps.get(event.Package);
+      if (!outputMap) {
+        outputMap = new Map();
+        this.outputMaps.set(event.Package, outputMap);
+      }
+      const result = applyEvent(
+        this.controller,
+        this.run,
+        event,
+        outputMap,
+        event.Package,
+        dir,
+        { builds: this.builds, buildDir: this.buildDir },
+      );
+      if (result) applied.push(result);
+    }
+    return applied;
+  }
+}
+
 export interface SpawnResult {
   stdout: string;
   stderr: string;
