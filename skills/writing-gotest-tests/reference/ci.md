@@ -65,7 +65,7 @@ jobs:
   minute). The session's table lands in the step summary. A new crasher
   fails the step; its corpus file stays in the checkout and is listed in
   the `fuzz-crashers` output, for an upload-artifact step or
-  `gotest fuzz promote` in the same job (v1.36+: promote takes only the
+  `gotest fuzz promote` in the same job (v1.36.1+: promote takes only the
   crashers the latest session in that job's gotest cache wrote; a
   downloaded crasher is written as a typed `f.Add` seed by hand). Seed replay needs no input, since every ordinary
   run already replays seeds. The step carries Go's fuzz cache between

@@ -156,7 +156,7 @@ its own `go test -fuzz` process:
   method as a permanent typed `f.Add(...)` seed and delete the file —
   the durable form, especially for struct-typed targets whose corpus
   files are bound to the type's field order (the `fuzz-struct-corpus`
-  lint rule flags them). v1.34+: only the crashers the latest
+  lint rule flags them). v1.36.1+: only the crashers the latest
   `gotest fuzz` session wrote; an older corpus file is deleted or written
   as a typed `f.Add` seed by hand.
 

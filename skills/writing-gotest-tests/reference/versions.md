@@ -640,3 +640,27 @@ Rules and sections tagged **v1.36+** need v1.36.0 or newer. What v1.36 changes:
    every suite and fixture budget, declared or default, deadline and verdict
    alike; set it on a CI runner slower than the machine the budgets were
    written on instead of raising them in code. Earlier versions ignore it.
+
+## v1.36.1
+
+Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 changes:
+
+1. **`fuzz promote` takes only the latest session's crashers** — the ones
+   the latest `gotest fuzz` session of their target recorded, written with
+   their exact values (a `-0` or a NaN payload included); a crasher that
+   cannot be written exactly is refused and kept. Before v1.36.1 promote took
+   every file in the corpus folder and deleted it, committed seeds included.
+
+2. **`--ci` refuses focused benchmark and fuzz methods** — before v1.36.1 only
+   a focused test method or suite failed the focus guard.
+
+3. **`lint -fix` never flips a verdict** — `Nil`/`NotNil`/`Empty`/`NotEmpty`
+   on an interface, float orderings and `True(errors.Is(err, target))` are
+   reported without a fix, and a concrete error pointer becomes `Zero`/
+   `NotZero`, not `NoError`/`Error`.
+
+4. **A shared fixture's teardown is judged on its protocol** — a fixture
+   that logs `X.AfterAll failed:` no longer fails a passing run.
+
+5. **`bench --json` carries `failures`** — what a failed benchmark printed,
+   a panic's message and stack included.
