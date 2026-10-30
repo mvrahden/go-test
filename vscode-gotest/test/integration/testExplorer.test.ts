@@ -425,6 +425,53 @@ describe("the watch entry point", () => {
   }, 300_000);
 });
 
+describe("stopping a watch", () => {
+  it("ends the run of the cycle that is still open", async () => {
+    const manager = new WatchManager(
+      controller,
+      cache,
+      createRecordingChannel().channel as never,
+      () => {},
+      registry,
+    );
+    const fake = state.controllers[0] as FakeTestController;
+    const create = fake.createTestRun.bind(fake);
+    let open: FakeTestRun | undefined;
+    let ranStop!: () => void;
+    const stopped = new Promise<void>((resolve) => (ranStop = resolve));
+    // Stop the moment the cycle's run exists: the cycle has started and its
+    // tests have not reported yet.
+    fake.createTestRun = (request?: unknown, name?: string) => {
+      const run = create(request, name);
+      if (!open && name === "Watch: ./passing/...") {
+        open = run;
+        queueMicrotask(() => {
+          expect(run.ended, "the cycle is still open").toBe(false);
+          manager.stop("./passing/...");
+          ranStop();
+        });
+      }
+      return run;
+    };
+
+    try {
+      await manager.start("./passing/...", fixturesDir);
+      await Promise.race([
+        stopped,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("no cycle started")), 120_000),
+        ),
+      ]);
+      expect(open!.ended, "stopping the watch must end its run").toBe(true);
+      expect(manager.activeCount).toBe(0);
+    } finally {
+      fake.createTestRun = create;
+      manager.stopAll();
+      manager.dispose();
+    }
+  }, 300_000);
+});
+
 // Polls rather than sleeping a fixed interval, so a slow first compile does not
 // turn into a flaky failure and a fast one does not waste the budget.
 async function waitFor<T>(probe: () => T | undefined, ms: number): Promise<T> {
