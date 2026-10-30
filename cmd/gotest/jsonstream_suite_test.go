@@ -40,6 +40,9 @@ type goTestEvent struct {
 	Output      string  `json:",omitempty"`
 	OutputType  string  `json:",omitempty"`
 	FailedBuild string  `json:",omitempty"`
+	// RunLevel is gotest's own: it marks the packages a run books for
+	// itself, which go test's schema has no word for.
+	RunLevel bool `json:",omitempty"`
 }
 
 var goTestActions = []string{"start", "run", "pause", "cont", "pass", "bench", "fail", "output", "skip", "build-output", "build-fail", "attr"}

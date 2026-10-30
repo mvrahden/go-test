@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / keeps the failing branch, its failing leaf and a suite that failed in its own hooks, and leaves out the rows that passed
+Clause: when a failing stream is rendered with --hide=pass → keeps the failing branch, its failing leaf and a suite that failed in its own hooks, and leaves out the rows that passed
+--- a/internal/gotestspec/view.go
++++ b/internal/gotestspec/view.go
+@@ -24,7 +24,7 @@ func WithPackageStats() RenderOption {
+ // shown reports whether a row is rendered: its own status is not hidden, or
+ // a row beneath it is shown.
+ func (c *renderConfig) shown(n *Node) bool {
+-	if !c.hidden[n.Status] {
++	if !c.hidden[n.Status] && len(n.Children) == 0 {
+ 		return true
+ 	}
+ 	for _, child := range n.Children {

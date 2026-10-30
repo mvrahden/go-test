@@ -43,7 +43,7 @@ func (s *SpecVerdictsTestSuite) TestAFailureBelowFailsTheBranch(t *gotest.T) {
 			gotest.Equal(it, specJSON(it, 1, failedStream), composed)
 			gotest.Len(it, composed.Packages, 1)
 			gotest.Equal(it, "fail", composed.Packages[0].Status)
-			gotest.Equal(it, "fail", node(it, composed.Packages[0], "TestAccountTestSuite").Status)
+			gotest.Equal(it, "fail", node(it, composed.Packages[0].Nodes, "TestAccountTestSuite").Status)
 		})
 		w.It("counts one failure and exits 1, or 0 with --render-only", func(it *gotest.T) {
 			doc := specJSON(it, 1, composedStream)

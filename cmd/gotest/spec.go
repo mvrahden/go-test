@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -49,11 +50,27 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
+	view, err := parseSpecView(own, input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
 	if input != "" {
 		if refuseGroups(own, "--input") {
 			return 2
 		}
-		return runSpecFromInput(input, format, output, noColor, renderOnly)
+		var source *declaredSource
+		if view.declared {
+			cfg, err := parseExecFlags(own, goTestArgs, &inv.Config)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+				return 2
+			}
+			loadFlags := gotestrunner.StripNonLoadFlags(gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs).BuildFlags)
+			source = &declaredSource{patterns: cfg.PackagePatterns, loadFlags: loadFlags}
+		}
+		return runSpecFromInput(input, format, output, noColor, renderOnly, source, view.options)
 	}
 
 	if own.Bool("--static") {
@@ -163,24 +180,63 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		w = f
 	}
 
-	var renderOpts []gotestspec.RenderOption
+	renderSpec(w, tree, format, noColor, view.options)
+
+	return enforceCoverage(coverProfile, minCoverage, code)
+}
+
+// renderSpec renders tree in format, under the view's options.
+func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor bool, view []gotestspec.RenderOption) {
+	renderOpts := slices.Clone(view)
 	if noColor {
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
 	}
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree)
+		gotestspec.RenderMarkdown(w, tree, view...)
 	case "json":
-		gotestspec.RenderJSON(w, tree)
+		gotestspec.RenderJSON(w, tree, view...)
 	default:
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}
-
-	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
-func runSpecFromInput(input, format, output string, noColor, renderOnly bool) int {
+// declaredSource is the source a stream's verdicts are laid over (--declared).
+type declaredSource struct {
+	patterns  []string
+	loadFlags []string
+}
+
+// overlay reads the specification the source declares, as --static does,
+// and lays the stream's verdicts over it. A package that cannot be read is
+// named on stderr and left to the stream.
+func (s *declaredSource) overlay(events []gotestspec.TestEvent) ([]*gotestspec.Package, error) {
+	pkgs, err := loadRunPackages(s.patterns, s.loadFlags)
+	if err != nil {
+		return nil, err
+	}
+	for i := range pkgs.Broken {
+		fmt.Fprintf(os.Stderr, "declared: %s could not be read; its declarations are left out\n", pkgs.Broken[i].PkgPath)
+	}
+	declared, _ := buildStaticSpec(pkgs.Loaded, nil)
+	// The labels of what the stream holds outside the patterns are read as
+	// a plain --input reads them.
+	idx := buildDeclarationIndex(pkgs.Loaded)
+	loaded := map[string]bool{}
+	for _, lr := range pkgs.Loaded {
+		loaded[lr.PkgPath] = true
+	}
+	for pkg, paths := range declarationsForStream(events, loaded) {
+		if idx == nil {
+			idx = gotestspec.DeclarationIndex{}
+		}
+		idx[pkg] = paths
+	}
+	return gotestspec.Overlay(declared, gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx))), nil
+}
+
+func runSpecFromInput(input, format, output string, noColor, renderOnly bool, source *declaredSource, view []gotestspec.RenderOption) int {
 	var r io.Reader
 	if input == "-" {
 		r = os.Stdin
@@ -200,7 +256,13 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool) in
 		return 2
 	}
 
-	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events)))
+	var tree []*gotestspec.Package
+	if source == nil {
+		tree = gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
+	} else if tree, err = source.overlay(events); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 
 	var w io.Writer = os.Stdout
 	if output != "" {
@@ -213,19 +275,7 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool) in
 		w = of
 	}
 
-	var renderOpts []gotestspec.RenderOption
-	if noColor {
-		renderOpts = append(renderOpts, gotestspec.WithNoColor())
-	}
-
-	switch format {
-	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree)
-	case "json":
-		gotestspec.RenderJSON(w, tree)
-	default:
-		gotestspec.RenderTerminal(w, tree, renderOpts...)
-	}
+	renderSpec(w, tree, format, noColor, view)
 
 	// The same exit rule as `summary --input`: a renderer fed a failing stream
 	// must not exit 0 — in a pipe without pipefail this exit code is the only
@@ -332,4 +382,55 @@ func builtPackage(importPath string) string {
 		return strings.TrimSuffix(strings.TrimSuffix(variant, "]"), ".test")
 	}
 	return importPath
+}
+
+// specView is how a spec is shown: the rows --hide leaves out, and whether
+// the source's declarations lie under the stream's verdicts (--declared).
+type specView struct {
+	declared bool
+	options  []gotestspec.RenderOption
+}
+
+// hideWords are the statuses --hide accepts, in the words the JSON uses.
+var hideWords = map[string]gotestspec.Status{
+	"pass": gotestspec.StatusPass,
+	"fail": gotestspec.StatusFail,
+	"skip": gotestspec.StatusSkip,
+	"none": gotestspec.StatusNone,
+}
+
+// parseSpecView reads --declared and --hide. Either gives each JSON package
+// its own stats. --hide= with nothing after it hides nothing.
+func parseSpecView(own OwnFlags, input string) (specView, error) {
+	var view specView
+	static := own.Bool("--static")
+	view.declared = own.Bool("--declared")
+	if view.declared && static {
+		return view, fmt.Errorf("--static and --declared are mutually exclusive")
+	}
+	if view.declared && input == "" {
+		return view, fmt.Errorf("--declared requires --input: it lays a stream's verdicts over the source")
+	}
+	if own.Given("--hide") {
+		if static {
+			return view, fmt.Errorf("--hide leaves out rows by their verdict, and --static has none")
+		}
+		var hidden []gotestspec.Status
+		for _, word := range strings.Split(own.Value("--hide"), ",") {
+			word = strings.TrimSpace(word)
+			if word == "" {
+				continue
+			}
+			status, ok := hideWords[word]
+			if !ok {
+				return view, fmt.Errorf("unknown --hide status %q: use pass, fail, skip or none", word)
+			}
+			hidden = append(hidden, status)
+		}
+		view.options = append(view.options, gotestspec.WithHidden(hidden...))
+	}
+	if view.declared || own.Given("--hide") {
+		view.options = append(view.options, gotestspec.WithPackageStats())
+	}
+	return view, nil
 }

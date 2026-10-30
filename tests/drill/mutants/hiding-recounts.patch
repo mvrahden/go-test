@@ -1,0 +1,66 @@
+Expect: ^FAIL .*conformance/spec .* / counts every behavior that passed in the trailer and in its package's stats, as without --hide
+Clause: when a failing stream is rendered with --hide=pass → counts every behavior that passed in the trailer and in its package's stats, as without --hide
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -87,7 +87,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
+ 	for _, o := range opts {
+ 		o(&cfg)
+ 	}
+-	stats := CollectStats(packages)
++	stats := CollectStats(cfg.pruned(packages))
+ 
+ 	root := jsonRoot{
+ 		Version:  about.ResolvedVersion(),
+@@ -112,7 +112,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
+ 			Output:   output,
+ 		}
+ 		if cfg.packageStats {
+-			own := jsonStats(CollectStats([]*Package{pkg}))
++			own := jsonStats(CollectStats(cfg.pruned([]*Package{pkg})))
+ 			jp.Stats = &own
+ 		}
+ 		root.Packages = append(root.Packages, jp)
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -189,7 +189,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
+ 
+ 	renderBenchDeltaTable(w, cfg.benchDeltas, c)
+ 	fmt.Fprintln(w)
+-	stats := CollectStats(packages)
++	stats := CollectStats(cfg.pruned(packages))
+ 	renderSummary(w, stats, c)
+ }
+ 
+--- a/internal/gotestspec/view.go
++++ b/internal/gotestspec/view.go
+@@ -49,6 +49,30 @@ func (c *renderConfig) visible(nodes []*Node) []*Node {
+ 	return out
+ }
+ 
++// pruned copies the shown packages and rows.
++func (c *renderConfig) pruned(pkgs []*Package) []*Package {
++	var out []*Package
++	for _, p := range pkgs {
++		if !c.packageShown(p) {
++			continue
++		}
++		cp := *p
++		cp.Nodes = c.prunedNodes(p.Nodes)
++		out = append(out, &cp)
++	}
++	return out
++}
++
++func (c *renderConfig) prunedNodes(nodes []*Node) []*Node {
++	var out []*Node
++	for _, n := range c.visible(nodes) {
++		cp := *n
++		cp.Children = c.prunedNodes(n.Children)
++		out = append(out, &cp)
++	}
++	return out
++}
++
+ // packageShown reports whether a package is rendered: its own status is not
+ // hidden, or one of its rows is shown.
+ func (c *renderConfig) packageShown(pkg *Package) bool {

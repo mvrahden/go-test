@@ -211,6 +211,13 @@ gotest spec ./... --static
 gotest spec ./... --static --format=md --output=docs/behavior-spec.md
 ```
 
+Lay a saved run's verdicts over that specification with `--declared`: every behavior the source declares is listed, and what the run did not report shows without a verdict and is counted as not run ([The declared specification under a run's verdicts](specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)). `--hide=pass` (or `fail`, `skip`, `none`, comma-separated) leaves rows out of the rendering and none out of the counts ([Hiding rows by status](specs/spec/spec.md#requirement-hiding-rows-by-status)):
+
+```bash
+gotest spec --input=events.json --declared ./...
+gotest spec --input=events.json --hide=pass
+```
+
 ## Isolation
 
 Each suite runs in its own process with zero shared state.

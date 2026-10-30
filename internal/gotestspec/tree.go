@@ -163,7 +163,15 @@ type Node struct {
 	// list — a statically read method that declares behaviors whose names or
 	// existence depend on runtime values. A tree stream never sets it, because
 	// what ran is by definition all there was.
-	Incomplete  bool
+	Incomplete bool
+	// NotRun marks a node the source declares that the stream laid over it
+	// did not report (see Overlay). It has no verdict and no duration.
+	NotRun bool
+	// File and Line say where the source declares the node: File relative
+	// to the package directory, as gotest discover gives it. Empty for a
+	// node only a run revealed.
+	File        string
+	Line        int
 	Variant     int
 	duplicate   bool
 	Iterations  int
@@ -178,7 +186,9 @@ type Node struct {
 }
 
 type Package struct {
-	Path     string
+	Path string
+	// Dir is the package's directory, when the tree was read from source.
+	Dir      string
 	Status   Status
 	Duration time.Duration
 	Nodes    []*Node
@@ -199,9 +209,12 @@ type Stats struct {
 	// carry no failing behavior, so folding them into Failed would break the
 	// Passed+Failed+Skipped arithmetic; they are counted as what they are.
 	FailedPackages int
+	// NotRun counts the declared behaviors and fuzz targets the stream laid
+	// over them did not report.
+	NotRun int
 }
 
-func (s Stats) Total() int {
+func (s Stats) Total() int { //nolint:gocritic // hugeParam: stable API
 	return s.Passed + s.Failed + s.Skipped
 }
 
@@ -689,14 +702,7 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 	if n.Kind == KindFuzz {
 		// One verdict per target; its seeds are evidence, not behaviors.
 		s.Fuzzers++
-		switch n.Status {
-		case StatusPass:
-			s.Passed++
-		case StatusFail:
-			s.Failed++
-		case StatusSkip:
-			s.Skipped++
-		}
+		countVerdict(n, s)
 		return
 	}
 	if n.Kind == KindSuite {
@@ -719,17 +725,23 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 		} else {
 			s.Behaviors++
 		}
-		switch n.Status {
-		case StatusPass:
-			s.Passed++
-		case StatusFail:
-			s.Failed++
-		case StatusSkip:
-			s.Skipped++
-		}
+		countVerdict(n, s)
 	}
 	for _, c := range n.Children {
 		collectStats(c, s, inStdlib)
+	}
+}
+
+func countVerdict(n *Node, s *Stats) {
+	switch {
+	case n.NotRun:
+		s.NotRun++
+	case n.Status == StatusPass:
+		s.Passed++
+	case n.Status == StatusFail:
+		s.Failed++
+	case n.Status == StatusSkip:
+		s.Skipped++
 	}
 }
 

@@ -1,0 +1,27 @@
+{"Time":"2026-10-30T10:00:00.030Z","Action":"start","Package":"example.com/hiding"}
+{"Time":"2026-10-30T10:00:00.039Z","Action":"run","Package":"example.com/hiding","Test":"TestAccountTestSuite"}
+{"Time":"2026-10-30T10:00:00.040Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite","Output":"=== RUN   TestAccountTestSuite\n"}
+{"Time":"2026-10-30T10:00:00.031Z","Action":"run","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose"}
+{"Time":"2026-10-30T10:00:00.032Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose","Output":"=== RUN   TestAccountTestSuite/TestClose\n"}
+{"Time":"2026-10-30T10:00:00.033Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose","Output":"--- PASS: TestAccountTestSuite/TestClose (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.034Z","Action":"pass","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.035Z","Action":"run","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen"}
+{"Time":"2026-10-30T10:00:00.036Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Output":"=== RUN   TestAccountTestSuite/TestOpen\n"}
+{"Time":"2026-10-30T10:00:00.037Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Output":"--- PASS: TestAccountTestSuite/TestOpen (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.038Z","Action":"pass","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.041Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite","Output":"--- PASS: TestAccountTestSuite (0.01s)\n"}
+{"Time":"2026-10-30T10:00:00.042Z","Action":"pass","Package":"example.com/hiding","Test":"TestAccountTestSuite","Elapsed":0.01}
+{"Time":"2026-10-30T10:00:00.051Z","Action":"run","Package":"example.com/hiding","Test":"TestBootTestSuite"}
+{"Time":"2026-10-30T10:00:00.052Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite","Output":"=== RUN   TestBootTestSuite\n"}
+{"Time":"2026-10-30T10:00:00.043Z","Action":"run","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart"}
+{"Time":"2026-10-30T10:00:00.044Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart","Output":"=== RUN   TestBootTestSuite/TestStart\n"}
+{"Time":"2026-10-30T10:00:00.045Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart","Output":"--- PASS: TestBootTestSuite/TestStart (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.046Z","Action":"pass","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.047Z","Action":"run","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop"}
+{"Time":"2026-10-30T10:00:00.048Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop","Output":"=== RUN   TestBootTestSuite/TestStop\n"}
+{"Time":"2026-10-30T10:00:00.049Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop","Output":"--- PASS: TestBootTestSuite/TestStop (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.050Z","Action":"pass","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.053Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite","Output":"--- PASS: TestBootTestSuite (0.01s)\n"}
+{"Time":"2026-10-30T10:00:00.054Z","Action":"pass","Package":"example.com/hiding","Test":"TestBootTestSuite","Elapsed":0.01}
+{"Time":"2026-10-30T10:00:00.055Z","Action":"output","Package":"example.com/hiding","Output":"ok  \texample.com/hiding\t0.030s\n"}
+{"Time":"2026-10-30T10:00:00.056Z","Action":"pass","Package":"example.com/hiding","Elapsed":0.03}

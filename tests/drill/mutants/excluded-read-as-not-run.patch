@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / reads a method the X_ prefix excludes, and its rows, as skipped rather than not run
+Clause: when a stream of some of a package's methods is rendered with --declared → reads a method the X_ prefix excludes, and its rows, as skipped rather than not run
+--- a/internal/gotestspec/declared.go
++++ b/internal/gotestspec/declared.go
+@@ -92,7 +92,7 @@ func overlayNodes(declared, observed []*Node, excluded bool) []*Node {
+ // where the X_ prefix excludes them.
+ func notRun(nodes []*Node, excluded bool) {
+ 	for _, n := range nodes {
+-		skipped := excluded || n.Excluded
++		skipped := false
+ 		if skipped {
+ 			n.Status = StatusSkip
+ 		} else {
