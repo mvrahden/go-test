@@ -35,6 +35,9 @@ type Event struct {
 	Package string `json:"Package"`
 	Test    string `json:"Test"`
 	Output  string `json:"Output"`
+	// ImportPath names the package of a build-output or build-fail event,
+	// which carries no Package.
+	ImportPath string `json:"ImportPath"`
 }
 
 // MarkersFile is the file, inside the directory GOTEST_CANARY_DIR names, that

@@ -427,8 +427,13 @@ func rowVerdicts(t *gotest.T, dir string) (verdicts, output map[string]string) {
 	verdicts, output = map[string]string{}, map[string]string{}
 	for _, ev := range testkit.ParseEvents(stdout.Bytes()) {
 		pkg := filepath.Base(ev.Package)
-		if ev.Action == "output" {
+		if ev.Package == "" {
+			pkg = filepath.Base(ev.ImportPath) // a build event
+		}
+		if ev.Output != "" {
 			output[pkg] += ev.Output
+		} else if ev.Test == "" {
+			output[pkg] += "<" + ev.Action + ">\n"
 		}
 		if ev.Test != "TestRow" {
 			continue
