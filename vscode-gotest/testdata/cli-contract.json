@@ -1398,7 +1398,20 @@
           "Package": "shared fixtures",
           "RunLevel": true
         }
-      ]
+      ],
+      "spec": {
+        "exitCode": 0,
+        "packages": [
+          {
+            "path": "gotest.runlevel/down",
+            "runLevel": false
+          },
+          {
+            "path": "shared fixtures",
+            "runLevel": true
+          }
+        ]
+      }
     }
   },
   "outputs": {

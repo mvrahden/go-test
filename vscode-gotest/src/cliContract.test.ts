@@ -717,6 +717,22 @@ describe("recorded live runs", () => {
       for (const e of runLevel) expect(e.RunLevel).toBe(true);
     });
 
+    it("marks the run's own package, and no other, in the spec document", () => {
+      const spec = (
+        recorded as unknown as {
+          spec: {
+            exitCode: number;
+            packages: { path: string; runLevel: boolean }[];
+          };
+        }
+      ).spec;
+      expect(spec.exitCode).toBe(0);
+      expect(spec.packages).toEqual([
+        { path: "gotest.runlevel/down", runLevel: false },
+        { path: "shared fixtures", runLevel: true },
+      ]);
+    });
+
     it("marks no event of a package it ran", () => {
       expect(suite.length).toBeGreaterThan(0);
       expect(

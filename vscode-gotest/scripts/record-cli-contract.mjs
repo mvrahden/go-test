@@ -588,6 +588,16 @@ writeFileSync(
       .join(""),
     events: mask(maskDir(result.stdout, runLevelDir, "<module>")),
   };
+  // The same stream rendered as the Spec View renders it: the document marks
+  // the run's own package.
+  const rendered = await run(bin, [...RENDER, "--hide="], result.stdout);
+  live["run-level"].spec = {
+    exitCode: rendered.exitCode,
+    packages: JSON.parse(rendered.stdout).packages.map((pkg) => ({
+      path: pkg.path,
+      runLevel: pkg.runLevel ?? false,
+    })),
+  };
 }
 removeRunLevel();
 
