@@ -6,7 +6,8 @@
 // extension's reading of it were each tested in isolation and never together.
 //
 // Two variants are recorded per stream: the gating form, whose exit code CI
-// depends on, and the --render-only form the Spec View sends.
+// depends on, and the --render-only form the Spec View sends. The `spec`
+// runs replay a stream with --declared or --hide.
 
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -79,6 +80,7 @@ interface LiveEvent {
   Package?: string;
   Test?: string;
   Output?: string;
+  RunLevel?: boolean;
 }
 
 // A live `gotest -json` run, times and durations masked as "<d>".
@@ -95,6 +97,50 @@ interface LintRun {
   exitCode: number | null;
   stderr: string;
   document: Record<string, Record<string, unknown[]>> | null;
+}
+
+interface LintRule {
+  id: string;
+  tier: string;
+  scope: string;
+  skippable: boolean;
+  fixable: boolean;
+  description: string;
+}
+
+type Stats = Record<string, number>;
+
+interface SpecNode {
+  name: string;
+  status: string;
+  duration: number;
+  file?: string;
+  line?: number;
+  children: SpecNode[];
+}
+
+interface SpecPackage {
+  path: string;
+  dir?: string;
+  status: string;
+  nodes: SpecNode[];
+  stats?: Stats;
+}
+
+interface SpecDocument {
+  version: string;
+  packages: SpecPackage[];
+  stats: Stats;
+}
+
+// A `gotest spec --input=-` run over a stream under testdata/, with
+// --declared or --hide; the repository's directory is masked as "<repo>".
+interface SpecRun {
+  stream: string;
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  document: SpecDocument;
 }
 
 interface ContractCase {
@@ -125,10 +171,25 @@ const golden = JSON.parse(
   ),
 ) as {
   cases: Record<string, ContractCase>;
+  spec: Record<string, SpecRun>;
   live: Record<string, LiveRun>;
   outputs: Record<string, OutputRun>;
   lint: Record<string, LintRun>;
 };
+
+// nodesOf lists every node beneath pkg, keyed by its slash-joined path.
+function nodesOf(pkg: SpecPackage): Map<string, SpecNode> {
+  const out = new Map<string, SpecNode>();
+  const walk = (nodes: SpecNode[], prefix: string) => {
+    for (const n of nodes) {
+      const key = prefix + n.name;
+      out.set(key, n);
+      walk(n.children, key + "/");
+    }
+  };
+  walk(pkg.nodes, "");
+  return out;
+}
 
 // What each stream shape means. Stated here rather than derived from the
 // recording, so that re-recording a changed CLI cannot quietly relabel a case:
@@ -438,12 +499,129 @@ describe("recorded CLI contract", () => {
   });
 });
 
+describe("recorded spec runs", () => {
+  it("records exactly the stated runs", () => {
+    expect(Object.keys(golden.spec).sort()).toEqual([
+      "declared",
+      "hide-nothing",
+      "hide-pass",
+    ]);
+  });
+
+  for (const [name, recorded] of Object.entries(golden.spec)) {
+    it(`${name}: renders with exit 0 and nothing on stderr`, () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+    });
+  }
+
+  // The stream reports one method of examples/search and one the source
+  // does not declare; the source declares the rest.
+  describe("--declared", () => {
+    const recorded = golden.spec.declared;
+    const pkg = recorded.document.packages[0];
+    const nodes = nodesOf(pkg);
+    const streamOnly = "TestArticleSearchTestSuite/TestSearchByAuthor";
+
+    it("renders the one package, with its directory", () => {
+      expect(recorded.document.packages.map((p) => p.path)).toEqual([
+        "github.com/mvrahden/go-test/examples/search",
+      ]);
+      expect(pkg.dir).toBe("<repo>/examples/search");
+    });
+
+    it("places every node the source declares at its file and line", () => {
+      const declared = [...nodes].filter(([key]) => key !== streamOnly);
+      expect(declared.length).toBeGreaterThan(0);
+      for (const [, n] of declared) {
+        expect(n.file).toMatch(/^[^/]+_test\.go$/);
+        expect(Number.isInteger(n.line)).toBe(true);
+        expect(n.line).toBeGreaterThan(0);
+      }
+    });
+
+    it("keeps a node only the stream holds, with no file or line", () => {
+      const n = nodes.get(streamOnly);
+      expect(n?.status).toBe("pass");
+      expect(n).not.toHaveProperty("file");
+      expect(n).not.toHaveProperty("line");
+    });
+
+    it("gives a declared node the stream did not report no verdict", () => {
+      const n = nodes.get("TestArticleSearchTestSuite/TestSearchByBody");
+      expect(n?.status).toBe("none");
+      expect(n?.duration).toBe(0);
+      expect(n?.file).toBe("suite_test.go");
+    });
+
+    it("counts every behavior the stream did not report as not run", () => {
+      const leaves = [...nodes.values()].filter((n) => n.children.length === 0);
+      const unreported = leaves.filter((n) => n.status === "none");
+      expect(unreported.length).toBeGreaterThan(0);
+      expect(recorded.document.stats.notRun).toBe(unreported.length);
+    });
+
+    it("gives the package its own stats, here the document's", () => {
+      expect(pkg.stats).toEqual(recorded.document.stats);
+    });
+
+    it("adds dir, file and line only under --declared", () => {
+      const plain = JSON.parse(
+        golden.cases["declared-source"].renderOnly.direct.stdout,
+      ) as SpecDocument;
+      expect(plain.packages[0]).not.toHaveProperty("dir");
+      expect(plain.packages[0]).not.toHaveProperty("stats");
+      for (const n of nodesOf(plain.packages[0]).values()) {
+        expect(n).not.toHaveProperty("file");
+        expect(n).not.toHaveProperty("line");
+      }
+    });
+  });
+
+  // Both replay mixed.jsonl: one behavior passes, one fails.
+  describe("--hide", () => {
+    const hidden = golden.spec["hide-pass"].document;
+    const nothing = golden.spec["hide-nothing"].document;
+    const plain = JSON.parse(
+      golden.cases.mixed.renderOnly.direct.stdout,
+    ) as SpecDocument;
+    const leaves = (doc: SpecDocument) =>
+      [...nodesOf(doc.packages[0]).keys()].sort();
+
+    it("leaves the counts the run's", () => {
+      expect(hidden.stats).toEqual(plain.stats);
+      expect(nothing.stats).toEqual(plain.stats);
+    });
+
+    it("gives each package its own stats, even when it hides nothing", () => {
+      expect(hidden.packages[0].stats).toEqual(plain.stats);
+      expect(nothing.packages[0].stats).toEqual(plain.stats);
+      expect(plain.packages[0]).not.toHaveProperty("stats");
+    });
+
+    it("leaves the passing behavior out under --hide=pass", () => {
+      expect(leaves(hidden)).toEqual([
+        "TestCartTestSuite",
+        "TestCartTestSuite/totals_the_basket",
+      ]);
+    });
+
+    it("hides nothing under --hide=", () => {
+      const { stats, ...rest } = nothing.packages[0];
+      expect(stats).toBeDefined();
+      expect(rest).toEqual(plain.packages[0]);
+      expect(leaves(nothing)).toContain("TestCartTestSuite/adds_an_item");
+    });
+  });
+});
+
 const unrunPkg = "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/";
 
 describe("recorded live runs", () => {
   it("records exactly the stated runs", () => {
     expect(Object.keys(golden.live).sort()).toEqual([
       "no-packages",
+      "run-level",
       "verdicts",
     ]);
   });
@@ -507,6 +685,45 @@ describe("recorded live runs", () => {
     it("parses in full with the extension's stream reader", () => {
       const stream = recorded.events.map((e) => JSON.stringify(e)).join("\n");
       expect(parseTestEvents(stream)).toHaveLength(recorded.events.length);
+    });
+
+    it("marks no event as the run's own", () => {
+      expect(recorded.events.filter((e) => "RunLevel" in e)).toEqual([]);
+    });
+  });
+
+  // A module the recorder writes: one suite reading a shared fixture whose
+  // setup fails, booked by the run under a package of its own.
+  describe("a shared fixture that never comes up", () => {
+    const recorded = golden.live["run-level"];
+    const runLevel = recorded.events.filter(
+      (e) => e.Package === "shared fixtures",
+    );
+    const suite = recorded.events.filter(
+      (e) => e.Package === "gotest.runlevel/down",
+    );
+
+    it("fails the run, the suite reading the fixture with it", () => {
+      expect(recorded.exitCode).toBe(1);
+      expect(recorded.stderr).toContain(
+        "DownSharedFixture.BeforeAll failed after 1 attempt(s)",
+      );
+      expect(suite.at(-1)?.Action).toBe("fail");
+      expect(runLevel.at(-1)?.Action).toBe("fail");
+    });
+
+    it("marks every event of the run's own package, its start first", () => {
+      expect(runLevel[0]?.Action).toBe("start");
+      for (const e of runLevel) expect(e.RunLevel).toBe(true);
+    });
+
+    it("marks no event of a package it ran", () => {
+      expect(suite.length).toBeGreaterThan(0);
+      expect(
+        recorded.events.filter(
+          (e) => e.Package !== "shared fixtures" && "RunLevel" in e,
+        ),
+      ).toEqual([]);
     });
   });
 });
@@ -724,6 +941,7 @@ describe("recorded lint runs", () => {
   it("records exactly the stated runs", () => {
     expect(Object.keys(golden.lint).sort()).toEqual([
       "findings",
+      "rules",
       "uncompilable",
     ]);
   });
@@ -756,6 +974,15 @@ describe("recorded lint runs", () => {
       }
     });
 
+    it("ends every finding past where it starts", () => {
+      for (const f of findings) {
+        expect([f.endLine, f.endCol]).not.toEqual([f.line, f.col]);
+        expect(
+          f.endLine > f.line || (f.endLine === f.line && f.endCol > f.col),
+        ).toBe(true);
+      }
+    });
+
     it("carries fixes as byte-offset edits of named files", () => {
       const edits = findings.flatMap((f) => f.fixes.flatMap((x) => x.edits));
       expect(edits.length).toBeGreaterThan(0);
@@ -774,6 +1001,59 @@ describe("recorded lint runs", () => {
       expect(recorded.exitCode).toBe(1);
       expect(recorded.document).toBeNull();
       expect(recorded.stderr).toContain("cannot lint uncompilable packages");
+    });
+  });
+
+  describe("the rule registry", () => {
+    const recorded = golden.lint.rules;
+    const doc = recorded.document as unknown as {
+      version: string;
+      rules: LintRule[];
+    };
+
+    it("exits 0 with one document and nothing on stderr", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(Object.keys(doc)).toEqual(["version", "rules"]);
+      expect(doc.version.length).toBeGreaterThan(0);
+      expect(doc.rules.length).toBeGreaterThan(0);
+    });
+
+    it("describes every rule by the same fields", () => {
+      for (const r of doc.rules) {
+        expect(Object.keys(r)).toEqual([
+          "id",
+          "tier",
+          "scope",
+          "skippable",
+          "fixable",
+          "description",
+        ]);
+        expect(r.id).toMatch(/^[a-z-]+$/);
+        expect(typeof r.scope).toBe("string");
+        expect(typeof r.fixable).toBe("boolean");
+        expect(r.description.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("names each rule once", () => {
+      const ids = doc.rules.map((r) => r.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("lets only a rule outside the integrity tier be skipped", () => {
+      for (const r of doc.rules) {
+        expect(["integrity", "expressiveness", "migration"]).toContain(r.tier);
+        expect(r.skippable).toBe(r.tier !== "integrity");
+      }
+    });
+
+    it("lists every rule the findings name", () => {
+      const ids = new Set(doc.rules.map((r) => r.id));
+      const findings = parseLintJson(
+        JSON.stringify(golden.lint.findings.document),
+      );
+      for (const f of findings) expect(ids).toContain(f.category);
     });
   });
 });
