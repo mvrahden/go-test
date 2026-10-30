@@ -214,3 +214,10 @@ A lint message SHALL name the check it reports, and lint -fix SHALL keep the mes
 - **WHEN** the rules are asked for with lint -rules
 - **THEN** prints the rule list gotest help lint prints and exits 0, with no package to lint
 - **AND** with -json prints one document opening with version that lists every rule once with its tier, scope, skippable, fixable and description
+
+### Requirement: Findings cover the code they are about
+In the findings `gotest lint -json` prints, each finding's `end` SHALL lie past its `posn`, at the end of the call, expression or declaration header the finding is about.
+
+#### Scenario: A finding's extent
+- **WHEN** lint -json reports a finding on a call and one on a function
+- **THEN** ends each past its posn, at the end of the call and of the function's signature

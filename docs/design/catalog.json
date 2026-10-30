@@ -17794,6 +17794,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "ends each past its posn, at the end of the call and of the function's signature",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "extent_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 22,
+                      "name": "ends_each_past_its_posn,_at_the_end_of_the_call_and_of_the_function's_signature",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint -json reports a finding on a call and one on a function",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "extent_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 21,
+                  "name": "lint_-json_reports_a_finding_on_a_call_and_one_on_a_function",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFindingsExtent",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "extent_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestAFindingsExtent",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LintExtent",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "extent_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestLintExtentTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "prints the rule list gotest help lint prints and exits 0, with no package to lint",
                       "duration": 0,
                       "excluded": false,
@@ -22338,13 +22399,13 @@
     }
   ],
   "stats": {
-    "behaviors": 632,
+    "behaviors": 633,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 100,
+    "suites": 101,
     "tests": 0
   }
 }

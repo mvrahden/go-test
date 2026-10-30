@@ -104,7 +104,7 @@ func reportNegativeTimeout(pass *analysis.Pass, typeName, field string, value as
 			}},
 		}}
 	}
-	reportWithFix(pass, ConfigNoDeadline, value.Pos(), fixes,
+	reportWithFix(pass, ConfigNoDeadline, value, fixes,
 		"%s.%s is negative, which disables the deadline; write gotest.NoDeadline to say so",
 		typeName, field)
 }

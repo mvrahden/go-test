@@ -68,7 +68,7 @@ func checkSharedFixtureUndeclared(pass *analysis.Pass, insp *inspector.Inspector
 				return true
 			}
 			reported[tn] = true
-			report(pass, SharedFixtureUndeclared, id.Pos(),
+			report(pass, SharedFixtureUndeclared, id,
 				"suite %s uses *%s without declaring it — window scheduling starts only declared fixtures, so it may be absent (never started, or already released); declare a pointer field for it or reach it through a declared fixture",
 				recvName, tn.Name())
 			return true

@@ -50,7 +50,7 @@ func checkFixtureHookCall(pass *analysis.Pass, insp *inspector.Inspector) {
 				return true
 			}
 			if rootIdent(pass, sel.X) == recv {
-				report(pass, FixtureHookCall, call.Pos(), "%s is called by the harness; calling it here runs it twice", sel.Sel.Name)
+				report(pass, FixtureHookCall, call, "%s is called by the harness; calling it here runs it twice", sel.Sel.Name)
 			}
 			return true
 		})

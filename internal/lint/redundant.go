@@ -28,7 +28,7 @@ func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl 
 			if reason == "" {
 				continue
 			}
-			reportWithFix(pass, AssertionRedundant, first.call.Pos(),
+			reportWithFix(pass, AssertionRedundant, first.call,
 				redundantFix(pass, block.List[i], block.List[i+1], first, second),
 				"%s is redundant before %s — %s",
 				first.name, second.name, reason)
