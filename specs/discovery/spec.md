@@ -69,6 +69,13 @@ discover SHALL report, for each behavior a method declares, the call that declar
 - **WHEN** a method declares a When with Its under it
 - **THEN** discover reports the When's kind as when and each It's as it
 
+### Requirement: Discover lists what the source declares
+`gotest discover` SHALL list every Test, Benchmark and Fuzz method a suite declares, an excluded or unfocused one included and marked as such, whatever a run of the package would select.
+
+#### Scenario: Excluded and unfocused methods
+- **WHEN** a suite declares an excluded method and a focused one
+- **THEN** discover lists the excluded method marked excluded and the unfocused methods beside the focused one
+
 ### Requirement: Declarations from other packages
 A suite SHALL run an alias of a generic suite another package declares, an alias declared in the external test package SHALL be discovered and run whether the package under test, the external test package or a third package declares the generic suite, and a fixture a suite binds from another package SHALL be held to the signature rules a local fixture is held to.
 

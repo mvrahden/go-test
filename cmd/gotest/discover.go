@@ -189,6 +189,14 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 				continue
 			}
 			result := c.CollectSuiteSpecs(pkg)
+			// Listed before the rejection check, which reduces each suite to the
+			// methods a run would select, in place: discover lists what the
+			// source declares, excluded and unfocused methods marked as such.
+			for _, suite := range result.Suites {
+				ds := buildDiscoverSuite(suite)
+				ds.Fixtures = discoverFixtureNames(suite)
+				pkgEntry.Suites = append(pkgEntry.Suites, ds)
+			}
 			if rejected := c.Rejections(pkg, result); len(rejected) > 0 {
 				for _, ce := range rejected {
 					warn(pkg, ce.Pos, ce.Err.Error())
@@ -204,12 +212,6 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 			}
 			for _, ce := range gotestgen.FuzzRejections(pkg, result.Suites) {
 				warn(pkg, ce.Pos, ce.Err.Error())
-			}
-
-			for _, suite := range result.Suites {
-				ds := buildDiscoverSuite(suite)
-				ds.Fixtures = discoverFixtureNames(suite)
-				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 			}
 		}
 
