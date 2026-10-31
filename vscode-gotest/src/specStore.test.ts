@@ -322,3 +322,38 @@ describe("SpecStore.prune", () => {
     expect(store.packages).toContain("other.com/x");
   });
 });
+
+describe("compose", () => {
+  it("starts every test before any verdict, so a slash in a name stays one subtest", () => {
+    const store = new SpecStore();
+    const suite = "TestPathsTestSuite";
+    const method = suite + "/TestRead";
+    const leaf = method + "/reads a/b paths";
+    store.merge({
+      stream: stream(
+        { Action: "run", Package: cart, Test: suite },
+        { Action: "run", Package: cart, Test: method },
+        ...test(cart, leaf, "pass"),
+        { Action: "pass", Package: cart, Test: method, Elapsed: 0.01 },
+        { Action: "pass", Package: cart, Test: suite, Elapsed: 0.01 },
+        verdict(cart, "pass"),
+      ),
+      folder: "/ws",
+    });
+
+    const actions = store
+      .compose("/ws")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => (JSON.parse(l) as { Action: string }).Action);
+    expect(actions).toEqual([
+      "run",
+      "run",
+      "run",
+      "pass",
+      "pass",
+      "pass",
+      "pass",
+    ]);
+  });
+});

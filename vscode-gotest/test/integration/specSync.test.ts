@@ -296,11 +296,14 @@ describe.each(MODES)("spec sync via $name", (mode) => {
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
+    // A leaf carries its display and its id, in that order.
     expect(html).toContain(
-      '<div class="leaf block pass" data-display="reads a/b paths">',
+      '<div class="leaf block pass" data-display="reads a/b paths" data-id=',
     );
     expect(html).not.toContain('data-display="reads a"');
-    expect(html).toContain('data-display="keeps &lt;b&gt;&amp;&quot; text">');
+    expect(html).toContain(
+      'data-display="keeps &lt;b&gt;&amp;&quot; text" data-id=',
+    );
     expect(html).toContain(' keeps &lt;b&gt;&amp;" text <span class="dur">');
     expect(html).not.toContain("&amp;lt;");
     expect(html).not.toContain("&amp;amp;");
