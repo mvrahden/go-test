@@ -331,6 +331,7 @@ shards of one run do not add up to every mutant exactly once.
 | `finding-without-extent` | a lint finding ends where it starts | lint conformance: the call's and the signature's findings end at their posn |
 | `runlevel-start-unmarked` | the start line of a package the run books for itself carries no RunLevel | cli conformance: the shared fixtures package's start line is unmarked |
 | `runlevel-package-unread` | the spec tree drops the RunLevel its events carry | cli conformance: the spec document does not mark the shared fixtures package |
+| `discover-lists-the-run-set` | discover lists the methods a run would select, not the ones the source declares | discovery conformance: the excluded and unfocused methods are listed |
 | `skipped-branch-rows-not-run` | under `--declared`, the rows of a suite the run skipped read as not run | spec conformance: the guarded suite's rows have no skip verdict |
 | `hidden-package-dropped` | the JSON document drops a package whose rows `--hide` leaves out, with its stats | spec conformance: the green run's packages vanish from the document |
 | `package-failure-shown-under-hide` | the JSON document keeps a package's own failure output under `--hide=fail` | spec conformance: the build failure's output stays in the document |

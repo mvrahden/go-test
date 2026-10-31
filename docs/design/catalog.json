@@ -9494,6 +9494,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "discover lists the excluded method marked excluded and the unfocused methods beside the focused one",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "listing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 28,
+                      "name": "discover_lists_the_excluded_method_marked_excluded_and_the_unfocused_methods_beside_the_focused_one",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares an excluded method and a focused one",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "listing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 27,
+                  "name": "a_suite_declares_an_excluded_method_and_a_focused_one",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "DeclaredMethods",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "listing_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 26,
+              "name": "TestDeclaredMethods",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "Listing",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "listing_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestListingTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a stale generated file on disk neither breaks the run nor is compiled",
                       "duration": 0,
                       "excluded": false,
@@ -22521,13 +22582,13 @@
     }
   ],
   "stats": {
-    "behaviors": 637,
+    "behaviors": 638,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 101,
+    "suites": 102,
     "tests": 0
   }
 }
