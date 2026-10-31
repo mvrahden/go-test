@@ -171,14 +171,22 @@ export class SpecStore {
     );
   }
 
-  // compose writes the kept lines of a folder's packages as one stream, each
-  // package's tests before its verdict, as go test orders them.
+  // compose writes the kept lines of a folder's packages as one stream, as
+  // go test orders them: a package's tests before its verdict, and every
+  // test's start before any verdict, since the CLI reads a slash in a name as
+  // one subtest only while the test above it still runs.
   compose(folder: string): string {
     const out: string[] = [];
     for (const record of this.records.values()) {
       if (record.folder !== folder) continue;
-      for (const lines of record.tests.values()) out.push(...lines);
-      out.push(...record.pkgLines);
+      const rest: string[] = [];
+      for (const lines of record.tests.values()) {
+        for (const l of lines) {
+          if (l.includes('"Action":"run"')) out.push(l);
+          else rest.push(l);
+        }
+      }
+      out.push(...rest, ...record.pkgLines);
     }
     return out.length > 0 ? out.join("\n") + "\n" : "";
   }
