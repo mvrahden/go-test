@@ -273,6 +273,31 @@ func (s *FlagParsingTestSuite) TestParseSubcommand(t *gotest.T) {
 	}
 }
 
+func (s *FlagParsingTestSuite) TestTagsFlagSpellings(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc   string
+		args   []string
+		expect []string
+	}{
+		{Desc: "double dash with =", args: []string{"--tags=foo", "./..."}, expect: []string{"-tags=foo", "./..."}},
+		{Desc: "double dash with a separate value", args: []string{"--tags", "foo", "./..."}, expect: []string{"-tags", "foo", "./..."}},
+		{Desc: "single dash with = is kept", args: []string{"-tags=foo"}, expect: []string{"-tags=foo"}},
+		{Desc: "after -- it is the binary's", args: []string{"--", "--tags=foo"}, expect: []string{"--", "--tags=foo"}},
+		{Desc: "after -args it is the binary's", args: []string{"-args", "--tags=foo"}, expect: []string{"-args", "--tags=foo"}},
+	}) {
+		gotest.Equal(sub, tc.expect, NormalizeTagsFlag(tc.args))
+	}
+	t.When("--tags=foo reaches the build", func(w *gotest.T) {
+		_, goTestArgs, err := SplitArgs(NormalizeTagsFlag([]string{"--tags=foo", "./..."}), map[string]bool{})
+		gotest.NoError(w, err)
+		gotest.Equal(w, []string{"-tags=foo", "./..."}, goTestArgs)
+	})
+	t.When("--tags=foo overrides the configured tags", func(w *gotest.T) {
+		inv := Invocation{Args: NormalizeTagsFlag([]string{"--tags=foo"}), Config: config.ProjectConfig{Tags: "bar"}}
+		gotest.Equal(w, []string{"-tags=foo"}, inv.TagArgs())
+	})
+}
+
 func (s *FlagParsingTestSuite) TestPackagePatterns(t *gotest.T) {
 	t.When("extract package patterns", func(w *gotest.T) {
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional

@@ -12,3 +12,10 @@ func (f *BadFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *BadFixture) FixtureConfig(x int) gotest.FixtureConfig {
 	return gotest.DefaultFixtureConfig()
 }
+
+// UsesTestSuite binds the fixture.
+type UsesTestSuite struct {
+	Fix *BadFixture
+}
+
+func (s *UsesTestSuite) TestRuns(t *gotest.T) {}

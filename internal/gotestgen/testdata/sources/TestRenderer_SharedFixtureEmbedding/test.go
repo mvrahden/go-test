@@ -13,15 +13,15 @@ type PostgresSharedFixture struct {
 func (f *PostgresSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type E2EFixture struct {
-	*PostgresSharedFixture
-	Pool string
+	PostgresSharedFixture *PostgresSharedFixture
+	Pool                  string
 }
 
 func (f *E2EFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *E2EFixture) AfterAll(ctx context.Context) error  { return nil }
 
 type QueryTestSuite struct {
-	*E2EFixture
+	E2EFixture *E2EFixture
 }
 
 func (s *QueryTestSuite) TestInsert(t *gotest.T) {}

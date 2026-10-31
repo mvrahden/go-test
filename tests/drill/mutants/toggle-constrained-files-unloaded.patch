@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus renames their references too, and the package still compiles with the tag \(
+Clause: when focus is toggled on a suite that files behind a build constraint refer to → refactor toggle-focus renames their references too, and the package still compiles with the tag
+--- a/internal/refactor/togglefocus.go
++++ b/internal/refactor/togglefocus.go
+@@ -187,7 +187,7 @@
+ 		byTags[tags] = append(byTags[tags], file)
+ 	}
+ 	for tags, files := range byTags {
+-		if tags != "" {
++		if false {
+ 			for _, p := range loadTagged(dir, tags) {
+ 				if p.TypesInfo == nil || len(p.Errors) > 0 {
+ 					continue

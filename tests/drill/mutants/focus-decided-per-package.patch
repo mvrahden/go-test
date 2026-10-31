@@ -1,0 +1,15 @@
+Expect: shapes focusacross: TestOtherTestSuite is "pass", want skip
+Expect: shapes focusacross: the focus-skipped suite started a fixture
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFocusIsRunWide
+Clause: when a run holds a focused suite → a focused suite in one package skips every unfocused suite in the others
+Clause: when a run holds a focused suite → an unfocused suite skipped by focus starts no fixture
+--- a/internal/gotestgen/generator.go
++++ b/internal/gotestgen/generator.go
+@@ -537,6 +537,7 @@
+ 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, i int) (*GenerateResult, error) {
+ 		c := collector{sources: lr.sources}
+ 		ptestCollected, pxtestCollected := all[i].ptest, all[i].pxtest
++		focusRun := ptestCollected.Suites.Focuses() || pxtestCollected.Suites.Focuses()
+ 
+ 		ptestSpec, err := c.applyInRun(ptestCollected, focusRun)
+ 		if err != nil {

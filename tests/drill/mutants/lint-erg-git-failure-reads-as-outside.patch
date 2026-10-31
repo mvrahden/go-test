@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / where git cannot read its repository, the finding says git cannot tell whether it is tracked \(
+Clause: when a generated file is on disk → where git cannot read its repository, the finding says git cannot tell whether it is tracked
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1168,7 +1168,7 @@
+ 	switch {
+ 	case err == nil:
+ 		return len(out) > 0, nil
+-	case strings.Contains(stderr.String(), "not a git repository"):
++	case true:
+ 		return true, nil
+ 	}
+ 	if msg := strings.TrimSpace(stderr.String()); msg != "" {

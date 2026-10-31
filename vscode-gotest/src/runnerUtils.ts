@@ -731,12 +731,58 @@ export function computeWildcard(
   return result.length < importPaths.length ? result : undefined;
 }
 
+// KnownPackages are the discovered packages a widened pattern must not reach
+// beyond the selection; dir-relative patterns resolve against workspaceDir.
+export interface KnownPackages {
+  workspaceDir: string;
+  packages: { importPath: string; dir: string }[];
+}
+
 /**
  * Determines the gotest package patterns for a batch of packages.
  * Uses workspace patterns (from go.work) when available and the common
  * prefix equals the module path. Otherwise falls back to computeWildcard.
+ * Focus is run-wide, so a pattern that would also match a discovered package
+ * outside the selection is dropped for the exact import paths.
  */
 export function resolveRunPatterns(
+  importPaths: string[],
+  modulePath: string | undefined,
+  workspacePatterns?: string[],
+  known?: KnownPackages,
+): string[] | undefined {
+  const patterns = widenRunPatterns(importPaths, modulePath, workspacePatterns);
+  if (!patterns || !known) return patterns;
+  const selected = new Set(importPaths);
+  const reachesOutside = known.packages.some(
+    (pkg) =>
+      !selected.has(pkg.importPath) &&
+      patterns.some((pattern) =>
+        patternCovers(pattern, pkg, known.workspaceDir),
+      ),
+  );
+  return reachesOutside ? undefined : patterns;
+}
+
+// patternCovers reports whether a go package pattern matches pkg: an import
+// path or `<path>/...`, or a `./`-relative directory pattern.
+export function patternCovers(
+  pattern: string,
+  pkg: { importPath: string; dir: string },
+  workspaceDir: string,
+): boolean {
+  const recursive = pattern === "..." || pattern.endsWith("/...");
+  const base = pattern === "..." ? "" : pattern.replace(/\/\.\.\.$/, "");
+  if (pattern.startsWith(".")) {
+    const rel = path.relative(path.resolve(workspaceDir, base), pkg.dir);
+    if (rel === "") return true;
+    return recursive && !rel.startsWith("..") && !path.isAbsolute(rel);
+  }
+  if (pkg.importPath === base) return true;
+  return recursive && pkg.importPath.startsWith(base + "/");
+}
+
+function widenRunPatterns(
   importPaths: string[],
   modulePath: string | undefined,
   workspacePatterns?: string[],

@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterFocusFix .* / lint -fix renames every generic receiver and alias, and the package still compiles \(
+Clause: when lint -fix removes the focus of a generic suite that aliases instantiate → lint -fix renames every generic receiver and alias, and the package still compiles
+--- a/internal/refactor/rename.go
++++ b/internal/refactor/rename.go
+@@ -27,6 +27,9 @@
+ 		if o.Pkg().Scope().Lookup(o.Name()) != o {
+ 			return Object{}, false
+ 		}
++		if named, ok := o.Type().(*types.Named); ok && named.TypeParams().Len() > 0 {
++			return Object{}, false
++		}
+ 		return Object{PkgPath: o.Pkg().Path(), Type: o.Name()}, true
+ 	case *types.Func:
+ 		recv := o.Origin().Signature().Recv()

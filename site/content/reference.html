@@ -733,14 +733,14 @@ percentage = covered / total</div>
     <!-- 11. Linter -->
     <section class="ref-section" id="linter">
       <h2>Linter</h2>
-      <p class="lead">Twenty-eight rules in three tiers. A rule's tier determines how it may be suppressed.</p>
+      <p class="lead">Thirty-three rules in three tiers. A rule's tier determines how it may be suppressed.</p>
 
       <h3>Integrity rules</h3>
       <p>Violations can make test outcomes unreliable or leak resources. These rules can only be suppressed per line — never project-wide.</p>
       <table class="ref-table">
         <thead><tr><th>Rule</th><th>Detects</th></tr></thead>
         <tbody>
-          <tr><td><code>focus</code></td><td>Committed <code>F_</code> prefixes on suites or methods.</td></tr>
+          <tr><td><code>focus</code></td><td>Committed <code>F_</code> prefixes on suites or on Test, Benchmark and Fuzz methods.</td></tr>
           <tr><td><code>receiver</code></td><td>Suite methods with value receivers instead of pointer receivers.</td></tr>
           <tr><td><code>lifecycle-typo</code></td><td>Method names one typo away from a lifecycle hook (<code>BeforAll</code>, <code>AfterEeach</code>).</td></tr>
           <tr><td><code>lifecycle-pair</code></td><td><code>BeforeAll</code> without <code>AfterAll</code> — resources may leak.</td></tr>
@@ -753,6 +753,11 @@ percentage = covered / total</div>
           <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
           <tr><td><code>bench-loop</code></td><td><code>Benchmark*</code> methods that never touch <code>b.Loop()</code>/<code>b.N</code> — nothing iterates, so the numbers lie.</td></tr>
           <tr><td><code>fuzz-determinism</code></td><td>Fuzz targets reading <code>time.Now</code>, <code>math/rand</code> or <code>os.Getenv</code> — corpus replay and coverage guidance degrade.</td></tr>
+          <tr><td><code>generation-rejects</code></td><td>Every shape the generator rejects, at the place and with the message it gives — such a package does not run at all.</td></tr>
+          <tr><td><code>suite-declaration</code></td><td>A suite or fixture declared inside a <code>type ( … )</code> block — the fix gives it its own declaration, doc comment kept.</td></tr>
+          <tr><td><code>no-embedding</code></td><td>An embedded suite, fixture or type carrying a method gotest reads, or a suite-typed field — reported at the field with the alternative.</td></tr>
+          <tr><td><code>fixture-hook-call</code></td><td>A suite or fixture method calling a lifecycle hook of its own or of a fixture it holds — the harness calls it too, so it runs twice; a shared fixture's <code>BeforeAll</code> or <code>AfterAll</code> may call its own <code>Hydrate</code> or <code>Dehydrate</code>, which its process never runs.</td></tr>
+          <tr><td><code>nolint-unknown</code></td><td>A <code>//nolint</code> id that names no gotest rule and no golangci-lint linter — it suppresses nothing, and the comment cannot suppress this finding.</td></tr>
           <tr><td><code>fuzz-struct-corpus</code></td><td>On-disk corpus entries for a struct-typed fuzz target — bound to the field order; <code>gotest fuzz promote</code> turns them into typed seeds.</td></tr>
         </tbody>
       </table>
@@ -788,7 +793,7 @@ percentage = covered / total</div>
       </table>
 
       <h3>Suppression</h3>
-      <p>Silence a single diagnostic with <code>//nolint:&lt;rule&gt;</code> on its line or in a comment block of its own ending on the line directly above it; on the <code>package</code> line it applies file-wide. Non-integrity rules can also be disabled per run (<code>-skip-&lt;rule&gt;</code>) or project-wide (<code>.gotest.yml</code> → <code>lint.skip</code>).</p>
+      <p>Silence a single diagnostic with <code>//nolint:&lt;rule&gt;</code> on its line or in a comment block of its own ending on the line directly above it; on the <code>package</code> line it applies file-wide. A bare <code>//nolint</code> (a reason may follow after <code>//</code>) or <code>//nolint:all</code> silences every rule there. Non-integrity rules can also be disabled per run (<code>-skip-&lt;rule&gt;</code>) or project-wide (<code>.gotest.yml</code> → <code>lint.skip</code>).</p>
 
       <h3>Exit codes</h3>
       <table class="ref-table">

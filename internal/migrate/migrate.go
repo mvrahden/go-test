@@ -146,6 +146,9 @@ type MigrateResult struct {
 	// Generated marks a file headed "Code generated ... DO NOT EDIT." that
 	// uses testify: migrate leaves it to its generator.
 	Generated bool
+	// Helper marks a base suite no suite.Run ran, migrated as a helper
+	// type the suites embedding it call: gotest does not run it.
+	Helper bool
 }
 
 // DeriveNewName computes the new suite name from an old one, exported:
@@ -234,7 +237,9 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 	var jobs []*dirJob
 	shown := map[string]string{} // canonical path -> the path to show
 	for _, dir := range dirs {
-		abs, err := canonical(dir)
+		// The path as given, not resolved: the go command keeps a symlinked
+		// working directory's paths, and judges a go.work's modules by them.
+		abs, err := filepath.Abs(dir)
 		if err != nil {
 			return nil, err
 		}
@@ -290,6 +295,10 @@ func MigratePackages(patterns []string, opts Options) ([]MigrateResult, error) {
 			return all, err
 		}
 		if err := u.migrate(); err != nil {
+			var outside *OutsideBaseError
+			if errors.As(err, &outside) && shown[outside.File] != "" {
+				outside.File = shown[outside.File]
+			}
 			return all, err
 		}
 		units = append(units, &jobUnit{job: j, u: u})
@@ -492,6 +501,7 @@ func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int
 			OldName: s.obj.Name(),
 			NewName: s.newName,
 			Markers: markers,
+			Helper:  s.helper,
 		})
 		markers = 0 // the file's markers are counted once, on its first suite
 	}
@@ -568,8 +578,8 @@ func errorString(e loadErr, shown map[string]string) string {
 	return e.String()
 }
 
-// canonical is dir absolute with symlinks resolved, as the go command
-// reports the files it loads.
+// canonical is dir absolute with symlinks resolved, so overlapping patterns
+// name a directory once.
 func canonical(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -579,6 +589,15 @@ func canonical(dir string) (string, error) {
 		return resolved, nil
 	}
 	return abs, nil
+}
+
+// canonicalFile is path with symlinks resolved, so a file is matched however
+// the go command spells its directory.
+func canonicalFile(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 // moduleRoot is the directory of the go.mod enclosing dir, empty outside

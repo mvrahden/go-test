@@ -10,7 +10,7 @@ type DBFixture struct{}
 func (f *DBFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type StdlibTestSuite struct {
-	*DBFixture
+	DBFixture *DBFixture
 }
 
 func (s *StdlibTestSuite) BeforeAll(t *testing.T) {}

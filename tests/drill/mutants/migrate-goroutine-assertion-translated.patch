@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AnAssertionOnAGoroutine / when an assertion runs on a goroutine a go statement starts / migrate leaves it unconverted under a marker naming gotest\.Go \(
+Clause: when an assertion runs on a goroutine a go statement starts → migrate leaves it unconverted under a marker naming gotest.Go
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -522,9 +522,6 @@
+ func (r *rewriter) assertions(body *ast.BlockStmt, recv *ast.Ident) bool {
+ 	changed := false
+ 	ast.Inspect(body, func(n ast.Node) bool {
+-		if _, ok := n.(*ast.GoStmt); ok {
+-			return false // left for a marker: FailNow there ends only that goroutine
+-		}
+ 		es, ok := n.(*ast.ExprStmt)
+ 		if !ok {
+ 			return true

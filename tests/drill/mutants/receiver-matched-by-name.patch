@@ -1,0 +1,14 @@
+Expect: shapes recvcollide: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite is declared through an alias or with an unusual signature → an alias runs the methods of the type it names, not those of a type named like the alias
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -762,7 +762,7 @@
+ 	if !ok {
+ 		return -1, nil
+ 	}
+-	if typeKey(recvType) != s.recvKey {
++	if recvType.Obj().Name() != s.ts.Name.Name && typeKey(recvType) != s.recvKey {
+ 		return decl.Name.Pos(), nil
+ 	}
+ 	if misnamed {

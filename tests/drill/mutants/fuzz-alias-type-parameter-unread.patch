@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fuzz .* / a callback that takes the suite's type parameter fuzzes the type the alias instantiates \(
+Clause: when a suite aliases a generic suite another package declares with a fuzz method → a callback that takes the suite's type parameter fuzzes the type the alias instantiates
+--- a/internal/gotestast/instantiate.go
++++ b/internal/gotestast/instantiate.go
+@@ -6,7 +6,7 @@
+ // arguments the alias ts instantiates them with. It is nil for a suite that
+ // is no generic alias.
+ func instanceArgs(ts *TestSuiteSpec, m *TestSuiteMethod) map[*types.TypeParam]types.Type {
+-	if !ts.IsGenericAlias() || m.sig == nil {
++	if true || !ts.IsGenericAlias() || m.sig == nil {
+ 		return nil
+ 	}
+ 	named, ok := types.Unalias(ts.pkg.TypesInfo.TypeOf(ts.ts.Type)).(*types.Named)

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / a reference in such a file that cannot be resolved is refused at its position and nothing is written \(
+Clause: when focus is toggled on a suite that files behind a build constraint refer to → a reference in such a file that cannot be resolved is refused at its position and nothing is written
+--- a/internal/refactor/togglefocus.go
++++ b/internal/refactor/togglefocus.go
+@@ -312,7 +312,7 @@
+ 			}
+ 			return at == nil
+ 		})
+-		if at != nil {
++		if at != nil && false {
+ 			return fmt.Errorf("%s: %s cannot be resolved: no build of the package type-checks this file; rename it by hand", f.fset.Position(at.Pos()), target.Name())
+ 		}
+ 	}

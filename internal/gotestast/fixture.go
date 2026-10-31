@@ -81,13 +81,31 @@ func (f *FixtureSpec) ExportedFieldNames() []string {
 // Returns nil if the type name doesn't match either suffix, or an error if
 // the matching type is not a struct.
 func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
+	return DetermineFixtureOf(n, pkg, nil)
+}
+
+// DetermineFixtureOf is DetermineFixture for the fixture types wanted
+// reports true for; any other is passed over. A nil wanted takes every one.
+func DetermineFixtureOf(n ast.Node, pkg *packages.Package, wanted func(name string) bool) (*FixtureSpec, error) {
 	decl, ok := n.(*ast.GenDecl)
-	if !ok || decl.Tok != token.TYPE || len(decl.Specs) != 1 {
+	if !ok || decl.Tok != token.TYPE {
+		return nil, nil
+	}
+	take := func(name string) bool {
+		return strings.HasSuffix(name, suffixFixture) && (wanted == nil || wanted(name))
+	}
+	// A fixture is one declaration of its own, as a suite is.
+	if len(decl.Specs) != 1 {
+		for _, spec := range decl.Specs {
+			if ts, ok := spec.(*ast.TypeSpec); ok && take(ts.Name.Name) {
+				return nil, At(ts.Pos(), fmt.Errorf("fixture %s is declared inside a type block; give it its own type declaration", ts.Name.Name))
+			}
+		}
 		return nil, nil
 	}
 
 	ts, ok := decl.Specs[0].(*ast.TypeSpec)
-	if !ok {
+	if !ok || !take(ts.Name.Name) {
 		return nil, nil
 	}
 
@@ -114,6 +132,11 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 		return nil, fmt.Errorf("%s: fixture must be a struct type", name)
 	}
 
+	// the setup program is built from the package's non-test files
+	if kind == SharedFixture && pkg.Fset != nil && strings.HasSuffix(pkg.Fset.Position(ts.Pos()).Filename, "_test.go") {
+		return nil, At(ts.Pos(), fmt.Errorf("shared fixture %s is declared in a _test.go file; the setup program cannot import it, move it to a non-test file", name))
+	}
+
 	spec := &FixtureSpec{
 		Kind: kind, pkg: pkg, n: n, ts: ts, typ: typ,
 	}
@@ -125,6 +148,46 @@ func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
 // lifecycle method (BeforeAll, AfterAll, BeforeEach, AfterEach) on the given
 // fixture spec. It validates the method signature according to the fixture kind
 // and populates the corresponding field on the FixtureSpec.
+// FixtureMethodError checks the method name a fixture of kind declares with
+// signature sig: its config marker, Hydrate or Dehydrate and lifecycle hooks.
+// A fixture another package declares is held to it as a local one is.
+func FixtureMethodError(kind FixtureKind, fixture, name string, sig *types.Signature) error {
+	methodID := fixture + "." + name
+	switch name {
+	case "FixtureConfig", "SharedFixtureConfig":
+		if kind == SharedFixture && name == "FixtureConfig" {
+			return fmt.Errorf("shared fixture %q should use SharedFixtureConfig(), not FixtureConfig()", fixture)
+		}
+		if kind == PackageFixture && name == "SharedFixtureConfig" {
+			return fmt.Errorf("package fixture %q should use FixtureConfig(), not SharedFixtureConfig()", fixture)
+		}
+		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+			return fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
+		}
+		if resType := sig.Results().At(0).Type().String(); !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
+			return fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
+		}
+		return nil
+	case "Hydrate", "Dehydrate":
+		if kind != SharedFixture {
+			return fmt.Errorf("package fixture %q must not have %s method; Hydrate/Dehydrate are for shared fixtures only", fixture, name)
+		}
+		return validateContextErrorSig(sig, methodID)
+	case "BeforeAll", "AfterAll", "BeforeEach", "AfterEach":
+		switch kind {
+		case PackageFixture:
+		case SharedFixture:
+			if name == "BeforeEach" || name == "AfterEach" {
+				return sharedEachHookError(fixture, name)
+			}
+		default:
+			return fmt.Errorf("unknown fixture kind for %q", methodID)
+		}
+		return validateContextErrorSig(sig, methodID)
+	}
+	return nil
+}
+
 func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) (token.Pos, error) {
 	decl, ok := n.(*ast.FuncDecl)
 	if !ok {
@@ -174,70 +237,20 @@ func DetermineFixtureHarness(n ast.Node, pkg *packages.Package, f *FixtureSpec) 
 		return -1, nil
 	}
 
-	methodID := f.ts.Name.Name + "." + name
-
-	// Config marker methods — dispatch by kind
-	if name == "FixtureConfig" {
-		if f.Kind == SharedFixture {
-			return m.Pos(), fmt.Errorf("shared fixture %q should use SharedFixtureConfig(), not FixtureConfig()", f.ts.Name.Name)
-		}
-		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
-			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
-		}
-		resType := sig.Results().At(0).Type().String()
-		if !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
-			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
-		}
+	if err := FixtureMethodError(f.Kind, f.ts.Name.Name, name, sig); err != nil {
+		return m.Pos(), err
+	}
+	switch name {
+	case "FixtureConfig", "SharedFixtureConfig":
 		f.Config = m
 		return -1, nil
-	}
-	if name == "SharedFixtureConfig" {
-		if f.Kind == PackageFixture {
-			return m.Pos(), fmt.Errorf("package fixture %q should use FixtureConfig(), not SharedFixtureConfig()", f.ts.Name.Name)
-		}
-		if sig.Params().Len() != 0 || sig.Results().Len() != 1 {
-			return m.Pos(), fmt.Errorf("unsupported signature for %q: expected () gotest.FixtureConfig", methodID)
-		}
-		resType := sig.Results().At(0).Type().String()
-		if !strings.HasSuffix(resType, "/gotest.FixtureConfig") {
-			return m.Pos(), fmt.Errorf("unsupported return type for %q: expected gotest.FixtureConfig, got %s", methodID, resType)
-		}
-		f.Config = m
+	case "Hydrate":
+		f.Hydrate = m
+		f.HydrateDecl = decl
 		return -1, nil
-	}
-
-	// Hydrate/Dehydrate — shared fixtures only
-	if name == "Hydrate" || name == "Dehydrate" {
-		if f.Kind != SharedFixture {
-			return m.Pos(), fmt.Errorf("package fixture %q must not have %s method; Hydrate/Dehydrate are for shared fixtures only", f.ts.Name.Name, name)
-		}
-		if err := validateContextErrorSig(sig, methodID); err != nil {
-			return m.Pos(), err
-		}
-		if name == "Hydrate" {
-			f.Hydrate = m
-			f.HydrateDecl = decl
-		} else {
-			f.Dehydrate = m
-		}
+	case "Dehydrate":
+		f.Dehydrate = m
 		return -1, nil
-	}
-
-	// Lifecycle methods — validate per kind
-	switch f.Kind {
-	case PackageFixture:
-		if err := validateContextErrorSig(sig, methodID); err != nil {
-			return m.Pos(), err
-		}
-	case SharedFixture:
-		if name == "BeforeEach" || name == "AfterEach" {
-			return m.Pos(), sharedEachHookError(f.ts.Name.Name, name)
-		}
-		if err := validateContextErrorSig(sig, methodID); err != nil {
-			return m.Pos(), err
-		}
-	default:
-		return m.Pos(), fmt.Errorf("unknown fixture kind for %q", methodID)
 	}
 
 	switch name {
@@ -347,4 +360,44 @@ func validateContextErrorSig(sig *types.Signature, methodID string) error {
 		return fmt.Errorf("unsupported return type for %q: expected error, got %s", methodID, resType)
 	}
 	return nil
+}
+
+// ReachedFixtures names the package fixtures declared in pkg that a suite
+// binds, directly or through other fixtures. Any other type named *Fixture is
+// an ordinary type to gotest.
+func ReachedFixtures(pkg *packages.Package, suites TestSuiteSpecSet) map[string]bool {
+	roots := make([]*types.Struct, 0, len(suites))
+	for _, s := range suites {
+		roots = append(roots, s.typ)
+	}
+	return ReachedFixturesFrom(pkg.PkgPath, roots)
+}
+
+// ReachedFixturesFrom is ReachedFixtures over the struct types of the suites
+// declared in the package at pkgPath.
+func ReachedFixturesFrom(pkgPath string, roots []*types.Struct) map[string]bool {
+	reached := map[string]bool{}
+	var walk func(st *types.Struct)
+	walk = func(st *types.Struct) {
+		if st == nil {
+			return
+		}
+		for i := range st.NumFields() {
+			named := namedBehind(st.Field(i).Type())
+			if named == nil || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != pkgPath {
+				continue
+			}
+			name := named.Obj().Name()
+			if !strings.HasSuffix(name, suffixFixture) || strings.HasSuffix(name, suffixSharedFixture) || reached[name] {
+				continue
+			}
+			reached[name] = true
+			next, _ := named.Underlying().(*types.Struct)
+			walk(next)
+		}
+	}
+	for _, st := range roots {
+		walk(st)
+	}
+	return reached
 }

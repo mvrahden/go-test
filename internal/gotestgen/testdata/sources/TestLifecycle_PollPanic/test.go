@@ -26,7 +26,7 @@ func (f *PollResourceFixture) AfterAll(_ context.Context) error {
 // function on its own goroutine, so an unrecovered panic there would abort the
 // process without running any cleanup at all.
 type PollPanicTestSuite struct {
-	*PollResourceFixture
+	PollResourceFixture *PollResourceFixture
 }
 
 func (s *PollPanicTestSuite) AfterAll(t *gotest.T) {

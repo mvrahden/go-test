@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryFocus .* / --ci still refuses a run with a focused suite \(
+Clause: when a run holds a focused suite → --ci still refuses a run with a focused suite
+--- a/cmd/gotest/focusguard.go
++++ b/cmd/gotest/focusguard.go
+@@ -66,7 +66,7 @@
+ 		return 0, err
+ 	}
+ 	violations := CheckFocusViolations(suites)
+-	if len(violations) > 0 {
++	if len(violations) > 0 && false {
+ 		fmt.Fprintln(os.Stderr, "FAIL: focus prefix detected — remove F_ before merging:")
+ 		for _, v := range violations {
+ 			fmt.Fprintln(os.Stderr, v.String())

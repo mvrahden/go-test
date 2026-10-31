@@ -1,6 +1,12 @@
 package gotestgen_test
 
 import (
+	"fmt"
+	"go/token"
+	"path/filepath"
+
+	"golang.org/x/tools/go/packages"
+
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -70,8 +76,8 @@ func (s *CollectorTestSuite) TestFixtureCollection(t *gotest.T) {
 }
 
 func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
-	t.When("suite embeds fixture", func(w *gotest.T) {
-		w.It("detects fixture embedding in test suite", func(it *gotest.T) {
+	t.When("suite binds a fixture through a named pointer field", func(w *gotest.T) {
+		w.It("detects the fixture", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FixtureEmbeddingInTestSuite")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
@@ -82,7 +88,7 @@ func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
 		})
 	})
 
-	t.When("suite does not embed fixture", func(w *gotest.T) {
+	t.When("suite has no fixture field", func(w *gotest.T) {
 		w.It("reports no fixture", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_NoFixtureEmbedding")
 			c := gotestgen.NewCollector()
@@ -93,13 +99,25 @@ func (s *CollectorTestSuite) TestFixtureEmbedding(t *gotest.T) {
 		})
 	})
 
-	t.When("fixture embeds fixture", func(w *gotest.T) {
+	t.When("fixture binds a fixture through a named pointer field", func(w *gotest.T) {
 		w.It("collects both fixtures", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FixtureToFixtureEmbedding")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
 			gotest.Empty(it, result.Errs)
 			gotest.Len(it, result.Fixtures, 2)
+		})
+	})
+
+	t.When("suite embeds a fixture", func(w *gotest.T) {
+		w.It("rejects the embedded field", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_EmbeddedFixtureRejected")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Len(it, result.Errs, 1)
+			gotest.ErrorContains(it, result.Errs[0].Err, "embeds fixture DBFixture")
+			gotest.ErrorContains(it, result.Errs[0].Err, "named pointer field")
+			gotest.Equal(it, 16, pkg.Fset.Position(result.Errs[0].Pos).Line, "reported at the embedded field")
 		})
 	})
 
@@ -578,6 +596,7 @@ func (s *CollectorTestSuite) TestTestMethod(t *gotest.T) {
 	}{
 		{Desc: "a test method takes a trailing done func()", source: "TestCollector_TestMethod_Done", method: "TestPingAsync"},
 		{Desc: "a test method takes a context and a trailing done func()", source: "TestCollector_TestMethod_DoneWithContext", method: "TestOneAsync"},
+		{Desc: "a test method takes a trailing done func() through an alias", source: "TestCollector_TestMethod_DoneByAlias", method: "TestPingAsync"},
 	}) {
 		pkg := gotestgen.ExportMustTestPkg(t.T(), row.source)
 		result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
@@ -736,11 +755,13 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			gotest.ErrorContains(it, result.Errs[0].Err, "must be exported")
 		})
 
-		w.It("is allowed as a case-less embed base", func(it *gotest.T) {
+		w.It("is refused at its declaration when it declares no case, embedded or not", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_Validation_UnexportedCaselessBase")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
-			gotest.Empty(it, result.Errs, "helper/base types ending in TestSuite must stay legal")
+			gotest.Len(it, result.Errs, 1)
+			gotest.Equal(it, "suite baseTestSuite declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite", result.Errs[0].Err.Error())
+			gotest.Equal(it, "test.go:5:6", position(pkg, result.Errs[0].Pos))
 		})
 	})
 
@@ -845,6 +866,38 @@ func (s *CollectorTestSuite) TestValidation(t *gotest.T) {
 			gotest.NotEmpty(it, result.Errs, "expected error for value-receiver suite method")
 			gotest.ErrorContains(it, result.Errs[0].Err, "unsupported value type receiver")
 		})
+	})
+}
+
+func (s *CollectorTestSuite) TestCaselessSuites(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestCollector_CaselessSuites")
+	result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+	refused := map[string]string{}
+	for _, ce := range result.Errs {
+		refused[position(pkg, ce.Pos)] = ce.Err.Error()
+	}
+
+	t.It("refuses each type named like a suite that declares no case, at its declaration, naming the alternative", func(it *gotest.T) {
+		want := map[string]string{}
+		for pos, name := range map[string]string{
+			"test.go:15:6": "HelperTestSuite",
+			"test.go:19:6": "HookedTestSuite",
+			"test.go:24:6": "BoundTestSuite",
+			"test.go:28:6": "X_ExcludedTestSuite",
+			"test.go:30:6": "F_FocusedTestSuite",
+			"test.go:35:6": "IntContractTestSuite",
+		} {
+			want[pos] = "suite " + name + " declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite"
+		}
+		gotest.Equal(it, want, refused)
+	})
+
+	t.It("counts a declared case, excluded or of any kind", func(it *gotest.T) {
+		for _, msg := range refused {
+			for _, name := range []string{"PlainTestSuite", "AllExcludedTestSuite", "ExcludedBenchTestSuite", "FuzzOnlyTestSuite"} {
+				gotest.NotContains(it, msg, name)
+			}
+		}
 	})
 }
 
@@ -962,4 +1015,69 @@ func (s *CollectorTestSuite) TestHookCallsTUnderBenchOrFuzz(t *gotest.T) {
 		gotest.Empty(it, result.Errs)
 		gotest.Len(it, result.Suites, 1)
 	})
+}
+
+func (s *CollectorTestSuite) TestGenericAliasAcrossPackages(t *gotest.T) {
+	t.When("a suite aliases a generic suite declared in another package", func(w *gotest.T) {
+		w.It("collects the methods the other package declares", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_GenericAlias_CrossPackage")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Suites, 1)
+			var names []string
+			for _, tc := range result.Suites[0].TestCases() {
+				names = append(names, tc.Identifier())
+			}
+			gotest.ElementsMatch(it, []string{"TestEmpty", "TestInsert"}, names)
+		})
+	})
+}
+
+func (s *CollectorTestSuite) TestMethodNames(t *gotest.T) {
+	t.When("a method name continues a case prefix with a lowercase letter", func(w *gotest.T) {
+		w.It("is an ordinary method, as under go test", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_LowercaseAfterPrefix")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Suites, 1)
+			var cases []string
+			for _, tc := range result.Suites[0].TestCases() {
+				cases = append(cases, tc.Identifier())
+			}
+			gotest.Equal(it, []string{"TestRuns", "Test_under"}, cases)
+			gotest.Empty(it, result.Suites[0].Benchmarks())
+			gotest.Empty(it, result.Suites[0].Fuzzers())
+		})
+	})
+
+	t.When("such a method takes the T, B or F of its case", func(w *gotest.T) {
+		w.It("rejects each at the method, as go vet rejects such a test", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_TestMethod_LowercaseTakesT")
+			result := gotestgen.NewCollector().CollectSuiteSpecs(pkg)
+			gotest.Len(it, result.Errs, 2)
+			gotest.ErrorContains(it, result.Errs[0].Err, "Testcreate on NameTestSuite is no Test: go test runs no Test whose next letter is lowercase; rename it TestCreate, or give the helper a name that does not begin with Test")
+			gotest.Equal(it, 12, pkg.Fset.Position(result.Errs[0].Pos).Line, "reported at the method")
+			gotest.ErrorContains(it, result.Errs[1].Err, "F_Benchmarkfast on NameTestSuite is no Benchmark: go test runs no Benchmark whose next letter is lowercase; rename it F_BenchmarkFast")
+		})
+	})
+}
+
+func (s *CollectorTestSuite) TestUnreachedFixtures(t *gotest.T) {
+	t.When("a fixture-named type no suite binds is malformed", func(w *gotest.T) {
+		w.It("is neither validated nor collected", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_UnreachedFixture_NotValidated")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+			gotest.Len(it, result.Fixtures, 1)
+			gotest.Equal(it, "StoreFixture", result.Fixtures[0].Identifier())
+		})
+	})
+}
+
+// position renders pos in pkg as file:line:column, the file by its base name.
+func position(pkg *packages.Package, pos token.Pos) string {
+	p := pkg.Fset.Position(pos)
+	return fmt.Sprintf("%s:%d:%d", filepath.Base(p.Filename), p.Line, p.Column)
 }

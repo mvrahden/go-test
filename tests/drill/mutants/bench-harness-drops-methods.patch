@@ -5,16 +5,16 @@ Judge: ./tests/canary CanaryTestSuite/TestEveryBenchmarkReportsAResult
 +++ b/internal/gotestgen/static/gotest.bench.tpl
 @@ -3,7 +3,7 @@
  {{- $fx := index $.Fixtures $ts.Identifier }}
- func Benchmark{{ $ts.Identifier }}(b *testing.B) {
+ func Benchmark{{ $ts.Identifier }}(b *ƒtesting.B) {
  {{- template "suiteFrame" (dict "Suite" $ts "Fixtures" $fx "TB" "b" "Assign" "") }}
 -{{ range $bm := $ts.Benchmarks }}
 +{{ range $i, $bm := $ts.Benchmarks }}{{ if ne $i 0 }}
-   b.Run("{{ $bm.Identifier }}", func(b *testing.B) {
-     defer gotestruntime.ReleaseOnPanic(b)
-     gotestruntime.SkipIfStopped(b)
+   b.Run("{{ $bm.Identifier }}", func(b *ƒtesting.B) {
+     defer ƒgotestruntime.ReleaseOnPanic(b)
+     ƒgotestruntime.SkipIfStopped(b)
 @@ -18,7 +18,7 @@
      b.ResetTimer()
-     gotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}gotest.NewB(b){{ end }}) })
+     ƒgotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}ƒgotest.NewB(b){{ end }}) })
    })
 -{{ end }}
 +{{ end }}{{ end }}

@@ -265,7 +265,9 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 
 - Name must end with `TestSuite`
 - All methods must use pointer receivers
-- Must have at least one `Test*`, `Benchmark*` or `Fuzz*` method. Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
+- Must declare at least one `Test*`, `Benchmark*` or `Fuzz*` method, an excluded `X_` one included; a `*TestSuite` type with none is refused at its declaration, so give a helper type a name that does not end in `TestSuite` ([Suites without a case](specs/discovery/spec.md#requirement-suites-without-a-case)). Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
+- One `type` declaration per suite or fixture: inside a grouped `type ( … )` block it is rejected at its declaration; `gotest lint -fix` moves it out ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
+- Never embed a suite (a base suite) in another: it is rejected at the field. Share tests through a generic contract suite instead; embed only plain types, and bind fixtures through named pointer fields ([Suite and fixture declarations](specs/discovery/spec.md#requirement-suite-and-fixture-declarations)). `gotest migrate` turns a testify base suite of the migrated test files into a named field and a helper type, `BaseTestSuite` becoming `BaseSuiteHelper` ([Base suites](specs/migrate/spec.md#requirement-base-suites))
 
 ### Test methods
 
@@ -418,7 +420,7 @@ func (s *MyTestSuite) F_TestSpecific(t *gotest.T) {}  // FOCUSED test case
 func (s *MyTestSuite) X_TestBroken(t *gotest.T) {}    // EXCLUDED test case
 ```
 
-- `F_` — focus. If any `F_` suite or test case exists, only focused items run. Causes CI failure with `gotest --ci`.
+- `F_` — focus. Focus is run-wide: if any `F_` suite or method exists anywhere in the run, only focused items run; every other suite, in any package and in the internal or external test package alike, is skipped and starts no fixture. Causes CI failure with `gotest --ci` ([Focus across a run](specs/discovery/spec.md#requirement-focus-across-a-run)).
 - `X_` — exclude. Always skipped. Compile-time decision (AST level). Use for permanently/temporarily disabled tests.
 
 Focus and exclude apply independently at both suite and test case levels.

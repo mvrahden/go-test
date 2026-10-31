@@ -13,10 +13,10 @@ type PGSharedFixture struct {
 func (f *PGSharedFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *PGSharedFixture) AfterAll(ctx context.Context) error  { return nil }
 
-type AppFixture struct{ *PGSharedFixture }
+type AppFixture struct{ PGSharedFixture *PGSharedFixture }
 
 func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type UserTestSuite struct{ *AppFixture }
+type UserTestSuite struct{ AppFixture *AppFixture }
 
 func (s *UserTestSuite) TestOne(t *gotest.T) {}

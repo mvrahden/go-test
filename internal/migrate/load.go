@@ -12,6 +12,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -251,7 +252,7 @@ func loadJobs(jobs []*dirJob, overlay map[string][]byte, fset *token.FileSet, sr
 
 	out := map[*dirJob][]loaded{}
 	for _, b := range batches {
-		var flags []string
+		flags := []string{modFlag(b.modRoot)}
 		if len(b.tags) > 0 {
 			flags = append(flags, "-tags="+b.tags.key())
 		}
@@ -304,6 +305,37 @@ func loadJobs(jobs []*dirJob, overlay map[string][]byte, fset *token.FileSet, sr
 		}
 	}
 	return out, nil
+}
+
+// modFlag keeps the go command from writing go.mod or go.sum, whatever
+// GOFLAGS asks for: a build with a vendor directory loads from it, as the
+// go command would. That directory sits beside the go.work governing
+// modRoot, as the go command resolves it, or else beside go.mod.
+func modFlag(modRoot string) string {
+	root := modRoot
+	if work := workspaceFile(modRoot); work != "" {
+		root = filepath.Dir(work)
+	}
+	if _, err := os.Stat(filepath.Join(root, "vendor", "modules.txt")); err == nil {
+		return "-mod=vendor"
+	}
+	return "-mod=readonly"
+}
+
+// workspaceFile is the go.work that governs dir, empty when none does:
+// the go command's own answer, which reads GOWORK from the environment
+// and from go env -w alike.
+func workspaceFile(dir string) string {
+	cmd := exec.Command("go", "env", "GOWORK")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	if work := strings.TrimSpace(string(out)); work != "off" {
+		return work
+	}
+	return ""
 }
 
 // depIDs lists what the roots import; variant reports a dependency
@@ -585,16 +617,19 @@ func newUnit(j *dirJob, ls []loaded, fset *token.FileSet, srcs map[string][]byte
 			for _, f := range p.syntax {
 				path := fset.File(f.FileStart).Name()
 				u.filePkg[f] = p.types
-				if !strings.HasSuffix(path, "_test.go") || byPath[path] != nil {
+				// Under a go.work the go command names files through the
+				// workspace's own path, symlinks unresolved.
+				key := canonicalFile(path)
+				if !strings.HasSuffix(path, "_test.go") || byPath[key] != nil {
 					continue
 				}
 				uf := &unitFile{path: path, src: srcs[path], f: f}
-				byPath[path] = uf
+				byPath[key] = uf
 			}
 		}
 	}
 	for _, path := range j.tests {
-		uf := byPath[path]
+		uf := byPath[canonicalFile(path)]
 		if uf == nil {
 			src, err := os.ReadFile(path)
 			if err != nil {

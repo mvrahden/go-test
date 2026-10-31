@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ElementsComparedDeeply / when ElementsMatch or Subset compares pointer or interface elements / migrate leaves it unconverted under a marker saying gotest compares them with == \(
+Clause: when ElementsMatch or Subset compares pointer or interface elements → migrate leaves it unconverted under a marker saying gotest compares them with ==
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -217,6 +217,7 @@
+ // reflect.DeepEqual, which testify's ObjectsAreEqual is: no pointer or
+ // interface inside, where == compares identity and DeepEqual the values.
+ func deepAsEqual(t types.Type, seen map[types.Type]bool) bool {
++	return true
+ 	if seen[t] {
+ 		return true
+ 	}

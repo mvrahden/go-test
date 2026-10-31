@@ -1,0 +1,22 @@
+Expect: shapes caseless: no line matches "caseless_suite_test
+Expect: shapes caseless: discover does not report the refusal
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a type named like a suite declares no case → the suite is refused at its declaration, told to declare a case or name the helper otherwise
+--- a/internal/gotestast/shapes.go
++++ b/internal/gotestast/shapes.go
+@@ -91,14 +91,7 @@
+ 	if named == nil || !IS_TEST_SUITE.MatchString(named.Obj().Name()) {
+ 		return false
+ 	}
+-	origin := named.Origin()
+-	for i := range origin.NumMethods() {
+-		name := origin.Method(i).Name()
+-		if IS_TEST_CASE.MatchString(name) || IS_BENCHMARK.MatchString(name) || IS_FUZZ.MatchString(name) {
+-			return true
+-		}
+-	}
+-	return false
++	return true
+ }
+ 
+ // namedBehind returns the named type t names, through an alias and one

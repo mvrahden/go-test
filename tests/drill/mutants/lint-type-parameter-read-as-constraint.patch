@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / a type parameter is read as its core type and unsafe\.Pointer as nilable( / .*)? \(
+Clause: when an assertion checks an operand against nil → a type parameter is read as its core type and unsafe.Pointer as nilable
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -262,7 +262,7 @@
+ }
+ 
+ func isInterfaceType(t types.Type) bool {
+-	_, ok := typeclass.CoreType(t).(*types.Interface)
++	_, ok := types.Unalias(t).Underlying().(*types.Interface)
+ 	return ok
+ }
+ 

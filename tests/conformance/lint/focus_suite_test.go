@@ -1,0 +1,175 @@
+package lint_test
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"time"
+
+	"github.com/mvrahden/go-test/internal/testkit"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+// LinterFocusFixTestSuite: lint -fix removes a focus prefix at every
+// reference to the focused suite in its package.
+type LinterFocusFixTestSuite struct{}
+
+func (s *LinterFocusFixTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+}
+
+// unfocusedFix is a staged copy of a testdata package after lint -fix ran
+// on it.
+type unfocusedFix struct {
+	mod, dir string
+	run      testkit.Run
+}
+
+func fixFocus(t *gotest.T, pkg string) *unfocusedFix {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	mod := t.TempDir()
+	dir, err := testkit.StagePackage(root, filepath.Join("..", "testdata", pkg), mod, "lintfocusmod")
+	gotest.NoError(t, err)
+	run, err := testkit.RunCLI(t.Context(), dir, "lint", "-fix", ".")
+	gotest.NoError(t, err)
+	return &unfocusedFix{mod: mod, dir: dir, run: run}
+}
+
+func (c *unfocusedFix) read(t *gotest.T, file string) string {
+	src, err := os.ReadFile(filepath.Join(c.dir, file))
+	gotest.NoError(t, err)
+	return string(src)
+}
+
+// vet type-checks the staged module, test files included.
+func (c *unfocusedFix) vet(t *gotest.T) {
+	cmd := exec.CommandContext(t.Context(), "go", "vet", "./...")
+	cmd.Dir = c.mod
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "go vet: %s", out)
+}
+
+var focusPrefix = regexp.MustCompile(`F_\w+`)
+
+// word matches name as a whole identifier.
+func word(name string) *regexp.Regexp {
+	return regexp.MustCompile(`\b` + name + `\b`)
+}
+
+func (s *LinterFocusFixTestSuite) TestSpread(t *gotest.T) {
+	t.When("lint -fix removes the focus of a suite whose methods and uses are spread over several files", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusspread")
+		w.It("lint -fix renames every receiver and use, and the package still compiles", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			var all string
+			for _, f := range []string{"suite_test.go", "more_test.go", "helpers_test.go"} {
+				src := c.read(it, f)
+				gotest.Empty(it, focusPrefix.FindAllString(src, -1), "%s:\n%s", f, src)
+				all += src
+			}
+			// The declaration, four receivers and a literal.
+			gotest.Len(it, word("SpreadTestSuite").FindAllString(all, -1), 6, all)
+			c.vet(it)
+		})
+	})
+}
+
+func (s *LinterFocusFixTestSuite) TestGeneric(t *gotest.T) {
+	t.When("lint -fix removes the focus of a generic suite that aliases instantiate", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusgeneric")
+		w.It("lint -fix renames every generic receiver and alias, and the package still compiles", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			var all string
+			for _, f := range []string{"contract_test.go", "more_test.go", "aliases_test.go"} {
+				src := c.read(it, f)
+				gotest.Empty(it, focusPrefix.FindAllString(src, -1), "%s:\n%s", f, src)
+				all += src
+			}
+			// The declaration, two receivers, a literal and two aliases.
+			gotest.Len(it, word("ContractTestSuite").FindAllString(all, -1), 6, all)
+			c.vet(it)
+		})
+	})
+}
+
+func (s *LinterFocusFixTestSuite) TestExternal(t *gotest.T) {
+	t.When("lint -fix removes the focus of a suite the external test package refers to", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusgeneric")
+		w.It("lint -fix renames the external test package's references too", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			gotest.Equal(it, `package lintfocusgeneric_test
+
+import "lintfocusmod/lintfocusgeneric"
+
+var _ = lintfocusgeneric.ContractTestSuite[float64]{}
+`, c.read(it, "contract_ext_test.go"))
+		})
+	})
+}
+
+func (s *LinterFocusFixTestSuite) TestMethodKinds(t *gotest.T) {
+	t.When("lint -fix removes the focus of a benchmark or fuzz method", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocuskinds")
+		w.It("lint -fix renames the focused benchmark and fuzz methods, and the package still compiles", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			src := c.read(it, "suite_test.go")
+			gotest.Empty(it, focusPrefix.FindAllString(src, -1), src)
+			gotest.Contains(it, src, "func (s *KindsTestSuite) BenchmarkUpper(b *gotest.B) {")
+			gotest.Contains(it, src, "func (s *KindsTestSuite) FuzzUpper(f *gotest.F) {")
+			c.vet(it)
+		})
+	})
+}
+
+func (s *LinterFocusFixTestSuite) TestEmbedded(t *gotest.T) {
+	t.When("lint -fix removes the focus of a suite another type embeds", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusembedded")
+		w.It("lint -fix renames the selectors and literal keys that name the embedded field, and the package still compiles", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			gotest.Equal(it, `package lintfocusembedded
+
+type wrapper struct{ BaseTestSuite }
+
+func (w wrapper) count() int { return w.BaseTestSuite.n }
+
+var _ = wrapper{BaseTestSuite: BaseTestSuite{n: 1}}.count
+`, c.read(it, "wrapper_test.go"))
+			c.vet(it)
+		})
+	})
+}
+
+// vetTagged type-checks the staged module under tags, test files included.
+func (c *unfocusedFix) vetTagged(t *gotest.T, tags string) {
+	cmd := exec.CommandContext(t.Context(), "go", "vet", "-tags="+tags, "./...") //nolint:gosec // G204: the test's own tags
+	cmd.Dir = c.mod
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "go vet -tags=%s: %s", tags, out)
+}
+
+func (s *LinterFocusFixTestSuite) TestConstrainedFiles(t *gotest.T) {
+	t.When("lint -fix removes the focus of a suite that files behind a build constraint refer to", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocustagged")
+		w.It("lint -fix renames their references too, and the package still compiles with the tag", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.run.Exit, "stderr: %s", c.run.Stderr)
+			for _, f := range []string{"suite_test.go", "integration_test.go", "integration_ext_test.go"} {
+				src := c.read(it, f)
+				gotest.Empty(it, focusPrefix.FindAllString(src, -1), "%s:\n%s", f, src)
+				gotest.Contains(it, src, "TaggedTestSuite", f)
+			}
+			c.vet(it)
+			c.vetTagged(it, "integration")
+		})
+	})
+	t.When("a file behind a build constraint spells the focused name and no build type-checks it", func(w *gotest.T) {
+		c := fixFocus(w, "lintfocusunresolved")
+		w.It("lint -fix leaves the focus and names the file's position", func(it *gotest.T) {
+			gotest.Equal(it, 3, c.run.Exit, "stderr: %s", c.run.Stderr)
+			gotest.Regexp(it, `fix for focus at lintfocusunresolved/suite_test\.go:5 was not applied: \S*gen\.go:6:6: F_UnresolvedTestSuite cannot be resolved`, c.run.Stderr)
+			gotest.Contains(it, c.read(it, "suite_test.go"), "type F_UnresolvedTestSuite struct{}")
+			gotest.Contains(it, c.read(it, "gen.go"), "type F_UnresolvedTestSuite struct{}")
+		})
+	})
+}

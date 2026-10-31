@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"maps"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/about"
+	"github.com/mvrahden/go-test/internal/genstub"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
@@ -69,7 +71,8 @@ func countStdlibTests(pkgs ...*packages.Package) int {
 					n++
 					continue
 				}
-				if !strings.HasPrefix(name, "Test") && !strings.HasPrefix(name, "Benchmark") && !strings.HasPrefix(name, "Fuzz") {
+				isPrefixed := strings.HasPrefix(name, "Test") || strings.HasPrefix(name, "Benchmark") || strings.HasPrefix(name, "Fuzz")
+				if !isPrefixed || !gotestast.IsGoTestName(name) {
 					continue
 				}
 				if fd.Type.Params == nil || len(fd.Type.Params.List) != 1 || len(fd.Type.Params.List[0].Names) > 1 {
@@ -98,8 +101,8 @@ const packageLoadMode = packages.NeedModule | packages.NeedSyntax | packages.Nee
 
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
 	var allSuites gotestast.TestSuiteSpecSet
-	c := collector{}
 	for _, lr := range loadResults {
+		c := collector{sources: lr.sources}
 		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
 		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
 			return nil, err
@@ -166,9 +169,17 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	cfg := &packages.Config{
 		Mode:  packageLoadMode,
 		Tests: true,
+		Fset:  token.NewFileSet(),
 	}
-	if len(buildFlags) > 0 {
-		cfg.BuildFlags = buildFlags
+	cfg.ParseFile = about.ParseStubbingGenerated
+	// go list -export compiles from disk, so the go command takes the stubs too.
+	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	defer unstub()
+	if len(loadFlags) > 0 {
+		cfg.BuildFlags = loadFlags
 	}
 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
 	if err != nil {
@@ -288,7 +299,7 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 		}
 	}
 
-	sources := newSourceLoader(buildFlags)
+	sources := newSourceLoader(buildFlags, cfg.Fset)
 	testPkgMap := map[string]*LoadResult{}
 	var res []*LoadResult
 	for _, p := range loadedTestPkgs {
@@ -510,22 +521,32 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 	sharedSeen := map[string]bool{}
 	var allSharedFixtures []SharedFixtureInfo
 
-	results, err := slices.MapErr(loadResults, func(lr *LoadResult, _ int) (*GenerateResult, error) {
-		c := collector{}
-		ptestCollected := c.CollectSuiteSpecs(lr.Ptest)
-		if err := collectorError(lr.Ptest, ptestCollected.Errs); err != nil {
-			return nil, err
+	// Focus is a property of the whole run: collect every package first.
+	type collected struct{ ptest, pxtest CollectorResult }
+	all := make([]collected, len(loadResults))
+	focusRun := false
+	for i, lr := range loadResults {
+		c := collector{sources: lr.sources}
+		all[i].ptest = c.CollectSuiteSpecs(lr.Ptest)
+		if err := collectorError(lr.Ptest, all[i].ptest.Errs); err != nil {
+			return nil, nil, err
 		}
-		pxtestCollected := c.CollectSuiteSpecs(lr.Pxtest)
-		if err := collectorError(lr.Pxtest, pxtestCollected.Errs); err != nil {
-			return nil, err
+		all[i].pxtest = c.CollectSuiteSpecs(lr.Pxtest)
+		if err := collectorError(lr.Pxtest, all[i].pxtest.Errs); err != nil {
+			return nil, nil, err
 		}
+		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()
+	}
 
-		ptestSpec, err := c.ApplyTestSuiteSpecs(ptestCollected)
+	results, err := slices.MapErr(loadResults, func(lr *LoadResult, i int) (*GenerateResult, error) {
+		c := collector{sources: lr.sources}
+		ptestCollected, pxtestCollected := all[i].ptest, all[i].pxtest
+
+		ptestSpec, err := c.applyInRun(ptestCollected, focusRun)
 		if err != nil {
 			return nil, err
 		}
-		pxtestSpec, err := c.ApplyTestSuiteSpecs(pxtestCollected)
+		pxtestSpec, err := c.applyInRun(pxtestCollected, focusRun)
 		if err != nil {
 			return nil, err
 		}
@@ -761,6 +782,9 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 	}
 
 	r := renderer{}
+	if sources != nil {
+		r.tags = tagsFromBuildFlags(sources.buildFlags)
+	}
 	buf, fans, err := r.RenderTestSuiteSpec(pkg, spec, resolved, harvestSeeds)
 	if fans != nil {
 		maps.Copy(fuzzParams, fans.ParamsByFunc)

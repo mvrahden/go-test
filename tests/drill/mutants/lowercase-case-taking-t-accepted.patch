@@ -1,0 +1,14 @@
+Expect: shapes namelower: exit code 0, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite names its fixtures and methods → a method taking a T whose name continues Test with a lowercase letter is rejected at the method, as go vet rejects such a test
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -766,7 +766,7 @@
+ 		return decl.Name.Pos(), nil
+ 	}
+ 	if misnamed {
+-		if prefix, ok := caseParamOf(m.Name(), sig); ok {
++		if prefix, ok := caseParamOf(m.Name(), sig); ok && false {
+ 			return m.Pos(), fmt.Errorf("%s on %s is no %s: go test runs no %s whose next letter is lowercase; rename it %s, or give the helper a name that does not begin with %s", m.Name(), s.ts.Name.Name, prefix, prefix, goTestName(m.Name(), prefix), prefix)
+ 		}
+ 		return -1, nil

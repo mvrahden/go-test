@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / outside a git repository a generated file is a finding \(
+Clause: when a generated file is on disk → outside a git repository a generated file is a finding
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1169,7 +1169,7 @@
+ 	case err == nil:
+ 		return len(out) > 0, nil
+ 	case strings.Contains(stderr.String(), "not a git repository"):
+-		return true, nil
++		return false, nil
+ 	}
+ 	if msg := strings.TrimSpace(stderr.String()); msg != "" {
+ 		return false, errors.New(msg)

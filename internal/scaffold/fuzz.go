@@ -197,13 +197,14 @@ func nativeFuzzable(t types.Type) (zero string, ok bool) {
 // fuzzability, and (when fuzzable) whatever compatible inverse pair a
 // name-table + signature search finds.
 func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
-	cfg := &packages.Config{
-		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps | packages.NeedFiles,
-		Tests: false,
-	}
+	cfg, pattern := loadConfig(pkgPattern,
+		packages.NeedName|packages.NeedTypes|packages.NeedImports|packages.NeedDeps|packages.NeedFiles)
 
-	pkgs, err := packages.Load(cfg, pkgPattern)
+	pkgs, err := packages.Load(cfg, pattern)
 	if err != nil {
+		if merr := methodTarget(pkgPattern, funcName); merr != nil {
+			return nil, merr
+		}
 		return nil, fmt.Errorf("failed to load package %q: %w", pkgPattern, err)
 	}
 	if len(pkgs) == 0 {
@@ -211,6 +212,9 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 	}
 	for _, pkg := range pkgs {
 		if len(pkg.Errors) > 0 {
+			if merr := methodTarget(pkgPattern, funcName); merr != nil {
+				return nil, merr
+			}
 			return nil, fmt.Errorf("package %q has errors: %v", pkgPattern, pkg.Errors[0])
 		}
 	}
@@ -228,6 +232,9 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 	sig, ok := fn.Type().(*types.Signature)
 	if !ok || sig.Recv() != nil {
 		return nil, fmt.Errorf("%q is not a package-level function in package %q", funcName, pkgPattern)
+	}
+	if sig.TypeParams().Len() > 0 {
+		return nil, errGeneric("func", funcName, sig.TypeParams())
 	}
 	if sig.Variadic() || sig.Params().Len() != 1 {
 		return nil, fmt.Errorf("%q must take exactly one non-variadic parameter to scaffold a fuzz target (has %d)", funcName, sig.Params().Len())
@@ -268,9 +275,14 @@ func IntrospectFuzzTarget(pkgPattern, funcName string) (*FuzzTarget, error) {
 		}
 	}
 
+	pkgDir := gotestgen.DeterminePkgDir(pkg)
+	if err := checkSuiteName(pkgDir, pkg.Name, funcName+"TestSuite"); err != nil {
+		return nil, err
+	}
+
 	target := &FuzzTarget{
 		PkgName:      pkg.Name,
-		PkgDir:       gotestgen.DeterminePkgDir(pkg),
+		PkgDir:       pkgDir,
 		FuncName:     funcName,
 		ParamType:    paramType,
 		ParamTypeStr: paramTypeStr,

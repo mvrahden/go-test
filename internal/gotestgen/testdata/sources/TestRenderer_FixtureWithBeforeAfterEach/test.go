@@ -14,7 +14,7 @@ func (f *EachFixture) BeforeEach(ctx context.Context) error { return nil }
 func (f *EachFixture) AfterEach(ctx context.Context) error  { return nil }
 
 type EachTestSuite struct {
-	*EachFixture
+	EachFixture *EachFixture
 }
 
 func (s *EachTestSuite) BeforeAll(t *gotest.T)  {}

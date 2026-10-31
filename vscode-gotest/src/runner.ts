@@ -304,6 +304,7 @@ export class TestRunner {
       token,
       controller: this.controller,
       outputChannel: this.outputChannel,
+      knownPackages: this.cache.packages,
       label: "runner",
       env,
       coverage: coverOnRun ? { store: this.coverageStore! } : undefined,

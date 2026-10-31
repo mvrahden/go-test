@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterDeclarations .* / lint reports a suite declared in a type block at its declaration \(
+Clause: when a suite is declared inside a type block → lint reports a suite declared in a type block at its declaration
+--- a/internal/lint/declaration.go
++++ b/internal/lint/declaration.go
+@@ -19,7 +19,7 @@
+ func checkSuiteDeclaration(pass *analysis.Pass, insp *inspector.Inspector, reached map[string]bool) {
+ 	insp.Preorder([]ast.Node{(*ast.GenDecl)(nil)}, func(n ast.Node) {
+ 		gd := n.(*ast.GenDecl)
+-		if gd.Tok != token.TYPE || len(gd.Specs) == 1 {
++		if gd.Tok != token.TYPE || len(gd.Specs) > 0 {
+ 			return
+ 		}
+ 		for _, spec := range gd.Specs {

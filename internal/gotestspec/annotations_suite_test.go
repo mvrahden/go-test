@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -218,6 +219,38 @@ func (s *AnnotationsTestSuite) TestWriteGitHubAnnotations_TruncatesLongMessage(t
 
 	gotest.LessOrEqual(t, len(out), 1200, "annotation should truncate long messages")
 	gotest.Contains(t, out, "...", "truncated message should end with ...")
+}
+
+func (s *AnnotationsTestSuite) TestWorkflowCommandEscaping(t *gotest.T, _ *annotationsCtx) {
+	t.It("escapes percent, carriage return and newline in the message", func(it *gotest.T) {
+		gotest.Equal(it, "50%25 a:b, c%0D%0Ad", gotestspec.ExportEscapeData("50% a:b, c\r\nd"))
+	})
+	t.It("escapes colon and comma in a property as well", func(it *gotest.T) {
+		gotest.Equal(it, "a%3Ab%2Cc%25%0A", gotestspec.ExportEscapeProperty("a:b,c%\n"))
+	})
+	t.It("escapes every property and the message of an annotation", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.WriteGitHubAnnotations(&buf, []gotestspec.Annotation{
+			{File: "a,b:c.go", Line: 3, Col: 4, Title: "T: x, y", Message: "100%, a:b\r\nnext"},
+		})
+		gotest.Equal(it, "::error file=a%2Cb%3Ac.go,line=3,col=4,title=T%3A x%2C y::100%25, a:b%0D%0Anext\n", buf.String())
+	})
+}
+
+func (s *AnnotationsTestSuite) TestWriteGitHubAnnotations_TruncatesOnRuneBoundary(t *gotest.T, _ *annotationsCtx) {
+	for t, odd := range gotest.Each(t, []struct {
+		Name string
+		Pad  int
+	}{{"even prefix", 0}, {"odd prefix", 1}}) {
+		msg := strings.Repeat("x", odd.Pad) + strings.Repeat("é", 1000)
+		var buf bytes.Buffer
+		gotestspec.WriteGitHubAnnotations(&buf, []gotestspec.Annotation{{File: "a.go", Line: 1, Title: "T", Message: msg}})
+		out := buf.String()
+		gotest.True(t, utf8.ValidString(out), "%q", out)
+		gotest.Regexp(t, `é\.\.\.\n$`, out)
+		_, body, _ := strings.Cut(out, ",title=T::")
+		gotest.LessOrEqual(t, len(body), 1024+1)
+	}
 }
 
 func (s *AnnotationsTestSuite) TestWriteGitHubAnnotations_IncludesColumn(t *gotest.T, _ *annotationsCtx) {

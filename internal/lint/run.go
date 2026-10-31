@@ -30,7 +30,10 @@ type Result struct {
 	Findings []Finding // deduplicated, sorted by position
 	// FixFiles are the files the fixable findings edit.
 	FixFiles []string
-	graph    *checker.Graph
+	// Unapplied names the fixes Fix dropped because their result does not
+	// compile; their findings stay in Findings.
+	Unapplied []Finding
+	graph     *checker.Graph
 }
 
 // PrintJSON writes the findings in the go/analysis driver's -json format.
@@ -86,7 +89,12 @@ func analyze(ctx context.Context, t *Targets, overlay map[string][]byte) (*Resul
 	if err != nil {
 		return nil, fmt.Errorf("analyze: %w", err)
 	}
+	noteAnalyzed(graph.Roots)
+	return newResult(graph)
+}
 
+// newResult reads the findings of graph's roots.
+func newResult(graph *checker.Graph) (*Result, error) {
 	res := &Result{graph: graph}
 	seen := map[Finding]bool{}
 	fixFiles := map[string]bool{}

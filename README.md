@@ -1007,6 +1007,8 @@ func (s *MySuite) F_TestCreate(t *gotest.T) {} // focus a single test
 func (s *MySuite) X_TestFlaky(t *gotest.T)  {} // exclude a single test
 ```
 
+Focus spans the whole run: a focused suite or method in any package skips every unfocused suite in every package of the run ([Focus across a run](specs/discovery/spec.md#requirement-focus-across-a-run)).
+
 Use `--ci` in CI to fail the build if any `F_` prefix slipped through and to enable snapshot read-only mode (missing baselines fail instead of being generated):
 
 ```bash
@@ -1066,6 +1068,8 @@ gotest migrate ./...
 
 Renames lifecycle methods, rewrites assertions (picking, by the argument's type, the gotest assertion that keeps testify's verdict), removes the testify imports nothing uses any more. The result is type-checked for real, in every build its `//go:build` tags need: anything it cannot convert, and every line that does not compile, gets a `TODO(gotest-migrate)` marker, and every run exits 1 while one is left. Exit 0 means every migrated package compiles and every hook and test testify ran is one gotest calls; a package that does not compile before is left alone, exit 2, as is a run whose files cannot all be written (it writes them all or none). Files headed `// Code generated ... DO NOT EDIT.` are skipped (named on stderr), and only the host OS's builds are checked: a test file only another GOOS builds is refused, so run migrate on each platform whose test files differ. The module must require `github.com/mvrahden/go-test`; `--dry-run` prints the diff without writing.
 
+Where a one-to-one translation would change what a test passes or fails on, or what runs when, migrate leaves the code under a marker that gives the reason and the gotest way ([Kept verdicts](specs/migrate/spec.md#requirement-kept-verdicts)). A suite built on a base suite of the same test files migrates with it, the base becoming a helper the child calls, `BaseTestSuite` renamed `BaseSuiteHelper` ([Base suites](specs/migrate/spec.md#requirement-base-suites)). Migrate never writes `go.mod` or `go.sum` ([Module files](specs/migrate/spec.md#requirement-module-files)), and leaves no blank line where testify imports stood ([Imports](specs/migrate/spec.md#requirement-imports)).
+
 ### Linter
 
 Catch common mistakes in test suites with static analysis:
@@ -1074,9 +1078,9 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Twenty-eight rules in three tiers:
+Thirty-three rules in three tiers:
 
-- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), and generated files checked into version control.
+- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), suites and fixtures declared inside a `type ( … )` block (the fix gives each its own declaration), embedded suites, fixtures or hook-carrying types and suite-typed fields, direct calls of a lifecycle hook the harness already calls, every other shape the generator rejects, `//nolint` comments naming no rule a linter knows, and generated files checked into version control.
 - **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); `-diff` prints exactly what `-fix` would write, as a unified diff with paths relative to the current directory, and writes nothing — `gotest lint -diff ./... | git apply` applies it (a file outside that directory needs `git apply --unsafe-paths`; a symlink is named by the file it leads to, which `-fix` writes).
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 

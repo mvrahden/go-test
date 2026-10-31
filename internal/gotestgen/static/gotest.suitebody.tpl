@@ -1,17 +1,17 @@
 {{- /* Building blocks of the Test, Benchmark and Fuzz wrapper templates. */ -}}
-{{- define "suiteWrapper" }}{{ $ts := . }}
+{{- define "suiteWrapper" }}{{ $ts := .Suite }}
 type ƒƒ_GOTEST_{{ $ts.Identifier }} struct {
   {{ $ts.Identifier }}
 }
 
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeAll(it *gotest.T) { {{ if $ts.BeforeAll -}} ts.{{ $ts.Identifier }}.BeforeAll({{ if $ts.BeforeAll.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterAll(it *gotest.T) { {{ if $ts.AfterAll -}} ts.{{ $ts.Identifier }}.AfterAll({{ if $ts.AfterAll.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeAll(it *ƒgotest.T) { {{ if $ts.BeforeAll -}} ts.{{ $ts.Identifier }}.BeforeAll({{ if $ts.BeforeAll.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterAll(it *ƒgotest.T) { {{ if $ts.AfterAll -}} ts.{{ $ts.Identifier }}.AfterAll({{ if $ts.AfterAll.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
 {{- if $ts.HasReturningBeforeEach }}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) {{ $ts.ContextTypeName }} { {{ if $ts.BeforeEach -}} return ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ else }}return nil {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T, ctx {{ $ts.ContextTypeName }}) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}, ctx) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *ƒgotest.T) {{ index $.ContextTypes $ts.Identifier }} { {{ if $ts.BeforeEach -}} return ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ else }}return nil {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *ƒgotest.T, ctx {{ index $.ContextTypes $ts.Identifier }}) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}, ctx) {{ end }}}
 {{- else }}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *gotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
-func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) BeforeEach(it *ƒgotest.T) { {{ if $ts.BeforeEach -}} ts.{{ $ts.Identifier }}.BeforeEach({{ if $ts.BeforeEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
+func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *ƒgotest.T) { {{ if $ts.AfterEach -}} ts.{{ $ts.Identifier }}.AfterEach({{ if $ts.AfterEach.UsesStdlibT }}it.T(){{ else }}it{{ end }}) {{ end }}}
 {{- end }}
 {{- end }}
 
@@ -23,17 +23,17 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 */ -}}
 {{- define "suiteFrame" }}{{ $ts := .Suite }}{{ $fx := .Fixtures }}
   s := &ƒƒ_GOTEST_{{ $ts.Identifier }}{}
-  {{ .Assign }}gotestruntime.OpenSuite({{ .TB }}, gotestruntime.Suite{
+  {{ .Assign }}ƒgotestruntime.OpenSuite({{ .TB }}, ƒgotestruntime.Suite{
 {{- if $ts.HasGuard }}
     Guard: s.{{ $ts.Identifier }}.SuiteGuard,
 {{- end }}
 {{- if $fx.Nodes }}
-    Fixtures: func(tb testing.TB) {
-      ƒ_holdFixtures(tb, func() time.Duration {
+    Fixtures: func(tb ƒtesting.TB) {
+      ƒ_holdFixtures(tb, func() ƒtime.Duration {
 {{- if $ts.HasConfig }}
-        return gotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
+        return ƒgotestruntime.WithSuiteDefaults((&{{ $ts.Identifier }}{}).SuiteConfig()).SetupTimeout
 {{- else }}
-        return gotestruntime.WithSuiteDefaults(gotest.SuiteConfig{}).SetupTimeout
+        return ƒgotestruntime.WithSuiteDefaults(ƒgotest.SuiteConfig{}).SetupTimeout
 {{- end }}
       }{{ range $n := $fx.Nodes }}, ƒ_node_{{ $n }}{{ end }})
 {{- range $f := $fx.Fields }}
@@ -58,42 +58,42 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 */ -}}
 {{- define "suiteMethods" }}{{ $ts := .Suite }}{{ $fixtures := .FixtureOrder }}
 {{- $hooks := false }}{{ range $fix := $fixtures }}{{ if or $fix.BeforeEach $fix.AfterEach }}{{ $hooks = true }}{{ end }}{{ end }}
-  gotestruntime.RunMethods(t, ƒcfg, ƒbudget, gotestruntime.Methods{
+  ƒgotestruntime.RunMethods(t, ƒcfg, ƒbudget, ƒgotestruntime.Methods{
 {{- if $ts.IsMethodParallel }}
     Parallel: true,
 {{- end }}
 {{- if $hooks }}
-    Fixtures: []gotestruntime.EachHooks{
+    Fixtures: []ƒgotestruntime.EachHooks{
 {{- range $fix := $fixtures }}{{ if or $fix.BeforeEach $fix.AfterEach }}
       {
         Name: "{{ $fix.Identifier }}",
 {{- if $fix.BeforeEach }}
-        Before: func(ctx context.Context) error { return ƒ_{{ $fix.Identifier }}.BeforeEach(ctx) },
+        Before: func(ctx ƒcontext.Context) error { return ƒ_{{ $fix.Identifier }}.BeforeEach(ctx) },
         BeforeAt: {{ printf "%q" $fix.BeforeEachAt }},
 {{- end }}
 {{- if $fix.AfterEach }}
-        After: func(ctx context.Context) error { return ƒ_{{ $fix.Identifier }}.AfterEach(ctx) },
+        After: func(ctx ƒcontext.Context) error { return ƒ_{{ $fix.Identifier }}.AfterEach(ctx) },
         AfterAt: {{ printf "%q" $fix.AfterEachAt }},
 {{- end }}
       },
 {{- end }}{{ end }}
     },
 {{- end }}
-    Cases: []gotestruntime.Method{
+    Cases: []ƒgotestruntime.Method{
 {{- range $tc := $ts.TestCases }}
 {{- $t := "t" }}{{ if $tc.UsesStdlibT }}{{ $t = "t.T()" }}{{ end }}
 {{- $ctx := "" }}{{ if $ts.HasReturningBeforeEach }}{{ $ctx = ", ctx" }}{{ end }}
-      {Name: "{{ $tc.Identifier }}", Run: func(ttt *gotest.T, run func(func())) {
+      {Name: "{{ $tc.Identifier }}", Run: func(ttt *ƒgotest.T, run func(func())) {
 {{- if $ts.HasReturningBeforeEach }}
         ctx := s.BeforeEach(ttt)
-        defer gotestruntime.AfterEach(func() { s.AfterEach(gotestruntime.AfterEachT(ttt), ctx) })
+        defer ƒgotestruntime.AfterEach(func() { s.AfterEach(ƒgotestruntime.AfterEachT(ttt), ctx) })
 {{- else }}
-        defer gotestruntime.AfterEach(func() { s.AfterEach(gotestruntime.AfterEachT(ttt)) })
+        defer ƒgotestruntime.AfterEach(func() { s.AfterEach(ƒgotestruntime.AfterEachT(ttt)) })
         s.BeforeEach(ttt)
 {{- end }}
         run(func() {
 {{- if or $tc.UsesStdlibT $ts.HasReturningBeforeEach }}
-          ƒƒ_GOTEST_exec(func(t *gotest.T) { s.{{ $tc.Identifier }}({{ $t }}{{ $ctx }}) }, ttt)
+          ƒƒ_GOTEST_exec(func(t *ƒgotest.T) { s.{{ $tc.Identifier }}({{ $t }}{{ $ctx }}) }, ttt)
 {{- else }}
           ƒƒ_GOTEST_exec(s.{{ $tc.Identifier }}, ttt)
 {{- end }}
@@ -106,7 +106,7 @@ func (ts *ƒƒ_GOTEST_{{ $ts.Identifier }}) AfterEach(it *gotest.T) { {{ if $ts.
 
 {{- /* Skipped TestX of an excluded suite, or of one whose every Test method is excluded. */ -}}
 {{- define "excludedSuite" }}
-func Test{{ .Identifier }}(t *testing.T) {
+func Test{{ .Identifier }}(t *ƒtesting.T) {
   t.Skipf("test suite was excluded by user")
 }
 {{- end }}

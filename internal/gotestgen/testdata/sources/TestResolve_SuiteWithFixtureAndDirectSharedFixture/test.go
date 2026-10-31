@@ -15,8 +15,8 @@ type AppFixture struct{ Val string }
 func (f *AppFixture) BeforeAll(ctx context.Context) error { return nil }
 
 type UserTestSuite struct {
-	*AppFixture
-	*PGSharedFixture
+	AppFixture      *AppFixture
+	PGSharedFixture *PGSharedFixture
 }
 
 func (s *UserTestSuite) TestOne(t *gotest.T) {}

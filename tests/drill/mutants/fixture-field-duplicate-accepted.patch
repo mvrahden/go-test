@@ -1,0 +1,16 @@
+Expect: shapes fielddup: exit code 0, want 2
+Expect: shapes fielddupparent: exit code 0, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite names its fixtures and methods → two fields of the same fixture type are rejected at the second field
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -1094,9 +1094,6 @@
+ 	if !strings.HasSuffix(name, protocol.SuffixFixture) || strings.HasSuffix(name, protocol.SuffixSharedFixture) {
+ 		return named, nil
+ 	}
+-	if prev, dup := bound[named]; dup {
+-		return nil, gotestast.At(field.Pos(), fmt.Errorf("%s %s declares two fields of the same fixture type %s (%s and %s); keep one", kind, owner, name, prev, field.Name()))
+-	}
+ 	bound[named] = field.Name()
+ 	return named, nil
+ }

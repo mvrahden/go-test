@@ -1,0 +1,16 @@
+Expect: shapes xpkgconfig: no line matches
+Expect: shapes xpkghydrate: exit code 0, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite reaches across packages → a package fixture from another package with a mis-signed FixtureConfig is rejected at the method
+Clause: when a suite reaches across packages → a package fixture from another package with Hydrate is rejected at the method
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -432,7 +432,7 @@
+ 				return nil, gotestast.At(fn.Pos(), fmt.Errorf("package fixture %q: %s must have signature (ctx context.Context) error", identifier, hook))
+ 			}
+ 		}
+-		for _, name := range []string{"FixtureConfig", "SharedFixtureConfig", "Hydrate", "Dehydrate"} {
++		for _, name := range []string{} {
+ 			if fn := declaredMethod(named, name); fn != nil {
+ 				if err := gotestast.FixtureMethodError(kind, identifier, name, fn.Signature()); err != nil {
+ 					return nil, gotestast.At(fn.Pos(), err)

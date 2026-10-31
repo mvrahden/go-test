@@ -81,8 +81,8 @@ func (s *DirectCallTestSuite) TestClean(t *gotest.T) {
 	gotest.True(t, true)
 }
 
-func (s *DirectCallTestSuite) BeforeEach() {}
-func (s *DirectCallTestSuite) AfterEach()  {}
+func (s *DirectCallTestSuite) BeforeEach(t *gotest.T) {}
+func (s *DirectCallTestSuite) AfterEach(t *gotest.T)  {}
 
 func helperParallel(t *testing.T) {
 	t.Parallel() // want `use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination`

@@ -1,0 +1,149 @@
+# Discovery Specification
+
+## Purpose
+Which declarations gotest reads as suites, fixtures and cases, which shapes it rejects and where, how focus is decided across a run, and how the generated harness stays in step with the suites it is generated from.
+
+## Requirements
+
+### Requirement: Suite and fixture declarations
+A suite or fixture SHALL be read only from a type declaration of its own that composes through named fields; a declaration inside a type block, an embedded suite or fixture, an embedded type with a method gotest would read, and a field of suite type SHALL be rejected at the declaration or field, naming the alternative, while an embedded plain type SHALL be accepted.
+
+#### Scenario: Each way a suite or fixture is declared
+- **WHEN** a suite or fixture is declared
+- **THEN** a suite declared alone, binding a fixture through a named pointer field, runs
+- **AND** a suite embedding a plain type runs
+- **AND** a suite in a type block is rejected at its declaration and told to stand alone
+- **AND** a fixture in a type block is rejected at its declaration and told to stand alone
+- **AND** a suite embedding a suite is rejected at the field and pointed to contract suites
+- **AND** a suite embedding a fixture is rejected at the field and pointed to a named pointer field
+- **AND** a suite embedding a type with a method gotest would read is rejected at the field
+- **AND** a suite holding a suite in a field is rejected at the field: suites are never nested
+- **AND** a fixture embedding a fixture is rejected at the field and pointed to a named pointer field
+
+### Requirement: Aliases and signatures
+An alias of a suite, at any depth and as a method receiver, SHALL stand for the type it names, whose own methods alone it runs; a defined type over a suite or over a type that declares a case, a Test method that returns a value and a shared fixture declared in a _test.go file SHALL be rejected where they are written.
+
+#### Scenario: Aliases and unusual signatures
+- **WHEN** a suite is declared through an alias or with an unusual signature
+- **THEN** a method declared on a pointer to an alias of the suite runs
+- **AND** an alias of an alias of a generic suite runs its methods
+- **AND** a defined type over a suite is rejected at its declaration and pointed to an alias
+- **AND** a defined type over a type that declares a case is rejected at its declaration and pointed to an alias
+- **AND** an alias runs the methods of the type it names, not those of a type named like the alias
+- **AND** a Test method that returns a value is rejected at the method
+- **AND** a shared fixture declared in a _test.go file is rejected at its declaration
+
+### Requirement: Fixture fields and case names
+A suite SHALL bind each fixture once, through a pointer field or an alias of one, and a fixture-named type no suite reaches SHALL NOT fail the package, and a method SHALL be a case only by a name go test would run; one taking the T, B or F of its case under a name go test would not run SHALL be rejected at the method.
+
+#### Scenario: Fields and method names
+- **WHEN** a suite names its fixtures and methods
+- **THEN** a fixture field by value is rejected at the field and told to take a pointer
+- **AND** a fixture field typed by an alias of the fixture pointer binds the fixture
+- **AND** two fields of the same fixture type are rejected at the second field
+- **AND** a fixture-named type no suite reaches cannot fail the package
+- **AND** a method whose name continues Test with a lowercase letter is not a case, as under go test
+- **AND** a method taking a T whose name continues Test with a lowercase letter is rejected at the method, as go vet rejects such a test
+
+### Requirement: Suites without a case
+A type named like a suite SHALL declare at least one Test, Benchmark or Fuzz method, an excluded one included; one that declares none SHALL be refused at its declaration, naming the alternative, and discover SHALL report its package broken with the refusal, while a testify suite SHALL be left to testify.
+
+#### Scenario: A type named like a suite with no case
+- **WHEN** a type named like a suite declares no case
+- **THEN** the suite is refused at its declaration, told to declare a case or name the helper otherwise
+- **AND** discover reports the package broken with the refusal
+- **AND** a suite whose only case is excluded runs as skipped
+- **AND** a testify base suite that declares no case is left to testify
+
+### Requirement: Declarations from other packages
+A suite SHALL run an alias of a generic suite another package declares, an alias declared in the external test package SHALL be discovered and run whether the package under test, the external test package or a third package declares the generic suite, and a fixture a suite binds from another package SHALL be held to the signature rules a local fixture is held to.
+
+#### Scenario: Across packages
+- **WHEN** a suite reaches across packages
+- **THEN** an alias of a generic suite from another package runs that suite's methods
+- **AND** a package fixture from another package with a mis-signed hook is rejected with the signature it needs
+- **AND** a package fixture from another package with a mis-signed FixtureConfig is rejected at the method
+- **AND** a package fixture from another package with Hydrate is rejected at the method
+
+#### Scenario: Generic aliases in the external test package
+- **WHEN** the external test package declares an alias of a generic suite
+- **THEN** an alias of a generic suite the package under test declares runs that suite's methods
+- **AND** an alias of a generic suite the external test package declares runs that suite's methods
+- **AND** an alias of a generic suite from a third package runs that suite's methods
+
+### Requirement: Focus across a run
+Focus SHALL be decided over the whole run: a focused suite or a focused method of any kind, Test, Benchmark or Fuzz, in any package or test package variant SHALL skip every unfocused suite, which then starts no fixture, and --ci SHALL still refuse the run, whatever kind of method is focused.
+
+#### Scenario: A focused suite in the run
+- **WHEN** a run holds a focused suite
+- **THEN** a focused suite in one package skips every unfocused suite in the others
+- **AND** an unfocused suite skipped by focus starts no fixture
+- **AND** a focused suite in the internal test package skips the external one's suites
+- **AND** --ci still refuses a run with a focused suite
+
+#### Scenario: A focused method in the run
+- **WHEN** a run holds a focused method
+- **THEN** a focused method in one package skips every unfocused suite in the others
+- **AND** a focused fuzz method in one package skips every unfocused suite in the others
+
+### Requirement: Toggling focus
+refactor toggle-focus SHALL add or remove the F_ prefix of a suite or method at every reference to it in its package, embedding fields, files a build constraint leaves out and the external test package included, so the package still compiles, and leave a same-named identifier for something else as it was. It SHALL refuse, at the position and writing nothing, a new name already declared, a method an interface in the package names, and a left-out file no build type-checks that spells the name.
+
+#### Scenario: Methods in several files
+- **WHEN** focus is toggled on a suite whose methods are spread over several files
+- **THEN** refactor toggle-focus renames every receiver and the package still compiles
+
+#### Scenario: A generic suite with aliases
+- **WHEN** focus is toggled on a generic suite that aliases instantiate
+- **THEN** refactor toggle-focus renames every generic receiver, alias and literal, and the package still compiles
+
+#### Scenario: The external test package
+- **WHEN** focus is toggled on a suite the external test package refers to
+- **THEN** refactor toggle-focus renames the external test package's references too
+
+#### Scenario: A reused name
+- **WHEN** focus is toggled on a suite whose name another scope reuses
+- **THEN** refactor toggle-focus leaves the identifiers of the other scope as they were
+
+#### Scenario: An embedded suite
+- **WHEN** focus is toggled on a suite another type embeds
+- **THEN** refactor toggle-focus renames the selectors and literal keys that name the embedded field, and the package still compiles
+
+#### Scenario: Files a build constraint leaves out
+- **WHEN** focus is toggled on a suite that files behind a build constraint refer to
+- **THEN** refactor toggle-focus renames their references too, and the package still compiles with the tag
+- **AND** a reference in such a file that cannot be resolved is refused at its position and nothing is written
+
+#### Scenario: A method an interface names
+- **WHEN** focus is toggled on a method an interface in the package names
+- **THEN** refactor toggle-focus refuses at the interface's position and writes nothing
+
+#### Scenario: A name already declared
+- **WHEN** focus is toggled on a suite or method whose new name is already declared
+- **THEN** refactor toggle-focus refuses at the declaration that holds the name and writes nothing
+
+### Requirement: The generated harness
+The generated harness SHALL compile beside whatever names the package declares, except a name Go predeclares that the harness uses with Go's meaning, which SHALL be rejected at its declaration, and gotest generate SHALL keep it in step with the suites: it SHALL drop references to renamed suites and files of variants without suites, and SHALL NOT rewrite a file whose content is unchanged.
+
+#### Scenario: Names the harness imports
+- **WHEN** the package declares names the harness imports
+- **THEN** a package declaring context, testing, gotest and the other imported names runs its suite
+- **AND** a suite binding fixtures from two packages both named pg runs
+- **AND** a package declaring a name Go predeclares that the harness uses is rejected at the declaration
+
+#### Scenario: Generating again
+- **WHEN** gotest generate runs again after the suites changed
+- **THEN** a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes
+- **AND** an unchanged generated file is not written again
+
+### Requirement: Stale generated files and build constraints
+A generated file left on disk by an earlier generate SHALL neither break nor be compiled into a run and SHALL be read past by discover and spec; --tags SHALL select the suite files built with that tag.
+
+#### Scenario: A stale generated file
+- **WHEN** a package holds a generated file from an earlier generate
+- **THEN** a stale generated file on disk neither breaks the run nor is compiled
+- **AND** discover and spec read past a stale generated file
+
+#### Scenario: A build-constrained suite file
+- **WHEN** a suite file carries a build constraint
+- **THEN** --tags= selects the files built with that tag

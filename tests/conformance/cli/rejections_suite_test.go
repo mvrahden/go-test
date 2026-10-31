@@ -37,6 +37,7 @@ func (s *CLIRejectionsTestSuite) TestHooksCallingT(t *gotest.T) {
 				{Desc: "fuzz methods", pkg: "../testdata/clihookcalls/", at: "hookcalls_suite_test.go:14:", hooks: "AfterAll and BeforeAll call t.T()", wrappers: "fuzz"},
 				{Desc: "benchmark methods", pkg: "../testdata/clihookbench/", at: "hookbench_suite_test.go:11:", hooks: "AfterAll and BeforeEach call t.T()", wrappers: "benchmark"},
 				{Desc: "fuzz and benchmark methods", pkg: "../testdata/clihookmixed/", at: "hookmixed_suite_test.go:10:", hooks: "BeforeEach and BeforeAll call t.T()", wrappers: "benchmark"},
+				{Desc: "a generic suite another package declares", pkg: "../testdata/clihookalias/", at: "contract.go:11:", hooks: "AfterEach and BeforeAll call t.T()", wrappers: "benchmark"},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.pkg)
 				gotest.NoError(sub, err)
@@ -83,7 +84,7 @@ func (s *CLIRejectionsTestSuite) TestSharedFixtureEachHooks(t *gotest.T) {
 			for sub, row := range gotest.Each(it, []struct {
 				Desc, pkg, at, fixture, hook string
 			}{
-				{Desc: "in the suite's package", pkg: "../testdata/clisharedlocal/", at: "sharedlocal_suite_test.go:16:", fixture: "QueueSharedFixture", hook: "AfterEach"},
+				{Desc: "in the suite's package", pkg: "../testdata/clisharedlocal/", at: "fixture.go:12:", fixture: "QueueSharedFixture", hook: "AfterEach"},
 				{Desc: "in another package", pkg: "../testdata/clisharedeach/", at: "shared/shared.go:17:", fixture: "CacheSharedFixture", hook: "BeforeEach"},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.pkg)

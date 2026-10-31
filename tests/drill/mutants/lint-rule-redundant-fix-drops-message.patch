@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / the stronger assertion takes a removed one's message and its comment stays \(
+Clause: when lint -fix rewrites assertions that carry messages and comments → the stronger assertion takes a removed one's message and its comment stays
+--- a/internal/lint/redundant.go
++++ b/internal/lint/redundant.go
+@@ -56,7 +56,7 @@
+ 	if stray := src.strayComments(stmt.Pos(), next.Pos(), msgs); len(stray) > 0 {
+ 		edits[0].NewText = []byte(strings.Join(stray, "\n"+indent) + "\n" + indent)
+ 	}
+-	if len(msgs) > 0 {
++	if len(msgs) < 0 {
+ 		parts := make([]string, len(msgs))
+ 		for i, m := range msgs {
+ 			parts[i] = src.text(pass.Fset, m)

@@ -28,8 +28,8 @@ func (f *PanickyTeardownFixture) AfterAll(_ context.Context) error {
 
 // TeardownPanicTestSuite binds both fixtures so their teardowns race.
 type TeardownPanicTestSuite struct {
-	*SlowReleaseFixture
-	*PanickyTeardownFixture
+	SlowReleaseFixture     *SlowReleaseFixture
+	PanickyTeardownFixture *PanickyTeardownFixture
 }
 
 func (s *TeardownPanicTestSuite) TestOne(t *gotest.T) {

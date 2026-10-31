@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldPaths / ASymlinkedWorkingDirectory / when a type is named by a relative package path from a symlinked working directory / scaffolds into the package's directory, named relative to the working directory \(
+Clause: when a type is named by a relative package path from a symlinked working directory → scaffolds into the package's directory, named relative to the working directory
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -302,9 +302,6 @@
+ 		return cfg, pkgPattern
+ 	}
+ 	cfg.Dir = pkgPattern
+-	if abs, err := filepath.Abs(pkgPattern); err == nil {
+-		cfg.Dir = abs
+-	}
+ 	return cfg, "."
+ }
+ 

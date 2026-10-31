@@ -80,6 +80,33 @@ func (s *OverlayTestSuite) TestOverlayManagement(t *gotest.T, ctx *overlayDirsCt
 			gotest.False(it, ok, "pkg/b should not have PXSuite mapping (empty PXTest)")
 		})
 
+		w.It("replaces each generated file left on disk it does not regenerate with its package clause", func(it *gotest.T) {
+			pkgDir := it.TempDir()
+			stale := "package a\n\nfunc TestOldTestSuite() { _ = OldTestSuite{} }\n"
+			for _, name := range []string{about.PSuite, about.PXSuite} {
+				gotest.NoError(it, os.WriteFile(filepath.Join(pkgDir, name), []byte(stale), 0o600))
+			}
+			results := gotestgen.GenerateResults{{AbsPath: pkgDir, PTest: []byte("package a\n// fresh\n")}}
+
+			tmpDir, err := gotestrunner.WriteOverlay(results)
+			gotest.NoError(it, err)
+			ctx.dirs = append(ctx.dirs, tmpDir)
+
+			data, err := os.ReadFile(filepath.Join(tmpDir, "overlay.json"))
+			gotest.NoError(it, err)
+			var ov gotestrunner.ExportOverlayJSON
+			gotest.NoError(it, json.Unmarshal(data, &ov))
+			gotest.Len(it, ov.Replace, 2)
+			for name, want := range map[string]string{
+				about.PSuite:  "package a\n// fresh\n",
+				about.PXSuite: "package a\n",
+			} {
+				got, err := os.ReadFile(ov.Replace[filepath.Join(pkgDir, name)])
+				gotest.NoError(it, err, name)
+				gotest.Equal(it, want, string(got), name)
+			}
+		})
+
 		w.It("produces unique overlay directories when called twice", func(it *gotest.T) {
 			results := gotestgen.GenerateResults{
 				{AbsPath: "/fake/pkg/a", PTest: []byte("package a\n")},

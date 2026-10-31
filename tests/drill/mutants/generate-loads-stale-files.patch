@@ -1,0 +1,32 @@
+Expect: shapes genrename: generate exit code 2, want 0
+Expect: shapes stalerename: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestGeneratedFilesStayValid
+Clause: when gotest generate runs again after the suites changed → a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes
+Clause: when a package holds a generated file from an earlier generate → a stale generated file on disk neither breaks the run nor is compiled
+--- a/internal/gotestgen/generator.go
++++ b/internal/gotestgen/generator.go
+@@ -14,7 +14,6 @@
+ 	"strings"
+ 
+ 	"github.com/mvrahden/go-test/internal/about"
+-	"github.com/mvrahden/go-test/internal/genstub"
+ 	"github.com/mvrahden/go-test/internal/gotestast"
+ 	"github.com/mvrahden/go-test/internal/goversion"
+ 	"github.com/mvrahden/go-test/internal/pkgpattern"
+@@ -168,14 +167,8 @@
+ 		Fset:  token.NewFileSet(),
+ 	}
+ 	cfg.ParseFile = about.ParseStubbingGenerated
+-	// go list -export compiles from disk, so the go command takes the stubs too.
+-	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
+-	if err != nil {
+-		return nil, nil, nil, nil, err
+-	}
+-	defer unstub()
+-	if len(loadFlags) > 0 {
+-		cfg.BuildFlags = loadFlags
++	if len(buildFlags) > 0 {
++		cfg.BuildFlags = buildFlags
+ 	}
+ 	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
+ 	if err != nil {

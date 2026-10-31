@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterFocusFix / ConstrainedFiles / when a file behind a build constraint spells the focused name and no build type-checks it / lint -fix leaves the focus and names the file's position \(
+Clause: when a file behind a build constraint spells the focused name and no build type-checks it → lint -fix leaves the focus and names the file's position
+--- a/internal/lint/fix.go
++++ b/internal/lint/fix.go
+@@ -431,7 +431,7 @@
+ 		}
+ 		if focus {
+ 			constrained, err := constrainedFocusReferences(graph.Roots, fa.act, fix.TextEdits, tags, f.current)
+-			if err != nil {
++			if err != nil && false {
+ 				f.dropped[key]++
+ 				p.refused = append(p.refused, Finding{
+ 					File: pos.Filename, Line: pos.Line, Col: pos.Column, EndLine: pos.Line, Rule: fa.diag.Category,

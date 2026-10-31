@@ -8,11 +8,12 @@ fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
 
-The checks are split by theme into four suites: `CanaryTestSuite` (verdicts,
+The checks are split by theme into five suites: `CanaryTestSuite` (verdicts,
 assertions, fixtures, goroutines, benchmarks), `CanaryBudgetsTestSuite`,
-`CanaryDagTestSuite` and `CanaryLifecycleTestSuite` (stops and process
-lifetime). Each runs its methods one after another; the runner runs the four
-side by side, each in its own process. None is `Parallel`, so the canary
+`CanaryDagTestSuite`, `CanaryDiscoveryTestSuite` (the shapes discovery reads
+or refuses) and `CanaryLifecycleTestSuite` (stops and process lifetime). Each
+runs its methods one after another; the runner runs the five side by side,
+each in its own process. None is `Parallel`, so the canary
 does not rest on the in-suite parallelism it guards.
 
 ## Fixtures
@@ -54,7 +55,7 @@ Each directory under `testdata/` is one package with one suite:
 | `fixturehookfail` | a package fixture whose `BeforeEach` fails for one method runs no `AfterEach` for it, and the failure is reported at the hook's file |
 | `fixtureafterfail` | a package fixture whose `AfterEach` returns an error is reported at the hook's file, not inside the runtime's |
 | `fixtureorder` | a fixture with only an `AfterEach` runs it when it comes before a fixture whose `BeforeEach` fails, and not when it comes after |
-| `fixtureelsewhere` | a failing fixture hook another package declares, a fixture's of that package or one promoted from its type, is located at its declaration: by base name, and by full path under `-fullpath` |
+| `fixtureelsewhere` | a failing hook of a fixture another package declares is located at its declaration: by base name, and by full path under `-fullpath` |
 | `benchpanic` | a panicking benchmark turns the run red, the next benchmark still reports, and `AfterAll` runs before the fixture is released |
 | `failfast` | a FailFast suite skips the methods after its first failure, each naming the method that stopped it |
 | `failfastsoft` | a failure `BeforeAll` records without stopping does not stop a FailFast suite's methods |
@@ -84,6 +85,7 @@ Each directory under `testdata/` is one package with one suite:
 | `dagrelease` | shared fixtures come up each after what they depend on and are released concurrently, a dependent before its dependency; with `DAGRELEASE_HANG=1` the release that never returns is force-killed after 30s plus the longest chain still resident, 35s, a fixture released at the barrier no longer counted |
 | `fuzzseedtype` | a fuzz seed of the wrong type fails its target at the `f.Add` call, not inside gotest's or the generated code |
 | `specmarkdown` | the Markdown spec, live and read from source, keeps each label in its own cell as text, shows an It with a slash as one It under its When, and marks what X_ excludes EXCLUDED when read from source |
+| `shapes/*` | one package per declaration shape: a suite declared alone or embedding a plain type runs, as do a method on a pointer to an alias, an alias of an alias of a generic suite an alias of a generic suite from another package aliases in the external test package of generic suites from any package, and an alias of another package's type that declares a type named like the alias, which runs the methods of the type it names; a suite or fixture in a type block, an embedded suite, fixture or type with a method gotest would read, a suite-typed field, a defined type over a suite or over a type declaring a case, a Test method with a result, a shared fixture in a `_test.go` file a mis-signed hook or `FixtureConfig` of a fixture from another package and a `Hydrate` on one each exit 2 at the line written; so do a fixture field by value or two fields of one fixture type, while a fixture field typed by an alias of the pointer binds, a fixture-named type no suite reaches is not checked, a method named `Test`, `Benchmark` or `Fuzz` and a lowercase letter is no case, and exits 2 when it takes its case's T, and a suite with no case is neither run, reported nor discovered; a package declaring the names the harness imports, or a predeclared name the harness does not use, a suite binding fixtures from two packages both named `pg` and a package holding a stale generated file run, discover reads past the stale file, a package redeclaring `any` exits 2 at the declaration, and `generate` after a rename leaves nothing of the old suite; a focused suite or method in one package, or a focused suite in the internal test package, skips the unfocused suites of the others, which start no fixture |
 
 `testdata/expected.txt` is the golden list. A `<fixture> exit <code>` line
 gives the exit code; `<fixture> <action> <test>` lines list every `pass`,

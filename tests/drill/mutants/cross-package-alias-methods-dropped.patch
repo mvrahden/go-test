@@ -1,0 +1,18 @@
+Expect: shapes xpkgcontract: exit code 2, want 0
+Clause: when a suite reaches across packages → an alias of a generic suite from another package runs that suite's methods
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+--- a/internal/gotestgen/collector.go
++++ b/internal/gotestgen/collector.go
+@@ -101,11 +101,7 @@
+ 			continue
+ 		}
+ 		walk := insp
+-		if declPkg == nil {
+-			declPkg = pkg
+-		} else {
+-			walk = goinspect.New(declPkg.Syntax)
+-		}
++		declPkg = pkg
+ 		walk.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+ 			pos, err := gotestast.DetermineTestSuiteHarness(n, declPkg, s)
+ 			if err != nil {

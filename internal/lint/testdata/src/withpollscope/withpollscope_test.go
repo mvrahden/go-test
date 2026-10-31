@@ -139,3 +139,23 @@ func TestNestedEventually(t *testing.T) {
 		})
 	})
 }
+
+// The outer t handed to a helper escapes the poll as surely as a direct use.
+func checkReady(t *testing.T) { gotest.True(t, true) }
+
+func checkReadyG(t *gotest.T) { gotest.True(t, true) }
+
+func checkPolled(r *gotest.R) { gotest.True(r, true) }
+
+func TestHelperInsideCallback(t *testing.T) {
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		checkReady(t)     // want `t passed to checkReady in poll callback bypasses assertion recording — use poll`
+		checkPolled(poll) // ok
+	})
+}
+
+func pollWithGotestT(t *gotest.T) {
+	gotest.Consistently(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		checkReadyG(t) // want `t passed to checkReadyG in poll callback bypasses assertion recording — use poll`
+	})
+}

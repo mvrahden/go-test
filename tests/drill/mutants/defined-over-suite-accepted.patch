@@ -1,0 +1,16 @@
+Expect: shapes sigdefined: no line matches
+Expect: shapes recvdefined: no line matches
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite is declared through an alias or with an unusual signature → a defined type over a suite is rejected at its declaration and pointed to an alias
+Clause: when a suite is declared through an alias or with an unusual signature → a defined type over a type that declares a case is rejected at its declaration and pointed to an alias
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -579,7 +579,7 @@
+ 		typ = t
+ 	} else if named, ok := rawType.(*types.Named); ok {
+ 		// a defined type has an empty method set: it would run nothing
+-		if !ts.Assign.IsValid() && declaresCase(named) {
++		if false && declaresCase(named) {
+ 			over := named.Obj().Name()
+ 			if IS_TEST_SUITE.MatchString(over) {
+ 				over = "suite " + over

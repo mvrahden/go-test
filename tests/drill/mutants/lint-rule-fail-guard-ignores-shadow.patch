@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package \(
+Clause: when a local variable shadows the gotest import → fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package
+--- a/internal/lint/failguard.go
++++ b/internal/lint/failguard.go
+@@ -348,7 +348,7 @@
+ 			}
+ 			name = imp.Name.Name
+ 		}
+-		if !namesGotest(pass, file, name, pos) {
++		if false && !namesGotest(pass, file, name, pos) {
+ 			continue
+ 		}
+ 		return name + ".", true

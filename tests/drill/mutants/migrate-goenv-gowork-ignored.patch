@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AWorkspaceTurnedOffByGoEnv / when go env -w GOWORK=off turns off a go\.work above a vendored module / migrate loads from the module's vendor directory and converts the suite \(
+Clause: when go env -w GOWORK=off turns off a go.work above a vendored module → migrate loads from the module's vendor directory and converts the suite
+--- a/internal/migrate/load.go
++++ b/internal/migrate/load.go
+@@ -328,6 +328,7 @@
+ func workspaceFile(dir string) string {
+ 	cmd := exec.Command("go", "env", "GOWORK")
+ 	cmd.Dir = dir
++	cmd.Env = append(os.Environ(), "GOENV=off")
+ 	out, err := cmd.Output()
+ 	if err != nil {
+ 		return ""

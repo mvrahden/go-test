@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryToggleFocus .* / refactor toggle-focus renames the selectors and literal keys that name the embedded field, and the package still compiles \(
+Expect: ^FAIL .*conformance/lint LinterFocusFix .* / lint -fix renames the selectors and literal keys that name the embedded field, and the package still compiles \(
+Clause: when focus is toggled on a suite another type embeds → refactor toggle-focus renames the selectors and literal keys that name the embedded field, and the package still compiles
+Clause: when lint -fix removes the focus of a suite another type embeds → lint -fix renames the selectors and literal keys that name the embedded field, and the package still compiles
+--- a/internal/refactor/rename.go
++++ b/internal/refactor/rename.go
+@@ -107,7 +107,7 @@
+ 		return o == target
+ 	}
+ 	v, ok := obj.(*types.Var)
+-	if !ok || !v.Embedded() || target.Method != "" {
++	if !ok || !v.Embedded() || target.Method != "" || true {
+ 		return false
+ 	}
+ 	t := v.Type()

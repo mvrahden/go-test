@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AnUntypedConstantOfAnotherPackage / when Equal or NotEqual compares an untyped constant another package declares with a value of another type / migrate leaves it unconverted under a marker naming both types \(
+Clause: when Equal or NotEqual compares an untyped constant another package declares with a value of another type → migrate leaves it unconverted under a marker naming both types
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -308,7 +308,7 @@
+ 	case *ast.Ident:
+ 		return untypedObj(u.info.Uses[x])
+ 	case *ast.SelectorExpr:
+-		return untypedObj(u.info.Uses[x.Sel])
++		return false
+ 	case *ast.UnaryExpr:
+ 		return u.untypedConst(x.X)
+ 	case *ast.BinaryExpr:

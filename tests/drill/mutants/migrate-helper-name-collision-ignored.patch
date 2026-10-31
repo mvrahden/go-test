@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AHelperNameTaken / when the helper name a base suite would take is already declared / migrate leaves the base's file unconverted under a marker naming the collision \(
+Clause: when the helper name a base suite would take is already declared → migrate leaves the base's file unconverted under a marker naming the collision
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -446,7 +446,7 @@
+ 		switch {
+ 		case !s.helper && !token.IsExported(s.newName):
+ 			s.refusal = s.obj.Name() + " cannot take an exported name, and gotest runs only exported suites — rename it and migrate this file by hand"
+-		case clash:
++		case clash && !s.helper:
+ 			s.refusal = "renaming " + s.obj.Name() + " to " + s.newName + " collides with another declaration — migrate this file by hand"
+ 		default:
+ 			continue

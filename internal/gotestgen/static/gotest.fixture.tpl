@@ -1,11 +1,11 @@
 {{- /* Shared fixture package-level vars */ -}}
 {{ range $sf := .SharedFixtureNodes }}
-var ƒ_sf_{{ $sf.Identifier }} = &{{ $sf.QualifiedType }}{}
+var ƒ_sf_{{ $sf.Identifier }} = &{{ index $.SharedTypes $sf.Identifier }}{}
 {{ end }}
 
 {{- /* Package fixture package-level vars */ -}}
 {{ range $f := .AllFixtures }}
-var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedType }}
+var ƒ_{{ $f.Identifier }} *{{ index $.FixtureTypes $f.Identifier }}
 {{ end }}
 
 {{- /*
@@ -14,26 +14,26 @@ var ƒ_{{ $f.Identifier }} *{{ $f.QualifiedType }}
   config method called.
 */}}
 {{ range $sf := .SharedFixtureNodes }}
-func ƒ_node_{{ $sf.Identifier }}() *gotestruntime.FixtureNode {
+func ƒ_node_{{ $sf.Identifier }}() *ƒgotestruntime.FixtureNode {
 {{- if $sf.HasConfig }}
     ƒcfg := ƒ_sf_{{ $sf.Identifier }}.SharedFixtureConfig()
 {{- end }}
-    return &gotestruntime.FixtureNode{
+    return &ƒgotestruntime.FixtureNode{
         Name: "{{ $sf.Identifier }}",
 {{- if $sf.HasConfig }}
-        Config: gotestruntime.WithFixtureDefaults(ƒcfg),
+        Config: ƒgotestruntime.WithFixtureDefaults(ƒcfg),
         Budget: ƒcfg.Timeout,
 {{- else }}
-        Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
+        Config: ƒgotestruntime.WithFixtureDefaults(ƒgotest.FixtureConfig{}),
 {{- end }}
-        SharedState: &gotestruntime.SharedStateNode{
+        SharedState: &ƒgotestruntime.SharedStateNode{
             StateKey: "{{ $sf.StateKey }}",
             Target: ƒ_sf_{{ $sf.Identifier }},
 {{- if $sf.HasHydrate }}
-            Hydrate: func(ctx context.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Hydrate(ctx) },
+            Hydrate: func(ctx ƒcontext.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Hydrate(ctx) },
 {{- end }}
 {{- if $sf.HasDehydrate }}
-            Dehydrate: func(ctx context.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Dehydrate(ctx) },
+            Dehydrate: func(ctx ƒcontext.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Dehydrate(ctx) },
 {{- end }}
         },
 {{- if $sf.ParentFields }}
@@ -55,21 +55,21 @@ func ƒ_node_{{ $sf.Identifier }}() *gotestruntime.FixtureNode {
 {{ end }}
 
 {{- range $f := .AllFixtures }}
-func ƒ_node_{{ $f.Identifier }}() *gotestruntime.FixtureNode {
+func ƒ_node_{{ $f.Identifier }}() *ƒgotestruntime.FixtureNode {
 {{- if $f.HasConfig }}
-    ƒcfg := (&{{ $f.QualifiedType }}{}).FixtureConfig()
+    ƒcfg := (&{{ index $.FixtureTypes $f.Identifier }}{}).FixtureConfig()
 {{- end }}
-    return &gotestruntime.FixtureNode{
+    return &ƒgotestruntime.FixtureNode{
         Name: "{{ $f.Identifier }}",
 {{- if $f.HasConfig }}
-        Config: gotestruntime.WithFixtureDefaults(ƒcfg),
+        Config: ƒgotestruntime.WithFixtureDefaults(ƒcfg),
         Budget: ƒcfg.Timeout,
 {{- else }}
-        Config: gotestruntime.WithFixtureDefaults(gotest.FixtureConfig{}),
+        Config: ƒgotestruntime.WithFixtureDefaults(ƒgotest.FixtureConfig{}),
 {{- end }}
         Init: func() {
 {{- if or $f.ParentFieldNames $f.SharedFixtures }}
-            ƒ_{{ $f.Identifier }} = &{{ $f.QualifiedType }}{
+            ƒ_{{ $f.Identifier }} = &{{ index $.FixtureTypes $f.Identifier }}{
 {{- range $parentID, $fieldName := $f.ParentFieldNames }}
                 {{ $fieldName }}: ƒ_{{ $parentID }},
 {{- end }}
@@ -78,14 +78,14 @@ func ƒ_node_{{ $f.Identifier }}() *gotestruntime.FixtureNode {
 {{- end }}
             }
 {{- else }}
-            ƒ_{{ $f.Identifier }} = &{{ $f.QualifiedType }}{}
+            ƒ_{{ $f.Identifier }} = &{{ index $.FixtureTypes $f.Identifier }}{}
 {{- end }}
         },
-        BeforeAll: func(ctx context.Context) error {
+        BeforeAll: func(ctx ƒcontext.Context) error {
             return ƒ_{{ $f.Identifier }}.BeforeAll(ctx)
         },
 {{- if $f.AfterAll }}
-        AfterAll: func(ctx context.Context) error {
+        AfterAll: func(ctx ƒcontext.Context) error {
             return ƒ_{{ $f.Identifier }}.AfterAll(ctx)
         },
 {{- end }}
@@ -105,12 +105,12 @@ func ƒ_node_{{ $f.Identifier }}() *gotestruntime.FixtureNode {
   holding test instead of the binary. Every hold starts from nil fixtures, so
   nothing reads one an earlier hold tore down.
 */}}
-func ƒ_holdFixtures(tb testing.TB, setupTimeout func() time.Duration, nodes ...func() *gotestruntime.FixtureNode) {
-    gotestruntime.HoldFixtures(tb, func() gotestruntime.MainConfig {
+func ƒ_holdFixtures(tb ƒtesting.TB, setupTimeout func() ƒtime.Duration, nodes ...func() *ƒgotestruntime.FixtureNode) {
+    ƒgotestruntime.HoldFixtures(tb, func() ƒgotestruntime.MainConfig {
 {{- range $f := .AllFixtures }}
         ƒ_{{ $f.Identifier }} = nil
 {{- end }}
-        ƒmain := gotestruntime.MainConfig{MaxSuiteSetupTimeout: setupTimeout()}
+        ƒmain := ƒgotestruntime.MainConfig{MaxSuiteSetupTimeout: setupTimeout()}
         for _, node := range nodes {
             ƒmain.Fixtures = append(ƒmain.Fixtures, node())
         }

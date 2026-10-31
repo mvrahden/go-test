@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / ErrorIs is named without a fix unless the target is the nil literal( / .*)? \(
+Clause: when True asserts an errors.Is call → ErrorIs is named without a fix unless the target is the nil literal
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -438,7 +438,7 @@
+ 			return conditionMapping{target: pick(negated, "Error", "NoError"), args: []ast.Expr{err}, desc: "errors.Is nil check"}, true
+ 		}
+ 		if !negated {
+-			return conditionMapping{target: "ErrorIs", args: []ast.Expr{err, target}, desc: "errors.Is call", noFix: "ErrorIs fails a nil target, which errors.Is matches to a nil error"}, true
++			return conditionMapping{target: "ErrorIs", args: []ast.Expr{err, target}, desc: "errors.Is call"}, true
+ 		}
+ 		return conditionMapping{}, false
+ 	}

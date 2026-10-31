@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / a nil comparison of a concrete pointer is not rewritten into an error assertion( / .*)? \(
+Clause: when an assertion checks an operand against nil → a nil comparison of a concrete pointer is not rewritten into an error assertion
+--- a/internal/lint/nilkind.go
++++ b/internal/lint/nilkind.go
+@@ -40,7 +40,7 @@
+ 		return unknownNil
+ 	case !typeclass.Nilable(t):
+ 		return notNilable
+-	case typeclass.IsErrorInterface(t):
++	case typeclass.ImplementsError(t):
+ 		return errorIface
+ 	case isInterfaceType(t):
+ 		return otherIface

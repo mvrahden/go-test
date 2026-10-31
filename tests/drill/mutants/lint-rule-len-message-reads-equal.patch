@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint names the len != 0 check in its message \(
+Clause: when True asserts len(x) != 0 → lint names the len != 0 check in its message
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -352,7 +352,7 @@
+ 		if negated {
+ 			positive = !positive
+ 		}
+-		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: pick(isNeq, "len != 0 check", "len == 0 check")}, true
++		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: "len == 0 check"}, true
+ 	}
+ 
+ 	// len(x) == n where n is not 0 — Len fits whenever the asserted reading

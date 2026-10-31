@@ -119,7 +119,7 @@ Flags (go test — use -single-dash, forwarded automatically):
   -timeout=<dur>          Deadline of each suite process (default: 10m); a
                           test's own deadline is SuiteConfig.Timeout
   -coverprofile=<file>    Write coverage profile
-  -tags=<tags>            Build tags (comma-separated)
+  -tags=<tags>            Build tags (comma-separated); --tags=<tags> too
   -json                   go test -json event stream; every matched package
                           gets a verdict, including those with no suites
 
@@ -676,6 +676,12 @@ Creates a new _test.go file next to the target: a suite struct holding
 the subject, a BeforeEach that constructs it, and one Test method per
 exported method with It stubs (a happy path and an error case for
 methods that return an error). Existing files are never overwritten.
+A package path may be relative or absolute.
+
+Scaffold writes only code that compiles. It refuses a generic type or
+function, and a method of a generic type, since a suite would need type
+arguments it cannot choose; and it refuses a suite name the package
+already declares, naming that declaration and its file.
 
 Flags:
   --fuzz    Scaffold a Fuzz<Func> method for a package-level function
@@ -722,7 +728,8 @@ prints:
 
 Exit codes:
   0   The skeleton was written
-  1   The target could not be scaffolded: not found, or its file exists
+  1   The target could not be scaffolded: not found, a method, generic,
+      its suite name already declared, or its file exists
   2   Usage error: no target, more than one, a target naming no type or
       function, or an unknown flag
 
@@ -756,6 +763,12 @@ Rules:
   shared-fixture-undeclared
                         Reads of a shared fixture the suite never declared as a
                         field (only declared fixtures are started)
+  generation-rejects    Shapes the generator rejects, where and as it rejects them
+  nolint-unknown        //nolint ids that name no gotest rule or golangci-lint linter
+  suite-declaration     Suites/fixtures declared inside a type ( … ) block
+  no-embedding          Embedded suites, fixtures or hook-carrying types, and
+                        suite-typed fields of a suite or fixture
+  fixture-hook-call     Direct calls of a lifecycle hook the harness calls
   assertion-simplify    Simplifiable assertions (True(t, a == b) → Equal, …)
   assertion-type-guard  Nil/Empty on types their runtime guards reject
   assertion-redundant   Assertions made redundant by the following assertion
@@ -815,6 +828,7 @@ Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line, or a comment block of its own
                                    ending on the line directly above
   package foo //nolint:stdlib-test  Suppress for entire file
+  //nolint // reason               Every rule (so does //nolint:all)
 
 A pattern that matches no package while others do only warns on stderr,
   warning: "<pattern>" matched no packages
@@ -891,9 +905,10 @@ Usage:
 Commands:
   toggle-focus <file> <identifier>
 
-    Toggle the F_ prefix on a suite type or method. The identifier is
-    either "SuiteName" (toggles the suite) or "SuiteName.MethodName"
-    (toggles a single method).
+    Toggle the F_ prefix on a suite type or method, declared in <file>,
+    at every reference to it in the package and its test packages. The
+    identifier is either "SuiteName" (toggles the suite) or
+    "SuiteName.MethodName" (toggles a single method).
 
 Examples:
   gotest refactor toggle-focus user_test.go UserTestSuite
@@ -975,8 +990,8 @@ func printCleanHelp() {
 Usage:
   gotest clean [packages...]
 
-Removes generated overlay files (gotest_p(x)suite_test.go) from the source
-tree. A run never writes them there; "gotest generate" does, for
+Removes generated overlay files (gotest_p(x)suite_test.go) from the
+source tree. A run never writes them there; "gotest generate" does, for
 inspection. Patterns expand as for generate, so "clean ./..." removes what
 "generate ./..." wrote; files in packages outside the main module(s) are
 left with a note on stderr. Without a pattern it cleans the current

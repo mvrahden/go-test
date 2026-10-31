@@ -1,0 +1,7 @@
+package uses_test
+
+import "refactormod/uses"
+
+var _ = uses.F_UsesTestSuite{}
+
+var _ = new(uses.F_UsesTestSuite)

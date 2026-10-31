@@ -664,3 +664,68 @@ Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 chang
 
 5. **`bench --json` carries `failures`** — what a failed benchmark printed,
    a panic's message and stack included.
+
+## v1.37
+
+Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
+
+1. **Suites and fixtures are read from their own declarations** — a suite or
+   fixture inside a grouped `type ( … )` block, an embedded suite or
+   fixture, an embedded type with a method gotest reads, a field of suite
+   type, a fixture field by value and two fields of one fixture type are
+   each refused where they are written, naming the alternative
+   ([declarations](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suite-and-fixture-declarations),
+   [fields](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-fixture-fields-and-case-names)).
+   Before v1.37 an embedded fixture was bound and an embedded type's
+   hooks were promoted; give each fixture a named pointer field and
+   share tests through a generic contract suite.
+
+2. **Focus is run-wide** — one `F_` suite or method of any kind, in any
+   package or test package variant, skips every unfocused suite of the
+   run, which then starts no fixture
+   ([focus](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-focus-across-a-run)).
+   Before v1.37 focus held per package and test package variant.
+
+3. **Aliases and generics work everywhere** — an alias of an alias, a
+   method on a pointer to an alias, and an alias of a generic suite from
+   another package or declared in the external test package all run
+   ([other packages](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-declarations-from-other-packages)).
+
+4. **A suite declares a case** — a `*TestSuite` type declaring no
+   `Test*`, `Benchmark*` or `Fuzz*` method, an excluded `X_` one counting,
+   is refused at its declaration with exit 2, and `discover` reports its
+   package broken; a testify suite is left to `go test`
+   ([suites without a case](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suites-without-a-case)).
+   `scaffold` refuses a type without an exported method or a file without
+   an exported function, and `migrate` marks a testify suite without a test.
+   Before v1.37 such a type was generated without a `Test` function, so it
+   and its hooks never ran, and `discover` listed it as a suite without
+   methods; name a helper type so it does not end in `TestSuite`.
+
+5. **The harness imports under its own names** and every load reads past a
+   generated file left on disk, so a package declaring `context` or
+   `testing`, or a suite renamed since the last `gotest generate`, still
+   runs
+   ([generated harness](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-the-generated-harness)).
+
+6. **`migrate` converts base suites** — a testify suite embedding a base
+   suite of the same test files migrates with it: the base becomes a helper
+   held in a named field, `BaseTestSuite` renamed `BaseSuiteHelper`, and the
+   child declares the hooks and tests it had through the base
+   ([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
+   Before v1.37 the files declaring both were left under a marker.
+
+7. **`migrate` keeps testify's verdicts or marks why not** — a translation
+   that would pass or fail where testify did not, or change what runs when,
+   is left under a marker naming the reason and the gotest way
+   ([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)),
+   and the load never writes `go.mod` or `go.sum`, a vendored workspace
+   included
+   ([module files](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-module-files)).
+   Before v1.37 such a translation could turn a passing testify suite red,
+   or a failing one green, with exit 0.
+
+8. **`lint -fix` unfocuses files behind a build constraint** — the `focus`
+   fix renames a suite in the files a build constraint leaves out too, and
+   names, unapplied, a fix such a file would break
+   ([the focus fix](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-the-focus-fix)).

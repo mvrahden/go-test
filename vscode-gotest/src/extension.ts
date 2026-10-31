@@ -17,7 +17,11 @@ import {
 } from "./fuzz.js";
 import { GoTestCodeLensProvider } from "./codeLens.js";
 import { DebugLauncher } from "./debug.js";
-import { FocusExcludeProvider } from "./focusExclude.js";
+import {
+  executeToggleFocus,
+  FocusExcludeProvider,
+  TOGGLE_FOCUS_COMMAND,
+} from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
 import { SpecViewPanel } from "./specView.js";
 import { WatchManager } from "./watch.js";
@@ -638,6 +642,22 @@ function registerCommands(deps: {
         const wsDir = workspaceDir ?? resolveActiveWorkspaceDir();
         return executeScaffold(
           target,
+          outputChannel,
+          () => {
+            if (wsDir) discoveryService.discover(wsDir);
+          },
+          wsDir,
+        );
+      },
+    ),
+
+    vscode.commands.registerCommand(
+      TOGGLE_FOCUS_COMMAND,
+      (file: string, identifier: string, workspaceDir?: string) => {
+        const wsDir = workspaceDir ?? resolveActiveWorkspaceDir();
+        return executeToggleFocus(
+          file,
+          identifier,
           outputChannel,
           () => {
             if (wsDir) discoveryService.discover(wsDir);

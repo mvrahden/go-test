@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ABasesTestsAmongTheChilds / when a base declares a test whose name sorts between the child's own tests / the migrated child declares its forwarding method between them \(
+Clause: when a base declares a test whose name sorts between the child's own tests → the migrated child declares its forwarding method between them
+--- a/internal/migrate/embed.go
++++ b/internal/migrate/embed.go
+@@ -510,7 +510,7 @@
+ 			}
+ 			for _, fw := range forwards[ts.Name.Name] {
+ 				in := insert{at: lineEnd(gd.End()), seq: len(inserts), text: "\n\n" + fw.text}
+-				if fw.test {
++				if fw.test && false {
+ 					in.at = after
+ 					for _, fd := range tests {
+ 						if fd.Name.Name > fw.name {

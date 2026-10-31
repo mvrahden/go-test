@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterFocusFix .* / lint -fix renames the external test package's references too \(
+Clause: when lint -fix removes the focus of a suite the external test package refers to → lint -fix renames the external test package's references too
+--- a/internal/lint/fix.go
++++ b/internal/lint/fix.go
+@@ -406,7 +406,7 @@
+ 			edits = append(edits, fileEdit{tf: fset.File(e.Pos), pkg: fa.act.Package.Types, edit: e})
+ 		}
+ 		focus := fa.diag.Category == string(Focus)
+-		if focus {
++		if focus && len(edits) == 0 {
+ 			edits = append(edits, focusReferences(graph.Roots, fa.act, fix.TextEdits)...)
+ 		}
+ 		for _, e := range edits {

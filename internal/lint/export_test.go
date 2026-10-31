@@ -16,3 +16,15 @@ func ExportSetSkip(r Rule, v bool) { *cfg.skip[r] = v }
 func ExportLoad(dir string, patterns []string, tests bool) ([]*packages.Package, error) {
 	return load(context.Background(), &Targets{Dir: dir, Patterns: patterns, Tests: tests}, nil)
 }
+
+var (
+	ExportIsBenchmarkMethodName = isBenchmarkMethodName
+	ExportIsFuzzMethodName      = isFuzzMethodName
+)
+
+// ExportOnAnalyze makes f see the package paths of every analysis until
+// the returned restore runs.
+func ExportOnAnalyze(f func(paths []string)) (restore func()) {
+	analyzed = f
+	return func() { analyzed = nil }
+}

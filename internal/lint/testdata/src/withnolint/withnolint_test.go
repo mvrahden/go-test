@@ -80,3 +80,17 @@ func TestFailGuardNolintAbove(t *testing.T) { //nolint:stdlib-test
 		gotest.Fail(t, "boom")
 	}
 }
+
+// suppressed: bare nolint with a reason
+func TestBareWithReason(t *testing.T) {} //nolint // kept on purpose
+
+// suppressed: nolint:all, above the line
+//
+//nolint:all
+func (s AboveTestSuite) TestAllAbove(t *testing.T) {}
+
+// NOT suppressed: an unknown rule suppresses nothing and is a finding
+func TestUnknownRule(t *testing.T) {} //nolint:stdlib-tset // want `stdlib test TestUnknownRule — consider using a gotest suite` `unknown rule stdlib-tset in nolint comment`
+
+// NOT suppressed: another linter's rule is left to it
+func TestForeignRule(t *testing.T) {} //nolint:gosec // want `stdlib test TestForeignRule — consider using a gotest suite`

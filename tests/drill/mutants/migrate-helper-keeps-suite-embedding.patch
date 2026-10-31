@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a testify suite embeds a base suite of the migrated test files / gotest lint reports no testify finding on the migrated code \(
+Clause: when a testify suite embeds a base suite of the migrated test files → gotest lint reports no testify finding on the migrated code
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -100,7 +100,7 @@
+ 				}
+ 				filtered := make([]*ast.Field, 0, len(st.Fields.List))
+ 				for _, field := range st.Fields.List {
+-					if !u.isSuiteField(field) {
++					if !u.isSuiteField(field) || s.helper {
+ 						filtered = append(filtered, field)
+ 					}
+ 				}

@@ -118,6 +118,10 @@
         "title": "Go Test: Scaffold Target"
       },
       {
+        "command": "gotest.toggleFocus",
+        "title": "Go Test: Toggle Focus"
+      },
+      {
         "command": "gotest.updateSnapshots",
         "title": "Go Test: Update Snapshots",
         "icon": "$(refresh)"
@@ -139,6 +143,12 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "gotest.toggleFocus",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
           "command": "gotest.showSpecView",

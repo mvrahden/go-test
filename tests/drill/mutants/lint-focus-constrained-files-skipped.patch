@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterFocusFix / ConstrainedFiles / when lint -fix removes the focus of a suite that files behind a build constraint refer to / lint -fix renames their references too, and the package still compiles with the tag \(
+Clause: when lint -fix removes the focus of a suite that files behind a build constraint refer to → lint -fix renames their references too, and the package still compiles with the tag
+--- a/internal/lint/fix.go
++++ b/internal/lint/fix.go
+@@ -439,7 +439,7 @@
+ 				})
+ 				continue
+ 			}
+-			edits = append(edits, constrained...)
++			edits = append(edits, constrained[:0]...)
+ 		}
+ 		fileEdits := map[string][]edit{}
+ 		for _, fe := range edits {

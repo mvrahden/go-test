@@ -1,0 +1,18 @@
+Expect: shapes fieldvalue: exit code 1, want 2
+Expect: shapes fieldalias: exit code 1, want 2
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite names its fixtures and methods → a fixture field by value is rejected at the field and told to take a pointer
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -1080,10 +1080,7 @@
+ 	if field.Anonymous() {
+ 		return pointerNamed(field), nil
+ 	}
+-	if named, ok := types.Unalias(field.Type()).(*types.Named); ok {
+-		if name := named.Obj().Name(); strings.HasSuffix(name, protocol.SuffixFixture) {
+-			return nil, gotestast.At(field.Pos(), fmt.Errorf("%s %s has fixture field %s of value type %s; a fixture is bound through a pointer field (*%s)", kind, owner, field.Name(), name, name))
+-		}
++	if _, ok := types.Unalias(field.Type()).(*types.Named); ok {
+ 		return nil, nil
+ 	}
+ 	named := pointerNamed(field)

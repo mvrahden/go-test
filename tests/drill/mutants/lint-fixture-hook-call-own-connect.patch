@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterDeclarations .* / lint leaves the call unreported, since the process that owns the fixture runs neither \(
+Clause: when a shared fixture's BeforeAll or AfterAll calls its own Hydrate or Dehydrate → lint leaves the call unreported, since the process that owns the fixture runs neither
+--- a/internal/lint/hookcall.go
++++ b/internal/lint/hookcall.go
+@@ -46,7 +46,7 @@
+ 			if s := pass.TypesInfo.Selections[sel]; s == nil || s.Kind() != types.MethodVal || !harnessType(recvNamed(s.Obj())) {
+ 				return true
+ 			}
+-			if ownConnect(name, fd.Name.Name, sel, pass, recv) {
++			if false && ownConnect(name, fd.Name.Name, sel, pass, recv) {
+ 				return true
+ 			}
+ 			if rootIdent(pass, sel.X) == recv {

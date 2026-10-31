@@ -3,6 +3,7 @@ package lint
 import (
 	"go/ast"
 	"go/token"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -28,18 +29,51 @@ func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl 
 				continue
 			}
 			reportWithFix(pass, AssertionRedundant, first.call.Pos(),
-				[]analysis.SuggestedFix{{
-					Message: "remove redundant assertion",
-					TextEdits: []analysis.TextEdit{{
-						Pos:     block.List[i].Pos(),
-						End:     block.List[i+1].Pos(),
-						NewText: []byte(""),
-					}},
-				}},
+				redundantFix(pass, block.List[i], block.List[i+1], first, second),
 				"%s is redundant before %s — %s",
 				first.name, second.name, reason)
 		}
 	})
+}
+
+// redundantFix removes the weaker assertion. Its message moves to the
+// stronger one, and its comments stay above it; when both carry a message
+// there is no fix.
+func redundantFix(pass *analysis.Pass, stmt, next ast.Stmt, weaker, stronger *parsedAssertion) []analysis.SuggestedFix {
+	msgs := weaker.call.Args[2:]
+	if len(msgs) > 0 && len(stronger.call.Args) > messageIndex(stronger.name) {
+		return nil
+	}
+	src, ok := sourceAt(pass, stmt.Pos())
+	if !ok {
+		return nil
+	}
+	indent, ok := src.lineIndent(next.Pos())
+	if !ok {
+		return nil
+	}
+	edits := []analysis.TextEdit{{Pos: stmt.Pos(), End: next.Pos()}}
+	if stray := src.strayComments(stmt.Pos(), next.Pos(), msgs); len(stray) > 0 {
+		edits[0].NewText = []byte(strings.Join(stray, "\n"+indent) + "\n" + indent)
+	}
+	if len(msgs) > 0 {
+		parts := make([]string, len(msgs))
+		for i, m := range msgs {
+			parts[i] = src.text(pass.Fset, m)
+		}
+		last := stronger.call.Args[len(stronger.call.Args)-1]
+		edits = append(edits, analysis.TextEdit{Pos: last.End(), End: last.End(), NewText: []byte(", " + strings.Join(parts, ", "))})
+	}
+	return []analysis.SuggestedFix{{Message: "remove redundant assertion", TextEdits: edits}}
+}
+
+// messageIndex is where the stronger assertion's msgAndArgs begin.
+func messageIndex(name string) int {
+	switch name {
+	case "ErrorAs", "NotEmpty":
+		return 2
+	}
+	return 3
 }
 
 type parsedAssertion struct {

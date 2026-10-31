@@ -1,0 +1,7 @@
+package generic
+
+type IntContractTestSuite = F_ContractTestSuite[int]
+
+type StringContractTestSuite = F_ContractTestSuite[string]
+
+var _ = (*IntContractTestSuite).TestCopy

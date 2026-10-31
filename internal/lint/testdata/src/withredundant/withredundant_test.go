@@ -99,3 +99,25 @@ func TestStandaloneAssertions(t *testing.T) {
 	s := []int{1, 2, 3}
 	gotest.NotEmpty(t, s)
 }
+
+// === The fix keeps the removed assertion's message and comments ===
+
+func TestRedundantKeepsMessage(t *testing.T) {
+	err := errors.New("x")
+	gotest.Error(t, err, "loading %s", "config") // want `Error is redundant before ErrorContains`
+	gotest.ErrorContains(t, err,
+		"msg",
+	)
+}
+
+func TestRedundantKeepsComments(t *testing.T) {
+	var s []int
+	gotest.NotNil(t, s /* built above */) // want `NotNil is redundant before NotEmpty`
+	gotest.NotEmpty(t, s)
+}
+
+func TestRedundantBothMessages(t *testing.T) {
+	err := errors.New("x")
+	gotest.Error(t, err, "guard") // want `Error is redundant before ErrorContains`
+	gotest.ErrorContains(t, err, "msg", "contains")
+}

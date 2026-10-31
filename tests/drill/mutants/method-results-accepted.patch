@@ -1,0 +1,22 @@
+Expect: shapes sigresult: no line matches
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite is declared through an alias or with an unusual signature → a Test method that returns a value is rejected at the method
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -671,16 +671,6 @@
+ 	isTestCase := IS_TEST_CASE.MatchString(m.Name())
+ 	isBenchmark := IS_BENCHMARK.MatchString(m.Name())
+ 	isFuzz := IS_FUZZ.MatchString(m.Name())
+-	if (isTestCase || isBenchmark || isFuzz) && sig.Results().Len() > 0 {
+-		kind := "Test"
+-		switch {
+-		case isBenchmark:
+-			kind = protocol.PrefixBenchmark
+-		case isFuzz:
+-			kind = protocol.PrefixFuzz
+-		}
+-		return m.Pos(), fmt.Errorf("%s on %s returns a value; a %s method returns nothing", m.Name(), s.ts.Name.Name, kind)
+-	}
+ 	switch {
+ 	case IS_BEFORE_ALL.MatchString(m.Name()):
+ 		s.th.BeforeAll = tm

@@ -1,0 +1,120 @@
+package withsimplifytypes //nolint:stdlib-test
+
+import (
+	"errors"
+	"testing"
+	"unsafe"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type myErr struct{}
+
+func (*myErr) Error() string { return "boom" }
+
+type flag bool
+
+// === nil checks of a concrete pointer to an error type ===
+
+func TestConcreteErrorPointer(t *testing.T) {
+	var p *myErr
+	gotest.Zero(t, p)     // want `use Zero instead of True for nil check`
+	gotest.Zero(t, p)     // want `use Zero instead of Equal for nil comparison`
+	gotest.Zero(t, p)     // want `use Zero instead of Nil for nil check`
+	gotest.NotZero(t, p)  // want `use NotZero instead of NotNil for nil check`
+	gotest.Zero(t, p)     // a pointer is no error: no NoError
+	gotest.NotZero(t, p)  // nor Error
+	gotest.Empty(t, p)    // nor for Empty
+	gotest.NotEmpty(t, p) // nor NotEmpty
+	var err error = p
+	gotest.NoError(t, err) // want `use NoError instead of Zero for error zero check`
+	gotest.Error(t, err)   // want `use Error instead of True for error nil check`
+}
+
+// === interfaces: Nil and Empty look through them ===
+
+func TestInterfaces(t *testing.T) {
+	var err error
+	gotest.Nil(t, err)    // want `use NoError instead of Nil for error nil check — Nil looks through the error to a nil pointer it holds`
+	gotest.NotNil(t, err) // want `use Error instead of NotNil for error nil check — NotNil looks through the error`
+	gotest.Empty(t, err)  // want `use NoError instead of Empty for error empty check — Empty looks through the error to the value it holds`
+	var v any
+	gotest.Nil(t, v)  // want `use Zero instead of Nil for nil check — Nil looks through the interface to a nil pointer it holds`
+	gotest.Zero(t, v) // want `use Zero instead of True for nil check`
+}
+
+// === type parameters read as their core type ===
+
+func pointerParam[P ~*int](t *testing.T, p P) {
+	gotest.Zero(t, p) // want `use Zero instead of Nil for nil check`
+	gotest.Zero(t, p) // want `use Zero instead of True for nil check`
+}
+
+func sliceParam[P ~[]int](t *testing.T, p P) {
+	gotest.Nil(t, p) // want `use Nil instead of True for nil check`
+	gotest.Nil(t, p)
+}
+
+func errorParam[E error](t *testing.T, e E) {
+	gotest.Nil(t, e) // some type implementing error: no error assertion, no type guard
+}
+
+func intParam[P ~int](t *testing.T, p P) {
+	gotest.Nil(t, p) // want `type P is not nilable`
+}
+
+func unionParam[P ~*int | ~[]int](t *testing.T, p P) {
+	gotest.Nil(t, p) // no core type: its values decide
+}
+
+func TestUnsafePointer(t *testing.T) {
+	var up unsafe.Pointer
+	gotest.Zero(t, up) // want `use Zero instead of Nil for nil check`
+	gotest.Zero(t, up) // want `use Zero instead of True for nil check`
+}
+
+// === bool literals ===
+
+func TestBoolLiterals(t *testing.T) {
+	b := true
+	gotest.True(t, b)  // want `use True instead of Equal for bool literal comparison`
+	gotest.False(t, b) // want `use False instead of Equal for bool literal comparison`
+	var f flag
+	gotest.Equal(t, true, f) // a named bool: True takes bool
+	var v any = true
+	gotest.Equal(t, true, v) // any: True takes bool
+}
+
+// === Error() searches ===
+
+func TestErrorMessages(t *testing.T) {
+	err := errors.New("boom")
+	gotest.ErrorContains(t, err, "oo") // want `use ErrorContains instead of Contains for err.Error\(\) contains check`
+	p := &myErr{}
+	gotest.ErrorContains(t, p, "oo") // want `use ErrorContains instead of Contains for err.Error\(\) contains check`
+	var v myErr
+	gotest.Contains(t, v.Error(), "oo") // myErr itself does not implement error
+}
+
+// === orderings ===
+
+func floatParam[F ~float64](t *testing.T, x, y F) {
+	gotest.False(t, x > y) // NaN: !(x > y) is not x <= y
+}
+
+func numberParam[N ~int | ~float64](t *testing.T, x, y N) {
+	gotest.True(t, x < y) // may hold a float
+}
+
+func TestOrderings(t *testing.T) {
+	i, j := 1, 2
+	gotest.LessOrEqual(t, i, j) // want `use LessOrEqual instead of False for > comparison`
+	gotest.Less(t, i, j)        // want `use Less instead of True for < comparison`
+	x, y := 1.0, 2.0
+	gotest.False(t, x > y)  // NaN: !(x > y) is not x <= y
+	gotest.False(t, x >= y) // nor x < y
+	gotest.True(t, x < y)   // cmp.Compare orders NaN below every number
+	gotest.True(t, x <= y)  // and the operators order it nowhere
+	s, u := "a", "b"
+	gotest.Less(t, s, u) // want `use Less instead of True for < comparison`
+}

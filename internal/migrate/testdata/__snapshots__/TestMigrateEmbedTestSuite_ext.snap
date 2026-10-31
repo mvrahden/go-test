@@ -1,0 +1,248 @@
+=== SNAP TestBaseShapes/a_base_named_like_a_suite_that_no_runner_ran p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BaseSuiteHelper struct{}
+
+func (b *BaseSuiteHelper) TestShared(t *gotest.T) { fmt.Println("RAN base TestShared") }
+
+type ChildTestSuite struct{ base BaseSuiteHelper }
+
+func (s *ChildTestSuite) TestOwn(t *gotest.T) { fmt.Println("RAN child TestOwn") }
+
+func (s *ChildTestSuite) TestShared(t *gotest.T) {
+	s.base.TestShared(t)
+}
+
+=== SNAP TestBaseShapes/a_base_named_like_a_suite_that_no_runner_ran p/ref_test.go ===
+package p
+
+func newBase() *BaseSuiteHelper { return &BaseSuiteHelper{} }
+
+var _ = newBase
+
+=== SNAP TestBaseShapes/a_base_with_hooks p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BaseSuite struct {
+	n int
+}
+
+func (b *BaseSuite) BeforeAll(t *gotest.T)  { fmt.Println("RAN base SetupSuite") }
+func (b *BaseSuite) AfterAll(t *gotest.T)   { fmt.Println("RAN base TearDownSuite") }
+func (b *BaseSuite) BeforeEach(t *gotest.T) { b.n = 1; fmt.Println("RAN base SetupTest") }
+func (b *BaseSuite) AfterEach(t *gotest.T)  { fmt.Println("RAN base TearDownTest") }
+
+type ChildTestSuite struct {
+	base BaseSuite
+}
+
+func (s *ChildTestSuite) BeforeAll(t *gotest.T) {
+	s.base.BeforeAll(t)
+}
+
+func (s *ChildTestSuite) AfterAll(t *gotest.T) {
+	s.base.AfterAll(t)
+}
+
+func (s *ChildTestSuite) BeforeEach(t *gotest.T) {
+	s.base.BeforeEach(t)
+}
+
+func (s *ChildTestSuite) AfterEach(t *gotest.T) {
+	s.base.AfterEach(t)
+}
+
+func (s *ChildTestSuite) TestOwn(t *gotest.T) {
+	gotest.Equal(t, 1, s.base.n)
+	fmt.Println("RAN child TestOwn")
+}
+
+=== SNAP TestBaseShapes/a_base_with_tests_the_child_overrides_and_some_it_does_not p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BaseSuite struct{}
+
+func (b *BaseSuite) TestShared(t *gotest.T) {
+	gotest.True(t, true)
+	fmt.Println("RAN base TestShared")
+}
+
+func (b *BaseSuite) TestOverridden(t *gotest.T) { fmt.Println("RAN base TestOverridden") }
+
+type ChildTestSuite struct{ base BaseSuite }
+
+func (s *ChildTestSuite) TestOverridden(t *gotest.T) {
+	gotest.True(t, true)
+	fmt.Println("RAN child TestOverridden")
+}
+
+func (s *ChildTestSuite) TestShared(t *gotest.T) {
+	s.base.TestShared(t)
+}
+
+=== SNAP TestBaseShapes/a_keyed_literal p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BaseSuite struct {
+	n int
+}
+
+type ChildTestSuite struct {
+	base BaseSuite
+	m    int
+}
+
+func seeded() *ChildTestSuite { return &ChildTestSuite{base: BaseSuite{n: 4}, m: 5} }
+
+func (s *ChildTestSuite) TestLiteral(t *gotest.T) {
+	c := seeded()
+	gotest.Equal(t, 9, c.base.n+c.m)
+	fmt.Println("RAN child TestLiteral")
+}
+
+=== SNAP TestBaseShapes/a_selector_through_the_embedding p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BaseSuite struct {
+	n int
+}
+
+func (b *BaseSuite) value() int { return b.n + 1 }
+
+func (b *BaseSuite) check(t *gotest.T, v int) {
+	t.T().Log("checking")
+	gotest.Equal(t, 3, v)
+}
+
+type ChildTestSuite struct {
+	base BaseSuite
+}
+
+func (s *ChildTestSuite) TestSelectors(t *gotest.T) {
+	s.base.n = 2
+	s.base.n++
+	s.base.n--
+	s.base.check(t, s.base.value())
+	fmt.Println("RAN child TestSelectors", s.base.n)
+}
+
+=== SNAP TestBaseShapes/a_two-level_chain p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type RootSuite struct {
+	n int
+}
+
+func (r *RootSuite) BeforeEach(t *gotest.T) { r.n = 1; fmt.Println("RAN root SetupTest") }
+func (r *RootSuite) TestRoot(t *gotest.T)   { gotest.Equal(t, 1, r.n); fmt.Println("RAN root TestRoot") }
+
+type MidSuite struct {
+	base RootSuite
+}
+
+func (m *MidSuite) BeforeEach(t *gotest.T) {
+	m.base.BeforeEach(t)
+}
+
+func (m *MidSuite) BeforeAll(t *gotest.T) { fmt.Println("RAN mid SetupSuite") }
+func (m *MidSuite) TestMid(t *gotest.T) {
+	gotest.Equal(t, 1, m.base.n)
+	fmt.Println("RAN mid TestMid")
+}
+
+func (m *MidSuite) TestRoot(t *gotest.T) {
+	m.base.TestRoot(t)
+}
+
+type LeafTestSuite struct {
+	base MidSuite
+}
+
+func (s *LeafTestSuite) BeforeAll(t *gotest.T) {
+	s.base.BeforeAll(t)
+}
+
+func (s *LeafTestSuite) BeforeEach(t *gotest.T) {
+	s.base.BeforeEach(t)
+}
+
+func (s *LeafTestSuite) TestLeaf(t *gotest.T) {
+	gotest.Equal(t, 1, s.base.base.n)
+	s.base.base.n = 2
+	fmt.Println("RAN leaf TestLeaf", s.base.base.n)
+}
+
+func (s *LeafTestSuite) TestMid(t *gotest.T) {
+	s.base.TestMid(t)
+}
+
+func (s *LeafTestSuite) TestRoot(t *gotest.T) {
+	s.base.TestRoot(t)
+}
+
+=== SNAP TestBaseShapes/an_explicit_base_hook_call p/a_test.go ===
+package p
+
+import (
+	"fmt"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+type BaseSuite struct {
+	n int
+}
+
+func (b *BaseSuite) BeforeEach(t *gotest.T) { b.n = 1; fmt.Println("RAN base SetupTest") }
+
+type ChildTestSuite struct {
+	base BaseSuite
+	m    int
+}
+
+func (s *ChildTestSuite) BeforeEach(t *gotest.T) {
+	s.base.BeforeEach(t)
+	s.m = s.base.n + 1
+}
+
+func (s *ChildTestSuite) TestHook(t *gotest.T) {
+	gotest.Equal(t, 2, s.m)
+	fmt.Println("RAN child TestHook")
+}
+

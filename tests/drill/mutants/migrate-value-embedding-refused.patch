@@ -1,0 +1,27 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a testify suite embeds a base suite of the migrated test files / migrate leaves no marker for the embedding \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a testify suite embeds a base suite of the migrated test files / the migrated child compiles and gotest runs the base's hooks and tests on it \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a testify suite embeds a base suite of the migrated test files / the base becomes a helper type, its TestSuite suffix turned into SuiteHelper, that gotest does not run as a suite \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a testify suite embeds a base suite of the migrated test files / gotest lint reports no testify finding on the migrated code \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AChildsMethodCallingTheBase / when a method of the child without t calls a base method that gains t / the method gains t, its callers pass it, and the migrated child runs without a marker \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AGenericBase / when a testify suite embeds an instance of a generic base suite / the base stays a generic helper type and gotest runs its hooks and tests on the child \(
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ABasesTestsAmongTheChilds / when a base declares a test whose name sorts between the child's own tests / the migrated child declares its forwarding method between them \(
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / SuiteHooksABaseGives / when a base suite gives a child the SetupSuite that can stop early or the TearDownSuite / migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped \(
+Clause: when a testify suite embeds a base suite of the migrated test files → migrate leaves no marker for the embedding
+Clause: when a testify suite embeds a base suite of the migrated test files → the migrated child compiles and gotest runs the base's hooks and tests on it
+Clause: when a testify suite embeds a base suite of the migrated test files → the base becomes a helper type, its TestSuite suffix turned into SuiteHelper, that gotest does not run as a suite
+Clause: when a testify suite embeds a base suite of the migrated test files → gotest lint reports no testify finding on the migrated code
+Clause: when a method of the child without t calls a base method that gains t → the method gains t, its callers pass it, and the migrated child runs without a marker
+Clause: when a testify suite embeds an instance of a generic base suite → the base stays a generic helper type and gotest runs its hooks and tests on the child
+Clause: when a base declares a test whose name sorts between the child's own tests → the migrated child declares its forwarding method between them
+Clause: when a base suite gives a child the SetupSuite that can stop early or the TearDownSuite → migrate marks the AfterAll the child declares, or notes on the child that the AfterAll it forwards runs even after BeforeAll stopped
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -330,7 +330,7 @@
+ 					continue
+ 				}
+ 				e := u.embedField[field]
+-				if e != nil && (!e.ptr || u.ptrRunsFresh(e) && !u.ptrFieldSet(e)) {
++				if e != nil && e.ptr {
+ 					continue // the migration names the field
+ 				}
+ 				child, pos, local, generic := "", field.Pos(), false, false

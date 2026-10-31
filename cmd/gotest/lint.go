@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -114,6 +115,8 @@ func parseLintArgs(args []string) (lintArgs, error) {
 		switch {
 		case lintAnalyzerFlag(name):
 			a.analyzer = append(a.analyzer, "-"+name+"="+value)
+		case strings.HasPrefix(name, "skip-") && lint.Known(lint.Rule(strings.TrimPrefix(name, "skip-"))):
+			return a, integrityRuleError("-"+name, strings.TrimPrefix(name, "skip-"))
 		case name == "fix":
 			a.fix, err = strconv.ParseBool(value)
 		case name == "diff":
@@ -289,18 +292,24 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		res = fixed
 	}
 
+	findings := slices.Concat(res.Findings, res.Unapplied)
+	slices.SortStableFunc(findings, func(x, y lint.Finding) int {
+		return cmp.Or(cmp.Compare(x.File, y.File), cmp.Compare(x.Line, y.Line), cmp.Compare(x.Col, y.Col))
+	})
 	switch {
 	case a.json:
-		// As with the driver, -json exits 0 with findings.
+		// As with the driver, -json exits 0 with findings. A dropped fix
+		// has no place in its format; stderr names it.
 		if err := res.PrintJSON(stdout); err != nil {
 			fmt.Fprintf(stderr, "FAIL: %v\n", err)
 			return 1, true
 		}
+		reportLintPlain(stderr, res.Unapplied, -1, source)
 		return 0, true
 	case github && !a.diff:
-		return reportLintGitHub(stdout, dir, res.Findings), true
+		return reportLintGitHub(stdout, dir, findings), true
 	default:
-		return reportLintPlain(stderr, res.Findings, a.context, source), true
+		return reportLintPlain(stderr, findings, a.context, source), true
 	}
 }
 
@@ -421,7 +430,12 @@ func stripFlag(args []string, name string) []string {
 // file:line:col text, and a stderr mirror would surface every finding as a
 // second, job-titled annotation.
 func reportLintGitHub(stdout io.Writer, dir string, findings []lint.Finding) int {
-	base := dir
+	// GitHub resolves an annotation's file against the workspace, whatever
+	// directory the step runs in.
+	base := os.Getenv("GITHUB_WORKSPACE")
+	if base == "" {
+		base = dir
+	}
 	if base == "" {
 		base, _ = os.Getwd()
 	}
@@ -492,7 +506,7 @@ func splitBoolFlag(arg string) (name, value string) {
 
 func relPath(base, file string) string {
 	rel, err := filepath.Rel(base, file)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return file
 	}
 	return filepath.ToSlash(rel)
@@ -520,6 +534,12 @@ func appendLintStepSummary(annotations []gotestspec.Annotation) {
 	fmt.Fprintln(f)
 }
 
+// integrityRuleError refuses to skip an integrity rule, naming where the
+// attempt came from.
+func integrityRuleError(source, rule string) error {
+	return fmt.Errorf("integrity lint rule in %s: %q can only be suppressed per line with //nolint", source, rule)
+}
+
 // lintSkipFlags returns analyzer flags derived from the config's lint.skip
 // list, omitting any rules that are already set via CLI args.
 func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { //nolint:gocritic // hugeParam: stable API
@@ -527,7 +547,7 @@ func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { 
 	for _, rule := range cfg.Lint.Skip {
 		if !lint.SkippableRules[lint.Rule(rule)] {
 			if lint.Known(lint.Rule(rule)) {
-				return nil, fmt.Errorf("integrity lint rule in %s: %q can only be suppressed per line with //nolint", config.FileName, rule)
+				return nil, integrityRuleError(config.FileName, rule)
 			}
 			return nil, fmt.Errorf("unknown lint rule in %s: %q", config.FileName, rule)
 		}

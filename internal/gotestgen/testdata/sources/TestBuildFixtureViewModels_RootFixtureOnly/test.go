@@ -12,7 +12,7 @@ func (f *MyFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *MyFixture) AfterAll(ctx context.Context) error  { return nil }
 
 type MyTestSuite struct {
-	*MyFixture
+	Fix *MyFixture
 }
 
 func (s *MyTestSuite) TestOne(t *gotest.T) {}

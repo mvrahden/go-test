@@ -348,7 +348,7 @@ func (s *MigratePackageTestSuite) TestEmbeddingAcrossFiles(t *gotest.T) {
 	t.When("a struct in another file embeds the suite", func(w *gotest.T) {
 		w.It("refuses the child's file with a marker", func(it *gotest.T) {
 			gotest.Contains(it, run.files["user/wrap_test.go"],
-				"// TODO(gotest-migrate): wrap embeds BaseSuite, not suite.Suite — migrate this file by hand\ntype wrap struct{ *BaseSuite }")
+				"// TODO(gotest-migrate): wrap embeds *BaseSuite, which not every suite.Run sets to a fresh &BaseSuite{}, or other code sets; gotest creates a suite with new, which leaves that pointer nil — embed BaseSuite by value, or migrate this file by hand\ntype wrap struct{ *BaseSuite }")
 		})
 
 		w.It("refuses the suite's own file, saying why", func(it *gotest.T) {
@@ -389,6 +389,8 @@ type OtherSuite struct {
 }
 
 func (s *OtherSuite) SetupSuite() {}
+
+func (s *OtherSuite) TestOther() {}
 
 func TestOtherSuite(t *testing.T) {
 	suite.Run(t, new(OtherSuite))

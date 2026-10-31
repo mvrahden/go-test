@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / a float comparison is not rewritten into an ordering assertion( / .*)? \(
+Clause: when an assertion states an ordering comparison → a float comparison is not rewritten into an ordering assertion
+--- a/internal/lint/nilkind.go
++++ b/internal/lint/nilkind.go
+@@ -63,7 +63,7 @@
+ 	if !ok {
+ 		return true
+ 	}
+-	return b.Info()&types.IsFloat != 0
++	return b.Info()&types.IsFloat != 0 && false
+ }
+ 
+ // mayBeEmptyString reports whether a Contains needle may be the empty

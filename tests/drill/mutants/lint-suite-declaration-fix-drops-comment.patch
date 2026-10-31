@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterDeclarations .* / lint -fix moves it into its own declaration, doc comment kept, and the package then generates \(
+Clause: when a suite is declared inside a type block → lint -fix moves it into its own declaration, doc comment kept, and the package then generates
+--- a/internal/lint/declaration.go
++++ b/internal/lint/declaration.go
+@@ -79,9 +79,6 @@
+ 		return nil
+ 	}
+ 	start, end := ts.Pos(), ts.End()
+-	if ts.Doc != nil {
+-		start = ts.Doc.Pos()
+-	}
+ 	if ts.Comment != nil {
+ 		end = ts.Comment.End()
+ 	}

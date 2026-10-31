@@ -47,25 +47,6 @@ func (s *FuzzFanCompileTestSuite) goMod(ctx *fanCompileCtx, module string) []byt
 	return []byte("module " + module + "\n\ngo 1.24\n\nrequire github.com/mvrahden/go-test v0.0.0\n\nreplace github.com/mvrahden/go-test => " + ctx.repoRoot + "\n")
 }
 
-// fanImports lists the imports the emitted source needs, as the wrapper's
-// generated file declares them.
-func fanImports(set *gotestgen.FuzzTargetSet) []string {
-	imports := []string{`"testing"`, `"github.com/mvrahden/go-test/pkg/gotest"`}
-	if set.NeedsRuntime {
-		imports = append(imports, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
-	}
-	if set.NeedsStrings {
-		imports = append(imports, `"strings"`)
-	}
-	if set.NeedsStrconv {
-		imports = append(imports, `"strconv"`)
-	}
-	if set.NeedsMath {
-		imports = append(imports, `"math"`)
-	}
-	return imports
-}
-
 func (s *FuzzFanCompileTestSuite) run(t *gotest.T, ctx *fanCompileCtx, set *gotestgen.FuzzTargetSet, args ...string) []byte {
 	cmd := exec.Command("go", args...)
 	cmd.Dir = ctx.dir
@@ -98,7 +79,7 @@ func (s *FuzzFanCompileTestSuite) TestGeneratedFans(t *gotest.T, ctx *fanCompile
 	gotest.NoError(t, err)
 	s.write(t, ctx, "roundtrip_test.go", check)
 	s.write(t, ctx, "fan_gen.go", []byte(
-		"package fuzzfan\n\nimport (\n\t"+strings.Join(fanImports(set), "\n\t")+"\n)\n"+set.Source+fanExprsDecl(set)))
+		"package fuzzfan\n\nimport (\n\t"+strings.Join(set.Imports, "\n\t")+"\n)\n"+set.Source+fanExprsDecl(set)))
 
 	t.It("prints a literal for every representative value and reconstructs each one", func(it *gotest.T) {
 		s.write(it, ctx, "literal_print_test.go", []byte(literalPrintTestSrc(litFunc)))
@@ -137,12 +118,8 @@ func (s *FuzzFanCompileTestSuite) TestCrossPackageLiteral(t *gotest.T, ctx *fanC
 		gotest.NoError(it, err)
 		s.write(it, ctx, "TestFuzzCodec_CrossDep/test.go", crossdepSrc)
 
-		imports := fanImports(set)
-		for _, p := range set.PkgPaths {
-			imports = append(imports, fmt.Sprintf("%q", p))
-		}
 		s.write(it, ctx, "fan_gen.go", []byte(
-			"package check\n\nimport (\n\t"+strings.Join(imports, "\n\t")+"\n)\n"+set.Source+fanExprsDecl(set)))
+			"package check\n\nimport (\n\t"+strings.Join(set.Imports, "\n\t")+"\n)\n"+set.Source+fanExprsDecl(set)))
 		s.run(it, ctx, set, "build", "./...")
 	})
 }
@@ -152,7 +129,7 @@ func (s *FuzzFanCompileTestSuite) TestCrossPackageLiteral(t *gotest.T, ctx *fanC
 // against the generated functions the way the real generated file does.
 func fanExprsDecl(set *gotestgen.FuzzTargetSet) string {
 	var b strings.Builder
-	b.WriteString("\nvar _ = []*gotest.FuzzTarget{\n")
+	b.WriteString("\nvar _ = []*ƒgotest.FuzzTarget{\n")
 	for _, f := range set.Targets {
 		b.WriteString("\t")
 		b.WriteString(f.Expr)

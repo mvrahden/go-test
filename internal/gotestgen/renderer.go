@@ -5,6 +5,8 @@ import (
 	"embed"
 	"fmt"
 	"go/format"
+	gotypes "go/types"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -75,6 +77,7 @@ type SharedFixtureNodeVM struct {
 	PkgPath       string
 	DependsOn     []string
 	ParentFields  map[string]string // parent shared fixture identifier → field name
+	Named         *gotypes.Named    // the fixture type, nil when unknown
 }
 
 type headerImport struct {
@@ -82,7 +85,9 @@ type headerImport struct {
 	Path string
 }
 
-type renderer struct{}
+type renderer struct {
+	tags []string // the build tags the package was loaded under
+}
 
 // RenderTestSuiteSpec renders the generated test file for pkg. The returned
 // FuzzTargetSet is the fan-out the file was rendered with — nil when the package
@@ -100,25 +105,71 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 	sfNodeVMs := buildSharedFixtureNodeVMs(resolved.RequiredSharedFixtures)
 	hasFixtures := len(resolved.RootFixtures) > 0 || len(sfNodeVMs) > 0
 
+	// Every harness references gotestruntime: the ƒƒ_GOTEST_exec sentinel takes a
+	// gotestruntime.TestCase, and each Test function runs its methods there.
+	imps := newImportSet(pkg.PkgPath)
+	imps.std("testing")
+	imps.std(gotestImport)
+	imps.std(about.Repo + "/pkg/gotestruntime")
+	if hasFixtures {
+		if usesContext(allFixtures, sfNodeVMs) {
+			imps.std("context")
+		}
+		imps.std("time")
+	}
+
+	// Fixture packages take their aliases in path order, so a/pg is ƒpg0.
+	var fixturePkgs []*gotypes.Package
+	for _, rf := range allFixtures {
+		fixturePkgs = append(fixturePkgs, rf.Named.Obj().Pkg())
+	}
+	for _, sf := range sfNodeVMs {
+		if sf.Named != nil {
+			fixturePkgs = append(fixturePkgs, sf.Named.Obj().Pkg())
+		}
+	}
+	sort.Slice(fixturePkgs, func(i, j int) bool { return fixturePkgs[i].Path() < fixturePkgs[j].Path() })
+	for _, p := range fixturePkgs {
+		if p.Path() != pkg.PkgPath {
+			imps.use(p.Path(), p.Name())
+		}
+	}
+
 	// Resolved before anything is written: a non-fuzzable argument type is a
 	// generation-time refusal, not a half-written file.
-	fans, err := BuildFuzzTargets(pkg, spec.EffectiveTestSuites)
+	fans, err := buildFuzzTargets(pkg, spec.EffectiveTestSuites, imps)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	refs := typeRefs{
+		Fixtures: map[string]string{},
+		Shared:   map[string]string{},
+		Contexts: map[string]string{},
+	}
+	for _, rf := range allFixtures {
+		refs.Fixtures[rf.Identifier] = imps.typeRef(rf.Named)
+	}
+	for _, sf := range sfNodeVMs {
+		refs.Shared[sf.Identifier] = sf.QualifiedType
+		if sf.Named != nil {
+			refs.Shared[sf.Identifier] = imps.typeRef(sf.Named)
+		}
+	}
+	for _, ts := range spec.EffectiveTestSuites {
+		if ts.HasReturningBeforeEach() {
+			refs.Contexts[ts.Identifier()] = contextTypeRef(pkg, ts, imps)
+		}
 	}
 
 	suiteFixtures := buildSuiteFixtureSets(resolved, sfNodeVMs)
 
 	buf := bytes.NewBuffer(nil)
-	if err := r.renderFileHeader(buf, pkg, spec, hasFixtures, resolved.SuiteSharedFixtures, allFixtures, sfNodeVMs, fans); err != nil {
-		return nil, nil, fmt.Errorf("failed rendering file header. err: %w", err)
-	}
-
-	if err := r.renderFixtures(buf, allFixtures, sfNodeVMs); err != nil {
+	if err := r.renderFixtures(buf, allFixtures, sfNodeVMs, refs); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering fixtures. err: %w", err)
 	}
 
-	if err := r.renderTestSuites(buf, spec, suiteFixtures); err != nil {
+	if err := r.renderTestSuites(buf, spec, suiteFixtures, refs); err != nil {
 		return nil, nil, fmt.Errorf("failed rendering test suites. err: %w", err)
 	}
 
@@ -129,8 +180,41 @@ func (r renderer) RenderTestSuiteSpec(pkg *packages.Package, spec SpecOutcome, r
 		return nil, nil, fmt.Errorf("failed rendering fuzz suites. err: %w", err)
 	}
 
-	out, err := r.formatOutput(buf)
-	return out, fans, err
+	// The header goes last in: only now is every import known.
+	head := bytes.NewBuffer(nil)
+	if err := r.renderFileHeader(head, pkg, imps); err != nil {
+		return nil, nil, fmt.Errorf("failed rendering file header. err: %w", err)
+	}
+	head.Write(buf.Bytes())
+
+	out, err := r.formatOutput(head)
+	if err != nil {
+		return nil, fans, err
+	}
+	return withBuildTags(out, r.tags), fans, nil
+}
+
+// typeRefs name the types the templates write out, each through the
+// generated file's own imports.
+type typeRefs struct {
+	Fixtures map[string]string // package fixture identifier → type
+	Shared   map[string]string // shared fixture node identifier → type
+	Contexts map[string]string // suite identifier → BeforeEach's returned type
+}
+
+// contextTypeRef names the type ts's BeforeEach returns.
+func contextTypeRef(pkg *packages.Package, ts *gotestast.TestSuiteSpec, imps *importSet) string {
+	if pkg.Types != nil {
+		if tn, ok := pkg.Types.Scope().Lookup(ts.Identifier()).(*gotypes.TypeName); ok {
+			obj, _, _ := gotypes.LookupFieldOrMethod(gotypes.NewPointer(tn.Type()), true, pkg.Types, "BeforeEach")
+			if fn, ok := obj.(*gotypes.Func); ok {
+				if sig, ok := fn.Type().(*gotypes.Signature); ok && sig.Results().Len() == 1 {
+					return imps.typeRef(sig.Results().At(0).Type())
+				}
+			}
+		}
+	}
+	return ts.ContextTypeName()
 }
 
 // usesContext reports whether the fixture section names context: every package
@@ -147,80 +231,16 @@ func usesContext(allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM) bo
 	return false
 }
 
-func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, spec SpecOutcome, hasFixtures bool, suiteSharedFixtures map[string][]SharedFixtureRef, allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM, fans *FuzzTargetSet) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, imps *importSet) error {
 	type TplData struct {
 		RepoName    string
 		PackageName string
 		Imports     []headerImport
 	}
-	// Every harness references gotestruntime: the ƒƒ_GOTEST_exec sentinel takes a
-	// gotestruntime.TestCase, and each Test function runs its methods there.
-	imports := []headerImport{
-		{Path: "testing"},
-		{Path: about.Repo + "/pkg/gotest"},
-		{Path: about.Repo + "/pkg/gotestruntime"},
-	}
-	// Every path goes through addImport: gotestruntime is reachable from two
-	// independent sources (fixtures and fuzz fans), and a duplicated import
-	// line is a compile error in the generated file.
-	seenPkg := map[string]bool{}
-	addImport := func(path string) {
-		if path == "" || seenPkg[path] {
-			return
-		}
-		seenPkg[path] = true
-		imports = append(imports, headerImport{Path: path})
-	}
-	if hasFixtures {
-		if usesContext(allFixtures, sfNodes) {
-			addImport("context")
-		}
-		addImport("time")
-	}
-	if fans != nil && fans.Source != "" {
-		// Generated targets reference the gotestfuzz leaf helpers,
-		// and the hybrid-leaf reader/writer.
-		if fans.NeedsRuntime {
-			addImport(fuzzRuntimeImport)
-		}
-		for _, path := range fans.PkgPaths {
-			addImport(path)
-		}
-		// strings/strconv/math back the literal-rendering functions, and are
-		// only pulled in when at least one was actually emitted.
-		if fans.NeedsStrings {
-			addImport("strings")
-		}
-		if fans.NeedsStrconv {
-			addImport("strconv")
-		}
-		if fans.NeedsMath {
-			addImport("math")
-		}
-	}
-	for _, rf := range allFixtures {
-		addImport(rf.PkgPath)
-		for _, sf := range rf.SharedFixtures {
-			addImport(sf.PkgPath)
-		}
-	}
-	for _, refs := range suiteSharedFixtures {
-		for _, sf := range refs {
-			addImport(sf.PkgPath)
-		}
-	}
-	for _, sf := range sfNodes {
-		if sf.PkgPath != pkg.PkgPath {
-			addImport(sf.PkgPath)
-		}
-	}
-	for _, ts := range spec.EffectiveTestSuites {
-		addImport(ts.ContextTypePkgPath())
-	}
 	data := TplData{
 		RepoName:    about.ShortInfo(),
 		PackageName: pkg.Name,
-		Imports:     imports,
+		Imports:     imps.imports(),
 	}
 	return headerTpl.ExecuteTemplate(buf, "header.go.tpl", map[string]any{"Header": data})
 }
@@ -228,13 +248,14 @@ func (r *renderer) renderFileHeader(buf *bytes.Buffer, pkg *packages.Package, sp
 // Every wrapper template gets the same per-suite fixture sets, so each kind of
 // wrapper holds and wires a suite's fixtures the same way.
 
-func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteFixtures map[string]SuiteFixtureSet) error { //nolint:gocritic // hugeParam: stable API
+func (r *renderer) renderTestSuites(buf *bytes.Buffer, spec SpecOutcome, suiteFixtures map[string]SuiteFixtureSet, refs typeRefs) error { //nolint:gocritic // hugeParam: stable API
 	if len(spec.EffectiveTestSuites) == 0 && len(spec.SkippedTestSuites) == 0 {
 		return nil
 	}
 	return gotestTpl.ExecuteTemplate(buf, "gotest.suites.tpl", map[string]any{
-		"Spec":     spec,
-		"Fixtures": suiteFixtures,
+		"Spec":         spec,
+		"Fixtures":     suiteFixtures,
+		"ContextTypes": refs.Contexts,
 	})
 }
 
@@ -301,7 +322,7 @@ func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestS
 	return out, nil
 }
 
-func (r *renderer) renderFixtures(buf *bytes.Buffer, allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM) error {
+func (r *renderer) renderFixtures(buf *bytes.Buffer, allFixtures []*BoundFixture, sfNodes []*SharedFixtureNodeVM, refs typeRefs) error { //nolint:gocritic // hugeParam: stable API
 	if len(allFixtures) == 0 && len(sfNodes) == 0 {
 		return nil
 	}
@@ -309,6 +330,8 @@ func (r *renderer) renderFixtures(buf *bytes.Buffer, allFixtures []*BoundFixture
 	return gotestTpl.ExecuteTemplate(buf, "gotest.fixture.tpl", map[string]any{
 		"AllFixtures":        allFixtures,
 		"SharedFixtureNodes": sfNodes,
+		"FixtureTypes":       refs.Fixtures,
+		"SharedTypes":        refs.Shared,
 	})
 }
 
@@ -327,21 +350,15 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixt
 
 	stateKeyToID := make(map[string]string, len(sharedFixtures))
 	for i := range sharedFixtures {
-		id := sharedFixtures[i].Identifier
-		if sharedFixtures[i].PkgName != "" {
-			id = sharedFixtures[i].PkgName + "_" + sharedFixtures[i].Identifier
-		}
+		id := sharedFixtures[i].nodeID()
 		stateKeyToID[sharedFixtures[i].PkgPath+"."+sharedFixtures[i].Identifier] = id
 	}
 
 	var vms []*SharedFixtureNodeVM
 	for i := range sharedFixtures {
 		sf := &sharedFixtures[i]
-		id := sf.Identifier
+		id := sf.nodeID()
 		qualifiedType := sf.QualifiedType
-		if sf.PkgName != "" {
-			id = sf.PkgName + "_" + sf.Identifier
-		}
 
 		var dependsOn []string
 		for _, depKey := range sf.Dependencies {
@@ -370,6 +387,7 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixt
 			PkgPath:       sf.PkgPath,
 			DependsOn:     dependsOn,
 			ParentFields:  parentFields,
+			Named:         sf.Named,
 		})
 	}
 	return vms

@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 // CacheFixture is a fixture-typed field (ends in "Fixture") for the
 // bench-fixture-io testdata below.
 type CacheFixture struct{}
+
+func (f *CacheFixture) BeforeAll(context.Context) error { return nil }
 
 type ParserBenchTestSuite struct{}
 

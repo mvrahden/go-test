@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldPaths / PackagePaths / when a type or a function is named by an absolute package path from outside its module / scaffolds into the package's directory / a type \(
+Clause: when a type or a function is named by an absolute package path from outside its module → scaffolds into the package's directory
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -301,11 +301,7 @@
+ 	if !isPathPattern(pkgPattern) {
+ 		return cfg, pkgPattern
+ 	}
+-	cfg.Dir = pkgPattern
+-	if abs, err := filepath.Abs(pkgPattern); err == nil {
+-		cfg.Dir = abs
+-	}
+-	return cfg, "."
++	return cfg, pkgPattern
+ }
+ 
+ // isPathPattern reports whether a package pattern is a directory path, not

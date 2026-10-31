@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / TearDownSuiteAfterASetupSuiteThatCanStop / when a suite declares TearDownSuite and a SetupSuite that can stop early / migrate marks AfterAll, which gotest runs even after BeforeAll stopped \(
+Clause: when a suite declares TearDownSuite and a SetupSuite that can stop early → migrate marks AfterAll, which gotest runs even after BeforeAll stopped
+--- a/internal/migrate/unit.go
++++ b/internal/migrate/unit.go
+@@ -584,7 +584,7 @@
+ 		u.collectNeedsT()
+ 		u.collectForwards()
+ 		for _, s := range u.suites {
+-			s.setupStops = s.migrated() && u.setupMayStop(s)
++			s.setupStops = false
+ 		}
+ 		u.gate()
+ 	}

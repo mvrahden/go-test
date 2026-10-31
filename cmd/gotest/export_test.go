@@ -19,6 +19,10 @@ var (
 // bench.go
 var ExportRunBench = runBench
 
+// clean.go
+var ExportGeneratedFiles = generatedFiles
+var ExportIsGenerated = isGenerated
+
 // cli.go
 var (
 	ExportResolveGlobalTimeout = resolveGlobalTimeout
@@ -172,6 +176,7 @@ func ExportSpliceExpr(a corpusArg) (string, error) { return a.spliceExpr() }
 var (
 	ExportLintGitHubArmed       = lintGitHubArmed
 	ExportAppendLintStepSummary = appendLintStepSummary
+	ExportRelPath               = relPath
 )
 
 // ExportRunLintGitHub runs lint in-process with GitHub annotations.

@@ -1,0 +1,14 @@
+Expect: shapes nameistest: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFieldNameAndCaselessShapes
+Clause: when a suite names its fixtures and methods → a method whose name continues Test with a lowercase letter is not a case, as under go test
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -39,7 +39,7 @@
+ 	for _, prefix := range []string{"Test", protocol.PrefixBenchmark, protocol.PrefixFuzz} {
+ 		if rest, ok := strings.CutPrefix(name, prefix); ok {
+ 			r, _ := utf8.DecodeRuneInString(rest)
+-			return rest == "" || !unicode.IsLower(r)
++			return rest == "" || !unicode.IsSpace(r)
+ 		}
+ 	}
+ 	return true

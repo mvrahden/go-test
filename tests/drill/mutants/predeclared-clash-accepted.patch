@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery GeneratedFiles .* / a package declaring a name Go predeclares that the harness uses is rejected at the declaration \(
+Clause: when the package declares names the harness imports → a package declaring a name Go predeclares that the harness uses is rejected at the declaration
+--- a/internal/gotestast/predeclared.go
++++ b/internal/gotestast/predeclared.go
+@@ -46,6 +46,8 @@
+ 		default:
+ 			continue
+ 		}
++		_ = obj
++		continue
+ 		return obj.Pos(), fmt.Errorf("package %s declares %s, a name Go predeclares that the generated harness uses; rename it", pkg.Types.Name(), name)
+ 	}
+ 	return token.NoPos, nil

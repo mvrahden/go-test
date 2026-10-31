@@ -10,10 +10,10 @@ type InfraFixture struct{ Val string }
 func (f *InfraFixture) BeforeAll(ctx context.Context) error { return nil }
 func (f *InfraFixture) AfterAll(ctx context.Context) error  { return nil }
 
-type APIFixture struct{ *InfraFixture }
+type APIFixture struct{ InfraFixture *InfraFixture }
 
 func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type FullTestSuite struct{ *APIFixture }
+type FullTestSuite struct{ APIFixture *APIFixture }
 
 func (s *FullTestSuite) TestOne(t *gotest.T) {}

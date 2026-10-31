@@ -276,13 +276,13 @@ func checkFuzzSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map[st
 	})
 }
 
-// isFuzzMethodName mirrors gotestast's IS_FUZZ classification
-// (^(?:X_|F_)?Fuzz.+$): an optional X_/F_ marker prefix, then "Fuzz"
-// followed by at least one more character.
+// isFuzzMethodName mirrors gotestast's IS_FUZZ classification: an optional
+// X_/F_ marker prefix, then "Fuzz" followed by at least one more character
+// that go test's rule accepts (not a lowercase letter).
 func isFuzzMethodName(name string) bool {
 	stripped := strings.TrimPrefix(strings.TrimPrefix(name, protocol.PrefixFocused), protocol.PrefixExcluded)
 	rest, ok := strings.CutPrefix(stripped, protocol.PrefixFuzz)
-	return ok && rest != ""
+	return ok && rest != "" && gotestast.IsGoTestName(stripped)
 }
 
 // fuzzParamName returns the name of a Fuzz* method's sole parameter (its

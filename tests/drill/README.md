@@ -1,3 +1,5 @@
+| `migrate-workspace-dir-resolved` | migrate loads a directory by its resolved path, which the go command judges outside a go.work reached through a symlink | conformance: the migrate It for a workspace through a symlinked directory sees the file left unchecked |
+| `scaffold-working-directory-resolved` | `scaffold` loads a type's package from its directory as the go command resolves it, not as the working directory names it | conformance: the CLI scaffold It for a symlinked working directory sees the generated file named by a path through the real directory |
 # Mutation drill
 
 The drill is a test of the tests. gotest runs its own test suites, so a bug
@@ -285,7 +287,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-beforeeach-after-a-fixture-overran` | a fixture's `BeforeEach` starts after an earlier fixture's overran the `Timeout` | canary: the hookoverrun later fixture's `BeforeEach` runs |
 | `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
-| `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is located through that package's own FileSet | canary: the fixtureelsewhere remote failure is unlocated |
+| `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is left unlocated | canary: the fixtureelsewhere remote failure is unlocated |
 | `fixture-report-in-runtime` | an error a fixture's `BeforeEach` returns is located in the runtime's `methods.go` | canary: the fixturehookfail failure names a runtime file, not the hook's |
 | `focus-ci-guard-tests-only` | `--ci` checks only test methods for the `F_` prefix, so a focused benchmark or fuzz method passes | cli conformance: `--ci` fails a run whose only focused method is a benchmark or a fuzz target |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
@@ -567,6 +569,144 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
 | `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
 | `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own with an empty status | spec conformance: the failed When's row carries no FAIL and no message |
+| `shapes-grouped-suite-accepted` | a suite declared inside a type block is not refused | canary: the `shapes/grouped` package exits 0 instead of 2 |
+| `shapes-grouped-fixture-accepted` | a fixture declared inside a type block is not refused | canary: the `shapes/groupedfixture` package exits 0 instead of 2 |
+| `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |
+| `shapes-nested-suite-accepted` | a suite-typed field of a suite is not refused | canary: the `shapes/nested` package exits 0 instead of 2 |
+| `shapes-every-field-rejected` | every field of a suite or fixture is refused | canary: the `shapes/plain` package exits 2 instead of 0 |
+| `alias-receiver-unresolved` | a method whose receiver names the suite through an alias is not read | canary: the `shapes/aliasrecv` package exits 2 instead of 0 |
+| `alias-of-alias-skipped` | an alias of an alias is not unwrapped to the suite it names | canary: the `shapes/aliasalias` alias of an alias has no pass verdict |
+| `defined-over-suite-accepted` | a defined type over a suite, or over any type that declares a case, is read as a helper with no case | canary: the `shapes/sigdefined` and `shapes/recvdefined` packages exit 0 instead of 2 |
+| `receiver-matched-by-name` | a suite's methods are found by the receiver's name, not its type | canary: the `shapes/recvcollide` alias, named like another type of the aliased package, exits 2 instead of 0 |
+| `method-results-accepted` | a Test method that returns a value is not refused | canary: the `shapes/sigresult` run has no line naming the returning method |
+| `shared-fixture-in-test-file-accepted` | a shared fixture declared in a `_test.go` file is not refused | canary: the `shapes/sharedintest` package exits 1 instead of 2 |
+| `cross-package-alias-methods-dropped` | an alias of another package's generic suite is read in its own package only | canary: the `shapes/xpkgcontract` package exits 2 instead of 0 |
+| `cross-package-fixture-hooks-unchecked` | the hook signatures of another package's fixture are not checked | canary: the `shapes/xpkgfixture` package is not refused with the signature it needs |
+| `cross-package-fixture-methods-unchecked` | a package fixture from another package is checked for its hooks alone, not its `FixtureConfig`, `Hydrate` or `Dehydrate` | canary: the `shapes/xpkgconfig` run fails to build instead of naming the method, and `shapes/xpkghydrate` runs instead of exiting 2 |
+| `fixture-field-by-value-accepted` | a fixture field held by value is not refused | canary: the `shapes/fieldvalue` and `shapes/fieldalias` packages exit 1 instead of 2 |
+| `fixture-field-alias-pointer-unbound` | a field typed by an alias of a fixture pointer is not seen as a fixture | canary: the `shapes/fieldaliasptr` package exits 1 instead of 0 |
+| `fixture-field-duplicate-accepted` | a second field of the same fixture type is not refused | canary: the `shapes/fielddup` and `shapes/fielddupparent` packages exit 0 instead of 2 |
+| `unreached-fixture-validated` | every type named like a fixture is checked, bound or not | canary: the `shapes/fieldunreferenced` package exits 2 instead of 0 |
+| `lowercase-after-test-is-a-case` | a method continuing `Test` with a lowercase letter is read as a case | canary: the `shapes/nameistest` package exits 2 instead of 0 |
+| `lowercase-case-taking-t-accepted` | a method taking its case's T under a name go test would not run passes as a helper | canary: the `shapes/namelower` package exits 0 instead of 2 |
+| `caseless-suite-accepted` | a type named like a suite that declares no case is accepted | canary: the `shapes/caseless` package exits 0 instead of 2 and `discover` does not report it broken |
+| `caseless-excluded-case-uncounted` | an excluded case does not count as a declared one | canary: the `shapes/excludedonly` package exits 2 instead of 0 |
+| `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package is refused at its helper field as a nested suite, not at the helper's declaration |
+| `caseless-testify-base-collected` | a testify suite embedding testify's suite through a base is read as a gotest suite | conformance: the discovery It for a testify base suite sees exit 2 |
+| `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
+| `harness-imports-collide-by-name` | two imported packages of the same name get the same alias | canary: the `shapes/genpgpg` package exits 2 instead of 0 |
+| `predeclared-clash-accepted` | a package redeclaring a name Go predeclares that the harness uses is generated for | conformance: the discovery It for `shapes/genpredeclared` sees a build failure instead of the located refusal |
+| `generate-loads-stale-files` | the go command compiles the generated files on disk while packages load | canary: the second generate of the staged `shapes/genrename` and the `shapes/stalerename` run exit 2 |
+| `discover-reads-stale-files` | a load parses the generated files on disk as written | canary: `discover` does not list `shapes/stalerename`'s NewTestSuite alone |
+| `generate-rewrites-unchanged` | `generate` writes a generated file whose content did not change | conformance: the discovery It for an unchanged generated file finds a new mtime |
+| `compile-overlay-keeps-stale-files` | a run's overlay stubs no generated file it does not regenerate | conformance: the discovery It for a stale generated file fails to build |
+| `tags-flag-unnormalized` | `--tags` is not spelled as go's `-tags` | conformance: the discovery It for `--tags=` sees `--tags` refused as an unknown flag with exit 2 |
+| `scaffold-package-path-loaded-as-pattern` | `scaffold` loads a type's or function's package path as a pattern from the working directory, not from the path itself | conformance: the CLI scaffold It for an absolute package path named from outside the module fails with exit 1 |
+| `scaffold-absolute-package-path-not-a-path` | an absolute package path is not read as a directory path | conformance: the CLI scaffold It for a package path through a symlinked directory fails with exit 1 |
+| `scaffold-generic-type-accepted` | `scaffold` writes a suite for a generic type | conformance: the CLI scaffold It for a generic type sees exit 0 and a written file |
+| `scaffold-caseless-type-written` | `scaffold` writes a suite without a case for a type without an exported method | conformance: the CLI scaffold It for such a type sees exit 0 and a written file |
+| `scaffold-suite-name-read-from-non-test-files` | the suite-name check reads only the package's non-test files | conformance: the CLI scaffold It for a suite name a test file declares sees exit 0 and a duplicate written |
+| `scaffold-subject-self-qualified` | the type scaffold names its subject through its own package | conformance: the CLI scaffold It for a type with methods sees go vet fail |
+| `scaffold-ignores-symlinks` | `scaffold` loads a file's package by its directory as a pattern, not from the directory itself | conformance: the CLI scaffold It for a file named through a symlinked directory fails with exit 1 |
+| `focus-decided-per-package` | the generator decides focus for each package on its own, not for the whole run | canary: the `shapes/focusacross` unfocused suite is not skipped and its fixtures start |
+| `focus-decided-per-variant` | the external test package decides its focus on its own | canary: the `shapes/focusvariants` external suite is not skipped |
+| `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
+| `external-generic-alias-dropped` | an alias of a generic suite in the external test package is read as a suite without cases | canary: none of the `shapes/pxgenericalias` aliases' methods passes |
+| `focus-method-not-run-wide` | only a focused suite, never a focused method, focuses the whole run | canary: the `shapes/focusmethod` unfocused suite in the other package is not skipped |
+| `focus-fuzz-method-not-run-wide` | a focused fuzz method does not focus the whole run | conformance: the discovery It for a focused fuzz method sees the unfocused suite in the other package run |
+| `hooks-calling-t-alias-unseen` | the hooks of a generic suite another package declares are read with the alias's package's types | cli conformance: the cross-package alias row runs instead of failing with exit 2 |
+| `fuzz-alias-methods-read-in-alias-package` | a fuzz method of a generic suite another package declares is read with the alias's package's types | conformance: the fuzz It for a cross-package alias sees the method refused as never calling `f.Fuzz` |
+| `fuzz-alias-type-parameter-unread` | a fuzz callback's type parameter is not read as the type the alias instantiates | conformance: the fuzz It for a type-parameter callback sees the target refused as not fuzzable |
+| `testify-suite-generated` | the generator reads a testify suite as a gotest suite | cli conformance: the package holding a testify suite beside a gotest suite fails with exit 2 |
+| `lint-generation-rejects-silent` | the `generation-rejects` lint rule reports nothing | conformance: the lint It for a package the generator rejects finds no `generation-rejects` finding |
+| `discover-rejected-not-broken` | `discover` lists a package the generator rejects without marking it broken | conformance: the lint It for `discover` on a rejected package sees no `broken` flag |
+| `lint-suite-declaration-silent` | `suite-declaration` never reports a suite inside a type block | conformance: the lint It for a suite in a type block finds no `suite-declaration` finding |
+| `lint-suite-declaration-fix-drops-comment` | the `suite-declaration` fix moves the suite without its doc comment | conformance: the lint `-fix` It finds the doc comment left behind in the block |
+| `lint-no-embedding-silent` | `no-embedding` never reports a field | conformance: the lint It for an embedded fixture finds no `no-embedding` finding |
+| `lint-fixture-hook-call-silent` | `fixture-hook-call` never reports a call | conformance: the lint It for a hook call finds no `fixture-hook-call` finding |
+| `lint-fixture-hook-call-own-connect` | a shared fixture's `BeforeAll` calling its own `Hydrate` is reported as a hook called twice | conformance: the lint It for a shared fixture connecting in its own setup finds the call reported |
+| `lint-error-mapping-accepts-implementers` | a nil check maps to `NoError`/`Error` for any type implementing error, a concrete pointer included | conformance: the lint It for a concrete pointer's nil comparison sees a typed nil fail `NoError` |
+| `lint-nil-check-of-interface-fixed` | `Nil`/`NotNil` of an error is fixed into `NoError`/`Error` | conformance: the lint It for a Nil check of an interface sees an error holding a nil pointer flip its verdict |
+| `lint-type-parameter-read-as-constraint` | a type parameter's operand is read as its constraint interface, not its core type | conformance: the lint It for type parameters finds no `Zero` fix and a `Zero` that does not compile |
+| `lint-len-rewrite-any-operand` | a length rewrite is offered whatever the operand's type, a pointer to an array or an interface included | conformance: the lint It for lengths finds a rewritten row whose verdict changed |
+| `lint-equality-structure-reaching-pointers` | `True(a == b)` on values that reach a pointer is rewritten into `Equal` | conformance: the lint It for equalities finds the struct row's verdict changed |
+| `lint-type-argument-ignored` | `Equal` under an explicit type argument is rewritten by the operand's own type | conformance: the lint It for type arguments finds a rewritten row whose verdict changed |
+| `lint-errors-is-fixed` | `True(errors.Is(err, target))` gets an `ErrorIs` fix | conformance: the lint It for `errors.Is` finds the nil-target row's verdict changed |
+| `lint-guard-fixed` | `ErrorIs` with a nil target is rewritten into `NoError` | conformance: the lint It for guards finds the row's verdict changed |
+| `lint-redundant-notnil-unguarded` | a `NotNil` that fails its type guard is removed as redundant | conformance: the lint It for redundant assertions finds the string row's verdict changed |
+| `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |
+| `lint-error-contains-any-receiver` | `Contains(t, v.Error(), s)` becomes `ErrorContains` on a receiver that does not implement error | conformance: the lint It for Error searches sees the fix fail to compile |
+| `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |
+| `lint-fix-all-or-nothing` | a `-fix` run with one fix that does not compile applies none | conformance: the lint `-fix` It finds the run failed and the other fixes unwritten |
+| `lint-fix-errors-repeated` | a compiler error is listed again as the go command printed it | conformance: the lint It for a target that does not compile counts its error twice |
+| `lint-rule-testify-suites-checked` | a struct embedding testify's `suite.Suite` is read as a gotest suite | conformance: the lint It for a testify suite finds gotest suite rules or generation-rejects reporting on it |
+| `lint-rule-own-t-method-escapes` | a `T()` call on any type counts as the `*gotest.T` escape | conformance: the lint It for a type with its own `T` method finds `t-escape` findings |
+| `lint-rule-poll-scope-misses-helpers` | `poll-scope` never reports the outer `t` passed to a helper | conformance: the lint It for a helper inside a polling callback finds no `poll-scope` finding |
+| `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
+| `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |
+| `lint-rule-simplify-fix-drops-comments` | the `assertion-simplify` fix drops comments between the arguments | conformance: the lint `-fix` It finds the comment gone |
+| `lint-rule-fail-guard-ignores-shadow` | `fail-guard` takes a local that shadows the `gotest` import for the package | conformance: the lint It for a local named `gotest` finds the guard in its scope reported |
+| `lint-erg-bare-nolint-reason-ignored` | a bare `//nolint` followed by a reason is not read as a nolint comment | conformance: the lint It for a bare nolint comment finds the line's finding reported |
+| `lint-erg-nolint-all-is-a-rule` | `//nolint:all` names a rule called `all` instead of every rule | conformance: the lint It for `nolint:all` finds the line's finding reported |
+| `lint-erg-unknown-nolint-silent` | a nolint comment naming an unknown rule is never reported | conformance: the lint It for an unknown rule finds no `nolint-unknown` finding |
+| `lint-erg-unknown-nolint-suppressible` | the unknown-rule finding goes through nolint suppression | conformance: the lint It for `nolint:all,not-a-rule` finds the comment silencing its own finding |
+| `lint-erg-foreign-nolint-unknown` | a golangci-lint linter's id counts as an unknown rule | conformance: the lint It for another linter's rule finds a `nolint-unknown` finding |
+| `lint-erg-generated-untracked-reported` | `generated-file` reports a generated file git does not track | conformance: the lint It for an untracked generated file finds it reported |
+| `lint-erg-git-failure-reads-as-outside` | `generated-file` reads every git failure as lying outside a repository | conformance: the lint It for an unreadable repository finds the plain checked-in finding |
+| `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
+| `lint-erg-generated-no-git-dropped` | `generated-file` reads a failed `git ls-files` as untracked | conformance: the lint It outside a git repository finds no finding |
+| `lint-erg-integrity-skip-usage` | `-skip-<integrity rule>` falls through to the driver's usage text | conformance: the lint It for `-skip-focus` finds the usage text instead of the refusal |
+| `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
+| `lint-gh-paths-from-working-directory` | annotation paths are relative to the working directory, not `$GITHUB_WORKSPACE` | conformance: the lint `--github` It for a step in a subdirectory finds a `../` path |
+| `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |
+| `toggle-focus-declaring-file-only` | `refactor toggle-focus` renames only the references in the file that declares the suite | conformance: the discovery It for a suite spread over several files finds receivers left unrenamed |
+| `rename-skips-instantiations` | the rename engine does not look inside a type instantiation, so `X[T]` receivers, literals and aliases keep the old name | conformance: the discovery It for a generic suite finds them unrenamed |
+| `toggle-focus-external-package-skipped` | `refactor toggle-focus` leaves the external test package out | conformance: the discovery It for the external test package finds its reference unrenamed |
+| `rename-embedded-field-skipped` | the rename engine leaves the selectors and literal keys that name an embedded suite's field | conformance: the discovery and lint Its for an embedded suite find `BaseTestSuite` left in the wrapper |
+| `toggle-constrained-files-unloaded` | `refactor toggle-focus` never type-checks a file a build constraint leaves out | conformance: the discovery It for files behind a build constraint sees the toggle refused |
+| `toggle-unresolved-reference-accepted` | a name in a file no build type-checks is left as it was without a word | conformance: the discovery It for an unresolvable reference sees exit 0 |
+| `toggle-interface-method-renamed` | a method an interface in the package names is renamed anyway | conformance: the discovery It for an interface method sees exit 0 |
+| `toggle-name-taken-ignored` | a toggle to a name already declared goes ahead | conformance: the discovery It for a taken name sees exit 0 |
+| `rename-by-spelling` | the rename engine renames every identifier spelled like the suite | conformance: the discovery It for a reused name finds the other scope's identifiers renamed |
+| `lint-focus-fix-declaring-file-only` | the `focus` fix renames only the references in the file that declares the suite | conformance: the lint `-fix` It for a suite spread over several files finds the fix dropped |
+| `rename-generic-type-unnamed` | the rename engine cannot name a generic type, so the `focus` fix renames only its declaration | conformance: the lint `-fix` It for a generic suite finds the fix dropped |
+| `lint-focus-fix-external-package-skipped` | the `focus` fix leaves the external test package out | conformance: the lint `-fix` It for the external test package finds the fix dropped |
+| `lint-focus-tests-only` | the `focus` rule reports only focused suites and Test methods, not benchmark or fuzz methods | conformance: the lint `-fix` It for benchmark and fuzz methods finds their `F_` left |
+| `lint-focus-constrained-files-skipped` | the `focus` fix leaves the files a build constraint leaves out | conformance: the lint `-fix` It for files behind a build constraint finds the focus left there |
+| `lint-focus-unresolved-accepted` | a constrained file no build type-checks is renamed past | conformance: the lint `-fix` It for such a file finds the fix applied |
+| `migrate-base-tests-not-forwarded` | a child of a base suite gets no forwarding method for the base's tests | conformance: the migrate Its for a child of a base, a base by pointer, a generic base and a base's tests among the child's find the base's test unforwarded |
+| `migrate-helper-keeps-suite-name` | a base no runner ran keeps a name gotest reads as a suite | conformance: the migrate It for the helper base finds the base still named BaseTestSuite |
+| `migrate-helper-name-collision-ignored` | a base's helper name already declared is taken anyway | conformance: the migrate It for a taken helper name finds no marker naming the collision |
+| `migrate-caseless-suite-migrated` | a testify suite that declares no test is migrated to a suite without a case | conformance: the migrate It for a suite with no test finds no marker |
+| `migrate-value-embedding-refused` | a child embedding its base by value is refused as before | conformance: every migrate It whose child embeds its base by value finds the child refused under the embedding marker |
+| `migrate-helper-keeps-suite-embedding` | a helper base keeps its `suite.Suite` embedding | conformance: the migrate It for a child of a base finds a testify lint finding |
+| `migrate-outside-base-ignored` | a base declared outside the migrated test files does not fail the run | conformance: the migrate It for an outside base finds an exit other than 2 |
+| `migrate-goroutine-assertion-translated` | an assertion inside a `go` statement is translated like any other | conformance: the migrate It for an assertion on a goroutine finds no marker |
+| `migrate-elements-compared-by-identity` | `ElementsMatch`/`Subset` over pointer or interface elements are translated | conformance: the migrate It for elements compared deeply finds no marker |
+| `migrate-interface-zero-translated` | `Zero` on an interface-typed value is translated | conformance: the migrate It for Zero or Empty on an interface finds no `Zero` marker |
+| `migrate-untyped-constant-converted` | `Equal` with an untyped constant of another type than the value is translated | conformance: the migrate It for an untyped constant finds no marker |
+| `migrate-teardown-guarantee-unmarked` | a `SetupSuite` that can stop early leaves `AfterAll` unmarked | conformance: the migrate It for TearDownSuite beside such a SetupSuite finds no marker |
+| `migrate-lifecycle-bypass-kept` | `s.T().Parallel()` and `s.T().Cleanup` become `t.T()` calls with no marker | conformance: the migrate It for Parallel and Cleanup finds no marker |
+| `migrate-order-change-unnoted` | a suite whose tests gotest runs in another order gets no note | conformance: the migrate It for tests in another order finds no note |
+| `migrate-forwards-before-own-tests` | a base's forwarded tests all go right after the child's type | conformance: the migrate It for a base's tests among the child's finds them out of name order |
+| `migrate-load-mod-flag-dropped` | the package load runs without `-mod=readonly`, so `GOFLAGS=-mod=mod` lets the go command write go.sum | conformance: the migrate It for `GOFLAGS=-mod=mod` finds go.sum changed |
+| `migrate-import-lines-kept` | removed testify imports leave their lines behind as blank lines | conformance: the migrate It for testify imports between others finds a blank line in the block |
+| `migrate-pointer-embedding-refused` | a child embedding its base by a pointer its runner sets fresh is refused | conformance: the migrate It for a base embedded by pointer finds the exit 1 of a marker |
+| `migrate-generic-base-refused` | a generic base embedded by a child is refused like a generic suite run directly | conformance: the migrate It for a generic base finds the exit 1 of a marker |
+| `migrate-local-embedding-unexplained` | a local struct embedding a base is marked without the package-level reason | conformance: the migrate It for a local or anonymous embedding finds the old marker |
+| `migrate-nontest-base-exits-2` | a base in a non-test file of the suite's directory fails the run with exit 2 | conformance: the migrate It for a base in a non-test file finds exit 2 |
+| `migrate-child-method-keeps-no-t` | a child's method calling a base method that gains t gets no t | conformance: the migrate It for a child's method calling the base finds a compile marker |
+| `migrate-interface-notnil-guarded` | `NotNil` on an interface becomes `gotest.NotZero`, which passes a typed nil testify failed | conformance: the migrate It for NotNil on an interface finds no marker |
+| `migrate-import-comment-orphaned` | a removed import leaves its comment behind | conformance: the migrate It for a comment on a removed import finds the comment in the import block |
+| `migrate-setup-callee-unfollowed` | a `SetupSuite` that stops only through a helper, a suite method or code handed its T counts as unable to stop | conformance: the migrate It for a SetupSuite stopping through what it calls finds no marker |
+| `migrate-base-setup-ignored` | a `SetupSuite` the child has from its base is not read | conformance: the migrate It for suite hooks a base gives finds no marker on the child's AfterAll |
+| `migrate-qualified-constant-converted` | an untyped constant named through its package counts as typed | conformance: the migrate It for a constant of another package finds no marker |
+| `migrate-concrete-types-instantiated` | `Equal`/`NotEqual` of two concrete types is instantiated with one of them | conformance: the migrate It for two concrete types finds no marker |
+| `migrate-interface-equal-uninstantiated` | `Equal`/`NotEqual` of an interface and a value it holds is left to inference | conformance: the migrate It for two concrete types finds the interface comparison uninstantiated |
+| `migrate-pointer-array-len-translated` | `Len` on a pointer to an array is translated | conformance: the migrate It for Len on a pointer to an array finds no marker |
+| `migrate-nan-indelta-translated` | `InDelta` is translated whatever may be NaN | conformance: the migrate It for InDelta where a NaN decides finds no marker |
+| `migrate-workspace-vendor-ignored` | the vendor directory is looked for beside go.mod even where a workspace governs | conformance: the migrate It for a vendored workspace finds the load failing offline |
+| `migrate-goenv-gowork-ignored` | the workspace is resolved without the `go env -w` settings | conformance: the migrate It for a workspace turned off by go env finds the load failing offline |
 
 ## Adding a mutant
 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ZeroOrEmptyOnAnInterface / when Zero or Empty checks a value of an interface type / migrate leaves it unconverted under a marker saying testify judged the value inside \(
+Clause: when Zero or Empty checks a value of an interface type → migrate leaves it unconverted under a marker saying testify judged the value inside
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -50,8 +50,6 @@
+ 
+ 	case "Zero", "NotZero":
+ 		switch {
+-		case isIface && name == "Zero":
+-			return "", nil, "testify Zero on interface type " + ts + " also passes for a zero value inside it, a typed nil included; gotest.Zero passes only for nil — use gotest.Zero if nil is meant"
+ 		case isIface && name == "NotZero":
+ 			return "", nil, "testify NotZero on interface type " + ts + " also fails for a zero value inside it; gotest.NotZero fails only for nil — use gotest.NotZero if non-nil is meant"
+ 		case types.Comparable(t):

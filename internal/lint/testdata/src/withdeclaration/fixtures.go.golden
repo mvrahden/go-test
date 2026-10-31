@@ -1,0 +1,12 @@
+package withdeclaration
+
+import "context"
+
+type (
+	other int
+)
+
+// CacheSharedFixture is bound from other packages.
+type CacheSharedFixture struct{ Addr string } // want `fixture CacheSharedFixture is declared inside a type block; give it its own type declaration`
+
+func (f *CacheSharedFixture) BeforeAll(context.Context) error { return nil }

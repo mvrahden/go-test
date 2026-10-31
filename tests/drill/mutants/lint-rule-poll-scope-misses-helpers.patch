@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint reports the outer t passed to a helper inside a polling callback \(
+Clause: when a polling callback hands the test's t to a helper → lint reports the outer t passed to a helper inside a polling callback
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1364,7 +1364,7 @@
+ 			}
+ 
+ 			// Case 2: the outer t handed to a helper — check(t)
+-			for _, arg := range innerCall.Args {
++			for _, arg := range innerCall.Args[:0] {
+ 				if ident, ok := arg.(*ast.Ident); ok && isTestT(pass, ident) && ident.Name != pollParam {
+ 					cl.add(PollScope, innerCall.Pos())
+ 					report(pass, PollScope, ident.Pos(),

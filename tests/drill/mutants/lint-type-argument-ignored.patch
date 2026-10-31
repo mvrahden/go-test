@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / Equal is not rewritten, since the type argument decides what it compares( / .*)? \(
+Clause: when Equal compares an operand with nil under an explicit type argument → Equal is not rewritten, since the type argument decides what it compares
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -492,9 +492,6 @@
+ 		if isNilIdent(expected) {
+ 			other = actual
+ 		}
+-		if hasTypeArgs(call.Fun) {
+-			return // the explicit type converts the operand first
+-		}
+ 		switch nilKindOf(pass, other) {
+ 		case errorIface:
+ 			emitSimplify(pass, call, source, pick(negated, "Error", "NoError"), []ast.Expr{tArg, other}, msgArgs, "nil error comparison")

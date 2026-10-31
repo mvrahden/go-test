@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterGitHub .* / a long annotation is cut on a rune boundary \(
+Clause: when a finding's message and file carry characters a workflow command escapes → a long annotation is cut on a rune boundary
+--- a/internal/gotestspec/annotations.go
++++ b/internal/gotestspec/annotations.go
+@@ -119,7 +119,7 @@
+ 		return s
+ 	}
+ 	cut := limit - len("...")
+-	for cut > 0 && !utf8.RuneStart(s[cut]) {
++	for cut > limit && !utf8.RuneStart(s[cut]) {
+ 		cut--
+ 	}
+ 	return s[:cut] + "..."

@@ -34,15 +34,16 @@ func newCLIRunner(cli *gotestcli.BinarySharedFixture) cliRunner {
 // childTempDir is the run's temp dir for child CLIs, set by newCLIRunner.
 var childTempDir string
 
-// cliEnviron is this process's environment minus the CI and snapshot
-// switches, so a child CLI sees only the flags its case gives it. Its temp
-// dir is the run's own, so its sweep never reaches the real one's dirs.
+// cliEnviron is this process's environment minus the GitHub Actions
+// variables and the CI and snapshot switches, so a child CLI sees only the
+// flags its case gives it. Its temp dir is the run's own, so its sweep
+// never reaches the real one's dirs.
 func cliEnviron() []string {
 	env := make([]string, 0, len(os.Environ())+3)
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
 		switch name {
-		case "CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS":
+		case "CI", "GOTEST_CI", "GOTEST_UPDATE_SNAPSHOTS", "GITHUB_ACTIONS", "GITHUB_STEP_SUMMARY", "GITHUB_WORKSPACE":
 			continue
 		}
 		// Windows spells these in any case.

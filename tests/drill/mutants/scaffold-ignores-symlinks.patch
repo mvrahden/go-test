@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldPaths .* / scaffolds beside the file \(
+Clause: when a source file is named by an absolute path through a symlinked directory → scaffolds beside the file
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -182,9 +182,8 @@
+ 	cfg := &packages.Config{
+ 		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles | packages.NeedModule,
+ 		Tests: false,
+-		Dir:   dir,
+ 	}
+-	pkgPattern := "."
++	pkgPattern := dir
+ 
+ 	pkgs, err := packages.Load(cfg, pkgPattern)
+ 	if err != nil {

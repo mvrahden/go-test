@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldCompiles / TakenSuiteNames / .* / refuses it on stderr with exit 1, naming the declaration and its file, and writes nothing / a type in the package's test files \(
+Clause: when the package already declares the suite name scaffold would write → refuses it on stderr with exit 1, naming the declaration and its file, and writes nothing
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -370,7 +370,7 @@
+ 	fset := token.NewFileSet()
+ 	for _, de := range dirEntries {
+ 		name := de.Name()
+-		if de.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
++		if de.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
+ 			continue
+ 		}
+ 		path := filepath.Join(pkgDir, name)

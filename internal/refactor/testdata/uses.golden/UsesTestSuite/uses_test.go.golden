@@ -1,0 +1,23 @@
+package uses
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+var _ F_UsesTestSuite
+
+var (
+	_ = F_UsesTestSuite{}
+	_ = &F_UsesTestSuite{name: "x"}
+	_ = new(F_UsesTestSuite)
+	_ = []F_UsesTestSuite{{}, {name: "y"}}
+	_ = map[string]*F_UsesTestSuite{"z": nil}
+	_ = (*F_UsesTestSuite)(nil)
+)
+
+var _ interface{ TestName(*gotest.T) } = (*F_UsesTestSuite)(nil)
+
+func build(from F_UsesTestSuite) *F_UsesTestSuite {
+	var s F_UsesTestSuite = from
+	return &s
+}
+
+var _ = build

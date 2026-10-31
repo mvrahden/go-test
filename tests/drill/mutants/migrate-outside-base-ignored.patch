@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / BaseOutsideTheMigratedDirectory / when a testify suite embeds a base suite of a package in another directory / migrate exits 2 naming the base's package and writes nothing \(
+Clause: when a testify suite embeds a base suite of a package in another directory → migrate exits 2 naming the base's package and writes nothing
+--- a/internal/migrate/embed.go
++++ b/internal/migrate/embed.go
+@@ -142,6 +142,7 @@
+ 		refused[s.file] = true
+ 		return nil
+ 	}
++	return nil
+ 	pos := u.fset.Position(field.Pos())
+ 	return &OutsideBaseError{
+ 		File: pos.Filename,

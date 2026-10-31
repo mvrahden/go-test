@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / nolint:all suppresses every rule on its line \(
+Clause: when a nolint comment names all → nolint:all suppresses every rule on its line
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -401,7 +401,7 @@
+ 
+ func parseNolint(text string) (rules map[Rule]bool, ok bool) {
+ 	ids, ok := nolintIDs(text)
+-	if !ok || len(ids) == 0 || slices.Contains(ids, "all") {
++	if !ok || len(ids) == 0 {
+ 		return nil, ok
+ 	}
+ 	rules = make(map[Rule]bool, len(ids))

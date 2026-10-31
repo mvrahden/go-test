@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/refactor"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -17,6 +18,7 @@ type FuzzPromoteTestSuite struct{}
 func (s *FuzzPromoteTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.DefaultSuiteConfig()
 	cfg.Parallel = true
+	cfg.Timeout = 90 * time.Second // go/packages loads per case run long under CI load
 	return cfg
 }
 

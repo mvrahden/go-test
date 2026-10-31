@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -59,23 +62,39 @@ func runGenerate(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 			}
 			continue
 		}
-		if len(r.PTest) > 0 {
-			dst := filepath.Join(r.AbsPath, about.PSuite)
-			if err := os.WriteFile(dst, r.PTest, 0644); err != nil { //nolint:gosec // G306: not sensitive data
-				fmt.Fprintf(os.Stderr, "FAIL: writing %s: %s\n", dst, err)
-				return 2
-			}
-			fmt.Println(dst)
+		if r.AbsPath == "" {
+			continue
 		}
-		if len(r.PXTest) > 0 {
-			dst := filepath.Join(r.AbsPath, about.PXSuite)
-			if err := os.WriteFile(dst, r.PXTest, 0644); err != nil { //nolint:gosec // G306: not sensitive data
+		for _, v := range []struct {
+			name string
+			src  []byte
+		}{{about.PSuite, r.PTest}, {about.PXSuite, r.PXTest}} {
+			dst := filepath.Join(r.AbsPath, v.name)
+			if err := syncGenerated(dst, v.src); err != nil {
 				fmt.Fprintf(os.Stderr, "FAIL: writing %s: %s\n", dst, err)
 				return 2
 			}
-			fmt.Println(dst)
+			if len(v.src) > 0 {
+				fmt.Println(dst)
+			}
 		}
 	}
 
 	return 0
+}
+
+// syncGenerated brings the generated file at dst in line with src: written
+// only when its content differs, so an unchanged file keeps its mtime, and
+// removed when src is empty, so a variant without suites leaves no stale file.
+func syncGenerated(dst string, src []byte) error {
+	if len(src) == 0 {
+		if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	if have, err := os.ReadFile(dst); err == nil && bytes.Equal(have, src) { //nolint:gosec // G304: the package's own generated file
+		return nil
+	}
+	return os.WriteFile(dst, src, 0644) //nolint:gosec // G306: not sensitive data
 }

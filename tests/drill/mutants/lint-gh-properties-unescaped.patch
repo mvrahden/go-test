@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterGitHub .* / lint --github escapes the annotation's message and properties \(
+Clause: when a finding's message and file carry characters a workflow command escapes → lint --github escapes the annotation's message and properties
+--- a/internal/gotestspec/annotations.go
++++ b/internal/gotestspec/annotations.go
+@@ -137,7 +137,7 @@
+ 
+ var (
+ 	dataEscaper     = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A")
+-	propertyEscaper = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A", ":", "%3A", ",", "%2C")
++	propertyEscaper = strings.NewReplacer("%", "%25", "\r", "%0D", "\n", "%0A")
+ )
+ 
+ func ReadModulePath(dir string) string {

@@ -1,0 +1,19 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ChildOfABase / when a testify suite embeds a base suite of the migrated test files / the migrated child compiles and gotest runs the base's hooks and tests on it \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ABaseEmbeddedByPointer / when a testify suite embeds a base suite of the migrated test files by a pointer its suite\.Run sets to a fresh base / the migrated child holds the base by value and gotest runs the base's hooks and tests on it \(
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / AGenericBase / when a testify suite embeds an instance of a generic base suite / the base stays a generic helper type and gotest runs its hooks and tests on the child \(
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ABasesTestsAmongTheChilds / when a base declares a test whose name sorts between the child's own tests / the migrated child declares its forwarding method between them \(
+Clause: when a testify suite embeds a base suite of the migrated test files → the migrated child compiles and gotest runs the base's hooks and tests on it
+Clause: when a testify suite embeds a base suite of the migrated test files by a pointer its suite.Run sets to a fresh base → the migrated child holds the base by value and gotest runs the base's hooks and tests on it
+Clause: when a testify suite embeds an instance of a generic base suite → the base stays a generic helper type and gotest runs its hooks and tests on the child
+Clause: when a base declares a test whose name sorts between the child's own tests → the migrated child declares its forwarding method between them
+--- a/internal/migrate/embed.go
++++ b/internal/migrate/embed.go
+@@ -304,7 +304,7 @@
+ 			name := sel.Obj().Name()
+ 			target := lifecycleRenames[name]
+ 			if target == "" {
+-				if !strings.HasPrefix(name, "Test") || name == "Test" {
++				if !strings.HasPrefix(name, "Test") || name != "" {
+ 					continue
+ 				}
+ 				target = name

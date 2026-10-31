@@ -12,8 +12,13 @@ be written (nothing is). Generated test files are skipped (named on
 stderr), and only the host OS's builds are checked: run it on each
 platform whose test files differ. The suite's own `s.Equal`,
 `s.Run` (as `t.It`), direct hook calls and most assertions are converted;
-a suite built on a base suite from another package, promoted mixin hooks
-and method values are marked. The module must require go-test first
+promoted mixin hooks and method values are marked. Before v1.37 a suite
+built on a base suite was marked; from v1.37 one built on a base suite of
+the same test files migrates with it, the base becoming a helper the
+child calls (`BaseTestSuite` renamed `BaseSuiteHelper`), and a base in
+another package exits 2
+([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
+The module must require go-test first
 (`go get -tool`, see `setup.md`). `--dry-run` prints the diff without
 writing (v1.30.2+). Exit 0 does not run the tests: run both runners
 afterwards, and the lint pair (`lint -fix`, then `lint`). Below v1.33 a
@@ -23,7 +28,14 @@ run, and a re-run exits 0 with markers left — grep for the markers and
 every soft form — `s.Assert().X`, the suite's own `s.X` inherited from the
 embedded `*assert.Assertions`, and `assert.X(s.T(), …)` — becomes the fatal
 `gotest.X`, exactly as `s.Require().X` and `require.X(s.T(), …)` do: a soft
-check turns into a hard stop. It does NOT convert bare
+check turns into a hard stop. From v1.37, a translation that would change
+a verdict, or what runs when, is left under a marker with its reason and
+the gotest way instead
+([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)):
+read each marker, it names what to write. v1.37+ never writes
+`go.mod`/`go.sum`
+([module files](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-module-files)).
+It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:
 

@@ -146,6 +146,18 @@ func (s *GeneratorTestSuite) TestGenerateFromLoaded_TestRunSuiteNames(t *gotest.
 	})
 }
 
+func (s *GeneratorTestSuite) TestGenerateFromLoaded_CaselessSuites(t *gotest.T) {
+	pkg := gotestgen.ExportMustTestPkg(t.T(), "TestCollector_CaselessSuites")
+	results, _, err := gotestgen.GenerateFromLoaded([]*gotestgen.LoadResult{
+		{PkgPath: pkg.PkgPath, PkgDir: "/fake/dir", Ptest: pkg},
+	})
+
+	t.It("generates nothing for a package with a suite that declares no case", func(it *gotest.T) {
+		gotest.Empty(it, results)
+		gotest.ErrorContains(it, err, "test.go:15:6: suite HelperTestSuite declares no Test, Benchmark or Fuzz method; declare one, or give the helper type a name that does not end in TestSuite")
+	})
+}
+
 func (s *GeneratorTestSuite) TestE2ENoTestSuites(t *gotest.T) {
 	t.When("packages without test suites", func(w *gotest.T) {
 		for sub, tC := range gotest.Each(w, []struct {

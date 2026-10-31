@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldCompiles / TargetShapes / when each target shape is scaffolded / writes a file go vet passes / a type with methods \(
+Clause: when each target shape is scaffolded → writes a file go vet passes
+--- a/internal/scaffold/static/scaffold.struct.go.tpl
++++ b/internal/scaffold/static/scaffold.struct.go.tpl
+@@ -5,7 +5,7 @@
+ )
+ 
+ type {{.Name}}TestSuite struct {
+-	sut *{{.Name}}
++	sut *{{.PkgName}}.{{.Name}}
+ }
+ 
+ func (s *{{.Name}}TestSuite) BeforeEach(t *gotest.T) {

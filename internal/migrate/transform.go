@@ -8,6 +8,9 @@ import (
 	"go/types"
 	"strconv"
 	"strings"
+
+	"github.com/mvrahden/go-test/internal/refactor"
+	"golang.org/x/tools/go/ast/astutil"
 )
 
 // transformFile migrates f in place for the unit's migrated suites, wherever
@@ -20,7 +23,28 @@ func (u *unit) transformFile(f *ast.File) bool {
 		}
 		return true
 	})
-	changed := false
+	// The runners gotest generates instead, judged before the rewrites.
+	runners := map[*ast.FuncDecl]bool{}
+	for _, decl := range f.Decls {
+		if fd, ok := decl.(*ast.FuncDecl); ok && u.runnerSuite(fd) != nil {
+			runners[fd] = true
+		}
+	}
+	changed := u.derefPtrEmbeds(f)
+	changed = u.rewriteEmbedded(f) || changed
+
+	// A base kept as a helper under a name gotest would run is renamed
+	// by what each identifier resolves to.
+	for _, s := range u.suites {
+		if !s.helper || !s.migrated() || s.newName == s.obj.Name() {
+			continue
+		}
+		target := refactor.Object{PkgPath: s.obj.Pkg().Path(), Type: s.obj.Name()}
+		for _, id := range refactor.Idents([]*ast.File{f}, u.info, target) {
+			id.Name = s.newName
+			changed = true
+		}
+	}
 
 	// 1. Rename every identifier that resolves to a migrated suite type.
 	// A field, variable or key spelled the same resolves elsewhere.
@@ -44,7 +68,7 @@ func (u *unit) transformFile(f *ast.File) bool {
 	// that a suite implements testify's interfaces.
 	decls := make([]ast.Decl, 0, len(f.Decls))
 	for _, decl := range f.Decls {
-		if fd, ok := decl.(*ast.FuncDecl); ok && u.runnerSuite(fd) != nil {
+		if fd, ok := decl.(*ast.FuncDecl); ok && runners[fd] {
 			changed = true
 			continue
 		}
@@ -90,6 +114,13 @@ func (u *unit) transformFile(f *ast.File) bool {
 					}
 				}
 				st.Fields.List = filtered
+				// A base becomes a named field.
+				for _, e := range s.embeds {
+					e.field.Names = []*ast.Ident{{Name: e.name, NamePos: e.field.Type.Pos()}}
+					if star, ok := e.field.Type.(*ast.StarExpr); ok && e.ptr {
+						e.field.Type = star.X
+					}
+				}
 				changed = true
 			}
 
@@ -100,6 +131,13 @@ func (u *unit) transformFile(f *ast.File) bool {
 
 	if changed {
 		u.rewriteImports(f, orig)
+	}
+	// The forwarding methods added after formatting take *gotest.T.
+	for _, s := range u.suites {
+		if s.migrated() && s.file.f == f && len(s.forwards) > 0 && !hasImport(f, gotestImport) {
+			addImport(f, gotestImport)
+			changed = true
+		}
 	}
 	return changed
 }
@@ -113,12 +151,17 @@ func (u *unit) transformFunc(f *ast.File, d *ast.FuncDecl) bool {
 	if onSuite {
 		name := d.Name.Name
 		newName, hook := lifecycleRenames[name]
-		if hook || strings.HasPrefix(name, "Test") {
+		fn, _ := u.info.Defs[d.Name].(*types.Func)
+		switch {
+		case hook || strings.HasPrefix(name, "Test"):
 			if hook {
 				d.Name.Name = newName
 			}
 			addGotestTParam(d, freeName(d))
 			u.pointerReceiver(d)
+			changed = true
+		case fn != nil && u.needsT[methodKey(fn)]:
+			addGotestTParam(d, freeName(d))
 			changed = true
 		}
 	}
@@ -288,14 +331,19 @@ func (u *unit) runnerSuite(fd *ast.FuncDecl) *suiteDecl {
 }
 
 // onlySuiteInit reports whether lit sets nothing but, perhaps, the
-// *suite.Suite a suite embeds by pointer, which gotest has no use for.
+// *suite.Suite a suite embeds by pointer, which gotest has no use for, or a
+// fresh base a child embeds by pointer, which gotest holds by value.
 func (u *unit) onlySuiteInit(lit *ast.CompositeLit) bool {
+	s := u.suiteOf(lit.Type)
 	for _, elt := range lit.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
 			return false
 		}
 		key, ok := kv.Key.(*ast.Ident)
+		if ok && s != nil && u.emptyBase(s, key.Name, kv.Value) {
+			continue
+		}
 		if !ok || key.Name != "Suite" {
 			return false
 		}
@@ -309,6 +357,21 @@ func (u *unit) onlySuiteInit(lit *ast.CompositeLit) bool {
 		}
 	}
 	return true
+}
+
+// emptyBase reports whether value, set for the embedding of s named orig,
+// is new(B) or &B{} setting nothing but what onlySuiteInit allows.
+func (u *unit) emptyBase(s *suiteDecl, orig string, value ast.Expr) bool {
+	for _, e := range s.embeds {
+		if e.orig != orig || !e.ptr || !u.freshBase(value, e) {
+			continue
+		}
+		if x, ok := ast.Unparen(value).(*ast.UnaryExpr); ok {
+			return u.onlySuiteInit(x.X.(*ast.CompositeLit))
+		}
+		return true
+	}
+	return false
 }
 
 // isSuiteRun reports whether call is testify's suite.Run(t, s).
@@ -490,6 +553,9 @@ func (r *rewriter) isSuiteVar(expr ast.Expr, vars []*ast.Ident) bool {
 func (r *rewriter) assertions(body *ast.BlockStmt, recv *ast.Ident) bool {
 	changed := false
 	ast.Inspect(body, func(n ast.Node) bool {
+		if _, ok := n.(*ast.GoStmt); ok {
+			return false // left for a marker: FailNow there ends only that goroutine
+		}
 		es, ok := n.(*ast.ExprStmt)
 		if !ok {
 			return true
@@ -680,39 +746,46 @@ func (u *unit) rewriteImports(f *ast.File, orig map[*ast.Ident]bool) {
 	})
 
 	hasGotest := false
-	for _, decl := range f.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok || gd.Tok != token.IMPORT {
-			continue
+	type named struct{ name, path string }
+	var drop []named
+	gone := map[*ast.CommentGroup]bool{}
+	for _, is := range f.Imports {
+		path := strings.Trim(is.Path.Value, `"`)
+		if path == gotestImport {
+			hasGotest = true
 		}
-		filtered := make([]ast.Spec, 0, len(gd.Specs))
-		for _, spec := range gd.Specs {
-			is, ok := spec.(*ast.ImportSpec)
-			if !ok {
-				filtered = append(filtered, spec)
-				continue
+		if removable[path] && !u.importUsed(is, used, dotUsed) {
+			n := named{path: path}
+			if is.Name != nil {
+				n.name = is.Name.Name
 			}
-			path := strings.Trim(is.Path.Value, `"`)
-			if path == gotestImport {
-				hasGotest = true
-			}
-			if removable[path] && !u.importUsed(is, used, dotUsed) {
-				continue
-			}
-			filtered = append(filtered, spec)
+			drop = append(drop, n)
+			gone[is.Doc], gone[is.Comment] = true, true
 		}
-		gd.Specs = filtered
 	}
-
-	// An import block left empty goes.
-	decls := f.Decls[:0]
+	// An unparenthesized import's doc comment goes with it.
 	for _, decl := range f.Decls {
-		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT && len(gd.Specs) == 0 {
-			continue
+		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT && !gd.Lparen.IsValid() && len(gd.Specs) == 1 {
+			if is := gd.Specs[0].(*ast.ImportSpec); gone[is.Comment] || gone[is.Doc] {
+				gone[gd.Doc] = true
+			}
 		}
-		decls = append(decls, decl)
 	}
-	f.Decls = decls
+	// astutil merges the lines a deleted import stood on, so no blank line
+	// is left in its place, and drops a block left empty.
+	for _, n := range drop {
+		astutil.DeleteNamedImport(u.fset, f, n.name, n.path)
+	}
+	delete(gone, nil)
+	if len(gone) > 0 {
+		kept := f.Comments[:0]
+		for _, cg := range f.Comments {
+			if !gone[cg] {
+				kept = append(kept, cg)
+			}
+		}
+		f.Comments = kept
+	}
 
 	if !hasGotest && needGotest {
 		addImport(f, gotestImport)
@@ -728,7 +801,13 @@ func addImport(f *ast.File, path string) {
 			if !gd.Lparen.IsValid() {
 				gd.Lparen = gd.Specs[0].Pos()
 				gd.Rparen = gd.Specs[0].End()
+				// The paren closes after the spec's line comment.
+				if c := gd.Specs[0].(*ast.ImportSpec).Comment; c != nil {
+					gd.Rparen = c.End()
+				}
 			}
+			// Placed at the paren, so no comment of the last spec follows it.
+			spec.Path.ValuePos = gd.Rparen
 			gd.Specs = append(gd.Specs, spec)
 			return
 		}

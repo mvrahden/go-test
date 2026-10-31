@@ -71,12 +71,12 @@ func TestTrueNilNonComparable(t *testing.T) {
 func TestTrueLen(t *testing.T) {
 	s := []int{1, 2, 3}
 	gotest.Empty(t, s)    // want `use Empty instead of True for len == 0 check`
-	gotest.NotEmpty(t, s) // want `use NotEmpty instead of True for len == 0 check`
+	gotest.NotEmpty(t, s) // want `use NotEmpty instead of True for len != 0 check`
 	gotest.NotEmpty(t, s) // want `use NotEmpty instead of True for len > 0 check`
 	gotest.NotEmpty(t, s) // want `use NotEmpty instead of True for len >= 1 check`
 	gotest.Len(t, s, 3)   // want `use Len instead of True for len comparison`
 	gotest.Empty(t, s)    // want `use Empty instead of True for len == 0 check`
-	gotest.NotEmpty(t, s) // want `use NotEmpty instead of True for len == 0 check`
+	gotest.NotEmpty(t, s) // want `use NotEmpty instead of True for len != 0 check`
 	gotest.Len(t, s, 3)   // want `use Len instead of True for len comparison`
 }
 
@@ -161,7 +161,7 @@ func TestFalseNilNonComparable(t *testing.T) {
 func TestFalseLen(t *testing.T) {
 	s := []int{1, 2, 3}
 	gotest.NotEmpty(t, s) // want `use NotEmpty instead of False for len == 0 check`
-	gotest.Empty(t, s)    // want `use Empty instead of False for len == 0 check`
+	gotest.Empty(t, s)    // want `use Empty instead of False for len != 0 check`
 	gotest.Empty(t, s)    // want `use Empty instead of False for len > 0 check`
 	gotest.Empty(t, s)    // want `use Empty instead of False for len >= 1 check`
 	gotest.NotEmpty(t, s) // want `use NotEmpty instead of False for len == 0 check`
@@ -368,10 +368,10 @@ func TestFuncNilComparison(t *testing.T) {
 // === Nil/NotNil type guard ===
 
 func TestNilTypeGuard(t *testing.T) {
-	// error — should use NoError/Error
+	// error — NoError/Error, without a fix: Nil looks through to a nil pointer it holds
 	var err error
-	gotest.Nil(t, err)    // want `use NoError instead of Nil for error nil check`
-	gotest.NotNil(t, err) // want `use Error instead of NotNil for error nil check`
+	gotest.Nil(t, err)    // want `use NoError instead of Nil for error nil check — Nil looks through the error to a nil pointer it holds`
+	gotest.NotNil(t, err) // want `use Error instead of NotNil for error nil check — NotNil looks through the error`
 
 	// pointer — should use Zero/NotZero
 	var p *int
@@ -383,10 +383,10 @@ func TestNilTypeGuard(t *testing.T) {
 	gotest.Zero(t, ch)    // want `use Zero instead of Nil for nil check`
 	gotest.NotZero(t, ch) // want `use NotZero instead of NotNil for nil check`
 
-	// interface — should use Zero/NotZero
+	// interface — Zero/NotZero, without a fix: Nil looks through to a nil pointer it holds
 	var iface any
-	gotest.Nil(t, iface)    // want `use Zero instead of Nil for nil check`
-	gotest.NotNil(t, iface) // want `use NotZero instead of NotNil for nil check`
+	gotest.Nil(t, iface)    // want `use Zero instead of Nil for nil check — Nil looks through the interface to a nil pointer it holds`
+	gotest.NotNil(t, iface) // want `use NotZero instead of NotNil for nil check — NotNil looks through the interface`
 
 	// non-nilable — type guard error
 	gotest.Nil(t, 42)    // want `type int is not nilable`
@@ -398,10 +398,10 @@ func TestNilTypeGuard(t *testing.T) {
 // === Empty/NotEmpty type guard ===
 
 func TestEmptyTypeGuard(t *testing.T) {
-	// error — should use NoError/Error
+	// error — NoError/Error, without a fix: Empty looks through to the value it holds
 	var err error
-	gotest.Empty(t, err)    // want `use NoError instead of Empty for error empty check`
-	gotest.NotEmpty(t, err) // want `use Error instead of NotEmpty for error empty check`
+	gotest.Empty(t, err)    // want `use NoError instead of Empty for error empty check — Empty looks through the error to the value it holds`
+	gotest.NotEmpty(t, err) // want `use Error instead of NotEmpty for error empty check — NotEmpty looks through the error`
 
 	// non-emptyable — type guard error
 	gotest.Empty(t, 42)    // want `type int cannot be empty`
@@ -418,12 +418,12 @@ func TestEmptyTypeGuard(t *testing.T) {
 
 func TestErrorIsTypeGuard(t *testing.T) {
 	var err error
-	gotest.NoError(t, err) // want `use NoError instead of ErrorIs for nil target`
+	gotest.ErrorIs(t, err, nil) // want `use NoError instead of ErrorIs for nil target`
 }
 
 func TestErrorContainsTypeGuard(t *testing.T) {
 	var err error
-	gotest.Error(t, err) // want `use Error instead of ErrorContains for empty contains string`
+	gotest.ErrorContains(t, err, "") // want `use Error instead of ErrorContains for empty contains string`
 }
 
 // === With message args — preserved in fix ===
@@ -552,4 +552,25 @@ func TestErrorIdentity(t *testing.T) {
 	target := &mixedErr{msg: "boom"}
 	gotest.True(t, err == target) // want `use ErrorIs instead of True for error == comparison — errors.Is also matches wrapped errors`
 	gotest.False(t, err == target)
+}
+
+// === Comments inside a rewritten assertion survive the fix ===
+
+func double(n int) int { return 2 * n }
+
+func TestSimplifyKeepsComments(t *testing.T) {
+	a, b := 1, 2
+	var s []int
+	/* expected */
+	gotest.Equal(t, a, b) // want `use Equal instead of True for == comparison`
+	/* why */
+	gotest.NotEqual(t, a, b, "differ")      // want `use NotEqual instead of True for != comparison`
+	gotest.Equal(t, 2, double(1 /* one */)) // want `use Equal instead of True for == comparison`
+	/* none yet */
+	gotest.Empty(t, s, "empty %d", 1) // want `use Empty instead of Len for zero length check`
+	// want `use Empty instead of True for len == 0 check`
+	// the reason
+	gotest.Empty(t, s, "no items")
+	check := func() { gotest.True(t, a == /* inline */ b) } // want `use Equal instead of True for == comparison`
+	check()
 }

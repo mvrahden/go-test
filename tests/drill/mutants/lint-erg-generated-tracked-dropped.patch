@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics .* / a generated file git tracks is a finding \(
+Clause: when a generated file is on disk → a generated file git tracks is a finding
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1167,7 +1167,7 @@
+ 	out, err := cmd.Output()
+ 	switch {
+ 	case err == nil:
+-		return len(out) > 0, nil
++		return len(out) < 0, nil
+ 	case strings.Contains(stderr.String(), "not a git repository"):
+ 		return true, nil
+ 	}

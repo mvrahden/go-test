@@ -97,5 +97,6 @@ func TestRedundancy(t *testing.T) {
 	s, needle := "abc", ""
 	gotest.NotEmpty(t, s) // Contains finds an empty needle in an empty string
 	gotest.Contains(t, s, needle)
+	// want `NotEmpty is redundant before Contains`
 	gotest.Contains(t, s, "b")
 }

@@ -13,10 +13,10 @@ type APIFixture struct{ infra *InfraFixture }
 
 func (f *APIFixture) BeforeAll(ctx context.Context) error { return nil }
 
-type LightTestSuite struct{ *InfraFixture }
+type LightTestSuite struct{ InfraFixture *InfraFixture }
 
 func (s *LightTestSuite) TestOne(t *gotest.T) {}
 
-type FullTestSuite struct{ *APIFixture }
+type FullTestSuite struct{ APIFixture *APIFixture }
 
 func (s *FullTestSuite) TestOne(t *gotest.T) {}

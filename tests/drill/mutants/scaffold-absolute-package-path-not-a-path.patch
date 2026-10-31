@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldPaths / ASymlinkedPackagePath / when a type is named by an absolute package path through a symlinked directory / scaffolds into the package's directory \(
+Clause: when a type is named by an absolute package path through a symlinked directory → scaffolds into the package's directory
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -303,9 +303,6 @@
+ 	if strings.Contains(p, "...") {
+ 		return false
+ 	}
+-	if filepath.IsAbs(p) {
+-		return true
+-	}
+ 	slashed := filepath.ToSlash(p)
+ 	return slashed == "." || slashed == ".." || strings.HasPrefix(slashed, "./") || strings.HasPrefix(slashed, "../")
+ }

@@ -6,3 +6,4 @@ var ExportInverseNameCandidates = inverseNameCandidates
 var ExportSignaturesInverse = signaturesInverse
 var ExportNativeFuzzable = nativeFuzzable
 var ExportErrorType = errorType
+var ExportToPascalCase = toPascalCase

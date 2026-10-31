@@ -1,0 +1,21 @@
+Expect: shapes embedsuite: exit code
+Expect: shapes embedfixture: exit code
+Expect: shapes embedhooks: exit code
+Expect: shapes fixtureembeds: exit code
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestDiscoveryShapesAreRejectedWhereWritten
+Clause: when a suite or fixture is declared → a suite embedding a suite is rejected at the field and pointed to contract suites
+Clause: when a suite or fixture is declared → a suite embedding a fixture is rejected at the field and pointed to a named pointer field
+Clause: when a suite or fixture is declared → a suite embedding a type with a method gotest would read is rejected at the field
+Clause: when a suite or fixture is declared → a fixture embedding a fixture is rejected at the field and pointed to a named pointer field
+--- a/internal/gotestast/shapes.go
++++ b/internal/gotestast/shapes.go
+@@ -53,6 +53,9 @@
+ // rejected with, or nil when the field is accepted. kind is "suite" or
+ // "fixture".
+ func FieldShapeError(kind, owner string, field *types.Var, in *types.Package) error {
++	if field.Anonymous() {
++		return nil
++	}
+ 	named := namedBehind(field.Type())
+ 	if !field.Anonymous() {
+ 		if isSuiteType(named) {

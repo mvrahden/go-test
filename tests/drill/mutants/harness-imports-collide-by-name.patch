@@ -1,0 +1,14 @@
+Expect: shapes genpgpg: exit code 2, want 0
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestGeneratedFilesStayValid
+Clause: when the package declares names the harness imports → a suite binding fixtures from two packages both named pg runs
+--- a/internal/gotestgen/imports.go
++++ b/internal/gotestgen/imports.go
+@@ -46,7 +46,7 @@
+ 	if !ok {
+ 		for i := 0; ; i++ {
+ 			a = "ƒ" + name + strconv.Itoa(i)
+-			if !s.taken[a] {
++			if !s.taken[path] {
+ 				break
+ 			}
+ 		}

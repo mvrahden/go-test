@@ -40,6 +40,13 @@ gotest SHALL note on stderr, in every mode, that a package has only stdlib tests
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
 
+### Requirement: Packages with testify suites
+gotest SHALL run the gotest suites of a package that holds a testify suite and SHALL leave the testify suite to go test, noting its runner as a stdlib test.
+
+#### Scenario: A testify suite beside a gotest suite
+- **WHEN** a package holds a testify suite beside a gotest suite
+- **THEN** runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0
+
 ### Requirement: Boolean flags
 Every boolean flag SHALL take --x, --x=true and --x=false, the last occurrence SHALL win, and any other value SHALL be a usage error. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
 
@@ -98,7 +105,7 @@ gotest SHALL find a coverage profile in every spelling go test accepts, for the 
 - **THEN** finds the profile in every spelling go test accepts, for the --min gate and for summary
 
 ### Requirement: Scaffold paths
-The scaffold subcommand SHALL write the scaffold beside the source file it is given, by a relative or an absolute path, even when the path to that file runs through a symlinked directory. The relative and absolute cases are the table in `tests/conformance/cli/scaffold_suite_test.go`.
+The scaffold subcommand SHALL write the scaffold beside the source file it is given, or into the directory of the package a type or function target names, by a relative or an absolute path, even when the path runs through a symlinked directory and when the working directory is outside the module. The relative and absolute cases are the tables in `tests/conformance/cli/scaffold_suite_test.go`.
 
 #### Scenario: A relative or an absolute path
 - **WHEN** a source file is named by path
@@ -107,6 +114,37 @@ The scaffold subcommand SHALL write the scaffold beside the source file it is gi
 #### Scenario: A path through a symlinked directory
 - **WHEN** a source file is named by an absolute path through a symlinked directory
 - **THEN** scaffolds beside the file
+
+#### Scenario: A package named by an absolute path
+- **WHEN** a type or a function is named by an absolute package path from outside its module
+- **THEN** scaffolds into the package's directory
+
+#### Scenario: A package path through a symlinked directory
+- **WHEN** a type is named by an absolute package path through a symlinked directory
+- **THEN** scaffolds into the package's directory
+
+#### Scenario: A symlinked working directory
+- **WHEN** a type is named by a relative package path from a symlinked working directory
+- **THEN** scaffolds into the package's directory, named relative to the working directory
+
+### Requirement: Scaffolds that compile
+The scaffold subcommand SHALL write only code that compiles. It SHALL refuse with exit 1 a generic type, a generic function and a method of a generic type, a suite name the package already declares in any of its files or its external test package's, and a type without an exported method or a file without an exported function, whose suite would declare no case, writing nothing. The target shapes are the tables in `tests/conformance/cli/scaffold_compiles_suite_test.go`.
+
+#### Scenario: A generic target
+- **WHEN** a generic type, a generic function or a method of a generic type is scaffolded
+- **THEN** refuses it on stderr with exit 1 and writes nothing
+
+#### Scenario: A suite name the package declares
+- **WHEN** the package already declares the suite name scaffold would write
+- **THEN** refuses it on stderr with exit 1, naming the declaration and its file, and writes nothing
+
+#### Scenario: A target without a case
+- **WHEN** a type without an exported method or a file without an exported function is scaffolded
+- **THEN** refuses it on stderr with exit 1, saying its suite would declare no case, and writes nothing
+
+#### Scenario: Each target shape
+- **WHEN** each target shape is scaffolded
+- **THEN** writes a file go vet passes
 
 ### Requirement: The go test -json stream
 The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too.

@@ -1,0 +1,13 @@
+Expect: shapes stalerename: discover does not list NewTestSuite alone
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestGeneratedFilesStayValid
+Clause: when a package holds a generated file from an earlier generate → discover and spec read past a stale generated file
+--- a/internal/gotestgen/generator.go
++++ b/internal/gotestgen/generator.go
+@@ -167,7 +167,6 @@
+ 		Tests: true,
+ 		Fset:  token.NewFileSet(),
+ 	}
+-	cfg.ParseFile = about.ParseStubbingGenerated
+ 	// go list -export compiles from disk, so the go command takes the stubs too.
+ 	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
+ 	if err != nil {

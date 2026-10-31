@@ -35,6 +35,9 @@ type Event struct {
 	Package string `json:"Package"`
 	Test    string `json:"Test"`
 	Output  string `json:"Output"`
+	// ImportPath names the package of a build-output or build-fail event,
+	// which carries no Package.
+	ImportPath string `json:"ImportPath"`
 }
 
 // MarkersFile is the file, inside the directory GOTEST_CANARY_DIR names, that
@@ -111,7 +114,12 @@ func runBinary(ctx context.Context, binary string, grace time.Duration, dir, mar
 	}
 	cmd := exec.CommandContext(ctx, binary, args...) //nolint:gosec // G204: the repo's own CLI with the caller's arguments
 	cmd.Dir = dir
-	cmd.Env = append(childEnv(markerDir), extraEnv...)
+	// PWD as exec sets it for a nil Env: a symlinked dir keeps its own path.
+	cwd, err := filepath.Abs(dir)
+	if err != nil {
+		return Run{}, err
+	}
+	cmd.Env = append(childEnv(markerDir), append([]string{"PWD=" + cwd}, extraEnv...)...)
 	// The pipes are the run's own, so a hold past the exit is seen whatever
 	// the exit status: exec reports an *ExitError over ErrWaitDelay.
 	var stdout, stderr bytes.Buffer
@@ -233,6 +241,7 @@ func childEnv(markerDir string) []string {
 		switch {
 		case strings.HasPrefix(kv, "GITHUB_ACTIONS="),
 			strings.HasPrefix(kv, "GITHUB_STEP_SUMMARY="),
+			strings.HasPrefix(kv, "GITHUB_WORKSPACE="),
 			strings.HasPrefix(kv, "GOTEST_UPDATE_SNAPSHOTS="),
 			strings.HasPrefix(kv, "GOTEST_CI="),
 			strings.HasPrefix(kv, "CI="),

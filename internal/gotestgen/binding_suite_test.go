@@ -39,8 +39,8 @@ func (s *BindingTestSuite) TestIsInternalPkgPath(t *gotest.T) {
 }
 
 func (s *BindingTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
-	t.When("suite embeds fixture", func(w *gotest.T) {
-		w.It("resolves fixture binding via embedding", func(it *gotest.T) {
+	t.When("suite binds a fixture through a pointer field named after its type", func(w *gotest.T) {
+		w.It("resolves the binding under the type name", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_SuiteToFixture")
 			c := gotestgen.NewCollector()
 			result := c.CollectSuiteSpecs(pkg)
@@ -85,7 +85,7 @@ func (s *BindingTestSuite) TestSuiteToFixtureBinding(t *gotest.T) {
 }
 
 func (s *BindingTestSuite) TestChildToParentFixtureBinding(t *gotest.T) {
-	t.When("child embeds parent fixture", func(w *gotest.T) {
+	t.When("child fixture binds its parent through a named pointer field", func(w *gotest.T) {
 		w.It("resolves parent-child fixture hierarchy", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_Embedding_ChildToParentFixture")
 			c := gotestgen.NewCollector()
@@ -157,7 +157,7 @@ func (s *BindingTestSuite) TestSharedFixtureResolution(t *gotest.T) {
 		})
 	})
 
-	t.When("suite directly embeds shared fixture", func(w *gotest.T) {
+	t.When("suite binds a shared fixture through a named pointer field", func(w *gotest.T) {
 		w.It("resolves as standalone with shared fixture reference", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_DirectSharedFixture_Embedded")
 			c := gotestgen.NewCollector()
@@ -332,9 +332,9 @@ func (s *BindingTestSuite) TestResolutionErrors(t *gotest.T) {
 			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, `shared fixture "QueueSharedFixture" declares BeforeEach, but shared fixtures have no per-test hooks, so it would never run; do that work in the BeforeEach of a package fixture that binds QueueSharedFixture, or in the suite's BeforeEach`)
 			at := pkg.Fset.Position(gotestast.PosOf(err))
-			// extfixtures/test.go:30 declares QueueSharedFixture.BeforeEach.
+			// extfixtures/test.go:25 declares QueueSharedFixture.BeforeEach.
 			gotest.Regexp(it, `extfixtures/test\.go$`, filepath.ToSlash(at.Filename))
-			gotest.Equal(it, 30, at.Line)
+			gotest.Equal(it, 25, at.Line)
 		})
 	})
 
@@ -420,6 +420,21 @@ func (s *BindingTestSuite) TestResolutionErrors(t *gotest.T) {
 
 			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
 			gotest.ErrorContains(it, err, "must have a BeforeAll")
+		})
+	})
+
+	t.When("a package fixture from another package declares a hook with the wrong signature", func(w *gotest.T) {
+		w.It("names the hook and the signature it needs", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_CrossPkgFixture_MisSignedHook")
+			c := gotestgen.NewCollector()
+			result := c.CollectSuiteSpecs(pkg)
+			gotest.Empty(it, result.Errs)
+
+			spec, err := c.ApplyTestSuiteSpecs(result)
+			gotest.NoError(it, err)
+
+			_, err = gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
+			gotest.ErrorContains(it, err, `fixture "BadFixture": BeforeEach must have signature (ctx context.Context) error`)
 		})
 	})
 
@@ -588,16 +603,12 @@ func (s *BindingTestSuite) TestHookLocations(t *gotest.T) {
 	gotest.Len(t, byName, 2)
 
 	t.It("names a hook in the suite's own directory by its base name", func(it *gotest.T) {
-		// test.go:17 declares LocalFixture.BeforeEach.
-		gotest.Equal(it, "test.go:17", byName["LocalFixture"].BeforeEachAt)
+		// test.go:14 declares LocalFixture.BeforeEach.
+		gotest.Equal(it, "test.go:14", byName["LocalFixture"].BeforeEachAt)
 	})
 	t.It("locates a hook of a fixture another package declares, relative to the suite's directory", func(it *gotest.T) {
 		// extfixtures/test.go:16 declares RemoteFixture.BeforeEach.
 		gotest.Equal(it, "../extfixtures/test.go:16", byName["RemoteFixture"].BeforeEachAt)
-	})
-	t.It("locates a hook promoted from another package's type, relative to the suite's directory", func(it *gotest.T) {
-		// extfixtures/test.go:21 declares Hooks.AfterEach.
-		gotest.Equal(it, "../extfixtures/test.go:21", byName["LocalFixture"].AfterEachAt)
 	})
 }
 
@@ -623,12 +634,12 @@ func (s *BindingTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {
 
 func (s *BindingTestSuite) TestGenericAlias(t *gotest.T) {
 	t.When("generic alias in pxtest package", func(w *gotest.T) {
-		w.It("rejects generic alias", func(it *gotest.T) {
+		w.It("allows generic alias", func(it *gotest.T) {
 			suite := gotestast.NewTestSuiteSpecForTest("FooTestSuite", "mypkg_test", true)
 			pkg := &packages.Package{Name: "mypkg_test", PkgPath: "example.com/mypkg_test"}
 
 			_, err := gotestgen.Bind(pkg, []*gotestast.TestSuiteSpec{suite}, nil)
-			gotest.ErrorContains(it, err, "must not be in an external test package")
+			gotest.NoError(it, err)
 		})
 	})
 
@@ -716,6 +727,57 @@ func (s *BindingTestSuite) TestSharedFixtureDependencies(t *gotest.T) {
 			deepKeys := resolved.SuiteRequiredSharedFixtureKeys["DeepTestSuite"]
 			gotest.Len(it, deepKeys, 1, "DeepTestSuite needs PG through its parent fixture")
 			gotest.Contains(it, deepKeys[0], "PGSharedFixture")
+		})
+	})
+}
+
+func (s *BindingTestSuite) TestFixtureFields(t *gotest.T) {
+	bind := func(it *gotest.T, name string) (*packages.Package, *gotestgen.Binding, error) {
+		pkg := gotestgen.ExportMustTestPkg(it.T(), name)
+		c := gotestgen.NewCollector()
+		result := c.CollectSuiteSpecs(pkg)
+		gotest.Empty(it, result.Errs)
+		spec, err := c.ApplyTestSuiteSpecs(result)
+		gotest.NoError(it, err)
+		resolved, err := gotestgen.Bind(pkg, spec.EffectiveTestSuites, result.Fixtures)
+		return pkg, resolved, err
+	}
+	rejected := func(it *gotest.T, name, msg string, line, col int) {
+		pkg, _, err := bind(it, name)
+		gotest.Error(it, err)
+		gotest.Equal(it, msg, err.Error())
+		pos := pkg.Fset.Position(gotestast.PosOf(err))
+		gotest.Equal(it, [2]int{line, col}, [2]int{pos.Line, pos.Column})
+	}
+
+	t.When("a suite holds a fixture by value", func(w *gotest.T) {
+		w.It("is rejected at the field", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_Value",
+				"suite ValueTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field (*StoreFixture)", 14, 2)
+		})
+		w.It("is rejected at the field through an alias of the struct", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_AliasOfStruct",
+				"suite AliasTestSuite has fixture field Store of value type StoreFixture; a fixture is bound through a pointer field (*StoreFixture)", 16, 2)
+		})
+	})
+
+	t.When("a suite names its fixture through an alias of the pointer", func(w *gotest.T) {
+		w.It("binds the fixture to that field", func(it *gotest.T) {
+			_, resolved, err := bind(it, "TestResolve_FixtureField_AliasOfPointer")
+			gotest.NoError(it, err)
+			gotest.Len(it, resolved.FixtureBound, 1)
+			gotest.Equal(it, "Store", resolved.FixtureBound[0].FixtureFieldName())
+		})
+	})
+
+	t.When("two fields name the same fixture type", func(w *gotest.T) {
+		w.It("is rejected at the second field of a suite", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_Duplicate",
+				"suite DupTestSuite declares two fields of the same fixture type StoreFixture (A and B); keep one", 14, 5)
+		})
+		w.It("is rejected at the second field of a fixture", func(it *gotest.T) {
+			rejected(it, "TestResolve_FixtureField_DuplicateParent",
+				"fixture CacheFixture declares two fields of the same fixture type StoreFixture (A and B); keep one", 15, 2)
 		})
 	})
 }

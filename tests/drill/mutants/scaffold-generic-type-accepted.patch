@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/cli CLIScaffoldCompiles / GenericTargets / .* / refuses it on stderr with exit 1 and writes nothing / a generic type \(
+Clause: when a generic type, a generic function or a method of a generic type is scaffolded → refuses it on stderr with exit 1 and writes nothing
+--- a/internal/scaffold/scaffold.go
++++ b/internal/scaffold/scaffold.go
+@@ -139,10 +139,6 @@
+ 		return nil, fmt.Errorf("%q is not a named type", typeName)
+ 	}
+ 
+-	if err := genericType(named); err != nil {
+-		return nil, err
+-	}
+-
+ 	info := &TypeInfo{
+ 		Name:    typeName,
+ 		PkgName: pkg.Name,

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterDeclarations .* / lint reports a direct call of a fixture's lifecycle hook at the call \(
+Clause: when a suite method calls a fixture's lifecycle hook → lint reports a direct call of a fixture's lifecycle hook at the call
+--- a/internal/lint/hookcall.go
++++ b/internal/lint/hookcall.go
+@@ -49,7 +49,7 @@
+ 			if ownConnect(name, fd.Name.Name, sel, pass, recv) {
+ 				return true
+ 			}
+-			if rootIdent(pass, sel.X) == recv {
++			if rootIdent(pass, sel.X) == recv && false {
+ 				report(pass, FixtureHookCall, call.Pos(), "%s is called by the harness; calling it here runs it twice", sel.Sel.Name)
+ 			}
+ 			return true

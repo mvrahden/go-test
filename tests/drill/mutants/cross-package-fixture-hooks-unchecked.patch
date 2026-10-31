@@ -1,0 +1,14 @@
+Expect: shapes xpkgfixture: no line matches
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestAliasesAndCrossPackageShapes
+Clause: when a suite reaches across packages → a package fixture from another package with a mis-signed hook is rejected with the signature it needs
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -427,7 +427,7 @@
+ 	// The collector checks local methods; one from another package is read
+ 	// by method set alone, so it is checked here.
+ 	if kind == gotestast.PackageFixture && !isLocal {
+-		for _, hook := range []string{"BeforeAll", "AfterAll", "BeforeEach", "AfterEach"} {
++		for _, hook := range []string{} {
+ 			if fn := declaredMethod(named, hook); fn != nil && !hasCtxErrSignature(fn) {
+ 				return nil, gotestast.At(fn.Pos(), fmt.Errorf("package fixture %q: %s must have signature (ctx context.Context) error", identifier, hook))
+ 			}

@@ -38,8 +38,8 @@ type discoverPackage struct {
 	Dir        string `json:"dir"`
 	ModulePath string `json:"modulePath,omitempty"`
 	TestOnly   bool   `json:"testOnly,omitempty"`
-	// Broken marks a package that failed to load; its diagnostics are in the
-	// top-level warnings. Suite discovery needs a successful parse, so a
+	// Broken marks a package that failed to load or whose suites the
+	// generator rejects; its diagnostics are in the top-level warnings. Suite discovery needs a successful parse, so a
 	// broken package's suite list is unknowable, not empty — consumers must
 	// render the package as broken rather than as having no suites.
 	Broken bool            `json:"broken,omitempty"`
@@ -189,10 +189,11 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 				continue
 			}
 			result := c.CollectSuiteSpecs(pkg)
-			if len(result.Errs) > 0 {
-				for _, ce := range result.Errs {
+			if rejected := c.Rejections(pkg, result); len(rejected) > 0 {
+				for _, ce := range rejected {
 					warn(pkg, ce.Pos, ce.Err.Error())
 				}
+				pkgEntry.Broken = true
 				continue
 			}
 			for _, w := range result.Warnings {
@@ -212,6 +213,9 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 			}
 		}
 
+		if pkgEntry.Broken {
+			pkgEntry.Suites = []discoverSuite{}
+		}
 		if len(pkgEntry.Suites) > 0 || hasWarnings {
 			out.Packages = append(out.Packages, pkgEntry)
 		}

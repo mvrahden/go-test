@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/tools/go/types/typeutil"
+
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -58,6 +60,11 @@ type unit struct {
 	// hooks maps a suite method gotest calls with t, by methodKey, to
 	// its gotest name.
 	hooks map[string]string
+	// needsT marks, by methodKey, the methods of a base that gain t
+	// although gotest does not call them.
+	needsT map[string]bool
+	// embedField maps the fields through which a child embeds its base.
+	embedField map[*ast.Field]*embedding
 }
 
 // suiteDecl is a struct type embedding suite.Suite.
@@ -78,9 +85,35 @@ type suiteDecl struct {
 	reserved map[string]string
 	// testifyHooks names the testify hooks the suite declares.
 	testifyHooks map[string]bool
+	// setupStops: the SetupSuite testify ran on it, its own or a base's,
+	// can stop early, on an assertion, a fatal call or a panic.
+	setupStops bool
+	// st is the struct of a suite that embeds its base; embeds are the
+	// fields it does so through.
+	st     *ast.StructType
+	embeds []*embedding
+	// generic: the suite has type parameters; gd declares it.
+	generic bool
+	gd      *ast.GenDecl
+	// helper: a base no suite.Run ran; it is migrated as a helper type
+	// the suites embedding it call, which gotest does not run.
+	helper   bool
+	forwards []forward
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
+
+// declaresTest reports whether testify runs a test on the suite obj names:
+// a Test method of its own or one a base promotes.
+func declaresTest(obj *types.TypeName) bool {
+	mset := types.NewMethodSet(types.NewPointer(obj.Type()))
+	for i := range mset.Len() {
+		if name := mset.At(i).Obj().Name(); strings.HasPrefix(name, "Test") && name != "Test" {
+			return true
+		}
+	}
+	return false
+}
 
 // objKey names a package-level object the same in every configuration;
 // the configurations type-check apart, so their objects differ.
@@ -167,6 +200,12 @@ func (u *unit) suiteOf(expr ast.Expr) *suiteDecl {
 		case *ast.ParenExpr:
 			expr = x.X
 			continue
+		case *ast.IndexExpr: // an instance of a generic type
+			expr = x.X
+			continue
+		case *ast.IndexListExpr:
+			expr = x.X
+			continue
 		case *ast.Ident:
 			return u.suiteFor(u.info.Uses[x])
 		case *ast.SelectorExpr:
@@ -218,12 +257,13 @@ func embedsTestifySuite(t types.Type, seen map[types.Type]bool) bool {
 }
 
 // findSuites collects every struct type a test file declares with
-// suite.Suite embedded. A testify suite it cannot convert is marked and
-// its file refused: a generic one, or one that inherits suite.Suite from
-// a type of another package.
-func (u *unit) findSuites() map[*unitFile]bool {
+// suite.Suite embedded, directly or through a base. A suite whose base
+// is declared outside these test files is an error.
+func (u *unit) findSuites() (map[*unitFile]bool, error) {
 	u.byKey = map[string]*suiteDecl{}
+	u.embedField = map[*ast.Field]*embedding{}
 	refused := map[*unitFile]bool{}
+	var cands []childCand
 	for _, uf := range u.files {
 		if uf.skipped() {
 			continue
@@ -251,49 +291,19 @@ func (u *unit) findSuites() map[*unitFile]bool {
 					direct = direct || u.isSuiteField(field)
 				}
 				switch {
-				case direct && ts.TypeParams != nil:
-					uf.marks = append(uf.marks, mark{pos: specPos(gd, ts), msg: obj.Name() + " is a generic testify suite; gotest instantiates generic suites through type aliases — migrate it by hand"})
-					refused[uf] = true
 				case direct:
-					s := &suiteDecl{obj: obj, spec: ts, file: uf, newName: DeriveNewName(obj.Name())}
+					s := &suiteDecl{obj: obj, spec: ts, file: uf, newName: DeriveNewName(obj.Name()), generic: ts.TypeParams != nil, gd: gd}
 					u.suites = append(u.suites, s)
 					u.byKey[objKey(obj)] = s
 				default:
-					if base := u.foreignBase(st); base != "" {
-						uf.marks = append(uf.marks, mark{pos: specPos(gd, ts), msg: obj.Name() + " embeds " + base + ", a testify suite of another package; gotest suites do not inherit hooks or assertions — migrate both by hand"})
-						refused[uf] = true
+					if embedsTestifySuite(obj.Type(), map[types.Type]bool{}) {
+						cands = append(cands, childCand{uf: uf, gd: gd, ts: ts, st: st, obj: obj})
 					}
 				}
 			}
 		}
 	}
-	return refused
-}
-
-// foreignBase names the embedded type of another package st inherits
-// suite.Suite through, empty for none.
-func (u *unit) foreignBase(st *ast.StructType) string {
-	for _, field := range st.Fields.List {
-		if len(field.Names) != 0 {
-			continue
-		}
-		t := u.info.TypeOf(field.Type)
-		if t == nil {
-			continue
-		}
-		base := t
-		if p, ok := base.(*types.Pointer); ok {
-			base = p.Elem()
-		}
-		n, ok := base.(*types.Named)
-		if !ok || n.Obj().Pkg() == nil || u.scopes[n.Obj().Pkg().Path()] != nil {
-			continue // declared here: refuse handles a suite embedding a suite
-		}
-		if embedsTestifySuite(t, map[types.Type]bool{}) {
-			return n.Obj().Pkg().Name() + "." + n.Obj().Name()
-		}
-	}
-	return ""
+	return refused, u.findChildren(cands, refused)
 }
 
 // specPos is where a marker for ts goes: above its own line, or above the
@@ -305,12 +315,16 @@ func specPos(gd *ast.GenDecl, ts *ast.TypeSpec) token.Pos {
 	return ts.Pos()
 }
 
-// refuse decides which suites stay as they are. A suite another struct
-// embeds would strand the child when renamed, so it is refused, with the
-// file declaring it and the file declaring the child; so is a suite whose
-// new name is taken, and one a file migrate cannot type-check refers to. A
-// refused file is left whole, so every suite it declares or refers to is
-// refused too, until nothing changes.
+// refuse decides which suites stay as they are. A package-level struct
+// embedding a suite migrates with it; by pointer only when every
+// suite.Run sets that pointer to a fresh base and nothing else does. Any
+// other struct embedding one, local or anonymous, would strand the child,
+// so the suite is refused with the file declaring it and the file
+// declaring the child.
+// So is a suite whose new name is taken, and one a file migrate cannot
+// type-check refers to. A refused file is left whole, so every suite it
+// declares or refers to is refused too, and a child goes with its base,
+// until nothing changes.
 func (u *unit) refuse(refused map[*unitFile]bool) {
 	for _, uf := range u.files {
 		if uf.skipped() {
@@ -329,19 +343,44 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 				if base == nil {
 					continue
 				}
-				child, pos := "a struct", field.Pos()
+				e := u.embedField[field]
+				if e != nil && (!e.ptr || u.ptrRunsFresh(e) && !u.ptrFieldSet(e)) {
+					continue // the migration names the field
+				}
+				child, pos, local, generic := "", field.Pos(), false, false
 				for i := len(stack) - 1; i >= 0; i-- {
-					if ts, ok := stack[i].(*ast.TypeSpec); ok {
-						child, pos = ts.Name.Name, ts.Pos()
-						if gd, ok := stack[max(i-1, 0)].(*ast.GenDecl); ok {
-							pos = specPos(gd, ts)
+					switch x := stack[i].(type) {
+					case *ast.FuncDecl, *ast.FuncLit:
+						local = true
+					case *ast.TypeSpec:
+						if child == "" && x.Type == st {
+							child, pos, generic = x.Name.Name, x.Pos(), x.TypeParams != nil
+							if gd, ok := stack[max(i-1, 0)].(*ast.GenDecl); ok {
+								pos = specPos(gd, x)
+							}
 						}
-						break
 					}
 				}
-				uf.marks = append(uf.marks, mark{pos: pos, msg: child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"})
+				var msg string
+				switch {
+				case e != nil:
+					msg = child + " embeds *" + base.obj.Name() + ", which not every suite.Run sets to a fresh &" + base.obj.Name() + "{}, or other code sets; gotest creates a suite with new, which leaves that pointer nil — embed " + base.obj.Name() + " by value, or migrate this file by hand"
+				case child == "":
+					msg = "an anonymous struct embeds " + base.obj.Name() + "; gotest runs only suites declared at package level — declare it as a package-level type, or migrate this file by hand"
+				case local:
+					msg = child + " embeds " + base.obj.Name() + " inside a function; gotest runs only suites declared at package level — declare " + child + " at package level, or migrate this file by hand"
+				case !generic: // a generic child carries its own marker
+					msg = child + " embeds " + base.obj.Name() + ", not suite.Suite — migrate this file by hand"
+				}
+				if msg != "" {
+					uf.marks = append(uf.marks, mark{pos: pos, msg: msg})
+				}
 				if base.migrated() {
-					base.refusal = base.obj.Name() + " is embedded by " + child + " in " + filepath.Base(uf.path) + " — migrate this file by hand"
+					by := child
+					if by == "" {
+						by = "an anonymous struct"
+					}
+					base.refusal = base.obj.Name() + " is embedded by " + by + " in " + filepath.Base(uf.path) + " — migrate this file by hand"
 					base.marked = true
 				}
 				refused[uf] = true
@@ -349,6 +388,17 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 			}
 			return true
 		})
+	}
+
+	u.markHelpers()
+
+	// A generic suite migrates only as a base the suites embedding it call.
+	for _, s := range u.suites {
+		if s.generic && !s.helper && s.migrated() {
+			s.refusal = s.obj.Name() + " is a generic testify suite; gotest instantiates generic suites through type aliases — migrate it by hand"
+			s.file.marks = append(s.file.marks, mark{pos: specPos(s.gd, s.spec), msg: s.refusal})
+			refused[s.file] = true
+		}
 	}
 
 	// A suite keeping its name holds it; one renamed onto a name taken,
@@ -363,7 +413,13 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		if !s.migrated() {
 			continue
 		}
-		if token.IsExported(s.newName) && !runsPlain(s.newName) {
+		if !s.helper && !declaresTest(s.obj) {
+			s.refusal = s.obj.Name() + " declares no test; gotest refuses a suite without a Test, Benchmark or Fuzz method — add a test, or migrate this file by hand"
+			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
+			refused[s.file] = true
+			continue
+		}
+		if !s.helper && token.IsExported(s.newName) && !runsPlain(s.newName) {
 			s.refusal = s.obj.Name() + " would become " + s.newName + ", which gotest does not run as a plain suite — rename it and migrate this file by hand"
 			s.file.marks = append(s.file.marks, mark{pos: s.spec.Pos(), msg: s.refusal})
 			refused[s.file] = true
@@ -388,7 +444,7 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 		}
 		taken[key] = true
 		switch {
-		case !token.IsExported(s.newName):
+		case !s.helper && !token.IsExported(s.newName):
 			s.refusal = s.obj.Name() + " cannot take an exported name, and gotest runs only exported suites — rename it and migrate this file by hand"
 		case clash:
 			s.refusal = "renaming " + s.obj.Name() + " to " + s.newName + " collides with another declaration — migrate this file by hand"
@@ -458,9 +514,26 @@ func (u *unit) refuse(refused map[*unitFile]bool) {
 					s.marked = true
 				}
 			}
+			for _, e := range s.embeds {
+				if s.migrated() && !e.base.migrated() {
+					s.refusal = s.obj.Name() + " embeds " + e.base.obj.Name() + ", which is left for hand migration — migrate this file by hand"
+					s.marked = true
+				}
+			}
 			if !s.migrated() {
 				refused[s.file] = true
 				changed = true
+			}
+		}
+		// A child left as it is still embeds its base, so the base stays too.
+		for _, s := range u.suites {
+			for _, e := range s.embeds {
+				if !s.migrated() && e.base.migrated() {
+					e.base.refusal = e.base.obj.Name() + " is embedded by " + s.obj.Name() + " in " + filepath.Base(s.file.path) + " — migrate this file by hand"
+					e.base.marked = true
+					refused[e.base.file] = true
+					changed = true
+				}
 			}
 		}
 	}
@@ -514,7 +587,10 @@ func importsTestify(f *ast.File) bool {
 // leaves a refused one with its markers. What the result still needs is
 // marked later, from its own type-check.
 func (u *unit) migrate() error {
-	refused := u.findSuites()
+	refused, err := u.findSuites()
+	if err != nil {
+		return err
+	}
 	u.refuse(refused)
 
 	migrated := false
@@ -523,6 +599,11 @@ func (u *unit) migrate() error {
 	}
 	if migrated {
 		u.collectHooks()
+		u.collectNeedsT()
+		u.collectForwards()
+		for _, s := range u.suites {
+			s.setupStops = s.migrated() && u.setupMayStop(s)
+		}
 		u.gate()
 	}
 	for _, uf := range u.files {
@@ -551,7 +632,11 @@ func (u *unit) migrate() error {
 		if err := format.Node(&buf, u.fset, uf.f); err != nil {
 			return fmt.Errorf("format %s: %w", uf.path, err)
 		}
-		out, err := formatImports(uf.path, buf.Bytes())
+		src, err := insertForwards(buf.Bytes(), u.forwardsIn(uf))
+		if err != nil {
+			return fmt.Errorf("format %s: %w", uf.path, err)
+		}
+		out, err := formatImports(uf.path, src)
 		if err != nil {
 			return fmt.Errorf("gofmt %s: %w", uf.path, err)
 		}
@@ -605,6 +690,105 @@ func (u *unit) collectHooks() {
 			}
 		}
 	}
+}
+
+// setupMayStop reports whether the SetupSuite testify ran on s, its own
+// or one promoted from a base, can stop early.
+func (u *unit) setupMayStop(s *suiteDecl) bool {
+	obj, _, _ := types.LookupFieldOrMethod(types.NewPointer(s.obj.Type()), true, s.obj.Pkg(), "SetupSuite")
+	fn, ok := obj.(*types.Func)
+	return ok && u.mayStop(fn, map[*types.Func]bool{})
+}
+
+// mayStop reports whether calling fn can end it early: a testify assertion,
+// which the migration makes fatal, a FailNow, Fatal or Skip, a panic, or a
+// call that can. A call into code whose body these files do not hold can,
+// when it is handed a T or a suite.
+func (u *unit) mayStop(fn *types.Func, seen map[*types.Func]bool) bool {
+	fd := u.funcDecl(fn)
+	if fd == nil || fd.Body == nil {
+		return false
+	}
+	if seen[fn] {
+		return false
+	}
+	seen[fn] = true
+	found := false
+	ast.Inspect(fd.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || found {
+			return !found
+		}
+		switch fun := call.Fun.(type) {
+		case *ast.Ident:
+			b, ok := u.info.Uses[fun].(*types.Builtin)
+			found = ok && b.Name() == "panic"
+		case *ast.SelectorExpr:
+			switch fun.Sel.Name {
+			case "FailNow", "Fatal", "Fatalf", "Skip", "Skipf", "SkipNow":
+				found = true
+			}
+		}
+		found = found || u.assertionName(call) != "" || u.callMayStop(call, seen)
+		return !found
+	})
+	return found
+}
+
+// callMayStop reports whether call reaches a function that can stop: one
+// these files declare and mayStop finds stopping, or one declared
+// elsewhere that is handed a T or a suite, which it may stop through.
+func (u *unit) callMayStop(call *ast.CallExpr, seen map[*types.Func]bool) bool {
+	fn, ok := typeutil.Callee(u.info, call).(*types.Func)
+	if !ok {
+		return false
+	}
+	if u.funcDecl(fn) != nil {
+		return u.mayStop(fn, seen)
+	}
+	if fn.Pkg() != nil && (fn.Pkg().Path() == "testing" || fn.Pkg().Path() == suitePkg || testifyObj(fn)) {
+		return false // the stopping ones are matched by name
+	}
+	args := call.Args
+	if sel, ok := call.Fun.(*ast.SelectorExpr); ok && u.info.Selections[sel] != nil {
+		args = append([]ast.Expr{sel.X}, args...)
+	}
+	for _, a := range args {
+		if t := u.info.TypeOf(a); t != nil && (u.suiteOfType(t) != nil || reachesT(t)) {
+			return true
+		}
+	}
+	return false
+}
+
+// reachesT reports whether t is a testing.T, B, F or TB, or a pointer to one.
+func reachesT(t types.Type) bool {
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	n, ok := types.Unalias(t).(*types.Named)
+	if !ok || n.Obj().Pkg() == nil || n.Obj().Pkg().Path() != "testing" {
+		return false
+	}
+	switch n.Obj().Name() {
+	case "T", "B", "F", "TB":
+		return true
+	}
+	return false
+}
+
+// funcDecl is the declaration of fn in these files, nil when they hold none.
+func (u *unit) funcDecl(fn *types.Func) *ast.FuncDecl {
+	uf := u.fileAt(fn.Pos())
+	if uf == nil {
+		return nil
+	}
+	for _, decl := range uf.f.Decls {
+		if fd, ok := decl.(*ast.FuncDecl); ok && fd.Name.Pos() == fn.Pos() {
+			return fd
+		}
+	}
+	return nil
 }
 
 // reservedName is the marker for a suite method gotest gives a meaning

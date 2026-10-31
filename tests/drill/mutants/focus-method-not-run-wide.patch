@@ -1,0 +1,15 @@
+Expect: shapes focusmethod: TestOtherTestSuite is "pass", want skip
+Clause: when a run holds a focused method → a focused method in one package skips every unfocused suite in the others
+Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFocusIsRunWide
+--- a/internal/gotestgen/generator.go
++++ b/internal/gotestgen/generator.go
+@@ -533,7 +533,8 @@
+ 		if err := collectorError(lr.Pxtest, all[i].pxtest.Errs); err != nil {
+ 			return nil, nil, err
+ 		}
+-		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()
++		suiteFocused := func(v *gotestast.TestSuiteSpec, _ int) bool { return v.IsFocused() }
++		focusRun = focusRun || slices.Any(all[i].ptest.Suites, suiteFocused) || slices.Any(all[i].pxtest.Suites, suiteFocused)
+ 	}
+ 
+ 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, i int) (*GenerateResult, error) {

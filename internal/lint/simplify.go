@@ -11,6 +11,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/mvrahden/go-test/internal/typeclass"
 )
 
 func checkAssertionSimplify(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) {
@@ -126,7 +128,7 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if m, ok, handled := mapNilComparison(pass, left, right, negated, false); handled {
 			return m, ok
 		}
-		if m, ok := mapLenEqNeq(left, right, negated, false); ok {
+		if m, ok := mapLenEqNeq(pass, left, right, negated, false); ok {
 			return m, true
 		}
 		if m, ok := mapEmptyStrEqNeq(pass, left, right, negated, false); ok {
@@ -138,7 +140,7 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		if m, ok, handled := mapNilComparison(pass, left, right, negated, true); handled {
 			return m, ok
 		}
-		if m, ok := mapLenEqNeq(left, right, negated, true); ok {
+		if m, ok := mapLenEqNeq(pass, left, right, negated, true); ok {
 			return m, true
 		}
 		if m, ok := mapEmptyStrEqNeq(pass, left, right, negated, true); ok {
@@ -147,7 +149,7 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		return mapEquality(pass, left, right, negated, true)
 
 	case token.GTR:
-		if inner, ok := isLenCall(left); ok && isIntLit(right, 0) {
+		if inner, ok := isLenCall(left); ok && isIntLit(right, 0) && hasLength(pass, inner) {
 			return conditionMapping{target: pick(negated, "Empty", "NotEmpty"), args: []ast.Expr{inner}, desc: "len > 0 check"}, true
 		}
 		if mayBeFloat(pass, left) || mayBeFloat(pass, right) {
@@ -156,7 +158,7 @@ func mapBoolBinary(pass *analysis.Pass, bin *ast.BinaryExpr, negated bool) (cond
 		return conditionMapping{target: pick(negated, "LessOrEqual", "Greater"), args: []ast.Expr{left, right}, desc: "> comparison"}, true
 
 	case token.GEQ:
-		if inner, ok := isLenCall(left); ok && isIntLit(right, 1) {
+		if inner, ok := isLenCall(left); ok && isIntLit(right, 1) && hasLength(pass, inner) {
 			return conditionMapping{target: pick(negated, "Empty", "NotEmpty"), args: []ast.Expr{inner}, desc: "len >= 1 check"}, true
 		}
 		if mayBeFloat(pass, left) || mayBeFloat(pass, right) {
@@ -213,7 +215,7 @@ func mapEquality(pass *analysis.Pass, left, right ast.Expr, negated, isNeq bool)
 		return equal(l, convertToAny(pass, r))
 	case isAnyInterface(tr) && bridgesToAny(tl):
 		return equal(convertToAny(pass, l), r)
-	case assertEqual && implementsError(tl) && implementsError(tr) && (isInterfaceType(tl) || isInterfaceType(tr)):
+	case assertEqual && typeclass.ImplementsError(tl) && typeclass.ImplementsError(tr) && (isInterfaceType(tl) || isInterfaceType(tr)):
 		return conditionMapping{target: "ErrorIs", args: []ast.Expr{l, r}, desc: "error " + desc, noFix: "errors.Is also matches wrapped errors"}, true
 	}
 	return conditionMapping{}, false
@@ -255,17 +257,13 @@ func bridgesToAny(t types.Type) bool {
 }
 
 func isPointerType(t types.Type) bool {
-	_, ok := types.Unalias(t).Underlying().(*types.Pointer)
+	_, ok := typeclass.CoreType(t).(*types.Pointer)
 	return ok
 }
 
 func isInterfaceType(t types.Type) bool {
-	_, ok := types.Unalias(t).Underlying().(*types.Interface)
+	_, ok := typeclass.CoreType(t).(*types.Interface)
 	return ok
-}
-
-func implementsError(t types.Type) bool {
-	return types.AssignableTo(t, types.Universe.Lookup("error").Type())
 }
 
 // mapNilComparison handles comparisons against nil. handled reports that the
@@ -295,9 +293,9 @@ func mapNilComparison(pass *analysis.Pass, left, right ast.Expr, negated, isNeq 
 	return conditionMapping{}, false, true
 }
 
-func mapLenEqNeq(left, right ast.Expr, negated, isNeq bool) (conditionMapping, bool) {
+func mapLenEqNeq(pass *analysis.Pass, left, right ast.Expr, negated, isNeq bool) (conditionMapping, bool) {
 	inner, _, other, ok := extractLenSide(left, right)
-	if !ok {
+	if !ok || !hasLength(pass, inner) {
 		return conditionMapping{}, false
 	}
 
@@ -307,7 +305,7 @@ func mapLenEqNeq(left, right ast.Expr, negated, isNeq bool) (conditionMapping, b
 		if negated {
 			positive = !positive
 		}
-		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: "len == 0 check"}, true
+		return conditionMapping{target: pick(!positive, "NotEmpty", "Empty"), args: []ast.Expr{inner}, desc: pick(isNeq, "len != 0 check", "len == 0 check")}, true
 	}
 
 	// len(x) == n where n is not 0 — Len fits whenever the asserted reading
@@ -470,7 +468,7 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 	source := pick(negated, "NotEqual", "Equal")
 
 	// Bool literals: Equal(t, true, x) / Equal(t, x, true)
-	if v, expr, ok := extractBoolLiteral(expected, actual); ok {
+	if v, expr, ok := extractBoolLiteral(expected, actual); ok && isBoolType(pass, expr) {
 		positive := v != negated // true+Equal or false+NotEqual → True; otherwise False
 		emitSimplify(pass, call, source, pick(!positive, "False", "True"), []ast.Expr{tArg, expr}, msgArgs, "bool literal comparison")
 		return
@@ -510,7 +508,7 @@ func simplifyEquality(pass *analysis.Pass, call *ast.CallExpr, negated bool) {
 
 	// Len calls: Equal(t, len(x), n) / Equal(t, n, len(x))
 	inner, _, other, ok := extractLenSide(expected, actual)
-	if !ok {
+	if !ok || !hasLength(pass, inner) {
 		return
 	}
 	if isIntLit(other, 0) {
@@ -528,7 +526,7 @@ func simplifyLen(pass *analysis.Pass, call *ast.CallExpr) {
 	if len(call.Args) < 3 {
 		return
 	}
-	if isIntLit(call.Args[2], 0) && !isNilIdent(call.Args[1]) {
+	if isIntLit(call.Args[2], 0) && hasLength(pass, call.Args[1]) {
 		emitSimplify(pass, call, "Len", "Empty", []ast.Expr{call.Args[0], call.Args[1]}, call.Args[3:], "zero length check")
 	}
 }
@@ -540,7 +538,7 @@ func simplifyComparisonLen(pass *analysis.Pass, call *ast.CallExpr, source strin
 		return
 	}
 	inner, ok := isLenCall(call.Args[1])
-	if !ok {
+	if !ok || !hasLength(pass, inner) {
 		return
 	}
 	if isIntLit(call.Args[2], threshold) {
@@ -574,6 +572,9 @@ func simplifyContainsErrMsg(pass *analysis.Pass, call *ast.CallExpr) {
 	}
 	recv, ok := isErrorMethodCall(call.Args[1])
 	if !ok {
+		return
+	}
+	if t := pass.TypesInfo.TypeOf(recv); t == nil || !typeclass.ImplementsError(t) {
 		return
 	}
 	emitSimplify(pass, call, "Contains", "ErrorContains", []ast.Expr{call.Args[0], recv, call.Args[2]}, call.Args[3:], "err.Error() contains check")
@@ -628,14 +629,16 @@ func guardEmptyNotEmpty(pass *analysis.Pass, call *ast.CallExpr, isNot bool) {
 		return
 	}
 
-	switch {
-	case nilKindOf(pass, arg) == errorIface:
+	switch kind := nilKindOf(pass, arg); {
+	case kind == errorIface:
 		report(pass, AssertionSimplify, call.Pos(), "use %s instead of %s for error empty check — %s looks through the error to the value it holds",
 			pick(isNot, "Error", "NoError"), source, source)
-	case isEmptyableType(pass, arg):
+	case hasLength(pass, arg):
 		// OK
 	case isPointerType(t):
 		// OK — isEmpty recursively dereferences pointers
+	case kind == otherIface, kind == unknownNil:
+		// OK — the value it holds decides
 	default:
 		report(pass, AssertionTypeGuard, call.Pos(),
 			"type %s cannot be empty; for nil checks, use %s; for zero-value checks, use %s",
@@ -652,10 +655,8 @@ func guardErrorIs(pass *analysis.Pass, call *ast.CallExpr) {
 	if !isNilIdent(call.Args[2]) {
 		return
 	}
-	tArg := call.Args[0]
-	err := call.Args[1]
-	msgArgs := call.Args[3:]
-	emitSimplify(pass, call, "ErrorIs", "NoError", []ast.Expr{tArg, err}, msgArgs, "nil target")
+	// No fix: the guard fails ErrorIs on every input, NoError passes some.
+	report(pass, AssertionSimplify, call.Pos(), "use NoError instead of ErrorIs for nil target — ErrorIs fails a nil target")
 }
 
 // --- ErrorContains type guard ---
@@ -667,28 +668,48 @@ func guardErrorContains(pass *analysis.Pass, call *ast.CallExpr) {
 	if !isEmptyStringLit(call.Args[2]) {
 		return
 	}
-	tArg := call.Args[0]
-	err := call.Args[1]
-	msgArgs := call.Args[3:]
-	emitSimplify(pass, call, "ErrorContains", "Error", []ast.Expr{tArg, err}, msgArgs, "empty contains string")
+	// No fix: the guard fails ErrorContains on every input, Error passes some.
+	report(pass, AssertionSimplify, call.Pos(), "use Error instead of ErrorContains for empty contains string — ErrorContains fails an empty string")
 }
 
 // --- reporting ---
 
 func emitSimplify(pass *analysis.Pass, call *ast.CallExpr, from, to string, newArgs, msgArgs []ast.Expr, desc string) {
 	qual := assertionQualifier(call.Fun)
-	newText := renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)
+	msg := fmt.Sprintf("use %s instead of %s for %s", to, from, desc)
+	src, ok := sourceAt(pass, call.Pos())
+	if !ok {
+		reportWithFix(pass, AssertionSimplify, call.Pos(), simplifyFix(qual, to, call, renderAssertion(pass.Fset, qual, to, newArgs, msgArgs)), "%s", msg)
+		return
+	}
+	kept := append(append([]ast.Expr{}, newArgs...), msgArgs...)
+	parts := make([]string, len(kept))
+	for i, arg := range kept {
+		parts[i] = src.text(pass.Fset, arg)
+	}
+	newText := qual + to + "(" + strings.Join(parts, ", ") + ")"
+	stray := src.strayComments(call.Pos(), call.End(), kept)
+	if len(stray) > 0 {
+		indent, ok := src.lineIndent(call.Pos())
+		if !ok {
+			// Nowhere to keep them: no fix rather than lose them.
+			report(pass, AssertionSimplify, call.Pos(), "%s", msg)
+			return
+		}
+		newText = strings.Join(stray, "\n"+indent) + "\n" + indent + newText
+	}
+	reportWithFix(pass, AssertionSimplify, call.Pos(), simplifyFix(qual, to, call, newText), "%s", msg)
+}
 
-	reportWithFix(pass, AssertionSimplify, call.Pos(),
-		[]analysis.SuggestedFix{{
-			Message: fmt.Sprintf("use %s%s", qual, to),
-			TextEdits: []analysis.TextEdit{{
-				Pos:     call.Pos(),
-				End:     call.End(),
-				NewText: []byte(newText),
-			}},
+func simplifyFix(qual, to string, call *ast.CallExpr, newText string) []analysis.SuggestedFix {
+	return []analysis.SuggestedFix{{
+		Message: fmt.Sprintf("use %s%s", qual, to),
+		TextEdits: []analysis.TextEdit{{
+			Pos:     call.Pos(),
+			End:     call.End(),
+			NewText: []byte(newText),
 		}},
-		"use %s instead of %s for %s", to, from, desc)
+	}}
 }
 
 func renderAssertion(fset *token.FileSet, qual, target string, args, msgArgs []ast.Expr) string {
@@ -700,6 +721,80 @@ func renderAssertion(fset *token.FileSet, qual, target string, args, msgArgs []a
 		parts = append(parts, renderExpr(fset, arg))
 	}
 	return qual + target + "(" + strings.Join(parts, ", ") + ")"
+}
+
+// fileSource is the text of the file a fix edits, so rewritten code can be
+// copied with the comments inside it.
+type fileSource struct {
+	tf   *token.File
+	src  []byte
+	file *ast.File
+}
+
+func sourceAt(pass *analysis.Pass, pos token.Pos) (*fileSource, bool) {
+	tf := pass.Fset.File(pos)
+	file := fileContaining(pass, pos)
+	if tf == nil || file == nil {
+		return nil, false
+	}
+	src, err := passSource(pass, tf.Name())
+	if err != nil || tf.Size() != len(src) {
+		return nil, false
+	}
+	return &fileSource{tf: tf, src: src, file: file}, true
+}
+
+// text is e as written, or rendered when the fix built it.
+func (fs *fileSource) text(fset *token.FileSet, e ast.Expr) string {
+	if e.Pos().IsValid() && fset.File(e.Pos()) == fs.tf {
+		return string(fs.src[fs.tf.Offset(e.Pos()):fs.tf.Offset(e.End())])
+	}
+	if c, ok := e.(*ast.CallExpr); ok {
+		args := make([]string, len(c.Args))
+		for i, a := range c.Args {
+			args[i] = fs.text(fset, a)
+		}
+		return renderExpr(fset, c.Fun) + "(" + strings.Join(args, ", ") + ")"
+	}
+	return renderExpr(fset, e)
+}
+
+// strayComments are the comments within [start, end) that no kept
+// expression carries.
+func (fs *fileSource) strayComments(start, end token.Pos, kept []ast.Expr) []string {
+	var out []string
+	for _, cg := range fs.file.Comments {
+		for _, c := range cg.List {
+			if c.Pos() < start || c.End() > end || insideAny(c, kept) {
+				continue
+			}
+			out = append(out, c.Text)
+		}
+	}
+	return out
+}
+
+func insideAny(c *ast.Comment, kept []ast.Expr) bool {
+	for _, e := range kept {
+		if e.Pos().IsValid() && c.Pos() >= e.Pos() && c.End() <= e.End() {
+			return true
+		}
+	}
+	return false
+}
+
+// lineIndent is the whitespace before pos on its line; ok is false when
+// code precedes pos there.
+func (fs *fileSource) lineIndent(pos token.Pos) (string, bool) {
+	off := fs.tf.Offset(pos)
+	start := off
+	for start > 0 && (fs.src[start-1] == ' ' || fs.src[start-1] == '\t') {
+		start--
+	}
+	if start > 0 && fs.src[start-1] != '\n' {
+		return "", false
+	}
+	return string(fs.src[start:off]), true
 }
 
 // --- expression helpers ---
@@ -833,18 +928,27 @@ func isErrorMethodCall(expr ast.Expr) (recv ast.Expr, ok bool) {
 	return sel.X, true
 }
 
-func isEmptyableType(pass *analysis.Pass, expr ast.Expr) bool {
+// hasLength reports whether expr's core type is one len reads and Len and
+// Empty read alike: a string, slice, map, channel or array. len of a pointer
+// to an array is the array's length even when the pointer is nil.
+func hasLength(pass *analysis.Pass, expr ast.Expr) bool {
 	t := pass.TypesInfo.TypeOf(expr)
 	if t == nil {
 		return false
 	}
-	switch u := t.Underlying().(type) {
+	switch u := typeclass.CoreType(t).(type) {
 	case *types.Slice, *types.Map, *types.Chan, *types.Array:
 		return true
 	case *types.Basic:
-		return u.Kind() == types.String
+		return u.Info()&types.IsString != 0
 	}
 	return false
+}
+
+// isBoolType reports whether expr is a bool, the one type True and False take.
+func isBoolType(pass *analysis.Pass, expr ast.Expr) bool {
+	b, ok := types.Unalias(pass.TypesInfo.TypeOf(expr)).(*types.Basic)
+	return ok && (b.Kind() == types.Bool || b.Kind() == types.UntypedBool)
 }
 
 func isStringType(pass *analysis.Pass, expr ast.Expr) bool {

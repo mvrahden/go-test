@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / ACommentOnARemovedImport / when an import migrate removes carries a comment on its line or above it / the comment goes with the import and the file stays as gofmt formats it \(
+Clause: when an import migrate removes carries a comment on its line or above it → the comment goes with the import and the file stays as gofmt formats it
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -760,7 +760,6 @@
+ 				n.name = is.Name.Name
+ 			}
+ 			drop = append(drop, n)
+-			gone[is.Doc], gone[is.Comment] = true, true
+ 		}
+ 	}
+ 	// An unparenthesized import's doc comment goes with it.

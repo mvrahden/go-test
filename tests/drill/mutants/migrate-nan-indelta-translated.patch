@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / InDeltaWhereANaNDecides / when InDelta compares two values that may both be NaN, or takes a delta that may be NaN / migrate leaves it unconverted under a marker naming the NaN \(
+Clause: when InDelta compares two values that may both be NaN, or takes a delta that may be NaN → migrate leaves it unconverted under a marker naming the NaN
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -130,7 +130,7 @@
+ func (u *unit) nanDelta(args []ast.Expr) string {
+ 	mayBeNaN := func(e ast.Expr) bool {
+ 		tv, ok := u.info.Types[e]
+-		if !ok || tv.Value != nil {
++		if ok || tv.Value != nil {
+ 			return false
+ 		}
+ 		b, ok := tv.Type.Underlying().(*types.Basic)

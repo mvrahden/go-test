@@ -226,6 +226,25 @@ func ownFlag(name string) (isValue, known bool) {
 	return kind == ValueFlag, ok
 }
 
+// NormalizeTagsFlag spells --tags as go's -tags, so every subcommand reads
+// it as the build flag it is. What follows "--" or "-args" is left alone.
+func NormalizeTagsFlag(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+	out := make([]string, 0, len(args))
+	for i, arg := range args {
+		if arg == "--" || arg == "-args" {
+			return append(out, args[i:]...)
+		}
+		if arg == "--tags" || strings.HasPrefix(arg, "--tags=") {
+			arg = arg[1:]
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
 func extractTagsFlag(args []string) (tags string, remaining []string) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]

@@ -13,7 +13,7 @@ func (f *HookedFixture) AfterAll(ctx context.Context) error   { return nil }
 func (f *HookedFixture) BeforeEach(ctx context.Context) error { return nil }
 
 type WorkerTestSuite struct {
-	*HookedFixture
+	HookedFixture *HookedFixture
 }
 
 func (s *WorkerTestSuite) BenchmarkWork(b *gotest.B) {

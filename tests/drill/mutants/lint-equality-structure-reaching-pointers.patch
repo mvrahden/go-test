@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / pointers are compared with Same, values that reach no pointer with Equal, and nothing else is rewritten( / .*)? \(
+Clause: when True or False asserts an == or != comparison → pointers are compared with Same, values that reach no pointer with Equal, and nothing else is rewritten
+--- a/internal/lint/simplify.go
++++ b/internal/lint/simplify.go
+@@ -209,7 +209,7 @@
+ 	switch {
+ 	case isPointerType(tl) && isPointerType(tr):
+ 		return conditionMapping{target: pick(assertEqual, "Same", "NotSame"), args: []ast.Expr{l, r}, desc: "pointer " + desc}, true
+-	case types.Identical(tl, tr) && !reachesPointer(tl):
++	case types.Identical(tl, tr):
+ 		return equal(l, r)
+ 	case isAnyInterface(tl) && bridgesToAny(tr):
+ 		return equal(l, convertToAny(pass, r))
