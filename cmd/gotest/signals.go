@@ -42,6 +42,10 @@ var forcedExit sync.Mutex
 // release their fixtures at once, before it kills what still runs.
 const abandonBound = 2 * time.Second
 
+// writeBound is how long the exit waits for an event on its way to stdout
+// and the events file; a write that takes longer has lost its reader.
+const writeBound = time.Second
+
 // duplicateWindow is how long after the first signal a repeat counts as the
 // same event; a person's second Ctrl-C comes later than a launcher's forward.
 const duplicateWindow = 300 * time.Millisecond
@@ -72,6 +76,7 @@ func shutdownContextThen(last func(hurry <-chan struct{})) (context.Context, con
 				go closeOnFurther(again, hurry, time.Now())
 				forcedExit.Lock()
 				last(hurry)
+				gotestrunner.EndWrites(writeBound, hurry)
 				os.Exit(130)
 			case <-window.C:
 				over = true

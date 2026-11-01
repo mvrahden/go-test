@@ -154,3 +154,39 @@ func askAgain(tree *proctree.Tree, l liveTree) bool {
 	pid := readPID(protocol.StopPIDPath(l.stopFile))
 	return pid > 0 && stopAgain(pid, l.root) == nil
 }
+
+// writeGate lets an event reach stdout and the events file whole before the
+// CLI exits: each write of the stream holds it shared, and a CLI about to
+// exit takes it for good, so its exit never lands between the two.
+type writeGate struct{ mu sync.RWMutex }
+
+// end waits for the write in flight to end and lets no other start: true
+// once it holds the gate, false at bound or when hurry closes, for a stream
+// whose reader is gone.
+func (g *writeGate) end(bound time.Duration, hurry <-chan struct{}) bool {
+	held := make(chan struct{})
+	go func() {
+		g.mu.Lock()
+		close(held)
+	}()
+	timer := time.NewTimer(bound)
+	defer timer.Stop()
+	select {
+	case <-held:
+		return true
+	case <-timer.C:
+		return false
+	case <-hurry:
+		return false
+	}
+}
+
+// exitGate is the gate every run's stream is written through.
+var exitGate writeGate
+
+// EndWrites lets the event on its way to stdout and the events file get
+// there and starts no other: for a CLI about to exit. It gives up at bound,
+// or as soon as hurry closes, and says whether it did.
+func EndWrites(bound time.Duration, hurry <-chan struct{}) bool {
+	return exitGate.end(bound, hurry)
+}
