@@ -693,10 +693,10 @@ describe("go to source", () => {
       return html.slice(at, html.indexOf("\n", html.indexOf("<span", at)));
     };
     expect(rowOf("an empty cart")).toContain(
-      'data-loc-file="/src/cart/add_test.go" data-loc-line="11"',
+      `data-loc-file="${path.join("/src/cart", "add_test.go")}" data-loc-line="11"`,
     );
     expect(rowOf("holds one item")).toContain(
-      'data-loc-file="/src/cart/add_test.go" data-loc-line="12"',
+      `data-loc-file="${path.join("/src/cart", "add_test.go")}" data-loc-line="12"`,
     );
   });
 });
