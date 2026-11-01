@@ -79,12 +79,14 @@ jobs:
   # CLI on Windows — where the child-process APIs differ most from a developer's
   # machine, and where killProcessTree has no process-group path at all.
   #
-  # Integration only: contract:record/verify is a `git diff` against a recorded
-  # file, and a Windows checkout is CRLF (.gitattributes pins only *.snap to
-  # LF), so the diff would fail for line endings rather than for drift.
+  # It records the contract too: the checkout is LF (.gitattributes sets
+  # eol=lf), so contract:verify diffs content, and the recording has to come
+  # out the same on Windows as on Linux.
   contract-windows:
     runs-on: windows-latest
-    timeout-minutes: 6
+    # Recording builds the CLI and runs it some thirty times; a cold Windows
+    # runner takes about twice as long as Linux for that.
+    timeout-minutes: 12
     defaults:
       run:
         working-directory: vscode-gotest
@@ -97,5 +99,11 @@ jobs:
           cache: npm
           cache-dependency-path: vscode-gotest/package-lock.json
       - run: npm ci
+      - name: Record the CLI contract
+        run: npm run contract:record
+      - name: Assert the recorded contract still means what we expect
+        run: npm test
+      - name: Fail on undeclared contract drift
+        run: npm run contract:verify
       - name: Cross the process boundary for real
         run: npm run test:integration
