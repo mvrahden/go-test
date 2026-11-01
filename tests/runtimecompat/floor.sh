@@ -19,6 +19,22 @@ else
   exit 1
 fi
 
+# The extension's floor names the oldest CLI it drives: a release, or the
+# next one when this tree raises it.
+ext=$(sed -n 's/^\(export \)\{0,1\}const MIN_CLI_VERSION = "\(v[^"]*\)";$/\2/p' "$root/vscode-gotest/src/cli.ts")
+if [ -z "$ext" ]; then
+  echo "FAIL  vscode-gotest/src/cli.ts declares no MIN_CLI_VERSION" >&2
+  exit 1
+fi
+if git -C "$root" rev-parse -q --verify "refs/tags/$ext" >/dev/null; then
+  echo "ok    the extension floor $ext is a release"
+elif [ "$(printf '%s\n%s\n' "$latest" "$ext" | sort -V | tail -n1)" = "$ext" ]; then
+  echo "ok    the extension floor $ext is the next release"
+else
+  echo "FAIL  MIN_CLI_VERSION $ext in vscode-gotest/src/cli.ts is no release and not after $latest" >&2
+  exit 1
+fi
+
 rm -rf "$work"
 mkdir -p "$work"
 cp -R "$root/tests/runtimecompat/testdata/corpus" "$work/corpus"
