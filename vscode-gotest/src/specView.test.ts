@@ -20,7 +20,7 @@ import {
   nearestItemId,
   linkSources,
 } from "./specView.js";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -593,6 +593,18 @@ describe("linkSources", () => {
       // A stack frame names the file absolutely.
       expect(linkSources(`\t${file}:7 +0x1d`, undefined)).toContain(
         `data-loc-line="7"`,
+      );
+      // Windows names a temp dir by a short name, tilde included.
+      const short = path.join(dir, "RUNNER~1");
+      mkdirSync(short);
+      writeFileSync(path.join(short, "short_test.go"), "package short\n");
+      expect(
+        linkSources(
+          `\t${path.join(short, "short_test.go")}:5 +0x1d`,
+          undefined,
+        ),
+      ).toContain(
+        `data-loc-file="${path.join(short, "short_test.go")}" data-loc-line="5"`,
       );
       // Nothing to open, nothing to click.
       expect(linkSources("    gone_test.go:3: boom", dir)).toBe(
