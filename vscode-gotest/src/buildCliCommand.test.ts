@@ -119,8 +119,15 @@ import {
   goLineFits,
   goReleaseQuery,
   lookupGoFlags,
+  escapeRegExp,
+  MIN_CLI_VERSION,
   type ReleaseQuery,
 } from "./cli.js";
+import {
+  ABOVE_FLOOR,
+  BELOW_FLOOR,
+  PSEUDO_AT_FLOOR,
+} from "./floor.test-support.js";
 
 function setGoMod(dir: string, content: string) {
   setFiles({ [path.join(dir, "go.mod")]: content });
@@ -612,10 +619,10 @@ describe("buildCliCommand", () => {
         CliUnavailableError,
       );
       await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
-        /v1\.0\.0.*v1\.35\.0/,
+        new RegExp(`v1\\.0\\.0.*${escapeRegExp(MIN_CLI_VERSION)}`),
       );
       await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
-        `Run: go get -tool ${GOTEST_MODULE}@v1.35.0`,
+        `Run: go get -tool ${GOTEST_MODULE}@${MIN_CLI_VERSION}`,
       );
       expect(mockExecFileAsync).not.toHaveBeenCalled();
     });
@@ -788,7 +795,7 @@ describe("buildCliCommand", () => {
       expect(goGets()).toEqual([]);
       expect(mockShowErrorMessage).toHaveBeenCalledWith(
         "gotest: upgrade failed, go.mod is unchanged: could not look up gotest releases. " +
-          "none of the releases of github.com/mvrahden/go-test at or above v1.35.0 could be resolved: v1.91.0, v1.90.0",
+          `none of the releases of github.com/mvrahden/go-test at or above ${MIN_CLI_VERSION} could be resolved: v1.91.0, v1.90.0`,
       );
     });
 
@@ -871,7 +878,7 @@ describe("buildCliCommand", () => {
 
       expect(goGets()).toEqual([]);
       expect(mockShowWarningMessage).toHaveBeenLastCalledWith(
-        `gotest: v1.35.0 and newer need go 1.25.0, but go.mod declares go 1.24.0. ` +
+        `gotest: ${MIN_CLI_VERSION} and newer need go 1.25.0, but go.mod declares go 1.24.0. ` +
           `Raise the go line to upgrade: go get -tool ${GOTEST_MODULE}@v1.91.0 raises it.`,
       );
       expect(mockShowInformationMessage).not.toHaveBeenCalled();
@@ -1285,10 +1292,10 @@ describe("checkProducerVersion", () => {
   it("accepts the floor, anything above it, a pseudo-version at the floor and a dev build", async () => {
     const { checkProducerVersion } = await import("./cli.js");
     for (const v of [
-      "v1.35.0",
-      "v1.35.1",
+      MIN_CLI_VERSION,
+      ABOVE_FLOOR,
       "v2.0.0",
-      "v1.35.0-0.20261011200000-3588ff09a1b2",
+      PSEUDO_AT_FLOOR,
       "dev (source checkout)",
       "dev (replace directive)",
       "dev",
@@ -1300,9 +1307,11 @@ describe("checkProducerVersion", () => {
   it("refuses a version below the floor with the upgrade command", async () => {
     const { checkProducerVersion, CliUnavailableError } =
       await import("./cli.js");
-    expect(() => checkProducerVersion("v1.34.0")).toThrow(CliUnavailableError);
+    expect(() => checkProducerVersion(BELOW_FLOOR)).toThrow(
+      CliUnavailableError,
+    );
     expect(() => checkProducerVersion("v1.29.0")).toThrow(
-      "the CLI is v1.29.0, but >= v1.35.0 is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@v1.35.0",
+      `the CLI is v1.29.0, but >= ${MIN_CLI_VERSION} is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@${MIN_CLI_VERSION}`,
     );
   });
 
@@ -1311,7 +1320,7 @@ describe("checkProducerVersion", () => {
       await import("./cli.js");
     expect(() => checkProducerVersion(undefined)).toThrow(CliUnavailableError);
     expect(() => checkProducerVersion(undefined)).toThrow(
-      "the CLI wrote no version, so it predates v1.35.0",
+      `the CLI wrote no version, so it predates ${MIN_CLI_VERSION}`,
     );
   });
 
@@ -1319,7 +1328,7 @@ describe("checkProducerVersion", () => {
     const { checkProducerVersion } = await import("./cli.js");
     mockConfigValues.set("modulePath", "example.com/fork/cmd/gotest");
     expect(() => checkProducerVersion("v1.0.0")).toThrow(
-      "go get -tool example.com/fork/cmd/gotest@v1.35.0",
+      `go get -tool example.com/fork/cmd/gotest@${MIN_CLI_VERSION}`,
     );
   });
 });
