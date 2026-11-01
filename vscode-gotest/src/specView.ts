@@ -875,7 +875,7 @@ function buildPackageFailureHtml(pkg: SpecPackage, env: RenderEnv): string {
 // files relative to the package, the compiler relative to where it ran.
 export function linkSources(escaped: string, dir: string | undefined): string {
   return escaped.replace(
-    /((?:[A-Za-z]:)?[\w.\-/\\]+\.go):(\d+)(?::\d+)?/g,
+    /((?:[A-Za-z]:)?[\w.\-~/\\]+\.go):(\d+)(?::\d+)?/g,
     (token: string, file: string, line: string) => {
       const resolved = resolveSource(file, dir);
       if (!resolved) return token;
