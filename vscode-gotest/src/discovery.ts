@@ -18,6 +18,14 @@ import { captureStdout, CaptureTimeoutError } from "./capture.js";
 import { discoveryTimeoutSeconds } from "./config.js";
 import type { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 
+// parseDiscoverOutput reads the `gotest discover` payload, skipping anything
+// printed before its opening brace.
+export function parseDiscoverOutput(stdout: string): DiscoverOutput {
+  const jsonStart = stdout.indexOf("{");
+  const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
+  return JSON.parse(json) as DiscoverOutput;
+}
+
 export class DiscoveryCache implements vscode.Disposable {
   private cache = new Map<string, DiscoverPackage>();
   private workspaceDirs = new Map<string, string>();
@@ -305,9 +313,7 @@ export class DiscoveryService {
         });
         const childMs = Date.now() - startedAt;
 
-        const jsonStart = stdout.indexOf("{");
-        const json = jsonStart > 0 ? stdout.substring(jsonStart) : stdout;
-        const output: DiscoverOutput = JSON.parse(json);
+        const output = parseDiscoverOutput(stdout);
         checkProducerVersion(output.version, workspaceDir);
         const parsedMs = Date.now() - startedAt - childMs;
         const fullScan = effectivePatterns.some((p) => p.includes("..."));

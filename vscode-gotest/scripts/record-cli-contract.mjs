@@ -25,15 +25,26 @@
 // what a run writes: the -json stream's shape (one start per package before
 // its other events, the verdicts of packages it runs nothing in) and a run
 // whose patterns match no package. Times and durations are masked.
+//
+// The `outputs` cases pin the other documents the extension reads: the
+// `discover` payload, the `bench --json` report, the cover profile a run
+// merges for `-coverprofile`, and what `fuzz promote` prints. Absolute paths
+// become <repo> or <stage>, and measurements and host facts are zeroed or
+// masked. Promote runs on a staged copy of cmd/gotest/testdata/fuzzcrash with
+// a session record written here, so no fuzzing happens and the bytes hold.
 
 import { spawn } from "node:child_process";
 import {
+  cpSync,
+  mkdirSync,
   readFileSync,
+  realpathSync,
   writeFileSync,
   readdirSync,
   mkdtempSync,
   rmSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,9 +87,9 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 // spawnAsync runs command to its end, feeding it input.
-function spawnAsync(command, args, input) {
+function spawnAsync(command, args, input, opts = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: repoRoot });
+    const child = spawn(command, args, { cwd: repoRoot, ...opts });
     current = child;
     let stdout = "";
     let stderr = "";
@@ -94,12 +105,18 @@ function spawnAsync(command, args, input) {
   });
 }
 
-async function buildBinary() {
-  const dir = mkdtempSync(path.join(tmpdir(), "gotest-contract-"));
-  // Removed however the script ends, a failed build or a stop included.
+// tempDir makes a dir that is removed however the script ends, a failed
+// build or a stop included.
+function tempDir(prefix) {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
   const remove = () => rmSync(dir, { recursive: true, force: true });
   process.on("exit", remove);
   removals.push(remove);
+  return dir;
+}
+
+async function buildBinary() {
+  const dir = tempDir("gotest-contract-");
   const bin = path.join(
     dir,
     process.platform === "win32" ? "gotest.exe" : "gotest",
@@ -115,8 +132,8 @@ async function buildBinary() {
   return bin;
 }
 
-async function run(bin, args, input) {
-  const result = await spawnAsync(bin, args, input);
+async function run(bin, args, input, opts) {
+  const result = await spawnAsync(bin, args, input, opts);
   return {
     exitCode: result.status,
     stdout: result.stdout,
@@ -195,18 +212,265 @@ for (const [name, args] of Object.entries(LIVE)) {
   };
 }
 
+// The environment of the outputs cases: no CI variables, which change what
+// the CLI writes, and no slow-build notice on a slow machine.
+function outputEnv(extra = {}) {
+  const env = { ...process.env, GOTEST_SLOW_BUILD_THRESHOLD: "1h", ...extra };
+  for (const name of [
+    "CI",
+    "GOTEST_CI",
+    "GOTEST_UPDATE_SNAPSHOTS",
+    "GITHUB_ACTIONS",
+    "GITHUB_STEP_SUMMARY",
+    "GITHUB_WORKSPACE",
+  ]) {
+    delete env[name];
+  }
+  return env;
+}
+
+// maskPaths replaces every string under root, at any depth, with label plus
+// its slash-separated path below root.
+function maskPaths(value, root, label) {
+  if (typeof value === "string") {
+    const rel = path.relative(root, value);
+    if (
+      path.isAbsolute(value) &&
+      !rel.startsWith("..") &&
+      !path.isAbsolute(rel)
+    ) {
+      return rel === "" ? label : `${label}/${rel.split(path.sep).join("/")}`;
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((v) => maskPaths(v, root, label));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, maskPaths(v, root, label)]),
+    );
+  }
+  return value;
+}
+
+// document parses a JSON stdout, or keeps it raw when it is not one document.
+function document(stdout, mask) {
+  try {
+    return { document: mask(JSON.parse(stdout)) };
+  } catch {
+    return { stdout };
+  }
+}
+
+// maskBench zeroes what a benchmark measures and masks the host it ran on.
+function maskBench(report) {
+  const base = report.baseline;
+  if (base) {
+    for (const key of ["createdAt", "goVersion", "goos", "goarch", "cpu"]) {
+      if (key in base) base[key] = `<${key}>`;
+    }
+    if ("gomaxprocs" in base) base.gomaxprocs = 0;
+    for (const r of base.results ?? []) {
+      for (const sample of r.samples ?? []) {
+        sample.nsPerOp = 0;
+        sample.bytesPerOp = 0;
+        sample.allocsPerOp = 0;
+      }
+    }
+  }
+  return report;
+}
+
+const outputs = {};
+
+const discoverArgs = [
+  "discover",
+  "./cmd/gotest/testdata/census/...",
+  "./examples/search/",
+];
+{
+  const result = await run(bin, discoverArgs, "", { env: outputEnv() });
+  outputs.discover = {
+    args: discoverArgs,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    ...document(result.stdout, (d) => maskPaths(d, repoRoot, "<repo>")),
+  };
+}
+
+// One iteration, so iterations is the only number left to pin.
+const benchArgs = [
+  "bench",
+  "./cmd/gotest/testdata/census/benchplain/",
+  "-bench=^BenchmarkBenchPlainTestSuite$",
+  "-benchtime=1x",
+  "--json",
+];
+{
+  const result = await run(bin, benchArgs, "", { env: outputEnv() });
+  outputs.bench = {
+    args: benchArgs,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    ...document(result.stdout, maskBench),
+  };
+}
+
+// The profile is written to a temp file; the golden names it <profile>.
+{
+  const profile = path.join(tempDir("gotest-contract-cover-"), "cover.out");
+  const shown = [
+    "--",
+    "-count=1",
+    "-covermode=atomic",
+    "-coverprofile=<profile>",
+    "./examples/search/",
+  ];
+  const args = shown.map((a) => a.replace("<profile>", profile));
+  const result = await run(bin, args, "", { env: outputEnv() });
+  let lines;
+  try {
+    lines = readFileSync(profile, "utf-8")
+      .split("\n")
+      .filter((l) => l !== "");
+  } catch {
+    lines = null;
+  }
+  outputs.cover = {
+    args: shown,
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+    profile: lines,
+  };
+}
+
+// stageFuzzModule copies the fuzzcrash module into a fresh dir, bound to this
+// checkout, with a gotest cache of its own for the session record.
+function stageFuzzModule() {
+  // Resolved, so the CLI's paths relative to it never climb through a link.
+  const root = realpathSync.native(tempDir("gotest-contract-fuzz-"));
+  const dir = path.join(root, "fuzzcrash");
+  cpSync(path.join(repoRoot, "cmd", "gotest", "testdata", "fuzzcrash"), dir, {
+    recursive: true,
+  });
+  const goMod = path.join(dir, "go.mod");
+  writeFileSync(
+    goMod,
+    readFileSync(goMod, "utf-8").replaceAll("REPO_ROOT", repoRoot),
+  );
+  const goWork = path.join(dir, "go.work");
+  writeFileSync(goWork, `go 1.26.0\n\nuse (\n\t.\n\t${repoRoot}\n)\n`);
+  const cache = path.join(root, "cache");
+  mkdirSync(cache);
+  return {
+    dir,
+    cache,
+    env: outputEnv({ GOWORK: goWork, GOTEST_CACHE_DIR: cache }),
+  };
+}
+
+// plant writes a corpus file under the target's testdata/fuzz dir.
+function plant(stage, func, name, content) {
+  const corpus = path.join(stage.dir, "testdata", "fuzz", func);
+  mkdirSync(corpus, { recursive: true });
+  writeFileSync(path.join(corpus, name), content);
+  return { dir: stage.dir, func, name, content };
+}
+
+// recordSession writes the session record a fuzz session that found the
+// given crashers would have left.
+function recordSession(stage, crashers) {
+  const session = {
+    crashers: crashers.map((c) => ({
+      dir: c.dir,
+      func: c.func,
+      name: c.name,
+      sha256: createHash("sha256").update(c.content).digest("hex"),
+    })),
+  };
+  writeFileSync(
+    path.join(stage.cache, "fuzz-session.json"),
+    JSON.stringify(session, null, 2),
+  );
+}
+
+const promoteArgs = ["fuzz", "promote", "fuzzcrash"];
+const trim = "FuzzMessageTestSuite_FuzzTrim";
+
+async function promote(stage) {
+  const result = await run(bin, promoteArgs, "", {
+    cwd: stage.dir,
+    env: stage.env,
+  });
+  // Paths print relative to the stage; Windows spells them with backslashes,
+  // which no recorded argument holds.
+  const slash = (s) => {
+    const masked = s.replaceAll(stage.dir, "<stage>");
+    return process.platform === "win32" ? masked.replaceAll("\\", "/") : masked;
+  };
+  return {
+    args: promoteArgs,
+    exitCode: result.exitCode,
+    stderr: slash(result.stderr),
+    stdout: slash(result.stdout),
+  };
+}
+
+// No session record: nothing to promote.
+outputs["promote-nothing"] = await promote(stageFuzzModule());
+
+// A crasher the session wrote is spliced as a seed; a corpus file beside it
+// that the session did not write stays.
+{
+  const stage = stageFuzzModule();
+  const crasher = plant(
+    stage,
+    trim,
+    "stale-seed",
+    'go test fuzz v1\nstring("stale")\n',
+  );
+  plant(stage, trim, "planted", 'go test fuzz v1\nstring("planted")\n');
+  recordSession(stage, [crasher]);
+  const recorded = await promote(stage);
+  // The line the confirmation names, as the editor then reveals it.
+  const m = /^promoted \S+ -> f\.Add\(.*\) in (.+):(\d+)$/m.exec(
+    recorded.stdout,
+  );
+  recorded.revealedLine = m
+    ? readFileSync(path.join(stage.dir, m[1]), "utf-8")
+        .split("\n")
+        [Number(m[2]) - 1].trim()
+    : null;
+  outputs["promote-staged"] = recorded;
+}
+
+// A crasher changed since the session wrote it: promote refuses the run.
+{
+  const stage = stageFuzzModule();
+  const crasher = plant(
+    stage,
+    trim,
+    "stale-seed",
+    'go test fuzz v1\nstring("stale")\n',
+  );
+  recordSession(stage, [crasher]);
+  plant(stage, trim, "stale-seed", 'go test fuzz v1\nstring("swapped")\n');
+  outputs["promote-refused"] = await promote(stage);
+}
+
 const golden = {
   note: [
-    "Recorded contract of `gotest spec --input=- --format=json`, and of live",
-    "`gotest -json` runs (`live`).",
+    "Recorded contract of `gotest spec --input=- --format=json`, of live",
+    "`gotest -json` runs (`live`), and of the other documents the extension",
+    "reads (`outputs`).",
     "Generated by scripts/record-cli-contract.mjs — do not hand-edit.",
     "A diff here is a change to an interface the VS Code extension consumes.",
   ],
   cases,
   live,
+  outputs,
 };
 
 writeFileSync(goldenPath, JSON.stringify(golden, null, 2) + "\n", "utf-8");
 console.log(
-  `recorded ${Object.keys(cases).length} cases and ${Object.keys(live).length} live runs -> ${path.relative(extensionDir, goldenPath)}`,
+  `recorded ${Object.keys(cases).length} cases, ${Object.keys(live).length} live runs and ${Object.keys(outputs).length} outputs -> ${path.relative(extensionDir, goldenPath)}`,
 );

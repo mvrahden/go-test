@@ -12,18 +12,51 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 
-vi.mock("vscode", () => ({
-  Uri: {
-    joinPath: (...args: string[]) => ({ toString: () => args.join("/") }),
-  },
-  workspace: { getConfiguration: () => ({ get: () => true }) },
-  window: {},
-  ViewColumn: { Beside: 2 },
-  commands: {},
-}));
+vi.mock("vscode", () => {
+  class Position {
+    constructor(
+      public line: number,
+      public character: number,
+    ) {}
+  }
+  class Range {
+    constructor(
+      public start: Position,
+      public end: Position,
+    ) {}
+  }
+  class StatementCoverage {
+    constructor(
+      public executed: number | boolean,
+      public location: Range,
+    ) {}
+  }
+  class EventEmitter {
+    event = () => ({ dispose: () => {} });
+    fire() {}
+    dispose() {}
+  }
+  return {
+    Uri: {
+      joinPath: (...args: string[]) => ({ toString: () => args.join("/") }),
+    },
+    workspace: { getConfiguration: () => ({ get: () => true }) },
+    window: {},
+    ViewColumn: { Beside: 2 },
+    commands: {},
+    Position,
+    Range,
+    StatementCoverage,
+    EventEmitter,
+  };
+});
 
 import { interpretSpecExit } from "./specView.js";
 import { parseTestEvents } from "./outputParser.js";
+import { DiscoveryCache, parseDiscoverOutput } from "./discovery.js";
+import { parseBenchReport } from "./benchReport.js";
+import { parseCoverProfile } from "./coverage.js";
+import { parsePromotedSeed } from "./fuzz.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -60,12 +93,32 @@ interface ContractCase {
   renderOnly: Variant;
 }
 
+// One run of a command whose document the extension reads. Absolute paths
+// are masked as <repo> or <stage>; measurements and host facts are zeroed.
+interface OutputRun {
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  // The stdout JSON document, when there is one.
+  document?: unknown;
+  // Plain stdout otherwise.
+  stdout?: string;
+  // The cover profile the run wrote.
+  profile?: string[] | null;
+  // The source line a promote confirmation names.
+  revealedLine?: string | null;
+}
+
 const golden = JSON.parse(
   readFileSync(
     path.join(__dirname, "..", "testdata", "cli-contract.json"),
     "utf-8",
   ),
-) as { cases: Record<string, ContractCase>; live: Record<string, LiveRun> };
+) as {
+  cases: Record<string, ContractCase>;
+  live: Record<string, LiveRun>;
+  outputs: Record<string, OutputRun>;
+};
 
 // What each stream shape means. Stated here rather than derived from the
 // recording, so that re-recording a changed CLI cannot quietly relabel a case:
@@ -444,6 +497,215 @@ describe("recorded live runs", () => {
     it("parses in full with the extension's stream reader", () => {
       const stream = recorded.events.map((e) => JSON.stringify(e)).join("\n");
       expect(parseTestEvents(stream)).toHaveLength(recorded.events.length);
+    });
+  });
+});
+
+const repoModule = "github.com/mvrahden/go-test";
+const census = `${repoModule}/cmd/gotest/testdata/census/`;
+const searchPkg = `${repoModule}/examples/search`;
+
+// The recorded discover payload, through the extension's reader.
+function discovered() {
+  const recorded = golden.outputs.discover;
+  return parseDiscoverOutput(JSON.stringify(recorded.document));
+}
+
+// A cache filled from the recorded payload, as a full workspace scan fills it.
+function discoveredCache(): DiscoveryCache {
+  const cache = new DiscoveryCache();
+  const output = discovered();
+  cache.update(output.packages, true, "<repo>", output.warnings);
+  return cache;
+}
+
+// promotedSeeds is what the extension reads from promote's stdout.
+function promotedSeeds(stdout: string) {
+  return stdout
+    .split("\n")
+    .map(parsePromotedSeed)
+    .filter((v) => v !== undefined);
+}
+
+describe("recorded outputs", () => {
+  it("records exactly the stated outputs", () => {
+    expect(Object.keys(golden.outputs).sort()).toEqual([
+      "bench",
+      "cover",
+      "discover",
+      "promote-nothing",
+      "promote-refused",
+      "promote-staged",
+    ]);
+  });
+
+  describe("discover", () => {
+    const recorded = golden.outputs.discover;
+
+    it("succeeds with one JSON document and a silent stderr", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(recorded.document).toBeDefined();
+    });
+
+    it("lists every matched package with suites, each with its dir", () => {
+      const pkgs = discovered().packages;
+      expect(pkgs.map((p) => p.importPath)).toEqual([
+        `${census}benchplain`,
+        `${census}fuzzplain`,
+        `${census}plain`,
+        `${census}skipped`,
+        searchPkg,
+      ]);
+      expect(pkgs.find((p) => p.importPath === searchPkg)?.dir).toBe(
+        "<repo>/examples/search",
+      );
+    });
+
+    it("sorts a suite's cases into tests, benchmarks and fuzzers", () => {
+      const suite = (pkg: string) =>
+        discovered().packages.find((p) => p.importPath === pkg)!.suites[0];
+      const names = (ms: { name: string }[]) => ms.map((m) => m.name);
+      const bench = suite(`${census}benchplain`);
+      expect(names(bench.methods)).toEqual(["TestOne"]);
+      expect(names(bench.benchmarks)).toEqual(["BenchmarkA", "BenchmarkB"]);
+      expect(names(suite(`${census}fuzzplain`).fuzzers)).toEqual(["FuzzTrim"]);
+      expect(suite(`${census}skipped`).lifecycle).toEqual(["BeforeAll"]);
+    });
+
+    it("carries a method's declared behaviors in their vocabulary", () => {
+      const search = discovered().packages.find(
+        (p) => p.importPath === searchPkg,
+      )!;
+      const first = search.suites[0].methods[0];
+      expect(first.behaviorsComplete).toBe(true);
+      expect(first.behaviors?.[0]).toMatchObject({
+        display: "when searching for a title keyword",
+        kind: "when",
+      });
+    });
+
+    it("reads the same with output before the document", () => {
+      const stdout = JSON.stringify(recorded.document);
+      expect(parseDiscoverOutput(`go: downloading x\n${stdout}`)).toEqual(
+        parseDiscoverOutput(stdout),
+      );
+    });
+
+    it("fills the cache's module and file lookups", () => {
+      const cache = discoveredCache();
+      expect(cache.getModuleDir(repoModule)).toBe("<repo>");
+      expect(cache.getModuleDir(`${repoModule}/examples`)).toBe(
+        "<repo>/examples",
+      );
+      expect(
+        cache.resolveFileToPackage("<repo>/examples/search/suite_test.go"),
+      ).toBe(searchPkg);
+    });
+  });
+
+  describe("bench --json", () => {
+    const recorded = golden.outputs.bench;
+
+    it("succeeds, noting on stderr only that the census was skipped", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe(
+        "note: census skipped under -run/-skip/-list/-bench\n",
+      );
+    });
+
+    it("parses into one result per benchmark, one sample each", () => {
+      const report = parseBenchReport(JSON.stringify(recorded.document));
+      expect(
+        report.baseline.results.map((r) => `${r.suite}.${r.name}`),
+      ).toEqual([
+        "BenchPlainTestSuite.BenchmarkA",
+        "BenchPlainTestSuite.BenchmarkB",
+      ]);
+      for (const r of report.baseline.results) {
+        expect(r.package).toBe(`${census}benchplain`);
+        expect(r.samples.map((x) => x.iterations)).toEqual([1]);
+      }
+    });
+
+    it("carries no comparison without a baseline to compare against", () => {
+      const report = parseBenchReport(JSON.stringify(recorded.document));
+      expect(report.deltas ?? []).toEqual([]);
+      expect(report.gate).toBeUndefined();
+      expect(report.failures ?? []).toEqual([]);
+    });
+  });
+
+  describe("a run's merged cover profile", () => {
+    const recorded = golden.outputs.cover;
+
+    it("succeeds and writes the profile it was asked for", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(recorded.profile?.[0]).toBe("mode: atomic");
+    });
+
+    it("maps every block onto the file discovery placed", () => {
+      const cache = discoveredCache();
+      const files = parseCoverProfile(recorded.profile!.join("\n"), (p) =>
+        cache.resolveImportPath(p),
+      );
+      expect(files.map((f) => f.absPath)).toEqual([
+        path.join("<repo>/examples/search", "index.go"),
+      ]);
+      expect(files[0].statements).toHaveLength(recorded.profile!.length - 1);
+    });
+
+    it("reads a block no test reached as not executed", () => {
+      const cache = discoveredCache();
+      const [file] = parseCoverProfile(recorded.profile!.join("\n"), (p) =>
+        cache.resolveImportPath(p),
+      );
+      const executed = file.statements.map((s) => s.executed);
+      expect(executed).toContain(false);
+      expect(executed.some((e) => typeof e === "number" && e > 0)).toBe(true);
+    });
+  });
+
+  describe("fuzz promote", () => {
+    it("with no session, succeeds and promotes nothing", () => {
+      const recorded = golden.outputs["promote-nothing"];
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(promotedSeeds(recorded.stdout!)).toEqual([]);
+    });
+
+    describe("a crasher the session wrote, beside a file it did not", () => {
+      const recorded = golden.outputs["promote-staged"];
+
+      it("succeeds and confirms exactly one seed, by file and line", () => {
+        expect(recorded.exitCode).toBe(0);
+        expect(recorded.stderr).toBe("");
+        const seeds = promotedSeeds(recorded.stdout!);
+        expect(seeds).toHaveLength(1);
+        expect(seeds[0].file).toBe("suite_test.go");
+        expect(seeds[0].line).toBeGreaterThan(0);
+      });
+
+      it("names the line that holds the spliced seed", () => {
+        expect(recorded.revealedLine).toBe('f.Add("stale")');
+      });
+
+      it("leaves the other file in place, saying so", () => {
+        expect(recorded.stdout).toContain(
+          "promote: testdata/fuzz/FuzzMessageTestSuite_FuzzTrim/planted: left in place: not written by the latest fuzz session\n",
+        );
+      });
+    });
+
+    it("refuses a crasher changed since the session, promoting nothing", () => {
+      const recorded = golden.outputs["promote-refused"];
+      expect(recorded.exitCode).toBe(1);
+      expect(recorded.stderr).toBe("");
+      expect(recorded.stdout).toContain(
+        "stale-seed: changed since the fuzz session wrote it\n",
+      );
+      expect(promotedSeeds(recorded.stdout!)).toEqual([]);
     });
   });
 });
