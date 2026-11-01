@@ -6,7 +6,12 @@ What gotest's assertions, polls and snapshots accept, where their failures point
 ## Requirements
 
 ### Requirement: Failure locations
-An assertion that fails inside a helper SHALL name the helper's line and the caller's, also in a module whose path's first element has no dot, built with -trimpath, and also when the helper is in another such module the build requires.
+An assertion that fails SHALL name the line it failed at and the assertion, in a method taking a *gotest.T or a *testing.T; inside a helper it SHALL name the helper's line and the caller's, also in a module whose path's first element has no dot, built with -trimpath, and also when the helper is in another such module the build requires.
+
+#### Scenario: Failures in a plain build
+- **WHEN** assertions fail in a method taking a *gotest.T, in one taking a *testing.T and in a helper
+- **THEN** each failure names its assertion and the line it failed at
+- **AND** the helper's failure names the helper's line and the caller's
 
 #### Scenario: A helper in a dotless module under -trimpath
 - **WHEN** a helper fails in a module whose path has no dot, built with -trimpath

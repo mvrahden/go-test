@@ -9,18 +9,21 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// Sequential: the tests/e2e golden pins its -v output order.
-type NotificationServiceTestSuite struct {
-	dispatcher *dispatcher
-}
+// NotificationServiceTestSuite gives each method a dispatcher of its own, so
+// its methods run in parallel.
+type NotificationServiceTestSuite struct{}
 
-func (s *NotificationServiceTestSuite) BeforeEach(t *gotest.T) {
-	s.dispatcher = newDispatcher()
+func (s *NotificationServiceTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *NotificationServiceTestSuite) TestDeliverNotification(t *gotest.T) {
+	dispatcher := newDispatcher()
+
 	t.When("a single notification is dispatched", func(t *gotest.T) {
-		s.dispatcher.Send(Notification{
+		dispatcher.Send(Notification{
 			To:       "user@example.com",
 			Subject:  "Welcome",
 			Body:     "Hello, welcome aboard!",
@@ -29,16 +32,18 @@ func (s *NotificationServiceTestSuite) TestDeliverNotification(t *gotest.T) {
 
 		t.It("eventually delivers the message", func(t *gotest.T) {
 			gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
-				gotest.Equal(poll, 1, s.dispatcher.DeliveryCount())
+				gotest.Equal(poll, 1, dispatcher.DeliveryCount())
 			})
 		})
 	})
 }
 
 func (s *NotificationServiceTestSuite) TestBatchDelivery(t *gotest.T) {
+	dispatcher := newDispatcher()
+
 	t.When("multiple notifications are sent at once", func(t *gotest.T) {
 		for i := range 3 {
-			s.dispatcher.Send(Notification{
+			dispatcher.Send(Notification{
 				To:      "team@example.com",
 				Subject: fmt.Sprintf("Update #%d", i+1),
 			})
@@ -46,31 +51,35 @@ func (s *NotificationServiceTestSuite) TestBatchDelivery(t *gotest.T) {
 
 		t.It("eventually delivers all messages", func(t *gotest.T) {
 			gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
-				gotest.Equal(poll, 3, s.dispatcher.DeliveryCount())
+				gotest.Equal(poll, 3, dispatcher.DeliveryCount())
 			})
 		})
 	})
 }
 
 func (s *NotificationServiceTestSuite) TestIdleDispatcher(t *gotest.T) {
+	dispatcher := newDispatcher()
+
 	t.When("no notifications have been sent", func(t *gotest.T) {
 		t.It("consistently reports zero deliveries", func(t *gotest.T) {
 			gotest.Consistently(t, 200*time.Millisecond, 50*time.Millisecond, func(poll *gotest.R) {
-				gotest.Equal(poll, 0, s.dispatcher.DeliveryCount())
+				gotest.Equal(poll, 0, dispatcher.DeliveryCount())
 			})
 		})
 	})
 }
 
 func (s *NotificationServiceTestSuite) TestDeliveryTimestamp(t *gotest.T) {
+	dispatcher := newDispatcher()
+
 	t.When("a notification is delivered", func(t *gotest.T) {
 		before := time.Now()
-		s.dispatcher.Send(Notification{To: "user@example.com", Subject: "Timestamp check"})
+		dispatcher.Send(Notification{To: "user@example.com", Subject: "Timestamp check"})
 
 		gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
-			gotest.Equal(poll, 1, s.dispatcher.DeliveryCount())
+			gotest.Equal(poll, 1, dispatcher.DeliveryCount())
 		})
-		delivered := s.dispatcher.Deliveries()[0]
+		delivered := dispatcher.Deliveries()[0]
 
 		t.It("records a recent timestamp", func(t *gotest.T) {
 			gotest.TimeIsNow(t, delivered.DeliveredAt, 2*time.Second)
@@ -83,8 +92,10 @@ func (s *NotificationServiceTestSuite) TestDeliveryTimestamp(t *gotest.T) {
 }
 
 func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
+	dispatcher := newDispatcher()
+
 	t.When("a high-priority notification is delivered", func(t *gotest.T) {
-		s.dispatcher.Send(Notification{
+		dispatcher.Send(Notification{
 			To:       "admin@example.com",
 			Subject:  "System Alert",
 			Body:     "CPU usage exceeded threshold",
@@ -92,9 +103,9 @@ func (s *NotificationServiceTestSuite) TestNotificationPayload(t *gotest.T) {
 		})
 
 		gotest.Eventually(t, 500*time.Millisecond, 10*time.Millisecond, func(poll *gotest.R) {
-			gotest.Equal(poll, 1, s.dispatcher.DeliveryCount())
+			gotest.Equal(poll, 1, dispatcher.DeliveryCount())
 		})
-		delivered := s.dispatcher.Deliveries()[0]
+		delivered := dispatcher.Deliveries()[0]
 
 		t.It("serializes to the expected JSON", func(t *gotest.T) {
 			actual, _ := json.Marshal(delivered.Notification)

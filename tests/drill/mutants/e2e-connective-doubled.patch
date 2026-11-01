@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / discover and every spec write it with no when in front \(
+Clause: when a When's label opens with a connective of its own → discover and every spec write it with no when in front
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -59,7 +59,7 @@
+ // own — "when", but also "with", "given", "after", … — is left alone rather
+ // than doubled: "when with an empty cache" is not a sentence.
+ func (v Vocab) Apply(label string) string {
+-	if v != VocabWhen || opensWithConnective(label) {
++	if v != VocabWhen {
+ 		return label
+ 	}
+ 	return "when " + label

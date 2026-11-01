@@ -146,3 +146,64 @@ func (s *BenchGateTestSuite) TestABenchRunKeepsTheBinaryWordsLast(t *gotest.T) {
 		})
 	})
 }
+
+// reportDoc is the part of the --json report the report clauses read.
+type reportDoc struct {
+	SchemaVersion int `json:"schemaVersion"`
+	Baseline      struct {
+		Results []struct {
+			Suite   string `json:"suite"`
+			Name    string `json:"name"`
+			Samples []struct {
+				Iterations int `json:"iterations"`
+			} `json:"samples"`
+		} `json:"results"`
+	} `json:"baseline"`
+	Deltas []struct {
+		Key string `json:"key"`
+	} `json:"deltas"`
+	Gate *struct {
+		ThresholdPct float64 `json:"thresholdPct"`
+		Breached     bool    `json:"breached"`
+	} `json:"gate"`
+}
+
+func (s *BenchGateTestSuite) TestTheJSONReport(t *gotest.T) {
+	const kept = "-bench=^BenchmarkReportTestSuite$/^BenchmarkKept$"
+	baseline := filepath.Join(t.TempDir(), "baseline.json")
+	runReport := func(w *gotest.T, args ...string) reportDoc {
+		args = append([]string{"bench", "--json", kept, "-benchtime=10x", "../testdata/e2ebenchreport/"}, args...)
+		run, err := testkit.RunCLI(w.Context(), ".", args...)
+		gotest.NoError(w, err)
+		gotest.Equal(w, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		var report reportDoc
+		gotest.NoError(w, json.Unmarshal([]byte(run.Stdout), &report), "stdout is not one report:\n%s", run.Stdout)
+		return report
+	}
+	t.When("a --json bench run selects one of two benchmarks with -benchtime=10x and saves a baseline", func(w *gotest.T) {
+		report := runReport(w, "--save="+baseline)
+		w.It("prints a schemaVersion 1 report whose baseline holds that benchmark alone, 10 iterations a sample, with no deltas and no gate", func(it *gotest.T) {
+			gotest.Equal(it, 1, report.SchemaVersion)
+			gotest.Len(it, report.Baseline.Results, 1)
+			r := report.Baseline.Results[0]
+			gotest.Equal(it, "ReportTestSuite", r.Suite)
+			gotest.Equal(it, "BenchmarkKept", r.Name)
+			gotest.NotEmpty(it, r.Samples)
+			for _, sample := range r.Samples {
+				gotest.Equal(it, 10, sample.Iterations)
+			}
+			gotest.Empty(it, report.Deltas)
+			gotest.Zero(it, report.Gate)
+		})
+	})
+	t.When("a --json bench run is compared against its saved baseline with --gate=1000 and -count=4", func(w *gotest.T) {
+		report := runReport(w, "--against="+baseline, "--gate=1000", "-count=4")
+		w.It("carries one delta for the benchmark and the gate's 1000% threshold, not breached", func(it *gotest.T) {
+			gotest.Len(it, report.Deltas, 1)
+			gotest.Regexp(it, `ReportTestSuite/BenchmarkKept$`, report.Deltas[0].Key)
+			gotest.NotZero(it, report.Gate)
+			gotest.Equal(it, 1000.0, report.Gate.ThresholdPct)
+			gotest.False(it, report.Gate.Breached)
+		})
+	})
+}

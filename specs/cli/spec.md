@@ -40,6 +40,13 @@ gotest SHALL note on stderr, in every mode, that a package has only stdlib tests
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
 
+### Requirement: Benchmarks a test run leaves out
+A test run SHALL note on stderr, in every mode, how many benchmarks its packages declare that it did not run, and that gotest bench runs them. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+
+#### Scenario: A package that declares a benchmark
+- **WHEN** a test run covers a package that declares a benchmark
+- **THEN** notes on stderr that 1 benchmark was not run and gotest bench runs it, in the plain, -json, summary and spec modes
+
 ### Requirement: Packages with testify suites
 gotest SHALL run the gotest suites of a package that holds a testify suite and SHALL leave the testify suite to go test, noting its runner as a stdlib test.
 

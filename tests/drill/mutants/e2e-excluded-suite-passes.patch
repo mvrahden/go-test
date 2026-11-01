@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery .* / reports the X_ suite skipped as excluded by the user, runs none of its methods and passes the suite beside it \(
+Clause: when a package holds an X_ suite beside a suite that runs → reports the X_ suite skipped as excluded by the user, runs none of its methods and passes the suite beside it
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -431,7 +431,7 @@
+ 				"Output": "    test suite was excluded by user\n",
+ 			})
+ 			writeJSONLine(w, map[string]any{
+-				"Time": now, "Action": "skip", "Package": pkg, "Test": testFunc, "Elapsed": 0,
++				"Time": now, "Action": "pass", "Package": pkg, "Test": testFunc, "Elapsed": 0,
+ 			})
+ 		}
+ 	}

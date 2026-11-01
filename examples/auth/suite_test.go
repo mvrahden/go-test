@@ -6,19 +6,21 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// Sequential: the tests/e2e goldens pin its -v output order.
-type TokenValidatorTestSuite struct {
-	validator *tokenValidator
-}
+// TokenValidatorTestSuite holds no state, so its methods run in parallel.
+type TokenValidatorTestSuite struct{}
 
-func (s *TokenValidatorTestSuite) BeforeEach(t *gotest.T) {
-	s.validator = newTokenValidator("secret-key")
+func (s *TokenValidatorTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
 }
 
 func (s *TokenValidatorTestSuite) TestValidateToken(t *gotest.T) {
+	validator := newTokenValidator("secret-key")
+
 	t.When("the token is valid", func(t *gotest.T) {
-		token := s.validator.Issue("user@example.com", time.Hour)
-		claims, err := s.validator.Validate(token)
+		token := validator.Issue("user@example.com", time.Hour)
+		claims, err := validator.Validate(token)
 
 		t.It("returns no error", func(t *gotest.T) {
 			gotest.NoError(t, err)
@@ -29,8 +31,8 @@ func (s *TokenValidatorTestSuite) TestValidateToken(t *gotest.T) {
 	})
 
 	t.When("the token is expired", func(t *gotest.T) {
-		token := s.validator.Issue("user@example.com", -time.Hour)
-		_, err := s.validator.Validate(token)
+		token := validator.Issue("user@example.com", -time.Hour)
+		_, err := validator.Validate(token)
 
 		t.It("returns a TokenExpiredError", func(t *gotest.T) {
 			_ = gotest.ErrorAs[*TokenExpiredError](t, err)
@@ -41,7 +43,7 @@ func (s *TokenValidatorTestSuite) TestValidateToken(t *gotest.T) {
 	})
 
 	t.When("the signature is tampered", func(t *gotest.T) {
-		_, err := s.validator.Validate("wrong-key|user@x.com|9999999999")
+		_, err := validator.Validate("wrong-key|user@x.com|9999999999")
 
 		t.It("returns ErrInvalidSignature", func(t *gotest.T) {
 			gotest.ErrorIs(t, err, ErrInvalidSignature)
@@ -49,7 +51,7 @@ func (s *TokenValidatorTestSuite) TestValidateToken(t *gotest.T) {
 	})
 
 	t.When("the token is malformed", func(t *gotest.T) {
-		_, err := s.validator.Validate("ab")
+		_, err := validator.Validate("ab")
 
 		t.It("returns ErrTokenMalformed", func(t *gotest.T) {
 			gotest.ErrorIs(t, err, ErrTokenMalformed)

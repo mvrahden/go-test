@@ -43,3 +43,17 @@ The Markdown spec read from source SHALL mark each suite and method the X_ prefi
 #### Scenario: X_ suites and methods read from source
 - **WHEN** the spec is read from source with X_ suites and methods
 - **THEN** marks each excluded suite, method and behavior EXCLUDED
+
+### Requirement: One label on every surface
+A behavior SHALL read the same in discover, in a run's spec, in the spec read from source and in the spec replayed from a run's -json stream: its label as the developer wrote it, underscores included, a When's behind the word when, which SHALL be written once, also for a label that opens with a connective of its own.
+
+#### Scenario: Labels with underscores
+- **WHEN** a When and its Its hold underscores in their labels
+- **THEN** discover reports each label as written, the When's behind the word when
+- **AND** a run's spec renders each behavior under the label discover reports
+- **AND** the spec read from source renders each behavior under that label
+- **AND** the spec replayed from the run's -json stream renders each behavior under that label
+
+#### Scenario: A When that opens with a connective
+- **WHEN** a When's label opens with a connective of its own
+- **THEN** discover and every spec write it with no when in front

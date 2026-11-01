@@ -55,6 +55,20 @@ A type named like a suite SHALL declare at least one Test, Benchmark or Fuzz met
 - **AND** a suite whose only case is excluded runs as skipped
 - **AND** a testify base suite that declares no case is left to testify
 
+### Requirement: Excluded suites
+A suite the X_ prefix excludes SHALL be reported skipped as excluded by the user, with none of its methods run, while the suites beside it run.
+
+#### Scenario: An excluded suite beside one that runs
+- **WHEN** a package holds an X_ suite beside a suite that runs
+- **THEN** reports the X_ suite skipped as excluded by the user, runs none of its methods and passes the suite beside it
+
+### Requirement: Behaviors in discover
+discover SHALL report, for each behavior a method declares, the call that declared it.
+
+#### Scenario: A When with Its under it
+- **WHEN** a method declares a When with Its under it
+- **THEN** discover reports the When's kind as when and each It's as it
+
 ### Requirement: Declarations from other packages
 A suite SHALL run an alias of a generic suite another package declares, an alias declared in the external test package SHALL be discovered and run whether the package under test, the external test package or a third package declares the generic suite, and a fixture a suite binds from another package SHALL be held to the signature rules a local fixture is held to.
 

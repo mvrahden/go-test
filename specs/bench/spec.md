@@ -62,3 +62,14 @@ The --json report SHALL carry every benchmark that failed, with the text it fail
 #### Scenario: A benchmark that panics
 - **WHEN** a benchmark panics in a --json bench run
 - **THEN** the report's failures name the benchmark with the panic's message
+
+### Requirement: The --json report
+A --json bench run SHALL print one schemaVersion 1 report whose baseline holds the benchmarks the run selected, each sample with the iterations it ran; it SHALL carry deltas and a gate only when a comparison ran, then one delta for each benchmark in both the baseline and the run and the gate's threshold and verdict.
+
+#### Scenario: Saving a baseline with --json
+- **WHEN** a --json bench run selects one of two benchmarks with -benchtime=10x and saves a baseline
+- **THEN** prints a schemaVersion 1 report whose baseline holds that benchmark alone, 10 iterations a sample, with no deltas and no gate
+
+#### Scenario: Comparing with --json under a gate
+- **WHEN** a --json bench run is compared against its saved baseline with --gate=1000 and -count=4
+- **THEN** carries one delta for the benchmark and the gate's 1000% threshold, not breached

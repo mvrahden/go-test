@@ -17,6 +17,22 @@ func (s *FailureLocationsTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: time.Minute}
 }
 
+func (s *FailureLocationsTestSuite) TestAPlainBuild(t *gotest.T) {
+	run, err := testkit.RunCLI(t.Context(), ".", "-v", "../testdata/e2elocations/")
+	gotest.NoError(t, err)
+	out := run.Stdout
+	t.When("assertions fail in a method taking a *gotest.T, in one taking a *testing.T and in a helper", func(w *gotest.T) {
+		w.It("each failure names its assertion and the line it failed at", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `(?m)^\s+e2elocations_suite_test\.go:12: True failed`, out)
+			gotest.Regexp(it, `(?m)^\s+e2elocations_suite_test\.go:14: Equal failed`, out)
+		})
+		w.It("the helper's failure names the helper's line and the caller's", func(it *gotest.T) {
+			gotest.Regexp(it, `(?m)^\s+e2elocations_suite_test\.go:21: e2elocations_suite_test\.go:17: Empty failed`, out)
+		})
+	})
+}
+
 func (s *FailureLocationsTestSuite) TestHelperUnderTrimpath(t *gotest.T) {
 	// A module whose path has no dot: the shape -trimpath cannot tell from
 	// the standard library by path alone.
