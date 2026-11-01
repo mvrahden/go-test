@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lifecycle .* / skips the method after it and runs the shared fixture's AfterAll before gotest exits \(
+Clause: when the first method of a FailFast suite bound to a shared fixture fails → skips the method after it and runs the shared fixture's AfterAll before gotest exits
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -1060,6 +1060,9 @@
+ 	releaseCancel()
+ 	releaseErr := releaser.Err()
+ 	var teardownErr error
++	if setupProc != nil && collector.WorstExitCode() != 0 {
++		_ = setupProc.tree.Kill()
++	}
+ 	if setupProc != nil {
+ 		teardownErr = errors.Join(slotErr, releaseErr, setupProc.Teardown())
+ 		reports := setupProc.TakeFailures()

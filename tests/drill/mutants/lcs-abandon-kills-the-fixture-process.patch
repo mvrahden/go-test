@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / exits 130 once the shared fixture's AfterAll ran, leaving no shared fixture process behind \(
+Clause: when a second SIGINT reaches gotest while a stopped method body bound to a shared fixture ignores its context → exits 130 once the shared fixture's AfterAll ran, leaving no shared fixture process behind
+--- a/internal/gotestrunner/abandon.go
++++ b/internal/gotestrunner/abandon.go
+@@ -149,7 +149,7 @@
+ // takes again however often it came.
+ func askAgain(tree *proctree.Tree, l liveTree) bool {
+ 	if l.stopFile == "" {
+-		return tree.Interrupt() == nil
++		return false
+ 	}
+ 	pid := readPID(protocol.StopPIDPath(l.stopFile))
+ 	return pid > 0 && stopAgain(pid, l.root) == nil

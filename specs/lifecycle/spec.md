@@ -1,7 +1,7 @@
 # Lifecycle Specification
 
 ## Purpose
-How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, the order ExclusiveGroups run suites in, and what the run reports about them when they do.
+How a suite's tests end, the hooks and the body going wrong, FailFast, panics among parallel methods and in benchmarks, the rows of an Each table, the goroutines gotest.Go starts, a panic ahead of AfterEach included, how a run stopped, cut short or timed out tears its shared fixtures down, the order ExclusiveGroups run suites in, and what the run reports about them when they do.
 
 ## Requirements
 
@@ -34,7 +34,7 @@ A benchmark that panics SHALL fail the run and print the panic with its stack, S
 - **AND** runs AfterAll before the fixture is released
 
 ### Requirement: FailFast
-A FailFast suite SHALL stop at the first failing method, failing it and the run and skipping every method not yet started with that method as the reason, a failure recorded in the method's cleanups included; a failure BeforeAll records without stopping SHALL NOT stop it.
+A FailFast suite SHALL stop at the first failing method, failing it and the run and skipping every method not yet started with that method as the reason, a failure recorded in the method's cleanups included; a failure BeforeAll records without stopping SHALL NOT stop it. The shared fixtures of a run a FailFast suite stopped SHALL still be torn down before gotest exits.
 
 #### Scenario: The first method fails
 - **WHEN** the first method of a FailFast suite fails
@@ -49,6 +49,10 @@ A FailFast suite SHALL stop at the first failing method, failing it and the run 
 #### Scenario: BeforeAll records a failure and goes on
 - **WHEN** BeforeAll of a FailFast suite records a failure without stopping and no method fails
 - **THEN** runs every method
+
+#### Scenario: A FailFast suite bound to a shared fixture
+- **WHEN** the first method of a FailFast suite bound to a shared fixture fails
+- **THEN** skips the method after it and runs the shared fixture's AfterAll before gotest exits
 
 ### Requirement: Each rows
 Every row of an Each table SHALL be its own subtest with its own verdict; a row that fails or skips SHALL end the method there, a row that ends the method's own T SHALL end the method with that verdict alone, and a loop that breaks SHALL leave the method running.
@@ -149,11 +153,15 @@ GOTEST_TIMEOUT_SCALE set to a number above zero SHALL multiply every Timeout and
 - **THEN** fails every suite before its fixtures, naming the value
 
 ### Requirement: What an expired --timeout names
-An expired --timeout SHALL name as running only the tests whose process it cut short, not a test whose suite process ended on its own before it.
+An expired --timeout SHALL fail the run with exit 1 on the text, -json and spec pipelines alike, naming in one FAIL line what it cut short, the method where a stream exists and the suite in the text run, and SHALL still run the shared fixtures' AfterAll. It SHALL name as running only the tests whose process it cut short, not a test whose suite process ended on its own before it.
 
 #### Scenario: A crash before the timeout
 - **WHEN** one suite's process crashed on its own and another suite hangs until --timeout
 - **THEN** names only the hung test as running when the timeout expired
+
+#### Scenario: A method sleeping past --timeout on every pipeline
+- **WHEN** --timeout expires while a method bound to a shared fixture sleeps, on the text, -json or spec pipeline
+- **THEN** exits 1 naming in one FAIL line what was running, the method on -json and spec and the suite in the text run, and runs the shared fixture's AfterAll
 
 ### Requirement: A test waiting to run is not running
 An expired --timeout SHALL NOT name a parallel test that was still waiting for a -parallel slot: only the tests holding a slot were running.
@@ -248,6 +256,17 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** runs AfterAll before the fixture is released
 - **AND** ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
 
+### Requirement: A stopped run's shared fixtures
+A run interrupted while a method bound to a shared fixture ignores its context SHALL exit 130 and run the shared fixture's AfterAll before gotest exits, on the text, -json and spec pipelines alike; an interrupt that arrives once every verdict is in, while the shared fixtures tear down, SHALL keep the run's exit code and let their AfterAll finish.
+
+#### Scenario: Interrupted on every pipeline
+- **WHEN** the run is interrupted on the text, -json or spec pipeline while a method bound to a shared fixture ignores its context
+- **THEN** exits 130 and runs the shared fixture's AfterAll before gotest exits, on every pipeline
+
+#### Scenario: Interrupted while the shared fixtures tear down
+- **WHEN** a passing run is interrupted while its shared fixture's AfterAll runs
+- **THEN** exits 0 and lets the AfterAll finish
+
 ### Requirement: Every launcher stops cleanly
 A run stopped by SIGINT, SIGTERM or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
 
@@ -269,6 +288,14 @@ A second SIGINT reaching gotest while its suites stop SHALL, on Unix, send each 
 - **WHEN** a second SIGINT reaches gotest while a stopped method body ignores its context
 - **THEN** releases the fixture at once, without AfterAll
 - **AND** exits 130 and leaves no suite process behind
+
+#### Scenario: A shared fixture that tears down slowly
+- **WHEN** a second SIGINT reaches gotest while a shared fixture's 20s AfterAll runs
+- **THEN** exits 130 within 5s, leaving no shared fixture process behind 2s later
+
+#### Scenario: A method that ignores the stop beside a shared fixture
+- **WHEN** a second SIGINT reaches gotest while a stopped method body bound to a shared fixture ignores its context
+- **THEN** exits 130 once the shared fixture's AfterAll ran, leaving no shared fixture process behind
 
 ### Requirement: The run after a second Ctrl-C
 Its processes gone, the run SHALL end on its own path, its stream complete and the run booked as interrupted; gotest SHALL exit by itself only when the run has not ended two seconds after that, or at a further SIGINT, and then between two events of the stream.
