@@ -11,6 +11,7 @@ import (
 
 // ExitWritesTestSuite: a CLI about to exit lets the event on its way reach
 // stdout and the events file both, and writes no other.
+// Sequential: the exit it observes is the process's.
 type ExitWritesTestSuite struct{}
 
 // heldWriter is an events file whose writes wait for release.
@@ -105,6 +106,35 @@ func (s *ExitWritesTestSuite) TestEndWrites(t *gotest.T) {
 			gotest.Less(it, time.Since(began), 5*time.Second)
 			file.letGo()
 			wait()
+		})
+	})
+	t.When("the process is exited while an event is on its way", func(w *gotest.T) {
+		w.It("ends once the event reached both, not between them", func(it *gotest.T) {
+			var stdout bytes.Buffer
+			file := newHeldWriter()
+			defer file.letGo()
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false,
+				gotestrunner.WithWriters(&stdout, &bytes.Buffer{}), gotestrunner.WithEvents(file))
+			wait := gotest.Go(it, func() { gotestrunner.WriteEvents(c, []byte(interruptedEvents)) })
+			<-file.entered
+			exited := make(chan string, 1)
+			restore := gotestrunner.ExportObserveExit(func(int) { exited <- file.buf.String() })
+			defer restore()
+			gotest.Go(it, func() { gotestrunner.Exit(130, nil) })
+			select {
+			case <-exited:
+				gotest.Fail(it, "the process was exited while the event was on its way to the file")
+			case <-time.After(100 * time.Millisecond):
+			}
+			file.letGo()
+			select {
+			case atExit := <-exited:
+				gotest.Equal(it, interruptedEvents, atExit)
+			case <-time.After(5 * time.Second):
+				gotest.Fail(it, "the process was not exited once the event was in the file")
+			}
+			wait()
+			gotestrunner.ResumeWrites(gotestrunner.ExportExitGate)
 		})
 	})
 	t.When("nothing is on its way", func(w *gotest.T) {
