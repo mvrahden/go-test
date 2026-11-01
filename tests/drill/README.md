@@ -501,7 +501,7 @@ shards of one run do not add up to every mutant exactly once.
 | `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
 | `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
 | `stop-kills-the-suite` | the runner stops a suite by its pid with SIGKILL | lifecycle conformance: AfterAll never runs before the fixture's release |
-| `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle conformance: the stopped run's stream has no failed package |
+| `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle and CLI conformance: the stopped run's stream has no failed package, and neither a forced stop's stream nor the events file ends with the run booked as interrupted |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 | `fixture-stdout-is-protocol` | a shared fixture's stdout is the protocol stream | canary: a setup that prints a fragment and a forged `_done` fails the run |
 | `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full; fixtures conformance: a hanging 2s-budget fixture is given up only after 30s, and a container fixture taking 35s is given up at 30s |

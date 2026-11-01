@@ -302,6 +302,7 @@ A run given --events-file SHALL write to that file byte for byte the go test -js
 - **WHEN** a -json run with --events-file is stopped while a suite holds
 - **THEN** keeps the events of the suites that ended before the stop, each line whole
 - **AND** writes the stopped suite's events too, as -json prints them
+- **AND** ends with the run booked as interrupted
 
 #### Scenario: A killed run
 - **WHEN** a -json run with --events-file is killed while a suite holds
