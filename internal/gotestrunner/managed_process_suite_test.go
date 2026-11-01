@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -89,7 +90,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_ProcessExitsDuringGrace(t *g
 			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
-			gotest.Less(it, elapsed, 2*time.Second, "should exit quickly after SIGTERM, took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "should exit quickly after SIGTERM, took %v", elapsed)
 		})
 	})
 }
@@ -129,7 +130,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceTimeout_ForceKills(t *g
 			elapsed := time.Since(start)
 
 			gotest.GreaterOrEqual(it, elapsed, 200*time.Millisecond, "should wait at least grace period, took %v", elapsed)
-			gotest.Less(it, elapsed, 2*time.Second, "should force-kill shortly after grace, took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "should force-kill shortly after grace, took %v", elapsed)
 		})
 	})
 }
@@ -172,7 +173,7 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceBudget(t *gotest.T) {
 			elapsed := time.Since(start)
 
 			gotest.GreaterOrEqual(it, elapsed, 300*time.Millisecond, "should wait budget duration, took %v", elapsed)
-			gotest.Less(it, elapsed, 2*time.Second, "should not wait forever, took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "should not wait forever, took %v", elapsed)
 		})
 	})
 }
@@ -209,7 +210,7 @@ func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 			mp.Terminate()
 			elapsed := time.Since(start)
 
-			gotest.Less(it, elapsed, 2*time.Second, "Terminate should return quickly for cooperative process, took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "Terminate should return quickly for cooperative process, took %v", elapsed)
 		})
 	})
 
@@ -244,7 +245,7 @@ func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 			elapsed := time.Since(start)
 
 			gotest.GreaterOrEqual(it, elapsed, 200*time.Millisecond, "took %v", elapsed)
-			gotest.Less(it, elapsed, 2*time.Second, "took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "took %v", elapsed)
 		})
 	})
 
@@ -274,7 +275,7 @@ func (s *ManagedProcessTestSuite) TestAdopt(t *gotest.T) {
 
 			select {
 			case <-mp.Done():
-			case <-time.After(3 * time.Second):
+			case <-time.After(testkit.Scaled(3 * time.Second)):
 				gotest.Fail(it, "Done channel not closed after process exited")
 			}
 		})
@@ -313,7 +314,7 @@ func (s *ManagedProcessTestSuite) TestSetGraceDuration(t *gotest.T) {
 			mp.Terminate()
 			elapsed := time.Since(start)
 
-			gotest.Less(it, elapsed, 2*time.Second, "should use updated 200ms grace, not original 10s, took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "should use updated 200ms grace, not original 10s, took %v", elapsed)
 		})
 	})
 
@@ -366,7 +367,7 @@ func (s *ManagedProcessTestSuite) TestGraceKill(t *gotest.T) {
 			_ = mp.WaitWithGrace(ctx)
 			elapsed := time.Since(start)
 
-			gotest.Less(it, elapsed, 500*time.Millisecond, "GraceKill should kill immediately, took %v", elapsed)
+			gotest.Less(it, elapsed, testkit.Scaled(500*time.Millisecond), "GraceKill should kill immediately, took %v", elapsed)
 		})
 	})
 }

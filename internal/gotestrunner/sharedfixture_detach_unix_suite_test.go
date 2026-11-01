@@ -10,6 +10,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/sharedfixture/fixtures"
 )
@@ -71,6 +72,6 @@ func (s *SharedFixtureDetachedGrandchildTestSuite) TestTeardownDoesNotWaitForThe
 		gotest.NoError(it, err)
 	})
 	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
-		gotest.Less(it, elapsed, drain+3*time.Second, "Teardown blocked %v on a pipe a detached grandchild holds", elapsed)
+		gotest.Less(it, elapsed, testkit.Scaled(drain+3*time.Second), "Teardown blocked %v on a pipe a detached grandchild holds", elapsed)
 	})
 }

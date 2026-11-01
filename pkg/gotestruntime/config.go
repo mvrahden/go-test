@@ -40,6 +40,12 @@ func scaleTimeout(d time.Duration) time.Duration {
 	return time.Duration(float64(d) * f)
 }
 
+// ScaleDuration is d multiplied by GOTEST_TIMEOUT_SCALE, as the harness
+// scales every budget: for a bound a test measures itself, so it holds on the
+// slower machine the scale describes. Zero and negative durations stay as
+// they are.
+func ScaleDuration(d time.Duration) time.Duration { return scaleTimeout(d) }
+
 // WithSuiteDefaults is the config a SuiteConfig() marker runs under: a
 // duration it leaves at zero takes DefaultSuiteConfig's, as if the marker were
 // absent, and every duration is scaled by GOTEST_TIMEOUT_SCALE. A negative

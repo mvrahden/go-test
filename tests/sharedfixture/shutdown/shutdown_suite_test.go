@@ -90,7 +90,7 @@ func (r rig) launch(t *gotest.T, cmd *exec.Cmd) *cliRun {
 
 // interruptWhen interrupts the run once the marker file appears.
 func interruptWhen(t *gotest.T, run *cliRun, markers, name string) {
-	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
+	gotest.Eventually(t, testkit.Scaled(90*time.Second), 100*time.Millisecond, func(poll *gotest.R) {
 		gotest.True(poll, marker(markers, name), "%s never appeared", name)
 	})
 	gotest.NoError(t, testkit.Interrupt(run.cmd, run.tree))
@@ -123,7 +123,7 @@ func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	run := s.rig.startWith(t, markers, []string{"GOTEST_SHUTDOWN_TEARDOWN_SLEEP=20s"}, "./stoppable/")
 	interruptWhen(t, run, markers, "test-running")
 	first := time.Now()
-	gotest.Eventually(t, 90*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
+	gotest.Eventually(t, testkit.Scaled(90*time.Second), 100*time.Millisecond, func(poll *gotest.R) {
 		gotest.True(poll, marker(markers, "fixture-tearing-down"), "fixture-tearing-down never appeared")
 	})
 	// A repeat this soon after the first is the first delivered again, as
@@ -137,7 +137,7 @@ func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	var code int
 	select {
 	case code = <-exited:
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Scaled(10 * time.Second)):
 		_ = run.tree.Kill()
 		gotest.Fail(t, "the CLI was still running 10s after the second interrupt")
 	}
@@ -149,11 +149,11 @@ func (s *ShutdownTestSuite) TestSecondInterruptEndsTheRun(t *gotest.T) {
 	gotest.NoError(t, err)
 
 	t.It("exits 130 at once instead of waiting the teardown out", func(it *gotest.T) {
-		gotest.Less(it, elapsed, 5*time.Second, "took %v", elapsed)
+		gotest.Less(it, elapsed, testkit.Scaled(5*time.Second), "took %v", elapsed)
 		gotest.Equal(it, 130, code)
 	})
 	t.It("leaves no shared fixture process behind", func(it *gotest.T) {
-		gotest.True(it, testkit.EndedWithin(setup, 2*time.Second), "the shared fixture process %d outlived the CLI", setup)
+		gotest.True(it, testkit.EndedWithin(setup, testkit.Scaled(2*time.Second)), "the shared fixture process %d outlived the CLI", setup)
 	})
 }
 
@@ -174,7 +174,7 @@ func (s *ShutdownTestSuite) TestSecondInterruptDuringAMethod(t *gotest.T) {
 	var code int
 	select {
 	case code = <-exited:
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Scaled(10 * time.Second)):
 		_ = run.tree.Kill()
 		gotest.Fail(t, "the CLI was still running 10s after the second interrupt")
 	}
@@ -190,7 +190,7 @@ func (s *ShutdownTestSuite) TestSecondInterruptDuringAMethod(t *gotest.T) {
 		gotest.NoError(it, err)
 		setup, err := strconv.Atoi(string(data))
 		gotest.NoError(it, err)
-		gotest.True(it, testkit.EndedWithin(setup, 2*time.Second), "the shared fixture process %d outlived the CLI", setup)
+		gotest.True(it, testkit.EndedWithin(setup, testkit.Scaled(2*time.Second)), "the shared fixture process %d outlived the CLI", setup)
 	})
 }
 

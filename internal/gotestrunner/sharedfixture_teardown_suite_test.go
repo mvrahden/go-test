@@ -9,6 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/sharedfixture/fixtures"
 )
@@ -333,7 +334,7 @@ func (s *SharedFixtureTeardownTestSuite) TestProcessThatDiedOnItsOwn(t *gotest.T
 		gotest.NoError(w, gotestrunner.ExportKillTree(proc))
 		select {
 		case <-gotestrunner.ExportProcessDone(proc):
-		case <-time.After(10 * time.Second):
+		case <-time.After(testkit.Scaled(10 * time.Second)):
 			gotest.Fail(w, "the killed fixture process never exited")
 		}
 		err := proc.Teardown()

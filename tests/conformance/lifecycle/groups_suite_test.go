@@ -124,7 +124,7 @@ func (s *GroupsTestSuite) TestAStopDuringAGroup(t *gotest.T) {
 				}
 			}
 			gotest.NotZero(it, pid, "markers: %v", run.Markers)
-			gotest.True(it, testkit.EndedWithin(pid, time.Second), "the shared fixture process %d still runs", pid)
+			gotest.True(it, testkit.EndedWithin(pid, testkit.Scaled(time.Second)), "the shared fixture process %d still runs", pid)
 		})
 	})
 }
@@ -138,7 +138,7 @@ func reached(t *gotest.T, cmd *exec.Cmd, markerDir, marker string) *proctree.Tre
 	tree, err := testkit.StartCLI(cmd)
 	gotest.NoError(t, err)
 	markers := filepath.Join(markerDir, testkit.MarkersFile)
-	for deadline := time.Now().Add(90 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(testkit.Scaled(90 * time.Second)); ; time.Sleep(20 * time.Millisecond) {
 		got, _ := testkit.ReadMarkers(markers)
 		if slices.Contains(got, marker) {
 			return tree

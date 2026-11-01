@@ -10,6 +10,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/sharedfixture/fixtures"
 )
@@ -79,7 +80,7 @@ func (s *SharedFixtureDAGTestSuite) TestALateStartOfIndependentFixturesTakesTheS
 		w.It("acknowledges as soon as the slower is up, not after both in turn", func(it *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.NoError(it, teardownErr)
-			gotest.Less(it, took, 1800*time.Millisecond)
+			gotest.Less(it, took, testkit.Scaled(1800*time.Millisecond))
 		})
 	})
 }
@@ -249,7 +250,7 @@ func (s *SharedFixtureDAGTestSuite) TestARequestThatCouldOnlyHangIsRefused(t *go
 				for _, name := range r.names {
 					gotest.ErrorContains(it, err, name)
 				}
-				gotest.Less(it, took, time.Second)
+				gotest.Less(it, took, testkit.Scaled(time.Second))
 			})
 		})
 	}
@@ -319,7 +320,7 @@ func (s *SharedFixtureDAGTestSuite) TestAHungReleaseHoldsUpNoLaterStart(t *gotes
 			gotest.NoError(it, startErr)
 			gotest.NoError(it, releaseErr)
 			gotest.NoError(it, teardownErr)
-			gotest.Less(it, took, 1500*time.Millisecond)
+			gotest.Less(it, took, testkit.Scaled(1500*time.Millisecond))
 		})
 	})
 }
@@ -372,7 +373,7 @@ func (s *SharedFixtureDAGTestSuite) TestAReleaseGivenUpIsNotWaitedForAgain(t *go
 			})
 			if r.atOnce {
 				w.It("does not wait out a budget again once nothing else is held", func(it *gotest.T) {
-					gotest.Less(it, took, 5*time.Second)
+					gotest.Less(it, took, testkit.Scaled(5*time.Second))
 				})
 			}
 			if len(r.names) > 1 {
@@ -477,7 +478,7 @@ func (s *SharedFixtureDAGTestSuite) TestAFailedReleaseHoldsNothing(t *gotest.T) 
 			gotest.ErrorContains(it, failed, "teardown failed")
 			gotest.ErrorContains(it, givenUp, "timed out after 300ms")
 			gotest.ErrorContains(it, teardownErr, "force-killed after 300ms;")
-			gotest.Less(it, took, 5*time.Second)
+			gotest.Less(it, took, testkit.Scaled(5*time.Second))
 		})
 	})
 }
