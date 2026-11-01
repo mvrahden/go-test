@@ -1612,6 +1612,59 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "each failure names its assertion and the line it failed at",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "each_failure_names_its_assertion_and_the_line_it_failed_at",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the helper's failure names the helper's line and the caller's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_helper's_failure_names_the_helper's_line_and_the_caller's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when assertions fail in a method taking a *gotest.T, in one taking a *testing.T and in a helper",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "assertions_fail_in_a_method_taking_a_*gotest.T,_in_one_taking_a_*testing.T_and_in_a_helper",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APlainBuild",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAPlainBuild",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "the failure names the helper's line and the caller's",
                       "duration": 0,
                       "excluded": false,
@@ -2824,6 +2877,73 @@
               "focused": false,
               "kind": "method",
               "name": "TestABenchRunKeepsTheBinaryWordsLast",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "prints a schemaVersion 1 report whose baseline holds that benchmark alone, 10 iterations a sample, with no deltas and no gate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "prints_a_schemaVersion_1_report_whose_baseline_holds_that_benchmark_alone,_10_iterations_a_sample,_with_no_deltas_and_no_gate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a --json bench run selects one of two benchmarks with -benchtime=10x and saves a baseline",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_--json_bench_run_selects_one_of_two_benchmarks_with_-benchtime=10x_and_saves_a_baseline",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "carries one delta for the benchmark and the gate's 1000% threshold, not breached",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "carries_one_delta_for_the_benchmark_and_the_gate's_1000%_threshold,_not_breached",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a --json bench run is compared against its saved baseline with --gate=1000 and -count=4",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_--json_bench_run_is_compared_against_its_saved_baseline_with_--gate=1000_and_-count=4",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheJSONReport",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestTheJSONReport",
               "output": [],
               "status": "none"
             }
@@ -5003,6 +5123,99 @@
               "focused": false,
               "kind": "method",
               "name": "TestStdlibTestsAreNotedInEveryMode",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "the plain run notes it on stderr",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_plain_run_notes_it_on_stderr",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the -json run notes it on stderr",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "the_-json_run_notes_it_on_stderr",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "summary notes it on stderr",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "summary_notes_it_on_stderr",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "spec notes it on stderr",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "spec_notes_it_on_stderr",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "notes on stderr that 1 benchmark was not run and gotest bench runs it, in the plain, -json, summary and spec modes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "notes_on_stderr_that_1_benchmark_was_not_run_and_gotest_bench_runs_it,_in_the_plain,_-json,_summary_and_spec_modes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test run covers a package that declares a benchmark",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_test_run_covers_a_package_that_declares_a_benchmark",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BenchmarksLeftOutAreNotedInEveryMode",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBenchmarksLeftOutAreNotedInEveryMode",
               "output": [],
               "status": "none"
             }
@@ -7765,6 +7978,99 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "reports the X_ suite skipped as excluded by the user, runs none of its methods and passes the suite beside it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "reports_the_X__suite_skipped_as_excluded_by_the_user,_runs_none_of_its_methods_and_passes_the_suite_beside_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package holds an X_ suite beside a suite that runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_package_holds_an_X__suite_beside_a_suite_that_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnExcludedSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAnExcludedSuite",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "discover reports the When's kind as when and each It's as it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "discover_reports_the_When's_kind_as_when_and_each_It's_as_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a method declares a When with Its under it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_method_declares_a_When_with_Its_under_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BehaviorKinds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestBehaviorKinds",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ExcludedAndDeclared",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestExcludedAndDeclaredTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a package declaring context, testing, gotest and the other imported names runs its suite",
                       "duration": 0,
                       "excluded": false,
@@ -8003,6 +8309,59 @@
     {
       "duration": 0,
       "nodes": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "both suites pass, seeing the shared fixture hydrated and set up after its dependency",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "both_suites_pass,_seeing_the_shared_fixture_hydrated_and_set_up_after_its_dependency",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite in the internal and one in the external test package each bind a package fixture that binds a shared fixture depending on another",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_suite_in_the_internal_and_one_in_the_external_test_package_each_bind_a_package_fixture_that_binds_a_shared_fixture_depending_on_another",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SuitesInBothTestPackages",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestSuitesInBothTestPackages",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureBoundShared",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestFixtureBoundSharedTestSuite",
+          "output": [],
+          "status": "none"
+        },
         {
           "children": [
             {
@@ -13409,6 +13768,352 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "exits 130 within 5s, leaving no shared fixture process behind 2s later",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_130_within_5s,_leaving_no_shared_fixture_process_behind_2s_later",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGINT reaches gotest while a shared fixture's 20s AfterAll runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_second_SIGINT_reaches_gotest_while_a_shared_fixture's_20s_AfterAll_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASecondInterruptDuringTheSharedTeardown",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASecondInterruptDuringTheSharedTeardown",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 130 once the shared fixture's AfterAll ran, leaving no shared fixture process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_130_once_the_shared_fixture's_AfterAll_ran,_leaving_no_shared_fixture_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGINT reaches gotest while a stopped method body bound to a shared fixture ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_second_SIGINT_reaches_gotest_while_a_stopped_method_body_bound_to_a_shared_fixture_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASecondInterruptWhileAMethodIgnoresTheFirst",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestASecondInterruptWhileAMethodIgnoresTheFirst",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "text",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "text",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-json",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "-json",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 1 naming in one FAIL line what was running, the method on -json and spec and the suite in the text run, and runs the shared fixture's AfterAll",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_1_naming_in_one_FAIL_line_what_was_running,_the_method_on_-json_and_spec_and_the_suite_in_the_text_run,_and_runs_the_shared_fixture's_AfterAll",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --timeout expires while a method bound to a shared fixture sleeps, on the text, -json or spec pipeline",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "--timeout_expires_while_a_method_bound_to_a_shared_fixture_sleeps,_on_the_text,_-json_or_spec_pipeline",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ATimeoutOnEveryPipeline",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestATimeoutOnEveryPipeline",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SharedStopClock",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSharedStopClockTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "text",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "text",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-json",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "-json",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "exits 130 and runs the shared fixture's AfterAll before gotest exits, on every pipeline",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_130_and_runs_the_shared_fixture's_AfterAll_before_gotest_exits,_on_every_pipeline",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is interrupted on the text, -json or spec pipeline while a method bound to a shared fixture ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_run_is_interrupted_on_the_text,_-json_or_spec_pipeline_while_a_method_bound_to_a_shared_fixture_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "InterruptedOnEveryPipeline",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestInterruptedOnEveryPipeline",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "skips the method after it and runs the shared fixture's AfterAll before gotest exits",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "skips_the_method_after_it_and_runs_the_shared_fixture's_AfterAll_before_gotest_exits",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the first method of a FailFast suite bound to a shared fixture fails",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "the_first_method_of_a_FailFast_suite_bound_to_a_shared_fixture_fails",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFailFastSuiteBoundToASharedFixture",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAFailFastSuiteBoundToASharedFixture",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 0 and lets the AfterAll finish",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "exits_0_and_lets_the_AfterAll_finish",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a passing run is interrupted while its shared fixture's AfterAll runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_passing_run_is_interrupted_while_its_shared_fixture's_AfterAll_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "InterruptedWhileTheSharedFixturesTearDown",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestInterruptedWhileTheSharedFixturesTearDown",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SharedStop",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSharedStopTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "skips the methods that have not started with the reason run stopping",
                       "duration": 0,
                       "excluded": false,
@@ -17721,6 +18426,138 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "discover reports each label as written, the When's behind the word when",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "discover_reports_each_label_as_written,_the_When's_behind_the_word_when",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run's spec renders each behavior under the label discover reports",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "a_run's_spec_renders_each_behavior_under_the_label_discover_reports",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the spec read from source renders each behavior under that label",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_spec_read_from_source_renders_each_behavior_under_that_label",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the spec replayed from the run's -json stream renders each behavior under that label",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "the_spec_replayed_from_the_run's_-json_stream_renders_each_behavior_under_that_label",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a When and its Its hold underscores in their labels",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_When_and_its_Its_hold_underscores_in_their_labels",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LabelsWithUnderscores",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestLabelsWithUnderscores",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "discover and every spec write it with no when in front",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "discover_and_every_spec_write_it_with_no_when_in_front",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a When's label opens with a connective of its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_When's_label_opens_with_a_connective_of_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AConnectiveOfItsOwn",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "focused": false,
+              "kind": "method",
+              "name": "TestAConnectiveOfItsOwn",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecLabels",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "focused": false,
+          "kind": "suite",
+          "name": "TestSpecLabelsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "keeps each behavior on one row of its table",
                       "duration": 0,
                       "excluded": false,
@@ -17999,13 +18836,13 @@
     }
   ],
   "stats": {
-    "behaviors": 587,
+    "behaviors": 613,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 91,
+    "suites": 96,
     "tests": 0
   }
 }
