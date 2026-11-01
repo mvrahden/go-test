@@ -37,6 +37,10 @@ var testdataFS embed.FS
 // bulk's load cannot fail it. Keep invocations frugal: one CLI run per
 // distinct pipeline behavior, assertions merged into it, module copies built
 // once in BeforeAll, workloads pinned tiny (-benchtime=10x scale).
+//
+// Not bound to specs/. A method that needs a change moves its claim into
+// specs/cli as a scenario with a conformance clause and is deleted; see
+// ARCHITECTURE.md, "Testing gotest".
 type E2ETestSuite struct {
 	CLI     *gotestcli.BinarySharedFixture
 	binary  string
