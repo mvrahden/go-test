@@ -2,13 +2,12 @@ Judge: ./internal/gotestrunner AbandonTestSuite/TestAFurtherSignalSkipsTheWait
 Expect: ^FAIL .*internal/gotestrunner Abandon .* / kills it then instead of waiting out the bound \(
 --- a/internal/gotestrunner/abandon.go
 +++ b/internal/gotestrunner/abandon.go
-@@ -119,9 +119,6 @@ wait:
+@@ -71,8 +71,6 @@
+ 		case <-done:
  		case <-timer.C:
- 			expired = true
  			break wait
 -		case <-hurry:
--			killAll(trees)
--			return
+-			break wait
  		}
  	}
  	killAll(trees)

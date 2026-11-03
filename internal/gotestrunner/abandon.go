@@ -2,6 +2,7 @@ package gotestrunner
 
 import (
 	"context"
+	"os"
 	"sync"
 	"time"
 
@@ -35,54 +36,8 @@ func untrack(tree *proctree.Tree) {
 	delete(live, tree)
 }
 
-// Suite runs whose events are yet to reach the stream: a suite's events go
-// out once its result is recorded, after its process ended.
-var (
-	relayMu   sync.Mutex
-	relaying  int
-	relayIdle = closed()
-)
-
-func closed() chan struct{} {
-	c := make(chan struct{})
-	close(c)
-	return c
-}
-
-// relay counts a suite run until done marks its events passed on.
-func relay() (done func()) {
-	relayMu.Lock()
-	if relaying == 0 {
-		relayIdle = make(chan struct{})
-	}
-	relaying++
-	relayMu.Unlock()
-	var once sync.Once
-	return func() {
-		once.Do(func() {
-			relayMu.Lock()
-			defer relayMu.Unlock()
-			if relaying--; relaying == 0 {
-				close(relayIdle)
-			}
-		})
-	}
-}
-
-func relaysIdle() <-chan struct{} {
-	relayMu.Lock()
-	defer relayMu.Unlock()
-	return relayIdle
-}
-
-// relayGrace is how long a tree killed at the bound gets for its suite's
-// events to reach the stream.
-const relayGrace = 500 * time.Millisecond
-
-// runRecorded runs a suite and records its result, counted as a relay so
-// a CLI that abandons the run still passes the suite's events on.
+// runRecorded runs a suite and records its result.
 func runRecorded(ctx context.Context, c *OutputCollector, pkg string, idx int, t SuiteTarget, env []string, test2json bool) { //nolint:gocritic // hugeParam: as RunSingleSuite
-	defer relay()()
 	c.RecordResult(pkg, idx, RunSingleSuite(ctx, t, env, test2json))
 }
 
@@ -92,8 +47,7 @@ func runRecorded(ctx context.Context, c *OutputCollector, pkg string, idx int, t
 // tree with no stop file, the shared fixture's, is asked to tear down; a tree
 // neither reaches is killed at once. Within bound of that, or as soon as
 // hurry closes, every tree still running is killed, so no process outlives
-// the CLI. The events of the suites that ended are passed on before it
-// returns, within bound, or relayGrace past it for a tree killed there.
+// the CLI.
 func Abandon(bound time.Duration, hurry <-chan struct{}) {
 	liveMu.Lock()
 	trees := make(map[*proctree.Tree]liveTree, len(live))
@@ -111,31 +65,17 @@ func Abandon(bound time.Duration, hurry <-chan struct{}) {
 	}
 	timer := time.NewTimer(bound)
 	defer timer.Stop()
-	expired := false
 wait:
 	for _, done := range stopping {
 		select {
 		case <-done:
 		case <-timer.C:
-			expired = true
 			break wait
 		case <-hurry:
-			killAll(trees)
-			return
+			break wait
 		}
 	}
 	killAll(trees)
-	left := timer.C
-	if expired {
-		grace := time.NewTimer(relayGrace)
-		defer grace.Stop()
-		left = grace.C
-	}
-	select {
-	case <-relaysIdle():
-	case <-left:
-	case <-hurry:
-	}
 }
 
 func killAll(trees map[*proctree.Tree]liveTree) {
@@ -154,3 +94,47 @@ func askAgain(tree *proctree.Tree, l liveTree) bool {
 	pid := readPID(protocol.StopPIDPath(l.stopFile))
 	return pid > 0 && stopAgain(pid, l.root) == nil
 }
+
+// writeGate lets an event reach stdout and the events file whole before the
+// CLI exits: each write of the stream holds it shared, and a CLI about to
+// exit takes it for good, so its exit never lands between the two.
+type writeGate struct{ mu sync.RWMutex }
+
+// end waits for the write in flight to end and lets no other start: true
+// once it holds the gate, false at bound or when hurry closes, for a stream
+// whose reader is gone.
+func (g *writeGate) end(bound time.Duration, hurry <-chan struct{}) bool {
+	held := make(chan struct{})
+	go func() {
+		g.mu.Lock()
+		close(held)
+	}()
+	timer := time.NewTimer(bound)
+	defer timer.Stop()
+	select {
+	case <-held:
+		return true
+	case <-timer.C:
+		return false
+	case <-hurry:
+		return false
+	}
+}
+
+// exitGate is the gate every run's stream is written through.
+var exitGate writeGate
+
+// writeBound is how long the exit waits for an event on its way to stdout
+// and the events file; a write that takes longer has lost its reader.
+const writeBound = time.Second
+
+// Exit ends the process with code between two events of the stream: the
+// event on its way to stdout and the events file gets there first, within
+// writeBound or until hurry closes, and no other starts.
+func Exit(code int, hurry <-chan struct{}) {
+	exitGate.end(writeBound, hurry)
+	osExit(code)
+}
+
+// osExit ends the process; a test observes it instead.
+var osExit = os.Exit

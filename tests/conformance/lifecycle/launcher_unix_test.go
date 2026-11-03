@@ -216,4 +216,9 @@ func (s *LauncherSignalTestSuite) TestASecondCtrlCReleasesTheFixturesAtOnce(t *g
 			gotest.True(it, gone(pid), "the suite process %d outlived the run", pid)
 		})
 	})
+	t.When("a second SIGINT reaches a -json run while a stopped method body ignores its context", func(w *gotest.T) {
+		w.It("books the run as interrupted on its stream", func(it *gotest.T) {
+			gotest.Contains(it, run.Stdout, `{"Action":"fail","Package":"interrupted"}`, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		})
+	})
 }

@@ -43,6 +43,8 @@ type OutputCollector struct {
 	stderr io.Writer
 	// starts writes the JSON stream, opening each package as go test does.
 	starts *startWriter
+	// gate is held by every write of the stream; the exit takes it whole.
+	gate *writeGate
 	// events receives a copy of the JSON stream; nil for none.
 	events io.Writer
 }
@@ -80,6 +82,7 @@ func NewOutputCollector(mode RunMode, verbose bool, opts ...OutputOption) *Outpu
 		pkgs:    map[string]*pkgState{},
 		stdout:  os.Stdout,
 		stderr:  os.Stderr,
+		gate:    &exitGate,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -536,21 +539,25 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 		if c.events != nil {
 			w = io.MultiWriter(w, c.events)
 		}
-		c.starts = &startWriter{w: w, started: map[string]bool{}}
+		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate}
 	}
 	return c.starts
 }
 
 // startWriter writes a JSON event stream, opening each package with go
 // test's start event before any other event of it, exactly once. Writes may
-// split a line; each is passed on whole.
+// split a line; each is passed on whole. A write holds the gate, so an exit
+// comes before or after it, never between stdout and the events file.
 type startWriter struct {
 	w       io.Writer
 	buf     []byte
 	started map[string]bool
+	gate    *writeGate
 }
 
 func (s *startWriter) Write(p []byte) (int, error) {
+	s.gate.mu.RLock()
+	defer s.gate.mu.RUnlock()
 	s.buf = append(s.buf, p...)
 	for {
 		i := bytes.IndexByte(s.buf, '\n')

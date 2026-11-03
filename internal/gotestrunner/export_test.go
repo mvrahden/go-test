@@ -256,10 +256,6 @@ func ExportResulted(c *OutputCollector) int { return len(c.verdicts.resulted) }
 
 var ExportApplyInterrupt = applyInterrupt
 
-// ExportRelay counts a suite run whose events are yet to reach the stream,
-// until the returned func marks them passed on.
-var ExportRelay = relay
-
 // ExportTrack tracks tree as a live tree rooted at root, for Abandon, until
 // the returned func untracks it.
 func ExportTrack(tree *proctree.Tree, root int, stopFile string, done <-chan struct{}) (stop func()) {
@@ -353,4 +349,39 @@ func ExportGroupRuns(targets []SuiteTarget, ran map[string]bool) []GroupRun {
 		}
 	}
 	return c.runs()
+}
+
+// WriteGate is the gate a collector's stream is written through; a test
+// gives its collector one of its own, since the run's is taken for good.
+type WriteGate = writeGate
+
+// WithWriteGate writes the collector's stream through g.
+func WithWriteGate(g *WriteGate) OutputOption {
+	return func(c *OutputCollector) { c.gate = g }
+}
+
+// EndWritesOf ends the writes through g, as Exit does through the run's gate.
+func EndWritesOf(g *WriteGate, bound time.Duration, hurry <-chan struct{}) bool {
+	return g.end(bound, hurry)
+}
+
+// ExportExitGate is the run's gate, which Exit takes for good.
+var ExportExitGate = &exitGate
+
+// ExportObserveExit has Exit end the process by observe instead of os.Exit,
+// until the returned func restores it.
+func ExportObserveExit(observe func(code int)) (restore func()) {
+	osExit = observe
+	return func() { osExit = os.Exit }
+}
+
+// ResumeWrites releases a gate EndWritesOf took.
+func ResumeWrites(g *WriteGate) { g.mu.Unlock() }
+
+// WriteEvents writes p to the collector's stream in one write, as a run's
+// own failure is booked.
+func WriteEvents(c *OutputCollector, p []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, _ = c.jsonTarget().Write(p)
 }

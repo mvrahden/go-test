@@ -3131,6 +3131,19 @@
                           "output": [],
                           "status": "none",
                           "vocab": "it"
+                        },
+                        {
+                          "children": [],
+                          "display": "ends with the run booked as interrupted",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "ends_with_the_run_booked_as_interrupted",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
                         }
                       ],
                       "display": "when a -json run with --events-file is stopped while a suite holds",
@@ -3182,6 +3195,19 @@
                           "focused": false,
                           "kind": "block",
                           "name": "writes_the_stopped_suite's_events_too,_as_-json_prints_them",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "it"
+                        },
+                        {
+                          "children": [],
+                          "display": "ends with the run booked as interrupted",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "focused": false,
+                          "kind": "block",
+                          "name": "ends_with_the_run_booked_as_interrupted",
                           "output": [],
                           "status": "none",
                           "vocab": "it"
@@ -13074,6 +13100,33 @@
                   "output": [],
                   "status": "none",
                   "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "books the run as interrupted on its stream",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "focused": false,
+                      "kind": "block",
+                      "name": "books_the_run_as_interrupted_on_its_stream",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGINT reaches a -json run while a stopped method body ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "focused": false,
+                  "kind": "block",
+                  "name": "a_second_SIGINT_reaches_a_-json_run_while_a_stopped_method_body_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
                 }
               ],
               "display": "ASecondCtrlCReleasesTheFixturesAtOnce",
@@ -17946,7 +17999,7 @@
     }
   ],
   "stats": {
-    "behaviors": 584,
+    "behaviors": 587,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

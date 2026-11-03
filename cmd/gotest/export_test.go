@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/lint"
 )
 
@@ -244,4 +245,21 @@ func ExportRemoveLintTemp(dir string, bound time.Duration, remove func(string) e
 	removeAll = remove
 	defer func() { removeAll = prev }()
 	removeLintTemp(dir, bound)
+}
+
+// signals.go
+var ExportForcedStop = forcedStop
+
+// ExportObserveExit has the second signal end the process by observe instead
+// of os.Exit, until the returned func restores it.
+func ExportObserveExit(observe func(code int, hurry <-chan struct{})) (restore func()) {
+	exit = observe
+	return func() { exit = gotestrunner.Exit }
+}
+
+// ExportHoldForcedExit holds forcedExit, as a write that must not stop
+// halfway does, until the returned func releases it.
+func ExportHoldForcedExit() (release func()) {
+	forcedExit.Lock()
+	return forcedExit.Unlock
 }

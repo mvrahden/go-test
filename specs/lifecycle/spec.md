@@ -270,6 +270,13 @@ A second SIGINT reaching gotest while its suites stop SHALL, on Unix, send each 
 - **THEN** releases the fixture at once, without AfterAll
 - **AND** exits 130 and leaves no suite process behind
 
+### Requirement: The run after a second Ctrl-C
+Its processes gone, the run SHALL end on its own path, its stream complete and the run booked as interrupted; gotest SHALL exit by itself only when the run has not ended two seconds after that, or at a further SIGINT, and then between two events of the stream.
+
+#### Scenario: A -json run whose method ignores the stop
+- **WHEN** a second SIGINT reaches a -json run while a stopped method body ignores its context
+- **THEN** books the run as interrupted on its stream
+
 ### Requirement: A stop by the stop file alone
 On Windows, where the runner stops a suite by its stop file alone, an interrupted run SHALL skip the methods that have not started with the reason run stopping, SHALL carry every verdict to the stream and SHALL run AfterAll before the fixture is released.
 

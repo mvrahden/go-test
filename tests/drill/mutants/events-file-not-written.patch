@@ -6,7 +6,7 @@ Expect: ^FAIL .*conformance/cli .* / renders the summary the run rendered, with 
 Clause: when a summary run's --events-file is read back with summary --input → renders the summary the run rendered, with its exit code
 --- a/internal/gotestrunner/output_collector.go
 +++ b/internal/gotestrunner/output_collector.go
-@@ -513,7 +513,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {
+@@ -536,7 +536,7 @@
  		if c.mode == RunCaptureJSON {
  			w = &c.captured
  		}
@@ -14,4 +14,4 @@ Clause: when a summary run's --events-file is read back with summary --input →
 +		if false && c.events != nil {
  			w = io.MultiWriter(w, c.events)
  		}
- 		c.starts = &startWriter{w: w, started: map[string]bool{}}
+ 		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate}
