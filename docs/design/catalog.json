@@ -1,7 +1,6 @@
 {
   "packages": [
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/assertions",
       "duration": 0,
       "nodes": [
         {
@@ -2830,7 +2829,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/bench",
       "duration": 0,
       "nodes": [
         {
@@ -3406,7 +3404,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/cli",
       "duration": 0,
       "nodes": [
         {
@@ -6305,7 +6302,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 37,
+                          "line": 38,
                           "name": "fuzz_methods",
                           "output": [],
                           "status": "none",
@@ -6320,7 +6317,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 38,
+                          "line": 39,
                           "name": "benchmark_methods",
                           "output": [],
                           "status": "none",
@@ -6335,7 +6332,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 39,
+                          "line": 40,
                           "name": "fuzz_and_benchmark_methods",
                           "output": [],
                           "status": "none",
@@ -6350,7 +6347,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 40,
+                          "line": 41,
                           "name": "a_generic_suite_another_package_declares",
                           "output": [],
                           "status": "none",
@@ -6364,7 +6361,7 @@
                       "file": "rejections_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 35,
+                      "line": 36,
                       "name": "fails_with_exit_2_and_one_error_on_stderr_that_names_every_such_hook_in_source_order,_located_at_the_first",
                       "output": [],
                       "status": "none",
@@ -6378,7 +6375,7 @@
                   "file": "rejections_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 34,
+                  "line": 35,
                   "name": "several_hooks_call_t.T()_where_their_wrapper_makes_it_nil",
                   "output": [],
                   "status": "none",
@@ -6397,7 +6394,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 58,
+                          "line": 59,
                           "name": "parentheses",
                           "output": [],
                           "status": "none",
@@ -6412,7 +6409,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 59,
+                          "line": 60,
                           "name": "alias",
                           "output": [],
                           "status": "none",
@@ -6427,7 +6424,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 60,
+                          "line": 61,
                           "name": "method_value",
                           "output": [],
                           "status": "none",
@@ -6441,7 +6438,7 @@
                       "file": "rejections_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 53,
+                      "line": 54,
                       "name": "refuses_it_with_exit_2_like_a_direct_call",
                       "output": [],
                       "status": "none",
@@ -6455,7 +6452,7 @@
                   "file": "rejections_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 52,
+                  "line": 53,
                   "name": "a_hook_reaches_t.T()_through_parentheses,_an_alias_of_t_or_a_method_value",
                   "output": [],
                   "status": "none",
@@ -6472,7 +6469,7 @@
                       "file": "rejections_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 69,
+                      "line": 70,
                       "name": "runs_the_suite,_each_input_with_a_real_*testing.T",
                       "output": [],
                       "status": "none",
@@ -6486,7 +6483,7 @@
                   "file": "rejections_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 68,
+                  "line": 69,
                   "name": "a_fuzz_suite's_BeforeEach_and_AfterEach_call_t.T()",
                   "output": [],
                   "status": "none",
@@ -6503,7 +6500,7 @@
                       "file": "rejections_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 75,
+                      "line": 76,
                       "name": "runs_the_suite",
                       "output": [],
                       "status": "none",
@@ -6517,7 +6514,7 @@
                   "file": "rejections_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 74,
+                  "line": 75,
                   "name": "a_hook_checks_t.T()_for_nil_before_it_uses_it",
                   "output": [],
                   "status": "none",
@@ -6531,7 +6528,7 @@
               "file": "rejections_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 33,
+              "line": 34,
               "name": "TestHooksCallingT",
               "output": [],
               "status": "none"
@@ -6551,7 +6548,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 87,
+                          "line": 88,
                           "name": "in_the_suite's_package",
                           "output": [],
                           "status": "none",
@@ -6566,7 +6563,7 @@
                           "file": "rejections_suite_test.go",
                           "focused": false,
                           "kind": "block",
-                          "line": 88,
+                          "line": 89,
                           "name": "in_another_package",
                           "output": [],
                           "status": "none",
@@ -6580,7 +6577,7 @@
                       "file": "rejections_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 83,
+                      "line": 84,
                       "name": "fails_with_exit_2_and_one_error_on_stderr,_located_at_the_hook,_that_says_shared_fixtures_have_no_per-test_hooks_and_where_the_work_goes_instead",
                       "output": [],
                       "status": "none",
@@ -6594,7 +6591,7 @@
                   "file": "rejections_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 82,
+                  "line": 83,
                   "name": "a_shared_fixture_declares_BeforeEach_or_AfterEach,_in_the_suite's_package_or_another",
                   "output": [],
                   "status": "none",
@@ -6608,7 +6605,7 @@
               "file": "rejections_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 81,
+              "line": 82,
               "name": "TestSharedFixtureEachHooks",
               "output": [],
               "status": "none"
@@ -6626,7 +6623,7 @@
                       "file": "rejections_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 117,
+                      "line": 118,
                       "name": "fails_with_exit_2,_located_at_the_value,_naming_the_forms_it_accepts",
                       "output": [],
                       "status": "none",
@@ -6640,7 +6637,7 @@
                   "file": "rejections_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 116,
+                  "line": 117,
                   "name": "a_suite's_ExclusiveGroup_is_neither_a_string_literal_nor_a_string_constant",
                   "output": [],
                   "status": "none",
@@ -6654,7 +6651,7 @@
               "file": "rejections_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 115,
+              "line": 116,
               "name": "TestAGroupThatIsNotAConstant",
               "output": [],
               "status": "none"
@@ -6667,7 +6664,7 @@
           "file": "rejections_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 13,
+          "line": 14,
           "name": "TestCLIRejectionsTestSuite",
           "output": [],
           "status": "none"
@@ -7918,7 +7915,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/discovery",
       "duration": 0,
       "nodes": [
         {
@@ -9675,7 +9671,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/fixtures",
       "duration": 0,
       "nodes": [
         {
@@ -12714,7 +12709,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/fuzz",
       "duration": 0,
       "nodes": [
         {
@@ -13991,7 +13985,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/lifecycle",
       "duration": 0,
       "nodes": [
         {
@@ -17018,7 +17011,7 @@
                       "file": "stop_unix_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 42,
+                      "line": 46,
                       "name": "ends_that_process_before_gotest_exits",
                       "output": [],
                       "status": "none",
@@ -17033,7 +17026,7 @@
                       "file": "stop_unix_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 45,
+                      "line": 49,
                       "name": "interrupts_it_before_killing_it",
                       "output": [],
                       "status": "none",
@@ -17048,7 +17041,7 @@
                       "file": "stop_unix_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 48,
+                      "line": 52,
                       "name": "runs_AfterAll_before_the_fixture_is_released",
                       "output": [],
                       "status": "none",
@@ -17062,7 +17055,7 @@
                   "file": "stop_unix_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 41,
+                  "line": 45,
                   "name": "the_run_is_interrupted_while_a_holding_method_has_started_a_process_of_its_own",
                   "output": [],
                   "status": "none",
@@ -17076,7 +17069,7 @@
               "file": "stop_unix_test.go",
               "focused": false,
               "kind": "method",
-              "line": 27,
+              "line": 31,
               "name": "TestAStopEndsWhatATestStarted",
               "output": [],
               "status": "none"
@@ -17091,8 +17084,10 @@
                       "duration": 0,
                       "excluded": false,
                       "external": false,
+                      "file": "stop_unix_test.go",
                       "focused": false,
                       "kind": "block",
+                      "line": 110,
                       "name": "ends_with_its_tests'_own_status,_every_verdict_in_the_stream",
                       "output": [],
                       "status": "none",
@@ -17103,8 +17098,10 @@
                   "duration": 0,
                   "excluded": false,
                   "external": false,
+                  "file": "stop_unix_test.go",
                   "focused": false,
                   "kind": "block",
+                  "line": 109,
                   "name": "the_runner's_signal_reaches_the_suite_only_after_its_stop_file_settled_the_run",
                   "output": [],
                   "status": "none",
@@ -17115,8 +17112,10 @@
               "duration": 0,
               "excluded": false,
               "external": false,
+              "file": "stop_unix_test.go",
               "focused": false,
               "kind": "method",
+              "line": 98,
               "name": "TestASignalAfterTheStopFileSettledTheRun",
               "output": [],
               "status": "none"
@@ -17899,7 +17898,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/lint",
       "duration": 0,
       "nodes": [
         {
@@ -20018,7 +20016,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/migrate",
       "duration": 0,
       "nodes": [
         {
@@ -21482,7 +21479,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/spec",
       "duration": 0,
       "nodes": [
         {
@@ -22622,7 +22618,7 @@
     }
   ],
   "stats": {
-    "behaviors": 638,
+    "behaviors": 639,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
