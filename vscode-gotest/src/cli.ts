@@ -33,7 +33,7 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // that older versions do not have. Never below the CLI's
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
-const MIN_CLI_VERSION = "v1.35.0";
+export const MIN_CLI_VERSION = "v1.35.0";
 
 export interface CliCommand {
   bin: string;

@@ -16,6 +16,11 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotestfuzz"
 )
 
+// The top-level fuzz functions in this file run under plain go test only: the
+// gotest runner ignores stdlib functions by design, so FWrapperTestSuite
+// starts each of them in a go test subprocess, the armed ones to fail on
+// purpose and the rest to pass.
+
 // FuzzAdapterLifecycle is a top-level stdlib fuzz target using gotest as a
 // plain library: no generated target, so f.Fuzz binds the callback by
 // reflection. It replays two seeds and proves beforeEach/afterEach
@@ -29,9 +34,7 @@ func FuzzAdapterLifecycle(f *testing.F) {
 	gf.Add("ab")
 	gf.Add("cd")
 
-	if gf.F() != f {
-		f.Fatalf("gf.F() = %p, want %p (identity passthrough broken)", gf.F(), f)
-	}
+	gotest.Same(f, f, gf.F(), "identity passthrough broken")
 
 	gf.Fuzz(func(t *gotest.T, s string) {
 		order = append(order, "body:"+s)
@@ -44,15 +47,7 @@ func FuzzAdapterLifecycle(f *testing.F) {
 
 	// Under go test the seeds replay synchronously, so the last afterEach
 	// has run by now.
-	want := []string{"before", "body:ab", "after", "before", "body:cd", "after"}
-	if len(order) != len(want) {
-		f.Fatalf("order = %v, want %v", order, want)
-	}
-	for i, w := range want {
-		if order[i] != w {
-			f.Fatalf("order[%d] = %q, want %q (full: %v)", i, order[i], w, order)
-		}
-	}
+	gotest.Equal(f, []string{"before", "body:ab", "after", "before", "body:cd", "after"}, order)
 }
 
 // FuzzAdapterAfterEachRunsWhenBeforeEachLeaves: a beforeEach that leaves
@@ -65,10 +60,8 @@ func FuzzAdapterAfterEachRunsWhenBeforeEachLeaves(f *testing.F) {
 		func(*gotest.T) { after++ },
 		nil)
 	gf.Add("ab")
-	gf.Fuzz(func(t *gotest.T, s string) { f.Fatalf("the body ran after a skipping beforeEach") })
-	if after != 1 {
-		f.Fatalf("afterEach ran %d times after a beforeEach that skipped, want 1", after)
-	}
+	gf.Fuzz(func(t *gotest.T, s string) { gotest.Fail(t, "the body ran after a skipping beforeEach") })
+	gotest.Equal(f, 1, after, "afterEach runs after a beforeEach that skipped")
 }
 
 // FuzzAdapterNilHooks proves nil before/after hooks don't panic.
@@ -153,9 +146,8 @@ func FuzzTargetDispatch(f *testing.F) {
 		}
 	})
 
-	if len(order) < 3 || order[0] != "before" || order[1] != "body" || order[2] != "after" {
-		f.Fatalf("order = %v, want the per-execution before/body/after triple", order)
-	}
+	gotest.GreaterOrEqual(f, len(order), 3, "order = %v", order)
+	gotest.Equal(f, []string{"before", "body", "after"}, order[:3], "the per-execution triple")
 }
 
 // FuzzTargetMixed proves a two-value target fans one position and passes
@@ -214,9 +206,7 @@ func FuzzTargetReportsDecodedInputOnFailure(f *testing.F) {
 // FuzzHandleContext proves the handle's context is the engine's own.
 func FuzzHandleContext(f *testing.F) {
 	gf := gotest.NewF(f, nil, nil, nil)
-	if gf.Context() != f.Context() {
-		f.Fatalf("gf.Context() is not f.Context()")
-	}
+	gotest.Equal(f, f.Context(), gf.Context())
 	gf.Add("x")
 	gf.Fuzz(func(t *gotest.T, s string) {})
 }
@@ -389,14 +379,45 @@ func sourceLine(t *gotest.T, needle string) string {
 	return ""
 }
 
+// runFuzzTargets runs the top-level fuzz functions pattern selects in a go
+// test subprocess, with env added, and returns the output and the exit error.
+// -count=1 defeats the cache.
+func runFuzzTargets(pattern string, env ...string) (string, error) {
+	cmd := exec.Command("go", "test", "-count=1", "-v", "-run", pattern, ".") //nolint:gosec // G204: pattern is a test-local constant, not user input
+	cmd.Env = append(os.Environ(), env...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
 // runArmedFuzzTarget re-runs one of the env-armed targets above in a
 // subprocess with the arming variable set. The target fails deliberately
-// once armed, so the non-zero exit is expected. -count=1 defeats the cache.
+// once armed, so the non-zero exit is expected.
 func runArmedFuzzTarget(target, armEnv string) string {
-	cmd := exec.Command("go", "test", "-count=1", "-v", "-run", "^"+target+"$", ".") //nolint:gosec // G204: target is a test-local constant, not user input
-	cmd.Env = append(os.Environ(), armEnv+"=1")
-	out, _ := cmd.CombinedOutput()
-	return string(out)
+	out, _ := runFuzzTargets("^"+target+"$", armEnv+"=1")
+	return out
+}
+
+// unarmedFuzzTargets are the top-level targets that pass as written.
+var unarmedFuzzTargets = []string{
+	"FuzzAdapterLifecycle",
+	"FuzzAdapterAfterEachRunsWhenBeforeEachLeaves",
+	"FuzzAdapterNilHooks",
+	"FuzzAdapter2Args",
+	"FuzzTargetDispatch",
+	"FuzzTargetMixed",
+	"FuzzHandleContext",
+}
+
+func (s *FWrapperTestSuite) TestUnarmedTargets(t *gotest.T) {
+	t.When("the top-level targets that take no arming variable run under go test", func(w *gotest.T) {
+		out, err := runFuzzTargets("^(" + strings.Join(unarmedFuzzTargets, "|") + ")$")
+		w.It("every one of them passes", func(it *gotest.T) {
+			gotest.NoError(it, err, out)
+			for _, target := range unarmedFuzzTargets {
+				gotest.Contains(it, out, "--- PASS: "+target+" ", out)
+			}
+		})
+	})
 }
 
 func (s *FWrapperTestSuite) TestDecodedInputReporting(t *gotest.T) {

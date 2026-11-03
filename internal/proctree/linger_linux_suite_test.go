@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -58,7 +59,7 @@ func isZombie(pid int) bool {
 // still answers a probe of the group, but nothing is left to wait for.
 func (s *LingerTestSuite) TestAGroupOfZombiesIsNotWaitedFor(t *gotest.T) {
 	tree, zombie := interruptedRoot(t, func(pgid int) *exec.Cmd { return inGroup(pgid, "true") })
-	gotest.Eventually(t, 5*time.Second, 10*time.Millisecond, func(poll *gotest.R) {
+	gotest.Eventually(t, testkit.Scaled(5*time.Second), 10*time.Millisecond, func(poll *gotest.R) {
 		gotest.True(poll, isZombie(zombie.Process.Pid), "the member never became a zombie")
 	})
 	gotest.NoError(t, tree.Interrupt())
@@ -69,7 +70,7 @@ func (s *LingerTestSuite) TestAGroupOfZombiesIsNotWaitedFor(t *gotest.T) {
 
 	_ = zombie.Wait()
 	tree.Release()
-	gotest.Less(t, waited, 2*time.Second, "waited %s for a group of zombies", waited)
+	gotest.Less(t, waited, testkit.Scaled(2*time.Second), "waited %s for a group of zombies", waited)
 }
 
 func (s *LingerTestSuite) TestALiveMemberIsWaitedFor(t *gotest.T) {
@@ -79,7 +80,7 @@ func (s *LingerTestSuite) TestALiveMemberIsWaitedFor(t *gotest.T) {
 		// ignore and becomes sleep, which keeps it.
 		return inGroup(pgid, "sh", "-c", "trap '' TERM; exec sleep 1")
 	})
-	gotest.Eventually(t, 5*time.Second, 5*time.Millisecond, func(poll *gotest.R) {
+	gotest.Eventually(t, testkit.Scaled(5*time.Second), 5*time.Millisecond, func(poll *gotest.R) {
 		comm, _ := os.ReadFile("/proc/" + strconv.Itoa(member.Process.Pid) + "/comm")
 		gotest.Equal(poll, "sleep", strings.TrimSpace(string(comm)), "the member is not sleeping yet")
 	})
@@ -128,7 +129,7 @@ func (s *LingerTestSuite) TestEndKillsWhatOutlivesTheTimeout(t *gotest.T) {
 	// sleep, which keeps it.
 	member := exec.Command("sh", "-c", "trap '' TERM; exec sleep 30")
 	tree := exitedRoot(t, member)
-	gotest.Eventually(t, 5*time.Second, 5*time.Millisecond, func(poll *gotest.R) {
+	gotest.Eventually(t, testkit.Scaled(5*time.Second), 5*time.Millisecond, func(poll *gotest.R) {
 		comm, _ := os.ReadFile("/proc/" + strconv.Itoa(member.Process.Pid) + "/comm")
 		gotest.Equal(poll, "sleep", strings.TrimSpace(string(comm)), "the member is not sleeping yet")
 	})

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -96,7 +97,7 @@ func (s *DetachedGrandchildTestSuite) TestWaitReturnsOnceTheOutputIsDrained(t *g
 	elapsed := time.Since(start)
 
 	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
-		gotest.Less(it, elapsed, drain+3*time.Second, "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
+		gotest.Less(it, elapsed, testkit.Scaled(drain+3*time.Second), "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
 	})
 	t.It("keeps what the child wrote", func(it *gotest.T) {
 		gotest.Contains(it, stdout.String(), "child ran")
@@ -126,6 +127,6 @@ func (s *DetachedGrandchildTestSuite) TestWaitReturnsWithinTheDrainDelayAfterShu
 	elapsed := time.Since(start)
 
 	t.It("returns once the drain delay passes, not when the grandchild lets go", func(it *gotest.T) {
-		gotest.Less(it, elapsed, 5*time.Second, "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
+		gotest.Less(it, elapsed, testkit.Scaled(5*time.Second), "Wait blocked %v on a pipe a detached grandchild holds", elapsed)
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/sharedfixture/fixtures"
 )
@@ -53,7 +54,7 @@ func (s *SharedFixtureWindowTestSuite) TestAWindowIsHeldToTheDeclaredBudget(t *g
 	t.When("no --setup-timeout is given and a fixture started for a window outlives the Timeout it declared", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget as a setup timeout", func(it *gotest.T) {
 			gotest.ErrorContains(it, err, "timed out")
-			gotest.Less(it, took, 10*time.Second)
+			gotest.Less(it, took, testkit.Scaled(10*time.Second))
 		})
 		w.It("a release of the fixture sent meanwhile waits for its setup to end", func(it *gotest.T) {
 			ctx, cancel := context.WithTimeout(it.Context(), time.Second)
@@ -64,7 +65,7 @@ func (s *SharedFixtureWindowTestSuite) TestAWindowIsHeldToTheDeclaredBudget(t *g
 		w.It("the run sends no such release: the final teardown owns the fixture", func(it *gotest.T) {
 			began := time.Now()
 			gotest.NoError(it, proc.TeardownKeys(it.Context(), []string{slowSetupKey}, time.Minute))
-			gotest.Less(it, time.Since(began), time.Second)
+			gotest.Less(it, time.Since(began), testkit.Scaled(time.Second))
 		})
 	})
 }
@@ -80,7 +81,7 @@ func (s *SharedFixtureWindowTestSuite) TestAStoppedRunEndsTheWaitForAWindow(t *g
 	t.When("the run is stopped while a fixture started for a window hangs, with --setup-timeout 0", func(w *gotest.T) {
 		w.It("the wait ends with the run", func(it *gotest.T) {
 			gotest.ErrorIs(it, err, context.DeadlineExceeded)
-			gotest.Less(it, took, 5*time.Second)
+			gotest.Less(it, took, testkit.Scaled(5*time.Second))
 		})
 	})
 }

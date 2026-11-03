@@ -17,7 +17,16 @@ import {
   formatCliCommand,
   buildBenchArgs,
   buildFuzzArgs,
+  MIN_CLI_VERSION,
 } from "./cli.js";
+
+// Every other test reads the floor from cli.ts; this one pins its value, so
+// raising it is a deliberate edit here too.
+describe("MIN_CLI_VERSION", () => {
+  it("is v1.35.0", () => {
+    expect(MIN_CLI_VERSION).toBe("v1.35.0");
+  });
+});
 
 describe("compareVersions", () => {
   it("returns 0 for equal versions", () => {

@@ -65,3 +65,11 @@ func ExportScaleFixture(c gotest.FixtureConfig) gotest.FixtureConfig {
 	c.Timeout = scaleTimeout(c.Timeout)
 	return c
 }
+
+// ExportSetTimeoutScale makes f the scale every duration is multiplied by and
+// returns the restore of the reader it replaced.
+func ExportSetTimeoutScale(f float64) (restore func()) {
+	prev := timeoutScale
+	timeoutScale = func() (float64, error) { return f, nil }
+	return func() { timeoutScale = prev }
+}

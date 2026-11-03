@@ -9,6 +9,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/tests/sharedfixture/fixtures"
 )
@@ -67,7 +68,7 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestTheWaitIsTheDeclaredBudget(t *go
 	t.When("no --setup-timeout is given and a fixture outlives the Timeout it declared", func(w *gotest.T) {
 		w.It("the wait ends at the declared budget as a setup timeout", func(it *gotest.T) {
 			gotest.ErrorContains(it, err, "timed out")
-			gotest.Less(it, took, 10*time.Second)
+			gotest.Less(it, took, testkit.Scaled(10*time.Second))
 		})
 	})
 }
@@ -166,7 +167,7 @@ func (s *SharedFixtureSetupBudgetTestSuite) TestAFlatTimeoutIsStillTheBudget(t *
 	t.When("--setup-timeout is given below a fixture's declared Timeout", func(w *gotest.T) {
 		w.It("the flag is the budget", func(it *gotest.T) {
 			gotest.ErrorContains(it, err, "timed out after 1s")
-			gotest.Less(it, took, 4*time.Second)
+			gotest.Less(it, took, testkit.Scaled(4*time.Second))
 		})
 	})
 }

@@ -1224,6 +1224,17 @@ protects it:
 4. Render `gotest spec` once. The suite is a subject, the method a
    capability, each `It` one behavior. If the render reads as a list of
    functions, the names are wrong.
+5. A wall-clock bound the body measures itself goes through
+   `testkit.Scaled`, so it follows `GOTEST_TIMEOUT_SCALE` as the budgets do.
+   Scale an upper bound only when its scaled value still tells the outcomes
+   apart: a bound that must stay below a timeout the test also sets, or a
+   lower bound, is left as written.
+
+`tests/e2e` and `tests/sharedfixture` predate the conformance suites and are
+not bound to `specs/`. They are retired by migration, not by a sweep: a method
+there that needs a change moves its claim into `specs/cli` as a scenario with a
+conformance clause and is deleted, with the case list captured by `gotest -json`
+before and after. One e2e method stays as the smoke of a consumer-shaped module.
 
 Case accounting for any restructuring is by `gotest -json` capture
 (`Package`+`Test` pairs) before and after, never by grepping sources: grep
@@ -1236,7 +1247,10 @@ miscounts test functions embedded in string fixtures.
 - Filtered runs are not censused. Nothing in gotest models `go test`'s
   selection flags; a filtered census would have to start there.
 - `When`/`It` rows are not censused; that would need the static spec's
-  handling of behaviors it cannot enumerate.
+  handling of behaviors it cannot enumerate. The conformance rows need none:
+  the drill counts a catch only when the clause's own failure line appears,
+  so every clause a mutant names is proven to execute, and the unmutated
+  budget caps the rest. The rows without that proof are ring-1 behaviors.
 - The extension's runs use `-json` and inherit the census: the missing
   units arrive in the stream as failed tests, so the Test Explorer marks
   the method and the Spec View names it. Nothing in the editor knows the

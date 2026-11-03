@@ -342,7 +342,7 @@ function registerProviders(
   ];
 }
 
-function registerCommands(deps: {
+export function registerCommands(deps: {
   controller: GoTestController;
   runner: TestRunner;
   benchRunner: BenchRunner;
