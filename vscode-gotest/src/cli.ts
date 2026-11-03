@@ -20,9 +20,9 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-// v1.34.0 is the release whose generated code calls gotestruntime.AfterEach
-// and the shared fixture lifetime, so the CLI's runtime floor moved there
-// and this floor with it; v1.34.0 is retracted, so both sit at v1.35.0.
+// v1.37.0 is the release whose spec reads --declared and --hide and whose
+// lint prints -rules -json, which the Spec View and the lint diagnostics
+// drive, so this floor sits there; the runtime floor stays at v1.35.0.
 // From v1.31.0 on the stream carries
 // every verdict the tree shows, including a shared fixture that failed to
 // set up. Every
@@ -33,7 +33,7 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // that older versions do not have. Never below the CLI's
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
-export const MIN_CLI_VERSION = "v1.35.0";
+export const MIN_CLI_VERSION = "v1.37.0";
 
 export interface CliCommand {
   bin: string;
