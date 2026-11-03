@@ -1,7 +1,6 @@
 {
   "packages": [
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/assertions",
       "duration": 0,
       "nodes": [
         {
@@ -2830,7 +2829,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/bench",
       "duration": 0,
       "nodes": [
         {
@@ -3406,7 +3404,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/cli",
       "duration": 0,
       "nodes": [
         {
@@ -7918,7 +7915,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/discovery",
       "duration": 0,
       "nodes": [
         {
@@ -9675,7 +9671,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/fixtures",
       "duration": 0,
       "nodes": [
         {
@@ -12714,7 +12709,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/fuzz",
       "duration": 0,
       "nodes": [
         {
@@ -13991,7 +13985,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/lifecycle",
       "duration": 0,
       "nodes": [
         {
@@ -17859,7 +17852,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/lint",
       "duration": 0,
       "nodes": [
         {
@@ -19978,7 +19970,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/migrate",
       "duration": 0,
       "nodes": [
         {
@@ -21442,7 +21433,6 @@
       "status": "none"
     },
     {
-      "dir": "/home/ubuntu/projects/mvrahden/go-test/.worktrees/declared-spec/tests/conformance/spec",
       "duration": 0,
       "nodes": [
         {

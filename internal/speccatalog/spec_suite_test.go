@@ -243,3 +243,17 @@ func (s *SpecTestSuite) TestAFailedRenderNamesItsExitStatus(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SpecTestSuite) TestTheCommittedDocument(t *gotest.T) {
+	raw := `{"version":"v1.37.0 (abc)","packages":[{"path":"a","dir":"/home/x/a","nodes":[]},{"path":"b","dir":"/home/x/b","nodes":[]}]}`
+	t.When("spec --static names its version and the directory each package was read from", func(w *gotest.T) {
+		out, err := speccatalog.ExportCommitted([]byte(raw))
+		w.It("keeps neither, since the catalog describes behavior, not the host that rendered it", func(it *gotest.T) {
+			gotest.NoError(it, err)
+			gotest.NotContains(it, string(out), `"version"`)
+			gotest.NotContains(it, string(out), `"dir"`)
+			gotest.Contains(it, string(out), `"path": "a"`)
+			gotest.Contains(it, string(out), `"path": "b"`)
+		})
+	})
+}
