@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/lint LinterRules .* / bench-loop stays silent and be
 Clause: when a benchmark loops with b.B().Loop() and sleeps inside it → bench-loop stays silent and bench-wait reports the sleep
 --- a/internal/lint/bench.go
 +++ b/internal/lint/bench.go
-@@ -241,7 +241,7 @@
- 		return id.Name == param
- 	}
+@@ -283,7 +283,7 @@
+ // isEscape reports whether expr is the zero-argument call <param>.<wrapper>().
+ func (w wrapperRecv) isEscape(expr ast.Expr) bool {
  	call, ok := expr.(*ast.CallExpr)
 -	if !ok || len(call.Args) != 0 {
 +	if !ok || call != nil {

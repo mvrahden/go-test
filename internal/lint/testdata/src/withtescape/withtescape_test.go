@@ -216,7 +216,7 @@ func (s *EscapeBenchTestSuite) BenchmarkDirect(b *gotest.B) {
 func (s *EscapeBenchTestSuite) BenchmarkAlias(b *gotest.B) {
 	tb := b.B()
 	tb.ReportAllocs() // want `ReportAllocs is available on gotest.B — unnecessary B escape`
-	for b.Loop() {
+	for tb.Loop() {   // want `Loop is available on gotest.B — unnecessary B escape`
 	}
 }
 
@@ -229,6 +229,11 @@ func (s *EscapeBenchTestSuite) BenchmarkViaHelper(b *gotest.B) {
 func benchHelper(b *testing.B) {
 	b.Helper()       // directOnly: no finding through a helper
 	b.ReportAllocs() // want `ReportAllocs is available on gotest.B — unnecessary B escape`
+}
+
+// benchHelperUncalled is never handed b.B() by a suite method: no finding.
+func benchHelperUncalled(b *testing.B) {
+	b.ReportAllocs()
 }
 
 func benchHelperCleanup(b *gotest.B) {

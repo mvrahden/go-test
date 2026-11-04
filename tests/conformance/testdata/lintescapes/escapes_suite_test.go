@@ -45,3 +45,17 @@ func (s *SeedsTestSuite) FuzzEscapes(f *gotest.F) {
 		gotest.NotEmpty(t, in)
 	})
 }
+
+// fuzzHarness has an F method of its own; it is no gotest.F.
+type fuzzHarness struct{ f *testing.F }
+
+func (h *fuzzHarness) F() *testing.F { return h.f }
+
+func (s *SeedsTestSuite) FuzzOwnF(f *gotest.F) {
+	h := &fuzzHarness{f: nil}
+	h.F().Add("s")
+	f.Add("t")
+	f.Fuzz(func(t *gotest.T, in string) {
+		gotest.NotEmpty(t, in)
+	})
+}
