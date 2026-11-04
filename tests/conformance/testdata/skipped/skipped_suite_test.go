@@ -11,7 +11,7 @@ func (s *BoundTestSuite) TestOne(t *gotest.T) { gotest.Equal(t, "up", s.Shared.S
 func (s *BoundTestSuite) TestTwo(t *gotest.T) { gotest.Equal(t, "up", s.Shared.State) }
 
 func (s *BoundTestSuite) BenchmarkOne(b *gotest.B) {
-	for b.B().Loop() {
+	for b.Loop() {
 	}
 }
 
@@ -21,6 +21,6 @@ type FreeTestSuite struct{}
 func (s *FreeTestSuite) TestOne(t *gotest.T) {}
 
 func (s *FreeTestSuite) BenchmarkOne(b *gotest.B) {
-	for b.B().Loop() {
+	for b.Loop() {
 	}
 }
