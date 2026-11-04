@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/lifecycle .* / exits 130 within 5s, leaving no shared fixture process behind 2s later \(
+Clause: when a second SIGINT reaches gotest while a shared fixture's 20s AfterAll runs → exits 130 within 5s, leaving no shared fixture process behind 2s later
+--- a/internal/gotestrunner/abandon.go
++++ b/internal/gotestrunner/abandon.go
+@@ -75,7 +75,6 @@ wait:
+ 			break wait
+ 		}
+ 	}
+-	killAll(trees)
+ }
+ 
+ func killAll(trees map[*proctree.Tree]liveTree) {

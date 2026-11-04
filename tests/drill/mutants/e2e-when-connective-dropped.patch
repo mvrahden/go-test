@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / discover reports each label as written, the When's behind the word when \(
+Clause: when a When and its Its hold underscores in their labels → discover reports each label as written, the When's behind the word when
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -62,7 +62,7 @@
+ 	if v != VocabWhen || opensWithConnective(label) {
+ 		return label
+ 	}
+-	return "when " + label
++	return label
+ }
+ 
+ // connectives are the words that already turn a label into a clause, so no

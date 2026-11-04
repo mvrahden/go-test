@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / a run's spec renders each behavior under the label discover reports \(
+Clause: when a When and its Its hold underscores in their labels → a run's spec renders each behavior under the label discover reports
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -150,7 +150,7 @@
+ 	noteStdlibTests(overlay.StdlibTestsByPkg)
+ 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
+ 
+-	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
++	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(nil))
+ 
+ 	var w io.Writer = os.Stdout
+ 	if output != "" {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery .* / discover reports the When's kind as when and each It's as it \(
+Clause: when a method declares a When with Its under it → discover reports the When's kind as when and each It's as it
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -370,7 +370,7 @@
+ func behaviorKindString(k gotestast.BehaviorKind) string {
+ 	switch k {
+ 	case gotestast.BehaviorWhen:
+-		return "when"
++		return "it"
+ 	case gotestast.BehaviorIt:
+ 		return "it"
+ 	case gotestast.BehaviorEach:

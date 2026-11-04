@@ -98,3 +98,23 @@ func (s *CLINewcomerTestSuite) TestStdlibTestsAreNotedInEveryMode(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLINewcomerTestSuite) TestBenchmarksLeftOutAreNotedInEveryMode(t *gotest.T) {
+	const note = "note: 1 benchmark(s) not run — gotest runs tests; use 'gotest bench'\n"
+	t.When("a test run covers a package that declares a benchmark", func(w *gotest.T) {
+		w.It("notes on stderr that 1 benchmark was not run and gotest bench runs it, in the plain, -json, summary and spec modes", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "the plain run notes it on stderr", args: []string{"../testdata/e2ebenchnote/"}, exit: 0},
+				{Desc: "the -json run notes it on stderr", args: []string{"-json", "../testdata/e2ebenchnote/"}, exit: 0},
+				{Desc: "summary notes it on stderr", args: []string{"summary", "../testdata/e2ebenchnote/"}, exit: 0},
+				{Desc: "spec notes it on stderr", args: []string{"spec", "../testdata/e2ebenchnote/"}, exit: 0},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, note)
+				gotest.NotContains(sub, run.Stdout, "benchmark(s) not run")
+			}
+		})
+	})
+}

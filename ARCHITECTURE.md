@@ -1230,11 +1230,12 @@ protects it:
    apart: a bound that must stay below a timeout the test also sets, or a
    lower bound, is left as written.
 
-`tests/e2e` and `tests/sharedfixture` predate the conformance suites and are
-not bound to `specs/`. They are retired by migration, not by a sweep: a method
-there that needs a change moves its claim into `specs/cli` as a scenario with a
-conformance clause and is deleted, with the case list captured by `gotest -json`
-before and after. One e2e method stays as the smoke of a consumer-shaped module.
+`tests/e2e` holds one suite, the smoke of a consumer-shaped module: a copy of
+this repository whose examples module reaches gotest through a go.work, run the
+way a user runs it. Every other claim it once made is a scenario in `specs/`.
+`tests/sharedfixture` holds no tests of its own: its packages are shared
+fixtures and the suites binding them, which the runner's, the generator's and
+the CLI's own tests run.
 
 Case accounting for any restructuring is by `gotest -json` capture
 (`Package`+`Test` pairs) before and after, never by grepping sources: grep

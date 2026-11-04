@@ -496,7 +496,7 @@ shards of one run do not add up to every mutant exactly once.
 | `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: the group gets no interrupt, and AfterAll never runs before the fixture's release |
 | `second-signal-leaves-the-processes` | the CLI's second signal exits without killing the processes still running | lifecycle conformance: a suite process outlives the run after a second SIGINT |
 | `second-signal-not-forwarded` | the CLI's second signal kills the suites without sending them the second stop first | lifecycle conformance: the fixture of a method ignoring its context is never released |
-| `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | shared fixture shutdown suite: the setup process outlives the CLI |
+| `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | lifecycle conformance: the shared fixture process outlives the CLI after a second SIGINT during its teardown |
 | `second-signal-kills-the-shared-fixture` | the CLI's second signal kills a tree without a stop file instead of asking it to tear down | runner unit suite: the tree without a stop file never tears down |
 | `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
 | `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
@@ -707,6 +707,25 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-nan-indelta-translated` | `InDelta` is translated whatever may be NaN | conformance: the migrate It for InDelta where a NaN decides finds no marker |
 | `migrate-workspace-vendor-ignored` | the vendor directory is looked for beside go.mod even where a workspace governs | conformance: the migrate It for a vendored workspace finds the load failing offline |
 | `migrate-goenv-gowork-ignored` | the workspace is resolved without the `go env -w` settings | conformance: the migrate It for a workspace turned off by go env finds the load failing offline |
+| `e2e-bench-note-dropped` | a test run drops the note on the benchmarks it left out | conformance: the CLI It for a package that declares a benchmark sees no note on stderr |
+| `e2e-excluded-suite-passes` | an X_ suite is booked as passed, not skipped | conformance: the discovery It for an X_ suite sees it not reported skipped |
+| `e2e-discover-when-kind-misnamed` | discover reports a When's kind as it | conformance: the discovery It for a When with Its sees the wrong kind |
+| `e2e-when-connective-dropped` | a When's label loses its when on every surface | conformance: the spec It for labels with underscores sees discover's When label without when |
+| `e2e-run-spec-labels-reconstructed` | a run's spec ignores the labels source declares | conformance: the spec It for a run's spec sees underscores turned into spaces |
+| `e2e-static-spec-labels-reconstructed` | the spec read from source ignores the labels as written | conformance: the spec It for --static sees underscores turned into spaces |
+| `e2e-replay-labels-reconstructed` | a replayed stream's spec ignores the labels source declares | conformance: the spec It for a replay sees underscores turned into spaces |
+| `e2e-connective-doubled` | a label that opens with a connective gets a second when | conformance: the spec It for a connective of its own sees "when with …" |
+| `e2e-bench-sample-iterations-lost` | a saved sample records 1 iteration, not the ones it ran | conformance: the bench It for saving with --json sees iterations other than 10 |
+| `e2e-bench-report-drops-gate` | the --json report leaves out the gate verdict | conformance: the bench It for comparing under a gate sees no gate |
+| `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |
+| `e2e-assertion-line-left-to-testing` | testing's location for a failure points into gotest | canary: the trimpath helper check sees the failure not naming both lines |
+| `fixs-external-overlay-dropped` | the overlay leaves out the external test package's harness | fixtures conformance: the external test package's suite never runs |
+| `lcs-spec-ignores-the-interrupt` | `spec` runs without the shutdown handling | lifecycle conformance: an interrupted spec run does not exit 130 |
+| `lcs-failed-run-kills-the-shared-fixture` | a failed run kills the shared fixture process instead of releasing it | lifecycle conformance: the FailFast run never runs the shared fixture's AfterAll |
+| `lcs-stop-during-teardown-reads-as-interrupt` | the exit code reads the stop that arrived after the last verdict | lifecycle conformance: a green run interrupted during its teardown exits 130 |
+| `lcs-abandon-leaves-the-fixture-process` | a second signal kills nothing once its bound has passed | lifecycle conformance: the shared fixture process outlives the CLI |
+| `lcs-abandon-kills-the-fixture-process` | a second signal kills the shared fixture process instead of asking it to tear down | lifecycle conformance: the shared fixture's AfterAll never runs |
+| `lcs-timeout-names-nothing` | an expired `--timeout` no longer names what was running | lifecycle conformance: no FAIL line names the method or the suite |
 
 ## Adding a mutant
 

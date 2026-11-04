@@ -1,193 +1,61 @@
+// Package testutils stages a copy of this repository as a consumer would
+// hold it.
 package testutils
 
 import (
-	"bytes"
-	"embed"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
-	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-var (
-	timestampRegex     = regexp.MustCompile(`(\d+\.\d+s|\(cached\))`)
-	assertionLineRegex = regexp.MustCompile(`assertions\.go:\d+:`)
-	slowBuildRegex     = regexp.MustCompile(`(?m)^gotest: .* (has been building for \S+ and is still running|finished building after \S+)\r?\n`)
+// excluded are the root-level paths a copy leaves out: VCS state, the
+// checkout's own workspace, this suite and the editor extension.
+var excluded = []string{".git", "go.work", "tests/e2e", "vscode-gotest", "node_modules", ".worktrees"}
 
-	DefaultExcludePaths = []string{
-		".git",
-		"go.work",
-		"tests/e2e",
-		"vscode-gotest",
-		"node_modules",
-		".worktrees",
-	}
-)
-
-// WithoutSlowBuildNotices drops the notices a long build prints on stderr:
-// how fast a runner compiles is no part of a run's output.
-func WithoutSlowBuildNotices(stderr string) string {
-	return strings.ReplaceAll(slowBuildRegex.ReplaceAllString(stderr, ""), "\r\n", "\n")
+// CopyModule copies the module at modPath into dir, leaving out excluded.
+func CopyModule(t *gotest.T, dir, modPath string) {
+	gotest.NoError(t, copyFS(dir, os.DirFS(modPath), excluded...))
 }
 
-func CompareTestOutputWithGolden(t *testing.T, tmp string, actual *bytes.Buffer, testFS embed.FS, goldenName string) {
-	expected := openGolden(t, testFS, goldenName)
-	t.Helper()
-	actualStr := actual.String()
-	actualStr = strings.ReplaceAll(actualStr, tmp, "<REPLACED>")
-	actualStr = timestampRegex.ReplaceAllString(actualStr, "<TIMESTAMP>")
-	actualStr = assertionLineRegex.ReplaceAllString(actualStr, "assertions.go:<LINE>:")
-	expectedStr := strings.ReplaceAll(expected.String(), "\r\n", "\n")
-	actualStr = strings.ReplaceAll(actualStr, "\r\n", "\n")
-	gotest.Equal(t, sortTestBlocks(expectedStr), sortTestBlocks(actualStr))
+// UseExamplesWorkspace tidies the copy and gives it a go.work holding the
+// copy and its examples module.
+func UseExamplesWorkspace(t *gotest.T, dir string) {
+	for _, args := range [][]string{
+		{"mod", "tidy"},
+		{"work", "init", dir},
+		{"work", "use", filepath.Join(dir, "examples")},
+	} {
+		cmd := exec.CommandContext(t.Context(), "go", args...) //nolint:gosec // G204: go tool with controlled arguments
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		gotest.NoError(t, err, "go %s: %s", strings.Join(args, " "), out)
+	}
 }
 
-var topLevelRunRe = regexp.MustCompile(`^=== RUN   (Test[^/\s]+)\s*$`)
-
-// sortTestBlocks reorders top-level test blocks alphabetically while
-// preserving content within each block and keeping the trailer last.
-func sortTestBlocks(s string) string {
-	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
-
-	type block struct {
-		key   string
-		lines []string
-	}
-	var blocks []block
-	var trailer []string
-	cur := -1
-
-	for _, line := range lines {
-		m := topLevelRunRe.FindStringSubmatch(line)
-		switch {
-		case m != nil:
-			blocks = append(blocks, block{key: m[1], lines: []string{line}})
-			cur = len(blocks) - 1
-		case cur >= 0 && (line == "PASS" || line == "FAIL"):
-			trailer = append(trailer, line)
-			cur = -1
-		case cur < 0:
-			trailer = append(trailer, line)
-		default:
-			blocks[cur].lines = append(blocks[cur].lines, line)
+// copyFS copies fsys into dir, skipping paths that start with a skip prefix.
+func copyFS(dir string, fsys fs.FS, skip ...string) error {
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-	}
-
-	slices.SortFunc(blocks, func(a, b block) int {
-		return strings.Compare(a.key, b.key)
-	})
-
-	var result []string
-	for _, b := range blocks {
-		result = append(result, b.lines...)
-	}
-	result = append(result, trailer...)
-	return strings.Join(result, "\n") + "\n"
-}
-
-func openGolden(t *testing.T, testFS embed.FS, name string) *bytes.Buffer {
-	buf, err := testFS.ReadFile("testdata/" + name)
-	gotest.NoError(t, err, "failed reading golden: %s", err)
-	return bytes.NewBuffer(buf)
-}
-
-func CopyModuleUnderTestToTmp(t *testing.T, tmp string, modPath string, skipByPrefix ...string) {
-	t.Helper()
-	err := copyFS(tmp, os.DirFS(modPath), skipByPrefix...)
-	gotest.NoError(t, err, "failed copying: %s", err)
-}
-
-// ActivateTests replaces ".go.test" suffix of file names to ".go".
-func ActivateTests(t *testing.T, tmp string) {
-	t.Helper()
-	tmpFS := os.DirFS(tmp)
-	err := fs.WalkDir(tmpFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if strings.HasSuffix(d.Name(), ".go.test") {
-			return os.Rename(
-				filepath.Join(tmp, path),
-				filepath.Join(tmp, filepath.Dir(path), strings.TrimSuffix(d.Name(), ".test")))
-		}
-		return nil
-	})
-	gotest.NoError(t, err, "failed renaming file: %s", err)
-}
-
-// AssertFilesInTmp activates test files, which are intended to be executed only
-// in a Temp-dir and are excluded from execution via `go test`.
-func AssertFilesInTmp(t *testing.T, path string, expectedFiles ...string) {
-	t.Helper()
-	_, notFound := determineNotFoundFiles(t, path, expectedFiles...)
-	gotest.Empty(t, notFound, "could not find expected files: %+v", notFound)
-}
-
-func AssertFilesNotInTmp(t *testing.T, path string, unexpectedFiles ...string) {
-	t.Helper()
-	found, _ := determineNotFoundFiles(t, path, unexpectedFiles...)
-	gotest.Empty(t, found, "found unexpected files: %+v", found)
-}
-
-func determineNotFoundFiles(t *testing.T, path string, searchFiles ...string) (found, notFound []string) {
-	t.Helper()
-	for _, v := range searchFiles {
-		_, err := os.Stat(filepath.Join(path, v))
-		notExists := errors.Is(err, os.ErrNotExist)
-		gotest.False(t, err != nil && !notExists, "failed reading pwd: %s", err)
-		if notExists {
-			notFound = append(notFound, v)
-		} else {
-			found = append(found, v)
-		}
-	}
-	return found, notFound
-}
-
-func HackGoWork(t *testing.T, tmp string) {
-	t.Helper()
-	tidy := exec.Command("go", "mod", "tidy")
-	tidy.Dir = tmp
-	out, err := tidy.CombinedOutput()
-	gotest.NoError(t, err, "go mod tidy output: %s", string(out))
-	init := exec.Command("go", "work", "init", tmp)
-	init.Dir = tmp
-	out, err = init.CombinedOutput()
-	gotest.NoError(t, err, "go work init output: %s", string(out))
-	use := exec.Command("go", "work", "use", filepath.Join(tmp, "examples")) //nolint:gosec // G204: go tool with controlled arguments
-	use.Dir = tmp
-	out, err = use.CombinedOutput()
-	gotest.NoError(t, err, "go work use output: %s", string(out))
-}
-
-// copied from: https://github.com/golang/go/issues/62484#issue-1884498794
-func copyFS(dir string, fsys fs.FS, skipRootLevels ...string) error {
-	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, _ error) error {
-		// assert path matches
-		if slices.ContainsFunc(skipRootLevels, func(v string) bool {
-			return strings.HasPrefix(path, v)
-		}) {
-			return nil // skip
-		}
-
-		targ := filepath.Join(dir, filepath.FromSlash(path))
-
-		if d.IsDir() {
-			if err := os.MkdirAll(targ, 0777); err != nil {
-				return err
+		if slices.ContainsFunc(skip, func(v string) bool { return strings.HasPrefix(path, v) }) {
+			if d.IsDir() {
+				return fs.SkipDir
 			}
 			return nil
 		}
-		if !d.Type().IsRegular() {
-			return nil
+		targ := filepath.Join(dir, filepath.FromSlash(path))
+		if d.IsDir() {
+			return os.MkdirAll(targ, 0o777)
 		}
-		if slices.Contains(skipRootLevels, path) {
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		r, err := fsys.Open(path)
@@ -199,17 +67,14 @@ func copyFS(dir string, fsys fs.FS, skipRootLevels ...string) error {
 		if err != nil {
 			return err
 		}
-		w, err := os.OpenFile(targ, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666|info.Mode()&0777)
+		w, err := os.OpenFile(targ, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666|info.Mode()&0o777)
 		if err != nil {
 			return err
 		}
 		if _, err := io.Copy(w, r); err != nil {
 			w.Close()
-			return fmt.Errorf("copying %s: %v", path, err)
+			return fmt.Errorf("copying %s: %w", path, err)
 		}
-		if err := w.Close(); err != nil {
-			return err
-		}
-		return nil
+		return w.Close()
 	})
 }

@@ -1,7 +1,7 @@
 # Fixtures Specification
 
 ## Purpose
-Which shared fixtures a run starts for the suites it selects, guarded suites included, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, how a shared fixture started late comes up and is released, and that shared fixtures need the gotest runner.
+Which shared fixtures a run starts for the suites it selects, guarded suites included, that a suite of either test package sees a shared fixture it binds through a package fixture, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, how a shared fixture started late comes up and is released, and that shared fixtures need the gotest runner.
 
 ## Requirements
 
@@ -41,6 +41,13 @@ A shared fixture bound by a guard-skipped suite SHALL still be started, and its 
 #### Scenario: A guarded suite whose shared fixture fails
 - **WHEN** a guard-skipped suite binds a shared fixture whose setup fails
 - **THEN** the fixture is started for it and its failure fails the run and the suite, whose guard never runs
+
+### Requirement: A shared fixture bound through a package fixture
+A suite SHALL see a shared fixture it binds through a package fixture hydrated, set up after the shared fixtures it depends on, from the internal and the external test package of one package alike; a shared fixture SHALL need no AfterAll.
+
+#### Scenario: Suites in both test packages
+- **WHEN** a suite in the internal and one in the external test package each bind a package fixture that binds a shared fixture depending on another
+- **THEN** both suites pass, seeing the shared fixture hydrated and set up after its dependency
 
 ### Requirement: A package fixture's BeforeAll or AfterAll going wrong
 A package fixture whose BeforeAll returns an error or panics SHALL fail the run and its suite, which never opens, and SHALL still get its AfterAll; one whose AfterAll returns an error or panics SHALL fail the run after every other hook ran. The cases are the table in `tests/conformance/fixtures/hooks_suite_test.go`.

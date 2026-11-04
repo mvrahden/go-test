@@ -1,0 +1,14 @@
+Expect: helpers under -trimpath: the failure does not name both lines
+Judge: ./tests/canary CanaryTestSuite/TestAHelperFailureNamesBothLinesUnderTrimpath
+Clause: when assertions fail in a method taking a *gotest.T, in one taking a *testing.T and in a helper → the helper's failure names the helper's line and the caller's
+--- a/pkg/gotest/internal/assert/trace.go
++++ b/pkg/gotest/internal/assert/trace.go
+@@ -65,7 +65,7 @@
+ 		return nil
+ 	}
+ 
+-	f := userFrames[len(userFrames)-1]
++	f := userFrames[0]
+ 	return &f
+ }
+ 

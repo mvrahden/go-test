@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / notes on stderr that 1 benchmark was not run and gotest bench runs it, in the plain, -json, summary and spec modes / the plain run notes it on stderr \(
+Clause: when a test run covers a package that declares a benchmark → notes on stderr that 1 benchmark was not run and gotest bench runs it, in the plain, -json, summary and spec modes
+--- a/cmd/gotest/exec.go
++++ b/cmd/gotest/exec.go
+@@ -69,7 +69,6 @@
+ 	// stderr is free in every output mode, so the notes about what did not
+ 	// run reach the reader whether stdout carries text or JSON.
+ 	noteStdlibTests(overlay.StdlibTestsByPkg)
+-	gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
+ 	return result.ExitCode
+ }
+ 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/fixtures .* / both suites pass, seeing the shared fixture hydrated and set up after its dependency \(
+Clause: when a suite in the internal and one in the external test package each bind a package fixture that binds a shared fixture depending on another → both suites pass, seeing the shared fixture hydrated and set up after its dependency
+--- a/internal/gotestrunner/overlay.go
++++ b/internal/gotestrunner/overlay.go
+@@ -258,7 +258,7 @@
+ 			}
+ 			overlay.Replace[filepath.Join(result.AbsPath, about.PSuite)] = dst
+ 		}
+-		if len(result.PXTest) > 0 {
++		if len(result.PXTest) > 0 && false {
+ 			dst := filepath.Join(subDir, about.PXSuite)
+ 			if err := os.WriteFile(dst, result.PXTest, 0600); err != nil {
+ 				return fmt.Errorf("write overlay pxtest: %w", err)

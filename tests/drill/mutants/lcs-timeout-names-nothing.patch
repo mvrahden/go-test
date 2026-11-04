@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle .* / exits 1 naming in one FAIL line what was running, the method on -json and spec and the suite in the text run, and runs the shared fixture's AfterAll / [^ ]+ \(
+Clause: when --timeout expires while a method bound to a shared fixture sleeps, on the text, -json or spec pipeline → exits 1 naming in one FAIL line what was running, the method on -json and spec and the suite in the text run, and runs the shared fixture's AfterAll
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -208,7 +208,7 @@
+ 		failRun(c, result, "global --timeout", msg)
+ 		return
+ 	}
+-	c.reportFailure("FAIL: %s while running: %s\n", msg, unitNames(running))
++	c.reportFailure("FAIL: %s\n", msg)
+ 	if result.ExitCode == 0 {
+ 		result.ExitCode = 1
+ 	}

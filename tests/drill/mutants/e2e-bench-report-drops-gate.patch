@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/bench .* / carries one delta for the benchmark and the gate's 1000% threshold, not breached \(
+Clause: when a --json bench run is compared against its saved baseline with --gate=1000 and -count=4 → carries one delta for the benchmark and the gate's 1000% threshold, not breached
+--- a/cmd/gotest/bench.go
++++ b/cmd/gotest/bench.go
+@@ -278,7 +278,7 @@
+ 	}
+ 
+ 	if jsonRequested {
+-		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, gateVerdict, envMismatch, gotestbench.FailuresOf(tree)); jsonCode != 0 {
++		if jsonCode := emitBenchReport(newBaseline, deltasForReport(deltas, againstPath), missing, added, nil, envMismatch, gotestbench.FailuresOf(tree)); jsonCode != 0 {
+ 			return jsonCode
+ 		}
+ 	}

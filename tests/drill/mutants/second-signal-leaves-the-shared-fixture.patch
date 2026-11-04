@@ -1,5 +1,5 @@
-Judge: ./tests/sharedfixture/shutdown ShutdownTestSuite/TestSecondInterruptEndsTheRun
-Expect: the shared fixture process [0-9]+ outlived the CLI
+Expect: ^FAIL .*conformance/lifecycle .* / exits 130 within 5s, leaving no shared fixture process behind 2s later \(
+Clause: when a second SIGINT reaches gotest while a shared fixture's 20s AfterAll runs → exits 130 within 5s, leaving no shared fixture process behind 2s later
 --- a/internal/gotestrunner/sharedfixture.go
 +++ b/internal/gotestrunner/sharedfixture.go
 @@ -497,7 +497,7 @@

@@ -1,0 +1,14 @@
+Expect: helpers under -trimpath: the failure does not name both lines
+Judge: ./tests/canary CanaryTestSuite/TestAHelperFailureNamesBothLinesUnderTrimpath
+Clause: when assertions fail in a method taking a *gotest.T, in one taking a *testing.T and in a helper → each failure names its assertion and the line it failed at
+--- a/pkg/gotest/t.go
++++ b/pkg/gotest/t.go
+@@ -88,7 +88,7 @@
+ // marked as helpers, and msg's leading location is dropped when it names
+ // that same line.
+ func report(tb testing.TB, msg string) {
+-	if goFrame := assert.SkipInternalFrames(tb); goFrame != "" {
++	if goFrame := ""; goFrame != "" {
+ 		msg = strings.TrimPrefix(msg, goFrame+": ")
+ 	}
+ 	tb.Errorf("%s", msg)
