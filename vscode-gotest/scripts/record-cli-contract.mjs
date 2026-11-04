@@ -482,6 +482,29 @@ function unroot(text) {
     .join("<fixtures>");
 }
 
+// slashed spells a path the way the Linux recording does; Windows prints
+// one below <fixtures> with backslashes, and relative ones in stderr too.
+function slashed(text) {
+  return process.platform === "win32" ? text.replaceAll("\\", "/") : text;
+}
+
+// slashPaths applies slashed to every masked path in a lint document: the
+// finding positions and the files its fixes edit.
+function slashPaths(value) {
+  if (typeof value === "string") {
+    return value.startsWith("<fixtures>") ? slashed(value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(slashPaths);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, slashPaths(v)]),
+    );
+  }
+  return value;
+}
+
 const lint = {};
 for (const [name, args] of Object.entries(LINT)) {
   const result = await run(bin, args, "", {
@@ -492,8 +515,8 @@ for (const [name, args] of Object.entries(LINT)) {
   lint[name] = {
     args,
     exitCode: result.exitCode,
-    stderr: unroot(result.stderr),
-    document: stdout ? JSON.parse(stdout) : null,
+    stderr: slashed(unroot(result.stderr)),
+    document: stdout ? slashPaths(JSON.parse(stdout)) : null,
   };
 }
 
