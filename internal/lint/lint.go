@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -642,26 +643,60 @@ type escapeConfig struct {
 	directOnly bool // only flag direct t.T().X() calls; plain *testing.T helpers may use X legitimately
 }
 
-var escapeConfigs = map[string]escapeConfig{
-	"Errorf":   {TEscape, "Errorf is available on gotest.T — unnecessary T escape", false, true, false},
-	"FailNow":  {TEscape, "FailNow is available on gotest.T — unnecessary T escape", false, true, false},
-	"Skipf":    {TEscape, "Skipf is available on gotest.T — unnecessary T escape", false, true, false},
-	"Setenv":   {TEscape, "Setenv is available on gotest.T — unnecessary T escape", false, true, false},
-	"TempDir":  {TEscape, "TempDir is available on gotest.T — unnecessary T escape", false, true, false},
-	"Context":  {TEscape, "Context is available on gotest.T — t.T().Context() drops the suite's Timeout", false, true, false},
-	"Deadline": {TEscape, "use t.Context().Deadline() — t.T().Deadline() reports go test's -timeout, not the suite's Timeout", false, true, false},
-	"Skip":     {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
-	"SkipNow":  {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
-	"Cleanup":  {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
-	"Parallel": {SuiteLifecycle, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
-	"Run":      {SuiteLifecycle, "use It or When instead — T.Run bypasses gotest wrapping", false, false, false},
-	"Helper":   {TEscape, "never call Helper — gotest resolves call sites automatically; Helper degrades failure locations", false, false, true},
-	"Log":      {TEscape, "use assertion message args instead — T.Log bypasses the failure report", false, false, true},
-	"Fatal":    {TEscape, "use assertions instead — T.Fatal bypasses the assertion tracer", false, false, true},
-	"Fatalf":   {TEscape, "use assertions instead — T.Fatalf bypasses the assertion tracer", false, false, true},
-	"Error":    {TEscape, "use assertions instead — T.Error bypasses the assertion tracer", false, false, true},
-	"Fail":     {TEscape, "use assertions instead — T.Fail bypasses the assertion tracer", false, false, true},
-	"Logf":     {TEscape, "use assertion message args instead — T.Logf bypasses the failure report", false, false, true},
+// escapeConfigs maps a wrapper's letter (T, B, F) to the stdlib methods
+// whose call through its escape the rules flag.
+var escapeConfigs = map[string]map[string]escapeConfig{
+	"T": withEscapes(wrapperEscapeConfigs("T"), map[string]escapeConfig{
+		"Setenv":   availableOn("T", "Setenv"),
+		"TempDir":  availableOn("T", "TempDir"),
+		"Context":  {TEscape, "Context is available on gotest.T — t.T().Context() drops the suite's Timeout", false, true, false},
+		"Deadline": {TEscape, "use t.Context().Deadline() — t.T().Deadline() reports go test's -timeout, not the suite's Timeout", false, true, false},
+		"Parallel": {SuiteLifecycle, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
+		"Run":      {SuiteLifecycle, "use It or When instead — T.Run bypasses gotest wrapping", false, false, false},
+	}),
+	"B": withEscapes(wrapperEscapeConfigs("B"), map[string]escapeConfig{
+		"Loop":         availableOn("B", "Loop"),
+		"Name":         availableOn("B", "Name"),
+		"ReportAllocs": availableOn("B", "ReportAllocs"),
+		"SetBytes":     availableOn("B", "SetBytes"),
+		"ReportMetric": availableOn("B", "ReportMetric"),
+	}),
+	"F": withEscapes(wrapperEscapeConfigs("F"), map[string]escapeConfig{
+		"Add":  {TEscape, "Add is available on gotest.F — f.F().Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed", false, true, false},
+		"Name": availableOn("F", "Name"),
+	}),
+}
+
+// wrapperEscapeConfigs is the table every wrapper shares; the texts that do
+// not name the wrapper read the same on each.
+func wrapperEscapeConfigs(wrapper string) map[string]escapeConfig {
+	return map[string]escapeConfig{
+		"Errorf":  availableOn(wrapper, "Errorf"),
+		"FailNow": availableOn(wrapper, "FailNow"),
+		"Skipf":   availableOn(wrapper, "Skipf"),
+		"Context": availableOn(wrapper, "Context"),
+		"Skip":    {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
+		"SkipNow": {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
+		"Cleanup": {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
+		"Helper":  {TEscape, "never call Helper — gotest resolves call sites automatically; Helper degrades failure locations", false, false, true},
+		"Log":     {TEscape, "use assertion message args instead — T.Log bypasses the failure report", false, false, true},
+		"Fatal":   {TEscape, "use assertions instead — T.Fatal bypasses the assertion tracer", false, false, true},
+		"Fatalf":  {TEscape, "use assertions instead — T.Fatalf bypasses the assertion tracer", false, false, true},
+		"Error":   {TEscape, "use assertions instead — T.Error bypasses the assertion tracer", false, false, true},
+		"Fail":    {TEscape, "use assertions instead — T.Fail bypasses the assertion tracer", false, false, true},
+		"Logf":    {TEscape, "use assertion message args instead — T.Logf bypasses the failure report", false, false, true},
+	}
+}
+
+// availableOn flags a method the wrapper offers itself, fixed by calling it there.
+func availableOn(wrapper, method string) escapeConfig {
+	return escapeConfig{TEscape, fmt.Sprintf("%s is available on gotest.%s — unnecessary %s escape", method, wrapper, wrapper), false, true, false}
+}
+
+// withEscapes adds extras to table, an extra replacing a shared entry.
+func withEscapes(table, extras map[string]escapeConfig) map[string]escapeConfig {
+	maps.Copy(table, extras)
+	return table
 }
 
 // escapeFixTargets names the gotest.T call an autofix writes when it is not
@@ -681,8 +716,8 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 	reported := map[token.Pos]bool{}
 	var deferred []deferredReport
 
-	scanBody := func(body *ast.BlockStmt, isSuiteMethod bool, gotestTVars map[string]bool) {
-		tVars := map[string]bool{}
+	scanBody := func(body *ast.BlockStmt, isSuiteMethod bool, gotestTVars map[string]string) {
+		tVars := map[string]string{}
 		ast.Inspect(body, func(n ast.Node) bool {
 			switch node := n.(type) {
 			case *ast.AssignStmt:
@@ -708,12 +743,12 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 			_, isSuiteMethod = suites[receiverTypeName(fd.Recv)]
 		}
 
-		gotestTVars := map[string]bool{}
+		gotestTVars := map[string]string{}
 		if isSuiteMethod && fd.Type.Params != nil {
 			for _, field := range fd.Type.Params.List {
-				if isGotestTType(pass, field) {
+				if w := gotestWrapperOf(pass, field); w != "" {
 					for _, name := range field.Names {
-						gotestTVars[name.Name] = true
+						gotestTVars[name.Name] = w
 					}
 				}
 			}
@@ -738,7 +773,7 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 				}
 				for _, value := range vs.Values {
 					if lit, ok := value.(*ast.FuncLit); ok && lit.Body != nil {
-						scanBody(lit.Body, false, map[string]bool{})
+						scanBody(lit.Body, false, map[string]string{})
 					}
 				}
 			}
@@ -754,7 +789,7 @@ func checkTEscape(pass *analysis.Pass, insp *inspector.Inspector, suites map[str
 	}
 }
 
-func trackTVarAssign(info *types.Info, assign *ast.AssignStmt, tVars, gotestTVars map[string]bool) {
+func trackTVarAssign(info *types.Info, assign *ast.AssignStmt, tVars, gotestTVars map[string]string) {
 	for i, rhs := range assign.Rhs {
 		if i >= len(assign.Lhs) {
 			break
@@ -763,94 +798,92 @@ func trackTVarAssign(info *types.Info, assign *ast.AssignStmt, tVars, gotestTVar
 		if !ok {
 			continue
 		}
-		if isTMethodCall(info, rhs) {
-			tVars[lhsId.Name] = true
+		if w, ok := wrapperEscape(info, rhs); ok {
+			tVars[lhsId.Name] = w
 			continue
 		}
 		if id, ok := rhs.(*ast.Ident); ok {
-			if tVars[id.Name] {
-				tVars[lhsId.Name] = true
+			if w := tVars[id.Name]; w != "" {
+				tVars[lhsId.Name] = w
 			}
-			if gotestTVars[id.Name] {
-				gotestTVars[lhsId.Name] = true
+			if w := gotestTVars[id.Name]; w != "" {
+				gotestTVars[lhsId.Name] = w
 			}
 		}
 	}
 }
 
-func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]bool, reported map[token.Pos]bool) {
+func reportDirectEscape(pass *analysis.Pass, cl *claims, call *ast.CallExpr, isSuiteMethod bool, tVars map[string]string, reported map[token.Pos]bool) {
 	sel, _ := call.Fun.(*ast.SelectorExpr)
 	if sel == nil {
 		return
 	}
 
-	if esc, ok := escapeConfigs[sel.Sel.Name]; ok {
-		if !esc.suiteOnly || isSuiteMethod {
-			isDirect := isTMethodCall(pass.TypesInfo, sel.X)
-			isAlias := false
-			if !isDirect {
-				if id, ok := sel.X.(*ast.Ident); ok && tVars[id.Name] {
-					isAlias = true
-				}
-			}
-			if isDirect || isAlias {
-				reported[call.Pos()] = true
-				cl.add(esc.rule, call.Pos())
-				if esc.canAutofix && isDirect {
-					inner := sel.X.(*ast.CallExpr)
-					innerSel := inner.Fun.(*ast.SelectorExpr)
-					target := sel.Sel.Name
-					if to, ok := escapeFixTargets[target]; ok {
-						target = to
-					}
-					reportWithFix(pass, esc.rule, call,
-						[]analysis.SuggestedFix{{
-							Message: fmt.Sprintf("call %s directly", target),
-							TextEdits: []analysis.TextEdit{{
-								Pos:     innerSel.X.End(),
-								End:     sel.Sel.End(),
-								NewText: []byte("." + target),
-							}},
-						}},
-						"%s", esc.message)
-				} else {
-					report(pass, esc.rule, call, "%s", esc.message)
-				}
-				return
-			}
+	wrapper, isDirect := wrapperEscape(pass.TypesInfo, sel.X)
+	if !isDirect {
+		if id, ok := sel.X.(*ast.Ident); ok {
+			wrapper = tVars[id.Name]
 		}
+	}
+	if esc, ok := escapeConfigs[wrapper][sel.Sel.Name]; ok && (!esc.suiteOnly || isSuiteMethod) {
+		reported[call.Pos()] = true
+		cl.add(esc.rule, call.Pos())
+		if esc.canAutofix && isDirect {
+			inner := sel.X.(*ast.CallExpr)
+			innerSel := inner.Fun.(*ast.SelectorExpr)
+			target := sel.Sel.Name
+			if to, ok := escapeFixTargets[target]; ok {
+				target = to
+			}
+			reportWithFix(pass, esc.rule, call,
+				[]analysis.SuggestedFix{{
+					Message: fmt.Sprintf("call %s directly", target),
+					TextEdits: []analysis.TextEdit{{
+						Pos:     innerSel.X.End(),
+						End:     sel.Sel.End(),
+						NewText: []byte("." + target),
+					}},
+				}},
+				"%s", esc.message)
+		} else {
+			report(pass, esc.rule, call, "%s", esc.message)
+		}
+		return
 	}
 
 	if assertionFuncName(pass, call.Fun) != "" && len(call.Args) > 0 {
 		arg := call.Args[0]
-		if inner, ok := arg.(*ast.CallExpr); ok && isTMethodCall(pass.TypesInfo, inner) {
+		if w, ok := wrapperEscape(pass.TypesInfo, arg); ok {
+			inner := arg.(*ast.CallExpr)
 			reported[inner.Pos()] = true
 			innerSel := inner.Fun.(*ast.SelectorExpr)
 			reportWithFix(pass, TEscape, inner,
 				[]analysis.SuggestedFix{{
-					Message: "pass gotest.T directly",
+					Message: fmt.Sprintf("pass gotest.%s directly", w),
 					TextEdits: []analysis.TextEdit{{
 						Pos:     innerSel.X.End(),
 						End:     inner.End(),
 						NewText: []byte(""),
 					}},
 				}},
-				"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
+				"pass gotest.%s directly to %s — unnecessary %s escape", w, sel.Sel.Name, w)
 			return
 		}
-		if id, ok := arg.(*ast.Ident); ok && tVars[id.Name] {
+		if id, ok := arg.(*ast.Ident); ok && tVars[id.Name] != "" {
+			w := tVars[id.Name]
 			reported[arg.Pos()] = true
 			report(pass, TEscape, arg,
-				"pass gotest.T directly to %s — unnecessary T escape", sel.Sel.Name)
+				"pass gotest.%s directly to %s — unnecessary %s escape", w, sel.Sel.Name, w)
 			return
 		}
 	}
 }
 
-func collectInterproceduralEscape(call *ast.CallExpr, tVars, gotestTVars map[string]bool, mr *methodReach, results *[]deferredReport) {
+func collectInterproceduralEscape(call *ast.CallExpr, tVars, gotestTVars map[string]string, mr *methodReach, results *[]deferredReport) {
 	methods := mr.reachedMethods(call, tVars, gotestTVars)
-	for method, positions := range methods {
-		esc := escapeConfigs[method]
+	for key, positions := range methods {
+		wrapper, method, _ := strings.Cut(key, ".")
+		esc := escapeConfigs[wrapper][method]
 		for pos := range positions {
 			*results = append(*results, deferredReport{esc.rule, pos, mr.ends[pos], esc.message})
 		}
@@ -893,8 +926,16 @@ func assertionFuncName(pass *analysis.Pass, fun ast.Expr) string {
 	return fn.Name()
 }
 
-func isGotestTType(pass *analysis.Pass, field *ast.Field) bool {
-	return namedPtrType(pass.TypesInfo.TypeOf(field.Type), gotestImportPath, "T")
+// gotestWrapperOf names the gotest wrapper a parameter field is typed as:
+// "T", "B", "F", or "" for any other type.
+func gotestWrapperOf(pass *analysis.Pass, field *ast.Field) string {
+	t := pass.TypesInfo.TypeOf(field.Type)
+	for _, w := range []string{"T", "B", "F"} {
+		if namedPtrType(t, gotestImportPath, w) {
+			return w
+		}
+	}
+	return ""
 }
 
 // --- interprocedural method reachability ---
@@ -963,22 +1004,31 @@ func (mr *methodReach) mark(fd *ast.FuncDecl, paramIdx int, method string, pos t
 	return true
 }
 
-// isStdlibT reports whether id denotes a *testing.T (or an untyped ident the
-// type checker could not resolve, kept conservative as before).
-func (mr *methodReach) isStdlibT(id *ast.Ident) bool {
+// markEscape marks call, a method on the parameter's stdlib value, under
+// "<wrapper>.<method>" when the rules flag it beyond direct calls.
+func (mr *methodReach) markEscape(fd *ast.FuncDecl, paramIdx int, wrapper string, call *ast.CallExpr) {
+	method := call.Fun.(*ast.SelectorExpr).Sel.Name
+	if esc, ok := escapeConfigs[wrapper][method]; !ok || esc.directOnly {
+		return
+	}
+	mr.mark(fd, paramIdx, wrapper+"."+method, call.Pos())
+	mr.ends[call.Pos()] = call.End()
+}
+
+// stdlibWrapper names the wrapper whose stdlib value id denotes: "T", "B" or
+// "F" for a *testing.T, *testing.B or *testing.F, "" otherwise. An ident the
+// type checker could not resolve counts as a *testing.T, conservatively.
+func (mr *methodReach) stdlibWrapper(id *ast.Ident) string {
 	obj := mr.pass.TypesInfo.Uses[id]
 	if obj == nil {
-		return true
+		return "T"
 	}
-	ptr, ok := obj.Type().(*types.Pointer)
-	if !ok {
-		return false
+	for _, w := range []string{"T", "B", "F"} {
+		if namedPtrType(obj.Type(), "testing", w) {
+			return w
+		}
 	}
-	named, ok := ptr.Elem().(*types.Named)
-	if !ok || named.Obj().Pkg() == nil {
-		return false
-	}
-	return named.Obj().Pkg().Path() == "testing" && named.Obj().Name() == "T"
+	return ""
 }
 
 func (mr *methodReach) resolveCallee(call *ast.CallExpr) *ast.FuncDecl {
@@ -1012,24 +1062,19 @@ func (mr *methodReach) scanDirect(fd *ast.FuncDecl) {
 		case *ast.CallExpr:
 			sel, ok := node.Fun.(*ast.SelectorExpr)
 			if ok {
-				if esc, ok := escapeConfigs[sel.Sel.Name]; ok && !esc.directOnly {
-					method := sel.Sel.Name
-					// A method called on the parameter itself is an escape only
-					// when the parameter is the stdlib T: Errorf on a *gotest.T
-					// helper parameter is the call the rule recommends.
-					if id, ok := sel.X.(*ast.Ident); ok && mr.isStdlibT(id) {
-						if idx, ok := aliases[id.Name]; ok {
-							mr.mark(fd, idx, method, node.Pos())
-							mr.ends[node.Pos()] = node.End()
-						}
+				// A method called on the parameter itself is an escape only
+				// when the parameter is the stdlib value: Errorf on a
+				// *gotest.T helper parameter is the call the rule recommends.
+				if id, ok := sel.X.(*ast.Ident); ok {
+					if idx, ok := aliases[id.Name]; ok {
+						mr.markEscape(fd, idx, mr.stdlibWrapper(id), node)
 					}
-					if isTMethodCall(mr.pass.TypesInfo, sel.X) {
-						innerSel := sel.X.(*ast.CallExpr).Fun.(*ast.SelectorExpr)
-						if id, ok := innerSel.X.(*ast.Ident); ok {
-							if idx, ok := aliases[id.Name]; ok {
-								mr.mark(fd, idx, method, node.Pos())
-								mr.ends[node.Pos()] = node.End()
-							}
+				}
+				if w, ok := wrapperEscape(mr.pass.TypesInfo, sel.X); ok {
+					innerSel := sel.X.(*ast.CallExpr).Fun.(*ast.SelectorExpr)
+					if id, ok := innerSel.X.(*ast.Ident); ok {
+						if idx, ok := aliases[id.Name]; ok {
+							mr.markEscape(fd, idx, w, node)
 						}
 					}
 				}
@@ -1072,7 +1117,7 @@ func (mr *methodReach) propagate() bool {
 	return changed
 }
 
-func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map[string]bool) map[string]map[token.Pos]bool {
+func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map[string]string) map[string]map[token.Pos]bool {
 	callee := mr.resolveCallee(call)
 	if callee == nil {
 		return nil
@@ -1087,10 +1132,10 @@ func (mr *methodReach) reachedMethods(call *ast.CallExpr, tVars, gotestTVars map
 		if len(argMethods) == 0 {
 			continue
 		}
-		tainted := isTMethodCall(mr.pass.TypesInfo, arg)
+		_, tainted := wrapperEscape(mr.pass.TypesInfo, arg)
 		if !tainted {
 			if id, ok := arg.(*ast.Ident); ok {
-				tainted = tVars[id.Name] || gotestTVars[id.Name]
+				tainted = tVars[id.Name] != "" || gotestTVars[id.Name] != ""
 			}
 		}
 		if tainted {
@@ -1147,7 +1192,8 @@ func trackParamFlow(info *types.Info, assign *ast.AssignStmt, aliases map[string
 			}
 			continue
 		}
-		if call, ok := rhs.(*ast.CallExpr); ok && isTMethodCall(info, call) {
+		if _, ok := wrapperEscape(info, rhs); ok {
+			call := rhs.(*ast.CallExpr)
 			if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
 				if id, ok := sel.X.(*ast.Ident); ok {
 					if idx, ok := aliases[id.Name]; ok {
@@ -1167,7 +1213,8 @@ func exprToParamIdx(info *types.Info, expr ast.Expr, aliases map[string]int) int
 			return idx
 		}
 	}
-	if call, ok := expr.(*ast.CallExpr); ok && isTMethodCall(info, call) {
+	if _, ok := wrapperEscape(info, expr); ok {
+		call := expr.(*ast.CallExpr)
 		if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
 			if id, ok := sel.X.(*ast.Ident); ok {
 				if idx, ok := aliases[id.Name]; ok {
@@ -1179,15 +1226,25 @@ func exprToParamIdx(info *types.Info, expr ast.Expr, aliases map[string]int) int
 	return -1
 }
 
-// isTMethodCall reports whether expr is a T() call on a *gotest.T; a T
-// method of any other type is not the escape.
-func isTMethodCall(info *types.Info, expr ast.Expr) bool {
+// wrapperEscape reports whether expr calls a gotest wrapper's escape — T() on
+// a *gotest.T, B() on a *gotest.B, F() on a *gotest.F — and names the
+// wrapper; the same method on any other type is not the escape.
+func wrapperEscape(info *types.Info, expr ast.Expr) (wrapper string, ok bool) {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok || len(call.Args) != 0 {
-		return false
+		return "", false
 	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	return ok && sel.Sel.Name == "T" && namedPtrType(info.TypeOf(sel.X), gotestImportPath, "T")
+	if !ok {
+		return "", false
+	}
+	switch w := sel.Sel.Name; w {
+	case "T", "B", "F":
+		if namedPtrType(info.TypeOf(sel.X), gotestImportPath, w) {
+			return w, true
+		}
+	}
+	return "", false
 }
 
 func checkOrphanedFiles(pass *analysis.Pass) {

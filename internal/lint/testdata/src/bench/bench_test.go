@@ -146,7 +146,7 @@ func (s *WaitBenchTestSuite) BenchmarkConsistentlyInNLoop(b *testing.B) {
 
 // Looping through the escape is still the loop: no bench-loop, and the wait inside is seen.
 func (s *WaitBenchTestSuite) BenchmarkLoopThroughEscape(b *gotest.B) {
-	for b.B().Loop() {
+	for b.B().Loop() { // want `Loop is available on gotest.B — unnecessary B escape`
 		time.Sleep(time.Millisecond) // want `benchmark WaitBenchTestSuite.BenchmarkLoopThroughEscape calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop`
 	}
 }
