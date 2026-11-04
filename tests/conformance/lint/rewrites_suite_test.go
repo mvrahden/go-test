@@ -360,6 +360,26 @@ func (s *LinterRewritesTestSuite) TestRedundancies(t *gotest.T) {
 
 // checkRows holds each row of group to its findings, its fix, and a verdict
 // the fix leaves as it was.
+func (s *LinterRewritesTestSuite) TestWrapperFixes(t *gotest.T) {
+	t.When("lint -fix rewrites a benchmark that loops and asserts through b.B()", func(w *gotest.T) {
+		w.It("the loop and the assertion call the gotest.B directly", func(it *gotest.T) {
+			root, err := testkit.RepoRoot()
+			gotest.NoError(it, err)
+			dir, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "lintescapes"), it.TempDir(), "lintescapesmod")
+			gotest.NoError(it, err)
+			fix, err := testkit.RunCLI(it.Context(), dir, "lint", "-fix", "./")
+			gotest.NoError(it, err)
+			gotest.NotEqual(it, 2, fix.Exit, "stderr: %s", fix.Stderr)
+			data, err := os.ReadFile(filepath.Join(dir, "escapes_suite_test.go"))
+			gotest.NoError(it, err)
+			src := string(data)
+			gotest.Contains(it, src, "for b.Loop() {")
+			gotest.Contains(it, src, "gotest.Equal(b, ")
+			gotest.NotContains(it, src, "b.B().Loop")
+		})
+	})
+}
+
 func (s *LinterRewritesTestSuite) checkRows(t *gotest.T, group string) {
 	type indexed struct {
 		Desc string

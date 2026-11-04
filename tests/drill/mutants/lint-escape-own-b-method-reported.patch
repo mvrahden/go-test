@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint leaves calls through that B method unreported( / .*)? \(
+Clause: when a type of its own has a B method → lint leaves calls through that B method unreported
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1240,7 +1240,7 @@
+ 	}
+ 	switch w := sel.Sel.Name; w {
+ 	case "T", "B", "F":
+-		if namedPtrType(info.TypeOf(sel.X), gotestImportPath, w) {
++		if w == "B" || namedPtrType(info.TypeOf(sel.X), gotestImportPath, w) {
+ 			return w, true
+ 		}
+ 	}

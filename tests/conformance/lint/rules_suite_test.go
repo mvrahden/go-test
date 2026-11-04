@@ -58,6 +58,69 @@ func (s *LinterRulesTestSuite) TestOwnTMethod(t *gotest.T) {
 	})
 }
 
+const escapesPkg = "../testdata/lintescapes/"
+
+func (s *LinterRulesTestSuite) TestWrapperEscapes(t *gotest.T) {
+	t.When("a benchmark calls Loop, Helper and Cleanup through b.B() and reads b.B().N", func(w *gotest.T) {
+		w.It("lint reports Loop as a t-escape with a fix, Helper as a t-escape without one and Cleanup as suite-lifecycle, and leaves N unreported", func(it *gotest.T) {
+			got, fixable := lintFindings(it, ".", escapesPkg)
+			loop := "t-escape escapes_suite_test.go:18:6: Loop is available on gotest.B — unnecessary B escape"
+			helper := "t-escape escapes_suite_test.go:21:2: never call Helper — gotest resolves call sites automatically; Helper degrades failure locations"
+			gotest.Contains(it, fixable, loop)
+			gotest.Contains(it, got, helper)
+			gotest.NotContains(it, fixable, helper)
+			gotest.Contains(it, got, "suite-lifecycle escapes_suite_test.go:22:2: use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle")
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:23:"))
+		})
+	})
+	t.When("a fuzz target seeds through f.F().Add", func(w *gotest.T) {
+		w.It("lint reports the seed as a t-escape with a fix and fuzz-seed stays silent", func(it *gotest.T) {
+			got, fixable := lintFindings(it, ".", escapesPkg)
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:43:2: Add is available on gotest.F — f.F().Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed")
+			gotest.Empty(it, findingsOf(got, "fuzz-seed "))
+		})
+	})
+	t.When("a benchmark loops with b.B().Loop() and sleeps inside it", func(w *gotest.T) {
+		w.It("bench-loop stays silent and bench-wait reports the sleep", func(it *gotest.T) {
+			got := ruleFindings(it, ".", escapesPkg)
+			gotest.Empty(it, findingsOf(got, "bench-loop "))
+			gotest.Contains(it, got, "bench-wait escapes_suite_test.go:28:3: benchmark EscapesTestSuite.BenchmarkSleepThroughEscape calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop")
+		})
+	})
+}
+
+func (s *LinterRulesTestSuite) TestOwnBMethod(t *gotest.T) {
+	t.When("a type of its own has a B method", func(w *gotest.T) {
+		w.It("lint leaves calls through that B method unreported", func(it *gotest.T) {
+			got := ruleFindings(it, ".", escapesPkg)
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:34:"))
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:35:"))
+		})
+	})
+}
+
+// findingsOf is the findings of got under the rule prefix.
+func findingsOf(got []string, prefix string) []string {
+	var of []string
+	for _, f := range got {
+		if strings.HasPrefix(f, prefix) {
+			of = append(of, f)
+		}
+	}
+	return of
+}
+
+// findingsAt is the findings of got at a "<file>:<line>:" position.
+func findingsAt(got []string, at string) []string {
+	var of []string
+	for _, f := range got {
+		if _, rest, ok := strings.Cut(f, " "); ok && strings.HasPrefix(rest, at) {
+			of = append(of, f)
+		}
+	}
+	return of
+}
+
 func (s *LinterRulesTestSuite) TestShadowedGotest(t *gotest.T) {
 	t.When("a local variable shadows the gotest import", func(w *gotest.T) {
 		w.It("fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package", func(it *gotest.T) {
@@ -118,22 +181,32 @@ func fixedRules(t *gotest.T) string {
 // ruleFindings lints pkg from dir with -json and returns each gotest finding
 // as "<rule> <file>:<line>:<col>: <message>".
 func ruleFindings(t *gotest.T, dir, pkg string) []string {
+	got, _ := lintFindings(t, dir, pkg)
+	return got
+}
+
+// lintFindings is ruleFindings, and of those the ones that carry a fix.
+func lintFindings(t *gotest.T, dir, pkg string) (got, fixable []string) {
 	run, err := testkit.RunCLI(t.Context(), dir, "lint", "-json", pkg)
 	gotest.NoError(t, err)
 	var byPkg map[string]map[string][]struct {
-		Posn     string `json:"posn"`
-		Message  string `json:"message"`
-		Category string `json:"category"`
+		Posn     string            `json:"posn"`
+		Message  string            `json:"message"`
+		Category string            `json:"category"`
+		Fixes    []json.RawMessage `json:"suggested_fixes"`
 	}
 	gotest.NoError(t, json.Unmarshal([]byte(run.Stdout), &byPkg), "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-	var got []string
 	for _, analyzers := range byPkg {
 		for _, d := range analyzers["gotestlint"] {
-			got = append(got, d.Category+" "+filepath.Base(d.Posn)+": "+d.Message)
+			f := d.Category + " " + filepath.Base(d.Posn) + ": " + d.Message
+			got = append(got, f)
+			if len(d.Fixes) > 0 {
+				fixable = append(fixable, f)
+			}
 		}
 	}
 	gotest.NotEmpty(t, got, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
-	return got
+	return got, fixable
 }
 
 // LintRulesTestSuite: lint names its rules without linting anything, as the

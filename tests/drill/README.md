@@ -659,6 +659,11 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-fix-errors-repeated` | a compiler error is listed again as the go command printed it | conformance: the lint It for a target that does not compile counts its error twice |
 | `lint-rule-testify-suites-checked` | a struct embedding testify's `suite.Suite` is read as a gotest suite | conformance: the lint It for a testify suite finds gotest suite rules or generation-rejects reporting on it |
 | `lint-rule-own-t-method-escapes` | a `T()` call on any type counts as the `*gotest.T` escape | conformance: the lint It for a type with its own `T` method finds `t-escape` findings |
+| `lint-escape-b-loop-unreported` | `Loop` through `b.B()` is not reported | conformance: the lint It for a benchmark escaping to `testing.B` finds no `Loop` finding with a fix |
+| `lint-escape-f-add-unreported` | `Add` through `f.F()` is not reported | conformance: the lint It for a fuzz target escaping to `testing.F` finds no seed finding |
+| `lint-escape-bench-loop-through-b` | the bench and fuzz rules do not read `b.B()` or `f.F()` as the benchmark or fuzz target | conformance: the lint It for a loop written through the escape finds `bench-loop` reporting the loop |
+| `lint-escape-own-b-method-reported` | a `B()` call on any type counts as the `*gotest.B` escape | conformance: the lint It for a type with its own `B` method finds `t-escape` findings |
+| `lint-escape-fix-on-t-only` | a method reached through an escape is fixed onto the wrapper only through `t.T()` | conformance: the lint `-fix` It for a benchmark looping through `b.B()` finds `b.B().Loop` left in place |
 | `lint-rule-poll-scope-misses-helpers` | `poll-scope` never reports the outer `t` passed to a helper | conformance: the lint It for a helper inside a polling callback finds no `poll-scope` finding |
 | `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
 | `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |

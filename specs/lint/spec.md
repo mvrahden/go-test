@@ -174,7 +174,7 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 - **THEN** the first is removed only where the second fails on every input the first fails
 
 ### Requirement: Rules skip what is not gotest's
-Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, and SHALL leave a failure guard unreported where a local variable shadows the gotest import.
+Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, SHALL leave a failure guard unreported where a local variable shadows the gotest import, and SHALL leave calls through a user type's own B or F method unreported.
 
 #### Scenario: A testify suite
 - **WHEN** a package holds a testify suite
@@ -187,6 +187,29 @@ Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite 
 #### Scenario: A local named gotest
 - **WHEN** a local variable shadows the gotest import
 - **THEN** fail-guard leaves a guard in the local's scope unreported and reports one where gotest names the package
+
+#### Scenario: A B method of the user's own
+- **WHEN** a type of its own has a B method
+- **THEN** lint leaves calls through that B method unreported
+
+### Requirement: Escapes from every wrapper
+The t-escape and suite-lifecycle rules SHALL report a method reached through `b.B()` on a gotest.B or `f.F()` on a gotest.F like one through `t.T()`: a method the wrapper has with a fix to call it there; Helper, Log, Fatal, Error, Fail, Skip and SkipNow without one; Cleanup as suite-lifecycle. They SHALL leave what gotest.B lacks by design, such as `N`, the timers or `Run`, unreported, and the bench and fuzz rules SHALL read a loop or seed written through the escape as one written directly.
+
+#### Scenario: A benchmark escaping to testing.B
+- **WHEN** a benchmark calls Loop, Helper and Cleanup through b.B() and reads b.B().N
+- **THEN** lint reports Loop as a t-escape with a fix, Helper as a t-escape without one and Cleanup as suite-lifecycle, and leaves N unreported
+
+#### Scenario: A fuzz target escaping to testing.F
+- **WHEN** a fuzz target seeds through f.F().Add
+- **THEN** lint reports the seed as a t-escape with a fix and fuzz-seed stays silent
+
+#### Scenario: A loop written through the escape
+- **WHEN** a benchmark loops with b.B().Loop() and sleeps inside it
+- **THEN** bench-loop stays silent and bench-wait reports the sleep
+
+#### Scenario: The fix calls the wrapper
+- **WHEN** lint -fix rewrites a benchmark that loops and asserts through b.B()
+- **THEN** the loop and the assertion call the gotest.B directly
 
 ### Requirement: Misuse reached through a helper
 Lint SHALL report the test's outer t handed to a helper inside a polling callback.
