@@ -121,7 +121,10 @@ var registry = []struct {
 	{PollScope, ruleInfo{TierIntegrity, ScopePollCallbacks, false, []string{"Outer t used inside Eventually/Consistently callbacks"}}},
 	{TestSignature, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Test methods not accepting *gotest.T or *testing.T"}}},
 	{XLifecycle, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"X_ prefix on a lifecycle hook (a no-op)"}}},
-	{SuiteLifecycle, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Cleanup/Parallel/Run via t.T() — bypass the suite lifecycle"}}},
+	{SuiteLifecycle, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
+		"Cleanup/Parallel/Run via t.T(), Cleanup via b.B() or f.F() —",
+		"bypass the suite lifecycle",
+	}}},
 	{SharedFixtureUndeclared, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
 		"Reads of a shared fixture the suite never declared as a",
 		"field (only declared fixtures are started)",
@@ -138,7 +141,10 @@ var registry = []struct {
 	{AssertionTypeGuard, ruleInfo{TierIntegrity, ScopeGotestFiles, false, []string{"Nil/Empty on types their runtime guards reject"}}},
 	{AssertionRedundant, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"Assertions made redundant by the following assertion"}}},
 	{FailGuard, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"if cond { Fail/Fatal(...) } guards — use assertions directly"}}},
-	{TEscape, ruleInfo{TierExpressiveness, ScopeSuites, true, []string{"Unnecessary t.T() convenience escapes (incl. Helper/Fatal/Log)"}}},
+	{TEscape, ruleInfo{TierExpressiveness, ScopeSuites, true, []string{
+		"Unnecessary t.T(), b.B() and f.F() convenience escapes",
+		"(incl. Helper/Fatal/Log)",
+	}}},
 	{BehaviorWording, ruleInfo{TierExpressiveness, ScopeGotestFiles, true, []string{"When(\"when …\") / It(\"it …\") — the spec supplies those words"}}},
 	// The rewrite keeps the meaning either way, so config-no-deadline is a
 	// matter of saying it in a word: skippable.

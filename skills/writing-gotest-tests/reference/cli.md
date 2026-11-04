@@ -78,8 +78,10 @@ the generated wrappers — always serially (it rejects `--parallel`, exit
 `-test.benchmem` is on by default.
 
 Writing one: put the measured work inside `for b.Loop() { … }` —
-`*gotest.B` has no `N` or timer methods (`b.B()` reaches the
-`*testing.B`). Setup above the loop is not timed, nor are the suite's
+`*gotest.B` has no `N`, timer or `Run` methods (`b.B()` reaches the
+`*testing.B` for those; for `Loop`, `ReportAllocs`, `SetBytes`,
+`ReportMetric` and `Name` call the `*gotest.B` itself — `t-escape` flags
+the escape). Setup above the loop is not timed, nor are the suite's
 `BeforeEach`/`AfterEach` around each benchmark. Assertions take `b`.
 Lint: `bench-loop` (integrity) — the method never calls `b.Loop()`, so
 nothing is measured; `bench-wait` — `time.Sleep`/`Eventually`/

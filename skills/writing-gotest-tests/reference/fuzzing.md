@@ -31,6 +31,9 @@ Rules the linter enforces (`gotest lint`): assert a property
 IO in the suite's per-execution hooks (`fuzz-hook-io`); typed seeds, never
 raw `[]byte` on a non-byte position (`fuzz-raw-seed`); no on-disk corpus
 entries for a struct-typed target (`fuzz-struct-corpus`).
+Seeds go through `f.Add`, never `f.F().Add`: the wrapper buffers and
+explodes struct seeds, the stdlib `Add` panics on them; `t-escape` flags
+it and `-fix` rewrites it.
 
 ## Arguments
 
