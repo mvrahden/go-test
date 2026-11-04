@@ -41,6 +41,7 @@ func (f *F) Add(args ...any)                   {}
 func (f *F) Errorf(format string, args ...any) {}
 func (f *F) FailNow()                          {}
 func (f *F) Skipf(format string, args ...any)  {}
+func (f *F) Name() string                      { return "" }
 
 func (f *F) Fuzz(fn any) {}
 

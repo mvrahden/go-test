@@ -304,7 +304,7 @@ func benchParamName(fd *ast.FuncDecl) string {
 // benchBodyUsesLoopOrN reports whether body references Loop or N on the
 // parameter or on its escape anywhere — a plain selector check, not
 // requiring Loop to actually be called, matching the shape used elsewhere
-// in this package for similar heuristics (e.g. isTMethodCall).
+// in this package for similar heuristics (e.g. wrapperEscape).
 func benchBodyUsesLoopOrN(body *ast.BlockStmt, param string) bool {
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {

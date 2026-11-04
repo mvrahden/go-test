@@ -156,7 +156,7 @@ func (s *FuzzSeedTestSuite) FuzzWithSeed(f *gotest.F) {
 
 // FuzzSeedThroughEscape seeds through f.F() — still a seed.
 func (s *FuzzSeedTestSuite) FuzzSeedThroughEscape(f *gotest.F) {
-	f.F().Add("x")
+	f.F().Add("x") // want `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
 	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
 }
 
@@ -311,7 +311,7 @@ func (s *FuzzRawSeedTestSuite) FuzzFrameRaw(f *gotest.F) {
 
 // FuzzFrameRawThroughEscape seeds raw bytes through f.F() — still a seed.
 func (s *FuzzRawSeedTestSuite) FuzzFrameRawThroughEscape(f *gotest.F) {
-	f.F().Add([]byte("junk")) // want `raw \[\]byte seed on fuzz target FuzzRawSeedTestSuite.FuzzFrameRawThroughEscape — the target takes fuzz.Frame and f.Fuzz rejects a seed of another type; write a typed fuzz.Frame literal instead \(gotest fuzz promote emits one\)`
+	f.F().Add([]byte("junk")) // want `raw \[\]byte seed on fuzz target FuzzRawSeedTestSuite.FuzzFrameRawThroughEscape — the target takes fuzz.Frame and f.Fuzz rejects a seed of another type; write a typed fuzz.Frame literal instead \(gotest fuzz promote emits one\)` `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
 	f.Fuzz(func(t *gotest.T, in Frame) {
 		gotest.Equal(t, in, in)
 	})

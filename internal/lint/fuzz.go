@@ -195,7 +195,7 @@ func fuzzCallback(pass *analysis.Pass, call *ast.CallExpr) (string, *ast.FuncLit
 		return "", nil
 	}
 	param := funcLit.Type.Params.List[0]
-	if !isGotestTType(pass, param) || len(param.Names) == 0 {
+	if gotestWrapperOf(pass, param) != "T" || len(param.Names) == 0 {
 		return "", nil
 	}
 	return param.Names[0].Name, funcLit
