@@ -250,3 +250,23 @@ func (s *EscapeFuzzTestSuite) FuzzDirect(f *gotest.F) {
 	f.F().Log("x")    // want `use assertion message args instead — T.Log bypasses the failure report`
 	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
 }
+
+func (s *EscapeBenchTestSuite) BenchmarkMore(b *gotest.B) {
+	_ = b.B().Context()        // want `Context is available on gotest.B — unnecessary B escape`
+	b.B().SetBytes(1)          // want `SetBytes is available on gotest.B — unnecessary B escape`
+	b.B().ReportMetric(1, "x") // want `ReportMetric is available on gotest.B — unnecessary B escape`
+	_ = b.B().Name()           // want `Name is available on gotest.B — unnecessary B escape`
+	b.B().Skip()               // want `must use Skipf instead — unnecessary B escape`
+	for b.Loop() {
+	}
+}
+
+func (s *EscapeFuzzTestSuite) FuzzViaHelper(f *gotest.F) {
+	f.Add("t")
+	fuzzHelper(f.F())
+	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
+}
+
+func fuzzHelper(f *testing.F) {
+	f.Add("s") // want `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
+}

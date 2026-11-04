@@ -667,16 +667,16 @@ var escapeConfigs = map[string]map[string]escapeConfig{
 	}),
 }
 
-// wrapperEscapeConfigs is the table every wrapper shares; the texts that do
-// not name the wrapper read the same on each.
+// wrapperEscapeConfigs is the table every wrapper shares; the texts that
+// name a T method read the same on each.
 func wrapperEscapeConfigs(wrapper string) map[string]escapeConfig {
 	return map[string]escapeConfig{
 		"Errorf":  availableOn(wrapper, "Errorf"),
 		"FailNow": availableOn(wrapper, "FailNow"),
 		"Skipf":   availableOn(wrapper, "Skipf"),
 		"Context": availableOn(wrapper, "Context"),
-		"Skip":    {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
-		"SkipNow": {TEscape, "must use Skipf instead — unnecessary T escape", false, false, false},
+		"Skip":    {TEscape, fmt.Sprintf("must use Skipf instead — unnecessary %s escape", wrapper), false, false, false},
+		"SkipNow": {TEscape, fmt.Sprintf("must use Skipf instead — unnecessary %s escape", wrapper), false, false, false},
 		"Cleanup": {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
 		"Helper":  {TEscape, "never call Helper — gotest resolves call sites automatically; Helper degrades failure locations", false, false, true},
 		"Log":     {TEscape, "use assertion message args instead — T.Log bypasses the failure report", false, false, true},

@@ -28,11 +28,15 @@ func (t *T) When(string, func(*T))    {}
 
 type B struct{}
 
-func (b *B) Loop() bool                        { return false }
-func (b *B) B() *testing.B                     { return nil }
-func (b *B) ReportAllocs()                     {}
-func (b *B) Errorf(format string, args ...any) {}
-func (b *B) FailNow()                          {}
+func (b *B) Loop() bool                          { return false }
+func (b *B) B() *testing.B                       { return nil }
+func (b *B) ReportAllocs()                       {}
+func (b *B) Errorf(format string, args ...any)   {}
+func (b *B) FailNow()                            {}
+func (b *B) Context() context.Context            { return nil }
+func (b *B) SetBytes(n int64)                    {}
+func (b *B) ReportMetric(n float64, unit string) {}
+func (b *B) Name() string                        { return "" }
 
 type F struct{}
 
