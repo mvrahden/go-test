@@ -256,6 +256,13 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** runs AfterAll before the fixture is released
 - **AND** ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
 
+### Requirement: A signal after the stop settled
+The runner's signal reaching a suite only after its stop file settled the run SHALL NOT end the process: it ends with its tests' own status, every verdict in the stream.
+
+#### Scenario: The signal lands after the stop file settled the run
+- **WHEN** the runner's signal reaches the suite only after its stop file settled the run
+- **THEN** ends with its tests' own status, every verdict in the stream
+
 ### Requirement: A stopped run's shared fixtures
 A run interrupted while a method bound to a shared fixture ignores its context SHALL exit 130 and run the shared fixture's AfterAll before gotest exits, on the text, -json and spec pipelines alike; an interrupt that arrives once every verdict is in, while the shared fixtures tear down, SHALL keep the run's exit code and let their AfterAll finish.
 

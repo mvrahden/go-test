@@ -488,6 +488,7 @@ shards of one run do not add up to every mutant exactly once.
 | `cut-short-releases-nothing` | a stop that cuts a body short ends the process without releasing the fixtures | canary: the stopgrace fixture's release marker is missing |
 | `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' verdict instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
 | `stop-file-ignored` | the suite's watcher never polls for the stop file, so a stop no signal brings never comes | canary: the stopfile run's later methods have no skip verdict and the stream ends without the verdicts |
+| `late-signal-ends-the-settled-suite` | a settled stop gives the stop signals their default action back, so the runner's signal landing after its stop file settled the run ends the process by it | canary: the latesignal run never marks lingered |
 | `plain-run-taken-for-the-runner` | a run without the runner's stop file falls back to a default one, so a plain run watches its stream | canary: the plainreader method's context ends when its reader goes |
 | `parent-death-not-asked` | a suite process under the runner neither asks for its parent's death signal nor polls for its parent | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
 | `death-signal-is-a-stop-signal` | the death signal is SIGTERM, so landing during a requested stop it counts as the second signal | runtime: the parent's death abandons the teardown a stop it asked for runs |
