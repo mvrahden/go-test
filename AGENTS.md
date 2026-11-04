@@ -16,10 +16,10 @@ These override any default instincts from stdlib `testing` or other Go test fram
 **Never call `t.T().Helper()` when using gotest assertions.**
 gotest automatically resolves assertion failures to the correct call site in your test code.
 Calling `t.T().Helper()` is counterproductive — it removes useful location information from failure output.
+The same holds for `b.B().Helper()` and `f.F().Helper()`.
 Without it, failures show both where the assertion was called (inside the helper) and where the helper was called (in the test).
 This applies to all gotest assertion functions (`gotest.Equal`, `gotest.True`, etc.).
 If you pass `t.T()` to third-party code that uses Go's standard `t.Errorf`, Go's `t.Helper()` convention applies as normal.
-The same holds for `b.B().Helper()` and `f.F().Helper()`.
 This holds in a module whose path has no dot and under `-trimpath` too ([Failure locations](specs/assertions/spec.md#requirement-failure-locations)).
 
 **Never call `t.T().Cleanup()` inside suite methods.**

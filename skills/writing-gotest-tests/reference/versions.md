@@ -737,6 +737,6 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
 1. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
    like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
    the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
-   loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw only `t.T()`;
-   `bench-loop` wrongly reported a `for b.B().Loop()` benchmark and
-   `bench-wait`/`fuzz-seed` did not see through the escape.
+   loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw
+   only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
+   benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
