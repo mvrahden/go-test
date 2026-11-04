@@ -157,6 +157,14 @@ func (s *WaitBenchTestSuite) BenchmarkNThroughEscape(b *gotest.B) {
 	}
 }
 
+// An alias of the escape is followed to the loop it drives.
+func (s *WaitBenchTestSuite) BenchmarkLoopThroughAlias(b *gotest.B) {
+	tb := b.B()
+	for tb.Loop() { // want `Loop is available on gotest.B — unnecessary B escape`
+		time.Sleep(time.Millisecond) // want `benchmark WaitBenchTestSuite.BenchmarkLoopThroughAlias calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
 // BenchmarkSleepAboveLoop settles before the measured region — clean.
 func (s *WaitBenchTestSuite) BenchmarkSleepAboveLoop(b *gotest.B) {
 	time.Sleep(time.Millisecond)

@@ -95,6 +95,7 @@ func (s *LinterRulesTestSuite) TestOwnBMethod(t *gotest.T) {
 			got := ruleFindings(it, ".", escapesPkg)
 			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:34:"))
 			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:35:"))
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:56:"))
 		})
 	})
 }

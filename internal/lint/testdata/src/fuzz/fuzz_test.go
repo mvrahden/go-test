@@ -160,6 +160,13 @@ func (s *FuzzSeedTestSuite) FuzzSeedThroughEscape(f *gotest.F) {
 	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
 }
 
+// FuzzSeedThroughAlias seeds through an alias of f.F() — still a seed.
+func (s *FuzzSeedTestSuite) FuzzSeedThroughAlias(f *gotest.F) {
+	ff := f.F()
+	ff.Add("x") // want `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
+	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
+}
+
 func (s *FuzzSeedTestSuite) FuzzSuppressed(f *gotest.F) { //nolint:fuzz-seed
 	f.Fuzz(func(t *gotest.T, in string) {
 		trimmed := strings.TrimSpace(in)

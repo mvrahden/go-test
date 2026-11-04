@@ -298,10 +298,11 @@ func fuzzParamName(fd *ast.FuncDecl) string {
 	return field.Names[0].Name
 }
 
-// fuzzBodyHasAdd reports whether body references Add on the parameter or
-// on its escape anywhere — a plain selector check, matching the shape
+// fuzzBodyHasAdd reports whether body references Add on the parameter, its
+// escape or an alias anywhere — a plain selector check, matching the shape
 // benchBodyUsesLoopOrN uses for the equivalent bench-loop check.
 func fuzzBodyHasAdd(body *ast.BlockStmt, param string) bool {
+	recv := newWrapperRecv(body, param, "F")
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {
 		if found {
@@ -311,7 +312,7 @@ func fuzzBodyHasAdd(body *ast.BlockStmt, param string) bool {
 		if !ok {
 			return true
 		}
-		if !wrapperReceiver(sel.X, param, "F") {
+		if !recv.matches(sel.X) {
 			return true
 		}
 		if sel.Sel.Name == "Add" {
@@ -563,6 +564,7 @@ func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map
 			return
 		}
 		target := recvName + "." + fd.Name.Name
+		recv := newWrapperRecv(fd.Body, param, "F")
 
 		ast.Inspect(fd.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
@@ -573,7 +575,7 @@ func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map
 			if !ok || sel.Sel.Name != "Add" {
 				return true
 			}
-			if !wrapperReceiver(sel.X, param, "F") {
+			if !recv.matches(sel.X) {
 				return true
 			}
 			// A seed of the wrong arity is its own error at run time; with
