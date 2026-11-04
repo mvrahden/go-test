@@ -205,7 +205,8 @@ func benchMeasuredRegion(body *ast.BlockStmt, param string) *ast.BlockStmt {
 	return region
 }
 
-// isBenchLoopCond reports whether cond is a call to <param>.Loop().
+// isBenchLoopCond reports whether cond is a call to Loop() on the parameter
+// or on its escape: <param>.Loop() or <param>.B().Loop().
 func isBenchLoopCond(cond ast.Expr, param string) bool {
 	call, ok := cond.(*ast.CallExpr)
 	if !ok {
@@ -215,11 +216,11 @@ func isBenchLoopCond(cond ast.Expr, param string) bool {
 	if !ok {
 		return false
 	}
-	id, ok := sel.X.(*ast.Ident)
-	return ok && id.Name == param && sel.Sel.Name == "Loop"
+	return wrapperReceiver(sel.X, param, "B") && sel.Sel.Name == "Loop"
 }
 
-// isBenchNCond reports whether cond is the classic `i < <param>.N` form.
+// isBenchNCond reports whether cond is the classic `i < <param>.N` form, on
+// the parameter or on its escape.
 func isBenchNCond(cond ast.Expr, param string) bool {
 	bin, ok := cond.(*ast.BinaryExpr)
 	if !ok || bin.Op != token.LSS {
@@ -229,8 +230,26 @@ func isBenchNCond(cond ast.Expr, param string) bool {
 	if !ok {
 		return false
 	}
+	return wrapperReceiver(sel.X, param, "B") && sel.Sel.Name == "N"
+}
+
+// wrapperReceiver reports whether expr is the identifier param or the
+// zero-argument call <param>.<wrapper>() — b.B() or f.F(). Syntactic: a
+// shadowed name or an aliased escape is not followed.
+func wrapperReceiver(expr ast.Expr, param, wrapper string) bool {
+	if id, ok := expr.(*ast.Ident); ok {
+		return id.Name == param
+	}
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || len(call.Args) != 0 {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != wrapper {
+		return false
+	}
 	id, ok := sel.X.(*ast.Ident)
-	return ok && id.Name == param && sel.Sel.Name == "N"
+	return ok && id.Name == param
 }
 
 // findFixtureRead walks region — including nested loops and closures —
@@ -282,10 +301,10 @@ func benchParamName(fd *ast.FuncDecl) string {
 	return field.Names[0].Name
 }
 
-// benchBodyUsesLoopOrN reports whether body references param.Loop or
-// param.N anywhere — a plain selector check, not requiring Loop to
-// actually be called, matching the shape used elsewhere in this package
-// for similar heuristics (e.g. isTMethodCall).
+// benchBodyUsesLoopOrN reports whether body references Loop or N on the
+// parameter or on its escape anywhere — a plain selector check, not
+// requiring Loop to actually be called, matching the shape used elsewhere
+// in this package for similar heuristics (e.g. isTMethodCall).
 func benchBodyUsesLoopOrN(body *ast.BlockStmt, param string) bool {
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -296,8 +315,7 @@ func benchBodyUsesLoopOrN(body *ast.BlockStmt, param string) bool {
 		if !ok {
 			return true
 		}
-		id, ok := sel.X.(*ast.Ident)
-		if !ok || id.Name != param {
+		if !wrapperReceiver(sel.X, param, "B") {
 			return true
 		}
 		if sel.Sel.Name == "Loop" || sel.Sel.Name == "N" {
