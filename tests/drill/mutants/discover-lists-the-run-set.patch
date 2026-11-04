@@ -1,0 +1,32 @@
+Expect: ^FAIL .*conformance/discovery .* / discover lists the excluded method marked excluded and the unfocused methods beside the focused one
+Clause: when a suite declares an excluded method and a focused one → discover lists the excluded method marked excluded and the unfocused methods beside the focused one
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -189,14 +189,6 @@
+ 				continue
+ 			}
+ 			result := c.CollectSuiteSpecs(pkg)
+-			// Listed before the rejection check, which reduces each suite to the
+-			// methods a run would select, in place: discover lists what the
+-			// source declares, excluded and unfocused methods marked as such.
+-			for _, suite := range result.Suites {
+-				ds := buildDiscoverSuite(suite)
+-				ds.Fixtures = discoverFixtureNames(suite)
+-				pkgEntry.Suites = append(pkgEntry.Suites, ds)
+-			}
+ 			if rejected := c.Rejections(pkg, result); len(rejected) > 0 {
+ 				for _, ce := range rejected {
+ 					warn(pkg, ce.Pos, ce.Err.Error())
+@@ -213,6 +205,12 @@
+ 			for _, ce := range gotestgen.FuzzRejections(pkg, result.Suites) {
+ 				warn(pkg, ce.Pos, ce.Err.Error())
+ 			}
++
++			for _, suite := range result.Suites {
++				ds := buildDiscoverSuite(suite)
++				ds.Fixtures = discoverFixtureNames(suite)
++				pkgEntry.Suites = append(pkgEntry.Suites, ds)
++			}
+ 		}
+ 
+ 		if pkgEntry.Broken {

@@ -36,7 +36,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 The extension invokes the gotest CLI automatically — no separate install needed.
 It runs the CLI your `go.mod` selects: `go tool` when the tool directive is declared, otherwise `go run` at the pinned version.
-The CLI must be **v1.35.0 or newer**. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
+The CLI must be **v1.37.0 or newer**. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
 
 ### Install
 
@@ -99,18 +99,19 @@ After each test run, the **Spec View** panel renders BDD-formatted output with c
 Open it with **Go Test: Show Spec View**.
 
 - **The newest verdict of everything that ran** — every package the panel has seen stays, each test with the verdict of the newest run that reported it, whichever of a run, a coverage run or a watch cycle that was; rerunning one method leaves its siblings as they were
+- **The specification under the runs** — the CLI lays a folder's runs over what the folder's source declares (`gotest spec --declared`), so a behavior no run reported is listed as *not run*, and every package and module row carries the CLI's counts
 - **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
-- **Go-to-source** — click any suite, method, When or It to navigate to its definition; `file:line` in failure output opens that line
+- **Go-to-source** — click any suite, method, fuzz target, When or It the source declares to navigate to the line the CLI names; `file:line` in failure output opens that line
 - **Run, Debug, Rerun failed** — hover a row to run or debug it; a behavior the Test Explorer does not list runs as its method
-- **Toolbar** — expand/collapse all, filter by pass/fail/skip status, search behaviors by name
-- **Copy / Clear** — copy the full spec report to clipboard or clear results
+- **Toolbar** — expand/collapse all, show or hide passed, failed, skipped and not run rows (the CLI's `--hide`; the counts stay the run's), search behaviors by name
+- **Copy / Clear** — copy what the panel shows as the CLI's Markdown, or clear results
 - **Persistence** — the panel survives editor reload and restores what it kept
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
 
 ### Lint
 
-Saving a `_test.go` file runs `gotest lint -json` on its package and shows the findings as problems, with the rule as their code. A finding the CLI can fix offers its fix as a Quick Fix; when the file changed since the lint read it, the fix lints again first. **Go Test: Fix lint findings in package** applies every fix through `gotest lint -fix`, and **Go Test: Lint Workspace** lints each folder. Which rules run is `.gotest.yml`'s `lint.skip`, read by the CLI itself.
+Saving a `_test.go` file runs `gotest lint -json` on its package and shows the findings as problems over the code each is about, with the rule as their code: an integrity rule's finding is an error, any other a warning, as `gotest lint -rules -json` tiers them. A finding the CLI can fix offers its fix as a Quick Fix; when the file changed since the lint read it, the fix lints again first. **Go Test: Fix lint findings in package** applies every fix through `gotest lint -fix`, and **Go Test: Lint Workspace** lints each folder. Which rules run is `.gotest.yml`'s `lint.skip`, read by the CLI itself.
 
 ### Focus and Exclude
 
@@ -290,8 +291,8 @@ The extension runs whatever `go.mod` selects, in this order:
 2. **Workspace is gotest module** — If the workspace's `go.mod` declares the gotest module itself (development or `go.work` overlap), uses `go run ./cmd/gotest`.
 3. **Tool directive** — If `go.mod` declares the CLI as a tool (`go get -tool github.com/mvrahden/go-test/cmd/gotest@<version>`), uses `go tool <modulePath>`.
 4. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
-5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.35.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
-6. **Pinned below v1.35.0** — Refused with an **Upgrade** action; a newer CLI generates code the pinned runtime cannot compile. **Upgrade** moves each pinning module to the newest release whose `go` line does not exceed the module's, so the module's Go version stays put. A `go 1.N` line takes a release that needs `go 1.N.0`: the same language version, which `go get` only spells out. When even v1.35.0 needs a newer Go, it changes nothing and names the `go` line required; raising it is your call. The release lookup runs in a private temporary module, so your `go.mod`, a `go.work` and `-mod`/`-modfile` in `GOFLAGS` do not affect it, while proxy settings do; it shows progress and can be cancelled, and releases the proxy cannot serve are skipped. A floor hit while an upgrade runs does not start a second one.
+5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.37.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
+6. **Pinned below v1.37.0** — Refused with an **Upgrade** action; a newer CLI generates code the pinned runtime cannot compile. **Upgrade** moves each pinning module to the newest release whose `go` line does not exceed the module's, so the module's Go version stays put. A `go 1.N` line takes a release that needs `go 1.N.0`: the same language version, which `go get` only spells out. When even v1.37.0 needs a newer Go, it changes nothing and names the `go` line required; raising it is your call. The release lookup runs in a private temporary module, so your `go.mod`, a `go.work` and `-mod`/`-modfile` in `GOFLAGS` do not affect it, while proxy settings do; it shows progress and can be cancelled, and releases the proxy cannot serve are skipped. A floor hit while an upgrade runs does not start a second one.
 7. **`go run @latest`** — Only when no module requires gotest yet, so `scaffold` can run before a pin exists.
 
 In a `go.work` root every `use` module is read: a tool declared by any of them counts, and the pin is the highest across modules, which is what the workspace builds.

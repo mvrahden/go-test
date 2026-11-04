@@ -8,7 +8,6 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
-import type { DiscoverBehavior } from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -40,11 +39,19 @@ export class SpecViewPanel implements vscode.Disposable {
   private stale = false;
   private rendering: Promise<void> = Promise.resolve();
   private actions: SpecViewActions | undefined;
+  // The statuses the toolbar hides, as the CLI's --hide names them.
+  private readonly hidden = new Set<string>();
 
+  // patternsFor names the packages a folder's discovery reads; the CLI lays
+  // the folder's runs over what their source declares. Without it, or for a
+  // folder it has no patterns for, the panel shows what ran.
   constructor(
     private readonly outputChannel: vscode.LogOutputChannel,
     private readonly cache?: DiscoveryCache,
     storageDir?: string,
+    private readonly patternsFor?: (
+      folder: string,
+    ) => Promise<string[] | undefined>,
   ) {
     this.persisted = new JsonStore(storageDir, RUNS_FILE, RUNS_VERSION);
     if (cache) {
@@ -233,18 +240,12 @@ export class SpecViewPanel implements vscode.Disposable {
       this.stale = true;
       void this.render();
     } else if (msg.type === "copySpec") {
-      if (this.lastSpecData) {
-        const hidden =
-          Array.isArray(msg.hidden) && msg.hidden.length > 0
-            ? new Set<string>(msg.hidden)
-            : undefined;
-        const text = specDataToReport(
-          this.lastSpecData,
-          this.modulePaths,
-          hidden,
-        );
-        vscode.env.clipboard.writeText(text);
-      }
+      void this.copy();
+    } else if (msg.type === "toggleHide") {
+      if (typeof msg.status !== "string") return;
+      if (!this.hidden.delete(msg.status)) this.hidden.add(msg.status);
+      this.stale = true;
+      void this.render();
     } else if (msg.type === "clearResults") {
       this.clear();
     } else if (msg.type === "goToLocation" && msg.file && msg.line) {
@@ -381,10 +382,49 @@ export class SpecViewPanel implements vscode.Disposable {
     const runs = this.currentRuns();
     const docs: SpecData[] = [];
     for (const folder of runs.folders()) {
-      const raw = await this.runSpecFromInput(runs.compose(folder), folder);
+      const raw = await this.runSpec(runs.compose(folder), folder, "json");
       docs.push(JSON.parse(raw) as SpecData);
     }
     return combineSpecData(docs);
+  }
+
+  // copy puts on the clipboard what the panel shows, as the CLI writes it in
+  // Markdown: the same streams, rendered with the same flags.
+  private async copy(): Promise<void> {
+    const runs = this.currentRuns();
+    const parts: string[] = [];
+    try {
+      for (const folder of runs.folders()) {
+        parts.push(await this.runSpec(runs.compose(folder), folder, "md"));
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.outputChannel.error(`[specView] copy: ${message}`);
+      return;
+    }
+    if (parts.length > 0)
+      await vscode.env.clipboard.writeText(parts.join("\n"));
+  }
+
+  // specArgs are the CLI's flags for a folder's render: the declared
+  // specification under the workspace's runs, never under an imported
+  // stream, and the statuses the toolbar hides. --hide is always given, so
+  // every package carries the CLI's counts.
+  private async specArgs(folder: string, format: string): Promise<string[]> {
+    const args = [
+      "spec",
+      "--input=-",
+      `--format=${format}`,
+      // A renderer, not a CI gate: without it the exit code also reports
+      // whether the tests passed, which says nothing about the rendering.
+      "--render-only",
+      `--hide=${Array.from(this.hidden).sort().join(",")}`,
+    ];
+    const patterns = this.selected
+      ? undefined
+      : await this.patternsFor?.(folder);
+    if (patterns && patterns.length > 0) args.push("--declared", ...patterns);
+    return args;
   }
 
   private async resolveModulePaths(): Promise<void> {
@@ -425,30 +465,6 @@ export class SpecViewPanel implements vscode.Disposable {
     return undefined;
   }
 
-  private buildLocationMap(): Record<string, { file: string; line: number }> {
-    const map: Record<string, { file: string; line: number }> = {};
-    if (!this.cache) return map;
-    for (const pkg of this.cache.packages) {
-      for (const suite of pkg.suites) {
-        const testName = `Test${suite.name}`;
-        map[testName] = {
-          file: path.join(pkg.dir, suite.file),
-          line: suite.line,
-        };
-        // Fuzz targets sit beside the methods in the tree and in the map:
-        // the spec re-homes the generated wrapper under its suite by the
-        // method name, so the same key shape reaches both.
-        for (const method of [...suite.methods, ...(suite.fuzzers ?? [])]) {
-          const file = path.join(pkg.dir, method.file);
-          const methodPath = `${testName}/${method.name}`;
-          map[methodPath] = { file, line: method.line };
-          addBehaviorLocations(map, methodPath, file, method.behaviors ?? []);
-        }
-      }
-    }
-    return map;
-  }
-
   dispose(): void {
     this.panel?.dispose();
     for (const d of this.disposables) {
@@ -471,7 +487,6 @@ export class SpecViewPanel implements vscode.Disposable {
   ): string {
     const gopherUri = this.getGopherUri();
     const nonce = getNonce();
-    const locationMap = this.buildLocationMap();
 
     const body =
       msg.type === "empty"
@@ -479,11 +494,9 @@ export class SpecViewPanel implements vscode.Disposable {
         : buildSpecBody(
             msg.data,
             this.modulePaths,
-            {
-              locations: locationMap,
-              dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir,
-            },
+            { dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir },
             this.sourcesForToolbar(),
+            this.hidden,
           );
     const stateJson =
       msg.type === "specData" ? encodeStateForScript(msg.data) : "null";
@@ -507,19 +520,18 @@ ${SCRIPT}
 </html>`;
   }
 
-  private async runSpecFromInput(
+  // runSpec has the folder's CLI render a composed stream in format.
+  private async runSpec(
     jsonInput: string,
-    folder?: string,
+    folder: string | undefined,
+    format: string,
   ): Promise<string> {
     const workspaceDir =
       folder ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     let cmd;
     try {
       cmd = await buildCliCommand(
-        // --render-only: this is a renderer, not a CI gate. Without it the exit
-        // code also reports whether the tests passed, which says nothing about
-        // whether a spec was produced.
-        ["spec", "--input=-", "--format=json", "--render-only"],
+        await this.specArgs(workspaceDir ?? "", format),
         workspaceDir,
         this.outputChannel,
       );
@@ -578,22 +590,6 @@ ${SCRIPT}
   }
 }
 
-// addBehaviorLocations maps every declared When/It to its line, keyed by the
-// go test path the run reports it under. A behavior is declared in its
-// method's file.
-function addBehaviorLocations(
-  map: Record<string, { file: string; line: number }>,
-  parentPath: string,
-  file: string,
-  behaviors: DiscoverBehavior[],
-): void {
-  for (const b of behaviors) {
-    const behaviorPath = `${parentPath}/${b.name}`;
-    if (b.line > 0) map[behaviorPath] = { file, line: b.line };
-    addBehaviorLocations(map, behaviorPath, file, b.children ?? []);
-  }
-}
-
 // encodeStateForScript serialises the spec for embedding inside a <script>
 // block. JSON.stringify leaves "<" alone, so a test whose output contains
 // "</script>" would close the block early and spill the rest of the document
@@ -643,6 +639,7 @@ export function combineSpecData(docs: SpecData[]): SpecData {
     failed: 0,
     skipped: 0,
     failedPackages: 0,
+    notRun: 0,
   };
   const packages: SpecPackage[] = [];
   for (const doc of docs) {
@@ -666,21 +663,32 @@ export interface SpecData {
 
 export interface SpecPackage {
   path: string;
+  // The package's directory, when the CLI read its source (--declared).
+  dir?: string;
   status: string;
   duration: number;
   nodes: SpecNode[];
   output?: string[];
+  // The package's own counts; given with --hide or --declared.
+  stats?: SpecStats;
+  // A package the run booked for itself (shared fixtures, an interrupt).
+  runLevel?: boolean;
 }
 
 export interface SpecNode {
   name: string;
   display: string;
   kind: string;
+  // "none" for a declared node the run did not report.
   status: string;
   duration: number;
   focused: boolean;
   excluded: boolean;
   external: boolean;
+  incomplete?: boolean;
+  // Where the source declares the node, relative to its package's dir.
+  file?: string;
+  line?: number;
   output: string[];
   children: SpecNode[];
 }
@@ -698,6 +706,8 @@ export interface SpecStats {
   // death outside any test. They carry no failing behavior, so they are
   // counted separately from `failed`.
   failedPackages?: number;
+  // Declared behaviors the run did not report (--declared).
+  notRun?: number;
 }
 
 // --- HTML Builders ---
@@ -715,16 +725,14 @@ function buildEmptyBody(gopherUri: string): string {
     <span class="legend-item pass">✓ passed</span>
     <span class="legend-item fail">✗ failed</span>
     <span class="legend-item skip">~ skipped</span>
+    <span class="legend-item none">? not run</span>
   </div>
 </div>`;
 }
 
-type LocationMap = Record<string, { file: string; line: number }>;
-
-// What the tree is rendered against: declarations and package directories,
-// both from discovery.
+// What the tree is rendered against: package directories from discovery,
+// for the file:line tokens of output a stream without positions holds.
 interface RenderEnv {
-  locations: LocationMap;
   dirOf: (pkgPath: string) => string | undefined;
 }
 
@@ -734,15 +742,17 @@ interface SourceOption {
   selected: boolean;
 }
 
-function buildSpecBody(
+export function buildSpecBody(
   data: SpecData,
   modulePaths: string[],
   env: RenderEnv,
   sources: SourceOption[] = [],
+  hidden: ReadonlySet<string> = new Set(),
 ): string {
   const toolbar = buildToolbar(
     data.stats.failed > 0 || (data.stats.failedPackages ?? 0) > 0,
     sources,
+    hidden,
   );
   const groups = groupByModule(data.packages, modulePaths);
   let tree: string;
@@ -766,7 +776,19 @@ function buildSpecBody(
 </div>`;
 }
 
-function buildToolbar(anyFailed: boolean, sources: SourceOption[]): string {
+// The toolbar's status toggles, each named as the CLI's trailer words it.
+const STATUS_TOGGLES = [
+  { status: "pass", glyph: "✓", word: "passed" },
+  { status: "fail", glyph: "✗", word: "failed" },
+  { status: "skip", glyph: "~", word: "skipped" },
+  { status: "none", glyph: "?", word: "not run" },
+];
+
+function buildToolbar(
+  anyFailed: boolean,
+  sources: SourceOption[],
+  hidden: ReadonlySet<string>,
+): string {
   const rerun = anyFailed ? "" : " disabled";
   const picker =
     sources.length === 0
@@ -777,6 +799,10 @@ function buildToolbar(anyFailed: boolean, sources: SourceOption[]): string {
               `<option value="${escapeAttr(o.id)}"${o.selected ? " selected" : ""}>${escapeHtml(o.label)}</option>`,
           )
           .join("")}</select></div>`;
+  const toggles = STATUS_TOGGLES.map(
+    (t) =>
+      `<button class="filter-btn ${t.status}${hidden.has(t.status) ? "" : " active"}" data-filter="${t.status}" title="Show or hide ${t.word}">${t.glyph}</button>`,
+  ).join("\n    ");
   return `<div class="toolbar">
   ${picker}
   <div class="toolbar-group">
@@ -784,9 +810,7 @@ function buildToolbar(anyFailed: boolean, sources: SourceOption[]): string {
     <button class="tool-btn" id="collapse-all-btn" title="Collapse all">▲ None</button>
   </div>
   <div class="toolbar-group">
-    <button class="filter-btn pass active" data-filter="pass" title="Toggle passed">✓</button>
-    <button class="filter-btn fail active" data-filter="fail" title="Toggle failed">✗</button>
-    <button class="filter-btn skip active" data-filter="skip" title="Toggle skipped">~</button>
+    ${toggles}
   </div>
   <div class="toolbar-group search-group">
     <input type="text" class="search-input" id="search-input" placeholder="Search behaviors..." />
@@ -794,7 +818,7 @@ function buildToolbar(anyFailed: boolean, sources: SourceOption[]): string {
   <div class="toolbar-group">
     <button class="tool-btn" id="rerun-failed-btn" title="Run what failed again"${rerun}>Rerun failed</button>
     <button class="tool-btn" id="refresh-btn" title="Render the newest runs">Refresh</button>
-    <button class="tool-btn" id="copy-spec-btn" title="Copy spec report">Copy</button>
+    <button class="tool-btn" id="copy-spec-btn" title="Copy the spec as Markdown">Copy</button>
     <button class="tool-btn" id="clear-results-btn" title="Clear results">Clear</button>
   </div>
 </div>`;
@@ -828,42 +852,86 @@ function groupByModule(
   return Array.from(groups.values());
 }
 
+// statsText words a package's or a module's counts as the CLI's trailer
+// does; empty when the CLI gave none.
+export function statsText(stats: SpecStats | undefined): string {
+  if (!stats) return "";
+  const parts: string[] = [];
+  if (stats.passed > 0) parts.push(`${stats.passed} passed`);
+  if (stats.failed > 0) parts.push(`${stats.failed} failed`);
+  if (stats.skipped > 0) parts.push(`${stats.skipped} skipped`);
+  if ((stats.notRun ?? 0) > 0) parts.push(`${stats.notRun} not run`);
+  const failedPackages = stats.failedPackages ?? 0;
+  if (failedPackages > 0)
+    parts.push(countNoun(failedPackages, "failed package"));
+  return parts.join(", ");
+}
+
+// addStats adds the CLI's counts of several packages, for a module's row.
+export function addStats(
+  all: (SpecStats | undefined)[],
+): SpecStats | undefined {
+  const given = all.filter((s): s is SpecStats => s !== undefined);
+  if (given.length === 0) return undefined;
+  const sum: SpecStats = {
+    suites: 0,
+    behaviors: 0,
+    tests: 0,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    notRun: 0,
+    failedPackages: 0,
+  };
+  for (const s of given) {
+    sum.suites += s.suites;
+    sum.behaviors += s.behaviors;
+    sum.tests += s.tests;
+    sum.passed += s.passed;
+    sum.failed += s.failed;
+    sum.skipped += s.skipped;
+    sum.notRun = (sum.notRun ?? 0) + (s.notRun ?? 0);
+    sum.failedPackages = (sum.failedPackages ?? 0) + (s.failedPackages ?? 0);
+  }
+  return sum;
+}
+
+function statsHtml(stats: SpecStats | undefined): string {
+  const text = statsText(stats);
+  return text ? ` <span class="row-stats">${escapeHtml(text)}</span>` : "";
+}
+
+// A package whose rows the CLI left out, and that says nothing of its own,
+// has no row; its counts still reach its module's.
 function buildPackageSectionHtml(
   displayPath: string,
   pkg: SpecPackage,
   env: RenderEnv,
 ): string {
+  const failure = buildPackageFailureHtml(pkg, env);
+  if (pkg.nodes.length === 0 && !failure) return "";
   const nodes = pkg.nodes
     .map((n) => buildNodeHtml(n, "", nodeCtx(env, pkg)))
     .join("");
   return `<details class="pkg-section" open>
-  <summary class="pkg-header">${escapeHtml(displayPath)}</summary>
-  ${buildPackageFailureHtml(pkg, env)}${nodes}
+  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
+  ${failure}${nodes}
 </details>`;
 }
 
-// pkgFailedOnItsOwn reports whether a package's FAIL verdict originates on
-// the package itself rather than on any test beneath it — a build failure, a
-// TestMain os.Exit, a crash outside any test.
-function pkgFailedOnItsOwn(pkg: SpecPackage): boolean {
-  return pkg.status === "fail" && !pkg.nodes.some(hasFailure);
-}
-
-// buildPackageFailureHtml renders a package-level FAIL verdict with its
-// diagnostics. Such a package has no failing node to render it, so without
-// this block the spec view would show the package as an empty green section
-// beside a red exit code.
+// buildPackageFailureHtml renders a verdict the CLI counts on the package
+// itself (a build failure, a death outside any test) with the output the
+// CLI gives it; under --hide=fail the CLI gives none and the block goes.
 function buildPackageFailureHtml(pkg: SpecPackage, env: RenderEnv): string {
-  if (!pkgFailedOnItsOwn(pkg)) return "";
-  const dir = env.dirOf(pkg.path);
+  if ((pkg.stats?.failedPackages ?? 0) === 0) return "";
+  const dir = pkg.dir ?? env.dirOf(pkg.path);
   const lines = (pkg.output ?? [])
     .map((l) => l.trimEnd())
     .filter(Boolean)
     .map((l) => linkSources(escapeHtml(l), dir))
     .join("\n");
-  const errorBlock = lines
-    ? `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`
-    : "";
+  if (!lines) return "";
+  const errorBlock = `<details class="error-details" open><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`;
   return `<div class="leaf test fail"${idAttr(pkg.path)}>
   <span class="icon fail"><span class="status-text">✗</span></span> <strong>FAIL</strong>
   ${errorBlock}
@@ -896,6 +964,8 @@ function resolveSource(
   return candidates.find((c) => existsSync(c));
 }
 
+// A module counts every package the CLI gave, rows shown or not; one with
+// no row to show has none itself.
 function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
   const only = group.entries[0].pkg;
   const inner =
@@ -905,25 +975,32 @@ function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
       : group.entries
           .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
           .join("");
+  if (!inner) return "";
+  const stats = addStats(group.entries.map((e) => e.pkg.stats));
   return `<details class="module-section" open>
-  <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}</summary>
+  <summary class="module-header">${escapeHtml(group.modulePath || "unknown")}${statsHtml(stats)}</summary>
   ${inner}
 </details>`;
 }
 
-// What a node needs from around it: where declarations live, and the
-// package it belongs to, which with its path names its Test Explorer item.
+// What a node needs from around it: the package it belongs to, which with
+// its path names its Test Explorer item, and the package's directory, where
+// the source the CLI names lives.
 interface NodeCtx {
-  locations: LocationMap;
   pkgPath: string;
-  pkgDir: string | undefined;
+  // The directory the CLI read the package's source from; a node's file is
+  // relative to it.
+  declDir: string | undefined;
+  // Where the file:line tokens of output resolve: the CLI's directory, else
+  // discovery's.
+  outputDir: string | undefined;
 }
 
 function nodeCtx(env: RenderEnv, pkg: SpecPackage): NodeCtx {
   return {
-    locations: env.locations,
     pkgPath: pkg.path,
-    pkgDir: env.dirOf(pkg.path),
+    declDir: pkg.dir,
+    outputDir: pkg.dir ?? env.dirOf(pkg.path),
   };
 }
 
@@ -965,8 +1042,8 @@ function idAttr(id: string | undefined): string {
   return id ? ` data-id="${escapeAttr(id)}"` : "";
 }
 
-// Nodes are rendered with their go test path: the parent's path and their
-// own name, which is how discovery keys a declaration.
+// Nodes are rendered with their go test path, the parent's path and their
+// own name, which names their Test Explorer item.
 function buildNodeHtml(
   node: SpecNode,
   parentPath: string,
@@ -979,33 +1056,47 @@ function buildNodeHtml(
   return buildBranchHtml(node, nodePath, ctx);
 }
 
-function buildIconHtml(status: string, nodePath: string, ctx: NodeCtx): string {
-  const icon = statusIcon(status);
-  const loc = ctx.locations[nodePath];
+// sourceOf is where the CLI says the source declares a node; a node only a
+// run revealed has no position.
+export function sourceOf(
+  node: SpecNode,
+  dir: string | undefined,
+): { file: string; line: number } | undefined {
+  if (!dir || !node.file || !node.line) return undefined;
+  return { file: path.join(dir, node.file), line: node.line };
+}
+
+function buildIconHtml(node: SpecNode, ctx: NodeCtx): string {
+  const icon = statusIcon(node.status);
+  const loc = sourceOf(node, ctx.declDir);
   const locAttrs = loc
     ? ` data-loc-file="${escapeAttr(loc.file)}" data-loc-line="${loc.line}"`
     : "";
   const gotoSpan = loc
     ? `<span class="goto-text" title="Go to source">↗</span>`
     : "";
-  return `<span class="icon ${status}"${locAttrs}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
+  return `<span class="icon ${node.status}"${locAttrs}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
 }
 
 function buildLeafHtml(node: SpecNode, nodePath: string, ctx: NodeCtx): string {
-  const iconHtml = buildIconHtml(node.status, nodePath, ctx);
+  const iconHtml = buildIconHtml(node, ctx);
   const id =
     node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
-  const dur = formatDuration(node.duration);
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
+  // A declared behavior the run did not report took no time.
+  const dur =
+    node.status === "none"
+      ? ` <span class="tag none">NOT RUN</span>`
+      : ` <span class="dur">(${formatDuration(node.duration)})</span>`;
 
   const errorBlock =
-    node.status === "fail" ? errorBlockHtml(node, ctx.pkgDir) : "";
+    node.status === "fail" ? errorBlockHtml(node, ctx.outputDir) : "";
 
   return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}"${idAttr(id)}>
-  ${iconHtml} ${escapeHtml(node.display)}${suffix} <span class="dur">(${dur})</span>${actionsHtml(id)}
+  ${iconHtml} ${escapeHtml(node.display)}${suffix}${dur}${actionsHtml(id)}
   ${errorBlock}
 </div>`;
 }
@@ -1015,10 +1106,8 @@ function buildBranchHtml(
   nodePath: string,
   ctx: NodeCtx,
 ): string {
-  const shouldOpen = hasFailure(node);
-  const openAttr = shouldOpen ? " open" : "";
-  const status = derivedStatus(node);
-  const iconHtml = buildIconHtml(status, nodePath, ctx);
+  const openAttr = node.status === "fail" ? " open" : "";
+  const iconHtml = buildIconHtml(node, ctx);
   const id =
     node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
   const children = node.children
@@ -1041,12 +1130,12 @@ function buildBranchHtml(
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded) suffix += ` <span class="tag skipped">SKIPPED</span>`;
 
-  // What the branch itself reported: a failed AfterAll, a panic booked on
-  // the suite rather than on the behavior that raised it.
-  const errorBlock = status === "fail" ? errorBlockHtml(node, ctx.pkgDir) : "";
-  const ownFail = failedOnItsOwn(node) ? " fail-own" : "";
+  // What the branch itself said when it failed: a failed AfterAll, a panic
+  // booked on the suite rather than on the behavior that raised it.
+  const errorBlock =
+    node.status === "fail" ? errorBlockHtml(node, ctx.outputDir) : "";
 
-  return `<details class="branch${ownFail}" data-display="${escapeAttr(node.display)}"${openAttr}>
+  return `<details class="branch ${node.status}" data-display="${escapeAttr(node.display)}"${openAttr}>
   <summary class="node ${node.kind}"${idAttr(id)}>${iconHtml} ${label}${suffix}${actionsHtml(id)}</summary>
   ${errorBlock}${children}
 </details>`;
@@ -1065,42 +1154,6 @@ function errorBlockHtml(node: SpecNode, dir: string | undefined): string {
     .join("\n");
   if (!lines) return "";
   return `<details class="error-details"><summary class="error-summary">Error details</summary><pre class="error-output">${lines}</pre></details>`;
-}
-
-// failedOnItsOwn: the node's verdict is a failure no child accounts for.
-function failedOnItsOwn(node: SpecNode): boolean {
-  return (
-    node.children.length > 0 &&
-    node.status === "fail" &&
-    !node.children.some(hasFailure)
-  );
-}
-
-function hasFailure(node: SpecNode): boolean {
-  if (node.status === "fail") return true;
-  return node.children.some(hasFailure);
-}
-
-// derivedStatus is the branch's own verdict when that is a failure, else the
-// worst of its children's: the kept runs can hold a child that failed in an
-// earlier run beside a parent that passed in the newest one.
-function derivedStatus(node: SpecNode): string {
-  if (node.status === "fail") return "fail";
-  if (
-    node.children.some(
-      (c) => c.status === "fail" || derivedStatus(c) === "fail",
-    )
-  )
-    return "fail";
-  if (
-    node.children.every(
-      (c) =>
-        c.status === "skip" ||
-        (c.children.length > 0 && derivedStatus(c) === "skip"),
-    )
-  )
-    return "skip";
-  return "pass";
 }
 
 function statusIcon(status: string): string {
@@ -1132,249 +1185,28 @@ function buildSummary(stats: SpecStats): string {
   if (stats.tests > 0) counts.push(`${stats.tests} stdlib tests`);
 
   const failedPackages = stats.failedPackages ?? 0;
+  const notRun = stats.notRun ?? 0;
   return `<div class="summary">
   <span class="summary-counts">${counts.join(", ")}</span>
   <span class="summary-results">
     ${stats.passed > 0 ? `<span class="pass">${stats.passed} passed</span>` : ""}
     ${stats.failed > 0 ? `<span class="fail">${stats.failed} failed</span>` : ""}
     ${stats.skipped > 0 ? `<span class="skip">${stats.skipped} skipped</span>` : ""}
-    ${failedPackages > 0 ? `<span class="fail">${failedPackages} failed packages</span>` : ""}
+    ${notRun > 0 ? `<span class="none">${notRun} not run</span>` : ""}
+    ${failedPackages > 0 ? `<span class="fail">${countNoun(failedPackages, "failed package")}</span>` : ""}
   </span>
 </div>`;
 }
-
-interface LeafAgg {
-  passed: number;
-  failed: number;
-  skipped: number;
-  duration: number;
-}
-
-function countLeaves(node: SpecNode, hidden?: Set<string>): LeafAgg {
-  if (node.children.length === 0) {
-    if (hidden && hidden.has(node.status)) {
-      return { passed: 0, failed: 0, skipped: 0, duration: 0 };
-    }
-    return {
-      passed: node.status === "pass" ? 1 : 0,
-      failed: node.status === "fail" ? 1 : 0,
-      skipped: node.status === "skip" ? 1 : 0,
-      duration: node.duration,
-    };
-  }
-  const agg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
-  for (const c of node.children) {
-    const ca = countLeaves(c, hidden);
-    agg.passed += ca.passed;
-    agg.failed += ca.failed;
-    agg.skipped += ca.skipped;
-    agg.duration += ca.duration;
-  }
-  // Counted as the CLI counts it: the branch is the failure.
-  if (failedOnItsOwn(node) && !hidden?.has("fail")) agg.failed++;
-  return agg;
-}
-
-function fmtAgg(a: LeafAgg): string {
-  const parts: string[] = [];
-  if (a.passed > 0) parts.push(`${a.passed} passed`);
-  if (a.failed > 0) parts.push(`${a.failed} failed`);
-  if (a.skipped > 0) parts.push(`${a.skipped} skipped`);
-  return parts.length > 0 ? parts.join(", ") : "-";
-}
-
-function fmtTime(seconds: number): string {
-  return seconds > 0 ? seconds.toFixed(3) + "s" : "-";
-}
-
-type ReportRow =
-  { label: string; time: string; result: string } | { raw: string };
 
 /** Spells a count with its noun, singular for exactly one, as the CLI trailer does. */
 export function countNoun(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
-export function specDataToReport(
-  data: SpecData,
-  modulePaths: string[],
-  hidden?: Set<string>,
-): string {
-  const rows: ReportRow[] = [];
-  const groups = groupByModule(data.packages, modulePaths);
-  const totalAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
-
-  for (const group of groups) {
-    if (groups.length > 1) {
-      const moduleAgg: LeafAgg = {
-        passed: 0,
-        failed: 0,
-        skipped: 0,
-        duration: 0,
-      };
-      for (const e of group.entries) {
-        for (const n of e.pkg.nodes) {
-          const a = countLeaves(n, hidden);
-          moduleAgg.passed += a.passed;
-          moduleAgg.failed += a.failed;
-          moduleAgg.skipped += a.skipped;
-          moduleAgg.duration += a.duration;
-        }
-      }
-      if (
-        moduleAgg.passed + moduleAgg.failed + moduleAgg.skipped === 0 &&
-        !group.entries.some((e) => pkgFailedOnItsOwn(e.pkg))
-      ) {
-        continue;
-      }
-      rows.push({
-        label: group.modulePath || "unknown",
-        time: fmtTime(moduleAgg.duration),
-        result: fmtAgg(moduleAgg),
-      });
-    }
-
-    const pkgIndent = groups.length > 1 ? 1 : 0;
-    for (const entry of group.entries) {
-      const pkgAgg: LeafAgg = { passed: 0, failed: 0, skipped: 0, duration: 0 };
-      for (const n of entry.pkg.nodes) {
-        const a = countLeaves(n, hidden);
-        pkgAgg.passed += a.passed;
-        pkgAgg.failed += a.failed;
-        pkgAgg.skipped += a.skipped;
-        pkgAgg.duration += a.duration;
-      }
-      const pkgBroken = pkgFailedOnItsOwn(entry.pkg);
-      if (pkgAgg.passed + pkgAgg.failed + pkgAgg.skipped === 0 && !pkgBroken)
-        continue;
-      totalAgg.passed += pkgAgg.passed;
-      totalAgg.failed += pkgAgg.failed;
-      totalAgg.skipped += pkgAgg.skipped;
-      totalAgg.duration += pkgAgg.duration;
-      rows.push({
-        label: "  ".repeat(pkgIndent) + entry.displayPath,
-        time: fmtTime(pkgAgg.duration),
-        result: pkgBroken ? "FAIL (package)" : fmtAgg(pkgAgg),
-      });
-      for (const node of entry.pkg.nodes) {
-        walkReportNode(rows, node, pkgIndent + 1, hidden);
-      }
-    }
-  }
-
-  const maxLabelLen = Math.max(
-    8,
-    ...rows.map((r) => ("label" in r ? r.label.length : 0)),
-  );
-  const header = `${"Behavior".padEnd(maxLabelLen)}  Time       Result`;
-  const separator = "-".repeat(header.length);
-
-  const lines = [header, separator];
-  for (const row of rows) {
-    if ("raw" in row) {
-      lines.push(row.raw);
-    } else {
-      lines.push(
-        `${row.label.padEnd(maxLabelLen)}  ${row.time.padEnd(9)}  ${row.result}`,
-      );
-    }
-  }
-  lines.push(separator);
-
-  const counts: string[] = [];
-  if (data.stats.suites > 0) counts.push(countNoun(data.stats.suites, "suite"));
-  if (data.stats.behaviors > 0)
-    counts.push(countNoun(data.stats.behaviors, "behavior"));
-  if ((data.stats.fuzzers ?? 0) > 0)
-    counts.push(countNoun(data.stats.fuzzers ?? 0, "fuzz target"));
-  if (data.stats.tests > 0) counts.push(`${data.stats.tests} stdlib tests`);
-  const results: string[] = [];
-  if (totalAgg.passed > 0) results.push(`${totalAgg.passed} passed`);
-  if (totalAgg.failed > 0) results.push(`${totalAgg.failed} failed`);
-  if (totalAgg.skipped > 0) results.push(`${totalAgg.skipped} skipped`);
-  const failedPackages = data.stats.failedPackages ?? 0;
-  if (failedPackages > 0) results.push(`${failedPackages} failed packages`);
-  const totalDur = hidden
-    ? totalAgg.duration
-    : data.packages.reduce((s, p) => s + p.duration, 0);
-  lines.push(
-    `${counts.join(", ")}: ${results.join(", ")} (${fmtTime(totalDur)})`,
-  );
-
-  return lines.join("\n");
-}
-
-function walkReportNode(
-  rows: ReportRow[],
-  node: SpecNode,
-  indent: number,
-  hidden?: Set<string>,
-): void {
-  if (node.kind === "fixture") {
-    for (const c of node.children) walkReportNode(rows, c, indent, hidden);
-    return;
-  }
-
-  if (node.children.length === 0) {
-    if (hidden && hidden.has(node.status)) return;
-    let label = node.display;
-    const tags: string[] = [];
-    if (node.kind === "fuzz") tags.push(fuzzTagText(node));
-    if (node.external) tags.push("EXTERNAL");
-    if (node.focused) tags.push("FOCUSED");
-    else if (node.excluded) tags.push("SKIPPED");
-    if (tags.length > 0) label += " — " + tags.join(", ");
-    rows.push({
-      label: "  ".repeat(indent) + label,
-      time: fmtTime(node.duration),
-      result: node.status,
-    });
-    if (node.status === "fail" && node.output.length > 0) {
-      const prefix = "  ".repeat(indent + 1) + "│ ";
-      const filtered = node.output
-        .map((l) => l.trim())
-        .filter((l) => l && !l.startsWith("=== ") && !l.startsWith("--- "));
-      for (const line of filtered) {
-        rows.push({ raw: prefix + line });
-      }
-    }
-    return;
-  }
-
-  const agg = countLeaves(node, hidden);
-  if (agg.passed + agg.failed + agg.skipped === 0) return;
-
-  let label = node.display;
-  const tags: string[] = [];
-  if (node.kind === "fuzz") tags.push(fuzzTagText(node));
-  if (node.external) tags.push("EXTERNAL");
-  if (node.focused) tags.push("FOCUSED");
-  else if (node.excluded) tags.push("SKIPPED");
-  if (tags.length > 0) label += " — " + tags.join(", ");
-
-  rows.push({
-    label: "  ".repeat(indent) + label,
-    time: fmtTime(agg.duration),
-    result: fmtAgg(agg),
-  });
-  if (derivedStatus(node) === "fail" && !hidden?.has("fail")) {
-    const prefix = "  ".repeat(indent + 1) + "│ ";
-    for (const line of ownOutput(node)) rows.push({ raw: prefix + line });
-  }
-  for (const c of node.children) {
-    walkReportNode(rows, c, indent + 1, hidden);
-  }
-}
-
 // A fuzz target is a property backed by seeds, not an example; the marker
 // says so and how much evidence sits beneath it, as the CLI's own view does.
 function seedCount(node: SpecNode): number {
   return node.children.length;
-}
-
-function fuzzTagText(node: SpecNode): string {
-  const n = seedCount(node);
-  return `FUZZ (${n} seed${n === 1 ? "" : "s"})`;
 }
 
 function fuzzTagHtml(node: SpecNode): string {
@@ -1478,6 +1310,7 @@ body {
 .legend-item.pass { color: var(--vscode-testing-iconPassed); }
 .legend-item.fail { color: var(--vscode-testing-iconFailed); }
 .legend-item.skip { color: var(--vscode-testing-iconSkipped); }
+.legend-item.none { color: var(--vscode-descriptionForeground); }
 
 /* Toolbar */
 .toolbar {
@@ -1520,6 +1353,8 @@ body {
 .filter-btn.fail.active { border-color: var(--vscode-testing-iconFailed); }
 .filter-btn.skip { color: var(--vscode-testing-iconSkipped); }
 .filter-btn.skip.active { border-color: var(--vscode-testing-iconSkipped); }
+.filter-btn.none { color: var(--vscode-descriptionForeground); }
+.filter-btn.none.active { border-color: var(--vscode-descriptionForeground); }
 .search-group { flex: 1; }
 .search-input {
   width: 100%;
@@ -1602,6 +1437,9 @@ summary.node.block { color: var(--vscode-terminal-ansiYellow); }
 .tag.skipped { color: var(--vscode-testing-iconSkipped); }
 .tag.external { color: var(--vscode-descriptionForeground); }
 .tag.fuzz { color: var(--vscode-textLink-foreground); }
+.tag.none { color: var(--vscode-descriptionForeground); }
+.leaf.none { color: var(--vscode-descriptionForeground); }
+.row-stats { color: var(--vscode-descriptionForeground); font-size: 0.85em; font-weight: normal; margin-left: 8px; }
 
 /* Icon hover swap: status icon → go-to-source */
 .icon .goto-text { display: none; }
@@ -1662,12 +1500,9 @@ summary.node:hover > .node-actions,
 .summary .pass { color: var(--vscode-testing-iconPassed); }
 .summary .fail { color: var(--vscode-testing-iconFailed); }
 .summary .skip { color: var(--vscode-testing-iconSkipped); }
+.summary .none { color: var(--vscode-descriptionForeground); }
 
 /* Filter hiding */
-.hide-pass .leaf.pass { display: none; }
-.hide-fail .leaf.fail { display: none; }
-.hide-skip .leaf.skip { display: none; }
-.branch-hidden { display: none; }
 .search-hidden { display: none; }
 `;
 
@@ -1694,8 +1529,13 @@ document.addEventListener('click', (e) => {
     return;
   }
   if (t.id === 'rerun-failed-btn') {
-    const ids = Array.from(document.querySelectorAll('.leaf.fail[data-id], details.branch.fail-own > summary[data-id]'))
-      .map(el => el.dataset.id);
+    // The narrowest failed rows: one with a failed row beneath it runs
+    // with that row.
+    const ids = Array.from(document.querySelectorAll('.leaf.fail, details.branch.fail'))
+      .filter(el => !el.querySelector('.leaf.fail, details.branch.fail'))
+      .map(el => el.matches('details') ? el.querySelector(':scope > summary') : el)
+      .map(el => el && el.dataset.id)
+      .filter(id => id);
     if (ids.length > 0) vscode.postMessage({ type: 'run', ids: ids });
     return;
   }
@@ -1711,12 +1551,7 @@ document.addEventListener('click', (e) => {
     }
   }
   if (t.id === 'copy-spec-btn') {
-    const tree = document.getElementById('spec-tree');
-    const hidden = [];
-    if (tree && tree.classList.contains('hide-pass')) hidden.push('pass');
-    if (tree && tree.classList.contains('hide-fail')) hidden.push('fail');
-    if (tree && tree.classList.contains('hide-skip')) hidden.push('skip');
-    vscode.postMessage({ type: 'copySpec', hidden: hidden });
+    vscode.postMessage({ type: 'copySpec' });
     return;
   }
   if (t.id === 'refresh-btn') {
@@ -1736,39 +1571,12 @@ document.addEventListener('click', (e) => {
     document.querySelectorAll('details.branch, details.pkg-section, details.module-section').forEach(d => d.open = false);
     return;
   }
+  // The CLI leaves the hidden rows out; the panel renders again.
   if (t.dataset.filter) {
-    const status = t.dataset.filter;
-    const tree = document.getElementById('spec-tree');
-    if (!tree) return;
-    t.classList.toggle('active');
-    tree.classList.toggle('hide-' + status);
-    updateBranchVisibility();
+    vscode.postMessage({ type: 'toggleHide', status: t.dataset.filter });
     return;
   }
 });
-
-function updateBranchVisibility() {
-  const tree = document.getElementById('spec-tree');
-  if (!tree) return;
-  const branches = document.querySelectorAll('details.branch');
-  const arr = Array.from(branches).reverse();
-  for (const branch of arr) {
-    const children = branch.querySelectorAll(':scope > .leaf:not([style*="display: none"]):not(.search-hidden), :scope > details.branch:not(.branch-hidden):not(.search-hidden)');
-    const visibleChildren = Array.from(children).filter(el => {
-      if (el.classList.contains('branch-hidden') || el.classList.contains('search-hidden')) return false;
-      if (el.classList.contains('leaf')) {
-        return getComputedStyle(el).display !== 'none';
-      }
-      return true;
-    });
-    const ownFailShown = branch.classList.contains('fail-own') && !tree.classList.contains('hide-fail');
-    if (visibleChildren.length === 0 && !ownFailShown) {
-      branch.classList.add('branch-hidden');
-    } else {
-      branch.classList.remove('branch-hidden');
-    }
-  }
-}
 
 const sourceSelect = document.getElementById('source-select');
 if (sourceSelect) {
@@ -1794,13 +1602,11 @@ function applySearch() {
   if (!tree) return;
 
   tree.querySelectorAll('.search-hidden').forEach(el => el.classList.remove('search-hidden'));
-  tree.querySelectorAll('.branch-hidden').forEach(el => el.classList.remove('branch-hidden'));
 
   if (!query) {
     tree.querySelectorAll('details.branch').forEach(d => {
-      d.open = d.querySelector('.leaf.fail') !== null;
+      d.open = d.classList.contains('fail');
     });
-    updateBranchVisibility();
     return;
   }
 
@@ -1813,14 +1619,12 @@ function applySearch() {
 
   const branches = Array.from(tree.querySelectorAll('details.branch')).reverse();
   for (const branch of branches) {
-    const hasVisible = branch.querySelector('.leaf:not(.search-hidden):not(.branch-hidden), details.branch:not(.search-hidden):not(.branch-hidden)');
+    const hasVisible = branch.querySelector('.leaf:not(.search-hidden), details.branch:not(.search-hidden)');
     if (!hasVisible) {
       branch.classList.add('search-hidden');
     } else {
       branch.open = true;
     }
   }
-
-  updateBranchVisibility();
 }
 `;

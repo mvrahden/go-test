@@ -218,7 +218,7 @@ func (s *LauncherSignalTestSuite) TestASecondCtrlCReleasesTheFixturesAtOnce(t *g
 	})
 	t.When("a second SIGINT reaches a -json run while a stopped method body ignores its context", func(w *gotest.T) {
 		w.It("books the run as interrupted on its stream", func(it *gotest.T) {
-			gotest.Contains(it, run.Stdout, `{"Action":"fail","Package":"interrupted"}`, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stdout, `{"Action":"fail","Package":"interrupted","RunLevel":true}`, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 	})
 }

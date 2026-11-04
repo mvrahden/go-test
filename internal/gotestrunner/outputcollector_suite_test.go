@@ -968,3 +968,65 @@ func (s *OutputCollectorTestSuite) TestPackageTimeIsTheSpanOfItsSuites(t *gotest
 		})
 	})
 }
+
+func (s *OutputCollectorTestSuite) TestRunLevelPackagesAreMarked(t *gotest.T) {
+	t.When("the run books a failure for itself beside a package's own", func(w *gotest.T) {
+		w.It("marks every event of the run's own packages RunLevel and no event of the other", func(it *gotest.T) {
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+			gotestrunner.ExportBookBuildFailures(c, nil, []gotestrunner.BuildFailure{
+				{Package: "example.com/broken", Err: fmt.Errorf("compile example.com/broken: exit status 1")},
+				{Package: "", Err: fmt.Errorf("compile stage could not start")},
+			})
+			var result gotestrunner.PipelineResult
+			gotestrunner.ExportApplyTeardownFailure(c, &result, fmt.Errorf("shared fixture teardown failed"))
+
+			marked := map[string]int{}
+			byPackage := map[string]int{}
+			for _, line := range strings.Split(strings.TrimSpace(string(c.CapturedJSON())), "\n") {
+				var ev struct {
+					Package  string
+					RunLevel bool
+				}
+				gotest.NoError(it, json.Unmarshal([]byte(line), &ev), "line: %s", line)
+				if ev.Package == "" {
+					continue // a build's own events name it by ImportPath
+				}
+				byPackage[ev.Package]++
+				if ev.RunLevel {
+					marked[ev.Package]++
+				}
+			}
+			gotest.Equal(it, byPackage["go build"], marked["go build"])
+			gotest.Equal(it, byPackage["shared fixtures"], marked["shared fixtures"])
+			gotest.Greater(it, marked["go build"], 2)
+			gotest.Greater(it, marked["shared fixtures"], 2)
+			gotest.Greater(it, byPackage["example.com/broken"], 2)
+			gotest.Zero(it, marked["example.com/broken"])
+		})
+	})
+}
+
+func (s *OutputCollectorTestSuite) TestAPackageNamedLikeARunLevelOneIsNotMarked(t *gotest.T) {
+	t.When("a package's import path reads like a package the run books for itself", func(w *gotest.T) {
+		w.It("carries no RunLevel on any of its events", func(it *gotest.T) {
+			c := gotestrunner.NewOutputCollector(gotestrunner.RunCaptureJSON, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+			c.Register("interrupted", 1)
+			c.RecordResult("interrupted", 0, gotestrunner.SuiteResult{Stdout: []byte(
+				`{"Action":"run","Package":"interrupted","Test":"TestXTestSuite"}` + "\n" +
+					`{"Action":"pass","Package":"interrupted","Test":"TestXTestSuite"}` + "\n")})
+
+			events := 0
+			for _, line := range strings.Split(strings.TrimSpace(string(c.CapturedJSON())), "\n") {
+				var ev struct {
+					Package  string
+					RunLevel bool
+				}
+				gotest.NoError(it, json.Unmarshal([]byte(line), &ev), "line: %s", line)
+				gotest.Equal(it, "interrupted", ev.Package)
+				gotest.False(it, ev.RunLevel, "line: %s", line)
+				events++
+			}
+			gotest.Greater(it, events, 3)
+		})
+	})
+}

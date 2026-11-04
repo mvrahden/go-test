@@ -42,9 +42,23 @@ func checkNoEmbedding(pass *analysis.Pass, insp *inspector.Inspector, reached ma
 			for i := range st.NumFields() {
 				field := st.Field(i)
 				if err := gotestast.FieldShapeError(kind, ts.Name.Name, field, pass.Pkg); err != nil {
-					report(pass, NoEmbedding, field.Pos(), "%s", err)
+					report(pass, NoEmbedding, fieldRange(ts, field), "%s", err)
 				}
 			}
 		}
 	})
+}
+
+// fieldRange runs from the field's name, where the field is reported, to the
+// end of its declaration in the struct type; the name alone when no
+// declaration holds it.
+func fieldRange(ts *ast.TypeSpec, field *types.Var) analysis.Range {
+	if st, ok := ts.Type.(*ast.StructType); ok {
+		for _, f := range st.Fields.List {
+			if f.Pos() <= field.Pos() && field.Pos() <= f.End() {
+				return span{field.Pos(), f.End()}
+			}
+		}
+	}
+	return span{field.Pos(), field.Pos()}
 }

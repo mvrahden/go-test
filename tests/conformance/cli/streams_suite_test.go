@@ -2,6 +2,8 @@ package cli_test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,6 +54,65 @@ func (s *CLIStreamsTestSuite) TestJSONOutputsStayPure(t *gotest.T) {
 			for _, line := range strings.Split(strings.TrimSpace(run.Stdout), "\n") {
 				gotest.Regexp(it, `^\{`, line)
 			}
+		})
+	})
+}
+
+func (s *CLIStreamsTestSuite) TestRunLevelPackagesAreMarked(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/failingshared/")
+	gotest.NoError(t, err)
+	t.When("a -json run's shared fixture does not come up", func(w *gotest.T) {
+		w.It("marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
+			marked := map[string]int{}
+			unmarked := map[string]int{}
+			var actions []string
+			for _, line := range strings.Split(strings.TrimSpace(run.Stdout), "\n") {
+				var ev struct {
+					Action   string
+					Package  string
+					RunLevel *bool
+				}
+				gotest.NoError(it, json.Unmarshal([]byte(line), &ev), "line: %s", line)
+				if ev.RunLevel != nil {
+					gotest.True(it, *ev.RunLevel, "line: %s", line)
+					marked[ev.Package]++
+				} else {
+					unmarked[ev.Package]++
+				}
+				if ev.Package == "shared fixtures" {
+					actions = append(actions, ev.Action)
+				}
+			}
+			gotest.NotEmpty(it, actions)
+			gotest.Equal(it, "start", actions[0])
+			gotest.Equal(it, "fail", actions[len(actions)-1])
+			gotest.Equal(it, map[string]int{"shared fixtures": len(actions)}, marked)
+			gotest.NotEmpty(it, unmarked)
+			gotest.Zero(it, unmarked["shared fixtures"])
+		})
+		w.It("spec's JSON document of that stream marks the shared fixtures package runLevel, and no other", func(it *gotest.T) {
+			input := filepath.Join(it.TempDir(), "events.jsonl")
+			gotest.NoError(it, os.WriteFile(input, []byte(run.Stdout), 0o600))
+			doc, err := testkit.RunCLI(it.Context(), ".", "spec", "--input="+input, "--format=json", "--render-only")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, doc.Exit, "stderr: %s", doc.Stderr)
+			var spec struct {
+				Packages []struct {
+					Path     string
+					RunLevel bool `json:"runLevel"`
+				}
+			}
+			gotest.NoError(it, json.Unmarshal([]byte(doc.Stdout), &spec), "stdout: %s", doc.Stdout)
+			marked := map[string]bool{}
+			for _, p := range spec.Packages {
+				marked[p.Path] = p.RunLevel
+			}
+			gotest.Len(it, marked, 2)
+			gotest.Equal(it, map[string]bool{
+				"shared fixtures": true,
+				"github.com/mvrahden/go-test/tests/conformance/testdata/failingshared": false,
+			}, marked)
 		})
 	})
 }

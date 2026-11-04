@@ -21,10 +21,15 @@
 // in its vocabulary, the `vocab` field on the wire, and a silent stderr while
 // the package loads. It is the one case that pays a type-check.
 //
+// The `spec` cases replay a stream with the flags that reshape the rendering:
+// --declared over a package of this repository, and --hide. The repository's
+// directory is masked.
+//
 // The `live` cases run the CLI itself on packages of this repository and pin
 // what a run writes: the -json stream's shape (one start per package before
 // its other events, the verdicts of packages it runs nothing in) and a run
-// whose patterns match no package. Times and durations are masked.
+// whose patterns match no package. One more runs a module the script writes,
+// whose shared fixture never comes up. Times and durations are masked.
 //
 // The `outputs` cases pin the other documents the extension reads: the
 // `discover` payload, the `bench --json` report, the cover profile a run
@@ -35,7 +40,8 @@
 //
 // The `lint` cases run `gotest lint -json` from the fixture module, through
 // a go.work that spans this checkout, on packages with known findings and on
-// one that does not compile. Paths are masked to the module root.
+// one that does not compile, and print the rule registry. Paths are masked to
+// the module root.
 
 import { spawn } from "node:child_process";
 import {
@@ -56,7 +62,8 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const extensionDir = path.resolve(here, "..");
 const repoRoot = path.resolve(extensionDir, "..");
-const streamDir = path.join(extensionDir, "testdata", "streams");
+const testdataDir = path.join(extensionDir, "testdata");
+const streamDir = path.join(testdataDir, "streams");
 const goldenPath = path.join(extensionDir, "testdata", "cli-contract.json");
 
 // Both invocations the contract has to hold for: the gating form, and the
@@ -145,6 +152,15 @@ async function run(bin, args, input, opts) {
   };
 }
 
+// maskDir replaces dir with token, however a string spells it.
+function maskDir(text, dir, token) {
+  return text
+    .split(dir)
+    .join(token)
+    .split(JSON.stringify(dir).slice(1, -1))
+    .join(token);
+}
+
 const bin = await buildBinary();
 const cases = {};
 
@@ -173,6 +189,39 @@ for (const file of readdirSync(streamDir).sort()) {
       },
     };
   }
+}
+
+// Replays reshaped by flags, from the repo root: its go.work loads
+// examples/search for --declared. The declared stream reports one method of
+// that package and one the source does not declare.
+const RENDER = ["spec", "--input=-", "--format=json", "--render-only"];
+const SPEC = {
+  declared: {
+    stream: "declared/search.jsonl",
+    args: [...RENDER, "--declared", "./examples/search"],
+  },
+  "hide-pass": {
+    stream: "streams/mixed.jsonl",
+    args: [...RENDER, "--hide=pass"],
+  },
+  "hide-nothing": {
+    stream: "streams/mixed.jsonl",
+    args: [...RENDER, "--hide="],
+  },
+};
+
+const spec = {};
+for (const [name, { stream, args }] of Object.entries(SPEC)) {
+  const input = readFileSync(path.join(testdataDir, stream), "utf-8");
+  const result = await run(bin, args, input);
+  const stdout = maskDir(result.stdout, repoRoot, "<repo>").trim();
+  spec[name] = {
+    stream,
+    args,
+    exitCode: result.exitCode,
+    stderr: maskDir(result.stderr, repoRoot, "<repo>"),
+    document: stdout ? JSON.parse(stdout) : null,
+  };
 }
 
 // Live runs: args relative to the repo root. At most one package runs a
@@ -461,6 +510,97 @@ outputs["promote-nothing"] = await promote(stageFuzzModule());
   outputs["promote-refused"] = await promote(stage);
 }
 
+// A module whose one suite reads a shared fixture that never comes up: the
+// run books the failure under a package of its own. Its path is fixed, so the
+// build cache keys it the same each recording.
+const runLevelDir = path.join(tmpdir(), "gotest-contract-runlevel");
+const removeRunLevel = () =>
+  rmSync(runLevelDir, { recursive: true, force: true });
+process.on("exit", removeRunLevel);
+removals.push(removeRunLevel);
+removeRunLevel();
+mkdirSync(path.join(runLevelDir, "down"), { recursive: true });
+const RUN_LEVEL_FILES = {
+  "go.mod": [
+    "module gotest.runlevel",
+    "",
+    "go 1.26.0",
+    "",
+    "require github.com/mvrahden/go-test v0.0.0-00010101000000-000000000000",
+    "",
+    `replace github.com/mvrahden/go-test => ${repoRoot}`,
+  ],
+  "down/fixture.go": [
+    "package down",
+    "",
+    'import (\n\t"context"\n\t"errors"\n)',
+    "",
+    "type DownSharedFixture struct{ State string }",
+    "",
+    "func (f *DownSharedFixture) BeforeAll(ctx context.Context) error {",
+    '\treturn errors.New("the fixture would not come up")',
+    "}",
+    "",
+    "func (f *DownSharedFixture) AfterAll(ctx context.Context) error { return nil }",
+  ],
+  "down/down_test.go": [
+    "package down",
+    "",
+    'import "github.com/mvrahden/go-test/pkg/gotest"',
+    "",
+    "type DownTestSuite struct{ Probe *DownSharedFixture }",
+    "",
+    "func (s *DownTestSuite) TestFixtureIsUp(t *gotest.T) {",
+    '\tgotest.Equal(t, "up", s.Probe.State)',
+    "}",
+  ],
+};
+for (const [file, lines] of Object.entries(RUN_LEVEL_FILES)) {
+  writeFileSync(path.join(runLevelDir, file), lines.join("\n") + "\n", "utf-8");
+}
+const runLevelWork = path.join(path.dirname(bin), "runlevel.work");
+writeFileSync(
+  runLevelWork,
+  `go 1.26.0\n\nuse (\n\t${repoRoot}\n\t${runLevelDir}\n)\n`,
+  "utf-8",
+);
+{
+  const args = ["-json", "./..."];
+  const result = await run(bin, args, "", {
+    cwd: runLevelDir,
+    // A slow first build would otherwise add a notice to stderr.
+    env: {
+      ...process.env,
+      GOWORK: runLevelWork,
+      GOTEST_SLOW_BUILD_THRESHOLD: "1h",
+    },
+  });
+  live["run-level"] = {
+    args,
+    exitCode: result.exitCode,
+    // Sorted: the fixture's failure and the suite's are written by two
+    // processes, in either order.
+    stderr: maskDir(result.stderr, runLevelDir, "<module>")
+      .split("\n")
+      .filter((line) => line !== "")
+      .sort()
+      .map((line) => line + "\n")
+      .join(""),
+    events: mask(maskDir(result.stdout, runLevelDir, "<module>")),
+  };
+  // The same stream rendered as the Spec View renders it: the document marks
+  // the run's own package.
+  const rendered = await run(bin, [...RENDER, "--hide="], result.stdout);
+  live["run-level"].spec = {
+    exitCode: rendered.exitCode,
+    packages: JSON.parse(rendered.stdout).packages.map((pkg) => ({
+      path: pkg.path,
+      runLevel: pkg.runLevel ?? false,
+    })),
+  };
+}
+removeRunLevel();
+
 const fixturesDir = path.join(extensionDir, "testdata", "fixtures");
 const workFile = path.join(path.dirname(bin), "lint.work");
 writeFileSync(
@@ -471,15 +611,12 @@ writeFileSync(
 const LINT = {
   findings: ["lint", "-json", "./stdlibtests", "./lifecycle"],
   uncompilable: ["lint", "-json", "./broken"],
+  rules: ["lint", "-rules", "-json"],
 };
 
-// unroot masks the fixture module's directory, however a string spells it.
+// unroot masks the fixture module's directory.
 function unroot(text) {
-  return text
-    .split(fixturesDir)
-    .join("<fixtures>")
-    .split(JSON.stringify(fixturesDir).slice(1, -1))
-    .join("<fixtures>");
+  return maskDir(text, fixturesDir, "<fixtures>");
 }
 
 // slashed spells a path the way the Linux recording does; Windows prints
@@ -522,13 +659,15 @@ for (const [name, args] of Object.entries(LINT)) {
 
 const golden = {
   note: [
-    "Recorded contract of `gotest spec --input=- --format=json`, of live",
-    "`gotest -json` runs (`live`), of the other documents the extension",
-    "reads (`outputs`), and of `gotest lint -json` (`lint`).",
+    "Recorded contract of `gotest spec --input=- --format=json`, of its",
+    "--declared and --hide forms (`spec`), of live `gotest -json` runs",
+    "(`live`), of the other documents the extension reads (`outputs`), and",
+    "of `gotest lint -json` and `gotest lint -rules -json` (`lint`).",
     "Generated by scripts/record-cli-contract.mjs — do not hand-edit.",
     "A diff here is a change to an interface the VS Code extension consumes.",
   ],
   cases,
+  spec,
   live,
   outputs,
   lint,
@@ -536,5 +675,5 @@ const golden = {
 
 writeFileSync(goldenPath, JSON.stringify(golden, null, 2) + "\n", "utf-8");
 console.log(
-  `recorded ${Object.keys(cases).length} cases, ${Object.keys(live).length} live runs, ${Object.keys(outputs).length} outputs and ${Object.keys(lint).length} lint runs -> ${path.relative(extensionDir, goldenPath)}`,
+  `recorded ${Object.keys(cases).length} cases, ${Object.keys(spec).length} spec runs, ${Object.keys(live).length} live runs, ${Object.keys(outputs).length} outputs and ${Object.keys(lint).length} lint runs -> ${path.relative(extensionDir, goldenPath)}`,
 );

@@ -44,6 +44,9 @@ type TestEvent struct {
 	ImportPath string `json:"ImportPath"`
 	// FailedBuild names the build whose failure failed this package.
 	FailedBuild string `json:"FailedBuild"`
+	// RunLevel marks an event of a package gotest's run booked for itself
+	// ("shared fixtures", "interrupted", …) rather than for an import path.
+	RunLevel bool `json:"RunLevel"`
 }
 
 func ParseEvents(r io.Reader) ([]TestEvent, error) {

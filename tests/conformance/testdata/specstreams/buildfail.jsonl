@@ -1,0 +1,6 @@
+{"ImportPath":"example.com/broken","Action":"build-output","Output":"# example.com/broken\n"}
+{"ImportPath":"example.com/broken","Action":"build-output","Output":"broken.go:3:1: syntax error: non-declaration statement outside function body\n"}
+{"ImportPath":"example.com/broken","Action":"build-fail"}
+{"Time":"2026-10-30T10:00:01Z","Action":"start","Package":"example.com/broken"}
+{"Time":"2026-10-30T10:00:01Z","Action":"output","Package":"example.com/broken","Output":"FAIL\texample.com/broken [build failed]\n"}
+{"Time":"2026-10-30T10:00:01Z","Action":"fail","Package":"example.com/broken","Elapsed":0,"FailedBuild":"example.com/broken"}

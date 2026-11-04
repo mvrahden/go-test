@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / counts one failure and exits 1, or 0 with --render-only
+Clause: when a stream holds a suite's pass line above a fail line of one of its methods → counts one failure and exits 1, or 0 with --render-only
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -811,8 +811,7 @@ func splitTestPath(path string) []string { return protocol.SplitTestPath(path) }
+ // leaf already fails the run, and the node's own output is still rendered.
+ func failedOnItsOwn(n *Node) bool {
+ 	return len(n.Children) > 0 &&
+-		n.Status == StatusFail &&
+-		!anyDescendantFailed(n)
++		n.Status == StatusFail
+ }
+ 
+ // noDiagnosticNote is rendered in place of output for a failure that produced

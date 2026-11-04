@@ -196,7 +196,7 @@ func (s *CLIEventsFileStopTestSuite) TestAStoppedRunLeavesItsEventsFile(t *gotes
 				gotest.Equal(it, r.stdout, r.file)
 			})
 			w.It("ends with the run booked as interrupted", func(it *gotest.T) {
-				gotest.Regexp(it, `\{"Action":"fail","Package":"interrupted"\}\n$`, r.file)
+				gotest.Regexp(it, `\{"Action":"fail","Package":"interrupted","RunLevel":true\}\n$`, r.file)
 			})
 		})
 	}

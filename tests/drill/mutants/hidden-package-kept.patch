@@ -1,0 +1,11 @@
+Expect: ^FAIL .*conformance/spec .* / renders the trailer and no row
+Clause: when a stream in which everything passed is rendered with --hide=pass → renders the trailer and no row
+--- a/internal/gotestspec/view.go
++++ b/internal/gotestspec/view.go
+@@ -52,5 +52,5 @@ func (c *renderConfig) visible(nodes []*Node) []*Node {
+ // packageShown reports whether a package is rendered: its own status is not
+ // hidden, or one of its rows is shown.
+ func (c *renderConfig) packageShown(pkg *Package) bool {
+-	return !c.hidden[pkg.Status] || len(c.visible(pkg.Nodes)) > 0
++	return true
+ }

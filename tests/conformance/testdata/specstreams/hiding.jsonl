@@ -1,0 +1,29 @@
+{"Time":"2026-10-30T10:00:00.001Z","Action":"start","Package":"example.com/hiding"}
+{"Time":"2026-10-30T10:00:00.011Z","Action":"run","Package":"example.com/hiding","Test":"TestAccountTestSuite"}
+{"Time":"2026-10-30T10:00:00.012Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite","Output":"=== RUN   TestAccountTestSuite\n"}
+{"Time":"2026-10-30T10:00:00.002Z","Action":"run","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose"}
+{"Time":"2026-10-30T10:00:00.003Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose","Output":"=== RUN   TestAccountTestSuite/TestClose\n"}
+{"Time":"2026-10-30T10:00:00.004Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose","Output":"--- PASS: TestAccountTestSuite/TestClose (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.005Z","Action":"pass","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestClose","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.006Z","Action":"run","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen"}
+{"Time":"2026-10-30T10:00:00.007Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Output":"=== RUN   TestAccountTestSuite/TestOpen\n"}
+{"Time":"2026-10-30T10:00:00.008Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Output":"    account_test.go:20: Equal failed\n"}
+{"Time":"2026-10-30T10:00:00.009Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Output":"--- FAIL: TestAccountTestSuite/TestOpen (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.010Z","Action":"fail","Package":"example.com/hiding","Test":"TestAccountTestSuite/TestOpen","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.013Z","Action":"output","Package":"example.com/hiding","Test":"TestAccountTestSuite","Output":"--- FAIL: TestAccountTestSuite (0.01s)\n"}
+{"Time":"2026-10-30T10:00:00.014Z","Action":"fail","Package":"example.com/hiding","Test":"TestAccountTestSuite","Elapsed":0.01}
+{"Time":"2026-10-30T10:00:00.023Z","Action":"run","Package":"example.com/hiding","Test":"TestBootTestSuite"}
+{"Time":"2026-10-30T10:00:00.024Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite","Output":"=== RUN   TestBootTestSuite\n"}
+{"Time":"2026-10-30T10:00:00.015Z","Action":"run","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart"}
+{"Time":"2026-10-30T10:00:00.016Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart","Output":"=== RUN   TestBootTestSuite/TestStart\n"}
+{"Time":"2026-10-30T10:00:00.017Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart","Output":"--- PASS: TestBootTestSuite/TestStart (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.018Z","Action":"pass","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStart","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.019Z","Action":"run","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop"}
+{"Time":"2026-10-30T10:00:00.020Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop","Output":"=== RUN   TestBootTestSuite/TestStop\n"}
+{"Time":"2026-10-30T10:00:00.021Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop","Output":"--- PASS: TestBootTestSuite/TestStop (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.022Z","Action":"pass","Package":"example.com/hiding","Test":"TestBootTestSuite/TestStop","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.025Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite","Output":"    boot_test.go:14: could not release the database\n"}
+{"Time":"2026-10-30T10:00:00.026Z","Action":"output","Package":"example.com/hiding","Test":"TestBootTestSuite","Output":"--- FAIL: TestBootTestSuite (0.01s)\n"}
+{"Time":"2026-10-30T10:00:00.027Z","Action":"fail","Package":"example.com/hiding","Test":"TestBootTestSuite","Elapsed":0.01}
+{"Time":"2026-10-30T10:00:00.028Z","Action":"output","Package":"example.com/hiding","Output":"FAIL\texample.com/hiding\t0.030s\n"}
+{"Time":"2026-10-30T10:00:00.029Z","Action":"fail","Package":"example.com/hiding","Elapsed":0.03}

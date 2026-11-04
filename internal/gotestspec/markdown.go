@@ -22,6 +22,9 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 		fmt.Fprintf(w, "%s. Read from source; nothing was executed.\n", strings.Join(counts, ", "))
 	} else {
 		verdicts := fmt.Sprintf("%d passed, %d failed, %d skipped", stats.Passed, stats.Failed, stats.Skipped)
+		if stats.NotRun > 0 {
+			verdicts += fmt.Sprintf(", %d not run", stats.NotRun)
+		}
 		if stats.FailedPackages > 0 {
 			verdicts += ", " + countNoun(stats.FailedPackages, "failed package", "failed packages")
 		}
@@ -30,11 +33,14 @@ func RenderMarkdown(w io.Writer, packages []*Package, opts ...RenderOption) {
 	fmt.Fprintln(w)
 
 	for _, pkg := range packages {
-		for _, node := range pkg.Nodes {
-			renderMarkdownNode(w, node, 2, cfg.withoutVerdicts)
+		if !cfg.packageShown(pkg) {
+			continue
+		}
+		for _, node := range cfg.visible(pkg.Nodes) {
+			renderMarkdownNode(w, node, 2, &cfg)
 		}
 		// A build failure, a fixture that failed: no behavior carries it.
-		if !cfg.withoutVerdicts && PkgFailedOnItsOwn(pkg) {
+		if !cfg.withoutVerdicts && PkgFailedOnItsOwn(pkg) && !cfg.hidden[StatusFail] {
 			fmt.Fprintf(w, "## %s — FAILED\n\n", EscapeLabel(pkg.Path))
 			markdownOutput(w, pkg.Output)
 		}
@@ -128,6 +134,11 @@ func markdownRow(w io.Writer, indent, display string, n *Node, bare bool) {
 		fmt.Fprintf(w, "| %s%s |\n", indent, display)
 		return
 	}
+	if n.NotRun {
+		// A declared behavior the stream did not report took no time.
+		fmt.Fprintf(w, "| %s%s | NOT RUN | |\n", indent, display)
+		return
+	}
 	fmt.Fprintf(w, "| %s%s | %s | %s |\n", indent, display, statusText(n.Status), formatDuration(EffectiveDuration(n)))
 }
 
@@ -149,11 +160,13 @@ func markdownNote(w io.Writer, n *Node) {
 	}
 }
 
-func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
+func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, cfg *renderConfig) {
+	bare := cfg.withoutVerdicts
+	children := cfg.visible(n.Children)
 	switch n.Kind {
 	case KindFixture:
-		for _, child := range n.Children {
-			renderMarkdownNode(w, child, headingLevel, bare)
+		for _, child := range children {
+			renderMarkdownNode(w, child, headingLevel, cfg)
 		}
 
 	case KindSuite:
@@ -167,7 +180,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 			// unmarked, those behaviors read as live ones.
 			label += " — EXCLUDED"
 		}
-		if len(n.Children) == 0 {
+		if len(children) == 0 {
 			// A suite without behaviors has no table to carry its verdict.
 			switch {
 			case bare && n.Excluded:
@@ -176,6 +189,8 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 				label += " — SKIPPED"
 			case n.Status == StatusFail && !bare:
 				label += " — FAILED"
+			case n.NotRun && !bare:
+				label += " — NOT RUN"
 			}
 			fmt.Fprintf(w, "%s %s\n\n", heading, label)
 			if n.Status == StatusFail && !bare {
@@ -186,11 +201,11 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		fmt.Fprintf(w, "%s %s\n\n", heading, label)
 
 		var leafChildren, benchChildren, nestedChildren []*Node
-		for _, c := range n.Children {
+		for _, c := range children {
 			switch {
-			case c.Kind == KindBenchmark && len(c.Children) == 0:
+			case c.Kind == KindBenchmark && len(cfg.visible(c.Children)) == 0:
 				benchChildren = append(benchChildren, c)
-			case len(c.Children) == 0:
+			case len(cfg.visible(c.Children)) == 0:
 				leafChildren = append(leafChildren, c)
 			default:
 				nestedChildren = append(nestedChildren, c)
@@ -210,7 +225,7 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		}
 
 		for _, c := range nestedChildren {
-			renderMarkdownNode(w, c, headingLevel+1, bare)
+			renderMarkdownNode(w, c, headingLevel+1, cfg)
 		}
 
 	case KindMethod, KindTest, KindFuzz:
@@ -219,12 +234,12 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		if bare && n.Excluded {
 			label += " — EXCLUDED"
 		}
-		if n.Kind == KindFuzz && len(n.Children) == 0 {
+		if n.Kind == KindFuzz && len(children) == 0 {
 			// A declared target, or one that replayed nothing.
 			fmt.Fprintf(w, "%s %s (fuzz target)\n\n", heading, label)
 			return
 		}
-		if len(n.Children) == 0 {
+		if len(children) == 0 {
 			// A method whose every behavior is runtime-dependent has nothing to
 			// tabulate, but dropping it would delete a declared method from the
 			// specification without saying so.
@@ -237,11 +252,11 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		fmt.Fprintf(w, "%s %s\n\n", heading, label)
 		markdownNote(w, n)
 		markdownHeader(w, bare)
-		renderMarkdownTable(w, n.Children, 0, bare)
+		renderMarkdownTable(w, children, 0, cfg)
 		fmt.Fprintln(w)
 
 	case KindBenchmark:
-		if len(n.Children) != 0 {
+		if len(children) != 0 {
 			return
 		}
 		// A bare top-level benchmark node with no enclosing suite.
@@ -250,9 +265,13 @@ func renderMarkdownNode(w io.Writer, n *Node, headingLevel int, bare bool) {
 		renderMarkdownBenchTable(w, []*Node{n})
 
 	default:
-		if len(n.Children) == 0 {
+		if len(children) == 0 {
 			if bare {
 				fmt.Fprintf(w, "- %s\n", EscapeLabel(n.Display))
+				return
+			}
+			if n.NotRun {
+				fmt.Fprintf(w, "- NOT RUN %s\n", EscapeLabel(n.Display))
 				return
 			}
 			fmt.Fprintf(w, "- %s %s (%s)\n", statusText(n.Status), EscapeLabel(n.Display), formatDuration(EffectiveDuration(n)))
@@ -270,13 +289,13 @@ func renderMarkdownBenchTable(w io.Writer, nodes []*Node) {
 	fmt.Fprintln(w)
 }
 
-func renderMarkdownTable(w io.Writer, nodes []*Node, depth int, bare bool) {
+func renderMarkdownTable(w io.Writer, nodes []*Node, depth int, cfg *renderConfig) {
 	indent := strings.Repeat("&nbsp;&nbsp;", depth)
 	for _, n := range nodes {
-		if len(n.Children) > 0 {
+		if children := cfg.visible(n.Children); len(children) > 0 {
 			label := EscapeLabel(n.Display)
 			switch {
-			case bare:
+			case cfg.withoutVerdicts:
 				suffix := ""
 				if n.Excluded {
 					suffix = " — EXCLUDED"
@@ -296,9 +315,9 @@ func renderMarkdownTable(w io.Writer, nodes []*Node, depth int, bare bool) {
 			default:
 				fmt.Fprintf(w, "| %s**%s** | | |\n", indent, label)
 			}
-			renderMarkdownTable(w, n.Children, depth+1, bare)
+			renderMarkdownTable(w, children, depth+1, cfg)
 		} else {
-			markdownRow(w, indent, n.Display, n, bare)
+			markdownRow(w, indent, n.Display, n, cfg.withoutVerdicts)
 		}
 	}
 }

@@ -39,7 +39,7 @@ func checkBenchLoop(pass *analysis.Pass, insp *inspector.Inspector, suites map[s
 			return
 		}
 
-		report(pass, BenchLoop, fd.Pos(),
+		report(pass, BenchLoop, funcHeader(fd),
 			"benchmark %s never calls b.Loop() — nothing is measured", recvName+"."+methodName)
 	})
 }
@@ -93,7 +93,7 @@ func checkBenchFixtureIO(pass *analysis.Pass, insp *inspector.Inspector, suites 
 			return
 		}
 
-		report(pass, BenchFixtureIO, fd.Pos(),
+		report(pass, BenchFixtureIO, funcHeader(fd),
 			"benchmark %s reads fixture-backed state %s inside the measured loop — hoist the read above the loop, or you are timing whatever backs the fixture",
 			recvName+"."+methodName, recvIdent+"."+field)
 	})
@@ -137,7 +137,7 @@ func checkBenchWait(pass *analysis.Pass, insp *inspector.Inspector, suites map[s
 				return true
 			}
 			if name := waitingCallName(pass, call); name != "" {
-				report(pass, BenchWait, call.Pos(),
+				report(pass, BenchWait, call,
 					"benchmark %s calls %s inside the measured loop — this times the wait, not the code; move it outside the loop",
 					recvName+"."+methodName, name)
 			}

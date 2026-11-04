@@ -1,0 +1,17 @@
+{"Time":"2026-10-30T10:00:00.000Z","Action":"start","Package":"example.com/composed"}
+{"Time":"2026-10-30T10:00:00.001Z","Action":"run","Package":"example.com/composed","Test":"TestAccountTestSuite"}
+{"Time":"2026-10-30T10:00:00.001Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite","Output":"=== RUN   TestAccountTestSuite\n"}
+{"Time":"2026-10-30T10:00:00.002Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite","Output":"    account_test.go:12: ledger opened\n"}
+{"Time":"2026-10-30T10:00:00.003Z","Action":"run","Package":"example.com/composed","Test":"TestAccountTestSuite/TestClose"}
+{"Time":"2026-10-30T10:00:00.003Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite/TestClose","Output":"=== RUN   TestAccountTestSuite/TestClose\n"}
+{"Time":"2026-10-30T10:00:00.005Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite/TestClose","Output":"--- PASS: TestAccountTestSuite/TestClose (0.00s)\n"}
+{"Time":"2026-10-30T10:00:00.005Z","Action":"pass","Package":"example.com/composed","Test":"TestAccountTestSuite/TestClose","Elapsed":0}
+{"Time":"2026-10-30T10:00:00.006Z","Action":"run","Package":"example.com/composed","Test":"TestAccountTestSuite/TestOpen"}
+{"Time":"2026-10-30T10:00:00.006Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite/TestOpen","Output":"=== RUN   TestAccountTestSuite/TestOpen\n"}
+{"Time":"2026-10-30T10:00:00.015Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite/TestOpen","Output":"    account_test.go:20: Equal failed\n"}
+{"Time":"2026-10-30T10:00:00.016Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite/TestOpen","Output":"--- FAIL: TestAccountTestSuite/TestOpen (0.01s)\n"}
+{"Time":"2026-10-30T10:00:00.016Z","Action":"fail","Package":"example.com/composed","Test":"TestAccountTestSuite/TestOpen","Elapsed":0.01}
+{"Time":"2026-10-30T10:00:00.020Z","Action":"output","Package":"example.com/composed","Test":"TestAccountTestSuite","Output":"--- PASS: TestAccountTestSuite (0.02s)\n"}
+{"Time":"2026-10-30T10:00:00.020Z","Action":"pass","Package":"example.com/composed","Test":"TestAccountTestSuite","Elapsed":0.02}
+{"Time":"2026-10-30T10:00:00.021Z","Action":"output","Package":"example.com/composed","Output":"ok  \texample.com/composed\t0.021s\n"}
+{"Time":"2026-10-30T10:00:00.021Z","Action":"pass","Package":"example.com/composed","Elapsed":0.021}

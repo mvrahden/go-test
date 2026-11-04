@@ -39,12 +39,13 @@ func renderedBehaviorLabel(b *gotestast.Behavior) string {
 // cannot be loaded here — a stream from another module, a checkout without
 // the source — simply contribute nothing, and their labels are reconstructed
 // from the names as before. Nothing about loading may fail the render.
-func declarationsForStream(events []gotestspec.TestEvent) gotestspec.DeclarationIndex {
+// Packages in have are left out: the caller read them already.
+func declarationsForStream(events []gotestspec.TestEvent, have map[string]bool) gotestspec.DeclarationIndex {
 	seen := map[string]bool{}
 	var pkgs []string
 	for i := range events {
 		pkg := events[i].Package
-		if pkg == "" || seen[pkg] {
+		if pkg == "" || seen[pkg] || have[pkg] || events[i].RunLevel {
 			continue
 		}
 		seen[pkg] = true

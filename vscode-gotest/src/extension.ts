@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import { DiscoveryCache, DiscoveryService } from "./discovery.js";
+import {
+  DiscoveryCache,
+  DiscoveryService,
+  workspacePatterns,
+} from "./discovery.js";
 import { treeSignature } from "./treeSignature.js";
 import { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
 import { GoTestController } from "./testController.js";
@@ -143,10 +147,13 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     runRegistry,
   );
+  // The panel shows each folder's runs over the specification its source
+  // declares, read from the packages the folder's discovery reads.
   const specView = new SpecViewPanel(
     outputChannel,
     cache,
     context.storageUri?.fsPath,
+    workspacePatterns,
   );
   specView.setExtensionUri(context.extensionUri);
 

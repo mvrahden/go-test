@@ -1,7 +1,7 @@
 # Living Spec Specification
 
 ## Purpose
-How `gotest spec` writes the behavior specification of a run, and the one it reads from source with `--static`, as a Markdown document whose labels stay text.
+How `gotest spec` writes the behavior specification of a run, and the one it reads from source with `--static`, as a Markdown document whose labels stay text; which verdict a branch and its package carry when a failure lies beneath them; how --declared lays a stream's verdicts over the specification the source declares and where the source declares each node; and which rows --hide leaves out of a rendering without changing what it counts.
 
 ## Requirements
 
@@ -57,3 +57,53 @@ A behavior SHALL read the same in discover, in a run's spec, in the spec read fr
 #### Scenario: A When that opens with a connective
 - **WHEN** a When's label opens with a connective of its own
 - **THEN** discover and every spec write it with no when in front
+
+### Requirement: A failure below fails the branch
+A node SHALL be failed when a node beneath it failed, and a package SHALL be failed when one of its nodes failed, whatever the stream's own line for the node or the package says, so a stream composed from several runs renders, counts and exits as one go test failed.
+
+#### Scenario: A pass line above a failed method
+- **WHEN** a stream holds a suite's pass line above a fail line of one of its methods
+- **THEN** renders the suite and its package as failed in the terminal, Markdown and JSON formats, as when their own lines say fail
+- **AND** counts one failure and exits 1, or 0 with --render-only
+
+### Requirement: The declared specification under a run's verdicts
+`spec --input=<file> --declared [packages]` SHALL render the specification the source declares, as --static reads it: a node the stream reported carries its verdict, duration and output, one it did not report neither, or skipped under a node the run skipped; what only the stream holds stays under its declared parent. Unreported behaviors SHALL count as not run, sparing the exit code. With --static or --declared each JSON package SHALL carry its dir and each declared node its file and line.
+
+#### Scenario: A run of some of a package's methods
+- **WHEN** a stream of some of a package's methods is rendered with --declared
+- **THEN** shows every method the source declares with its When and It rows, those the stream did not report with no verdict and no duration
+- **AND** counts the behaviors the stream did not report as not run, and exits as without --declared
+- **AND** reads a method the X_ prefix excludes, and its rows, as skipped rather than not run
+
+#### Scenario: Rows only a run can name
+- **WHEN** a stream holds the rows of an Each whose table is not a literal, rendered with --declared
+- **THEN** shows the rows under their method, which is marked incomplete
+
+#### Scenario: A suite its guard kept from running
+- **WHEN** a stream holds the skip of a suite its guard kept from running, rendered with --declared
+- **THEN** reads the suite's declared methods and rows as skipped, not as not run, and counts them so
+
+#### Scenario: Where the source declares a node
+- **WHEN** a package's specification is rendered as JSON with --static or with --declared
+- **THEN** gives the package its dir and each node the source declares the file and line gotest discover gives it, and a node only the stream holds neither
+
+### Requirement: Hiding rows by status
+`--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared without --input or beside --static, SHALL exit 2.
+
+#### Scenario: Hiding what passed
+- **WHEN** a failing stream is rendered with --hide=pass
+- **THEN** keeps the failing branch, its failing leaf and a suite that failed in its own hooks, and leaves out the rows that passed
+- **AND** counts every behavior that passed in the trailer and in its package's stats, as without --hide
+
+#### Scenario: Hiding a green run
+- **WHEN** a stream in which everything passed is rendered with --hide=pass
+- **THEN** renders the trailer and no row
+- **AND** keeps every package in the JSON document with all of its stats and none of its rows
+
+#### Scenario: Hiding a package's own failure
+- **WHEN** a stream whose package failed to build is rendered with --hide=fail
+- **THEN** leaves the package's failure and its output out of every format, its stats still counting it
+
+#### Scenario: A view that cannot apply
+- **WHEN** --hide is given with --static or with a status it does not know, or --declared without --input or with --static
+- **THEN** refuses with exit 2, naming what it needs or the statuses it accepts

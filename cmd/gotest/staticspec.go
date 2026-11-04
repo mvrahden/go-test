@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -38,7 +39,7 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 	collector := gotestgen.NewCollector()
 
 	for _, lr := range loadResults {
-		pkgNode := &gotestspec.Package{Path: lr.PkgPath}
+		pkgNode := &gotestspec.Package{Path: lr.PkgPath, Dir: lr.PkgDir}
 
 		for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
 			if pkg == nil {
@@ -101,15 +102,21 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 	var notes []string
 
 	// The runtime tree keys suites by the generated entrypoint name, so the
-	// static tree has to use the identical one to line up with it.
-	node := &gotestspec.Node{Name: "Test" + suite.Identifier()}
+	// static tree has to use the identical one to line up with it. Positions
+	// are the ones gotest discover gives the same nodes.
+	fset := suite.Package().Fset
+	pos := fset.Position(suite.TypeSpecPos())
+	node := &gotestspec.Node{Name: "Test" + suite.Identifier(), File: filepath.Base(pos.Filename), Line: pos.Line}
 
 	for _, method := range suite.TestCases() {
 		methodName := method.Identifier()
-		methodNode := &gotestspec.Node{Name: methodName}
+		mPos := fset.Position(method.Pos())
+		file := filepath.Base(mPos.Filename)
+		methodNode := &gotestspec.Node{Name: methodName, File: file, Line: mPos.Line}
 
 		spec := suite.BehaviorsOf(method)
-		methodNode.Children = staticBehaviorNodes(spec.Behaviors)
+		// A method's behaviors are read from its body, so they share its file.
+		methodNode.Children = staticBehaviorNodes(spec.Behaviors, file)
 		if !spec.Complete {
 			// Carried on the node, not only on stderr: a spec written to a file
 			// or piped as JSON has to state its own limits, or the reader has
@@ -124,17 +131,20 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 	// Fuzz targets are properties the suite states; they sit beside its
 	// examples, named as the run tree names them.
 	for _, fz := range suite.Fuzzers() {
+		fPos := fset.Position(fz.Pos())
 		node.Children = append(node.Children, &gotestspec.Node{
 			Kind:    gotestspec.KindFuzz,
 			Name:    fz.Identifier(),
 			Display: strings.TrimPrefix(fz.Identifier(), "Fuzz"),
+			File:    filepath.Base(fPos.Filename),
+			Line:    fPos.Line,
 		})
 	}
 
 	return node, notes
 }
 
-func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
+func staticBehaviorNodes(behaviors []*gotestast.Behavior, file string) []*gotestspec.Node {
 	var out []*gotestspec.Node
 	for _, b := range reportedBehaviors(behaviors) {
 		// The behavior carries the exact go test segment, "#01" and all,
@@ -145,8 +155,10 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior) []*gotestspec.Node {
 			Name:        gotestspec.StripDuplicateSuffix(b.Name),
 			Vocab:       vocabOf(b.Kind),
 			SourceLabel: b.Display,
+			File:        file,
+			Line:        b.Line,
 		}
-		node.Children = staticBehaviorNodes(b.Children)
+		node.Children = staticBehaviorNodes(b.Children, file)
 		out = append(out, node)
 	}
 	return out

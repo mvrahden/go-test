@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / shows the rows under their method, which is marked incomplete
+Clause: when a stream holds the rows of an Each whose table is not a literal, rendered with --declared → shows the rows under their method, which is marked incomplete
+--- a/internal/gotestspec/declared.go
++++ b/internal/gotestspec/declared.go
+@@ -90,7 +90,7 @@ func overlayNodes(declared, observed []*Node, excluded bool) []*Node {
+ 	}
+ 	for i, o := range observed {
+ 		if !used[i] {
+-			out = append(out, o)
++			_ = o
+ 		}
+ 	}
+ 	return out

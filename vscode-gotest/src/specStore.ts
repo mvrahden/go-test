@@ -22,9 +22,10 @@ export interface PackageRecord {
   pkgLines: string[];
   // Test path to its lines, in the order the paths were first seen.
   tests: Map<string, string[]>;
-  // Booked by the CLI under a name that is not a package (a run that was
-  // interrupted, shared fixtures that did not come up): it belongs to the
-  // folder's newest run, not to a package.
+  // Booked by the CLI for the run itself rather than for an import path (a
+  // run that was interrupted, shared fixtures that did not come up): its
+  // events carry RunLevel. It belongs to the folder's newest run, not to a
+  // package.
   runLevel: boolean;
 }
 
@@ -42,6 +43,7 @@ interface Parsed {
   Test?: string;
   ImportPath?: string;
   FailedBuild?: string;
+  RunLevel?: boolean;
 }
 
 interface PieceGroup {
@@ -49,13 +51,8 @@ interface PieceGroup {
   tests: Map<string, string[]>;
   topRuns: Map<string, number>;
   failedBuilds: string[];
-}
-
-// isRunLevelPackage reports whether the CLI booked a run's failure under a
-// synthetic name: one with a space can never be an import path, and a stopped
-// run is booked as "interrupted".
-export function isRunLevelPackage(name: string): boolean {
-  return /\s/.test(name) || name === "interrupted";
+  // Whether any of its lines carried the CLI's RunLevel marker.
+  runLevel: boolean;
 }
 
 export class SpecStore {
@@ -108,9 +105,11 @@ export class SpecStore {
           tests: new Map(),
           topRuns: new Map(),
           failedBuilds: [],
+          runLevel: false,
         };
         groups.set(ev.Package, group);
       }
+      if (ev.RunLevel === true) group.runLevel = true;
       if (!ev.Test) {
         group.pkgLines.push(line);
         if (ev.FailedBuild) group.failedBuilds.push(ev.FailedBuild);
@@ -150,7 +149,7 @@ export class SpecStore {
           folder: piece.folder,
           pkgLines,
           tests: group.tests,
-          runLevel: isRunLevelPackage(path),
+          runLevel: group.runLevel,
         });
         continue;
       }
@@ -158,7 +157,7 @@ export class SpecStore {
         folder: piece.folder,
         pkgLines,
         tests: mergeTests(kept.tests, group, covered),
-        runLevel: kept.runLevel,
+        runLevel: group.runLevel,
       });
     }
     return Array.from(groups.keys());

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / leaves the package's failure and its output out of every format, its stats still counting it
+Clause: when a stream whose package failed to build is rendered with --hide=fail → leaves the package's failure and its output out of every format, its stats still counting it
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -102,7 +102,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
+ 	// count. One whose rows are all hidden keeps no node.
+ 	for _, pkg := range packages {
+ 		output := pkg.Output
+-		if output == nil || cfg.hidden[StatusFail] {
++		if output == nil {
+ 			// The failure a package carries on its own is a row the
+ 			// other formats leave out under --hide=fail.
+ 			output = []string{}
