@@ -3,6 +3,7 @@ package cli_test
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -13,7 +14,7 @@ import (
 type CLIRejectionsTestSuite struct{}
 
 func (s *CLIRejectionsTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 45 * time.Second}
 }
 
 type rejectionRow struct {
