@@ -268,6 +268,7 @@ export function buildTestResultsTable(
     passed: number;
     failed: number;
     skipped: number;
+    errored: number;
     // What this row displayed, so a parent without timestamps can still fall
     // back to summing; the longest single child, and the windows this row
     // contributes upward.
@@ -280,6 +281,8 @@ export function buildTestResultsTable(
     duration?: number;
     status?: string;
     agg?: Agg;
+    // A package the run errored: its own verdict, beside its children's.
+    errored?: boolean;
   };
   const rows: Row[] = [];
 
@@ -288,19 +291,23 @@ export function buildTestResultsTable(
       item.id.startsWith("dir:") ||
       item.id.startsWith("wsFolder:") ||
       item.tags.some((t) => t.id === "package");
-    const result = structural ? undefined : resultStore.get(item.id);
+    const stored = resultStore.get(item.id);
+    const result = structural ? undefined : stored;
+    const packageErrored = structural && stored?.status === "errored";
 
     const rowIdx = rows.length;
     rows.push({
       label: "  ".repeat(indent) + item.label,
       duration: effectiveOf(result),
       status: result?.status,
+      errored: packageErrored,
     });
 
     const childAgg: Agg = {
       passed: 0,
       failed: 0,
       skipped: 0,
+      errored: packageErrored ? 1 : 0,
       duration: 0,
       maxChild: 0,
       windows: [],
@@ -310,6 +317,7 @@ export function buildTestResultsTable(
       childAgg.passed += ca.passed;
       childAgg.failed += ca.failed;
       childAgg.skipped += ca.skipped;
+      childAgg.errored += ca.errored;
       childAgg.duration += ca.duration;
       childAgg.maxChild = Math.max(childAgg.maxChild, ca.duration);
       childAgg.windows.push(...ca.windows);
@@ -360,6 +368,7 @@ export function buildTestResultsTable(
       passed: 0,
       failed: 0,
       skipped: 0,
+      errored: 0,
       duration: effectiveOf(result) ?? 0,
       maxChild: 0,
       windows: own ? [own] : [],
@@ -367,6 +376,7 @@ export function buildTestResultsTable(
     if (result?.status === "pass") leafAgg.passed = 1;
     else if (result?.status === "fail") leafAgg.failed = 1;
     else if (result?.status === "skip") leafAgg.skipped = 1;
+    else if (result?.status === "errored") leafAgg.errored = 1;
     return leafAgg;
   };
 
@@ -399,6 +409,7 @@ export function buildTestResultsTable(
   let totalPassed = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
+  let totalErrored = 0;
 
   for (const row of rows) {
     const time = row.duration !== undefined ? fmtSeconds(row.duration) : "-";
@@ -409,6 +420,8 @@ export function buildTestResultsTable(
       if (a.passed > 0) parts.push(`${a.passed} passed`);
       if (a.failed > 0) parts.push(`${a.failed} failed`);
       if (a.skipped > 0) parts.push(`${a.skipped} skipped`);
+      if (a.errored > 0) parts.push(`${a.errored} errored`);
+      if (row.errored) totalErrored++;
       const aggSummary = parts.length > 0 ? parts.join(", ") : "-";
       lines.push(
         `${row.label.padEnd(maxLabelLen)}  ${time.padEnd(9)}  ${aggSummary}`,
@@ -424,15 +437,18 @@ export function buildTestResultsTable(
     if (row.status === "pass") totalPassed++;
     else if (row.status === "fail") totalFailed++;
     else if (row.status === "skip") totalSkipped++;
+    else if (row.status === "errored") totalErrored++;
   }
 
   lines.push(separator);
-  const hasResults = totalPassed + totalFailed + totalSkipped > 0;
+  const hasResults =
+    totalPassed + totalFailed + totalSkipped + totalErrored > 0;
   if (hasResults) {
     const parts: string[] = [];
     if (totalPassed > 0) parts.push(`${totalPassed} passed`);
     if (totalFailed > 0) parts.push(`${totalFailed} failed`);
     if (totalSkipped > 0) parts.push(`${totalSkipped} skipped`);
+    if (totalErrored > 0) parts.push(`${totalErrored} errored`);
     lines.push(`Total: ${parts.join(", ")} (${fmtSeconds(rootDuration)})`);
   } else {
     lines.push("Total: no results");

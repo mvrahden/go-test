@@ -23,7 +23,7 @@ import {
   TOGGLE_FOCUS_COMMAND,
 } from "./focusExclude.js";
 import { FocusDiagnostics } from "./diagnostics.js";
-import { SpecViewPanel } from "./specView.js";
+import { SpecViewPanel, nearestItemId } from "./specView.js";
 import { WatchManager } from "./watch.js";
 import {
   ScaffoldCodeActionProvider,
@@ -43,9 +43,16 @@ import { validateGoBinary, scopedConfig } from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
-  resolveAncestorItems,
+  restoreStoredResults,
 } from "./runnerUtils.js";
 import { copyCoverageSummary, copyTestResults } from "./reporting.js";
+import {
+  LintService,
+  LintCodeActionProvider,
+  applyFixAfterRelint,
+} from "./lint.js";
+import type { LintFinding } from "./lintFindings.js";
+import { openEventsFile } from "./importEvents.js";
 import { execFile } from "node:child_process";
 import { ensureGitExclude } from "./gitExclude.js";
 
@@ -136,7 +143,11 @@ export function activate(context: vscode.ExtensionContext): void {
     outputChannel,
     runRegistry,
   );
-  const specView = new SpecViewPanel(outputChannel, cache);
+  const specView = new SpecViewPanel(
+    outputChannel,
+    cache,
+    context.storageUri?.fsPath,
+  );
   specView.setExtensionUri(context.extensionUri);
 
   const specViewSerializer = vscode.window.registerWebviewPanelSerializer(
@@ -156,8 +167,8 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     coverageStore,
     outputChannel,
-    (jsonOutput) => {
-      specView.refresh(jsonOutput, "coverage");
+    (pieces) => {
+      void specView.refresh(pieces);
     },
     runRegistry,
   );
@@ -184,21 +195,64 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(benchRunner, benchGateDiagnostics);
 
-  const specViewRefreshDisposable = runner.onDidComplete((jsonOutput) => {
-    specView.refresh(jsonOutput, "run");
+  // The Spec View's buttons act on Test Explorer items; a node the tree does
+  // not hold runs as its nearest ancestor that it does.
+  const toItem = (id: string) => {
+    const nearest = nearestItemId(id, (i) => !!controller.findItem(i));
+    if (nearest && nearest !== id) {
+      outputChannel.info(
+        `[specView] ${id} is not in the tree; using ${nearest}`,
+      );
+    }
+    return nearest ? controller.findItem(nearest) : undefined;
+  };
+  specView.setActions({
+    run: async (ids) => {
+      const items = Array.from(
+        new Set(ids.map(toItem).filter((i) => i !== undefined)),
+      );
+      if (items.length === 0) return;
+      const cts = new vscode.CancellationTokenSource();
+      try {
+        await runner.run(new vscode.TestRunRequest(items), cts.token);
+      } finally {
+        cts.dispose();
+      }
+    },
+    debug: async (id) => {
+      const item = toItem(id);
+      if (item)
+        await vscode.commands.executeCommand("gotest.debugTest", item.id);
+    },
+  });
+
+  const specViewRefreshDisposable = runner.onDidComplete((pieces) => {
+    void specView.refresh(pieces);
   });
 
   const watchManager = new WatchManager(
     controller,
     cache,
     outputChannel,
-    (jsonOutput, scope, cwd) => {
-      specView.refresh(jsonOutput, `watch:${scope}@${cwd}`);
+    (jsonOutput, _scope, cwd) => {
+      void specView.refresh({ stream: jsonOutput, folder: cwd });
     },
     runRegistry,
   );
 
   const diagnostics = new FocusDiagnostics(cache);
+  const lint = new LintService(cache, outputChannel);
+  context.subscriptions.push(
+    lint,
+    vscode.workspace.onDidSaveTextDocument((doc) => lint.onSaved(doc)),
+    vscode.languages.registerCodeActionsProvider(
+      { language: "go" },
+      new LintCodeActionProvider(lint),
+      {
+        providedCodeActionKinds: LintCodeActionProvider.providedCodeActionKinds,
+      },
+    ),
+  );
   debugLauncher.registerCleanupOnSessionEnd(context);
 
   const providerDisposables = registerProviders(cache, benchResultStore);
@@ -215,6 +269,7 @@ export function activate(context: vscode.ExtensionContext): void {
     testResultStore,
     cache,
     outputChannel,
+    lint,
   });
   const watcherDisposables = setupFileWatchers(
     cache,
@@ -260,6 +315,7 @@ export function activate(context: vscode.ExtensionContext): void {
       testResultStore.flush(),
       snapshotStore.flush(),
       processRegistry.flush(),
+      specView.flush(),
     ]);
   };
 
@@ -275,6 +331,7 @@ export function activate(context: vscode.ExtensionContext): void {
     processRegistry,
     context,
     snapshotStore,
+    specView,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
@@ -355,6 +412,7 @@ export function registerCommands(deps: {
   testResultStore: TestResultStore;
   cache: DiscoveryCache;
   outputChannel: vscode.LogOutputChannel;
+  lint: LintService;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -369,6 +427,7 @@ export function registerCommands(deps: {
     testResultStore,
     cache,
     outputChannel,
+    lint,
   } = deps;
 
   // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
@@ -596,6 +655,12 @@ export function registerCommands(deps: {
       await specView.show();
     }),
 
+    vscode.commands.registerCommand(
+      "gotest.openEventsFile",
+      (target?: string | vscode.Uri) =>
+        openEventsFile({ controller, cache, specView, outputChannel }, target),
+    ),
+
     vscode.commands.registerCommand("gotest.startWatch", async () => {
       const defaultScope =
         vscode.workspace
@@ -733,6 +798,46 @@ export function registerCommands(deps: {
           item,
         ),
     ),
+    ...registerLintCommands(lint, cache),
+  ];
+}
+
+function registerLintCommands(
+  lint: LintService,
+  cache: DiscoveryCache,
+): vscode.Disposable[] {
+  // The package to fix: the one named, else the active file's, else a pick.
+  const pickPackage = async (
+    importPath?: string,
+  ): Promise<string | undefined> => {
+    if (importPath) return importPath;
+    const active = vscode.window.activeTextEditor?.document.uri.fsPath;
+    const fromEditor = active ? cache.resolveFileToPackage(active) : undefined;
+    if (fromEditor) return fromEditor;
+    const picked = await vscode.window.showQuickPick(
+      cache.packages.map((p) => p.importPath),
+      { title: "Fix lint findings in package" },
+    );
+    return picked;
+  };
+  return [
+    vscode.commands.registerCommand(
+      "gotest.lintFixPackage",
+      async (importPath?: string) => {
+        const target = await pickPackage(importPath);
+        if (target) await lint.fixPackage(target);
+      },
+    ),
+    vscode.commands.registerCommand("gotest.lintWorkspace", async () => {
+      for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        await lint.lintFolder(folder.uri.fsPath);
+      }
+    }),
+    vscode.commands.registerCommand(
+      "gotest.applyLintFix",
+      (uri: vscode.Uri, finding: LintFinding, fixIndex: number) =>
+        applyFixAfterRelint(lint, cache, uri, finding, fixIndex),
+    ),
   ];
 }
 
@@ -839,6 +944,7 @@ async function initializeAsync(deps: {
   processRegistry: ProcessRegistry;
   context: vscode.ExtensionContext;
   snapshotStore: DiscoverySnapshotStore;
+  specView: SpecViewPanel;
 }): Promise<void> {
   const {
     workspaceFolders,
@@ -852,6 +958,7 @@ async function initializeAsync(deps: {
     processRegistry,
     context,
     snapshotStore,
+    specView,
   } = deps;
 
   const firstDir = workspaceFolders[0].uri.fsPath;
@@ -953,6 +1060,7 @@ async function initializeAsync(deps: {
   // restored tree exists precisely so runs can start during discovery.
   await coverageStore.load();
   await testResultStore.load();
+  await specView.load();
 
   const restoreStored = async () => {
     await restoreCoverage();
@@ -996,31 +1104,7 @@ async function initializeAsync(deps: {
   async function restoreResults(): Promise<void> {
     const resultsStartedAt = Date.now();
     if (testResultStore.size > 0) {
-      const resultRequest = new vscode.TestRunRequest();
-      const resultRun = controller.createTestRun(
-        resultRequest,
-        "Restored Results",
-      );
-      let applied = 0;
-      testResultStore.forEach((result, itemId) => {
-        const item = controller.findItem(itemId);
-        // A stored id with no item is a test that no longer exists, or one the
-        // tree cannot name yet. Counting only what landed keeps the log honest:
-        // reporting the store's size implies a restore that may not have
-        // happened.
-        if (!item) return;
-        applied++;
-        if (result.status === "pass") resultRun.passed(item, result.duration);
-        else if (result.status === "fail")
-          resultRun.failed(
-            item,
-            [new vscode.TestMessage("(restored from previous session)")],
-            result.duration,
-          );
-        else if (result.status === "skip") resultRun.skipped(item);
-      });
-      resolveAncestorItems(resultRun, controller);
-      resultRun.end();
+      const applied = restoreStoredResults(controller, testResultStore);
       outputChannel.info(
         `[results] restored ${applied} of ${testResultStore.size} result(s) from storage in ${Date.now() - resultsStartedAt}ms`,
       );

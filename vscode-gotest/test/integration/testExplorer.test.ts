@@ -350,8 +350,8 @@ describe("the coverage entry point", () => {
       cache,
       store,
       createRecordingChannel().channel as never,
-      (json) => {
-        handedOn = json;
+      (pieces) => {
+        handedOn = pieces.map((p) => p.stream).join("");
       },
       registry,
     );
@@ -379,16 +379,16 @@ describe("the coverage entry point", () => {
 });
 
 describe("the watch entry point", () => {
-  it("drives a live test run from its first cycle, then stops cleanly", async () => {
-    // onCycleComplete flushes the previous cycle, so it fires on the *second*
-    // cycle or on an unexpected exit — never after a single initial pass. What
-    // is observable after one cycle is the run it drives, which is exactly the
-    // integration that matters: the Test Explorer updating while watching.
+  // This used to keep a cycle's run open until the next cycle started, so
+  // the Explorer and the Spec View showed a save's verdict one save late.
+  // The CLI says when a cycle is over; that is when its run ends.
+  it("ends a cycle's run at the CLI's watch-end and hands that cycle on", async () => {
+    const cycles: string[] = [];
     const manager = new WatchManager(
       controller,
       cache,
       createRecordingChannel().channel as never,
-      () => {},
+      (json) => cycles.push(json),
       registry,
     );
     const fake = state.controllers[0] as FakeTestController;
@@ -397,34 +397,78 @@ describe("the watch entry point", () => {
     try {
       await manager.start("./passing/...", fixturesDir);
 
-      // The run streams its verdicts: wait for the one this test reads, not
-      // for the first, which on a slow runner is often another's.
+      // Nothing is saved after the first cycle, so only its watch-end can
+      // close the run.
       const run = await waitFor(
         () =>
           fake.runs
             .slice(runsBefore)
-            .find((r) =>
-              r
-                .verdictsMatching("passed")
-                .some((id) => id.endsWith("returns_their_sum")),
+            .find(
+              (r) =>
+                r.ended &&
+                r
+                  .verdictsMatching("passed")
+                  .some((id) => id.endsWith("returns_their_sum")),
             ),
         120_000,
       );
 
-      expect(run.ended).toBe(false);
+      expect(run.ended).toBe(true);
+      expect(cycles).toHaveLength(1);
+      expect(cycles[0]).toContain("returns_their_sum");
+      expect(cycles[0]).not.toContain("watch-end");
+      expect(manager.activeCount, "the watcher keeps watching").toBe(1);
     } finally {
       manager.stopAll();
       manager.dispose();
     }
+  }, 300_000);
+});
 
-    const run = fake.runs
-      .slice(runsBefore)
-      .find((r) =>
-        r
-          .verdictsMatching("passed")
-          .some((id) => id.endsWith("returns_their_sum")),
-      )!;
-    expect(run.ended, "stopping the watch must end its run").toBe(true);
+describe("stopping a watch", () => {
+  it("ends the run of the cycle that is still open", async () => {
+    const manager = new WatchManager(
+      controller,
+      cache,
+      createRecordingChannel().channel as never,
+      () => {},
+      registry,
+    );
+    const fake = state.controllers[0] as FakeTestController;
+    const create = fake.createTestRun.bind(fake);
+    let open: FakeTestRun | undefined;
+    let ranStop!: () => void;
+    const stopped = new Promise<void>((resolve) => (ranStop = resolve));
+    // Stop the moment the cycle's run exists: the cycle has started and its
+    // tests have not reported yet.
+    fake.createTestRun = (request?: unknown, name?: string) => {
+      const run = create(request, name);
+      if (!open && name === "Watch: ./passing/...") {
+        open = run;
+        queueMicrotask(() => {
+          expect(run.ended, "the cycle is still open").toBe(false);
+          manager.stop("./passing/...");
+          ranStop();
+        });
+      }
+      return run;
+    };
+
+    try {
+      await manager.start("./passing/...", fixturesDir);
+      await Promise.race([
+        stopped,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("no cycle started")), 120_000),
+        ),
+      ]);
+      expect(open!.ended, "stopping the watch must end its run").toBe(true);
+      expect(manager.activeCount).toBe(0);
+    } finally {
+      fake.createTestRun = create;
+      manager.stopAll();
+      manager.dispose();
+    }
   }, 300_000);
 });
 

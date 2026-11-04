@@ -1,7 +1,9 @@
 import { JsonStore } from "./jsonStore.js";
 
 export interface TestResult {
-  status: "pass" | "fail" | "skip";
+  // errored: the run could not say whether the test passed — its package
+  // never reported, or the run failed for a reason no test carries.
+  status: "pass" | "fail" | "skip" | "errored";
   /**
    * What go test measured for this node alone. For a leaf that is its execution
    * time; for a node with children it is close to useless, because go test
@@ -43,7 +45,9 @@ interface StoredTestResult extends TestResult {
 // version exists to prevent — a newer build would read an older file's fields
 // as if they were current. A mismatch purges, which is correct for a cache.
 // (3 and 4 were used mid-development and never released, so this reuses 3.)
-const STORE_VERSION = 3;
+// 5: a result can be errored, which a build reading 3 would restore as
+// nothing at all.
+const STORE_VERSION = 5;
 
 type StoredData = Record<string, StoredTestResult>;
 

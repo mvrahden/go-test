@@ -10,9 +10,11 @@ import {
   groupByPackage,
   buildRunFilter,
   resolveAncestorItems,
+  erroredItem,
 } from "./runnerUtils.js";
 import { executeBatch } from "./batchRunner.js";
 import type { RunRegistry } from "./runRegistry.js";
+import type { RunPiece } from "./specStore.js";
 
 export interface ParsedFileCoverage {
   absPath: string;
@@ -249,7 +251,7 @@ export class CoverageRunner implements vscode.Disposable {
     private readonly cache: DiscoveryCache,
     private readonly store: CoverageStore,
     private readonly outputChannel: vscode.LogOutputChannel,
-    private readonly onJsonOutput: (json: string) => void,
+    private readonly onJsonOutput: (pieces: RunPiece[]) => void,
     private readonly registry: RunRegistry,
   ) {}
 
@@ -305,7 +307,7 @@ export class CoverageRunner implements vscode.Disposable {
       }
 
       const groups = groupByPackage(items);
-      let allJsonOutput = "";
+      const pieces: RunPiece[] = [];
 
       interface PkgInfo {
         importPath: string;
@@ -322,9 +324,11 @@ export class CoverageRunner implements vscode.Disposable {
         const pkg = this.cache.getPackage(importPath);
         if (!pkg) {
           for (const item of groupItems) {
-            run.errored(
+            erroredItem(
+              run,
+              this.controller,
               item,
-              new vscode.TestMessage(`Package not found: ${importPath}`),
+              `Package not found: ${importPath}`,
             );
           }
           continue;
@@ -333,11 +337,11 @@ export class CoverageRunner implements vscode.Disposable {
         const workspaceDir = this.cache.getWorkspaceDir(importPath);
         if (!workspaceDir) {
           for (const item of groupItems) {
-            run.errored(
+            erroredItem(
+              run,
+              this.controller,
               item,
-              new vscode.TestMessage(
-                `Workspace folder not found for: ${importPath}`,
-              ),
+              `Workspace folder not found for: ${importPath}`,
             );
           }
           continue;
@@ -388,25 +392,29 @@ export class CoverageRunner implements vscode.Disposable {
         const filtered = pkgInfos.filter((p) => p.filter);
 
         if (unfiltered.length > 0) {
-          allJsonOutput += await this.runCoverageBatch(
-            unfiltered,
-            undefined,
-            workspaceDir,
-            testFlags,
-            run,
-            effectiveToken,
+          pieces.push(
+            await this.runCoverageBatch(
+              unfiltered,
+              undefined,
+              workspaceDir,
+              testFlags,
+              run,
+              effectiveToken,
+            ),
           );
         }
 
         if (unfilteredTestOnly.length > 0) {
-          allJsonOutput += await this.runCoverageBatch(
-            unfilteredTestOnly,
-            undefined,
-            workspaceDir,
-            testFlags,
-            run,
-            effectiveToken,
-            true,
+          pieces.push(
+            await this.runCoverageBatch(
+              unfilteredTestOnly,
+              undefined,
+              workspaceDir,
+              testFlags,
+              run,
+              effectiveToken,
+              true,
+            ),
           );
         }
 
@@ -417,14 +425,16 @@ export class CoverageRunner implements vscode.Disposable {
             }
             continue;
           }
-          allJsonOutput += await this.runCoverageBatch(
-            [info],
-            info.filter,
-            workspaceDir,
-            testFlags,
-            run,
-            effectiveToken,
-            coverTestOnly && info.testOnly,
+          pieces.push(
+            await this.runCoverageBatch(
+              [info],
+              info.filter,
+              workspaceDir,
+              testFlags,
+              run,
+              effectiveToken,
+              coverTestOnly && info.testOnly,
+            ),
           );
         }
       }
@@ -441,8 +451,8 @@ export class CoverageRunner implements vscode.Disposable {
       await this.store.flush();
       await this.controller.saveResults();
 
-      if (allJsonOutput) {
-        this.onJsonOutput(allJsonOutput);
+      if (pieces.some((p) => p.stream)) {
+        this.onJsonOutput(pieces);
       }
     } finally {
       const wasCancelled = effectiveToken.isCancellationRequested;
@@ -479,7 +489,7 @@ export class CoverageRunner implements vscode.Disposable {
     run: vscode.TestRun,
     token: vscode.CancellationToken,
     testOnly?: boolean,
-  ): Promise<string> {
+  ): Promise<RunPiece> {
     const result = await executeBatch({
       pkgInfos,
       filter,
@@ -493,7 +503,7 @@ export class CoverageRunner implements vscode.Disposable {
       label: "coverage",
       coverage: { store: this.store, testOnly },
     });
-    return result.stdout;
+    return result.piece;
   }
 
   dispose(): void {

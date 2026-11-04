@@ -275,3 +275,32 @@ describe("buildTestResultsTable", () => {
     ).toBeUndefined();
   });
 });
+
+describe("buildTestResultsTable with errored results", () => {
+  it("names a package the run errored, and an item it errored, and counts both", () => {
+    const pkg = node(
+      "example.com/pkg",
+      "pkg",
+      [
+        node("example.com/pkg/Suite", "Suite", [
+          node("example.com/pkg/Suite/TestA", "TestA"),
+          node("example.com/pkg/Suite/TestB", "TestB"),
+        ]),
+      ],
+      ["package"],
+    );
+    const table = buildTestResultsTable(
+      rootsOf([pkg]),
+      store({
+        "example.com/pkg": { status: "errored" },
+        "example.com/pkg/Suite/TestA": { status: "pass" },
+        "example.com/pkg/Suite/TestB": { status: "errored" },
+      }),
+      () => undefined,
+    )!;
+
+    expect(table).toMatch(/^pkg\s+.*1 passed, 2 errored$/m);
+    expect(table).toMatch(/TestB\s+-\s+errored/);
+    expect(table).toContain("Total: 1 passed, 2 errored");
+  });
+});

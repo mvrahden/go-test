@@ -90,7 +90,7 @@ Copy a tabular coverage summary to the clipboard via the **Go Test: Copy Coverag
 
 Start continuous testing with **Go Test: Start Watch**.
 The extension spawns a `gotest watch` process that re-runs tests on file changes.
-Results stream into Test Explorer in real-time.
+Results stream into Test Explorer in real-time; each cycle's run ends, and the Spec View refreshes, when the CLI reports the cycle over.
 A status bar item shows active watcher count and lets you stop all watchers with a click.
 
 ### Spec View
@@ -98,11 +98,19 @@ A status bar item shows active watcher count and lets you stop all watchers with
 After each test run, the **Spec View** panel renders BDD-formatted output with color-coded pass/fail/skip indicators.
 Open it with **Go Test: Show Spec View**.
 
-- **Go-to-source** — click any suite or method to navigate to its definition
+- **The newest verdict of everything that ran** — every package the panel has seen stays, each test with the verdict of the newest run that reported it, whichever of a run, a coverage run or a watch cycle that was; rerunning one method leaves its siblings as they were
+- **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
+- **Go-to-source** — click any suite, method, When or It to navigate to its definition; `file:line` in failure output opens that line
+- **Run, Debug, Rerun failed** — hover a row to run or debug it; a behavior the Test Explorer does not list runs as its method
 - **Toolbar** — expand/collapse all, filter by pass/fail/skip status, search behaviors by name
 - **Copy / Clear** — copy the full spec report to clipboard or clear results
-- **Persistence** — the panel survives editor reload and restores its last state
-- **Live updates** — auto-refreshes from test runs, coverage runs, and watch mode
+- **Persistence** — the panel survives editor reload and restores what it kept
+- **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
+- **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
+
+### Lint
+
+Saving a `_test.go` file runs `gotest lint -json` on its package and shows the findings as problems, with the rule as their code. A finding the CLI can fix offers its fix as a Quick Fix; when the file changed since the lint read it, the fix lints again first. **Go Test: Fix lint findings in package** applies every fix through `gotest lint -fix`, and **Go Test: Lint Workspace** lints each folder. Which rules run is `.gotest.yml`'s `lint.skip`, read by the CLI itself.
 
 ### Focus and Exclude
 
@@ -196,6 +204,9 @@ Projects using `go.work` are also supported.
 | Go Test: Refresh | Re-run test discovery for all workspace folders |
 | Go Test: Show Focused Tests | List all focused tests and navigate to them |
 | Go Test: Show Spec View | Open the BDD spec output panel |
+| Go Test: Open Events File… | Open a saved `go test -json` stream in the Spec View and the Test Explorer |
+| Go Test: Fix lint findings in package | Apply every suggested lint fix in a package and show what is left |
+| Go Test: Lint Workspace | Run `gotest lint` on every workspace folder |
 | Go Test: Start Watch | Start continuous testing for a package scope |
 | Go Test: Stop Watch | Stop all active watch processes |
 | Go Test: Run Benchmark | Run a suite's or method's benchmarks via `gotest bench` |
@@ -231,6 +242,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.discoverOnSave` | `true` | Re-discover tests when `_test.go` files change |
 | `gotest.coverOnRun` | `true` | Collect coverage data alongside normal test runs |
 | `gotest.coverOnSave` | `false` | Re-run package coverage when a `.go` file is saved |
+| `gotest.lintOnSave` | `true` | Lint the package of a saved `_test.go` file and show its findings as problems |
 | `gotest.coverTestOnlyPackages` | `false` | Enable cross-package coverage instrumentation for test-only packages |
 | `gotest.debug.prepareTimeout` | `60` | Seconds to wait for debug preparation before timing out |
 | `gotest.discoveryTimeout` | `120` | Seconds to wait for test discovery before giving up (raise it for a very large workspace) |
@@ -244,7 +256,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 |---------|---------|-------------|
 | `gotest.showCodeLens` | `true` | Show Run/Debug CodeLens above suites and methods |
 | `gotest.showFocusWarnings` | `true` | Show diagnostics for `F_` prefixed (focused) tests |
-| `gotest.specView.autoRefresh` | `true` | Auto-refresh Spec View after test runs |
+| `gotest.specView.autoRefresh` | `true` | Render new runs in the Spec View as they finish; when off, they are kept and shown on Refresh |
 | `gotest.watch.autoRestart` | `true` | Auto-restart watch process on crash |
 
 ### Example `.vscode/settings.json`

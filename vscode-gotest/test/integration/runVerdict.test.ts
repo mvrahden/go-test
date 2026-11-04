@@ -112,6 +112,8 @@ describe("a run that fails after its last verdict", () => {
 
     expect(run.verdicts.get(testId)).toBe("passed");
     expect(run.verdicts.get(importPath)).toBe("errored");
+    // Stored as such, so a reload and Copy Test Results say it too.
+    expect(controller.getResult(importPath)?.status).toBe("errored");
   }, 300_000);
 
   it("says on the package what the run failed for", async () => {
@@ -122,6 +124,11 @@ describe("a run that fails after its last verdict", () => {
     expect(said).toContain("exit code 1");
     // The -json stream is the run's output, not a message to read on an item.
     expect(said).not.toContain('"Action"');
+    // The CLI booked the failure under a package of its own, which no item
+    // holds; its words still reach the run.
+    expect(run.output.join("")).toContain(
+      "[shared fixtures] FAIL: shared fixture teardown failed",
+    );
   }, 300_000);
 
   it("leaves the package alone when the run succeeds", async () => {
@@ -129,5 +136,41 @@ describe("a run that fails after its last verdict", () => {
 
     expect(run.verdicts.get(testId)).toBe("passed");
     expect(run.verdicts.get(importPath)).not.toBe("errored");
+  }, 300_000);
+});
+
+describe("what a passing run says on stderr", () => {
+  it("reaches the run's output", async () => {
+    const nosuites =
+      "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/nosuites";
+    const run = new FakeTestRun();
+    await executeBatch({
+      pkgInfos: [
+        {
+          importPath: nosuites,
+          items: [],
+          dir: path.join(
+            repoRoot,
+            "cmd",
+            "gotest",
+            "testdata",
+            "unrun",
+            "nosuites",
+          ),
+        },
+      ],
+      filter: undefined,
+      workspaceDir: repoRoot,
+      testFlags: [],
+      run: run as never,
+      token,
+      controller,
+      outputChannel: recorder.channel as never,
+      label: "verdict",
+    });
+
+    expect(run.output.join("")).toContain(
+      `stdlib test(s) in ${nosuites} not run`,
+    );
   }, 300_000);
 });

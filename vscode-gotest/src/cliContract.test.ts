@@ -57,6 +57,7 @@ import { DiscoveryCache, parseDiscoverOutput } from "./discovery.js";
 import { parseBenchReport } from "./benchReport.js";
 import { parseCoverProfile } from "./coverage.js";
 import { parsePromotedSeed } from "./fuzz.js";
+import { parseLintJson } from "./lintFindings.js";
 
 interface Invocation {
   exitCode: number | null;
@@ -86,6 +87,14 @@ interface LiveRun {
   exitCode: number | null;
   stderr: string;
   events: LiveEvent[];
+}
+
+// A `gotest lint -json` run, its paths masked to "<fixtures>".
+interface LintRun {
+  args: string[];
+  exitCode: number | null;
+  stderr: string;
+  document: Record<string, Record<string, unknown[]>> | null;
 }
 
 interface ContractCase {
@@ -118,6 +127,7 @@ const golden = JSON.parse(
   cases: Record<string, ContractCase>;
   live: Record<string, LiveRun>;
   outputs: Record<string, OutputRun>;
+  lint: Record<string, LintRun>;
 };
 
 // What each stream shape means. Stated here rather than derived from the
@@ -706,6 +716,64 @@ describe("recorded outputs", () => {
         "stale-seed: changed since the fuzz session wrote it\n",
       );
       expect(promotedSeeds(recorded.stdout!)).toEqual([]);
+    });
+  });
+});
+
+describe("recorded lint runs", () => {
+  it("records exactly the stated runs", () => {
+    expect(Object.keys(golden.lint).sort()).toEqual([
+      "findings",
+      "uncompilable",
+    ]);
+  });
+
+  describe("packages with findings", () => {
+    const recorded = golden.lint.findings;
+    const findings = parseLintJson(JSON.stringify(recorded.document));
+
+    // -json reports findings on stdout and still exits 0; the extension
+    // reads exit 0 as "analyzed", not as "clean".
+    it("exits 0 with the findings in the document and nothing on stderr", () => {
+      expect(recorded.exitCode).toBe(0);
+      expect(recorded.stderr).toBe("");
+      expect(findings.length).toBeGreaterThan(0);
+    });
+
+    it("keys packages by their test variant, as the go/analysis driver does", () => {
+      expect(Object.keys(recorded.document!)).toContain(
+        "gotest.fixtures/stdlibtests [gotest.fixtures/stdlibtests.test]",
+      );
+    });
+
+    it("names the rule, the file:line:col and the message of every finding", () => {
+      for (const f of findings) {
+        expect(f.category).toMatch(/^[a-z-]+$/);
+        expect(f.file).toMatch(/^<fixtures>\/.+_test\.go$/);
+        expect(f.line).toBeGreaterThan(0);
+        expect(f.col).toBeGreaterThan(0);
+        expect(f.message.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("carries fixes as byte-offset edits of named files", () => {
+      const edits = findings.flatMap((f) => f.fixes.flatMap((x) => x.edits));
+      expect(edits.length).toBeGreaterThan(0);
+      for (const e of edits) {
+        expect(e.filename).toMatch(/^<fixtures>\//);
+        expect(Number.isInteger(e.start)).toBe(true);
+        expect(e.end).toBeGreaterThan(e.start);
+        expect(typeof e.new).toBe("string");
+      }
+    });
+  });
+
+  describe("a package that does not compile", () => {
+    const recorded = golden.lint.uncompilable;
+    it("exits 1 with no document, saying why on stderr", () => {
+      expect(recorded.exitCode).toBe(1);
+      expect(recorded.document).toBeNull();
+      expect(recorded.stderr).toContain("cannot lint uncompilable packages");
     });
   });
 });

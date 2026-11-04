@@ -703,7 +703,7 @@ export class GoTestController implements vscode.Disposable {
 
   recordResult(
     itemId: string,
-    status: "pass" | "fail" | "skip",
+    status: TestResult["status"],
     duration?: number,
     endedAt?: number,
   ): void {
