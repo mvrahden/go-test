@@ -240,19 +240,34 @@ const stopGrace = 5 * time.Second
 // start when that came later, a second stop signal, or a run still going when
 // only the fixtures' teardown time is left of the release bound, forces it:
 // the fixtures are torn down within what is left of the bound and the process
-// ends by sig. Once the stop is settled or forced, the handlers are reset, so
-// the next signal has its default action. A stop no signal asked for, which
+// ends by sig. Once the stop is forced, or settled under plain go test, the
+// handlers are reset, so the next signal has its default action; settled
+// under the runner, the stop signals stay caught and dropped, since the
+// runner's own may still be on its way after its stop file settled the run,
+// and a process that ended its run is not one to end by it. A stop no signal
+// asked for, which
 // the poll found or the death signal brought, takes the first signal that
 // follows as its request, the runner's own after its stop file among them;
 // only the next one forces it. The death signal is never a request.
 func (w *watcher) stop(sig os.Signal, requested bool) {
 	w.unasked = !requested
 	releaseEnd, settled := w.settle(sig, stopGrace)
+	if settled && w.file != "" {
+		w.absorb()
+		return
+	}
 	signal.Reset(w.sigs...)
 	if settled {
 		return
 	}
 	w.force(sig, releaseEnd)
+}
+
+// absorb keeps the stop signals caught and dropped for the rest of the
+// process. Caught rather than ignored, so a process a test starts after it
+// keeps the default.
+func (w *watcher) absorb() {
+	signal.Notify(make(chan os.Signal, 1), w.sigs...)
 }
 
 // force tears the held fixtures down, until releaseEnd, and ends the process
@@ -348,6 +363,10 @@ var openSuites atomic.Int64
 // close stops the watcher.
 func (w *watcher) close() {
 	if len(w.sigs) > 0 {
+		// Closed by the last suite's end, under a stop the run is settling.
+		if w.file != "" && stopping.Load() {
+			w.absorb()
+		}
 		signal.Stop(w.ch)
 	}
 	if w.death != nil {
