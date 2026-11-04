@@ -8,6 +8,6 @@ type NotedTestSuite struct{}
 func (s *NotedTestSuite) TestRuns(t *gotest.T) { gotest.True(t, true) }
 
 func (s *NotedTestSuite) BenchmarkLeftOut(b *gotest.B) {
-	for b.B().Loop() {
+	for b.Loop() {
 	}
 }

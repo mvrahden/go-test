@@ -12,7 +12,7 @@ type JoinTestSuite struct{}
 
 func (s *JoinTestSuite) BenchmarkJoin(b *gotest.B) {
 	parts := []string{"a", "b", "c"}
-	for b.B().Loop() {
+	for b.Loop() {
 		_ = strings.Join(parts, ",")
 	}
 }
