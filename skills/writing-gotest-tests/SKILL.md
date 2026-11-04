@@ -188,7 +188,9 @@ those are your job, below.
    no suite `Timeout` (v1.33+: `t-escape` flags it, `-fix` writes
    `t.Context()`). There is no `Log`: context goes into an assertion's
    message arguments (`gotest.Equal(t, want, got, "order %s", id)`), and
-   `t-escape` flags `t.T().Log`.
+   `t-escape` flags `t.T().Log`. `b.B()` and `f.F()` follow the same rule:
+   reach for them only for what `gotest.B`/`gotest.F` lack (`N`, timers,
+   `Run` on `*testing.B`); `t-escape` flags the rest (v1.38+).
 7. **Ask "why is this wall-clock-asserting suite NOT Exclusive?"
    (v1.27+)** — the counterpart to rule 4. A suite whose assertions or
    timeout budgets measure elapsed time (latency bounds, timing budgets,

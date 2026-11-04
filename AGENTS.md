@@ -19,12 +19,14 @@ Calling `t.T().Helper()` is counterproductive — it removes useful location inf
 Without it, failures show both where the assertion was called (inside the helper) and where the helper was called (in the test).
 This applies to all gotest assertion functions (`gotest.Equal`, `gotest.True`, etc.).
 If you pass `t.T()` to third-party code that uses Go's standard `t.Errorf`, Go's `t.Helper()` convention applies as normal.
+The same holds for `b.B().Helper()` and `f.F().Helper()`.
 This holds in a module whose path has no dot and under `-trimpath` too ([Failure locations](specs/assertions/spec.md#requirement-failure-locations)).
 
 **Never call `t.T().Cleanup()` inside suite methods.**
 Use `BeforeAll`/`AfterAll` for suite-level resources and `BeforeEach`/`AfterEach` for per-test resources.
 The generated harness manages cleanup ordering (LIFO).
 Calling `t.T().Cleanup()` inside suite methods breaks the predictable lifecycle.
+Nor `b.B().Cleanup()`/`f.F().Cleanup()` — benchmarks get `BeforeEach`/`AfterEach` per method, fuzz targets `BeforeAll`/`AfterAll`.
 
 **Never call `t.T().Fatalf()` in reusable test helpers.**
 Use gotest assertions instead.
