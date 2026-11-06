@@ -827,6 +827,9 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 	// and because a signalled process reports no meaningful exit status, the
 	// run still says ok.
 	tree := proctree.New(cmd)
+	// A runner that dies does not take the process with it: the EOF on its
+	// stdin has it tear the fixtures down.
+	tree.HoldJobWithRoot()
 	// The run's cancellation — Ctrl-C, --timeout — does not reach this
 	// process: the suites are still stopping, and their AfterAlls still need
 	// the fixtures. Teardown, after the last suite, is the one owner of its

@@ -29,6 +29,9 @@ type ProcessConfig struct {
 	// CtrlC interrupts the tree as a terminal's Ctrl-C does, for a program
 	// that stops gracefully on it (go test -fuzz); see proctree.
 	CtrlC bool
+	// HoldJob keeps the tree whole while its root lives, past the runner's
+	// own end, for a process that tears its fixtures down; see proctree.
+	HoldJob bool
 	// DrainDelay bounds how long the output pipes are still read once the
 	// process has exited, against a detached grandchild that keeps the write
 	// ends open. Zero means OutputDrainDelay.
@@ -79,6 +82,9 @@ func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
 	tree := proctree.New(cmd)
 	if cfg.CtrlC {
 		tree.InterruptLikeCtrlC()
+	}
+	if cfg.HoldJob {
+		tree.HoldJobWithRoot()
 	}
 	// exec's own kill timer never runs: the grace strategy is the only kill,
 	// so a teardown budget is never cut short by a bound set before it was

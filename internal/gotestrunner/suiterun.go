@@ -242,6 +242,7 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 		Grace:      GraceBudget,
 		BudgetFile: target.BudgetFile,
 		StopFile:   target.StopFile,
+		HoldJob:    true,
 	})
 	s.mp = mp
 	// exec cancels only a process still running when ctx ends.
