@@ -101,6 +101,15 @@ jobs:
   apart from it. Split them into a CI job of their own with
   `--group=<name>` there and `--skip-group=<name>` in the main job
   (`config.md`); a name no suite declares exits 2.
+- **Stops:** on Linux and macOS runners a cancelled or timed-out job stops
+  the v1.37+ action's run as Ctrl-C does: the suites tear down, the summary
+  and events file are written. Elsewhere no shell may hold the signal back:
+  `exec go tool gotest ...` in a container entrypoint or a bash/sh CI step
+  (`go run` passes no signal on), `docker run --init` with no shell after
+  the init, `command:` as an argument list in Kubernetes. A custom step
+  also sets `--timeout` below the job's limit and uploads its
+  `--events-file` from a step with `if: always()`. v1.37+ also stops on
+  SIGHUP (not under `nohup`) and, on Windows, on the console closing.
 
 ## gotest-exclusive projects: drop the stdlib step
 

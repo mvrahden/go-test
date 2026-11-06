@@ -730,6 +730,32 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
    names, unapplied, a fix such a file would break
    ([the focus fix](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-the-focus-fix)).
 
+9. **A stop reaches gotest from CI and from a closed terminal** — on Linux
+   and macOS runners the action passes a cancelled or timed-out job's
+   signal on to gotest, and SIGHUP (a closed terminal, a dropped ssh
+   session; not under `nohup`) and, on Windows, the console closing stop a
+   run as Ctrl-C does: the suites tear down and the summary and events
+   file are written
+   ([every launcher](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-every-launcher-stops-cleanly)).
+   Before v1.37 the action's shell kept the signal and the run was killed
+   without teardown, and a hangup or a closed console ended gotest at once,
+   without a summary. Outside the action, `exec` gotest so no shell holds
+   the signal back (`ci.md`).
+
+10. **On Windows a gotest that dies leaves its suites to finish** — they run
+    to their end and tear down. Before v1.37 they were killed with it,
+    mid-method, without teardown.
+
+11. **A full or `noexec` temp dir no longer breaks or stalls a run** — the
+    work directory goes under `GOTMPDIR` when it is set, as Go's own does, so a
+    run works where `/tmp` is mounted `noexec` (`docker run --tmpfs /tmp`);
+    a stop that cannot write a suite's stop file kills that suite at once
+    and says so on stderr; and the files kept beside each suite are named
+    by its index in the run, so two suites whose names differ only in case
+    no longer share them on macOS or Windows. Before v1.37 the work
+    directory ignored `GOTMPDIR`, and such a stop waited out the suite's
+    shutdown budget, minutes, before the run ended.
+
 ## v1.38
 
 Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
