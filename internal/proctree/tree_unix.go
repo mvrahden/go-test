@@ -22,6 +22,8 @@ func prepare(cmd *exec.Cmd) {
 
 func (sysTree) adopt(int) {}
 
+func (sysTree) holdJob(*os.Process) {}
+
 func (sysTree) interrupt(pid int, ctrlC bool) error {
 	if ctrlC {
 		return signalGroup(pid, syscall.SIGINT)
