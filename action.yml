@@ -225,8 +225,23 @@ runs:
         fi
 
         set +e
-        "${cmd[@]}" "${args[@]}"
-        exit_code=$?
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          "${cmd[@]}" "${args[@]}"
+          exit_code=$?
+        else
+          # A cancelled job signals this shell alone: pass it on to gotest's process group, as a terminal does.
+          trap 'kill -INT -- -"$pid" 2>/dev/null || kill -INT "$pid" 2>/dev/null' INT
+          trap 'kill -TERM -- -"$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null' TERM
+          set -m
+          "${cmd[@]}" "${args[@]}" < /dev/null &
+          pid=$!
+          set +m
+          while :; do
+            wait "$pid"; exit_code=$?
+            kill -0 "$pid" 2>/dev/null || break
+          done
+          trap - INT TERM
+        fi
         set -e
 
         echo "exit-code=$exit_code" >> "$GITHUB_OUTPUT"
@@ -379,8 +394,22 @@ runs:
         args+=("${pkgs[@]}")
 
         set +e
-        "${cmd[@]}" "${args[@]}" > "$report"
-        exit_code=$?
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          "${cmd[@]}" "${args[@]}" > "$report"
+          exit_code=$?
+        else
+          trap 'kill -INT -- -"$pid" 2>/dev/null || kill -INT "$pid" 2>/dev/null' INT
+          trap 'kill -TERM -- -"$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null' TERM
+          set -m
+          "${cmd[@]}" "${args[@]}" > "$report" < /dev/null &
+          pid=$!
+          set +m
+          while :; do
+            wait "$pid"; exit_code=$?
+            kill -0 "$pid" 2>/dev/null || break
+          done
+          trap - INT TERM
+        fi
         set -e
 
         echo "bench-report=$report" >> "$GITHUB_OUTPUT"
@@ -444,8 +473,28 @@ runs:
         if [ -n "$INPUT_FUZZ_FOR" ]; then
           args+=("--for=$INPUT_FUZZ_FOR")
         fi
-        "${cmd[@]}" "${args[@]}" "${pkgs[@]}" 2>&1 | tee "$log"
-        exit_code=${PIPESTATUS[0]}
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          "${cmd[@]}" "${args[@]}" "${pkgs[@]}" 2>&1 | tee "$log"
+          exit_code=${PIPESTATUS[0]}
+        else
+          fifo="$log.fifo"
+          mkfifo "$fifo"
+          tee "$log" < "$fifo" &
+          tee_pid=$!
+          trap 'kill -INT -- -"$pid" 2>/dev/null || kill -INT "$pid" 2>/dev/null' INT
+          trap 'kill -TERM -- -"$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null' TERM
+          set -m
+          "${cmd[@]}" "${args[@]}" "${pkgs[@]}" > "$fifo" 2>&1 < /dev/null &
+          pid=$!
+          set +m
+          while :; do
+            wait "$pid"; exit_code=$?
+            kill -0 "$pid" 2>/dev/null || break
+          done
+          trap - INT TERM
+          wait "$tee_pid"
+          rm -f "$fifo"
+        fi
         set -e
 
         crashers=$(sed -n 's/^\[[^]]*\] new crasher: //p' "$log" | python3 -c 'import os, sys; print(",".join(os.path.relpath(p.strip()) for p in sys.stdin if p.strip()), end="")')
