@@ -69,6 +69,8 @@ type ExecConfig struct {
 	// Events receives the run's go test -json event stream as it is
 	// written; nil without --events-file.
 	Events io.Writer
+	// Control carries stop and force lines; nil without --control.
+	Control io.Reader
 }
 
 // knownSubcommands is the set of recognized subcommands.

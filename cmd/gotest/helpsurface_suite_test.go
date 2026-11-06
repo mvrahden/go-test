@@ -39,6 +39,7 @@ func (s *HelpSurfaceTestSuite) TestHelpNamesTheFlagsASubcommandAccepts(t *gotest
 		{"bench", ExportBenchAllowed},
 		{"fuzz", ExportFuzzAllowed},
 		{"migrate", ExportMigrateAllowed},
+		{"prepare", ExportControlAllowed},
 	}) {
 		help, _, code := s.cli.runSplit(t, "help", tc.Name)
 		gotest.Equal(t, 0, code)

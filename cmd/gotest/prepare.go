@@ -21,7 +21,12 @@ type prepareOutput struct {
 }
 
 func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	_, args, err := SplitArgs(inv.TagArgs(), noOwnFlags)
+	own, args, err := SplitArgs(inv.TagArgs(), controlAllowed)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	control, err := parseControlFlag(own)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -46,7 +51,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(control)
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, nil, false, false, prepareHarvestSeeds(inv.Config))
 	if err != nil {

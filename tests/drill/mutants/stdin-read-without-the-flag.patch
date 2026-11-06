@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle ControlInput .* / runs to its end, its exit the tests' own \(
+Clause: when gotest runs without --control and its standard input carries a stop line, then ends → runs to its end, its exit the tests' own
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -265,7 +265,7 @@
+ // value, and nil without the flag, so standard input is left alone.
+ func parseControlFlag(own OwnFlags) (io.Reader, error) {
+ 	if !own.Given("--control") {
+-		return nil, nil
++		return os.Stdin, nil
+ 	}
+ 	if v := own.Value("--control"); v != "stdin" {
+ 		return nil, fmt.Errorf("invalid --control value %q: its one value is stdin", v)

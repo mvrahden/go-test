@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -260,7 +261,37 @@ func parseCompileParallelFlag(own OwnFlags) (int, error) {
 	return parsePositiveIntFlag(own, "--compile-parallel")
 }
 
+// parseControlFlag reads --control: standard input for stdin, its one
+// value, and nil without the flag, so standard input is left alone.
+func parseControlFlag(own OwnFlags) (io.Reader, error) {
+	if !own.Given("--control") {
+		return nil, nil
+	}
+	if v := own.Value("--control"); v != "stdin" {
+		return nil, fmt.Errorf("invalid --control value %q: its one value is stdin", v)
+	}
+	return os.Stdin, nil
+}
+
+// refuseControl reports, on stderr, a --control value other than stdin, and
+// --control=stdin beside --input=-, as both would read standard input.
+func refuseControl(own OwnFlags, input string) bool {
+	if _, err := parseControlFlag(own); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return true
+	}
+	if input != "-" || !own.Given("--control") {
+		return false
+	}
+	fmt.Fprintln(os.Stderr, "FAIL: --control=stdin and --input=- both read standard input; save the stream to a file for --input")
+	return true
+}
+
 func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {
+	control, err := parseControlFlag(own)
+	if err != nil {
+		return ExecConfig{}, err
+	}
 	setupTimeout, err := parseSetupTimeoutFlag(own)
 	if err != nil {
 		return ExecConfig{}, err
@@ -305,6 +336,7 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 		HarvestSeeds:    !own.Bool("--no-harvest") && projCfg.Fuzz.HarvestSeeds(),
 		Groups:          own.Values("--group"),
 		SkipGroups:      own.Values("--skip-group"),
+		Control:         control,
 	}, nil
 }
 

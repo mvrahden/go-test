@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/lifecycle ControlInput .* / stops the run as a SIGINT does: exit 130, the holding method's context ended and the fixture teardown finished \(
+Clause: when gotest's standard input ends while a method holds → stops the run as a SIGINT does: exit 130, the holding method's context ended and the fixture teardown finished
+--- a/cmd/gotest/signals.go
++++ b/cmd/gotest/signals.go
+@@ -122,7 +122,6 @@
+ 			events <- aForce
+ 		}
+ 	}
+-	events <- inputEnd
+ }
+ 
+ // firstStop waits for the first stop, forced when it is a force line: false

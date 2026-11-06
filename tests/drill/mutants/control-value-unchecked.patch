@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli ControlFlag .* / refuses it with exit 2, naming --control and stdin / a run \(
+Clause: when --control is given a value other than stdin → refuses it with exit 2, naming --control and stdin
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -267,9 +267,6 @@
+ 	if !own.Given("--control") {
+ 		return nil, nil
+ 	}
+-	if v := own.Value("--control"); v != "stdin" {
+-		return nil, fmt.Errorf("invalid --control value %q: its one value is stdin", v)
+-	}
+ 	return os.Stdin, nil
+ }
+ 

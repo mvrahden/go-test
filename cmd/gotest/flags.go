@@ -57,19 +57,21 @@ var gotestFlags = map[string]FlagKind{
 
 	"--group":      ListFlag,
 	"--skip-group": ListFlag,
+
+	"--control": ValueFlag,
 }
 
 var testAllowed = flagSet(
 	"--debug", "--ci", "--spec", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
-	"--no-harvest", "--events-file", "--group", "--skip-group",
+	"--no-harvest", "--events-file", "--group", "--skip-group", "--control",
 )
 
 var specAllowed = flagSet(
 	"--debug", "--ci", "--update-snapshots", "--no-cache",
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--render-only",
-	"--static", "--declared", "--hide", "--group", "--skip-group",
+	"--static", "--declared", "--hide", "--group", "--skip-group", "--control",
 )
 
 var summaryAllowed = flagSet(
@@ -77,21 +79,25 @@ var summaryAllowed = flagSet(
 	"--min", "--setup-timeout", "--timeout", "--parallel", "--compile-parallel",
 	"--format", "--output", "--input", "--no-color", "--github",
 	"--coverage", "--render-only", "--badge", "--events-file",
-	"--group", "--skip-group",
+	"--group", "--skip-group", "--control",
 )
 
 var watchAllowed = flagSet(
 	"--debug", "--ci", "--update-snapshots", "--no-cache", "--spec",
 	"--setup-timeout", "--timeout", "--debounce", "--parallel", "--compile-parallel",
-	"--bench",
+	"--bench", "--control",
 )
 
 var benchAllowed = flagSet(
 	"--timeout", "--setup-timeout", "--no-cache", "--debug", "--spec", "--no-color",
-	"--save", "--against", "--gate", "--json",
+	"--save", "--against", "--gate", "--json", "--control",
 )
 
-var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--no-harvest", "--target")
+var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--no-harvest", "--target", "--control")
+
+// controlAllowed is the allowed set of prepare, fuzz triage and fuzz promote,
+// whose one flag is --control.
+var controlAllowed = flagSet("--control")
 
 var scaffoldAllowed = flagSet("--fuzz")
 

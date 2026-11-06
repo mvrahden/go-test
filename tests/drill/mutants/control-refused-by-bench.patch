@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli ControlFlag .* / takes the flag and ends, stopped by the input's end where it was still running / bench \(
+Clause: when --control=stdin is given to each command that stops on a SIGINT, its standard input at its end → takes the flag and ends, stopped by the input's end where it was still running
+--- a/cmd/gotest/flags.go
++++ b/cmd/gotest/flags.go
+@@ -90,7 +90,7 @@
+ 
+ var benchAllowed = flagSet(
+ 	"--timeout", "--setup-timeout", "--no-cache", "--debug", "--spec", "--no-color",
+-	"--save", "--against", "--gate", "--json", "--control",
++	"--save", "--against", "--gate", "--json",
+ )
+ 
+ var fuzzAllowed = flagSet("--for", "--jobs", "--no-cache", "--debug", "--no-harvest", "--target", "--control")

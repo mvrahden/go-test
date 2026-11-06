@@ -130,7 +130,7 @@ func runFuzz(inv Invocation) (code int) { //nolint:gocritic // hugeParam: stable
 		}
 	}
 
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(cfg.Control)
 	defer stop()
 
 	// Up before the budget starts, for the whole session: the --for deadline

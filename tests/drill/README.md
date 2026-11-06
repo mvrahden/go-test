@@ -524,6 +524,15 @@ shards of one run do not add up to every mutant exactly once.
 | `stop-kills-the-suite` | the runner stops a suite by its pid with SIGKILL | lifecycle conformance: AfterAll never runs before the fixture's release |
 | `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle and CLI conformance: the stopped run's stream has no failed package, and neither a forced stop's stream nor the events file ends with the run booked as interrupted |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
+| `stop-line-ignored` | the CLI reads a `stop` line on its standard input and does nothing with it | lifecycle conformance: the run sent a `stop` line holds until it is killed, never exiting 130 or booking the stop |
+| `force-line-taken-for-a-repeat` | a `force` line within the window of a repeat is taken for the first stop delivered again | lifecycle conformance: the run forced right after its stop waits out the five-second grace without saying it was interrupted again |
+| `force-line-alone-only-stops` | a `force` line with no stop under way starts a stop and never forces it | lifecycle conformance: the run sent only a `force` line waits out the five-second grace without saying it was interrupted again |
+| `control-input-end-ignored` | the end of the control input is no stop | lifecycle conformance: the run whose standard input was closed holds until it is killed |
+| `stdin-read-without-the-flag` | the CLI reads its standard input for stop lines without `--control=stdin` | lifecycle conformance: the run without the flag is stopped by its `stop` line and exits 130 instead of 0 |
+| `stop-line-taken-for-a-force` | a `stop` line counts as a `force` line, so a SIGINT right after it is a second stop | lifecycle conformance: the SIGINT at once after a `stop` line abandons the teardown |
+| `control-value-unchecked` | `--control` takes any value as stdin | CLI conformance: `--control=pipe` and the others run instead of exiting 2 |
+| `control-refused-by-bench` | `bench` does not take `--control` | CLI conformance: `bench --control=stdin` exits 2 |
+| `control-beside-stdin-input` | `--control=stdin` beside `--input=-` is not refused, so both read standard input | CLI conformance: the refusal does not say that both read standard input |
 | `fixture-stdout-is-protocol` | a shared fixture's stdout is the protocol stream | canary: a setup that prints a fragment and a forged `_done` fails the run |
 | `setup-wait-ignores-the-fixtures-budget` | the runner's wait for shared fixtures ignores the budgets they report | canary: a 2s-budget fixture taking 15s is waited for in full; fixtures conformance: a hanging 2s-budget fixture is given up only after 30s, and a container fixture taking 35s is given up at 30s |
 | `fixture-held-past-its-last-use` | a parallel suite that finishes never hands its shared fixtures to the releaser | fixtures conformance: the fixture is released after an unrelated suite ends |

@@ -31,6 +31,9 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	output := own.Value("--output")
 	input := own.Value("--input")
+	if refuseControl(own, input) {
+		return 2
+	}
 	coverageProfile := own.Value("--coverage")
 	badgePath := own.Value("--badge")
 	noColor := colorDisabled(own.Bool("--no-color"))
@@ -109,7 +112,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer cleanup()
 
-	ctx, cancel := shutdownContext()
+	ctx, cancel := shutdownContext(cfg.Control)
 	defer cancel()
 
 	if cfg.GlobalTimeout > 0 {

@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/lifecycle .* / exits 130 and runs the shared fixture
 Clause: when the run is interrupted on the text, -json or spec pipeline while a method bound to a shared fixture ignores its context → exits 130 and runs the shared fixture's AfterAll before gotest exits, on every pipeline
 --- a/cmd/gotest/spec.go
 +++ b/cmd/gotest/spec.go
-@@ -112,7 +112,7 @@
+@@ -132,7 +132,7 @@
  	}
  	defer cleanup()
  
--	ctx, cancel := shutdownContext()
+-	ctx, cancel := shutdownContext(cfg.Control)
 +	ctx, cancel := context.WithCancel(context.Background())
  	defer cancel()
  

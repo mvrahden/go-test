@@ -259,7 +259,7 @@ func runLintInProcess(stdout, stderr io.Writer, dir string, args []string, githu
 		// then leaves every file as it was; writing holds off a second
 		// signal until it is done.
 		var stop context.CancelFunc
-		ctx, stop = shutdownContextThen(func(<-chan struct{}) {
+		ctx, stop = shutdownContextThen(nil, func(<-chan struct{}) {
 			removeLintTemp(tmp, time.Second)
 			if len(written) == 0 {
 				fmt.Fprintln(stderr, "lint: interrupted again; nothing was written")

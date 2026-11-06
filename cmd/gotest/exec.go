@@ -37,7 +37,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer cleanup()
 
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(cfg.Control)
 	defer stop()
 
 	if cfg.GlobalTimeout > 0 {

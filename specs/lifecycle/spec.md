@@ -319,6 +319,34 @@ Its processes gone, the run SHALL end on its own path, its stream complete and t
 - **WHEN** a second SIGINT reaches a -json run while a stopped method body ignores its context
 - **THEN** books the run as interrupted on its stream
 
+### Requirement: Stopping gotest through its standard input
+With --control=stdin, gotest SHALL read its standard input by line: a stop line SHALL stop the run as a first SIGINT does; a force line SHALL act as a second SIGINT, never a repeat of the first, starting the stop when none is under way; the input's end SHALL stop a run no stop is under way in. Lines and signals SHALL count as one source: a SIGINT within 300ms of a stop line is that stop, a later one the second. Without --control, gotest SHALL NOT read its standard input.
+
+#### Scenario: A stop line
+- **WHEN** a stop line reaches gotest's standard input while a method holds
+- **THEN** exits 130 and finishes the fixture teardown
+- **AND** books the run as interrupted on its stream
+
+#### Scenario: A force line after the stop
+- **WHEN** a force line follows a stop line at once while the stopped method body ignores its context
+- **THEN** releases the fixture at once, without AfterAll, exits 130 before a single stop's five-second grace is over, saying so, and leaves no suite process behind
+
+#### Scenario: A force line with no stop under way
+- **WHEN** a force line reaches gotest with no stop under way while the method body ignores its context
+- **THEN** stops the run and forces the stop as a stop line followed by a force line does
+
+#### Scenario: The input's end
+- **WHEN** gotest's standard input ends while a method holds
+- **THEN** stops the run as a SIGINT does: exit 130, the holding method's context ended and the fixture teardown finished
+
+#### Scenario: Without the flag
+- **WHEN** gotest runs without --control and its standard input carries a stop line, then ends
+- **THEN** runs to its end, its exit the tests' own
+
+#### Scenario: A stop line and a SIGINT
+- **WHEN** a SIGINT follows a stop line
+- **THEN** is the same stop within 300ms, finishing the fixture teardown, and later the second, abandoning the teardown saying so
+
 ### Requirement: A stop by the stop file alone
 On Windows, where the runner stops a suite by its stop file alone, an interrupted run SHALL skip the methods that have not started with the reason run stopping, SHALL carry every verdict to the stream and SHALL run AfterAll before the fixture is released.
 
