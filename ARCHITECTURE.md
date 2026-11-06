@@ -43,7 +43,7 @@
                             ▼
  ┌─────────────────────────────────────────────────────────────┐
  │  5. TEARDOWN                                                │
- │     stop line on stdin → shared fixture subprocess          │
+ │     `stop` on stdin → shared fixture subprocess             │
  │     → AfterAll per fixture (reverse order) → exit           │
  └─────────────────────────────────────────────────────────────┘
 ```
@@ -239,8 +239,11 @@ runtime, but a replaced or main module carries no version to check, so a
 runtime function the generator stops calling stays behind as a deprecated
 shim (`pkg/gotestruntime/deprecated.go`): a harness an older gotest left on
 disk still compiles. A changed signature is a new symbol, never an edit;
-calling one moves the floor to the first release that has it. A retracted
-release is never the floor: v1.34.0 is one, so the floor skipped to v1.35.0.
+calling one moves the floor to the first release that has it. A change to
+what the runner and the runtime say to each other moves it too: the control
+channel moved it to v1.38.0, and a runtime from v1.38 refuses, at its first
+suite, a runner that still names a stop file. A retracted release is never
+the floor: v1.34.0 is one, so the floor skipped to v1.35.0.
 `make runtime-compat` holds both: `apidiff` fails a runtime that drops or
 changes a symbol of the last release, and a corpus under
 `tests/runtimecompat` runs this tree's generated code against the floor
@@ -274,7 +277,7 @@ func ƒ_holdFixtures(tb testing.TB, setupTimeout func() time.Duration, nodes ...
     // 2. DAG wavefront setup: no-dependency fixtures start concurrently;
     //    each fixture waits for its DependsOn set
     // 3. BeforeAll on each fixture (retries, timeout)
-    // 4. Compute teardown budget → write budget file
+    // 4. Compute teardown budget → budget line on the control channel
     // 5. t.Cleanup: teardown (reverse-wavefront: leaves first, roots last)
 }
 
@@ -303,9 +306,9 @@ unwinds, and the run may print PASS and exit 0 first). So each generated
 `b.Run` defers `gotestruntime.ReleaseOnPanic(b)`, and `OpenSuite` guards a
 benchmark's guard-to-`BeforeAll` frame and its `AfterAll` cleanup the same
 way: the panic is recovered, printed with its stack, and fails the benchmark.
-While a suite runs, a stop watcher turns an announced stop (or Ctrl-C
-under plain `go test`) into an orderly end of the suite and its teardown;
-see `docs/design/fixtures.md`.
+While a suite runs, a stop watcher turns a `stop` line on its control
+channel (or Ctrl-C under plain `go test`) into an orderly end of the suite
+and its teardown; see `docs/design/fixtures.md`.
 
 For suites with `Benchmark*` methods, one `Benchmark<Suite>` wrapper is
 generated (standalone or fixture-bound, same shape as above), with one
@@ -521,7 +524,7 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │  failed setup still has succeeded siblings to release under it — and  │
 │  the _cmd acknowledging a start or release)                           │
 │                                                                       │
-│  ═════ block on a stop line on stdin, or SIGTERM/SIGINT ═════         │
+│  ═══════ block on `stop` (stdin) or SIGTERM/SIGINT ═══════            │
 │                                                                       │
 │  every SharedFixture, concurrently, each after its dependents:        │
 │    sf.AfterAll(ctx)      timeout: SharedFixtureConfig.Timeout         │
@@ -803,13 +806,14 @@ still run — never speculatively.
 │     Default: 10m, injected when the run passes none                    │
 │                                                                        │
 │  Teardown Budget (per suite subprocess)                                │
-│  └─ Written to BudgetFile after fixture setup completes                │
+│  └─ Sent as a `budget` line on the control channel after fixture setup │
 │     = max(fixture tree path timeout) + max(suite setup timeout) + 30s  │
 │     Used by RunSingleSuite on context cancellation before SIGKILL      │
 │                                                                        │
 │  GracefulShutdownDelay (hardcoded: 5m30s)                              │
-│  └─ Fallback when no budget file exists; a budget file can name any    │
-│     length, and nothing else bounds a managed process                  │
+│  └─ Fallback until the first budget line; the runner keeps the         │
+│     largest, which can name any length, and nothing else bounds        │
+│     a managed process                                                  │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -831,8 +835,8 @@ still run — never speculatively.
             │ cmd      │  │ fixture  │  │ cmd      │
             │          │  │ cmd      │  │          │
             │ Cancel:  │  │ Cancel:  │  │ Cancel:  │
-            │ kill     │  │ interrupt│  │ interrupt│
-            │ →tree    │  │ →tree    │  │ →tree    │
+            │ kill     │  │ `stop`   │  │ `stop`   │
+            │ →tree    │  │ →stdin   │  │ →channel │
             │          │  │          │  │          │
             │ WaitDly: │  │ WaitDly: │  │ WaitDly: │
             │ 0 (mgd)  │  │ 0 (mgd)  │  │ 0 (mgd)  │
@@ -842,7 +846,7 @@ still run — never speculatively.
                                  ┌───────────┘
                                  │
                                  ▼
-                          read budget file
+                          largest budget line
                           (or use 5m30s default)
                                  │
                                  ▼
@@ -877,21 +881,42 @@ its own console, so the runner starts a short-lived helper run of its own
 executable (`GOTEST_INTERNAL_INTERRUPT_CONSOLE`, handled in an `init` of
 `internal/proctree`) with no console; it attaches to the tree's console and
 sends the event there. The job object, with kill-on-close, is also what stops
-the tree when the runner itself is killed.
+the tree when the runner itself is killed; the root of a suite or
+shared-fixture tree holds a handle to its job as well, so that tree ends
+with its root, after the release a dead runner leaves it.
 
-On Linux a tree's root also gets SIGTERM from the kernel when the runner dies
-(`Pdeathsig`), so a suite or shared-fixture process tears down before it
-exits. A suite process under the runner asks for SIGHUP instead, which only
-wakes its watcher to look at its parent: no SIGINT or SIGTERM it gets is the
-kernel's, so each is someone's request, and the second abandons the
-teardown, while the death signal never does. A second signal to the CLI
-kills every tree it still runs before it exits, so none outlives it where no
-death signal comes. On Linux, macOS, the BSDs and Windows the suite process watches for a
-dead runner itself (its parent gone, or, on Linux and macOS, nobody reading its stdout), and a shared-fixture process
+A suite process is stopped on its control channel (`internal/control`), not
+by Interrupt. The runner creates one channel per suite process, a socket
+pair on Unix whose child end is descriptor 3 and a duplex named pipe on
+Windows whose client handle is inherited, and names it in `GOTEST_CONTROL`.
+The runtime's init moves the descriptor to 1000 or above, close-on-exec (on
+Windows it clears the handle's inheritance), unsets the variable and writes
+`hello`, so nothing a test starts holds the channel. The runner writes
+`stop` for the first stop and `force` for the second; the suite writes
+`budget` once its fixtures are set up and `stopped <reason>` when a stop the
+runner did not send begins, a SIGINT or SIGTERM from outside the runner,
+which then fails the suite's package. Only a suite with no `hello` 3s after
+its start, or a `stop` that cannot be written, gets a signal: one SIGINT to
+its group on Unix, CTRL_BREAK on its console on Windows, neither of which
+reaches the converter. See
+[A stop reaches the suite on its channel](specs/lifecycle/spec.md#requirement-a-stop-reaches-the-suite-on-its-channel),
+[A suite under a wrapper that drops the channel](specs/lifecycle/spec.md#requirement-a-suite-under-a-wrapper-that-drops-the-channel)
+and [A signal from outside the runner](specs/lifecycle/spec.md#requirement-a-signal-from-outside-the-runner).
+
+The runner closes its end only once the tree is released, so the end of the
+channel tells the suite that the runner is gone, on every OS: it stops by
+itself and, on Unix, after its release sends SIGTERM to its own process
+group and SIGKILL 2s later, so what its tests started ends too. On Linux the
+root also gets SIGTERM from the kernel when the runner dies (`Pdeathsig`),
+the backstop for a wrapper that dropped the descriptor; the runtime counts
+it as the same first stop. A shared-fixture process takes `stop` and `force`
+verbs on its stdin, with Interrupt as the fallback when the write fails, and
 tears down when its stdin closes, exiting with status 1 once its setup and
-teardown budgets have passed if a hook never returns. A wrapper that
-re-pipes stdout (`tee`) or runs the suite remotely (`ssh`, `docker`) hides
-both traces. See [A suite whose runner is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone)
+teardown budgets have passed if a hook never returns. A second signal to the
+CLI sends `force` to every suite and to the shared-fixture process and kills
+every tree it still runs two seconds later, before it exits. See
+[A suite whose runner is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone),
+[A shared fixture process asked to stop](specs/fixtures/spec.md#requirement-a-shared-fixture-process-asked-to-stop)
 and [A shared fixture process whose CLI is killed](specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed).
 
 A tree holds its root until `Release`, which runs once the root has been
@@ -901,7 +926,8 @@ signalled. On Windows, `Release` also kills what the root left running.
 `ManagedProcess` stops a tree by one of three grace strategies:
 
 - `GraceFixed` — wait a fixed duration after the interrupt.
-- `GraceBudget` — read the teardown budget from a sidecar file at runtime.
+- `GraceBudget` — wait the largest teardown budget the suite sent on its
+  control channel, 5m30s until the first.
 - `GraceKill` — skip the interrupt and kill immediately.
 
 ---
@@ -920,8 +946,11 @@ signalled. On Windows, `Release` also kills what the root left running.
 │                                                                      │
 ├─ RunStreamJSON (-json flag) ─────────────────────────────────────────┤
 │                                                                      │
-│  Each suite wrapped with `test2json -p <pkg> -t <binary>`; the       │
-│  tool's path is resolved once per run (`go tool -n test2json`).      │
+│  Each suite runs as the runner's child; the runner keeps its         │
+│  merged stdout+stderr and feeds it to `test2json -p <pkg> -t`,       │
+│  a filter beside the suite, rerun over the kept bytes if it          │
+│  ends early. The tool's path is resolved once per run                │
+│  (`go tool -n test2json`).                                           │
 │  JSON events streamed to stdout as each suite completes.             │
 │  No batching; order depends on completion time.                      │
 │                                                                      │
@@ -958,19 +987,40 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByP
            RunFilter:  "" or user's -run value
            RunFlags:   ["-test.v", "-test.timeout=30s", ...]
            CoverProfile: "/tmp/gotest/cover/0.out" (if -coverprofile)
-           BudgetFile:   "/tmp/gotest/bin/auth_a1b2c3d4.test.budget"
          }
 ```
 
-Each target becomes one `exec.Command`:
-```
-<test2json> -p <pkg> -t <binary> -test.paniconexit0 -test.run=^TestFooTestSuite$ [flags]
-```
-
-Or without test2json:
+Each target becomes one `exec.Command`, the binary itself (behind the
+`-exec` wrapper, if any), on every pipeline:
 ```
 <binary> -test.paniconexit0 -test.run=^TestFooTestSuite$ [flags]
 ```
+
+The JSON pipelines add `-test.v=test2json` and start the converter beside
+the suite, as a filter on its merged output:
+```
+<test2json> -p <pkg> -t
+```
+
+```
+runner ──► suite binary (root of its tree: own pgid on Unix, own hidden console + job on Windows)
+ │           │ merged stdout+stderr, one pipe
+ │           ▼
+ ├─ raw buffer ──► test2json -p <pkg> -t   (own pgid on Unix, DETACHED_PROCESS on Windows)
+ │                   │ JSON events
+ │                   ▼
+ │                suite's event buffer
+ │
+ └─ control channel: descriptor 3 on Unix (socket pair), an inherited
+    handle on Windows (named pipe), named by GOTEST_CONTROL
+      down: stop, force      up: hello, budget, stopped <reason>
+```
+
+Nothing aimed at the suite reaches the converter, and the runner holds the
+suite's real exit status: once the suite has exited, it ends the
+converter's input with the result that status gives, so a crash fails the
+package by its status
+([A crash is the package's failure](specs/lifecycle/spec.md#requirement-a-crash-is-the-packages-failure)).
 
 `-test.paniconexit0` is what `go test` passes too: an `os.Exit(0)` during a
 test panics and fails the suite instead of ending the process with a pass.
@@ -1061,6 +1111,7 @@ t=1s    pkg/auth compiles first → CompileResult on compileCh
         ├─ AuthTestSuite needs shared fixtures → blocks on Ready(key)
         └─ TokenTestSuite doesn't → acquires sem slot, starts subprocess
            └─ ./auth_hash.test -test.paniconexit0 -test.run=^TestTokenTestSuite$ -test.v=test2json
+              (test2json -p pkg/auth -t beside it; control channel on fd 3)
         │
 t=2s    pkg/cart compiles → 2 more suites start
         │
@@ -1077,7 +1128,7 @@ t=5s    AuthTestSuite finishes (exit 0)
         │
 t=8s    All suites done, wg.Wait() returns
         ├─ setupProc.Teardown()
-        │   ├─ {"verb":"stop"} on its stdin (an interrupt if it cannot be written)
+        │   ├─ `stop` on its stdin (Interrupt if the write fails)
         │   └─ Shared fixture subprocess runs AfterAll, exits
         └─ Return worst exit code
 ```
@@ -1301,8 +1352,8 @@ reported `harness.go:38` as the user's frame. The tracer now treats
 
 6. **Budget-based teardown**: Each suite subprocess computes its own teardown
    budget (max fixture timeout + max suite setup timeout + 30s headroom) and
-   writes it to a sidecar file. The runner reads this before deciding when to
-   escalate from SIGTERM to SIGKILL.
+   sends it as a `budget` line on its control channel. The runner keeps the
+   largest before deciding when to escalate from the stop to SIGKILL.
 
 7. **No coverage interception needed**: Fixture setup no longer uses
    `TestMain` + `os.Exit(m.Run())`, so Go's coverage machinery works
@@ -1330,7 +1381,7 @@ Project-specific terms, one definition each; the section named elaborates.
 - **Overlay** — Go's `-overlay` mechanism, through which the harness reaches the compiler without touching the source tree. (Code Generation)
 - **ptest / pxtest** — the two test-package variants `packages.Load` returns for one directory: the in-package tests (`package foo`) and the external ones (`package foo_test`). Each gets its own generated file. (Discovery)
 - **Bound / budget** — a *bound* is the deadline on a phase's context; a *budget* is the duration the phase is held to by verdict, which applies only when the suite or fixture declared a config of its own. (Timeout Architecture; spec.md, Generated Behavior)
-- **Teardown budget** — the grace period a suite subprocess computes for itself and writes to a sidecar file; the runner waits that long after SIGTERM before SIGKILL. (Timeout Architecture)
+- **Teardown budget** — the grace period a suite subprocess computes for itself and sends as a `budget` line on its control channel; the runner waits that long after the stop before SIGKILL. (Timeout Architecture)
 - **Bulk / tail** — the two dispatch phases: the parallel bulk of ordinary suites, then the serial tail of `Exclusive` suites, each slot starting the shared fixtures it needs. (Dispatch Phases)
 - **Exclusive** — a suite dispatched strictly alone in the tail, for verdicts that measure wall-clock behavior or contend for a resource. (Dispatch Phases)
 - **Fixture window** — the span during which a shared fixture is resident: from the first phase that needs it to the last, never speculatively. (Per-Suite Fixture Readiness; fixtures.md, Execution Model)
