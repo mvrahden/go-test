@@ -44,27 +44,34 @@ const overlayDirGrace = time.Minute
 const unknownID = "unknown"
 
 func cleanStaleTmpOverlays() {
-	for glob, grace := range map[string]time.Duration{"gotest-overlay-*": overlayDirGrace, "gotest-work-*": workDirGrace} {
-		dirs, err := filepath.Glob(filepath.Join(os.TempDir(), glob))
-		if err != nil {
+	sweepStale(os.TempDir(), "gotest-overlay-*", overlayDirGrace)
+	sweepStale(os.TempDir(), "gotest-work-*", workDirGrace)
+	if parent := workDirParent(); parent != "" && filepath.Clean(parent) != filepath.Clean(os.TempDir()) {
+		sweepStale(parent, "gotest-work-*", workDirGrace)
+	}
+}
+
+// sweepStale removes the dirs in parent matching glob whose owner is gone.
+func sweepStale(parent, glob string, grace time.Duration) {
+	dirs, err := filepath.Glob(filepath.Join(parent, glob))
+	if err != nil {
+		return
+	}
+	for _, dir := range dirs {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() || exists(filepath.Join(dir, keepFile)) && time.Since(info.ModTime()) < keptMaxAge {
 			continue
 		}
-		for _, dir := range dirs {
-			info, err := os.Stat(dir)
-			if err != nil || !info.IsDir() || exists(filepath.Join(dir, keepFile)) && time.Since(info.ModTime()) < keptMaxAge {
+		switch judgeOwner(dir) {
+		case ownerLive, ownerElsewhere:
+			continue
+		case ownerUnknown:
+			if time.Since(info.ModTime()) < grace {
 				continue
 			}
-			switch judgeOwner(dir) {
-			case ownerLive, ownerElsewhere:
-				continue
-			case ownerUnknown:
-				if time.Since(info.ModTime()) < grace {
-					continue
-				}
-			case ownerGone:
-			}
-			os.RemoveAll(dir)
+		case ownerGone:
 		}
+		os.RemoveAll(dir)
 	}
 }
 

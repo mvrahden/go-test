@@ -451,6 +451,47 @@ func (s *OverlayTestSuite) TestWorkDirNamesItsRun(t *gotest.T, ctx *overlayDirsC
 	})
 }
 
+// A run makes its work dir under GOTMPDIR when it is set, where the go
+// command makes its own, and a later run's sweep looks for it there.
+func (s *OverlayTestSuite) TestTheWorkDirGoesUnderGOTMPDIR(t *gotest.T, ctx *overlayDirsCtx) {
+	gotmp := t.TempDir()
+	t.Setenv("GOTMPDIR", gotmp)
+	overlay, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+	gotest.NoError(t, err)
+	ctx.dirs = append(ctx.dirs, overlay.WorkDir)
+	parent, parentErr := filepath.EvalSymlinks(filepath.Dir(overlay.WorkDir))
+	want, wantErr := filepath.EvalSymlinks(gotmp)
+	// The run is over.
+	gotest.NoError(t, os.WriteFile(filepath.Join(overlay.WorkDir, ".pid"), []byte("999999999"), 0o600))
+	gotestrunner.CleanStaleOverlays()
+	_, sweptErr := os.Stat(overlay.WorkDir)
+
+	t.Setenv("GOTMPDIR", "")
+	plain, _, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+	gotest.NoError(t, err)
+	ctx.dirs = append(ctx.dirs, plain.WorkDir)
+	plainParent, plainErr := filepath.EvalSymlinks(filepath.Dir(plain.WorkDir))
+	tmp, tmpErr := filepath.EvalSymlinks(os.TempDir())
+
+	t.When("GOTMPDIR is set", func(w *gotest.T) {
+		w.It("makes the run's work dir in it", func(it *gotest.T) {
+			gotest.NoError(it, parentErr)
+			gotest.NoError(it, wantErr)
+			gotest.Equal(it, want, parent)
+		})
+		w.It("a later run's sweep removes it there once its run is gone", func(it *gotest.T) {
+			gotest.True(it, os.IsNotExist(sweptErr), "the dead run's work dir is still there: %v", sweptErr)
+		})
+	})
+	t.When("GOTMPDIR is empty", func(w *gotest.T) {
+		w.It("makes the run's work dir in the system temp dir", func(it *gotest.T) {
+			gotest.NoError(it, plainErr)
+			gotest.NoError(it, tmpErr)
+			gotest.Equal(it, tmp, plainParent)
+		})
+	})
+}
+
 // A --debug run keeps its work dir and overlay for inspection: a later run's
 // sweep leaves them, though their owner is gone.
 func (s *OverlayTestSuite) TestADebugRunKeepsItsDirs(t *gotest.T, ctx *overlayDirsCtx) {
