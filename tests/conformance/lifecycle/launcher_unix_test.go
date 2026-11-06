@@ -62,7 +62,7 @@ func (s *LauncherSignalTestSuite) AfterAll(t *gotest.T) {}
 type launcherRow struct {
 	Desc     string
 	launcher string // direct, exec wrapper, go run, go tool
-	signal   string // SIGINT, SIGTERM, second
+	signal   string // SIGINT, SIGTERM, SIGHUP, second
 }
 
 // command builds the row's launcher invocation over the staged package.
@@ -83,13 +83,16 @@ func (s *LauncherSignalTestSuite) command(launcher string) *exec.Cmd {
 }
 
 // deliver sends the row's signal to the run's process group, as a terminal
-// (SIGINT) or a job supervisor (SIGTERM) would; "second" is Ctrl-C twice,
-// the second landing while the fixture's teardown runs.
+// (SIGINT, or SIGHUP as it closes) or a job supervisor (SIGTERM) would;
+// "second" is Ctrl-C twice, the second landing while the fixture's teardown
+// runs.
 func deliver(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, markerDir, signal string) {
 	group := -cmd.Process.Pid
 	switch signal {
 	case "SIGTERM":
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGTERM))
+	case "SIGHUP":
+		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGHUP))
 	case "second":
 		signalled(t, cmd, tree, syscall.Kill(group, syscall.SIGINT))
 		secondCtrlC(t, cmd, tree, time.Now(), markerDir, "fixture.AfterAll")
@@ -139,11 +142,13 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 	// tool end with 130; go run swallows SIGINT, waits, and reports "exit
 	// status 130" with exit 1, while a group SIGTERM ends go run itself by
 	// the signal.
+	runs := map[string]testkit.Run{}
 	t.When("a run is stopped by a signal, however gotest was launched", func(w *gotest.T) {
 		w.It("ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind", func(it *gotest.T) {
 			for sub, row := range gotest.Each(it, []launcherRow{
 				{Desc: "direct, SIGINT", launcher: "direct", signal: "SIGINT"},
 				{Desc: "direct, SIGTERM", launcher: "direct", signal: "SIGTERM"},
+				{Desc: "direct, SIGHUP", launcher: "direct", signal: "SIGHUP"},
 				{Desc: "direct, a second SIGINT", launcher: "direct", signal: "second"},
 				{Desc: "under an -exec wrapper, SIGINT", launcher: "exec wrapper", signal: "SIGINT"},
 				{Desc: "under an -exec wrapper, a second SIGINT", launcher: "exec wrapper", signal: "second"},
@@ -166,6 +171,7 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				tree := holding(sub, cmd, markerDir)
 				deliver(sub, cmd, tree, markerDir, row.signal)
 				run := finished(cmd, tree, markerDir)
+				runs[row.Desc] = run
 
 				switch {
 				case row.launcher == "go run" && row.signal == "SIGTERM":
@@ -187,6 +193,39 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				gotest.NotZero(sub, pid, "markers: %v", run.Markers)
 				gotest.True(sub, gone(pid), "the suite process %d outlived the run", pid)
 			}
+		})
+	})
+	t.When("a run is stopped by SIGHUP, as when its terminal closes", func(w *gotest.T) {
+		hup, term := runs["direct, SIGHUP"], runs["direct, SIGTERM"]
+		w.It("ends as a run stopped by SIGTERM does: the same exit code, the fixture teardown finished and the run booked as interrupted on its stream", func(it *gotest.T) {
+			gotest.Equal(it, term.Exit, hup.Exit, "stdout: %s\nstderr: %s", hup.Stdout, hup.Stderr)
+			gotest.Contains(it, hup.Markers, "teardown done")
+			gotest.Equal(it, "fail", packageVerdict(&hup, "interrupted"), "stream:\n%s", hup.Stdout)
+			gotest.Equal(it, packageOutput(&term, "interrupted"), packageOutput(&hup, "interrupted"))
+		})
+	})
+}
+
+func (s *LauncherSignalTestSuite) TestAHangupIgnoredAtStart(t *gotest.T) {
+	markerDir := t.TempDir()
+	// The shell ignores SIGHUP, as nohup does, and the CLI it becomes
+	// inherits that.
+	cmd := exec.Command("/bin/sh", "-c", `trap "" HUP; exec "$@"`, "sh", s.cli, "-json", "./stopping/") //nolint:gosec // G204: binary built by this suite
+	cmd.Dir = s.staged
+	cmd.Env = testkit.ChildEnv(markerDir)
+	tree := holding(t, cmd, markerDir)
+	signalled(t, cmd, tree, syscall.Kill(-cmd.Process.Pid, syscall.SIGHUP))
+	// A stop ends the holding method's context within milliseconds.
+	time.Sleep(2 * time.Second)
+	afterHangup := awaitMarkers(markerDir, 0)
+	signalled(t, cmd, tree, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT))
+	run := finished(cmd, tree, markerDir)
+
+	t.When("a run started with SIGHUP ignored, as nohup starts it, gets a SIGHUP", func(w *gotest.T) {
+		w.It("runs on until a SIGINT stops it", func(it *gotest.T) {
+			gotest.NotContains(it, afterHangup, "context ended", "stderr: %s", run.Stderr)
+			gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Markers, "teardown done")
 		})
 	})
 }

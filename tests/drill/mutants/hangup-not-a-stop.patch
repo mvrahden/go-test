@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lifecycle LauncherSignal .* / direct, SIGHUP \(
+Expect: ^FAIL .*conformance/lifecycle LauncherSignal .* / ends as a run stopped by SIGTERM does: the same exit code, the fixture teardown finished and the run booked as interrupted on its stream \(
+Clause: when a run is stopped by a signal, however gotest was launched → ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
+Clause: when a run is stopped by SIGHUP, as when its terminal closes → ends as a run stopped by SIGTERM does: the same exit code, the fixture teardown finished and the run booked as interrupted on its stream
+--- a/cmd/gotest/signals_unix.go
++++ b/cmd/gotest/signals_unix.go
+@@ -10,7 +10,7 @@
+ 
+ // shutdownSignals: SIGHUP is the terminal closing, unless it was ignored at
+ // start, as nohup leaves it: catching it would undo that.
+-var shutdownSignals = append([]os.Signal{os.Interrupt, syscall.SIGTERM}, unlessIgnored(syscall.SIGHUP)...)
++var shutdownSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
+ 
+ func unlessIgnored(sig os.Signal) []os.Signal {
+ 	if signal.Ignored(sig) {

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lifecycle LauncherSignal .* / runs on until a SIGINT stops it \(
+Clause: when a run started with SIGHUP ignored, as nohup starts it, gets a SIGHUP → runs on until a SIGINT stops it
+--- a/cmd/gotest/signals_unix.go
++++ b/cmd/gotest/signals_unix.go
+@@ -13,7 +13,7 @@
+ var shutdownSignals = append([]os.Signal{os.Interrupt, syscall.SIGTERM}, unlessIgnored(syscall.SIGHUP)...)
+ 
+ func unlessIgnored(sig os.Signal) []os.Signal {
+-	if signal.Ignored(sig) {
++	if false && signal.Ignored(sig) {
+ 		return nil
+ 	}
+ 	return []os.Signal{sig}

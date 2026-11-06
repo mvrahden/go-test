@@ -2,9 +2,14 @@
 
 package main
 
-import "os"
+import (
+	"os"
+	"syscall"
+)
 
-var shutdownSignals = []os.Signal{os.Interrupt}
+// shutdownSignals: Go reports the console closing, a logoff and a shutdown
+// as SIGTERM.
+var shutdownSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
 
 // abandonMessage says what a second signal does, given the abandon bound: no
 // second stop reaches a suite on Windows, so the suites are killed at once.
