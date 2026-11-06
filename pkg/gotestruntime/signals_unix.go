@@ -14,11 +14,10 @@ var stopSignals = []os.Signal{syscall.SIGTERM}
 
 var pipeOnce sync.Once
 
-// notePipe keeps a write to a reader that already exited — test2json ends on
-// the runner's group SIGTERM before this process does — from killing the
-// process: with SIGPIPE delivered to a channel, Go returns EPIPE instead.
-// Unlike an ignored SIGPIPE, a handled one is reset across exec, so processes a
-// test starts keep the default.
+// notePipe keeps a write to a reader that already exited, a runner that
+// died, from killing the process: with SIGPIPE delivered to a channel, Go
+// returns EPIPE instead. Unlike an ignored SIGPIPE, a handled one is reset
+// across exec, so processes a test starts keep the default.
 func notePipe() {
 	pipeOnce.Do(func() { signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE) })
 }

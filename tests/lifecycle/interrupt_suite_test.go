@@ -183,8 +183,8 @@ func (s *InterruptTestSuite) TestAnUnannouncedInterruptIsLeftAlone(t *gotest.T) 
 	gotest.Equal(t, []string{"setup", "running"}, readEvents(log))
 }
 
-// The runner announces the stop and waits for the suite process, including
-// past test2json, which ends on the interrupt before the binary it runs.
+// The runner announces the stop and waits for the suite process to release
+// its fixtures, on the text and the -json pipelines alike.
 func (s *InterruptTestSuite) TestTheRunnerWaitsForTheRelease(t *gotest.T) {
 	for _, flags := range [][]string{nil, {"-json"}} {
 		cmd := exec.Command(s.cli, append(flags, "-run", "TestHoldingTestSuite", "./testdata/interrupt/")...) //nolint:gosec // G204: controlled binary with fixed args

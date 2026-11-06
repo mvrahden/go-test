@@ -8,13 +8,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// signalSuite stops a suite by its stop file alone on Windows: a console
-// event would reach the converter in front of it, which cannot ignore one
-// there and dies, taking the rest of the stream with it.
+// signalSuite stops a suite by its stop file alone on Windows: no console
+// event reaches one process alone, only every process on the suite's console.
 var signalSuite = stopFileSignal
 
 // stopAgain has no second stop to send on Windows: the stop file was the
-// first, and a console event would reach the converter too.
+// first, and a console event would reach every process on the console.
 func stopAgain(int, int) error { return errNoSecondStop }
 
 var errNoSecondStop = errors.New("no second stop reaches a suite process alone")

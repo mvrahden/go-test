@@ -4,7 +4,7 @@ Clause: when the run is interrupted and the pid the suite published names a proc
 Clause: when the run is interrupted and the pid the suite published names a process outside its group → runs AfterAll before the fixture is released
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go
-@@ -259,7 +259,9 @@
+@@ -266,7 +266,9 @@
  				}
  			}
  		}
@@ -13,5 +13,5 @@ Clause: when the run is interrupted and the pid the suite published names a proc
 +		mp.forceKill()
 +		return nil
  	}
- 	return s, mp.Start()
- }
+ 	if err := mp.Start(); err != nil {
+ 		if s.relay != nil {

@@ -23,7 +23,8 @@ var ExportCompilePackage = compilePackage
 var ExportBuildSuiteCmd = buildSuiteCmd
 var ExportTest2JSONPath = test2jsonPath
 var ExportResolveTest2JSON = resolveTest2JSON
-var ExportTest2JSONArgv = test2jsonArgv
+var ExportConverterArgv = converterArgv
+var ExportConverterCmd = converterCmd
 var ExportReadTeardownBudget = readTeardownBudget
 var ExportBookBuildFailures = bookBuildFailures
 var ExportBrokenPackageMessage = brokenPackageMessage
@@ -384,4 +385,12 @@ func WriteEvents(c *OutputCollector, p []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, _ = c.jsonTarget().Write(p)
+}
+
+// ExportOnConverterStart hands each converter a relay starts to seen, until
+// the returned call restores the default.
+func ExportOnConverterStart(seen func(*os.Process)) (restore func()) {
+	prev := converterStarted
+	converterStarted = seen
+	return func() { converterStarted = prev }
 }

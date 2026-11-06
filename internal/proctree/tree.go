@@ -118,8 +118,9 @@ func (t *Tree) HoldJobWithRoot() {
 // Linger waits, at most for timeout, until every process of an interrupted
 // tree has exited; call it once the root has been waited for and before
 // Release. The root may exit first while another process still finishes its
-// shutdown: test2json ends on the interrupt, the test binary it runs is still
-// tearing its fixtures down. A tree nobody interrupted returns at once.
+// shutdown: an -exec command ends on the interrupt, the test binary it runs
+// is still tearing its fixtures down. A tree nobody interrupted returns at
+// once.
 func (t *Tree) Linger(timeout time.Duration) {
 	t.mu.Lock()
 	wait := t.interrupted && t.adopted && !t.released

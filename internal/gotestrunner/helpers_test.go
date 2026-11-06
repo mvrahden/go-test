@@ -41,7 +41,9 @@ func buildPlainArgs(target gotestrunner.SuiteTarget) (path string, args []string
 	return target.BinaryPath, args
 }
 
-// buildTest2JSONArgs reproduces the exact arg logic of the old RunSingleSuiteTest2JSON.
+// buildTest2JSONArgs reproduces the exact arg logic of the old
+// RunSingleSuiteTest2JSON, minus the converter in front: the binary runs
+// itself and frames its lines for the converter beside it.
 func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []string) { //nolint:gocritic // hugeParam: stable API
 	testArgs := []string{"-test.paniconexit0"}
 	if target.RunFilter != "" {
@@ -59,9 +61,7 @@ func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []st
 	if target.CoverProfile != "" {
 		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
-	args = []string{"-p", target.Package, "-t", target.BinaryPath}
-	args = append(args, testArgs...)
-	return "test2json", args
+	return target.BinaryPath, testArgs
 }
 
 func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {

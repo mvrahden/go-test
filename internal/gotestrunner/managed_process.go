@@ -36,6 +36,11 @@ type ProcessConfig struct {
 	// process has exited, against a detached grandchild that keeps the write
 	// ends open. Zero means OutputDrainDelay.
 	DrainDelay time.Duration
+	// AwaitOutput keeps the tree whole past its root's exit while the output
+	// is still open, for the grace at most, unless the caller stopped it: a
+	// root that runs the process the output is from, an -exec command, can
+	// end before that process does.
+	AwaitOutput bool
 }
 
 // OutputDrainDelay is the default DrainDelay. Everything the process wrote is
@@ -104,7 +109,8 @@ func NewManagedProcess(cmd *exec.Cmd, cfg ProcessConfig) *ManagedProcess {
 // takeOutput replaces every writer set as Stdout or Stderr with the write end
 // of a pipe of its own. A file passes through untouched, as exec would pass
 // it, and one writer set for both streams gets one pipe, so their order is
-// kept. When a pipe cannot be made the writers stay as they were.
+// kept: a suite's relay is one. When a pipe cannot be made the writers stay
+// as they were.
 func (p *ManagedProcess) takeOutput() (err error) {
 	stdout, stderr := p.cmd.Stdout, p.cmd.Stderr
 	defer func() {
@@ -260,8 +266,8 @@ func (p *ManagedProcess) Adopt() {
 	go p.wait()
 }
 
-// wait ends ownership as soon as the root has been reaped, since its pid may
-// be reused from then on, and only then drains what is left in the pipes.
+// wait ends ownership once the root has been reaped, since its pid may be
+// reused from then on, and only then drains what is left in the pipes.
 func (p *ManagedProcess) wait() {
 	_ = p.cmd.Wait()
 	if p.stopped.Load() {
@@ -269,14 +275,34 @@ func (p *ManagedProcess) wait() {
 		// interrupted, given the grace and killed.
 		p.tree.End(p.graceTimeout())
 	} else {
+		grace := p.graceTimeout()
+		deadline := time.Now().Add(grace)
+		if p.config.AwaitOutput {
+			// The process the root ran may outlive it.
+			p.awaitOutput(grace)
+		}
 		// An interrupted root can exit before the rest of its tree is done
 		// shutting down; the grace it was given covers them too.
-		p.tree.Linger(p.graceTimeout())
+		p.tree.Linger(time.Until(deadline))
 	}
 	untrack(p.tree)
 	p.tree.Release()
 	p.drain()
 	close(p.done)
+}
+
+// awaitOutput waits until every holder of the output pipes has closed them,
+// at most timeout.
+func (p *ManagedProcess) awaitOutput(timeout time.Duration) {
+	if len(p.pipes) == 0 {
+		return
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-p.copied:
+	case <-timer.C:
+	}
 }
 
 // Stopped records that the caller stopped the process without interrupting

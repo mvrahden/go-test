@@ -1,0 +1,12 @@
+{"Action":"start","Package":"example.com/relay/passing"}
+{"Action":"run","Package":"example.com/relay/passing","Test":"TestOne"}
+{"Action":"output","Package":"example.com/relay/passing","Test":"TestOne","Output":"=== RUN   TestOne\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/passing","Test":"TestOne","Output":"    p_test.go:5: hello from one\n"}
+{"Action":"output","Package":"example.com/relay/passing","Test":"TestOne","Output":"--- PASS: TestOne (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/passing","Test":"TestOne","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/passing","Test":"TestTwo"}
+{"Action":"output","Package":"example.com/relay/passing","Test":"TestTwo","Output":"=== RUN   TestTwo\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/passing","Test":"TestTwo","Output":"--- PASS: TestTwo (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/passing","Test":"TestTwo","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/passing","Output":"PASS\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/passing"}

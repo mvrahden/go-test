@@ -49,8 +49,7 @@ func stopFileChildRun(t *testing.T) {
 }
 
 // StopFileTestSuite covers a run stopped by the stop file alone, the way a
-// Windows run is: no console event reaches the converter, so the stream
-// carries the suite's verdicts to their end.
+// Windows run is: the stream carries the suite's verdicts to their end.
 // Sequential: the scenario swaps how the runner signals a suite.
 type StopFileTestSuite struct{}
 
@@ -117,9 +116,10 @@ func (s *StopFileTestSuite) TestAStopByTheStopFileKeepsTheStream(t *gotest.T) {
 			gotest.NotEmpty(it, verdict[prefix+"TestHolds"], string(result.Stdout))
 			gotest.NotEmpty(it, verdict[stopFileSuite], string(result.Stdout))
 		})
-		w.It("leaves the converter alive", func(it *gotest.T) {
+		w.It("ends by the suite's own status, its stream converted once", func(it *gotest.T) {
 			_, how := gotestrunner.ExitStatusVerdict(result.ExitCode)
 			gotest.Empty(it, how, string(result.Stderr))
+			gotest.NotContains(it, string(result.Stderr), "the converter ended early")
 		})
 		w.It("ends well within the teardown budget", func(it *gotest.T) {
 			gotest.True(it, result.CutShort)

@@ -1,0 +1,9 @@
+=== RUN   TestBefore
+--- PASS: TestBefore (0.00s)
+=== NAME  
+=== RUN   TestExits
+=== RUN   TestExits/fine
+--- PASS: TestExits/fine (0.00s)
+=== NAME  TestExits
+=== RUN   TestExits/gone
+leaving now

@@ -54,8 +54,8 @@ func StopFilePath(binaryPath string) string {
 }
 
 // StopPIDPath is where the suite process writes its own pid once it watches
-// for a stop, so the runner can signal it and not the converter in front of
-// it, which must live on to relay the final events.
+// for a stop, so the runner can signal it alone, and not an -exec command in
+// front of it.
 func StopPIDPath(stopFile string) string {
 	return stopFile + ".pid"
 }

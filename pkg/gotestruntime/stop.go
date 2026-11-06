@@ -124,10 +124,9 @@ func watchFile(stderr io.Writer, file string) *watcher {
 		signal.Notify(w.death, deathSignal)
 	}
 	if w.file != "" {
-		// The runner stops this process alone, by pid or by the stop file, so
-		// the converter in front of it lives on to relay the stream to its
-		// end. Published once the signals are caught: the runner signals the
-		// pid it reads at once.
+		// The runner stops this process alone, by pid or by the stop file,
+		// not an -exec command in front of it. Published once the signals
+		// are caught: the runner signals the pid it reads at once.
 		publishPID(protocol.StopPIDPath(w.file))
 	}
 	w.running = true
@@ -165,9 +164,8 @@ const (
 )
 
 // poll hands the loop sig once the runner's stop file exists, the parent is
-// gone, or nobody reads the stream any more: under -json behind an -exec
-// wrapper that stays, the converter's death is the only trace a dead runner
-// leaves. It runs under the runner only, and fires once.
+// gone, or nobody reads the stream any more: behind an -exec wrapper that
+// stays, the stream's lost reader is the only trace a dead runner leaves. It runs under the runner only, and fires once.
 func (w *watcher) poll(sig os.Signal) {
 	defer close(w.polled)
 	tick := time.NewTicker(stopFilePoll)

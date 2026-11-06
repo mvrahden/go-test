@@ -63,17 +63,19 @@ type SuiteResult struct {
 type RunMode int
 
 const (
-	// RunBatchText runs suites directly (no test2json). Output is batched
-	// per-package: when all suites for a package complete, their output is
-	// written to stdout followed by a package summary line.
+	// RunBatchText runs suites with no converter, their stdout and stderr
+	// apart. Output is batched per-package: when all suites for a package
+	// complete, their output is written to stdout followed by a package
+	// summary line.
 	RunBatchText RunMode = iota
 
-	// RunStreamJSON wraps each suite with test2json and streams its JSON
-	// events to stdout as soon as it completes.
+	// RunStreamJSON converts each suite's output to JSON events with
+	// test2json beside it (see relay) and streams them to stdout as soon as
+	// the suite completes.
 	RunStreamJSON
 
-	// RunCaptureJSON wraps each suite with test2json and captures all JSON
-	// events into a buffer (nothing written to stdout).
+	// RunCaptureJSON converts each suite's output as RunStreamJSON does and
+	// captures all JSON events into a buffer (nothing written to stdout).
 	RunCaptureJSON
 )
 
@@ -186,14 +188,6 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		testArgs = insertBeforeWords(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
 
-	if test2json {
-		argv := test2jsonArgv(test2jsonPath(), target, testArgs)
-		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: the Go toolchain's own converter
-		cmd.Env = slices.Concat(env, sidecarEnv(target))
-		cmd.Dir = target.Dir
-		return cmd
-	}
-
 	argv := append(slices.Clone(target.Exec), target.BinaryPath)
 	argv = append(argv, testArgs...)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: binary built by this tool, under the -exec command the user named
@@ -227,6 +221,7 @@ type startedSuite struct {
 	mp             *ManagedProcess
 	stdout, stderr *bytes.Buffer
 	cutShort       *atomic.Bool
+	relay          *relay // the converter beside a suite on a JSON pipeline
 }
 
 // suiteStart starts a suite process; a variable so tests can count starts.
@@ -235,14 +230,20 @@ var suiteStart = startSuite
 func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: a copy per start is nothing beside the process it starts
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	s := startedSuite{cmd: cmd, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, cutShort: &atomic.Bool{}}
-	cmd.Stdout = s.stdout
-	cmd.Stderr = s.stderr
+	if test2json {
+		// One writer for both streams gets one pipe, which keeps their order.
+		s.relay = startRelay(target, s.stdout, s.stderr)
+		cmd.Stdout, cmd.Stderr = s.relay, s.relay
+	} else {
+		cmd.Stdout, cmd.Stderr = s.stdout, s.stderr
+	}
 
 	mp := NewManagedProcess(cmd, ProcessConfig{
-		Grace:      GraceBudget,
-		BudgetFile: target.BudgetFile,
-		StopFile:   target.StopFile,
-		HoldJob:    true,
+		Grace:       GraceBudget,
+		BudgetFile:  target.BudgetFile,
+		StopFile:    target.StopFile,
+		HoldJob:     true,
+		AwaitOutput: test2json && len(target.Exec) > 0,
 	})
 	s.mp = mp
 	// exec cancels only a process still running when ctx ends.
@@ -268,12 +269,18 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 		}
 		return cancel()
 	}
-	return s, mp.Start()
+	if err := mp.Start(); err != nil {
+		if s.relay != nil {
+			s.relay.discard()
+		}
+		return s, err
+	}
+	return s, nil
 }
 
 // killUnannounced stops a suite whose stop file could not be written, which
 // no signal can stop then: its process is killed, by the pid it published
-// and alone, so the converter in front of it relays the stream to its end.
+// and alone; what it started ends with its tree once it has exited.
 // It reports false for a suite that published no pid, or one outside its
 // process group, whose group the caller interrupts instead.
 func killUnannounced(target SuiteTarget, group int, err error) bool { //nolint:gocritic // hugeParam: as startSuite
@@ -298,20 +305,23 @@ func waitRetry(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// RunSingleSuite executes a single suite subprocess.
-// When test2json is true, the binary is wrapped with the test2json tool.
+// RunSingleSuite executes a single suite subprocess: the binary, behind the
+// -exec command if there is one, as the root of its own process tree. When
+// test2json is true its stdout and stderr are one stream, which a converter
+// beside it turns into JSON events (see relay); the result carries the
+// suite's own exit status either way.
 //
 // On context cancellation, cmd.Cancel announces the stop and signals the
 // suite process alone, by the pid it published on Unix and by the stop file
-// itself on Windows, so the converter in front of it relays the stream to its
-// end; a process that published no pid, or one outside the suite's process
-// group, gets the group's SIGTERM instead. A stop file that cannot be
-// written has the suite process killed by its pid, since no signal stops it
-// without the file. A suite stopped alone leaves what it started running; once the root has exited, the rest of the group
-// is interrupted and, past the budget, killed. A per-process kill timer (from
-// the teardown budget file) governs when the suite itself is killed. Output is
-// read by the managed process itself, so a grandchild outside the group that
-// keeps the pipes open holds the result for the drain delay at most.
+// itself on Windows; a process that published no pid, or one outside the
+// suite's process group, gets the group's SIGTERM instead. A stop file that
+// cannot be written has the suite process killed by its pid, since no signal
+// stops it without the file. A suite stopped alone leaves what it started
+// running; once the root has exited, the rest of the group is interrupted
+// and, past the budget, killed. A per-process kill timer (from the teardown
+// budget file) governs when the suite itself is killed. Output is read by the
+// managed process itself, so a grandchild outside the group that keeps the
+// pipes open holds the result for the drain delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	start := time.Now()
 	s, err := suiteStart(ctx, target, env, test2json)
@@ -320,8 +330,8 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		// command writing a tool into the shared build cache in place.
 		// Unix reports it; Windows refuses such a file with a sharing
 		// violation instead.
-		// It covers starting the suite or test2json, which execs the suite
-		// binary itself; copyFile's ForkLock guards the runner's own writes.
+		// It covers the binary the runner starts itself, not one an -exec
+		// command starts; copyFile's ForkLock guards the runner's own writes.
 		retry = max(2*retry, startRetryFirst)
 		if err = waitRetry(ctx, retry); err != nil {
 			break // a cancelled start, as exec reports one
@@ -345,6 +355,9 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	exitCode := 0
 	if cmd.ProcessState != nil {
 		exitCode = cmd.ProcessState.ExitCode()
+	}
+	if s.relay != nil && s.relay.finish(exitCode) != nil && exitCode == 0 {
+		exitCode = 1 // no events to read a verdict from
 	}
 	// A failed test exits 1, a panic 2, os.Exit whatever it was given: each
 	// is a failed suite, 1, as go test reports it. A status the binary did

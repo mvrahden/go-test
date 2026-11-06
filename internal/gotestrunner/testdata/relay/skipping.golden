@@ -1,0 +1,12 @@
+{"Action":"start","Package":"example.com/relay/skipping"}
+{"Action":"run","Package":"example.com/relay/skipping","Test":"TestSkipped"}
+{"Action":"output","Package":"example.com/relay/skipping","Test":"TestSkipped","Output":"=== RUN   TestSkipped\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/skipping","Test":"TestSkipped","Output":"    s_test.go:5: not here\n"}
+{"Action":"output","Package":"example.com/relay/skipping","Test":"TestSkipped","Output":"--- SKIP: TestSkipped (0.00s)\n","OutputType":"frame"}
+{"Action":"skip","Package":"example.com/relay/skipping","Test":"TestSkipped","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/skipping","Test":"TestRuns"}
+{"Action":"output","Package":"example.com/relay/skipping","Test":"TestRuns","Output":"=== RUN   TestRuns\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/skipping","Test":"TestRuns","Output":"--- PASS: TestRuns (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/skipping","Test":"TestRuns","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/skipping","Output":"PASS\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/skipping"}

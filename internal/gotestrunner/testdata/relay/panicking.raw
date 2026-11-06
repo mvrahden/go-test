@@ -1,0 +1,25 @@
+=== RUN   TestBefore
+--- PASS: TestBefore (0.00s)
+=== NAME  
+=== RUN   TestPanics
+=== RUN   TestPanics/fine
+--- PASS: TestPanics/fine (0.00s)
+=== NAME  TestPanics
+=== RUN   TestPanics/boom
+--- FAIL: TestPanics/boom (0.00s)
+--- FAIL: TestPanics (0.00s)
+panic: kaboom [recovered, repanicked]
+
+goroutine 9 [running]:
+testing.tRunner.func1.2({0x6b3630, 0x5645a0})
+	testing/testing.go:2125 +0x232
+testing.tRunner.func1()
+	testing/testing.go:2128 +0x329
+panic({0x6b3630?, 0x5645a0?})
+	runtime/panic.go:859 +0x125
+example.com/relay/panicking.TestPanics.func2(0x2849a08da908?)
+	example.com/relay/panicking/p_test.go:8 +0x25
+testing.tRunner(0x2849a08da908, 0x6d3ff8)
+	testing/testing.go:2195 +0xea
+created by testing.(*T).Run in goroutine 7
+	testing/testing.go:2260 +0x4d4

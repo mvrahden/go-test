@@ -1,0 +1,13 @@
+{"Action":"start","Package":"example.com/relay/failing"}
+{"Action":"run","Package":"example.com/relay/failing","Test":"TestGood"}
+{"Action":"output","Package":"example.com/relay/failing","Test":"TestGood","Output":"=== RUN   TestGood\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/failing","Test":"TestGood","Output":"--- PASS: TestGood (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/failing","Test":"TestGood","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/failing","Test":"TestBad"}
+{"Action":"output","Package":"example.com/relay/failing","Test":"TestBad","Output":"=== RUN   TestBad\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/failing","Test":"TestBad","Output":"plain stdout line\n"}
+{"Action":"output","Package":"example.com/relay/failing","Test":"TestBad","Output":"    f_test.go:11: want 1, got 2\n","OutputType":"error"}
+{"Action":"output","Package":"example.com/relay/failing","Test":"TestBad","Output":"--- FAIL: TestBad (0.00s)\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/failing","Test":"TestBad","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/failing","Output":"FAIL\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/failing"}

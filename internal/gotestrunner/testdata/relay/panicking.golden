@@ -1,0 +1,34 @@
+{"Action":"start","Package":"example.com/relay/panicking"}
+{"Action":"run","Package":"example.com/relay/panicking","Test":"TestBefore"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestBefore","Output":"=== RUN   TestBefore\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestBefore","Output":"--- PASS: TestBefore (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/panicking","Test":"TestBefore","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/panicking","Test":"TestPanics"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"=== RUN   TestPanics\n","OutputType":"frame"}
+{"Action":"run","Package":"example.com/relay/panicking","Test":"TestPanics/fine"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics/fine","Output":"=== RUN   TestPanics/fine\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics/fine","Output":"--- PASS: TestPanics/fine (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/panicking","Test":"TestPanics/fine","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/panicking","Test":"TestPanics/boom"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics/boom","Output":"=== RUN   TestPanics/boom\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics/boom","Output":"--- FAIL: TestPanics/boom (0.00s)\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/panicking","Test":"TestPanics/boom","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"--- FAIL: TestPanics (0.00s)\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"panic: kaboom [recovered, repanicked]\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"goroutine 9 [running]:\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"testing.tRunner.func1.2({0x6b3630, 0x5645a0})\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\ttesting/testing.go:2125 +0x232\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"testing.tRunner.func1()\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\ttesting/testing.go:2128 +0x329\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"panic({0x6b3630?, 0x5645a0?})\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\truntime/panic.go:859 +0x125\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"example.com/relay/panicking.TestPanics.func2(0x2849a08da908?)\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\texample.com/relay/panicking/p_test.go:8 +0x25\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"testing.tRunner(0x2849a08da908, 0x6d3ff8)\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\ttesting/testing.go:2195 +0xea\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"created by testing.(*T).Run in goroutine 7\n"}
+{"Action":"output","Package":"example.com/relay/panicking","Test":"TestPanics","Output":"\ttesting/testing.go:2260 +0x4d4\n"}
+{"Action":"fail","Package":"example.com/relay/panicking","Test":"TestPanics","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/panicking","Output":"FAIL\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/panicking"}

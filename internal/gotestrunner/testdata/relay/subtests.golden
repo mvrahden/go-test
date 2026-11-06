@@ -1,0 +1,30 @@
+{"Action":"start","Package":"example.com/relay/subtests"}
+{"Action":"run","Package":"example.com/relay/subtests","Test":"TestTree"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree","Output":"=== RUN   TestTree\n","OutputType":"frame"}
+{"Action":"run","Package":"example.com/relay/subtests","Test":"TestTree/leaf_pass"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/leaf_pass","Output":"=== RUN   TestTree/leaf_pass\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/leaf_pass","Output":"    s_test.go:6: a leaf\n"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/leaf_pass","Output":"--- PASS: TestTree/leaf_pass (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/subtests","Test":"TestTree/leaf_pass","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/subtests","Test":"TestTree/branch"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch","Output":"=== RUN   TestTree/branch\n","OutputType":"frame"}
+{"Action":"run","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_fail"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_fail","Output":"=== RUN   TestTree/branch/deep_fail\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_fail","Output":"    s_test.go:8: deep failure\n","OutputType":"error"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_fail","Output":"--- FAIL: TestTree/branch/deep_fail (0.00s)\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_fail","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_skip"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_skip","Output":"=== RUN   TestTree/branch/deep_skip\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_skip","Output":"    s_test.go:9: deep skip\n"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_skip","Output":"--- SKIP: TestTree/branch/deep_skip (0.00s)\n","OutputType":"frame"}
+{"Action":"skip","Package":"example.com/relay/subtests","Test":"TestTree/branch/deep_skip","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/branch","Output":"--- FAIL: TestTree/branch (0.00s)\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/subtests","Test":"TestTree/branch","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/subtests","Test":"TestTree/leaf_last"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/leaf_last","Output":"=== RUN   TestTree/leaf_last\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree/leaf_last","Output":"--- PASS: TestTree/leaf_last (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/subtests","Test":"TestTree/leaf_last","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/subtests","Test":"TestTree","Output":"--- FAIL: TestTree (0.00s)\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/subtests","Test":"TestTree","Elapsed":0}
+{"Action":"output","Package":"example.com/relay/subtests","Output":"FAIL\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/subtests"}

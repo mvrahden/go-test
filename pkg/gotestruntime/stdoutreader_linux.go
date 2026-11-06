@@ -25,7 +25,7 @@ func sampleStdoutPipe() pipeID {
 }
 
 // stdoutReaderGone reports whether nobody reads the pipe fd 1 was at start
-// any more. A converter that died leaves it so, even where the process's
+// any more. A runner that died leaves it so, even where the process's
 // parent, an -exec wrapper, lives on and no death signal comes.
 func stdoutReaderGone() bool {
 	if stdoutPipe == (pipeID{}) {
