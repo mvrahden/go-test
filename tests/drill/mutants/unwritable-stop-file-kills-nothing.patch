@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lifecycle UnwritableStopFile .* / kills the suite process alone, saying on stderr that the stop file could not be written \(
+Expect: ^FAIL .*conformance/lifecycle UnwritableStopFile .* / ends at once, the run booked as interrupted on its stream \(
+Clause: when the run is interrupted while a method holds and the suite's stop file cannot be written → kills the suite process alone, saying on stderr that the stop file could not be written
+Clause: when the run is interrupted while a method holds and the suite's stop file cannot be written → ends at once, the run booked as interrupted on its stream
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -278,7 +278,7 @@
+ // process group, whose group the caller interrupts instead.
+ func killUnannounced(target SuiteTarget, group int, err error) bool { //nolint:gocritic // hugeParam: as startSuite
+ 	pid := readPID(protocol.StopPIDPath(target.StopFile))
+-	if pid > 0 && killPID(pid, group) == nil {
++	if pid > 0 {
+ 		fmt.Fprintf(os.Stderr, "WARN: %s %s: the stop file could not be written (%v), so the suite process was killed\n", target.Package, target.SuiteName, err)
+ 		return true
+ 	}

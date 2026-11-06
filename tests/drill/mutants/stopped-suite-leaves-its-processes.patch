@@ -4,8 +4,8 @@ Clause: when the run is interrupted while a holding method has started a process
 Clause: when the run is interrupted while a holding method has started a process of its own → interrupts it before killing it
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go
-@@ -253,7 +253,7 @@
- 			_ = os.WriteFile(target.StopFile, nil, 0o600)
+@@ -261,7 +261,7 @@
+ 			}
  			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
  				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
 -					mp.Stopped()
@@ -15,7 +15,7 @@ Clause: when the run is interrupted while a holding method has started a process
  			}
 --- a/internal/proctree/tree_unix.go
 +++ b/internal/proctree/tree_unix.go
-@@ -35,7 +35,6 @@
+@@ -37,7 +37,6 @@
  // stays its own while any member lives, so a signal to it after the root was
  // reaped reaches no stranger.
  func (t sysTree) release(pid int) {

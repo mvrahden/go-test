@@ -19,6 +19,23 @@ var stopAgain = signalPID
 // namespace, or after pid reuse, it names a stranger, and the caller
 // interrupts the group instead.
 func signalPID(pid, group int) error {
+	if err := inGroup(pid, group); err != nil {
+		return err
+	}
+	return syscall.Kill(pid, syscall.SIGTERM)
+}
+
+// killPID kills pid, which must be in the suite's process group as for
+// signalPID.
+func killPID(pid, group int) error {
+	if err := inGroup(pid, group); err != nil {
+		return err
+	}
+	return syscall.Kill(pid, syscall.SIGKILL)
+}
+
+// inGroup reports why pid is not in the suite's process group, if it is not.
+func inGroup(pid, group int) error {
 	pgid, err := syscall.Getpgid(pid)
 	if err != nil {
 		return err
@@ -26,5 +43,5 @@ func signalPID(pid, group int) error {
 	if pgid != group {
 		return fmt.Errorf("pid %d is outside the suite's process group %d", pid, group)
 	}
-	return syscall.Kill(pid, syscall.SIGTERM)
+	return nil
 }

@@ -4,7 +4,7 @@ Clause: when the run is interrupted and the pid the suite published names a proc
 Clause: when the run is interrupted and the pid the suite published names a process outside its group → interrupts the suite's process group instead
 --- a/internal/gotestrunner/stop_unix.go
 +++ b/internal/gotestrunner/stop_unix.go
-@@ -19,7 +19,7 @@
+@@ -39,7 +39,7 @@
  	if err != nil {
  		return err
  	}
@@ -12,4 +12,4 @@ Clause: when the run is interrupted and the pid the suite published names a proc
 +	if false && pgid != group {
  		return fmt.Errorf("pid %d is outside the suite's process group %d", pid, group)
  	}
- 	return syscall.Kill(pid, syscall.SIGTERM)
+ 	return nil

@@ -361,6 +361,14 @@ A cancelled run SHALL send no signal to a pid the suite published that is outsid
 - **AND** interrupts the suite's process group instead
 - **AND** runs AfterAll before the fixture is released
 
+### Requirement: A stop file that cannot be written
+A cancelled run that cannot write a suite's stop file SHALL say so on stderr and SHALL kill the suite's process alone, by the pid it published, so the converter in front of it carries the stream to its end and the run ends at once instead of at the suite's teardown budget.
+
+#### Scenario: A work dir that turned read-only
+- **WHEN** the run is interrupted while a method holds and the suite's stop file cannot be written
+- **THEN** kills the suite process alone, saying on stderr that the stop file could not be written
+- **AND** ends at once, the run booked as interrupted on its stream
+
 ### Requirement: A stop ends what the tests started
 A run stopped while a test has a process of its own running SHALL end that process before gotest exits: once the suite's process has torn down, what is left of its process tree is, on Unix, interrupted and, past the teardown budget, killed, and on Windows killed at once.
 

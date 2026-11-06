@@ -252,7 +252,13 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 		// Announced before the signal: the process reads it on the signal,
 		// or polls for it where no signal comes.
 		if target.StopFile != "" {
-			_ = os.WriteFile(target.StopFile, nil, 0o600)
+			if err := os.WriteFile(target.StopFile, nil, 0o600); err != nil {
+				if killUnannounced(target, cmd.Process.Pid, err) {
+					mp.Stopped()
+					return nil
+				}
+				return cancel()
+			}
 			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
 				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
 					mp.Stopped()
@@ -263,6 +269,21 @@ func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json
 		return cancel()
 	}
 	return s, mp.Start()
+}
+
+// killUnannounced stops a suite whose stop file could not be written, which
+// no signal can stop then: its process is killed, by the pid it published
+// and alone, so the converter in front of it relays the stream to its end.
+// It reports false for a suite that published no pid, or one outside its
+// process group, whose group the caller interrupts instead.
+func killUnannounced(target SuiteTarget, group int, err error) bool { //nolint:gocritic // hugeParam: as startSuite
+	pid := readPID(protocol.StopPIDPath(target.StopFile))
+	if pid > 0 && killPID(pid, group) == nil {
+		fmt.Fprintf(os.Stderr, "WARN: %s %s: the stop file could not be written (%v), so the suite process was killed\n", target.Package, target.SuiteName, err)
+		return true
+	}
+	fmt.Fprintf(os.Stderr, "WARN: %s %s: the stop file could not be written (%v), so the suite's process group is interrupted\n", target.Package, target.SuiteName, err)
+	return false
 }
 
 // waitRetry waits d, or returns ctx's error once it ends.
@@ -284,8 +305,9 @@ func waitRetry(ctx context.Context, d time.Duration) error {
 // suite process alone, by the pid it published on Unix and by the stop file
 // itself on Windows, so the converter in front of it relays the stream to its
 // end; a process that published no pid, or one outside the suite's process
-// group, gets the group's SIGTERM instead. A suite stopped alone leaves
-// what it started running; once the root has exited, the rest of the group
+// group, gets the group's SIGTERM instead. A stop file that cannot be
+// written has the suite process killed by its pid, since no signal stops it
+// without the file. A suite stopped alone leaves what it started running; once the root has exited, the rest of the group
 // is interrupted and, past the budget, killed. A per-process kill timer (from
 // the teardown budget file) governs when the suite itself is killed. Output is
 // read by the managed process itself, so a grandchild outside the group that
