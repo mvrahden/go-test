@@ -43,7 +43,7 @@
                             ▼
  ┌─────────────────────────────────────────────────────────────┐
  │  5. TEARDOWN                                                │
- │     SIGTERM → shared fixture subprocess                     │
+ │     stop line on stdin → shared fixture subprocess          │
  │     → AfterAll per fixture (reverse order) → exit           │
  └─────────────────────────────────────────────────────────────┘
 ```
@@ -521,7 +521,7 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │  failed setup still has succeeded siblings to release under it — and  │
 │  the _cmd acknowledging a start or release)                           │
 │                                                                       │
-│  ═══════════ block on SIGTERM/SIGINT ═══════════                      │
+│  ═════ block on a stop line on stdin, or SIGTERM/SIGINT ═════         │
 │                                                                       │
 │  every SharedFixture, concurrently, each after its dependents:        │
 │    sf.AfterAll(ctx)      timeout: SharedFixtureConfig.Timeout         │
@@ -1077,7 +1077,7 @@ t=5s    AuthTestSuite finishes (exit 0)
         │
 t=8s    All suites done, wg.Wait() returns
         ├─ setupProc.Teardown()
-        │   ├─ tree.Interrupt() → SIGTERM / CTRL_BREAK
+        │   ├─ {"verb":"stop"} on its stdin (an interrupt if it cannot be written)
         │   └─ Shared fixture subprocess runs AfterAll, exits
         └─ Return worst exit code
 ```

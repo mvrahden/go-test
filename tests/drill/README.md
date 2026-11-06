@@ -386,7 +386,6 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-nil-key-read-as-zero-key` | a nil needle is looked up as the zero key of a map whose keys cannot be nil | ring-0 predicates suite |
 | `contains-type-guard-silent` | a slice needle of a type the slice cannot hold is reported absent, not refused | canary: no failure message names both types |
 | `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
-| `crashed-suite-named-by-the-timeout` | a test whose suite process crashed on its own stays counted as cut short | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
 | `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
 | `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
@@ -540,7 +539,6 @@ shards of one run do not add up to every mutant exactly once.
 | `ledger-without-dependency-closure` | the fixture ledger counts a suite only for the shared fixtures it binds directly, not their dependencies | fixtures conformance: the dependency is released while its dependent is up, and the run fails |
 | `release-before-the-suite-is-gone` | a parallel suite frees its shared fixtures as its process starts, not once its process group is gone | fixtures conformance: the fixture is released while the suite, or what it started, still runs |
 | `tail-fixtures-start-at-the-first-slot` | every shared fixture the exclusive tail needs starts before its first suite, not just before the suite that reads it | fixtures conformance: a fixture only the second exclusive suite reads is up before the first runs |
-| `given-up-start-released-early` | a shared fixture whose late start timed out is released at once, so the release waits on its hung `BeforeAll` | fixtures conformance: the tail's and the bench slot's runs take 2m30s more |
 | `release-given-up-waited-again` | a shared fixture process holding nothing but releases given up at their budget is waited for that budget again at the end of the run | fixtures conformance: the tail's and the bench slot's runs take 32s more |
 | `slot-waits-for-releases` | an exclusive suite's slot waits for every release in flight before it starts its fixtures | fixtures conformance: the suite runs only after a slow release ends |
 | `ledger-without-the-tail` | the release ledger counts only the concurrent suites, so a fixture an exclusive suite still needs is released before it runs | fixtures conformance: the fixture is released before the exclusive suite reading it |
@@ -762,6 +760,10 @@ shards of one run do not add up to every mutant exactly once.
 | `lcs-abandon-leaves-the-fixture-process` | a second signal kills nothing once its bound has passed | lifecycle conformance: the shared fixture process outlives the CLI |
 | `lcs-abandon-kills-the-fixture-process` | a second signal kills the shared fixture process instead of asking it to tear down | lifecycle conformance: the shared fixture's AfterAll never runs |
 | `lcs-timeout-names-nothing` | an expired `--timeout` no longer names what was running | lifecycle conformance: no FAIL line names the method or the suite |
+| `shared-stop-verb-ignored` | the shared fixture process ignores the stop line on its stdin | canary: the stopped run does not end within 20s, the fixture process never stopped |
+| `shared-stop-sent-by-signal-only` | the runner stops the shared fixture process by an interrupt, never by the stop line | canary: a signal reaches the shared fixture process |
+| `shared-force-verb-ignored` | the shared fixture process ignores the force line on its stdin | canary: the AfterAll's context does not end on the second stop, and a force before any stop stops nothing |
+| `shared-force-leaves-the-process-serving` | a force line before any stop ends the releases' context but leaves the shared fixture process serving | canary: the second stop does not stop the shared fixture process while its suite still runs |
 
 ## Adding a mutant
 

@@ -1,0 +1,16 @@
+Expect: sharedstop: a signal reached the shared fixture process
+Judge: ./tests/canary CanaryDagTestSuite/TestAStopReachesTheSharedFixtureAsALine
+Clause: when a run is interrupted while a suite bound to a shared fixture holds → no signal reaches the fixture process
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -359,9 +359,7 @@
+ // stop asks the process to stop by a line on its stdin, by an interrupt
+ // when the line cannot be written.
+ func (p *SharedFixtureProcess) stop() {
+-	if p.send(stopLine) != nil {
+-		_ = p.tree.Interrupt()
+-	}
++	_ = p.tree.Interrupt()
+ }
+ 
+ // force asks the process to end its releases' contexts, stopping it first

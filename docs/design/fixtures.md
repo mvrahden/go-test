@@ -367,7 +367,7 @@ gotest ./tests/e2e ./tests/integration -v
 3. If shared fixtures are needed, generate and start a setup subprocess (calls `BeforeAll`, serializes transferable fields as JSON lines on a protocol descriptor of its own — fd 3; on Windows its stdout, which the process takes away from fixture code before any runs, so what a fixture prints lands on stderr)
 4. Generate test code for each package
 5. Run `go test` — test harness deserializes fixture state, calls `Hydrate` if present
-6. Send SIGTERM to the setup subprocess (calls `AfterAll` in reverse order)
+6. Send the setup subprocess a `stop` line on its stdin, an interrupt when the line cannot be written (calls `AfterAll` in reverse order)
 
 ## Execution Model
 

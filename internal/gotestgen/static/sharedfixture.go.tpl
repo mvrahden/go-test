@@ -26,7 +26,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -51,9 +52,10 @@ func ƒhasKey(keys []string, key string) bool {
 */}}
 func main() {
 {{- /*
-  Shutdown-capable from birth: SIGTERM at any phase cancels ƒctx, so setup
-  attempts abort instead of the default disposition killing the process
-  mid-lifecycle, and the epilogue below still releases whatever came up.
+  Shutdown-capable from birth: SIGTERM at any phase cancels ƒctx, as the
+  runner's stop line does, so setup attempts abort instead of the default
+  disposition killing the process mid-lifecycle, and the epilogue below still
+  releases whatever came up.
 */}}
 {{- /*
   The runner is this process's parent: a parent pid that changed means it is
@@ -66,10 +68,20 @@ func main() {
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime({{ range .Fixtures }}"{{ .Identifier }}", {{ end }})
 {{- /*
-  Runner commands on stdin, read from the start. Stdin ending means the
+  The context every AfterAll runs under: only a force line ends it, so a
+  release that honours its context returns at once. A stop, by line or by
+  signal, leaves it alone.
+*/}}
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
+{{- /*
+  Runner commands on stdin, read from the start. A stop line ends ƒctx as
+  SIGTERM does; a force line ends the releases' context too, and stops the
+  process first when no stop is under way. Both are served here, not through
+  ƒcmds, whose send is dropped once ƒctx is done. Stdin ending means the
   runner is gone, the one sign of it where no death signal is sent: it ends
-  setup as SIGTERM does. The reader keeps reading past a shutdown, so the end
-  of stdin is seen during teardown as well.
+  setup as SIGTERM does. The reader keeps reading past a shutdown, so a force
+  line and the end of stdin are seen during teardown as well.
 */}}
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
@@ -84,9 +96,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -343,7 +363,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_{{ $f.VarName }} = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_{{ $f.VarName }} = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "{{ $f.Identifier }}",
 				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
 				Budget:   {{ if $f.HasConfig }}ƒbudget_{{ $f.VarName }}{{ else }}0{{ end }},
@@ -406,7 +426,7 @@ func main() {
 {{- /*
   Window commands until shutdown. The runner owns shutdown TIMING — only it
   knows when every suite has stopped using the fixtures — so even a failed
-  setup reports and then serves commands until the signal instead of tearing
+  setup reports and then serves commands until the stop instead of tearing
   down on its own; this process owns shutdown EXECUTION. StartKeys and
   TeardownKeys run their fixtures concurrently, a start after its
   dependencies and a release after its dependents, and commands run
@@ -414,8 +434,9 @@ func main() {
   command is acknowledged on the protocol stream with a _cmd line carrying
   its id, the joined per-fixture
   failures and the teardown budget, which now covers what the command brought
-  up. A SIGTERM that already arrived (canceling setup above) has ƒctx closed
-  and falls straight through, as does the end of stdin.
+  up. A stop that already arrived, by line or by SIGTERM (canceling setup
+  above), has ƒctx closed and falls straight through, as does the end of
+  stdin.
 */}}
 
 ƒloop:

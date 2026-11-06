@@ -361,6 +361,28 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			gotest.Regexp(it, `case <-ƒeof:\s+break ƒloop`, code)
 		})
 
+		w.It("stops on a stop line and ends the releases' context on a force line, outside the command queue", func(it *gotest.T) {
+			fixtures := []gotestgen.SharedFixtureInfo{
+				{Identifier: "PGFixture", HasAfterAll: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
+			}
+
+			src, err := gotestgen.GenerateSharedSetup(fixtures)
+			gotest.NoError(it, err)
+
+			code := string(src)
+			// Served by the reader itself: a send on ƒcmds is dropped once
+			// ƒctx is done, and a force line must still land then.
+			gotest.Regexp(it, `switch ƒc\.Verb \{\s+case "stop":\s+ƒend\(\)\s+case "force":\s+ƒforce\(\)\s+ƒend\(\)\s+default:\s+select \{\s+case ƒcmds <- ƒc:`, code)
+			gotest.Contains(it, code, "ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())",
+				"the releases' context must end on force alone, not with ƒctx")
+			gotest.Less(it, strings.Index(code, "ƒreleaseCtx, ƒforce :="), strings.Index(code, "go func() {\n\t\tdefer ƒend()"),
+				"the releases' context must exist before the reader can force it")
+			gotest.Equal(it, 1, strings.Count(code, "ƒreleaseCtx, gotestruntime.FixtureTeardown{"),
+				"every release, by command or terminal, runs under the context a force line ends")
+			gotest.Contains(it, code, "ƒctx, ƒstop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)",
+				"a signal from outside still stops the process")
+		})
+
 		w.It("exits on its own once the teardown budget has passed with the runner gone", func(it *gotest.T) {
 			fixtures := []gotestgen.SharedFixtureInfo{
 				{Identifier: "PGFixture", HasAfterAll: true, PkgPath: "github.com/example/fixtures", TransferFields: []string{"ConnStr"}},
@@ -418,8 +440,8 @@ func (s *SharedFixtureTestSuite) TestGeneratedCodeStructure(t *gotest.T) {
 			// The inlined ƒteardown was the copy that never learned to hold an
 			// AfterAll to its declared Timeout — the DAG side gained the
 			// verdict while the subprocess kept context-bounding alone.
-			gotest.Contains(it, code, "gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{",
-				"teardown must go through the shared policy")
+			gotest.Contains(it, code, "gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{",
+				"teardown must go through the shared policy, under the context a force line ends")
 			gotest.NotContains(it, code, "func ƒteardown(",
 				"no second copy of the teardown policy may remain")
 			gotest.Contains(it, code, "Budget:   ƒbudget_sf0,",

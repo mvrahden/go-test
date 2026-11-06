@@ -1,7 +1,7 @@
 # Fixtures Specification
 
 ## Purpose
-Which shared fixtures a run starts for the suites it selects, guarded suites included, that a suite of either test package sees a shared fixture it binds through a package fixture, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, how a shared fixture started late comes up and is released, and that shared fixtures need the gotest runner.
+Which shared fixtures a run starts for the suites it selects, guarded suites included, that a suite of either test package sees a shared fixture it binds through a package fixture, how a package fixture's per-method hooks run and where their failures are reported, how a fixture whose setup or Hydrate went wrong is released, how long the runner waits for shared fixture setup and that a setup it gives up fails the run, how a shared fixture started late comes up and is released, how a shared fixture process is asked to stop, and that shared fixtures need the gotest runner.
 
 ## Requirements
 
@@ -321,3 +321,20 @@ When the CLI is killed, its shared fixture process SHALL end the setup's context
 #### Scenario: A BeforeAll that ignores its context
 - **WHEN** the CLI is killed while a shared fixture's BeforeAll ignores its context
 - **THEN** the fixture process exits with status 1 once its 1s setup budget and 31s teardown budget have passed
+
+### Requirement: A shared fixture process asked to stop
+A `stop` line on the shared fixture process's standard input SHALL end its setups' contexts and run every AfterAll as a stop signal does, and the runner SHALL stop it by that line, by a signal only when the line cannot be written; a `force` line SHALL end the releases' contexts, so an AfterAll that honours its context returns at once, and SHALL first stop a process no stop is under way in; the end of its standard input SHALL still mean the runner is gone.
+
+#### Scenario: A stopped run
+- **WHEN** a run is interrupted while a suite bound to a shared fixture holds
+- **THEN** the fixture's AfterAll runs and its process exits on its own
+- **AND** no signal reaches the fixture process
+
+#### Scenario: A second Ctrl-C during the release
+- **WHEN** a second SIGINT reaches gotest while a shared fixture's AfterAll waits on its context for 20s
+- **THEN** the AfterAll's context ends and it returns, and gotest exits 130 within 1.5s
+- **AND** no process is killed and none is left behind
+
+#### Scenario: A second Ctrl-C while the suite still runs
+- **WHEN** a second SIGINT reaches gotest while a suite bound to a shared fixture ignores the first and its package fixture takes 10s to release
+- **THEN** the fixture's AfterAll runs with its context ended, and its process exits on its own

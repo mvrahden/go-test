@@ -2,9 +2,9 @@ Judge: ./internal/gotestrunner AbandonTestSuite/TestATreeWithoutAStopFileIsAsked
 Expect: ^FAIL .*internal/gotestrunner Abandon .* / asks it to stop and waits for it \(
 --- a/internal/gotestrunner/abandon.go
 +++ b/internal/gotestrunner/abandon.go
-@@ -78,7 +78,7 @@
- // takes again however often it came.
- func askAgain(tree *proctree.Tree, l liveTree) bool {
+@@ -95,7 +95,7 @@
+ 		return l.again() == nil
+ 	}
  	if l.stopFile == "" {
 -		return tree.Interrupt() == nil
 +		return false

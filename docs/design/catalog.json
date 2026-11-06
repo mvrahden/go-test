@@ -10077,6 +10077,189 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the fixture's AfterAll runs and its process exits on its own",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixb_asked_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 164,
+                      "name": "the_fixture's_AfterAll_runs_and_its_process_exits_on_its_own",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "no signal reaches the fixture process",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixb_asked_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 172,
+                      "name": "no_signal_reaches_the_fixture_process",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run is interrupted while a suite bound to a shared fixture holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "fixb_asked_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 163,
+                  "name": "a_run_is_interrupted_while_a_suite_bound_to_a_shared_fixture_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStoppedRun",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "fixb_asked_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 157,
+              "name": "TestAStoppedRun",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the AfterAll's context ends and it returns, and gotest exits 130 within 1.5s",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixb_asked_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 191,
+                      "name": "the_AfterAll's_context_ends_and_it_returns,_and_gotest_exits_130_within_1.5s",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "no process is killed and none is left behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixb_asked_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 196,
+                      "name": "no_process_is_killed_and_none_is_left_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGINT reaches gotest while a shared fixture's AfterAll waits on its context for 20s",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "fixb_asked_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 190,
+                  "name": "a_second_SIGINT_reaches_gotest_while_a_shared_fixture's_AfterAll_waits_on_its_context_for_20s",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASecondCtrlCDuringTheRelease",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "fixb_asked_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 179,
+              "name": "TestASecondCtrlCDuringTheRelease",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the fixture's AfterAll runs with its context ended, and its process exits on its own",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixb_asked_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 217,
+                      "name": "the_fixture's_AfterAll_runs_with_its_context_ended,_and_its_process_exits_on_its_own",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGINT reaches gotest while a suite bound to a shared fixture ignores the first and its package fixture takes 10s to release",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "fixb_asked_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 216,
+                  "name": "a_second_SIGINT_reaches_gotest_while_a_suite_bound_to_a_shared_fixture_ignores_the_first_and_its_package_fixture_takes_10s_to_release",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASecondCtrlCWhileTheSuiteStillRuns",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "fixb_asked_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 205,
+              "name": "TestASecondCtrlCWhileTheSuiteStillRuns",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AskedToStop",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "fixb_asked_unix_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 24,
+          "name": "TestAskedToStopTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "both suites pass, seeing the shared fixture hydrated and set up after its dependency",
                       "duration": 0,
                       "excluded": false,
@@ -23795,13 +23978,13 @@
     }
   ],
   "stats": {
-    "behaviors": 677,
+    "behaviors": 682,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 105,
+    "suites": 106,
     "tests": 0
   }
 }

@@ -80,6 +80,7 @@ Each directory under `testdata/` is one package with one suite:
 | `setupbudget` | a shared fixture slower than its declared 2s `Timeout` fails the run at that budget, not when it finishes |
 | `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
 | `killedcli` | the CLI killed while a shared fixture is up: the fixture's `AfterAll`, which logs and takes 2s, runs to its end and its process exits (Unix only) |
+| `sharedstop` | a stopped run asks its shared fixture process to stop by a line on its stdin: the fixture's `AfterAll` runs, no signal reaches the process and it exits on its own; a second stop ends the context of an `AfterAll` waiting on it, and stops the process first while its suite still runs (Unix only) |
 | `slowretry` | a shared fixture whose attempts and the release between them each take 1.6s of its 2s `Timeout` is waited for: the budget counts the release |
 | `latebudget` | a shared fixture started for the exclusive tail is released under the teardown budget its declared 2s `Timeout` gives: its `AfterAll`, which never returns, is force-killed after 32s, not the default's 2m30s |
 | `dagrelease` | shared fixtures come up each after what they depend on and are released concurrently, a dependent before its dependency; with `DAGRELEASE_HANG=1` the release that never returns is force-killed after 30s plus the longest chain still resident, 35s, a fixture released at the barrier no longer counted |

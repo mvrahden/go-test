@@ -27,7 +27,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -49,6 +50,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PostgresFixture", "RedisFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -62,9 +65,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -265,7 +276,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PostgresFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -295,7 +306,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "RedisFixture",
 				Timeout:  ƒcfg_sf1.Timeout,
 				Budget:   0,
@@ -508,7 +519,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -530,6 +542,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PostgresFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -543,9 +557,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -692,7 +714,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PostgresFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -869,7 +891,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -891,6 +914,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("SetupFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -904,9 +929,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -1038,7 +1071,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "SetupFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -1215,7 +1248,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -1237,6 +1271,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PostgresFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -1250,9 +1286,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -1397,7 +1441,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PostgresFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -1574,7 +1618,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -1596,6 +1641,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PostgresFixture", "RedisFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -1609,9 +1656,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -1812,7 +1867,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PostgresFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -1842,7 +1897,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "RedisFixture",
 				Timeout:  ƒcfg_sf1.Timeout,
 				Budget:   0,
@@ -2055,7 +2110,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -2077,6 +2133,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -2090,9 +2148,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -2237,7 +2303,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -2414,7 +2480,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -2436,6 +2503,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -2449,9 +2518,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -2596,7 +2673,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -2773,7 +2850,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -2795,6 +2873,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -2808,9 +2888,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -2955,7 +3043,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -3132,7 +3220,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -3154,6 +3243,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -3167,9 +3258,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -3314,7 +3413,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -3492,7 +3591,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -3514,6 +3614,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture", "RedisFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -3527,9 +3629,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -3730,7 +3840,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -3760,7 +3870,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "RedisFixture",
 				Timeout:  ƒcfg_sf1.Timeout,
 				Budget:   0,
@@ -3973,7 +4083,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -3995,6 +4106,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -4008,9 +4121,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -4155,7 +4276,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -4332,7 +4453,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -4354,6 +4476,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PGFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -4367,9 +4491,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -4522,7 +4654,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PGFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   ƒbudget_sf0,
@@ -4700,7 +4832,8 @@ func ƒquote(s string) string {
 }
 
 // ƒcommand is one runner instruction on stdin: start or tear down a set of
-// fixtures by state key, mid-run, at a window boundary.
+// fixtures by state key, mid-run, at a window boundary, or stop the process
+// (stop) and end its releases' contexts (force).
 type ƒcommand struct {
 	Verb string   `json:"verb"`
 	Keys []string `json:"keys"`
@@ -4722,6 +4855,8 @@ func main() {
 	// Before any fixture code: its stdout is not the runner's to read.
 	ƒproto := gotestruntime.ClaimSharedProtocol()
 	ƒlife := gotestruntime.NewSharedLifetime("PostgresFixture", "GCSFixture")
+	ƒreleaseCtx, ƒforce := context.WithCancel(context.Background())
+	defer ƒforce()
 	ƒctx, ƒend := context.WithCancel(ƒctx)
 	defer ƒend()
 	ƒcmds := make(chan ƒcommand)
@@ -4735,9 +4870,17 @@ func main() {
 			if json.Unmarshal(ƒsc.Bytes(), &ƒc) != nil {
 				continue
 			}
-			select {
-			case ƒcmds <- ƒc:
-			case <-ƒctx.Done():
+			switch ƒc.Verb {
+			case "stop":
+				ƒend()
+			case "force":
+				ƒforce()
+				ƒend()
+			default:
+				select {
+				case ƒcmds <- ƒc:
+				case <-ƒctx.Done():
+				}
 			}
 		}
 	}()
@@ -4940,7 +5083,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf0 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "PostgresFixture",
 				Timeout:  ƒcfg_sf0.Timeout,
 				Budget:   0,
@@ -4970,7 +5113,7 @@ func main() {
 			if ƒskip {
 				return
 			}
-			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(context.Background(), gotestruntime.FixtureTeardown{
+			ƒtornFailed_sf1 = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
 				Name:     "GCSFixture",
 				Timeout:  ƒcfg_sf1.Timeout,
 				Budget:   0,

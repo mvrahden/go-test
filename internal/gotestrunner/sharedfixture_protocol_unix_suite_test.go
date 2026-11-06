@@ -18,12 +18,11 @@ func (s *SharedFixtureProtocolProcessTestSuite) SuiteConfig() gotest.SuiteConfig
 	return gotest.SuiteConfig{Parallel: true}
 }
 
-// twiceDone reports its setup done twice, then exits 1 on the shutdown request.
-const twiceDone = `trap 'exit 1' TERM
-printf '{"key":"_done","teardownBudget":"10s"}\n' >&3
+// twiceDone reports its setup done twice, then exits 1 on the stop line.
+const twiceDone = `printf '{"key":"_done","teardownBudget":"10s"}\n' >&3
 sleep 0.2
 printf '{"key":"_done","teardownBudget":"10s"}\n' >&3
-while :; do sleep 0.05; done`
+while read -r line; do case $line in *'"verb":"stop"'*) exit 1;; esac; done`
 
 func (s *SharedFixtureProtocolProcessTestSuite) TestASecondDoneKeepsTheTeardownVerdict(t *gotest.T) {
 	ctx, cancel := context.WithCancel(t.Context())
@@ -47,11 +46,10 @@ func (s *SharedFixtureProtocolProcessTestSuite) TestASecondDoneKeepsTheTeardownV
 	})
 }
 
-// sameBudgetAck reports a 1s teardown budget, then answers the shutdown
-// request 300ms later with an ack reporting the same budget, and keeps running.
-const sameBudgetAck = `ack() { sleep 0.3; printf '{"key":"_cmd","id":99,"teardownBudget":"1s"}\n' >&3; }
-trap ack TERM
-printf '{"key":"_done","teardownBudget":"1s"}\n' >&3
+// sameBudgetAck reports a 1s teardown budget, then answers the stop line
+// 300ms later with an ack reporting the same budget, and keeps running.
+const sameBudgetAck = `printf '{"key":"_done","teardownBudget":"1s"}\n' >&3
+while read -r line; do case $line in *'"verb":"stop"'*) sleep 0.3; printf '{"key":"_cmd","id":99,"teardownBudget":"1s"}\n' >&3;; esac; done
 while :; do sleep 0.05; done`
 
 func (s *SharedFixtureProtocolProcessTestSuite) TestAnAckReportingTheSameBudgetExtendsNothing(t *gotest.T) {
@@ -70,17 +68,15 @@ func (s *SharedFixtureProtocolProcessTestSuite) TestAnAckReportingTheSameBudgetE
 	})
 }
 
-// failedBeside reports a failed setup, then on the shutdown request a sibling
+// failedBeside reports a failed setup, then on the stop line a sibling
 // teardown that failed, and exits 1.
-const failedBeside = `trap 'printf "{\"key\":\"_teardown\",\"error\":\"StuckSharedFixture: teardown failed\"}\n" >&3; exit 1' TERM
-printf '{"key":"_done","error":"one or more shared fixtures failed","teardownBudget":"10s"}\n' >&3
-while :; do sleep 0.05; done`
+const failedBeside = `printf '{"key":"_done","error":"one or more shared fixtures failed","teardownBudget":"10s"}\n' >&3
+while read -r line; do case $line in *'"verb":"stop"'*) printf '{"key":"_teardown","error":"StuckSharedFixture: teardown failed"}\n' >&3; exit 1;; esac; done`
 
-// failedAlone reports a failed setup and exits 1 on the shutdown request,
-// its teardowns all passed.
-const failedAlone = `trap 'echo "StuckSharedFixture.AfterAll failed: only words" >&2; exit 1' TERM
-printf '{"key":"_done","error":"one or more shared fixtures failed","teardownBudget":"10s"}\n' >&3
-while :; do sleep 0.05; done`
+// failedAlone reports a failed setup and exits 1 on the stop line, its
+// teardowns all passed.
+const failedAlone = `printf '{"key":"_done","error":"one or more shared fixtures failed","teardownBudget":"10s"}\n' >&3
+while read -r line; do case $line in *'"verb":"stop"'*) echo "StuckSharedFixture.AfterAll failed: only words" >&2; exit 1;; esac; done`
 
 func (s *SharedFixtureProtocolProcessTestSuite) TestATeardownReportedBesideAFailedSetup(t *gotest.T) {
 	type row struct {
