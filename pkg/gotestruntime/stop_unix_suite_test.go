@@ -89,9 +89,12 @@ func (s *PublishTestSuite) TestASignalAfterTheStopFileSettledTheRunIsNotFatal(t 
 
 // TestMain, in the watched process, sends it the runner's signal once its
 // run has ended, as a TestMain releasing what it set up would still be
-// running then.
+// running then. A scenario's suite process may wait before m.Run, and act
+// after it.
 func TestMain(m *testing.M) {
+	awaitLinkGate()
 	code := m.Run()
+	afterLinkRun()
 	if os.Getenv(envSettledChild) == "1" {
 		time.Sleep(500 * time.Millisecond)
 		if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {

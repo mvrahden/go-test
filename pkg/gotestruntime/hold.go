@@ -27,6 +27,7 @@ func HoldFixtures(tb testing.TB, build func() MainConfig) {
 		tb.Fatalf("fixture setup: %v", err)
 		return
 	}
+	drainLink() // a stop that came while no suite was open sets nothing up
 	startWatch()
 	dag, err := setupFixtureDAG(context.Background(), cfg, hold)
 	if err != nil {

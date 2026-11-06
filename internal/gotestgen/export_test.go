@@ -50,10 +50,11 @@ func loadAllTestPkgs() (map[string]*packages.Package, string, error) {
 	if err := os.WriteFile(filepath.Join(scratch, "go.mod"), goMod, 0600); err != nil {
 		return nil, "", err
 	}
-	if err := os.WriteFile(filepath.Join(scratch, "stub.go"), []byte("package testpkg\n\nimport _ \"github.com/mvrahden/go-test/pkg/gotest\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(scratch, "stub.go"), []byte("package testpkg\n\nimport (\n\t_ \"github.com/mvrahden/go-test/pkg/gotest\"\n\t_ \"github.com/mvrahden/go-test/pkg/gotestruntime\"\n)\n"), 0600); err != nil {
 		return nil, "", err
 	}
 
+	// The harness imports the runtime too, and its sums must be in the tidied go.sum.
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = scratch
 	cmd.Env = append(os.Environ(), "GOWORK=off")

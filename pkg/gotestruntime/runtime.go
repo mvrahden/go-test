@@ -264,12 +264,16 @@ func runDehydrate(node *FixtureNode) (failed bool) {
 }
 
 // writeBudgetFile advertises how long this process may take to release its
-// fixtures: the largest over every DAG it set up, so the DAG of the other test
-// package does not shrink it.
+// fixtures, on the runner's channel and in its budget file: the largest over
+// every DAG it set up, so the DAG of the other test package does not shrink
+// it.
 func writeBudgetFile(cfg MainConfig) {
 	path := computeMaxDAGPath(cfg.Fixtures)
 	recordReserve(path)
 	budget := recordBudget(path + cfg.MaxSuiteSetupTimeout + 30*time.Second)
+	if link != nil {
+		_ = link.Budget(budget)
+	}
 	if budgetFile == "" {
 		return
 	}

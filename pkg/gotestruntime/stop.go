@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/control"
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/runstate"
 )
@@ -22,6 +23,22 @@ var (
 	stopFile   = takeEnv(protocol.EnvStopFile)
 	budgetFile = takeEnv(protocol.EnvTeardownBudgetFile)
 )
+
+// link is the channel the runner passed this process, taken out of the
+// environment as the files are; nil under plain go test.
+var link = claimLink()
+
+// claimLink takes the runner's channel and says so at once, not at the first
+// suite's open: the runner falls back to a signal when no hello comes soon
+// after the start, and a TestMain may work long before m.Run. A stop sent
+// meanwhile waits on the channel for the first open.
+func claimLink() *control.Endpoint {
+	ep := control.Claim()
+	if ep != nil {
+		_ = ep.Hello(os.Getpid())
+	}
+	return ep
+}
 
 func takeEnv(key string) string {
 	v := os.Getenv(key)
@@ -40,6 +57,9 @@ var (
 	watchMu  sync.Mutex
 	watching int
 	active   *watcher
+	// unread holds what a closed watcher's reader took from the channel and
+	// could not hand over; the next open acts on it.
+	unread []control.Line
 )
 
 func startWatch() {
@@ -56,64 +76,128 @@ func stopWatch() {
 	defer watchMu.Unlock()
 	watching--
 	if watching == 0 {
-		active.close()
+		w := active
+		w.close()
 		active = nil
+		unread = append(unread, w.unread...)
 		// Under plain go test nothing else marks the run interrupted: once the
 		// stopped suite has torn down, the process ends by the signal, and the
 		// suites after it never run. Under the runner the process ends with the
 		// tests' own status, so the stream carries every verdict and the runner
-		// reports the stop.
-		if stopFile == "" && stopping.Load() {
+		// reports the stop; a stop a signal began on the runner's channel ends
+		// by the signal, as under plain go test. With the runner gone, the
+		// process group ends with it.
+		switch {
+		case runnerGone.Load():
+			endGroup()
+		case stopping.Load() && (!w.underRunner() || bySignal.Load()):
 			reraise(stoppedBy())
 		}
 	}
 }
 
+// drainLink acts, at a suite's open, on what reached the runner's channel
+// while no suite read it: during TestMain, or between two suites. A stop, a
+// force or the channel's end stops the run before anything is set up; with
+// nothing open there is nothing to settle, so the process ends with the
+// tests' own status, and a signal that follows changes nothing. While a
+// watcher runs, its reader takes the lines.
+func drainLink() {
+	if link == nil {
+		return
+	}
+	watchMu.Lock()
+	defer watchMu.Unlock()
+	if active != nil {
+		return
+	}
+	lines, gone := link.Drain()
+	lines = append(lines, unread...)
+	unread = nil
+	if leftToGo() {
+		return
+	}
+	asked := false
+	for _, l := range lines {
+		switch l.Kind {
+		case control.Stop, control.Force:
+			asked = true
+		case endOfChannel:
+			gone = true
+		}
+	}
+	if gone {
+		runnerGone.Store(true)
+	}
+	if stopping.Load() || !asked && !gone {
+		return
+	}
+	if !asked {
+		_ = link.Stopped("runner-gone")
+	}
+	stoppedSig.Store(runnerSignal())
+	stopping.Store(true)
+	runstate.Stop()
+	if sigs := caughtSignals(true); len(sigs) > 0 {
+		signal.Notify(make(chan os.Signal, 1), sigs...)
+	}
+}
+
 // watcher turns a stop request into fixture teardown.
 //
-// Under the gotest runner a signal counts only once the runner has created the
-// stop file, so a signal the code under test sends its own process is left to
-// that code. The stop file counts by itself too, which the watcher polls for:
-// on Windows it is the only stop the runner sends. So does a parent that is
-// gone, and a stream nobody reads any more, which the watcher checks for
-// itself. Under plain go test only SIGINT counts, the Ctrl-C a developer
-// sends, and nothing is polled. Fuzzing is left to Go once its engine has the
-// target: it stops on an interrupt by itself, saving what it found, and the
-// target returns. A signal ignored when the process started stays ignored.
+// On the gotest runner's channel the runner's stop line asks for a stop, its
+// force line forces one, and the channel's end, the runner gone, starts one
+// nobody asked for; a signal starts a stop the runner is told of, and never
+// forces one. Under the runner's stop file a signal counts only once the
+// runner has created the file, so a signal the code under test sends its own
+// process is left to that code. The stop file counts by itself too, which the
+// watcher polls for: on Windows it is the only stop the runner sends. So does
+// a parent that is gone, and a stream nobody reads any more, which the watcher
+// checks for itself. Under plain go test only SIGINT counts, the Ctrl-C a
+// developer sends, and nothing is polled. Fuzzing is left to Go once its
+// engine has the target: it stops on an interrupt by itself, saving what it
+// found, and the target returns. A signal ignored when the process started
+// stays ignored.
 type watcher struct {
 	stderr  io.Writer
-	file    string // the runner's stop file; empty under plain go test
+	file    string            // the runner's stop file; empty under plain go test
+	link    *control.Endpoint // the runner's channel; nil without one
 	sigs    []os.Signal
-	ch      chan os.Signal // the signals that arrived
-	death   chan os.Signal // the death signal, which only wakes the watcher
-	found   chan os.Signal // a stop the poll found
+	ch      chan os.Signal    // the signals that arrived
+	death   chan os.Signal    // the death signal, which only wakes the watcher
+	found   chan os.Signal    // a stop the poll found
+	lines   chan control.Line // the runner's lines, then endOfChannel
 	running bool
 	// unasked: the stop under way is one the poll found, which no signal
 	// has asked for yet.
 	unasked bool
-	quit    chan struct{}
-	done    chan struct{}
-	polled  chan struct{}
+	// forced: the runner's force line came, so the stop releases at once.
+	forced   bool
+	quit     chan struct{}
+	done     chan struct{}
+	polled   chan struct{}
+	readDone chan struct{}
+	unread   []control.Line // taken from the channel, not handed over by quit
 }
 
-func watch(stderr io.Writer) *watcher { return watchFile(stderr, stopFile) }
+// endOfChannel is the kind the watcher gives the end of the runner's
+// channel; no line has it.
+const endOfChannel control.Kind = 0
 
-func watchFile(stderr io.Writer, file string) *watcher {
+func watch(stderr io.Writer) *watcher { return watchOn(stderr, stopFile, link) }
+
+func watchFile(stderr io.Writer, file string) *watcher { return watchOn(stderr, file, nil) }
+
+func watchOn(stderr io.Writer, file string, ep *control.Endpoint) *watcher {
 	notePipe()
-	w := &watcher{stderr: stderr, file: file, ch: make(chan os.Signal, 1), found: make(chan os.Signal, 1),
-		quit: make(chan struct{}), done: make(chan struct{}), polled: make(chan struct{})}
-	candidates := []os.Signal{os.Interrupt}
-	if w.file != "" {
-		candidates = append(candidates, stopSignals...)
-	}
-	for _, s := range candidates {
-		if !signal.Ignored(s) {
-			w.sigs = append(w.sigs, s)
-		}
-	}
-	if len(w.sigs) == 0 && w.file == "" {
+	w := &watcher{stderr: stderr, file: file, link: ep, ch: make(chan os.Signal, 1), found: make(chan os.Signal, 1),
+		lines: make(chan control.Line), quit: make(chan struct{}), done: make(chan struct{}),
+		polled: make(chan struct{}), readDone: make(chan struct{})}
+	w.sigs = caughtSignals(w.underRunner())
+	if len(w.sigs) == 0 && !w.underRunner() {
 		close(w.done)
 		close(w.polled)
+		close(w.readDone)
 		return w
 	}
 	if len(w.sigs) > 0 {
@@ -132,15 +216,54 @@ func watchFile(stderr io.Writer, file string) *watcher {
 	w.running = true
 	go w.loop()
 	if w.file != "" {
-		sig := os.Interrupt
-		if len(stopSignals) > 0 {
-			sig = stopSignals[0]
-		}
-		go w.poll(sig)
+		go w.poll(runnerSignal())
 	} else {
 		close(w.polled)
 	}
+	if w.link != nil {
+		go w.read()
+	} else {
+		close(w.readDone)
+	}
 	return w
+}
+
+// underRunner reports whether the gotest runner started this watcher's
+// process: by its stop file or by its channel.
+func (w *watcher) underRunner() bool { return w.file != "" || w.link != nil }
+
+// caughtSignals is what a watcher catches: Ctrl-C's signal, and under the
+// runner its stop signals too, leaving out any ignored at the start.
+func caughtSignals(underRunner bool) []os.Signal {
+	candidates := []os.Signal{os.Interrupt}
+	if underRunner {
+		candidates = append(candidates, stopSignals...)
+	}
+	var sigs []os.Signal
+	for _, s := range candidates {
+		if !signal.Ignored(s) {
+			sigs = append(sigs, s)
+		}
+	}
+	return sigs
+}
+
+// runnerSignal is the signal a stop the runner began ends the process by when
+// it is forced: the runner's own stop signal.
+func runnerSignal() os.Signal {
+	if len(stopSignals) > 0 {
+		return stopSignals[0]
+	}
+	return os.Interrupt
+}
+
+// signalName spells a signal the watcher catches as the runner's stopped line
+// does: Ctrl-C's, or else the runner's stop signal, the only other one.
+func signalName(sig os.Signal) string {
+	if sig == os.Interrupt {
+		return "SIGINT"
+	}
+	return "SIGTERM"
 }
 
 // publishPID writes this process's pid to path whole, by rename, so the
@@ -184,6 +307,31 @@ func (w *watcher) poll(sig os.Signal) {
 	}
 }
 
+// read hands the loop what the runner sends on its channel, then the
+// channel's end, until quit closes. A line taken and not handed over by then
+// is kept for the next suite's open.
+func (w *watcher) read() {
+	defer close(w.readDone)
+	for {
+		l, err := w.link.Next(w.quit)
+		if errors.Is(err, control.ErrStopped) {
+			return
+		}
+		if err != nil {
+			l = control.Line{Kind: endOfChannel}
+		}
+		select {
+		case w.lines <- l:
+		case <-w.quit:
+			w.unread = append(w.unread, l)
+			return
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
 func (w *watcher) loop() {
 	defer close(w.done)
 	for {
@@ -192,6 +340,7 @@ func (w *watcher) loop() {
 			return
 		case sig := <-w.ch:
 			if w.counts(sig) {
+				w.announce(sig)
 				w.stop(sig, true) // returns once the run has stopped, or ends the process
 			}
 		case sig := <-w.found:
@@ -206,16 +355,83 @@ func (w *watcher) loop() {
 			if !stopping.Load() && parentExited() {
 				w.stop(stopSignals[0], false)
 			}
+		case l := <-w.lines:
+			w.take(l)
 		}
 	}
 }
 
+// take starts the stop a line asks for while none is under way: the stop line
+// a requested one, the force line one forced from the start, and the
+// channel's end one nobody asked for, which the runner is told of in case it
+// lives. After a stop a line changes nothing, but the channel's end still
+// marks the runner gone.
+func (w *watcher) take(l control.Line) {
+	if leftToGo() {
+		return
+	}
+	if l.Kind == endOfChannel {
+		runnerGone.Store(true)
+	}
+	if stopping.Load() {
+		return
+	}
+	switch l.Kind {
+	case control.Stop:
+		w.stop(runnerSignal(), true)
+	case control.Force:
+		w.forced = true
+		w.stop(runnerSignal(), true)
+	case endOfChannel:
+		_ = w.link.Stopped("runner-gone")
+		w.stop(runnerSignal(), false)
+	}
+}
+
+// heed takes a line that arrives while a stop is under way: the force line
+// forces it, the stop line is the request a stop nobody asked for ran ahead
+// of, and the channel's end marks the runner gone.
+func (w *watcher) heed(l control.Line) {
+	if leftToGo() {
+		return
+	}
+	switch l.Kind {
+	case control.Force:
+		w.forced = true
+	case control.Stop:
+		w.unasked = false
+	case endOfChannel:
+		runnerGone.Store(true)
+	}
+}
+
+// announce tells the runner, on its channel, of a stop a signal began, which
+// it did not send; that stop ends the process by the signal.
+func (w *watcher) announce(sig os.Signal) {
+	if w.link == nil {
+		return
+	}
+	bySignal.Store(true)
+	_ = w.link.Stopped("signal:" + signalName(sig))
+}
+
+// signalsStopOnTheChannel: on the runner's channel, a signal landing while no
+// stop is under way or done starts one, of which the runner is told; false
+// drops every signal there.
+const signalsStopOnTheChannel = true
+
+// Set once the stop under way came by a signal on the runner's channel, and
+// once that channel ended.
+var bySignal, runnerGone atomic.Bool
+
 func (w *watcher) counts(sig os.Signal) bool {
-	if runstate.FuzzWorker() {
+	if leftToGo() {
 		return false
 	}
-	if runstate.FuzzTarget() != "" && runstate.FuzzEngine() {
-		return false
+	if w.link != nil {
+		// Only the first signal: the runner forces a stop by its force line,
+		// never by a signal.
+		return signalsStopOnTheChannel && !stopping.Load()
 	}
 	if w.file == "" {
 		return sig == os.Interrupt
@@ -224,6 +440,12 @@ func (w *watcher) counts(sig os.Signal) bool {
 		return true
 	}
 	return os.Getppid() != parentPID || parentExited() || stdoutReaderGone()
+}
+
+// leftToGo reports whether a stop is Go's own to handle: in a fuzzing worker,
+// and once the engine has the fuzz target.
+func leftToGo() bool {
+	return runstate.FuzzWorker() || runstate.FuzzTarget() != "" && runstate.FuzzEngine()
 }
 
 // stopGrace is how long a stop waits for a running method body to return once
@@ -235,22 +457,22 @@ const stopGrace = 5 * time.Second
 // setups in flight see their contexts end, the methods not yet started are
 // skipped, AfterAll runs, and the hold's cleanup releases the fixtures. A
 // body or BeforeAll still running stopGrace after the stop, or after its own
-// start when that came later, a second stop signal, or a run still going when
-// only the fixtures' teardown time is left of the release bound, forces it:
-// the fixtures are torn down within what is left of the bound and the process
-// ends by sig. Once the stop is forced, or settled under plain go test, the
-// handlers are reset, so the next signal has its default action; settled
-// under the runner, the stop signals stay caught and dropped, since the
-// runner's own may still be on its way after its stop file settled the run,
-// and a process that ended its run is not one to end by it. A stop no signal
-// asked for, which
-// the poll found or the death signal brought, takes the first signal that
-// follows as its request, the runner's own after its stop file among them;
-// only the next one forces it. The death signal is never a request.
+// start when that came later, a second stop signal or the runner's force
+// line, or a run still going when only the fixtures' teardown time is left of
+// the release bound, forces it: the fixtures are torn down within what is
+// left of the bound and the process ends by sig. Once the stop is forced, or
+// settled under plain go test, the handlers are reset, so the next signal has
+// its default action; settled under the runner, the stop signals stay caught
+// and dropped, since the runner's own may still be on its way after its stop
+// file settled the run, and a process that ended its run is not one to end by
+// it. A stop no signal asked for, which the poll found or the death signal
+// brought, takes the first signal that follows as its request, the runner's
+// own after its stop file among them; only the next one forces it. The death
+// signal is never a request.
 func (w *watcher) stop(sig os.Signal, requested bool) {
 	w.unasked = !requested
 	releaseEnd, settled := w.settle(sig, stopGrace)
-	if settled && w.file != "" {
+	if settled && w.underRunner() {
 		w.absorb()
 		return
 	}
@@ -265,13 +487,18 @@ func (w *watcher) stop(sig os.Signal, requested bool) {
 // process. Caught rather than ignored, so a process a test starts after it
 // keeps the default.
 func (w *watcher) absorb() {
-	signal.Notify(make(chan os.Signal, 1), w.sigs...)
+	if len(w.sigs) > 0 { // none would catch every signal
+		signal.Notify(make(chan os.Signal, 1), w.sigs...)
+	}
 }
 
 // force tears the held fixtures down, until releaseEnd, and ends the process
-// by sig.
+// by sig, or, with the runner gone, ends its process group.
 func (w *watcher) force(sig os.Signal, releaseEnd time.Time) {
 	w.release(releaseEnd)
+	if runnerGone.Load() {
+		endGroup()
+	}
 	reraise(sig)
 }
 
@@ -299,6 +526,10 @@ func (w *watcher) settle(sig os.Signal, grace time.Duration) (releaseEnd time.Ti
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	for {
+		if w.forced {
+			fmt.Fprintln(w.stderr, "gotest: the runner forced the stop; the fixtures are torn down now and the process ends by the signal")
+			return releaseEnd, false
+		}
 		now := time.Now()
 		if kind := runstate.Overdue(stopAt, grace, now, settleExcept); kind != "" {
 			fmt.Fprintf(w.stderr, "gotest: %s did not return within %s of its context ending; it is cut short, the fixtures are torn down and the process ends by the signal\n", kind, grace)
@@ -321,6 +552,8 @@ func (w *watcher) settle(sig os.Signal, grace time.Duration) (releaseEnd time.Ti
 				fmt.Fprintln(w.stderr, "gotest: a second stop signal; the fixtures are torn down now and the process ends by the signal")
 				return releaseEnd, false
 			}
+		case l := <-w.lines:
+			w.heed(l)
 		case <-tick.C:
 		}
 	}
@@ -362,7 +595,7 @@ var openSuites atomic.Int64
 func (w *watcher) close() {
 	if len(w.sigs) > 0 {
 		// Closed by the last suite's end, under a stop the run is settling.
-		if w.file != "" && stopping.Load() {
+		if w.underRunner() && stopping.Load() {
 			w.absorb()
 		}
 		signal.Stop(w.ch)
@@ -375,6 +608,7 @@ func (w *watcher) close() {
 	}
 	<-w.done
 	<-w.polled
+	<-w.readDone
 }
 
 // releaseWithin tears the held fixtures down, giving up waiting at deadline.

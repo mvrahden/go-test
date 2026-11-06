@@ -4,11 +4,11 @@ Alone: its check bounds how long the stopped run takes
 Clause: when the run is stopped and a method body ignores its context → releases the fixture without running AfterAll
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go
-@@ -163,7 +163,6 @@
+@@ -497,7 +497,6 @@
  // force tears the held fixtures down, until releaseEnd, and ends the process
- // by sig.
+ // by sig, or, with the runner gone, ends its process group.
  func (w *watcher) force(sig os.Signal, releaseEnd time.Time) {
 -	w.release(releaseEnd)
- 	reraise(sig)
- }
- 
+ 	if runnerGone.Load() {
+ 		endGroup()
+ 	}
