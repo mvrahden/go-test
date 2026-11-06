@@ -11,7 +11,6 @@ import {
   type CliCommand,
 } from "./cli.js";
 import {
-  killProcessTree,
   resolveAncestorItems,
   skipUnresolved,
   StreamApplier,
@@ -65,6 +64,7 @@ class WatchProcess implements vscode.Disposable {
     this.managed = new ManagedChild(this.cmd.bin, this.cmd.args, {
       cwd: this.cwd,
       kind: "watch",
+      control: true,
     });
     this.child = this.managed.child;
     this.buffer = "";
@@ -206,10 +206,11 @@ class WatchProcess implements vscode.Disposable {
   }
 
   // forceKill=false is for shutdown. VS Code's deactivate window is seconds,
-  // so any SIGKILL timer long enough to respect a fixture teardown would never
+  // so any kill timer long enough to respect a fixture teardown would never
   // fire, and any timer short enough to fire would cut that teardown off. The
-  // child is in its own process group with the CLI's own force-kill backstop,
-  // so SIGTERM alone is both the most and the least we can honestly do.
+  // CLI has its own force-kill backstop, so a stop alone is both the most and
+  // the least we can honestly do; the extension host's exit closing the CLI's
+  // stdin is a stop too.
   dispose(forceKill = true): void {
     this.disposed = true;
 
@@ -218,15 +219,11 @@ class WatchProcess implements vscode.Disposable {
     this.managed = undefined;
     this.child = undefined;
 
-    this.outputChannel.info(`[watch] sending SIGTERM (pid ${managed.pid})`);
+    this.outputChannel.info(`[watch] stopping (pid ${managed.pid})`);
 
     if (!forceKill) {
-      // Shutdown. VS Code's deactivate window is seconds, so any SIGKILL timer
-      // long enough to respect a fixture teardown would never fire, and any
-      // timer short enough to fire would cut that teardown off. The child has
-      // its own process group and the CLI's force-kill backstop, so SIGTERM
-      // alone is both the most and the least we can honestly do.
-      killProcessTree(managed.child, "SIGTERM");
+      // Shutdown: the stop alone, as above.
+      managed.requestStop();
       managed.dispose();
       return;
     }

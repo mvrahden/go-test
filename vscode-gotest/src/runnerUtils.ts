@@ -541,7 +541,12 @@ export async function spawnTestProcess(
   onStdoutLine?: (line: string) => void,
   onStderrLine?: (line: string) => void,
 ): Promise<SpawnResult> {
-  const mc = new ManagedChild(bin, args, { cwd, env, kind: "test" });
+  const mc = new ManagedChild(bin, args, {
+    cwd,
+    env,
+    kind: "test",
+    control: true,
+  });
   let stdout = "";
   let stderr = "";
   let lineBuffer = "";
@@ -589,11 +594,11 @@ export async function spawnTestProcess(
     spawnError = err;
   });
 
-  // A run: SIGTERM is what starts fixture teardown, so it gets the teardown
+  // A run: the stop is what starts fixture teardown, so it gets the teardown
   // grace rather than the prompt one.
   const cancelListener = token.onCancellationRequested(() => {
     outputChannel.info(
-      `[${label}] cancellation requested, sending SIGTERM (pid ${mc.pid})`,
+      `[${label}] cancellation requested, stopping (pid ${mc.pid})`,
     );
     void mc.terminate("teardown");
   });

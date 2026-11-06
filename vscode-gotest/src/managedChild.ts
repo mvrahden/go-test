@@ -2,19 +2,32 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { killProcessTree } from "./processTree.js";
 import {
   CAPTURE_FORCE_KILL_GRACE_MS,
+  CONTROL_FORCE_FALLBACK_MS,
   forceKillTimeoutSeconds,
 } from "./config.js";
 
-// How long the child gets between SIGTERM and SIGKILL. Classified by what the
+// How long the child gets to stop before it is forced. Classified by what the
 // child is doing, not by which module spawned it:
 //
 //   prompt   — a read (`discover`, `cover -func`, `spec`). No fixtures, nothing
-//              to tear down, and its output is being discarded anyway.
-//   teardown — a run or a daemon (`gotest`, `watch`, `prepare`). SIGTERM is what
+//              to tear down, and its output is being discarded anyway: SIGTERM,
+//              then SIGKILL.
+//   teardown — a run or a daemon (`gotest`, `watch`, `prepare`). The stop is what
 //              starts fixture teardown, and the CLI allows that up to
 //              GracefulShutdownDelay (5m30s), so we must outlast it or we cut
 //              container teardown off and leak what it was holding.
 export type TerminationGrace = "prompt" | "teardown";
+
+// The flag that has the CLI read stop and force lines on its stdin.
+export const CONTROL_FLAG = "--control=stdin";
+
+// withControl adds the control flag to a gotest command line: before a bare
+// "--" or "-args", after which everything is the test binary's, else last.
+export function withControl(args: string[]): string[] {
+  const at = args.findIndex((a) => a === "--" || a === "-args");
+  if (at < 0) return [...args, CONTROL_FLAG];
+  return [...args.slice(0, at), CONTROL_FLAG, ...args.slice(at)];
+}
 
 export interface ManagedChildOptions {
   cwd?: string;
@@ -22,6 +35,9 @@ export interface ManagedChildOptions {
   // What this child is, for the process registry. Coarse on purpose — the
   // registry only needs enough to name what it reaped in a log line.
   kind?: string;
+  // A gotest command that stops on a SIGINT: it is started with --control=stdin
+  // and stopped through its stdin, the one graceful stop Windows has.
+  control?: boolean;
 }
 
 // Observes every child this extension starts, so something outside can know
@@ -83,7 +99,7 @@ export class ManagedChild {
     // What detaching *would* buy is a child that outlives the extension host —
     // the exact orphan this class exists to prevent, on the one platform with
     // no reaper to clean it up.
-    this.child = spawn(bin, args, {
+    this.child = spawn(bin, opts.control ? withControl(args) : args, {
       cwd: opts.cwd,
       env: opts.env ? { ...process.env, ...opts.env } : undefined,
       detached: process.platform !== "win32",
@@ -94,6 +110,8 @@ export class ManagedChild {
     // character it lands inside. These payloads carry the developer's own text.
     this.child.stdout?.setEncoding("utf-8");
     this.child.stderr?.setEncoding("utf-8");
+    // A line written once the child is gone fails on the stream, not here.
+    if (opts.control) this.child.stdin?.on("error", () => {});
 
     this.registration = observer?.spawned(this.child.pid, opts.kind ?? "child");
 
@@ -130,9 +148,29 @@ export class ManagedChild {
   // terminate is idempotent and always resolves. Calling it twice does not
   // restart the escalation, and calling it on an already-dead child is a no-op
   // that resolves immediately.
+  //
+  // A control child's teardown is `stop` on its stdin, `force` at the timeout
+  // (a second Ctrl-C: the fixtures released at once), and the kill
+  // CONTROL_FORCE_FALLBACK_MS after that, for a CLI that took neither.
   terminate(grace: TerminationGrace): Promise<Exit> {
     if (this.settled || this.terminating) return this.exited;
     this.terminating = true;
+
+    if (grace === "teardown" && this.opts.control) {
+      this.escalation = setTimeout(
+        () => {
+          if (this.settled) return;
+          this.writeControl("force");
+          this.escalation = setTimeout(() => {
+            if (this.settled) return;
+            killProcessTree(this.child, "SIGKILL");
+          }, CONTROL_FORCE_FALLBACK_MS);
+        },
+        forceKillTimeoutSeconds(this.opts.cwd) * 1000,
+      );
+      this.writeControl("stop");
+      return this.exited;
+    }
 
     const graceMs =
       grace === "prompt"
@@ -152,7 +190,27 @@ export class ManagedChild {
     return this.exited;
   }
 
+  // requestStop asks the child to stop and leaves it to: `stop` on a control
+  // child's stdin, SIGTERM to any other's tree.
+  requestStop(): void {
+    if (this.settled) return;
+    if (this.opts.control) this.writeControl("stop");
+    else killProcessTree(this.child, "SIGTERM");
+  }
+
   dispose(): void {
     clearTimeout(this.escalation);
+  }
+
+  // writeControl writes one line to the child's stdin; a closed stdin, the
+  // child gone or going, takes nothing and throws nothing.
+  private writeControl(line: "stop" | "force"): void {
+    const stdin = this.child.stdin;
+    if (!stdin || stdin.destroyed || !stdin.writable) return;
+    try {
+      stdin.write(`${line}\n`, () => {});
+    } catch {
+      // The pipe closed between the check and the write.
+    }
   }
 }

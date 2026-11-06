@@ -247,7 +247,7 @@ These can be set in `.vscode/settings.json` per workspace folder:
 | `gotest.coverTestOnlyPackages` | `false` | Enable cross-package coverage instrumentation for test-only packages |
 | `gotest.debug.prepareTimeout` | `60` | Seconds to wait for debug preparation before timing out |
 | `gotest.discoveryTimeout` | `120` | Seconds to wait for test discovery before giving up (raise it for a very large workspace) |
-| `gotest.forceKillTimeout` | `360` | Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process. SIGTERM is what triggers shared-fixture teardown, and the CLI allows that up to 5m30s, so this must outlast it |
+| `gotest.forceKillTimeout` | `360` | Seconds a cancelled run, watch or debug session gets to tear down. Cancelling writes `stop` to the CLI's standard input (it runs with `--control=stdin`, so the stop is graceful on Windows too), which starts the fixtures' teardown, and the CLI allows that up to 5m30s, so this must outlast it. At the timeout the CLI is sent `force`, a second Ctrl-C that releases the fixtures at once, and what still runs five seconds later is killed |
 | `gotest.fuzz.for` | `""` | Budget for fuzz sessions started from the Test Explorer's Fuzz profile (a Go duration; empty uses the CLI's default of one minute) |
 | `gotest.watch.scope` | `./...` | Default package scope for watch mode |
 

@@ -17,7 +17,12 @@ vi.mock("node:child_process", async () => {
   return { spawn: createScriptedSpawn(script, mockKill) };
 });
 
-import { ManagedChild } from "./managedChild.js";
+import { ManagedChild, withControl } from "./managedChild.js";
+import type { FakeChild } from "./scriptedSpawn.test-support.js";
+
+function written(mc: ManagedChild): string[] {
+  return (mc.child as unknown as FakeChild).written;
+}
 
 // Callers always consume; an unread pipe would stall the child by design.
 function drain(mc: ManagedChild): ManagedChild {
@@ -105,5 +110,130 @@ describe("ManagedChild", () => {
 
     await expect(mc.terminate("teardown")).resolves.toBeDefined();
     expect(mockKill).not.toHaveBeenCalled();
+  });
+
+  describe("with control", () => {
+    // forceKillTimeout's default: the vscode mock has no setting.
+    const FORCE_AT_MS = 360_000;
+
+    it("starts the CLI with --control=stdin, before a bare --", () => {
+      script.always = { neverExits: true };
+      drain(
+        new ManagedChild("go", ["tool", "gotest", "watch", "--", "-json"], {
+          control: true,
+        }),
+      );
+      drain(
+        new ManagedChild("gotest", ["fuzz", "triage", "./pkg"], {
+          control: true,
+        }),
+      );
+      expect(script.calls?.map((c) => c.args)).toEqual([
+        ["tool", "gotest", "watch", "--control=stdin", "--", "-json"],
+        ["fuzz", "triage", "./pkg", "--control=stdin"],
+      ]);
+      expect(withControl(["a", "-args", "--", "b"])).toEqual([
+        "a",
+        "--control=stdin",
+        "-args",
+        "--",
+        "b",
+      ]);
+    });
+
+    it("stops a teardown by stop, forces it at the timeout, kills it 5s later", async () => {
+      script.always = { neverExits: true, ignoresSigterm: true };
+      const mc = drain(new ManagedChild("go", ["run", "."], { control: true }));
+
+      const done = mc.terminate("teardown");
+      expect(written(mc)).toEqual(["stop\n"]);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(FORCE_AT_MS - 1);
+      expect(written(mc)).toEqual(["stop\n"]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(written(mc)).toEqual(["stop\n", "force\n"]);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(mockKill).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mockKill.mock.calls).toEqual([["SIGKILL"]]);
+      await done;
+    });
+
+    it("writes nothing more once the CLI has ended", async () => {
+      script.always = { neverExits: true };
+      const mc = drain(new ManagedChild("go", ["run", "."], { control: true }));
+      const done = mc.terminate("teardown");
+      mc.child.emit("exit", 130, null);
+      await done;
+      await vi.advanceTimersByTimeAsync(FORCE_AT_MS + 10_000);
+      expect(written(mc)).toEqual(["stop\n"]);
+      expect(mockKill).not.toHaveBeenCalled();
+    });
+
+    it("keeps the signal path for a prompt", async () => {
+      script.always = { neverExits: true, ignoresSigterm: true };
+      const mc = drain(new ManagedChild("go", ["run", "."], { control: true }));
+      const done = mc.terminate("prompt");
+      expect(mockKill).toHaveBeenCalledWith("SIGTERM");
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mockKill).toHaveBeenCalledWith("SIGKILL");
+      await done;
+      expect(written(mc)).toEqual([]);
+    });
+
+    it("does not throw on a closed stdin, and still kills at the end", async () => {
+      script.always = { neverExits: true, ignoresSigterm: true };
+      const mc = drain(new ManagedChild("go", ["run", "."], { control: true }));
+      mc.child.stdin?.destroy();
+
+      const done = mc.terminate("teardown");
+      await vi.advanceTimersByTimeAsync(FORCE_AT_MS + 5_000);
+      expect(written(mc)).toEqual([]);
+      expect(mockKill.mock.calls).toEqual([["SIGKILL"]]);
+      await done;
+    });
+
+    it("does not throw when stdin fails under a write", async () => {
+      script.always = { neverExits: true, ignoresSigterm: true };
+      const mc = drain(new ManagedChild("go", ["run", "."], { control: true }));
+      const stdin = mc.child.stdin!;
+      stdin.write = (() => {
+        throw new Error("EPIPE");
+      }) as typeof stdin.write;
+      expect(() => mc.terminate("teardown")).not.toThrow();
+      stdin.emit("error", new Error("EPIPE"));
+      await vi.advanceTimersByTimeAsync(FORCE_AT_MS + 5_000);
+      expect(mockKill.mock.calls).toEqual([["SIGKILL"]]);
+    });
+
+    it("asks a child to stop by its stdin, and any other by SIGTERM", () => {
+      script.always = { neverExits: true };
+      const control = drain(
+        new ManagedChild("go", ["run", "."], { control: true }),
+      );
+      control.requestStop();
+      expect(written(control)).toEqual(["stop\n"]);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      const plain = drain(new ManagedChild("go", ["run", "."]));
+      plain.requestStop();
+      expect(written(plain)).toEqual([]);
+      expect(mockKill).toHaveBeenCalledWith("SIGTERM");
+    });
+
+    it("never writes to a child started without control", async () => {
+      script.always = { neverExits: true, ignoresSigterm: true };
+      const mc = drain(new ManagedChild("go", ["run", "."]));
+      const done = mc.terminate("teardown");
+      expect(mockKill).toHaveBeenCalledWith("SIGTERM");
+      await vi.advanceTimersByTimeAsync(FORCE_AT_MS);
+      expect(mockKill).toHaveBeenCalledWith("SIGKILL");
+      await done;
+      expect(written(mc)).toEqual([]);
+      expect(script.calls?.[0].args).toEqual(["run", "."]);
+    });
   });
 });

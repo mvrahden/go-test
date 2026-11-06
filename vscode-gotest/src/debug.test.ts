@@ -104,6 +104,17 @@ function token() {
   return new vscode.CancellationTokenSource().token;
 }
 
+// prepare runs with --control=stdin: it is stopped by a line on its stdin,
+// never by a signal.
+function stopped(i: number): boolean {
+  const child = h.children[i];
+  if (child.written.includes("stop\n")) {
+    expect(child.kill).not.toHaveBeenCalled();
+    return true;
+  }
+  return false;
+}
+
 function launchedConfig(): any {
   return startDebugging.mock.calls[0][1];
 }
@@ -172,7 +183,7 @@ describe("DebugLauncher", () => {
     expect(buildCliCommand).toHaveBeenCalledWith(["prepare", PKG], "/ws", log);
     expect(h.script.calls![0]).toMatchObject({
       bin: "gotest",
-      args: ["prepare", PKG],
+      args: ["prepare", PKG, "--control=stdin"],
       opts: { cwd: "/ws" },
     });
     expect(startDebugging).toHaveBeenCalledWith(
@@ -189,6 +200,7 @@ describe("DebugLauncher", () => {
       }),
     );
     expect(h.children[0].kill).not.toHaveBeenCalled();
+    expect(stopped(0)).toBe(false);
   });
 
   it("passes no run filter and no env when there is neither", async () => {
@@ -217,7 +229,7 @@ describe("DebugLauncher", () => {
     expect(showError).toHaveBeenCalledWith(
       expect.stringContaining("Failed to parse prepare output"),
     );
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
+    expect(stopped(0)).toBe(true);
     expect(startDebugging).not.toHaveBeenCalled();
   });
 
@@ -244,7 +256,7 @@ describe("DebugLauncher", () => {
     expect(showError).toHaveBeenCalledWith(
       expect.stringContaining("timed out after 3s"),
     );
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
+    expect(stopped(0)).toBe(true);
   });
 
   it("stops prepare when the request is cancelled", async () => {
@@ -257,7 +269,7 @@ describe("DebugLauncher", () => {
     expect(showError).toHaveBeenCalledWith(
       expect.stringContaining("cancelled"),
     );
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
+    expect(stopped(0)).toBe(true);
     expect(startDebugging).not.toHaveBeenCalled();
   });
 
@@ -274,15 +286,15 @@ describe("DebugLauncher", () => {
     startDebugging.mockResolvedValueOnce(false);
     h.script.once = [daemon()];
     await debugItems(launcher, token());
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
+    expect(stopped(0)).toBe(true);
   });
 
   it("stops the previous prepare of a package relaunched", async () => {
     h.script.once = [daemon(), daemon()];
     await debugItems(launcher, token());
     await debugItems(launcher, token());
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
-    expect(h.children[1].kill).not.toHaveBeenCalled();
+    expect(stopped(0)).toBe(true);
+    expect(stopped(1)).toBe(false);
   });
 
   it("stops the prepare of the session that ended, and no other", async () => {
@@ -297,10 +309,10 @@ describe("DebugLauncher", () => {
     h.sessionEnd!({
       configuration: { __prepareKey: "gotest-prepare:/ws/other" },
     });
-    expect(h.children[0].kill).not.toHaveBeenCalled();
+    expect(stopped(0)).toBe(false);
 
     h.sessionEnd!({ configuration: { __prepareKey: `gotest-prepare:${PKG}` } });
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
+    expect(stopped(0)).toBe(true);
   });
 
   it("stops every prepare and the listener on dispose", async () => {
@@ -310,15 +322,19 @@ describe("DebugLauncher", () => {
     await debugItems(launcher, token(), { dir: "/ws/two" });
 
     launcher.dispose();
-    expect(h.children[0].kill).toHaveBeenCalledWith("SIGTERM");
-    expect(h.children[1].kill).toHaveBeenCalledWith("SIGTERM");
+    expect(stopped(0)).toBe(true);
+    expect(stopped(1)).toBe(true);
     expect(h.listener.dispose).toHaveBeenCalled();
   });
 
   it("launches an explicit pattern", async () => {
     h.script.once = [daemon()];
     await launcher.debugPattern(PKG, "^FuzzS_FuzzX$");
-    expect(h.script.calls![0].args).toEqual(["prepare", PKG]);
+    expect(h.script.calls![0].args).toEqual([
+      "prepare",
+      PKG,
+      "--control=stdin",
+    ]);
     expect(launchedConfig()).toMatchObject({
       program: PKG,
       args: ["-test.run", "^FuzzS_FuzzX$"],

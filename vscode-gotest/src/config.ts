@@ -9,13 +9,15 @@ function scoped(workspaceDir?: string): vscode.WorkspaceConfiguration {
 }
 
 // The CLI's own force-kill backstop, mirrored from
-// internal/gotestrunner/process.go: GracefulShutdownDelay = 5m30s. On SIGTERM
-// the CLI cancels its root context, which SIGTERMs the test process group and
-// then waits this long before killing it — long enough to cover a 5-minute
+// internal/gotestrunner/process.go: GracefulShutdownDelay = 5m30s. On a stop
+// line (or a SIGTERM) the CLI cancels its run, which stops each suite and then
+// waits this long before killing it — long enough to cover a 5-minute
 // ContainerFixtureConfig teardown or an IntegrationSuiteConfig AfterAll.
 //
-// Ours has to outlast it. We SIGKILL the whole process group, so killing early
-// takes the CLI's teardown with it and leaks whatever the fixture was holding.
+// Ours has to outlast it. At our timeout the CLI is sent `force`, its second
+// Ctrl-C, which releases the fixtures at once and kills what still runs two
+// seconds later; forcing early cuts the CLI's teardown short and leaks whatever
+// the fixture was holding.
 const CLI_GRACEFUL_SHUTDOWN_S = 330;
 
 // Enough margin for the CLI to finish its own force-kill and exit. Keep this
@@ -32,7 +34,12 @@ export const DEFAULT_DISCOVERY_TIMEOUT_S = 120;
 // killing it promptly once it has already ignored SIGTERM.
 export const CAPTURE_FORCE_KILL_GRACE_MS = 5_000;
 
-// Seconds to wait after SIGTERM before SIGKILL for a cancelled test run.
+// How long a CLI sent `force` gets before its process tree is killed: it ends
+// within about four seconds of the line, so a CLI still running then took
+// neither line.
+export const CONTROL_FORCE_FALLBACK_MS = 5_000;
+
+// Seconds a cancelled run gets after its `stop` line before it is sent `force`.
 export function forceKillTimeoutSeconds(workspaceDir?: string): number {
   return (
     scoped(workspaceDir).get<number>("forceKillTimeout") ??
