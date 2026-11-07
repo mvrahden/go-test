@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/control"
 	"github.com/mvrahden/go-test/internal/proctree"
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -21,9 +21,8 @@ import (
 // Go's default for an interrupt ends a process on the spot, so the fixture is
 // released only if the test binary takes the interrupt itself.
 //
-// Processes are started and stopped as the runner does it, through proctree:
-// SIGTERM to the process group on Unix, CTRL_BREAK to the tree's console on
-// Windows.
+// Processes are started as the runner does it, through proctree and with
+// the runner's channel, and stopped by its stop line.
 type InterruptTestSuite struct {
 	cli, binary, root string
 }
@@ -70,17 +69,69 @@ func sigintForChildren() {
 	sigintOnce.Do(func() { signal.Notify(make(chan os.Signal, 1), os.Interrupt) })
 }
 
-// ownEnv is this process's environment without the files the runner shares
-// with it: a process started here answers to this suite, not to the runner.
+// ownEnv is this process's environment without the runner's channel: a
+// process started here answers to this suite, not to the runner.
 func ownEnv() []string {
 	var env []string
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, protocol.EnvStopFile+"=") || strings.HasPrefix(kv, protocol.EnvTeardownBudgetFile+"=") {
+		if strings.HasPrefix(kv, control.Env+"=") {
 			continue
 		}
 		env = append(env, kv)
 	}
 	return env
+}
+
+// channel is the runner's end of a process's channel, with the lines the
+// process sent on it.
+type channel struct {
+	link  *control.Link
+	child *control.ChildEnd
+	read  chan struct{}
+
+	mu    sync.Mutex
+	lines []control.Line
+}
+
+// attach gives cmd a channel, as the runner gives a suite process one; call
+// started once cmd has started, and close once its tree is done.
+func attach(t *gotest.T, cmd *exec.Cmd) *channel {
+	link, child, err := control.New()
+	gotest.NoError(t, err)
+	child.Attach(cmd)
+	c := &channel{link: link, child: child, read: make(chan struct{})}
+	go func() {
+		defer close(c.read)
+		for l := range link.Lines() {
+			c.mu.Lock()
+			c.lines = append(c.lines, l)
+			c.mu.Unlock()
+		}
+	}()
+	return c
+}
+
+// started closes the end the process inherited, which the runner keeps no
+// copy of.
+func (c *channel) started() { c.child.Close() }
+
+// close closes the runner's end, once the process's tree is done.
+func (c *channel) close() {
+	c.link.Close()
+	<-c.read
+}
+
+// stopped returns the reasons of the stopped lines the process sent.
+func (c *channel) stopped() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var reasons []string
+	for _, l := range c.lines {
+		if l.Kind == control.Stopped {
+			reasons = append(reasons, l.Reason)
+		}
+	}
+	return reasons
 }
 
 // startTree starts cmd as the root of its own process tree, logging to a fresh
@@ -138,49 +189,52 @@ func readEvents(log string) []string {
 }
 
 // stopAsTheRunnerDoes stops the process the way the runner stops a suite
-// that published its pid: the stop file first, then, on Unix, a signal. On
-// Windows the stop file is the whole stop; a console event sent after it
-// races the process's own exit, which the file alone has begun.
-func stopAsTheRunnerDoes(t *gotest.T, tree *proctree.Tree, stop string) {
-	gotest.NoError(t, os.WriteFile(stop, nil, 0o600))
-	if stopSignalsTheSuite {
-		gotest.NoError(t, tree.Interrupt())
+// that took its channel: by the stop line, with no signal. A line that cannot
+// be sent kills the tree before the test fails, so nothing outlives it.
+func stopAsTheRunnerDoes(t *gotest.T, c *channel, tree *proctree.Tree, cmd *exec.Cmd) {
+	if err := c.link.Stop(); err != nil {
+		_ = tree.Kill()
+		_ = wait(tree, cmd)
+		c.close()
+		gotest.Fail(t, "the stop line was not sent: %v", err) //nolint:fail-guard // it must kill the tree before failing
 	}
 }
 
-// Under the runner an interrupt is a stop request only once the runner
-// announced it; the runner creates the stop file before it interrupts.
-func (s *InterruptTestSuite) TestAnAnnouncedStopReleasesTheFixture(t *gotest.T) {
-	stop := filepath.Join(t.TempDir(), "stop")
+// The runner stops a suite process by a line on its channel; the process
+// tears down and ends with its own status.
+func (s *InterruptTestSuite) TestALineStopReleasesTheFixture(t *gotest.T) {
 	cmd := exec.Command(s.binary) //nolint:gosec // G204: binary built by this suite
-	cmd.Env = append(ownEnv(), protocol.EnvStopFile+"="+stop)
+	cmd.Env = ownEnv()
+	c := attach(t, cmd)
 	tree, log := startTree(t, cmd)
+	c.started()
 
-	stopAsTheRunnerDoes(t, tree, stop)
+	stopAsTheRunnerDoes(t, c, tree, cmd)
 	err := wait(tree, cmd)
+	c.close()
 
 	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
 	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
+	gotest.Empty(t, c.stopped(), "the runner's own stop is not one from outside")
 }
 
-// An interrupt the runner did not announce came from somewhere else, such as
-// code under test signalling its own process; it is left to that code.
-func (s *InterruptTestSuite) TestAnUnannouncedInterruptIsLeftAlone(t *gotest.T) {
+// A signal the runner did not send, such as code under test signalling its
+// own process, is a first stop all the same: the process tears down, tells
+// the runner, and ends by the signal.
+func (s *InterruptTestSuite) TestASignalFromOutsideIsAStop(t *gotest.T) {
 	cmd := exec.Command(s.binary) //nolint:gosec // G204: binary built by this suite
-	cmd.Env = append(ownEnv(), protocol.EnvStopFile+"="+filepath.Join(t.TempDir(), "stop"))
+	cmd.Env = ownEnv()
+	c := attach(t, cmd)
 	tree, log := startTree(t, cmd)
+	c.started()
 
 	gotest.NoError(t, tree.Interrupt())
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
-	gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.R) {
-		gotest.Empty(poll, exited, "the process ended on an interrupt nobody announced")
-	})
+	err := wait(tree, cmd)
+	c.close()
 
-	gotest.NoError(t, tree.Kill())
-	<-exited
-	tree.Release()
-	gotest.Equal(t, []string{"setup", "running"}, readEvents(log))
+	gotest.Equal(t, []string{"setup", "running", "teardown"}, readEvents(log))
+	gotest.False(t, endedOnItsOwn(err), "the process ends by the signal: %v", err)
+	gotest.Equal(t, []string{"signal:" + interruptName}, c.stopped())
 }
 
 // The runner announces the stop and waits for the suite process to release

@@ -22,5 +22,6 @@ func endedOnItsOwn(err error) bool {
 	return errors.As(err, &exit) && uint32(exit.ExitCode()) != statusControlCExit //nolint:gosec // G115: a Windows exit status is a DWORD
 }
 
-// stopSignalsTheSuite: the runner sends a suite nothing after its stop file.
-const stopSignalsTheSuite = false
+// interruptName is the console event proctree's interrupt sends, as a suite
+// names it: Go reports it as an interrupt.
+const interruptName = "SIGINT"

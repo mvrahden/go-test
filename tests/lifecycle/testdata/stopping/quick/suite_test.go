@@ -13,11 +13,11 @@ type QuickTestSuite struct {
 
 func (s *QuickTestSuite) TestQuick(t *gotest.T) {}
 
-// EnvTestSuite reports what a test sees of the runner's stop file.
+// EnvTestSuite reports what a test sees of the runner's channel.
 type EnvTestSuite struct{}
 
 func (s *EnvTestSuite) TestEnv(t *gotest.T) {
 	if on("STOPPING_ENV") {
-		logLine("env=" + os.Getenv("GOTEST_STOP_FILE"))
+		logLine("env=" + os.Getenv("GOTEST_CONTROL"))
 	}
 }

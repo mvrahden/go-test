@@ -25,7 +25,6 @@ var ExportTest2JSONPath = test2jsonPath
 var ExportResolveTest2JSON = resolveTest2JSON
 var ExportConverterArgv = converterArgv
 var ExportConverterCmd = converterCmd
-var ExportReadTeardownBudget = readTeardownBudget
 var ExportBookBuildFailures = bookBuildFailures
 var ExportBrokenPackageMessage = brokenPackageMessage
 var ExportApplyTeardownFailure = applyTeardownFailure
@@ -257,10 +256,10 @@ func ExportResulted(c *OutputCollector) int { return len(c.verdicts.resulted) }
 
 var ExportApplyInterrupt = applyInterrupt
 
-// ExportTrack tracks tree as a live tree rooted at root, for Abandon, until
-// the returned func untracks it.
-func ExportTrack(tree *proctree.Tree, root int, stopFile string, done <-chan struct{}) (stop func()) {
-	track(tree, liveTree{root: root, stopFile: stopFile, done: done})
+// ExportTrack tracks tree as a live tree rooted at root, stopped once more by
+// again (nil: an interrupt), for Abandon, until the returned func untracks it.
+func ExportTrack(tree *proctree.Tree, root int, again func() error, done <-chan struct{}) (stop func()) {
+	track(tree, liveTree{root: root, again: again, done: done})
 	return func() { untrack(tree) }
 }
 

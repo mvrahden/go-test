@@ -147,10 +147,19 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 	// it and a Windows status towers over it, becoming the run's own exit code.
 	// Normalize both to a failure at this choke point so every downstream
 	// comparison agrees, and say what happened, because the binary's own output
-	// ends mid-stream with no verdict of its own.
-	if code, how := ExitStatusVerdict(r.ExitCode); how != "" {
+	// ends mid-stream with no verdict of its own. A suite stopped by a signal
+	// from outside the runner fails too, whatever its status: the methods the
+	// stop skipped never ran.
+	code, how := ExitStatusVerdict(r.ExitCode)
+	var note string
+	if name, ok := strings.CutPrefix(r.StoppedBy, "signal:"); ok {
+		r.ExitCode = max(code, 1)
+		note = fmt.Sprintf("gotest: suite stopped by %s from outside the runner\n", name)
+	} else if how != "" {
 		r.ExitCode = code
-		note := fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+		note = fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+	}
+	if note != "" {
 		r.Stderr = append(r.Stderr, note...)
 		if c.mode != RunBatchText {
 			// The stream is what -json consumers see; a note only stderr

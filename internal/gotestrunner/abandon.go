@@ -7,17 +7,13 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
-	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // liveTree is a process tree running now, for a CLI that gives up on it.
 type liveTree struct {
 	root int // the root's pid, which leads the tree's process group on Unix
-	// stopFile is the suite's stop file, next to which the suite process
-	// publishes its pid; empty for a tree that runs no suite.
-	stopFile string
-	// again is the tree's own way to be stopped once more; nil means
-	// interrupt as today.
+	// again is the tree's own way to be stopped once more: a suite's force
+	// line, the shared fixture process's force verb; nil means an interrupt.
 	again func() error
 	done  <-chan struct{} // closed once the tree is released; nil if unknown
 }
@@ -45,11 +41,10 @@ func runRecorded(ctx context.Context, c *OutputCollector, pkg string, idx int, t
 }
 
 // Abandon gives up on every process tree still running, for a CLI about to
-// exit without waiting for them. Each suite process that published its pid
-// is sent a second stop signal, which releases its fixtures at once, the
-// shared fixture process a force line, which ends its releases' contexts,
-// and any other tree with no stop file is interrupted; a tree none of these
-// reaches is killed at once. Within bound of that, or as soon as hurry
+// exit without waiting for them. Each suite process that took its channel is
+// sent the force line, which releases its fixtures at once, the shared
+// fixture process its force verb, which ends its releases' contexts, and any
+// other tree is interrupted; a tree none of these reaches is killed at once. Within bound of that, or as soon as hurry
 // closes, every tree still running is killed, so no process outlives the
 // CLI.
 func Abandon(bound time.Duration, hurry <-chan struct{}) {
@@ -88,17 +83,13 @@ func killAll(trees map[*proctree.Tree]liveTree) {
 	}
 }
 
-// askAgain asks a tree to stop once more: in its own way when it has one, a
-// suite by the second stop signal, any other tree by an interrupt.
+// askAgain asks a tree to stop once more: in its own way when it has one,
+// any other tree by an interrupt.
 func askAgain(tree *proctree.Tree, l liveTree) bool {
 	if l.again != nil {
 		return l.again() == nil
 	}
-	if l.stopFile == "" {
-		return tree.Interrupt() == nil
-	}
-	pid := readPID(protocol.StopPIDPath(l.stopFile))
-	return pid > 0 && stopAgain(pid, l.root) == nil
+	return tree.Interrupt() == nil
 }
 
 // writeGate lets an event reach stdout and the events file whole before the

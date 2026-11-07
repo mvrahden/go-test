@@ -135,49 +135,6 @@ func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceTimeout_ForceKills(t *g
 	})
 }
 
-func (s *ManagedProcessTestSuite) TestWaitWithGrace_GraceBudget(t *gotest.T) {
-	t.When("using GraceBudget strategy", func(w *gotest.T) {
-		w.It("reads grace period from budget file", func(it *gotest.T) {
-			if os.Getenv("GOTEST_MP_CHILD_IGNORE_TERM") == "1" {
-				signal.Notify(make(chan os.Signal, 1), terminationSignals()...)
-				fmt.Println("ready")
-				time.Sleep(30 * time.Second)
-				os.Exit(0)
-			}
-
-			budgetFile := filepath.Join(it.TempDir(), "budget")
-			_ = os.WriteFile(budgetFile, []byte("300ms"), 0600)
-
-			cmd := exec.CommandContext(context.Background(), os.Args[0], //nolint:gosec // G204: test-only subprocess
-				"-test.run=^TestManagedProcessTestSuite$/^TestWaitWithGrace_GraceBudget$")
-			cmd.Env = append(os.Environ(), "GOTEST_MP_CHILD_IGNORE_TERM=1")
-
-			stdout, err := cmd.StdoutPipe()
-			gotest.NoError(it, err)
-
-			mp := gotestrunner.NewManagedProcess(cmd, gotestrunner.ProcessConfig{
-				Grace:      gotestrunner.GraceBudget,
-				BudgetFile: budgetFile,
-			})
-			gotest.NoError(it, mp.Start())
-
-			buf := make([]byte, 64)
-			n, _ := stdout.Read(buf)
-			gotest.Contains(it, string(buf[:n]), "ready")
-
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			start := time.Now()
-			_ = mp.WaitWithGrace(ctx)
-			elapsed := time.Since(start)
-
-			gotest.GreaterOrEqual(it, elapsed, 300*time.Millisecond, "should wait budget duration, took %v", elapsed)
-			gotest.Less(it, elapsed, testkit.Scaled(2*time.Second), "should not wait forever, took %v", elapsed)
-		})
-	})
-}
-
 func (s *ManagedProcessTestSuite) TestTerminate(t *gotest.T) {
 	t.When("process responds to SIGTERM", func(w *gotest.T) {
 		w.It("exits within grace period", func(it *gotest.T) {

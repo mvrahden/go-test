@@ -4,9 +4,6 @@ package canary_test //nolint:fail-guard
 
 import (
 	"errors"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,15 +13,6 @@ import (
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
-
-// execWrapper writes an -exec wrapper script with body and returns its path.
-func execWrapper(t *gotest.T, body string) string {
-	path := filepath.Join(t.TempDir(), "wrapper.sh")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body), 0o700); err != nil { //nolint:gosec // G306: the script must be executable
-		fatalf(t, "write wrapper: %v", err)
-	}
-	return path
-}
 
 // markerValue is the value of the first key=value marker with key.
 func markerValue(markers []string, key string) int {
@@ -87,96 +75,19 @@ func selfStopped(t *gotest.T, name string, markers []string) {
 	}
 }
 
-// A suite process under the runner whose parent is killed while a method
-// holds stops by itself.
+// A suite process under the runner whose parent, the runner, is killed while
+// a method holds stops by itself.
 func (s *CanaryLifecycleTestSuite) TestASuiteWhoseParentIsKilledStops(t *gotest.T) {
 	dir := t.TempDir()
-	// sh stays the suite's parent: it waits for the command it runs.
-	wrap := execWrapper(t, `echo "wrapper=$$" >> "$GOTEST_CANARY_DIR/markers"
-"$@"
-`)
-	r := s.startRun(t, dir, nil, "-json", "-exec", wrap, "./testdata/stopping/")
-	if !r.await(90*time.Second, "running", "wrapper=", "pid=") {
+	r := s.startRun(t, dir, nil, "-json", "./testdata/stopping/")
+	if !r.await(90*time.Second, "running", "pid=") {
 		_, _ = r.end(0)
 		fatalf(t, "parentgone: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
 	}
-	got, _ := testkit.ReadMarkers(r.markers)
-	_ = syscall.Kill(markerValue(got, "wrapper"), syscall.SIGKILL)
+	// The runner is the suite's parent: killed, its end of the channel closes.
+	_ = r.cmd.Process.Kill()
+	_, _ = r.end(30 * time.Second)
 	awaitMarker(r.markers, selfStopWithin, "fixture.AfterAll")
 	markers, _ := testkit.ReadMarkers(r.markers)
 	selfStopped(t, "parentgone", markers)
-	_, _ = r.end(30 * time.Second)
-}
-
-// A suite process whose runner and converter are killed under -json, while
-// an -exec wrapper keeps it running, stops by itself: nobody reads its stream.
-func (s *CanaryLifecycleTestSuite) TestASuiteWhoseStreamNobodyReadsStops(t *gotest.T) {
-	dir := t.TempDir()
-	// The wrapper stays between the converter and the suite, and outlives both.
-	wrap := execWrapper(t, `echo "converter=$PPID" >> "$GOTEST_CANARY_DIR/markers"
-"$@"
-`)
-	r := s.startRun(t, dir, nil, "-json", "-exec", wrap, "./testdata/stopping/")
-	if !r.await(90*time.Second, "running", "converter=", "pid=") {
-		_, _ = r.end(0)
-		fatalf(t, "readergone: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
-	}
-	got, _ := testkit.ReadMarkers(r.markers)
-	_ = r.cmd.Process.Kill()
-	_ = syscall.Kill(markerValue(got, "converter"), syscall.SIGKILL)
-	_, _ = r.end(30 * time.Second)
-	awaitMarker(r.markers, selfStopWithin, "fixture.AfterAll")
-	markers, _ := testkit.ReadMarkers(r.markers)
-	selfStopped(t, "readergone", markers)
-}
-
-// Outside the runner a suite whose stdout nobody reads any more runs on: its
-// method's context does not end.
-func (s *CanaryLifecycleTestSuite) TestAPlainRunKeepsItsMethodWhenTheReaderGoes(t *gotest.T) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		fatalf(t, "abs: %v", err)
-	}
-	staged := t.TempDir()
-	if _, err := testkit.StagePackage(root, filepath.Join("testdata", "plainreader"), staged, "example.com/plainreader"); err != nil {
-		fatalf(t, "stage plainreader: %v", err)
-	}
-	generate := exec.Command(s.binary, "generate", "./plainreader/") //nolint:gosec // G204: controlled binary with fixed args
-	generate.Dir = staged
-	generate.Env = childEnv(t.TempDir())
-	if out, err := generate.CombinedOutput(); err != nil {
-		fatalf(t, "generate plainreader: %v\n%s", err, out)
-	}
-	binary := filepath.Join(staged, "plainreader.test")
-	build := exec.Command("go", "test", "-c", "-o", binary, "./plainreader/")
-	build.Dir = staged
-	if out, err := build.CombinedOutput(); err != nil {
-		fatalf(t, "build plainreader: %v\n%s", err, out)
-	}
-	dir := t.TempDir()
-	rd, wr, err := os.Pipe()
-	if err != nil {
-		fatalf(t, "pipe: %v", err)
-	}
-	cmd := exec.Command(binary, "-test.run=^TestReaderTestSuite$") //nolint:gosec // G204: binary built by this test
-	cmd.Env = childEnv(dir)
-	cmd.Stdout = wr
-	if err := cmd.Start(); err != nil {
-		fatalf(t, "start plainreader: %v", err)
-	}
-	// Nobody reads the stream from here on.
-	_ = wr.Close()
-	_ = rd.Close()
-	done := make(chan struct{})
-	go func() { _ = cmd.Wait(); close(done) }()
-	select {
-	case <-done:
-	case <-time.After(30 * time.Second):
-		_ = cmd.Process.Kill()
-		<-done
-	}
-	markers, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
-	if !slices.Contains(markers, "not stopped") || slices.Contains(markers, "context ended") {
-		t.Errorf("plainreader: the method's context ended when its reader went: markers %v", markers)
-	}
 }

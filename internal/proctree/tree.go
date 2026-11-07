@@ -94,6 +94,23 @@ func (t *Tree) Interrupt() error {
 	return t.sys.interrupt(t.cmd.Process.Pid, t.ctrlC)
 }
 
+// CtrlC sends the tree, once, what a terminal's Ctrl-C sends: SIGINT to the
+// process group on Unix, CTRL_BREAK on the tree's console on Windows. What
+// Interrupt sends later is left as it was. It returns as Interrupt does.
+func (t *Tree) CtrlC() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.released {
+		return os.ErrProcessDone
+	}
+	t.adoptLocked()
+	if !t.adopted {
+		return nil
+	}
+	t.interrupted = true
+	return t.sys.interrupt(t.cmd.Process.Pid, true)
+}
+
 // InterruptLikeCtrlC makes Interrupt send what a terminal's Ctrl-C sends,
 // SIGINT, in place of SIGTERM on Unix, for a program that stops gracefully on
 // it: go test -fuzz saves what it found. Windows already sends a console

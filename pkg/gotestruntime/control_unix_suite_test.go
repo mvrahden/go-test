@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/control"
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
@@ -508,23 +507,38 @@ func (s *ControlLinkTestSuite) TestASignalFromOutsideIsAStopTheRunnerIsToldOf(t 
 	})
 }
 
-func (s *ControlLinkTestSuite) TestTheBudgetLineCarriesWhatTheFileDoes(t *gotest.T, r *linkRun) {
+func (s *ControlLinkTestSuite) TestTheBudgetLineCarriesTheTeardownBudget(t *gotest.T, r *linkRun) {
 	if suiteProcess(t) {
 		return
 	}
-	budgetFile := filepath.Join(t.TempDir(), "budget")
-	r.start(t, linkSuite, "TestTheBudgetLineCarriesWhatTheFileDoes", child{mode: holdQuick,
-		env: []string{protocol.EnvTeardownBudgetFile + "=" + budgetFile}})
+	r.start(t, linkSuite, "TestTheBudgetLineCarriesTheTeardownBudget", child{mode: holdQuick})
 	ended := r.wait(t)
-	data, err := os.ReadFile(budgetFile) //nolint:gosec // G304: this method's own file
-	gotest.NoError(t, err)
-	inFile, err := time.ParseDuration(string(data))
-	gotest.NoError(t, err)
 
 	t.When("a suite process on the runner's channel sets its fixtures up", func(w *gotest.T) {
-		w.It("sends the runner the teardown budget its budget file carries", func(it *gotest.T) {
-			gotest.Equal(it, []control.Line{{Kind: control.Budget, Duration: inFile}}, r.seen(control.Budget))
+		w.It("sends the runner its teardown budget: the fixture's timeout, the suite setup's and 30s", func(it *gotest.T) {
+			gotest.Equal(it, []control.Line{{Kind: control.Budget, Duration: 2 * time.Minute}}, r.seen(control.Budget))
 			gotest.Equal(it, "exit status 0", ended, r.output())
+		})
+	})
+}
+
+func (s *ControlLinkTestSuite) TestAnOlderCLIIsRefused(t *gotest.T, r *linkRun) {
+	if os.Getenv(envLinkMode) != "" {
+		runLinkChild(t.T())
+		return
+	}
+	dir := t.TempDir()
+	cmd := exec.Command(os.Args[0], "-test.run=^"+linkSuite+"$/^TestAnOlderCLIIsRefused$", "-test.v", "-test.count=1") //nolint:gosec // G204: this test binary
+	cmd.Env = append(os.Environ(), envLinkMode+"="+holdQuick, envLinkDir+"="+dir, "GOTEST_STOP_FILE="+filepath.Join(dir, "stop"))
+	out, err := cmd.CombinedOutput()
+	markers, _ := os.ReadFile(filepath.Join(dir, "markers")) //nolint:gosec // G304: this method's own dir
+
+	t.When("a suite process finds an older CLI's stop file and no channel", func(w *gotest.T) {
+		w.It("fails the suite with one line naming the fix, before anything is set up", func(it *gotest.T) {
+			gotest.Error(it, err)
+			gotest.Equal(it, 1, strings.Count(string(out), "is newer than the gotest CLI running it"), string(out))
+			gotest.Contains(it, string(out), "run go tool gotest, or go get -tool github.com/mvrahden/go-test/cmd/gotest@")
+			gotest.Empty(it, string(markers))
 		})
 	})
 }

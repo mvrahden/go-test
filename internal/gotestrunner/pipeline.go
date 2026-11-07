@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -384,20 +383,6 @@ func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []got
 	return p
 }
 
-// assignBudgetFiles names each target's sidecar files by its index in the
-// run, first being targets[0]'s.
-func assignBudgetFiles(targets []SuiteTarget, first int) {
-	for i := range targets {
-		// Per suite process, not per binary: suites of one binary run as
-		// concurrent processes, each with its own fixtures and budget. By
-		// index, not by suite name: names that differ in case alone name one
-		// file where the file system ignores case.
-		base := targets[i].BinaryPath + "." + strconv.Itoa(first+i)
-		targets[i].BudgetFile = protocol.BudgetFilePath(base)
-		targets[i].StopFile = protocol.StopFilePath(base)
-	}
-}
-
 func assignCoverProfiles(targets []SuiteTarget, coverDir string) {
 	for i := range targets {
 		targets[i].CoverProfile = filepath.Join(coverDir, fmt.Sprintf("%d.out", i))
@@ -524,7 +509,6 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		return result, nil
 	}
 
-	assignBudgetFiles(targets, 0)
 	setupCoverage(targets, overlay, pf.UserCoverProfile)
 	if pf.UserCoverProfile != "" {
 		defer mergeCoverProfiles(targets, pf.UserCoverProfile)
@@ -769,7 +753,6 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	nothingToRun := false
 	buildFailed := len(overlay.BrokenPackages) > 0
 	var allTargets []SuiteTarget
-	assigned := 0 // targets given their sidecar files so far
 
 	// A package that will never run holds no fixture.
 	for i := range overlay.BrokenPackages {
@@ -831,9 +814,6 @@ loop:
 			continue
 		}
 		anyTargets = true
-
-		assignBudgetFiles(targets, assigned)
-		assigned += len(targets)
 
 		if pf.UserCoverProfile != "" {
 			baseIdx := len(allTargets)

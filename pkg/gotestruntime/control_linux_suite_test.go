@@ -3,15 +3,25 @@
 package gotestruntime_test
 
 import (
+	"os"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // RunnerGoneTestSuite: a suite process whose runner's end of the channel
-// closes while a method holds stops as the runner would have stopped it, then
-// ends what its tests started in its process group, nobody else being left to.
+// closes stops as the runner would have stopped it, then ends what its tests
+// started in its process group, nobody else being left to.
 type RunnerGoneTestSuite struct{}
+
+func (s *RunnerGoneTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
 
 func (s *RunnerGoneTestSuite) BeforeEach(t *gotest.T) *linkRun { return &linkRun{} }
 
@@ -39,4 +49,38 @@ func (s *RunnerGoneTestSuite) TestTheChannelsEndWhileAMethodHolds(t *gotest.T, r
 			})
 		})
 	})
+}
+
+func (s *RunnerGoneTestSuite) TestTheChannelsEndDuringARequestedStop(t *gotest.T, r *linkRun) {
+	if suiteProcess(t) {
+		return
+	}
+	r.start(t, "TestRunnerGoneTestSuite", "TestTheChannelsEndDuringARequestedStop", child{mode: holdOnContext, slow: 2 * time.Second})
+	r.awaitMarker(t, "holding")
+	gotest.NoError(t, r.link.Stop())
+	r.awaitMarker(t, "AfterAll began")
+	r.link.Close()
+	r.wait(t)
+
+	t.When("the runner's end of the channel closes while a stop it asked for runs AfterAll", func(w *gotest.T) {
+		w.It("lets AfterAll run to its end, then releases the fixture", func(it *gotest.T) {
+			gotest.Equal(it, []string{"fixture BeforeAll", "holding", "context ended",
+				"AfterAll began", "suite AfterAll", "fixture AfterAll"}, r.markers())
+			gotest.NotContains(it, r.output(), "forced")
+		})
+	})
+}
+
+// processGone reports whether pid has exited: no such process, or one only
+// waiting to be reaped.
+func processGone(pid int) bool {
+	if syscall.Kill(pid, 0) == syscall.ESRCH {
+		return true
+	}
+	stat, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return true
+	}
+	end := strings.LastIndexByte(string(stat), ')')
+	return end > 0 && end+2 < len(stat) && stat[end+2] == 'Z'
 }

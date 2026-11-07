@@ -10,7 +10,6 @@ import (
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/internal/proctree"
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -38,14 +37,10 @@ type abandoned struct {
 	ready string
 }
 
-// startTracked starts script as a tracked tree's root; $0 is a marker path
-// inside dir and $1 the tree's stop file, which is empty when stopFile is.
-func (s *AbandonTestSuite) startTracked(t *gotest.T, dir, script string, stopFile bool) *abandoned {
-	stop := ""
-	if stopFile {
-		stop = filepath.Join(dir, "stop")
-	}
-	cmd := exec.Command("/bin/sh", "-c", script, filepath.Join(dir, "marker"), stop) //nolint:gosec // G204: fixed script
+// startTracked starts script as a tracked tree's root, stopped once more by
+// again (nil: an interrupt); $0 is a marker path inside dir.
+func (s *AbandonTestSuite) startTracked(t *gotest.T, dir, script string, again func() error) *abandoned {
+	cmd := exec.Command("/bin/sh", "-c", script, filepath.Join(dir, "marker")) //nolint:gosec // G204: fixed script
 	tree := proctree.New(cmd)
 	gotest.NoError(t, tree.Start())
 	a := &abandoned{cmd: cmd, tree: tree, done: make(chan struct{}), ready: filepath.Join(dir, "marker.ready")}
@@ -54,7 +49,7 @@ func (s *AbandonTestSuite) startTracked(t *gotest.T, dir, script string, stopFil
 		tree.Release()
 		close(a.done)
 	}()
-	a.stop = gotestrunner.ExportTrack(tree, cmd.Process.Pid, stop, a.done)
+	a.stop = gotestrunner.ExportTrack(tree, cmd.Process.Pid, again, a.done)
 	s.tracked = append(s.tracked, a)
 	gotest.Eventually(t, 10*time.Second, 10*time.Millisecond, func(poll *gotest.R) {
 		_, err := os.Stat(a.ready)
@@ -74,16 +69,16 @@ func (a *abandoned) end() {
 	a.stop()
 }
 
-func (s *AbandonTestSuite) TestATreeWithoutAStopFileIsAskedFirst(t *gotest.T) {
+func (s *AbandonTestSuite) TestATreeWithoutAWayOfItsOwnIsAskedFirst(t *gotest.T) {
 	dir := t.TempDir()
 	// Tears down on SIGTERM, as the shared fixture process does.
-	s.startTracked(t, dir, `trap 'sleep 0.3; touch "$0.down"; exit 0' TERM; touch "$0.ready"; while :; do sleep 0.05; done`, false)
+	s.startTracked(t, dir, `trap 'sleep 0.3; touch "$0.down"; exit 0' TERM; touch "$0.ready"; while :; do sleep 0.05; done`, nil)
 	started := time.Now()
 	gotestrunner.Abandon(5*time.Second, nil)
 	took := time.Since(started)
 	_, err := os.Stat(filepath.Join(dir, "marker.down"))
 
-	t.When("the CLI gives up on a tree that has no stop file", func(w *gotest.T) {
+	t.When("the CLI gives up on a tree that has no way of its own to be stopped again", func(w *gotest.T) {
 		w.It("asks it to stop and waits for it", func(it *gotest.T) {
 			gotest.NoError(it, err, "the tree was killed before it tore down")
 		})
@@ -95,12 +90,8 @@ func (s *AbandonTestSuite) TestATreeWithoutAStopFileIsAskedFirst(t *gotest.T) {
 
 func (s *AbandonTestSuite) TestAFurtherSignalSkipsTheWait(t *gotest.T) {
 	dir := t.TempDir()
-	// Publishes its pid as a suite process does and ignores the second stop.
-	a := s.startTracked(t, dir, `trap '' TERM; echo $$ > "$1.pid"; touch "$0.ready"; while :; do sleep 0.05; done`, true)
-	gotest.Eventually(t, 10*time.Second, 10*time.Millisecond, func(poll *gotest.R) {
-		_, err := os.Stat(protocol.StopPIDPath(filepath.Join(dir, "stop")))
-		gotest.NoError(poll, err)
-	})
+	// Takes the second stop, as a suite's force line goes out, and ignores it.
+	a := s.startTracked(t, dir, `trap '' TERM; touch "$0.ready"; while :; do sleep 0.05; done`, func() error { return nil })
 	hurry := make(chan struct{})
 	time.AfterFunc(300*time.Millisecond, func() { close(hurry) })
 	started := time.Now()

@@ -333,6 +333,11 @@ func (s *RelayConverterTestSuite) TestAConverterKilledMidRunIsReplaced(t *gotest
 }
 
 func (s *RelayConverterTestSuite) TestAStopAimedAtTheSuiteMissesTheConverter(t *gotest.T, ctx *converterCtx) {
+	// A suite that never took its channel: the run interrupts its tree as a
+	// Ctrl-C would, SIGINT to its group on Unix, CTRL_BREAK on its console on
+	// Windows.
+	defer gotestrunner.ExportWithoutChannel()()
+	defer gotestrunner.ExportHelloWithin(100 * time.Millisecond)()
 	run, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	var result gotestrunner.SuiteResult
@@ -341,8 +346,6 @@ func (s *RelayConverterTestSuite) TestAStopAimedAtTheSuiteMissesTheConverter(t *
 	})
 	converter := ctx.converter(t)
 	ctx.halfway(t)
-	// No stop file: the run interrupts the suite's tree, SIGTERM to its
-	// group on Unix, CTRL_BREAK on its console on Windows.
 	cancel()
 	// Scaled: on Windows the Ctrl-Break goes through a helper run of this
 	// executable, whose first start can wait on an antivirus scan.

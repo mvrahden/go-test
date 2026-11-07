@@ -942,6 +942,35 @@ func (s *OutputCollectorTestSuite) TestATerminatedBinaryIsNotedInTheStream(t *go
 	})
 }
 
+// A suite a signal from outside the runner stopped skipped the methods not
+// started: its package fails, whatever status the process ended with.
+func (s *OutputCollectorTestSuite) TestASuiteStoppedFromOutsideFailsItsPackage(t *gotest.T) {
+	var text, textErr, stream, streamErr bytes.Buffer
+	c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&text, &textErr))
+	c.Register("example.com/a", 1)
+	c.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{StoppedBy: "signal:SIGTERM", Stdout: []byte("PASS\n")})
+	j := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stream, &streamErr))
+	j.Register("example.com/a", 1)
+	j.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{StoppedBy: "signal:SIGINT", ExitCode: -1, Duration: time.Millisecond})
+	gone := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&bytes.Buffer{}, &bytes.Buffer{}))
+	gone.Register("example.com/a", 1)
+	gone.RecordResult("example.com/a", 0, gotestrunner.SuiteResult{StoppedBy: "runner-gone", Stdout: []byte("PASS\n")})
+	t.When("a suite process reports it was stopped by a signal from outside the runner", func(w *gotest.T) {
+		w.It("fails its package with exit 1, though the process exited 0", func(it *gotest.T) {
+			gotest.Equal(it, 1, c.WorstExitCode())
+			gotest.Contains(it, text.String()+textErr.String(), "gotest: suite stopped by SIGTERM from outside the runner\n")
+		})
+		w.It("names the signal in the stream, once, in place of the termination note", func(it *gotest.T) {
+			gotest.Equal(it, 1, j.WorstExitCode())
+			gotest.Regexp(it, `"Action":"output".*"Output":"gotest: suite stopped by SIGINT from outside the runner\\n".*"Package":"example.com/a"`, stream.String())
+			gotest.NotContains(it, stream.String(), "suite binary terminated")
+		})
+		w.It("books no other reason", func(it *gotest.T) {
+			gotest.Zero(it, gone.WorstExitCode())
+		})
+	})
+}
+
 // Suites of one package run as concurrent processes; the package's time is
 // the clock they occupied together, never the sum of their durations.
 func (s *OutputCollectorTestSuite) TestPackageTimeIsTheSpanOfItsSuites(t *gotest.T) {

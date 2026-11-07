@@ -3,9 +3,9 @@ Judge: ./tests/canary CanaryLifecycleTestSuite/TestASignalAfterTheStopFileSettle
 Clause: when the runner's signal reaches the suite only after its stop file settled the run → ends with its tests' own status, every verdict in the stream
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go
-@@ -474,10 +474,6 @@
- func (w *watcher) stop(sig os.Signal, requested bool) {
- 	w.unasked = !requested
+@@ -402,10 +402,6 @@
+ // to end by a signal that comes late.
+ func (w *watcher) stop(sig os.Signal) {
  	releaseEnd, settled := w.settle(sig, stopGrace)
 -	if settled && w.underRunner() {
 -		w.absorb()
@@ -14,7 +14,7 @@ Clause: when the runner's signal reaches the suite only after its stop file sett
  	signal.Reset(w.sigs...)
  	if settled {
  		return
-@@ -596,10 +592,6 @@
+@@ -520,10 +516,6 @@
  // close stops the watcher.
  func (w *watcher) close() {
  	if len(w.sigs) > 0 {
@@ -24,4 +24,4 @@ Clause: when the runner's signal reaches the suite only after its stop file sett
 -		}
  		signal.Stop(w.ch)
  	}
- 	if w.death != nil {
+ 	if w.running {

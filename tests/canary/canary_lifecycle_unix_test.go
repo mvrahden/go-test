@@ -3,8 +3,6 @@
 package canary_test //nolint:fail-guard
 
 import (
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -37,35 +35,13 @@ func signalSuite(t *gotest.T, markersPath string) {
 	t.Errorf("no pid marker among %v", got)
 }
 
-// lateSignalWrapper is stopFileWrapper with the signal caught rather than
-// ignored, so the suite keeps the signal's default action.
-func lateSignalWrapper(t *gotest.T) ([]string, []string) {
-	path := filepath.Join(t.TempDir(), "wrapper.sh")
-	script := `#!/bin/sh
-trap ':' INT TERM
-pidfile="$GOTEST_STOP_FILE.pid"
-"$@" &
-child=$!
-while [ "$(cat "$pidfile" 2>/dev/null)" != "$child" ]; do kill -0 "$child" 2>/dev/null || exit 1; sleep 0.02; done
-echo $$ > "$pidfile"
-echo "pid swapped" >> "$GOTEST_CANARY_DIR/markers"
-status=0
-while kill -0 "$child" 2>/dev/null; do wait "$child"; status=$?; done
-exit $status
-`
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the script must be executable
-		fatalf(t, "write wrapper: %v", err)
-	}
-	return []string{"-exec", path}, []string{"running", "pid swapped"}
-}
-
 // A signal that reaches the suite only after its stop file settled the run
 // leaves it to end with its tests' own status: every verdict reaches the
 // stream and the process lives to its own end.
 func (s *CanaryLifecycleTestSuite) TestASignalAfterTheStopFileSettledTheRun(t *gotest.T) {
-	wrap, held := lateSignalWrapper(t)
-	r := s.startRun(t, t.TempDir(), []string{"STOPPING_LINGER=1"}, append(append([]string{"-json"}, wrap...), "./testdata/stopping/")...)
-	if !r.await(90*time.Second, held...) {
+	// The runner stops the suite by its stop line; the signal comes after.
+	r := s.startRun(t, t.TempDir(), []string{"STOPPING_LINGER=1"}, "-json", "./testdata/stopping/")
+	if !r.await(90*time.Second, "running") {
 		_, _ = r.end(0)
 		fatalf(t, "latesignal: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
 	}

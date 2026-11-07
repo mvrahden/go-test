@@ -439,7 +439,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     Under `-json` the stream carries every verdict of the stopped run, on
     Windows too, and ends with a failed run naming the suites the stop cut
     short
-    ([stop file](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-by-the-stop-file-alone)).
+    ([stop file](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-a-run)).
     Below v1.34 a stop released the fixtures and ended
     the process at once, without `AfterAll`, and only while fixtures were
     held. To migrate a `goleak.VerifyNone` inside a suite method, which now

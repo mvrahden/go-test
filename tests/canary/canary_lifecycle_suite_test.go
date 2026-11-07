@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -272,66 +271,10 @@ func (s *CanaryLifecycleTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest
 	}
 	took, _, out, markers := s.interruptedRun(t, "stopgrace", []string{"STOPGRACE_IGNORE=1"}, []string{"-json", "-run=TestGraceTestSuite", "./testdata/stopgrace/"}, func(r *liveRun) {
 		time.Sleep(500 * time.Millisecond)
-		signalSuite(t, r.markers)
+		// The runner sends the suite its second stop on a second Ctrl-C.
+		_ = testkit.Interrupt(r.cmd, r.tree)
 	})
-	if !strings.Contains(out, "a second stop signal") || !slices.Contains(markers, "fixture.AfterAll") || took > 4*time.Second {
+	if !strings.Contains(out, "the runner forced the stop") || !slices.Contains(markers, "fixture.AfterAll") || took > 4*time.Second {
 		t.Errorf("stopgrace: markers %v, want the fixture released at once on the second signal (the run ended %s after the first):\n%s", markers, took, out)
-	}
-}
-
-// stopFileWrapper writes an -exec wrapper that leaves the runner only the
-// stop file to reach the suite, as on Windows: it publishes its own pid in
-// place of the suite's and ignores the signal sent to it. It marks "pid
-// swapped" once it has. Windows itself needs none.
-func stopFileWrapper(t *gotest.T) ([]string, []string) {
-	if runtime.GOOS == "windows" {
-		return nil, []string{"running"}
-	}
-	path := filepath.Join(t.TempDir(), "wrapper.sh")
-	script := `#!/bin/sh
-trap '' INT TERM
-pidfile="$GOTEST_STOP_FILE.pid"
-"$@" &
-child=$!
-while [ "$(cat "$pidfile" 2>/dev/null)" != "$child" ]; do kill -0 "$child" 2>/dev/null || exit 1; sleep 0.02; done
-echo $$ > "$pidfile"
-echo "pid swapped" >> "$GOTEST_CANARY_DIR/markers"
-status=0
-while kill -0 "$child" 2>/dev/null; do wait "$child"; status=$?; done
-exit $status
-`
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the script must be executable
-		fatalf(t, "write wrapper: %v", err)
-	}
-	return []string{"-exec", path}, []string{"running", "pid swapped"}
-}
-
-// A run interrupted where only the stop file reaches the suite skips the
-// methods not started with the reason run stopping, carries every verdict to
-// the stream and runs AfterAll before the fixture is released. A run still
-// going 15s after the stop is killed: the holding method's context would
-// otherwise end it as if stopped.
-func (s *CanaryLifecycleTestSuite) TestOnlyTheStopFileStopsTheSuite(t *gotest.T) {
-	wrap, held := stopFileWrapper(t)
-	r := s.startRun(t, t.TempDir(), nil, append(append([]string{"-json"}, wrap...), "./testdata/stopping/")...)
-	if !r.await(90*time.Second, held...) {
-		_, _ = r.end(0)
-		fatalf(t, "stopfile: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
-	}
-	_ = testkit.Interrupt(r.cmd, r.tree)
-	_, markers := r.end(15 * time.Second)
-	out := r.stdout.String()
-	for _, method := range []string{"TestStopTestSuite/TestSecond", "TestStopTestSuite/TestThird"} {
-		if v := streamVerdict(out, method); v != "skip" || !strings.Contains(streamOutput(out, method), "run stopping") {
-			t.Errorf("stopfile: %s verdict %q, want skip with the reason run stopping:\n%s", method, v, streamOutput(out, method))
-		}
-	}
-	for _, path := range []string{"TestStopTestSuite/TestHolds", "TestStopTestSuite", ""} {
-		if streamVerdict(out, path) == "" {
-			t.Errorf("stopfile: no verdict for %q reached the stream", path)
-		}
-	}
-	if !testkit.MarkerOrderOf(markers, "context ended", "suite.AfterAll", "fixture.AfterAll") {
-		t.Errorf("stopfile: markers %v, want context ended, suite.AfterAll, fixture.AfterAll in order", markers)
 	}
 }

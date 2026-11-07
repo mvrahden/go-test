@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -62,17 +61,20 @@ func (s *StoppingTestSuite) TestATeardownPipelineFinishes(t *gotest.T) {
 	gotest.Less(t, time.Since(began), 10*time.Second)
 }
 
-// A suite process whose runner is gone has nobody left to announce a stop: a
-// SIGTERM then counts, and the fixtures are released.
-func (s *StoppingTestSuite) TestAnOrphanedSuiteHonoursASignal(t *gotest.T) {
+// A suite process whose runner is gone has nobody left to send a stop: the
+// end of its channel then counts as one, and the fixtures are released.
+func (s *StoppingTestSuite) TestAnOrphanedSuiteStopsAtItsChannelsEnd(t *gotest.T) {
 	log := filepath.Join(t.TempDir(), "events")
-	stop := filepath.Join(t.TempDir(), "stop") // never created
 	// The shell starts the binary in the background, waits until it holds its
 	// connection and exits: the binary's parent is gone, as when the CLI
-	// crashed after starting its suites.
+	// crashed after starting its suites. A group of its own: the orphan ends
+	// its group once torn down.
 	sh := exec.Command("sh", "-c", `"$BIN" -test.run=TestHoldingTestSuite >/dev/null 2>&1 & echo $!; until grep -q running "$STOPPING_LOG" 2>/dev/null; do sleep 0.05; done`)
-	sh.Env = append(ownEnv(), "BIN="+s.bin["hold"], "STOPPING_HOLD=1", "STOPPING_LOG="+log, protocol.EnvStopFile+"="+stop)
+	sh.Env = append(ownEnv(), "BIN="+s.bin["hold"], "STOPPING_HOLD=1", "STOPPING_LOG="+log)
+	sh.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	c := attach(t, sh)
 	out, err := sh.Output()
+	c.started()
 	gotest.NoError(t, err)
 	pid, err := strconv.Atoi(strings.TrimSpace(string(out)))
 	gotest.NoError(t, err)
@@ -83,11 +85,11 @@ func (s *StoppingTestSuite) TestAnOrphanedSuiteHonoursASignal(t *gotest.T) {
 		}
 	}
 
-	gotest.NoError(t, syscall.Kill(pid, syscall.SIGTERM))
+	c.close() // the runner is gone
 	for deadline := time.Now().Add(15 * time.Second); syscall.Kill(pid, 0) == nil; time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			_ = syscall.Kill(pid, syscall.SIGKILL)
-			gotest.Fail(t, "the orphaned binary ignored SIGTERM") //nolint:fail-guard // it must kill the process before failing
+			gotest.Fail(t, "the orphaned binary outlived its channel") //nolint:fail-guard // it must kill the process before failing
 		}
 	}
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))

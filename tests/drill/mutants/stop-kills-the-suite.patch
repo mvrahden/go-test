@@ -1,13 +1,13 @@
 Expect: ^FAIL .*conformance/lifecycle Stop .* / runs AfterAll before the fixture is released \(
 Clause: when the run is interrupted while a holding method has started a process of its own → runs AfterAll before the fixture is released
---- a/internal/gotestrunner/stop_unix.go
-+++ b/internal/gotestrunner/stop_unix.go
-@@ -22,7 +22,7 @@
- 	if err := inGroup(pid, group); err != nil {
- 		return err
- 	}
--	return syscall.Kill(pid, syscall.SIGTERM)
-+	return syscall.Kill(pid, syscall.SIGKILL)
- }
- 
- // killPID kills pid, which must be in the suite's process group as for
+--- a/internal/gotestrunner/managed_process.go
++++ b/internal/gotestrunner/managed_process.go
+@@ -342,7 +342,7 @@
+ // Without a hello, or when the line cannot be written, the tree gets one
+ // Ctrl-C instead; the process then stops as under plain go test.
+ func (p *ManagedProcess) RequestStop() error {
+-	if p.config.Link != nil && p.awaitHello() && p.config.Link.Stop() == nil {
++	if p.config.Link != nil && p.awaitHello() && p.tree.Kill() == nil {
+ 		// The rest of the tree is ended once the root has exited.
+ 		p.Stopped()
+ 		return nil

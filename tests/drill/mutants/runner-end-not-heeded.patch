@@ -5,20 +5,23 @@ Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteWhoseParentIsKilledStop
 Clause: when the parent of a suite process under the runner is killed while a method holds → ends the holding method's context
 Clause: when the parent of a suite process under the runner is killed while a method holds → runs AfterAll before the fixture is released
 Clause: when the parent of a suite process under the runner is killed while a method holds → leaves no suite process behind
---- a/pkg/gotestruntime/parentdeath_linux.go
-+++ b/pkg/gotestruntime/parentdeath_linux.go
-@@ -7,7 +7,7 @@
- 	"syscall"
- )
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -326,9 +326,6 @@
+ 	case control.Force:
+ 		w.forced = true
+ 		w.stop(runnerSignal())
+-	case endOfChannel:
+-		_ = w.link.Stopped("runner-gone")
+-		w.stop(runnerSignal())
+ 	}
+ }
  
--func init() { askForParentDeath() }
-+func init() {}
- 
- // deathSignal is what the kernel sends this process when its parent is gone.
- // It is no stop signal, so nobody's stop request is ever taken for it: it
-@@ -37,4 +37,4 @@
- 
- // parentExited reports whether the process that started this one has ended:
- // an orphan is handed to another parent.
--func parentExited() bool { return os.Getppid() != parentPID }
-+func parentExited() bool { return false }
+--- a/internal/proctree/deathsig_linux.go
++++ b/internal/proctree/deathsig_linux.go
+@@ -8,4 +8,4 @@
+ // started it is gone: a runner that dies asks its trees to stop, and a child
+ // that handles the request tears down before it exits. Only the root gets it;
+ // what the root started hears of it from the root.
+-func deathSignal(attr *syscall.SysProcAttr) { attr.Pdeathsig = syscall.SIGTERM }
++func deathSignal(attr *syscall.SysProcAttr) { _ = attr }

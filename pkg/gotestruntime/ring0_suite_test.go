@@ -98,12 +98,6 @@ func mustErrorIs(t *gotest.T, err, target error, msgAndArgs ...any) {
 	}
 }
 
-func mustNoError(t *gotest.T, err error, msgAndArgs ...any) {
-	if err != nil {
-		fatalf(t, "unexpected error: %v%s", err, note(msgAndArgs))
-	}
-}
-
 func mustTrue(t *gotest.T, v bool, msgAndArgs ...any) {
 	if !v {
 		t.Errorf("expected true%s", note(msgAndArgs))

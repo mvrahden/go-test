@@ -7,25 +7,18 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strconv"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/control"
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/runstate"
 )
 
-// The sidecar files the runner shares with this process, read once and taken
-// out of the environment: a process a test starts must not answer to them.
-var (
-	stopFile   = takeEnv(protocol.EnvStopFile)
-	budgetFile = takeEnv(protocol.EnvTeardownBudgetFile)
-)
-
 // link is the channel the runner passed this process, taken out of the
-// environment as the files are; nil under plain go test.
+// environment; nil under plain go test.
 var link = claimLink()
 
 // claimLink takes the runner's channel and says so at once, not at the first
@@ -40,15 +33,49 @@ func claimLink() *control.Endpoint {
 	return ep
 }
 
-func takeEnv(key string) string {
-	v := os.Getenv(key)
-	_ = os.Unsetenv(key)
-	return v
+// legacyRunner: a gotest CLI older than this runtime started the process. It
+// names a stop file and passes no channel, and its stop would kill the suite
+// without teardown, so no suite runs under it.
+var legacyRunner = takeLegacyStopFile() && link == nil
+
+// takeLegacyStopFile reports whether an older CLI named its stop file, and
+// takes the variable out of the environment.
+func takeLegacyStopFile() bool {
+	_, ok := os.LookupEnv("GOTEST_STOP_FILE")
+	_ = os.Unsetenv("GOTEST_STOP_FILE")
+	return ok
 }
 
-// parentPID is the process that started this one. Under the runner, a parent
-// that is gone means the CLI crashed and nobody is left to announce a stop.
-var parentPID = os.Getppid()
+// refuseLegacyRunner fails tb under an older CLI, naming the fix.
+func refuseLegacyRunner(tb testing.TB) {
+	if !legacyRunner {
+		return
+	}
+	tb.Helper()
+	bi, ok := debug.ReadBuildInfo()
+	tb.Fatal(legacyRefusal(bi, ok))
+}
+
+const runtimeModule = "github.com/mvrahden/go-test"
+
+// legacyRefusal says this runtime, at the version bi names, is newer than the
+// CLI running it, and how to run one that matches.
+func legacyRefusal(bi *debug.BuildInfo, ok bool) string {
+	version, pin := "this tree", "<the version go.mod requires>"
+	if ok {
+		for _, m := range append([]*debug.Module{&bi.Main}, bi.Deps...) {
+			if m.Path != runtimeModule {
+				continue
+			}
+			// A replaced module is a tree of its own, of no version to pin.
+			if m.Replace == nil && m.Version != "" && m.Version != "(devel)" {
+				version, pin = runtimeModule+" "+m.Version, m.Version
+			}
+			break
+		}
+	}
+	return "gotest: this runtime (" + version + ") is newer than the gotest CLI running it, which cannot stop it; run go tool gotest, or go get -tool " + runtimeModule + "/cmd/gotest@" + pin
+}
 
 // The watcher runs while a suite does: the first suite or hold starts it, the
 // one that ends last stops it, so it leaves no goroutine and no signal handler
@@ -148,34 +175,22 @@ func drainLink() {
 // On the gotest runner's channel the runner's stop line asks for a stop, its
 // force line forces one, and the channel's end, the runner gone, starts one
 // nobody asked for; a signal starts a stop the runner is told of, and never
-// forces one. Under the runner's stop file a signal counts only once the
-// runner has created the file, so a signal the code under test sends its own
-// process is left to that code. The stop file counts by itself too, which the
-// watcher polls for: on Windows it is the only stop the runner sends. So does
-// a parent that is gone, and a stream nobody reads any more, which the watcher
-// checks for itself. Under plain go test only SIGINT counts, the Ctrl-C a
-// developer sends, and nothing is polled. Fuzzing is left to Go once its
+// forces one. Under plain go test only SIGINT counts, the Ctrl-C a developer
+// sends, and a second one forces the stop. Fuzzing is left to Go once its
 // engine has the target: it stops on an interrupt by itself, saving what it
 // found, and the target returns. A signal ignored when the process started
 // stays ignored.
 type watcher struct {
 	stderr  io.Writer
-	file    string            // the runner's stop file; empty under plain go test
 	link    *control.Endpoint // the runner's channel; nil without one
 	sigs    []os.Signal
 	ch      chan os.Signal    // the signals that arrived
-	death   chan os.Signal    // the death signal, which only wakes the watcher
-	found   chan os.Signal    // a stop the poll found
 	lines   chan control.Line // the runner's lines, then endOfChannel
 	running bool
-	// unasked: the stop under way is one the poll found, which no signal
-	// has asked for yet.
-	unasked bool
 	// forced: the runner's force line came, so the stop releases at once.
 	forced   bool
 	quit     chan struct{}
 	done     chan struct{}
-	polled   chan struct{}
 	readDone chan struct{}
 	unread   []control.Line // taken from the channel, not handed over by quit
 }
@@ -184,42 +199,24 @@ type watcher struct {
 // channel; no line has it.
 const endOfChannel control.Kind = 0
 
-func watch(stderr io.Writer) *watcher { return watchOn(stderr, stopFile, link) }
+func watch(stderr io.Writer) *watcher { return watchOn(stderr, link) }
 
-func watchFile(stderr io.Writer, file string) *watcher { return watchOn(stderr, file, nil) }
-
-func watchOn(stderr io.Writer, file string, ep *control.Endpoint) *watcher {
+func watchOn(stderr io.Writer, ep *control.Endpoint) *watcher {
 	notePipe()
-	w := &watcher{stderr: stderr, file: file, link: ep, ch: make(chan os.Signal, 1), found: make(chan os.Signal, 1),
+	w := &watcher{stderr: stderr, link: ep, ch: make(chan os.Signal, 1),
 		lines: make(chan control.Line), quit: make(chan struct{}), done: make(chan struct{}),
-		polled: make(chan struct{}), readDone: make(chan struct{})}
+		readDone: make(chan struct{})}
 	w.sigs = caughtSignals(w.underRunner())
 	if len(w.sigs) == 0 && !w.underRunner() {
 		close(w.done)
-		close(w.polled)
 		close(w.readDone)
 		return w
 	}
 	if len(w.sigs) > 0 {
 		signal.Notify(w.ch, w.sigs...)
 	}
-	if w.file != "" && deathSignal != nil && !signal.Ignored(deathSignal) {
-		w.death = make(chan os.Signal, 1)
-		signal.Notify(w.death, deathSignal)
-	}
-	if w.file != "" {
-		// The runner stops this process alone, by pid or by the stop file,
-		// not an -exec command in front of it. Published once the signals
-		// are caught: the runner signals the pid it reads at once.
-		publishPID(protocol.StopPIDPath(w.file))
-	}
 	w.running = true
 	go w.loop()
-	if w.file != "" {
-		go w.poll(runnerSignal())
-	} else {
-		close(w.polled)
-	}
 	if w.link != nil {
 		go w.read()
 	} else {
@@ -229,8 +226,8 @@ func watchOn(stderr io.Writer, file string, ep *control.Endpoint) *watcher {
 }
 
 // underRunner reports whether the gotest runner started this watcher's
-// process: by its stop file or by its channel.
-func (w *watcher) underRunner() bool { return w.file != "" || w.link != nil }
+// process, which then has its channel.
+func (w *watcher) underRunner() bool { return w.link != nil }
 
 // caughtSignals is what a watcher catches: Ctrl-C's signal, and under the
 // runner its stop signals too, leaving out any ignored at the start.
@@ -264,47 +261,6 @@ func signalName(sig os.Signal) string {
 		return "SIGINT"
 	}
 	return "SIGTERM"
-}
-
-// publishPID writes this process's pid to path whole, by rename, so the
-// runner never reads a part of it.
-var publishPID = func(path string) {
-	tmp := path + ".tmp"
-	if os.WriteFile(tmp, []byte(strconv.Itoa(os.Getpid())), 0o600) != nil {
-		return
-	}
-	if os.Rename(tmp, path) != nil {
-		_ = os.Remove(tmp)
-	}
-}
-
-// stopFilePoll is how often the watcher looks for the runner's stop file;
-// readerPoll how often it checks that its parent lives and its stream is
-// still read.
-const (
-	stopFilePoll = 25 * time.Millisecond
-	readerPoll   = 200 * time.Millisecond
-)
-
-// poll hands the loop sig once the runner's stop file exists, the parent is
-// gone, or nobody reads the stream any more: behind an -exec wrapper that
-// stays, the stream's lost reader is the only trace a dead runner leaves. It runs under the runner only, and fires once.
-func (w *watcher) poll(sig os.Signal) {
-	defer close(w.polled)
-	tick := time.NewTicker(stopFilePoll)
-	defer tick.Stop()
-	for n := 0; ; n++ {
-		select {
-		case <-w.quit:
-			return
-		case <-tick.C:
-		}
-		_, err := os.Stat(w.file)
-		if err == nil || n%int(readerPoll/stopFilePoll) == 0 && (parentExited() || stdoutReaderGone()) {
-			w.found <- sig // buffered, and sent once
-			return
-		}
-	}
 }
 
 // read hands the loop what the runner sends on its channel, then the
@@ -341,19 +297,7 @@ func (w *watcher) loop() {
 		case sig := <-w.ch:
 			if w.counts(sig) {
 				w.announce(sig)
-				w.stop(sig, true) // returns once the run has stopped, or ends the process
-			}
-		case sig := <-w.found:
-			// A stop a signal already began has read the file too.
-			if !stopping.Load() && w.counts(sig) {
-				w.stop(sig, false)
-			}
-		case <-w.death:
-			// Only a parent that is gone makes it a stop, and the stop it
-			// starts is nobody's request. Landing during a stop, or after
-			// one, it starts none.
-			if !stopping.Load() && parentExited() {
-				w.stop(stopSignals[0], false)
+				w.stop(sig) // returns once the run has stopped, or ends the process
 			}
 		case l := <-w.lines:
 			w.take(l)
@@ -378,19 +322,18 @@ func (w *watcher) take(l control.Line) {
 	}
 	switch l.Kind {
 	case control.Stop:
-		w.stop(runnerSignal(), true)
+		w.stop(runnerSignal())
 	case control.Force:
 		w.forced = true
-		w.stop(runnerSignal(), true)
+		w.stop(runnerSignal())
 	case endOfChannel:
 		_ = w.link.Stopped("runner-gone")
-		w.stop(runnerSignal(), false)
+		w.stop(runnerSignal())
 	}
 }
 
 // heed takes a line that arrives while a stop is under way: the force line
-// forces it, the stop line is the request a stop nobody asked for ran ahead
-// of, and the channel's end marks the runner gone.
+// forces it, and the channel's end marks the runner gone.
 func (w *watcher) heed(l control.Line) {
 	if leftToGo() {
 		return
@@ -398,8 +341,6 @@ func (w *watcher) heed(l control.Line) {
 	switch l.Kind {
 	case control.Force:
 		w.forced = true
-	case control.Stop:
-		w.unasked = false
 	case endOfChannel:
 		runnerGone.Store(true)
 	}
@@ -433,13 +374,7 @@ func (w *watcher) counts(sig os.Signal) bool {
 		// never by a signal.
 		return signalsStopOnTheChannel && !stopping.Load()
 	}
-	if w.file == "" {
-		return sig == os.Interrupt
-	}
-	if _, err := os.Stat(w.file); err == nil {
-		return true
-	}
-	return os.Getppid() != parentPID || parentExited() || stdoutReaderGone()
+	return sig == os.Interrupt
 }
 
 // leftToGo reports whether a stop is Go's own to handle: in a fuzzing worker,
@@ -457,20 +392,15 @@ const stopGrace = 5 * time.Second
 // setups in flight see their contexts end, the methods not yet started are
 // skipped, AfterAll runs, and the hold's cleanup releases the fixtures. A
 // body or BeforeAll still running stopGrace after the stop, or after its own
-// start when that came later, a second stop signal or the runner's force
-// line, or a run still going when only the fixtures' teardown time is left of
-// the release bound, forces it: the fixtures are torn down within what is
-// left of the bound and the process ends by sig. Once the stop is forced, or
-// settled under plain go test, the handlers are reset, so the next signal has
-// its default action; settled under the runner, the stop signals stay caught
-// and dropped, since the runner's own may still be on its way after its stop
-// file settled the run, and a process that ended its run is not one to end by
-// it. A stop no signal asked for, which the poll found or the death signal
-// brought, takes the first signal that follows as its request, the runner's
-// own after its stop file among them; only the next one forces it. The death
-// signal is never a request.
-func (w *watcher) stop(sig os.Signal, requested bool) {
-	w.unasked = !requested
+// start when that came later, a second Ctrl-C under plain go test or the
+// runner's force line, or a run still going when only the fixtures' teardown
+// time is left of the release bound, forces it: the fixtures are torn down
+// within what is left of the bound and the process ends by sig. Once the stop
+// is forced, or settled under plain go test, the handlers are reset, so the
+// next signal has its default action; settled under the runner, the stop
+// signals stay caught and dropped, as a process that ended its run is not one
+// to end by a signal that comes late.
+func (w *watcher) stop(sig os.Signal) {
 	releaseEnd, settled := w.settle(sig, stopGrace)
 	if settled && w.underRunner() {
 		w.absorb()
@@ -544,11 +474,7 @@ func (w *watcher) settle(sig os.Signal, grace time.Duration) (releaseEnd time.Ti
 		}
 		select {
 		case again := <-w.ch:
-			switch {
-			case !w.counts(again):
-			case w.unasked:
-				w.unasked = false // the request the poll ran ahead of
-			default:
+			if w.counts(again) {
 				fmt.Fprintln(w.stderr, "gotest: a second stop signal; the fixtures are torn down now and the process ends by the signal")
 				return releaseEnd, false
 			}
@@ -600,14 +526,10 @@ func (w *watcher) close() {
 		}
 		signal.Stop(w.ch)
 	}
-	if w.death != nil {
-		signal.Stop(w.death)
-	}
 	if w.running {
 		close(w.quit)
 	}
 	<-w.done
-	<-w.polled
 	<-w.readDone
 }
 

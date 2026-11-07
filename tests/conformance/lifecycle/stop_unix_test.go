@@ -3,7 +3,6 @@
 package lifecycle_test
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -55,28 +54,6 @@ func (s *StopTestSuite) TestAStopEndsWhatATestStarted(t *gotest.T) {
 	})
 }
 
-// lateSignalWrapper writes an -exec wrapper that keeps the runner's signal
-// from the suite: it publishes its own pid in place of the suite's, marking
-// "pid swapped" once it has, and catches the signal sent to it. Caught, not
-// ignored, so the suite keeps the signal's default action.
-func lateSignalWrapper(t *gotest.T) string {
-	path := filepath.Join(t.TempDir(), "wrapper.sh")
-	script := `#!/bin/sh
-trap ':' INT TERM
-pidfile="$GOTEST_STOP_FILE.pid"
-"$@" &
-child=$!
-while [ "$(cat "$pidfile" 2>/dev/null)" != "$child" ]; do kill -0 "$child" 2>/dev/null || exit 1; sleep 0.02; done
-echo $$ > "$pidfile"
-echo "pid swapped" >> "$GOTEST_CANARY_DIR/markers"
-status=0
-while kill -0 "$child" 2>/dev/null; do wait "$child"; status=$?; done
-exit $status
-`
-	gotest.NoError(t, os.WriteFile(path, []byte(script), 0o700)) //nolint:gosec // G306: the script must be executable
-	return path
-}
-
 // marked waits for the run to leave every marker in wants; one that never
 // does is killed before the test fails.
 func marked(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, markerDir string, wants ...string) {
@@ -97,10 +74,10 @@ func marked(t *gotest.T, cmd *exec.Cmd, tree *proctree.Tree, markerDir string, w
 
 func (s *StopTestSuite) TestASignalAfterTheStopFileSettledTheRun(t *gotest.T) {
 	markerDir := t.TempDir()
-	cmd := exec.Command(s.cli, "-json", "-exec", lateSignalWrapper(t), "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
+	cmd := exec.Command(s.cli, "-json", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
 	cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_LINGER=1")
 	tree := holding(t, cmd, markerDir)
-	marked(t, cmd, tree, markerDir, "pid swapped")
+	// The runner stops the suite by its stop line; the signal comes after.
 	signalled(t, cmd, tree, testkit.Interrupt(cmd, tree))
 	marked(t, cmd, tree, markerDir, "teardown done")
 	signalled(t, cmd, tree, signalSuite(filepath.Join(markerDir, testkit.MarkersFile)))

@@ -835,9 +835,8 @@ func (s *RuntimeTestSuite) TestMultipleRoots_ConcurrentTeardown(t *gotest.T) {
 	mustEqual(t, 0, exitCode)
 }
 
-func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
-	budgetFile := filepath.Join(t.TempDir(), "budget")
-	gotestruntime.ExportUseBudgetFile(budgetFile)
+func (s *RuntimeTestSuite) TestBudget_AdvertisedCorrectly(t *gotest.T) {
+	gotestruntime.ExportForgetBudgets()
 
 	root := &gotestruntime.FixtureNode{
 		Name:      "Root",
@@ -859,17 +858,13 @@ func (s *RuntimeTestSuite) TestBudgetFile_WrittenCorrectly(t *gotest.T) {
 
 	mustEqual(t, 0, exitCode)
 
-	data, err := os.ReadFile(budgetFile)
-	mustNoError(t, err)
-
 	// Budget = longest dependency path (2m root + 1m child) + max suite setup (30s) + 30s
 	expected := (2*time.Minute + 1*time.Minute + 30*time.Second + 30*time.Second).String()
-	mustEqual(t, expected, string(data))
+	mustEqual(t, expected, gotestruntime.ExportBudget().String())
 }
 
-func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T) {
-	budgetFile := filepath.Join(t.TempDir(), "budget")
-	gotestruntime.ExportUseBudgetFile(budgetFile)
+func (s *RuntimeTestSuite) TestBudget_NoDeadlineIsNotZeroBudget(t *gotest.T) {
+	gotestruntime.ExportForgetBudgets()
 
 	// NoDeadline means "no deadline", not "takes no time". Reading it as zero
 	// would hand the supervisor a budget short enough to force-kill a teardown
@@ -894,16 +889,13 @@ func (s *RuntimeTestSuite) TestBudgetFile_NoDeadlineIsNotZeroBudget(t *gotest.T)
 	})
 	mustEqual(t, 0, exitCode)
 
-	data, err := os.ReadFile(budgetFile)
-	mustNoError(t, err)
-
 	// Each unbounded stage falls back to the 2m default floor: 2m + 2m + 30s + 30s.
 	expected := (2*time.Minute + 2*time.Minute + 30*time.Second + 30*time.Second).String()
-	mustEqual(t, expected, string(data))
+	mustEqual(t, expected, gotestruntime.ExportBudget().String())
 }
 
-func (s *RuntimeTestSuite) TestBudgetFile_NotWrittenWhenEnvUnset(t *gotest.T) {
-	gotestruntime.ExportUseBudgetFile("")
+func (s *RuntimeTestSuite) TestBudget_NothingSentWithoutAChannel(t *gotest.T) {
+	gotestruntime.ExportForgetBudgets()
 
 	root := &gotestruntime.FixtureNode{
 		Name:      "Root",
@@ -916,9 +908,8 @@ func (s *RuntimeTestSuite) TestBudgetFile_NotWrittenWhenEnvUnset(t *gotest.T) {
 	mustEqual(t, 0, exitCode)
 }
 
-func (s *RuntimeTestSuite) TestBudgetFile_MultipleRootsUsesMax(t *gotest.T) {
-	budgetFile := filepath.Join(t.TempDir(), "budget")
-	gotestruntime.ExportUseBudgetFile(budgetFile)
+func (s *RuntimeTestSuite) TestBudget_MultipleRootsUsesMax(t *gotest.T) {
+	gotestruntime.ExportForgetBudgets()
 
 	rootA := &gotestruntime.FixtureNode{
 		Name:      "RootA",
@@ -946,12 +937,9 @@ func (s *RuntimeTestSuite) TestBudgetFile_MultipleRootsUsesMax(t *gotest.T) {
 
 	mustEqual(t, 0, exitCode)
 
-	data, err := os.ReadFile(budgetFile)
-	mustNoError(t, err)
-
 	// Max tree path: max(1m, 3m+2m) = 5m; + 45s suite + 30s headroom
 	expected := (5*time.Minute + 45*time.Second + 30*time.Second).String()
-	mustEqual(t, expected, string(data))
+	mustEqual(t, expected, gotestruntime.ExportBudget().String())
 }
 
 func (s *RuntimeTestSuite) TestTeardownFailure_SetsExitCode1WhenTestsPassed(t *gotest.T) {
