@@ -486,7 +486,7 @@ shards of one run do not add up to every mutant exactly once.
 | `failed-hydrate-not-dehydrated` | a shared fixture whose Hydrate failed gets no Dehydrate | canary: the failed Hydrate's Dehydrate marker is missing |
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
-| `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the parent is gone |
+| `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the runner is gone |
 | `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
 | `stop-releases-before-afterall` | a stop releases the fixtures before the suite's AfterAll runs | canary: the stopped fixture's markers show the release ahead of AfterAll |
 | `stop-grace-past-5s` | a stopped method body that ignores its context gets 15s instead of 5s | canary: the stopgrace run does not say the body was cut short after 5s |
@@ -766,6 +766,20 @@ shards of one run do not add up to every mutant exactly once.
 | `reconversion-skipped` | a converter that ended early is not replaced | canary: what the suite wrote after the converter was killed is missing from the stream, and stderr says nothing |
 | `link-closed-at-wait` | the channel is closed once the root exits, before the tree is released | canary: a suite an `-exec` wrapper ran in the background stops when the wrapper exits |
 | `signalled-suite-read-as-passing` | a suite process ended by a signal is read as having exited 0 | canary: a suite process that kills itself leaves a passing package and exit 0 |
+| `channel-stop-line-ignored` | a suite process drops the runner's stop line, so the stop never reaches the method that holds | canary: the stopline run holds until it is killed, its method's context never ended |
+| `hello-never-sent` | a suite process never says hello on its channel, so the runner falls back to a Ctrl-C and the suite ends by the signal | canary: the stopline run's stderr names the signal and the stream has no verdict for the suite |
+| `eof-ignored` | the end of a suite process's channel starts no stop | ring-0 lifecycle: the orphaned binary outlives its channel |
+| `runner-gone-leaves-the-group` | a suite process whose runner is gone does not end its process group | canary: the process the runnergone holding method started outlives the suite |
+| `drain-at-open-skipped` | a stop that reached the channel before the first suite opened is not read at the open | canary: the stopatopen suites are not skipped with the reason run stopping |
+| `reader-outlives-the-suite` | the channel's reader is neither stopped nor waited for when the last suite ends | canary: the channel fixture's TestMain finds the reader still running |
+| `budget-line-ignored` | a suite process never sends its teardown budget, so the runner waits the default | canary: the stopbudget suite outlives its 32s budget |
+| `budget-line-leaves-out-the-fixtures` | the teardown budget a suite process sends is its setup timeout alone | canary: the stopbudget suite whose budget outlasts its linger is killed first |
+| `channel-cloexec-dropped` | the channel is moved without close-on-exec, so a process a test starts inherits it | canary: the channel fixture's child finds a socket among its descriptors |
+| `channel-type-unchecked` | the channel's variable is taken for a descriptor of any type, so a regular file it names is closed | canary: the channel fixture's child cannot write to its descriptor 3 |
+| `signal-forces-under-the-runner` | under the runner a second signal during a stop forces it | canary: the outside run's second SIGTERM releases the fixture without AfterAll |
+| `signal-not-announced` | a stop a signal from outside began is neither told to the runner nor ends by the signal | canary: the outside run's stream names no stop from outside and the run passes |
+| `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |
+| `force-before-stop` | the runner's force line with no stop under way is ignored | ring-0 lifecycle: the process the force reached keeps running |
 
 ## Adding a mutant
 

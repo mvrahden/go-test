@@ -94,3 +94,32 @@ func (s *StoppingTestSuite) TestAnOrphanedSuiteStopsAtItsChannelsEnd(t *gotest.T
 	}
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 }
+
+// The runner's force line with no stop under way, as when a second Ctrl-C
+// overtakes the first's stop line, forces a stop of its own: the fixtures
+// are released at once and the process ends by the signal, not after the
+// method that ignores its context returns.
+func (s *StoppingTestSuite) TestAForceWithNoStopForcesOne(t *gotest.T) {
+	cmd, c := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1", "STOPPING_IGNORE_CONTEXT=1")
+	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
+	c.started()
+	began := time.Now()
+	gotest.NoError(t, c.link.Force())
+	exited := make(chan error, 1)
+	go func() { exited <- cmd.Wait() }()
+	var err error
+	select {
+	case err = <-exited:
+	case <-time.After(20 * time.Second):
+		_ = tree.Kill()
+		<-exited
+		tree.Release()
+		c.close()
+		gotest.Fail(t, "a force with no stop under way left the process running") //nolint:fail-guard // the tree is killed before the test fails
+	}
+	tree.Release()
+	c.close()
+	gotest.Less(t, time.Since(began), 4*time.Second, "the force waited for the method")
+	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
+	gotest.False(t, endedOnItsOwn(err), "the process ends by the signal: %v", err)
+}

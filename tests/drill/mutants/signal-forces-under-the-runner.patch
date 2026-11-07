@@ -1,0 +1,14 @@
+Expect: outside: markers .*, want AfterAll before the release: the second signal forced the stop
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASignalFromOutsideIsAStop
+Clause: when a second SIGTERM from outside the runner reaches the suite during the stop the first began → still runs AfterAll before the fixture is released, the stop not forced
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -389,7 +389,7 @@
+ 	if w.link != nil {
+ 		// Only the first signal: the runner forces a stop by its force line,
+ 		// never by a signal.
+-		return signalsStopOnTheChannel && !stopping.Load()
++		return signalsStopOnTheChannel
+ 	}
+ 	return sig == os.Interrupt
+ }

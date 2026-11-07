@@ -1,0 +1,14 @@
+Expect: stopbudget: the suite was killed before its teardown budget was spent
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestAStoppedSuiteWithinItsBudgetEndsOnItsOwn
+Clause: when the runner stops a suite that reported a teardown budget longer than its 40s linger → lets the suite end on its own
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -271,7 +271,7 @@
+ 	recordReserve(path)
+ 	budget := recordBudget(path + cfg.MaxSuiteSetupTimeout + 30*time.Second)
+ 	if link != nil {
+-		_ = link.Budget(budget)
++		_ = link.Budget(cfg.MaxSuiteSetupTimeout + 0*budget)
+ 	}
+ }
+ 

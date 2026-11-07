@@ -1,0 +1,22 @@
+Expect: channel: markers .*, want no reader left: a reader of the channel outlived the last suite
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestTheChannelStaysWithTheSuite
+Clause: when the last suite of a process under the runner ends → leaves no goroutine reading the channel for a leak check in TestMain to find
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -286,7 +286,7 @@
+ func (w *watcher) read() {
+ 	defer close(w.readDone)
+ 	for {
+-		l, err := w.link.Next(w.quit)
++		l, err := w.link.Next(nil)
+ 		if errors.Is(err, control.ErrStopped) {
+ 			return
+ 		}
+@@ -547,7 +547,6 @@
+ 		close(w.quit)
+ 	}
+ 	<-w.done
+-	<-w.readDone
+ }
+ 
+ // releaseWithin tears the held fixtures down, giving up waiting at deadline.

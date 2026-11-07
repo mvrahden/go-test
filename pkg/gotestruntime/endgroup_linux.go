@@ -6,7 +6,14 @@ import (
 	"bytes"
 	"os"
 	"strconv"
+	"syscall"
 )
+
+// runnerDeathSignal is the signal the runner's death sends a suite process.
+// The kernel sends it as the runner's thread that started the suite exits,
+// which can come before the runner's last thread closes its end of the
+// channel.
+var runnerDeathSignal os.Signal = syscall.SIGTERM
 
 // othersInGroup reports whether a process of group pgid besides this one is
 // anything but a zombie, reading /proc. When /proc cannot be read it reports

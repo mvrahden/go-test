@@ -75,19 +75,27 @@ func selfStopped(t *gotest.T, name string, markers []string) {
 	}
 }
 
-// A suite process under the runner whose parent, the runner, is killed while
-// a method holds stops by itself.
-func (s *CanaryLifecycleTestSuite) TestASuiteWhoseParentIsKilledStops(t *gotest.T) {
+// A suite process whose runner is killed while a method holds stops by
+// itself at its channel's end, and ends what its tests started.
+func (s *CanaryLifecycleTestSuite) TestASuiteWhoseRunnerIsKilledStops(t *gotest.T) {
 	dir := t.TempDir()
-	r := s.startRun(t, dir, nil, "-json", "./testdata/stopping/")
-	if !r.await(90*time.Second, "running", "pid=") {
+	r := s.startRun(t, dir, []string{"STOPPING_CHILD=1"}, "-json", "./testdata/stopping/")
+	if !r.await(90*time.Second, "running", "pid=", "child=") {
 		_, _ = r.end(0)
-		fatalf(t, "parentgone: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
+		fatalf(t, "runnergone: the run never held:\n%s%s", r.stdout.String(), r.stderr.String())
 	}
-	// The runner is the suite's parent: killed, its end of the channel closes.
+	// Killed, the runner's end of the channel closes.
 	_ = r.cmd.Process.Kill()
 	_, _ = r.end(30 * time.Second)
 	awaitMarker(r.markers, selfStopWithin, "fixture.AfterAll")
 	markers, _ := testkit.ReadMarkers(r.markers)
-	selfStopped(t, "parentgone", markers)
+	// Before selfStopped, whose check kills the suite's group.
+	child := markerValue(markers, "child")
+	if child == 0 {
+		t.Errorf("runnergone: the test published no child: markers %v", markers)
+	} else if !testkit.EndedWithin(child, 3*time.Second) {
+		_ = syscall.Kill(child, syscall.SIGKILL)
+		t.Errorf("runnergone: the process %d the holding method started outlived the suite", child)
+	}
+	selfStopped(t, "runnergone", markers)
 }

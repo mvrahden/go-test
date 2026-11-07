@@ -12,19 +12,19 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// ParentGoneTestSuite: a suite process whose parent, the runner, ends stops
-// and tears down by itself, its channel ended.
-type ParentGoneTestSuite struct {
+// RunnerGoneTestSuite: a suite process whose runner is gone stops and tears
+// down by itself at its channel's end, and ends what its tests started.
+type RunnerGoneTestSuite struct {
 	cli string
 }
 
 // SuiteConfig: cold, BeforeAll took 7.4s locally and a method 0.7s; both
 // budgets hold twice a run seven times slower.
-func (s *ParentGoneTestSuite) SuiteConfig() gotest.SuiteConfig {
+func (s *RunnerGoneTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
-func (s *ParentGoneTestSuite) BeforeAll(t *gotest.T) {
+func (s *RunnerGoneTestSuite) BeforeAll(t *gotest.T) {
 	root, err := testkit.RepoRoot()
 	gotest.NoError(t, err)
 	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
@@ -33,20 +33,27 @@ func (s *ParentGoneTestSuite) BeforeAll(t *gotest.T) {
 }
 
 // AfterAll has nothing to release: the binary lives in a temp dir.
-func (s *ParentGoneTestSuite) AfterAll(t *gotest.T) {}
+func (s *RunnerGoneTestSuite) AfterAll(t *gotest.T) {}
 
-func (s *ParentGoneTestSuite) TestTheParentIsKilled(t *gotest.T) {
+func (s *RunnerGoneTestSuite) TestTheRunnerIsKilled(t *gotest.T) {
 	markerDir := t.TempDir()
 	cmd := commandOf(s.cli, "-json", "../testdata/stopping/")
-	cmd.Env = testkit.ChildEnv(markerDir)
-	tree := started(t, cmd, markerDir, "running", "pid=")
-	// The runner is the suite's parent: killed, its end of the channel closes.
+	cmd.Env = testkit.ChildEnv(markerDir, "STOPPING_CHILD=1")
+	tree := started(t, cmd, markerDir, "running", "pid=", "child=")
+	// Killed, the runner's end of the channel closes.
 	signalled(t, cmd, tree, syscall.Kill(cmd.Process.Pid, syscall.SIGKILL))
 	run := ended(cmd, tree, markerDir, 30*time.Second)
 	markers := awaitMarkers(markerDir, 60*time.Second, "fixture.AfterAll")
 	pid, _ := strconv.Atoi(markerValue(markers, "pid"))
+	// The group gets 2s on the SIGTERM before the SIGKILL, on every Unix.
+	suiteGone := pid != 0 && testkit.EndedWithin(pid, 5*time.Second)
+	child := childOf(markers)
+	childGone := child != 0 && testkit.EndedWithin(child, 3*time.Second)
+	if child != 0 && !childGone {
+		_ = syscall.Kill(child, syscall.SIGKILL)
+	}
 
-	t.When("the parent of a suite process under the runner is killed while a method holds", func(w *gotest.T) {
+	t.When("the runner of a suite process is killed while a method holds", func(w *gotest.T) {
 		w.It("ends the holding method's context", func(it *gotest.T) {
 			gotest.Contains(it, markers, "context ended", "stderr: %s", run.Stderr)
 		})
@@ -59,7 +66,11 @@ func (s *ParentGoneTestSuite) TestTheParentIsKilled(t *gotest.T) {
 		})
 		w.It("leaves no suite process behind", func(it *gotest.T) {
 			gotest.NotZero(it, pid, "markers: %v", markers)
-			gotest.True(it, gone(pid), "the suite process %d outlived the run", pid)
+			gotest.True(it, suiteGone, "the suite process %d outlived the run", pid)
+		})
+		w.It("ends a process the holding method started within 3s of the suite's exit, on Unix", func(it *gotest.T) {
+			gotest.NotZero(it, child, "markers: %v", markers)
+			gotest.True(it, childGone, "the process %d the test started outlived the suite: markers %v", child, markers)
 		})
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -107,6 +108,7 @@ func stopWatch() {
 		w.close()
 		active = nil
 		unread = append(unread, w.unread...)
+		takeEnd()
 		// Under plain go test nothing else marks the run interrupted: once the
 		// stopped suite has torn down, the process ends by the signal, and the
 		// suites after it never run. Under the runner the process ends with the
@@ -120,6 +122,50 @@ func stopWatch() {
 		case stopping.Load() && (!w.underRunner() || bySignal.Load()):
 			reraise(stoppedBy())
 		}
+	}
+}
+
+// takeEnd marks the runner gone when its channel ended before the last
+// suite's end: a stop the runner's death signal began may settle before the
+// reader hands the end over, or before the end closes at all, since the
+// signal can come while the dying runner still holds it. A stop that signal
+// began waits up to endWait for the end. What else arrived waits for the next
+// open.
+func takeEnd() {
+	if link == nil {
+		return
+	}
+	lines, gone := link.Drain()
+	unread = append(unread, lines...)
+	gone = gone || slices.ContainsFunc(unread, func(l control.Line) bool { return l.Kind == endOfChannel })
+	if !gone && bySignal.Load() && runnerDeathSignal != nil && stoppedBy() == runnerDeathSignal {
+		gone = awaitEnd(endWait)
+	}
+	if gone {
+		runnerGone.Store(true)
+	}
+}
+
+// endWait bounds the wait for the end of a runner whose death signal came:
+// its last thread closes the end moments later. A live runner keeps it open,
+// so a signal from outside costs the suite process this much at its end.
+const endWait = time.Second
+
+// awaitEnd reports whether the runner's end closes within d; the lines that
+// arrive meanwhile wait for the next open.
+func awaitEnd(d time.Duration) bool {
+	stop := make(chan struct{})
+	timer := time.AfterFunc(d, func() { close(stop) })
+	defer timer.Stop()
+	for {
+		l, err := link.Next(stop)
+		switch {
+		case errors.Is(err, io.EOF):
+			return true
+		case err != nil:
+			return false
+		}
+		unread = append(unread, l)
 	}
 }
 

@@ -1,10 +1,10 @@
-Expect: parentgone: the holding method.s context never ended
-Expect: parentgone: markers .*, want context ended, suite.AfterAll, fixture.AfterAll in order
-Expect: parentgone: the suite process [0-9]+ outlived the run
-Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteWhoseParentIsKilledStops
-Clause: when the parent of a suite process under the runner is killed while a method holds → ends the holding method's context
-Clause: when the parent of a suite process under the runner is killed while a method holds → runs AfterAll before the fixture is released
-Clause: when the parent of a suite process under the runner is killed while a method holds → leaves no suite process behind
+Expect: runnergone: the holding method.s context never ended
+Expect: runnergone: markers .*, want context ended, suite.AfterAll, fixture.AfterAll in order
+Expect: runnergone: the suite process [0-9]+ outlived the run
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteWhoseRunnerIsKilledStops
+Clause: when the runner of a suite process is killed while a method holds → ends the holding method's context
+Clause: when the runner of a suite process is killed while a method holds → runs AfterAll before the fixture is released
+Clause: when the runner of a suite process is killed while a method holds → leaves no suite process behind
 --- a/pkg/gotestruntime/stop.go
 +++ b/pkg/gotestruntime/stop.go
 @@ -326,9 +326,6 @@

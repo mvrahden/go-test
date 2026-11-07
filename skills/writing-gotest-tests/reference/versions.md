@@ -474,7 +474,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     Below v1.34 the state shared the fixture process's stdout, so such
     output could break it, and a state line past 1 MiB failed the setup.
 23. **A suite or shared fixture whose CLI died tears down by itself**
-    ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone),
+    ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone),
     [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)):
     after `kill -9`, an OOM kill or a crash of the CLI, a suite ends the
     holding method's context, starts no further method and runs

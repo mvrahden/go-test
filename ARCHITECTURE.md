@@ -891,7 +891,7 @@ dead runner itself (its parent gone, or, on Linux and macOS, nobody reading its 
 tears down when its stdin closes, exiting with status 1 once its setup and
 teardown budgets have passed if a hook never returns. A wrapper that
 re-pipes stdout (`tee`) or runs the suite remotely (`ssh`, `docker`) hides
-both traces. See [A suite whose parent is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone)
+both traces. See [A suite whose runner is gone](specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone)
 and [A shared fixture process whose CLI is killed](specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed).
 
 A tree holds its root until `Release`, which runs once the root has been

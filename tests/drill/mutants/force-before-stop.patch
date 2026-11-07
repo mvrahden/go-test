@@ -1,0 +1,14 @@
+Expect: a force with no stop under way left the process running
+Judge: ./tests/lifecycle StoppingTestSuite/TestAForceWithNoStopForcesOne
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -340,9 +340,6 @@
+ 	switch l.Kind {
+ 	case control.Stop:
+ 		w.stop(runnerSignal())
+-	case control.Force:
+-		w.forced = true
+-		w.stop(runnerSignal())
+ 	case endOfChannel:
+ 		_ = w.link.Stopped("runner-gone")
+ 		w.stop(runnerSignal())

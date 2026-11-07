@@ -1,0 +1,14 @@
+Expect: runnergone: the process [0-9]+ the holding method started outlived the suite
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteWhoseRunnerIsKilledStops
+Clause: when the runner of a suite process is killed while a method holds → ends a process the holding method started within 3s of the suite's exit, on Unix
+--- a/pkg/gotestruntime/endgroup_unix.go
++++ b/pkg/gotestruntime/endgroup_unix.go
+@@ -22,7 +22,7 @@
+ // dropped. Group 1 is never signalled: kill(-1) reaches every process.
+ func endGroup() {
+ 	pgid, err := unix.Getpgid(0)
+-	if err != nil || pgid <= 1 {
++	if err != nil || pgid > 0 {
+ 		return
+ 	}
+ 	signal.Notify(make(chan os.Signal, 1), syscall.SIGTERM)

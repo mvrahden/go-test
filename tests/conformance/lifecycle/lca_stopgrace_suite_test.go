@@ -206,17 +206,17 @@ func (s *StopGraceTestSuite) TestAStopDuringAFuzzSeed(t *gotest.T) {
 	})
 }
 
-func (s *StopGraceTestSuite) TestASecondStopSignal(t *gotest.T) {
+func (s *StopGraceTestSuite) TestTheRunnersForce(t *gotest.T) {
 	if !suiteSignallable {
 		t.Skipf("only Unix signals a single process")
 	}
 	var sent error
 	run, took := s.stoppedRun(t, []string{"LCA_IGNORE=1"}, []string{"-json", "../testdata/lcastop/", "-run=TestGraceTestSuite"}, func(_ string, again func() error) {
 		time.Sleep(500 * time.Millisecond)
-		// The runner sends the suite its second stop on a second Ctrl-C.
+		// A second Ctrl-C has the runner force the suite's stop.
 		sent = again()
 	})
-	t.When("a second stop signal reaches the suite while a stopped method body ignores its context", func(w *gotest.T) {
+	t.When("the runner forces the stop of a suite whose stopped method body ignores its context", func(w *gotest.T) {
 		w.It("releases the fixture at once, saying so, and the process ends by the signal", func(it *gotest.T) {
 			gotest.NoError(it, sent)
 			gotest.Contains(it, run.Stdout+run.Stderr, "the runner forced the stop")

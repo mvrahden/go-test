@@ -17036,112 +17036,6 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "ends the holding method's context",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "lcb_parent_unix_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 50,
-                      "name": "ends_the_holding_method's_context",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "the methods that have not started never run",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "lcb_parent_unix_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 53,
-                      "name": "the_methods_that_have_not_started_never_run",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "runs AfterAll before the fixture is released",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "lcb_parent_unix_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 57,
-                      "name": "runs_AfterAll_before_the_fixture_is_released",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "leaves no suite process behind",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "lcb_parent_unix_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 60,
-                      "name": "leaves_no_suite_process_behind",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
-                    }
-                  ],
-                  "display": "when the parent of a suite process under the runner is killed while a method holds",
-                  "duration": 0,
-                  "excluded": false,
-                  "external": false,
-                  "file": "lcb_parent_unix_test.go",
-                  "focused": false,
-                  "kind": "block",
-                  "line": 49,
-                  "name": "the_parent_of_a_suite_process_under_the_runner_is_killed_while_a_method_holds",
-                  "output": [],
-                  "status": "none",
-                  "vocab": "when"
-                }
-              ],
-              "display": "TheParentIsKilled",
-              "duration": 0,
-              "excluded": false,
-              "external": false,
-              "file": "lcb_parent_unix_test.go",
-              "focused": false,
-              "kind": "method",
-              "line": 38,
-              "name": "TestTheParentIsKilled",
-              "output": [],
-              "status": "none"
-            }
-          ],
-          "display": "ParentGone",
-          "duration": 0,
-          "excluded": false,
-          "external": false,
-          "file": "lcb_parent_unix_test.go",
-          "focused": false,
-          "kind": "suite",
-          "line": 17,
-          "name": "TestParentGoneTestSuite",
-          "output": [],
-          "status": "none"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "children": [],
                       "display": "interrupts the suite's process group with SIGINT",
                       "duration": 0,
                       "excluded": false,
@@ -17283,6 +17177,127 @@
           "kind": "suite",
           "line": 19,
           "name": "TestRelayFallbackTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "ends the holding method's context",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_runner_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "ends_the_holding_method's_context",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the methods that have not started never run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_runner_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "the_methods_that_have_not_started_never_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_runner_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 63,
+                      "name": "runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "leaves no suite process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_runner_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 66,
+                      "name": "leaves_no_suite_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends a process the holding method started within 3s of the suite's exit, on Unix",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_runner_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 70,
+                      "name": "ends_a_process_the_holding_method_started_within_3s_of_the_suite's_exit,_on_Unix",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the runner of a suite process is killed while a method holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcb_runner_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 55,
+                  "name": "the_runner_of_a_suite_process_is_killed_while_a_method_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheRunnerIsKilled",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcb_runner_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 38,
+              "name": "TestTheRunnerIsKilled",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "RunnerGone",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "lcb_runner_unix_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestRunnerGoneTestSuite",
           "output": [],
           "status": "none"
         },
@@ -18104,7 +18119,7 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when a second stop signal reaches the suite while a stopped method body ignores its context",
+                  "display": "when the runner forces the stop of a suite whose stopped method body ignores its context",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
@@ -18112,13 +18127,13 @@
                   "focused": false,
                   "kind": "block",
                   "line": 219,
-                  "name": "a_second_stop_signal_reaches_the_suite_while_a_stopped_method_body_ignores_its_context",
+                  "name": "the_runner_forces_the_stop_of_a_suite_whose_stopped_method_body_ignores_its_context",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
                 }
               ],
-              "display": "ASecondStopSignal",
+              "display": "TheRunnersForce",
               "duration": 0,
               "excluded": false,
               "external": false,
@@ -18126,7 +18141,7 @@
               "focused": false,
               "kind": "method",
               "line": 209,
-              "name": "TestASecondStopSignal",
+              "name": "TestTheRunnersForce",
               "output": [],
               "status": "none"
             }
@@ -18140,6 +18155,465 @@
           "kind": "suite",
           "line": 17,
           "name": "TestStopGraceTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "sends it no signal: the run's stderr names none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "sends_it_no_signal:_the_run's_stderr_names_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "ends the -json stream whole, a verdict for every test in it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 63,
+                      "name": "ends_the_-json_stream_whole,_a_verdict_for_every_test_in_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the runner stops a suite whose method holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 55,
+                  "name": "the_runner_stops_a_suite_whose_method_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheRunnersStop",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 45,
+              "name": "TestTheRunnersStop",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "kills the suite once that budget is spent, not the default's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 89,
+                      "name": "kills_the_suite_once_that_budget_is_spent,_not_the_default's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the runner stops a suite that reported a 32s teardown budget and lingers past it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 88,
+                  "name": "the_runner_stops_a_suite_that_reported_a_32s_teardown_budget_and_lingers_past_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AShortTeardownBudget",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 86,
+              "name": "TestAShortTeardownBudget",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lets the suite end on its own",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 101,
+                      "name": "lets_the_suite_end_on_its_own",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the runner stops a suite that reported a teardown budget longer than its 40s linger",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 100,
+                  "name": "the_runner_stops_a_suite_that_reported_a_teardown_budget_longer_than_its_40s_linger",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ALongTeardownBudget",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 98,
+              "name": "TestALongTeardownBudget",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the process inherits no descriptor of the channel",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 117,
+                      "name": "the_process_inherits_no_descriptor_of_the_channel",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test under the runner starts a process of its own",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 116,
+                  "name": "a_test_under_the_runner_starts_a_process_of_its_own",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "leaves that descriptor open",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 122,
+                      "name": "leaves_that_descriptor_open",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a process inherits the channel's variable naming a descriptor that is a regular file",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 121,
+                  "name": "a_process_inherits_the_channel's_variable_naming_a_descriptor_that_is_a_regular_file",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "leaves no goroutine reading the channel for a leak check in TestMain to find",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 127,
+                      "name": "leaves_no_goroutine_reading_the_channel_for_a_leak_check_in_TestMain_to_find",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the last suite of a process under the runner ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 126,
+                  "name": "the_last_suite_of_a_process_under_the_runner_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheChannelStaysWithTheSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 108,
+              "name": "TestTheChannelStaysWithTheSuite",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "skips every suite with the reason run stopping",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 172,
+                      "name": "skips_every_suite_with_the_reason_run_stopping",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "sets up no fixture",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 178,
+                      "name": "sets_up_no_fixture",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the run is interrupted while its suite processes run their TestMain, before their first suite opens",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 171,
+                  "name": "the_run_is_interrupted_while_its_suite_processes_run_their_TestMain,_before_their_first_suite_opens",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStopDuringTestMain",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 156,
+              "name": "TestAStopDuringTestMain",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "ends the holding method's context and runs AfterAll before the fixture is released",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 207,
+                      "name": "ends_the_holding_method's_context_and_runs_AfterAll_before_the_fixture_is_released",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "names the stop in the stream as one from outside the runner",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 212,
+                      "name": "names_the_stop_in_the_stream_as_one_from_outside_the_runner",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "fails the package and exits 1",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 215,
+                      "name": "fails_the_package_and_exits_1",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a SIGTERM from outside the runner reaches a suite while a method holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 206,
+                  "name": "a_SIGTERM_from_outside_the_runner_reaches_a_suite_while_a_method_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASignalFromOutside",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 204,
+              "name": "TestASignalFromOutside",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "still runs AfterAll before the fixture is released, the stop not forced",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcc_stopline_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 234,
+                      "name": "still_runs_AfterAll_before_the_fixture_is_released,_the_stop_not_forced",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a second SIGTERM from outside the runner reaches the suite during the stop the first began",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcc_stopline_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 233,
+                  "name": "a_second_SIGTERM_from_outside_the_runner_reaches_the_suite_during_the_stop_the_first_began",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASecondSignalDuringTheStop",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcc_stopline_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 222,
+              "name": "TestASecondSignalDuringTheStop",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "StopLine",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "lcc_stopline_unix_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 21,
+          "name": "TestStopLineTestSuite",
           "output": [],
           "status": "none"
         },
@@ -18347,7 +18821,7 @@
                       "vocab": "it"
                     }
                   ],
-                  "display": "when the runner's signal reaches the suite only after its stop file settled the run",
+                  "display": "when a signal reaches the suite only after the runner's stop settled the run",
                   "duration": 0,
                   "excluded": false,
                   "external": false,
@@ -18355,13 +18829,13 @@
                   "focused": false,
                   "kind": "block",
                   "line": 86,
-                  "name": "the_runner's_signal_reaches_the_suite_only_after_its_stop_file_settled_the_run",
+                  "name": "a_signal_reaches_the_suite_only_after_the_runner's_stop_settled_the_run",
                   "output": [],
                   "status": "none",
                   "vocab": "when"
                 }
               ],
-              "display": "ASignalAfterTheStopFileSettledTheRun",
+              "display": "ASignalAfterTheStopSettledTheRun",
               "duration": 0,
               "excluded": false,
               "external": false,
@@ -18369,7 +18843,7 @@
               "focused": false,
               "kind": "method",
               "line": 75,
-              "name": "TestASignalAfterTheStopFileSettledTheRun",
+              "name": "TestASignalAfterTheStopSettledTheRun",
               "output": [],
               "status": "none"
             }
@@ -23995,13 +24469,13 @@
     }
   ],
   "stats": {
-    "behaviors": 682,
+    "behaviors": 696,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 105,
+    "suites": 106,
     "tests": 0
   }
 }

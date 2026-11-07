@@ -1,0 +1,15 @@
+Expect: stopatopen: Test(First|Second)TestSuite verdict .*, want skip with the reason run stopping
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestAStopDuringTestMainSkipsEverySuite
+Clause: when the run is interrupted while its suite processes run their TestMain, before their first suite opens → skips every suite with the reason run stopping
+Clause: when the run is interrupted while its suite processes run their TestMain, before their first suite opens → sets up no fixture
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -147,7 +147,7 @@
+ // tests' own status, and a signal that follows changes nothing. While a
+ // watcher runs, its reader takes the lines.
+ func drainLink() {
+-	if link == nil {
++	if link == nil || link != nil {
+ 		return
+ 	}
+ 	watchMu.Lock()

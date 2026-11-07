@@ -71,6 +71,33 @@ func (s *RunnerGoneTestSuite) TestTheChannelsEndDuringARequestedStop(t *gotest.T
 	})
 }
 
+// The kernel sends the runner's death signal as the runner's thread that
+// started the suite exits, which can come before its last thread closes the
+// channel: the stop the signal began settles first, and the end comes after.
+func (s *RunnerGoneTestSuite) TestTheChannelsEndAfterTheDeathSignal(t *gotest.T, r *linkRun) {
+	if suiteProcess(t) {
+		return
+	}
+	r.start(t, "TestRunnerGoneTestSuite", "TestTheChannelsEndAfterTheDeathSignal", child{mode: holdGrandchild})
+	r.awaitMarker(t, "holding")
+	sleeper := r.grandchild()
+	gotest.Greater(t, sleeper, 0, "the method started no process")
+	gotest.NoError(t, syscall.Kill(r.cmd.Process.Pid, syscall.SIGTERM))
+	r.awaitMarker(t, "fixture AfterAll")
+	// Past the settled stop, well within the wait for the end.
+	time.Sleep(300 * time.Millisecond)
+	r.link.Close()
+	r.wait(t)
+
+	t.When("the runner's death signal stops a suite process whose method has started a process, and the channel ends after that stop settled", func(w *gotest.T) {
+		w.It("ends that process with itself, though it ignores SIGTERM", func(it *gotest.T) {
+			gotest.Eventually(it, 3*time.Second, 20*time.Millisecond, func(poll *gotest.R) {
+				gotest.True(poll, processGone(sleeper), "the process the method started outlived the suite process")
+			})
+		})
+	})
+}
+
 // processGone reports whether pid has exited: no such process, or one only
 // waiting to be reaped.
 func processGone(pid int) bool {
