@@ -1,0 +1,16 @@
+Expect: converter: TestWaitTestSuite/TestRows/second verdict "", want pass: the stream lost what the suite wrote after the converter died
+Expect: converter: stderr does not say the output was converted again
+Judge: ./tests/canary CanaryRelayTestSuite/TestAKilledConverterIsReplaced
+Clause: when the converter is killed while a suite runs → converts the suite's output again, every verdict in the stream
+Clause: when the converter is killed while a suite runs → says so on stderr, naming the suite and how the converter ended
+--- a/internal/gotestrunner/relay.go
++++ b/internal/gotestrunner/relay.go
+@@ -134,7 +134,7 @@
+ 	tail := crashTail(r.raw.Bytes(), status)
+ 	r.end(tail)
+ 	how := r.endedEarly()
+-	if how == "" {
++	if how == "" || r.cmd != nil {
+ 		r.raw = bytes.Buffer{}
+ 		return nil
+ 	}

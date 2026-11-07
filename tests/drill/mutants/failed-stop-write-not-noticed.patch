@@ -1,0 +1,16 @@
+Expect: relay hello3\.sh: the suite's process group got no SIGINT
+Expect: relay hello3\.sh: markers .*, want context ended, suite\.AfterAll, fixture\.AfterAll in order
+Judge: ./tests/canary CanaryRelayTestSuite/TestAStopLineThatCannotBeWrittenIsACtrlC
+Clause: when a run is stopped while the suite's channel, after its hello, is closed at the suite's end → interrupts the suite's process group with SIGINT and runs AfterAll before the fixture is released
+--- a/internal/gotestrunner/managed_process.go
++++ b/internal/gotestrunner/managed_process.go
+@@ -342,7 +342,8 @@
+ // Without a hello, or when the line cannot be written, the tree gets one
+ // Ctrl-C instead; the process then stops as under plain go test.
+ func (p *ManagedProcess) RequestStop() error {
+-	if p.config.Link != nil && p.awaitHello() && p.config.Link.Stop() == nil {
++	if p.config.Link != nil && p.awaitHello() {
++		_ = p.config.Link.Stop()
+ 		// The rest of the tree is ended once the root has exited.
+ 		p.Stopped()
+ 		return nil

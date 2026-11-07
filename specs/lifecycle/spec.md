@@ -264,7 +264,7 @@ The runner's signal reaching a suite only after its stop file settled the run SH
 - **THEN** ends with its tests' own status, every verdict in the stream
 
 ### Requirement: A stopped run's shared fixtures
-A run interrupted while a method bound to a shared fixture ignores its context SHALL exit 130 and run the shared fixture's AfterAll before gotest exits, on the text, -json and spec pipelines alike; an interrupt that arrives once every verdict is in, while the shared fixtures tear down, SHALL keep the run's exit code and let their AfterAll finish.
+A run stopped while a method bound to a shared fixture ignores its context SHALL exit 130 and run the shared fixture's AfterAll before gotest exits, on the text, -json and spec pipelines alike; a stop that arrives once every verdict is in, while the shared fixtures tear down, SHALL keep the run's exit code and let their AfterAll finish.
 
 #### Scenario: Interrupted on every pipeline
 - **WHEN** the run is interrupted on the text, -json or spec pipeline while a method bound to a shared fixture ignores its context
@@ -275,7 +275,7 @@ A run interrupted while a method bound to a shared fixture ignores its context S
 - **THEN** exits 0 and lets the AfterAll finish
 
 ### Requirement: Every launcher stops cleanly
-A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool; a SIGHUP ignored at start SHALL NOT stop it. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
+A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it, saying so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, even one closing descriptor 3, through go run or go tool; a SIGHUP ignored at start SHALL NOT stop it. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
 
 #### Scenario: Each launcher and each signal
 - **WHEN** a run is stopped by a signal, however gotest was launched
@@ -288,6 +288,43 @@ A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its e
 #### Scenario: A hangup ignored at start
 - **WHEN** a run started with SIGHUP ignored, as nohup starts it, gets a SIGHUP
 - **THEN** runs on until a SIGINT stops it
+
+#### Scenario: A wrapper that closes descriptor 3
+- **WHEN** a run under an -exec wrapper that runs the suite with descriptor 3 closed is stopped by SIGINT
+- **THEN** exits 130, finishes the fixture teardown and leaves no suite process behind
+
+### Requirement: A suite under a wrapper that drops the channel
+A suite process that has said no hello on its channel within 3s of its start SHALL be stopped by one SIGINT to its process group, as a terminal's Ctrl-C stops it, and so SHALL one whose stop line cannot be written; the converter beside it SHALL never receive that SIGINT. The stream SHALL end whole, and the suite SHALL tear down as under plain go test.
+
+#### Scenario: A wrapper that closes descriptor 3 behind it
+- **WHEN** a run is stopped while its suite, run by an -exec wrapper that closes descriptor 3, has said no hello
+- **THEN** interrupts the suite's process group with SIGINT
+- **AND** leaves the converter running, the suite's output converted once
+- **AND** ends the stream whole, the methods not started skipped with the reason run stopping
+- **AND** runs AfterAll before the fixture is released
+
+#### Scenario: A stop line that cannot be written
+- **WHEN** a run is stopped while the suite's channel, after its hello, is closed at the suite's end
+- **THEN** interrupts the suite's process group with SIGINT and runs AfterAll before the fixture is released
+
+### Requirement: A converter that ends early
+A converter that ends before the suite's output does, killed, crashed or refusing a write, SHALL be replaced once the suite has ended by a fresh conversion of every byte the suite wrote, which the runner keeps until then, so the stream carries every verdict; a note on stderr SHALL name the package, the suite and how the converter ended.
+
+#### Scenario: A converter killed mid-run
+- **WHEN** the converter is killed while a suite runs
+- **THEN** converts the suite's output again, every verdict in the stream
+- **AND** says so on stderr, naming the suite and how the converter ended
+
+### Requirement: A crash is the package's failure
+A suite process that ends by a signal, a panic or an os.Exit SHALL fail its package by its real exit status, the run exiting 1 and a signal named on stderr and in the stream, and SHALL NOT attribute the end to the test that was running, which gets no verdict unless testing reported one, as under go test -json; every verdict the stream reported before the end SHALL be kept.
+
+#### Scenario: A suite process that crashes
+- **WHEN** a suite process ends by os.Exit(3), a panic on a goroutine or a SIGKILL while a method runs
+- **THEN** fails its package and exits 1, the running method left without a verdict and the verdicts reported before the end kept
+
+#### Scenario: A method that panics
+- **WHEN** a method panics, ending its suite process
+- **THEN** fails the method, its suite and its package, every verdict testing reported kept
 
 ### Requirement: No process outlives the run
 A run SHALL leave no process a test started behind, even one the test never waits for.

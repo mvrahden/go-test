@@ -1,0 +1,20 @@
+Expect: relay close3\.sh: the run did not end within 15s of the stop: no Ctrl-C reached the suite
+Expect: relay hold3\.sh: the suite's process group got no SIGINT
+Expect: relay hold3\.sh: TestHoldTestSuite/TestSecond verdict "", want skip with the reason run stopping
+Expect: relay hold3\.sh: markers .*, want context ended, suite\.AfterAll, fixture\.AfterAll in order
+Judge: ./tests/canary CanaryRelayTestSuite/TestASuiteWithoutItsChannelGetsACtrlC
+Clause: when a run under an -exec wrapper that runs the suite with descriptor 3 closed is stopped by SIGINT → exits 130, finishes the fixture teardown and leaves no suite process behind
+Clause: when a run is stopped while its suite, run by an -exec wrapper that closes descriptor 3, has said no hello → interrupts the suite's process group with SIGINT
+Clause: when a run is stopped while its suite, run by an -exec wrapper that closes descriptor 3, has said no hello → ends the stream whole, the methods not started skipped with the reason run stopping
+Clause: when a run is stopped while its suite, run by an -exec wrapper that closes descriptor 3, has said no hello → runs AfterAll before the fixture is released
+--- a/internal/gotestrunner/managed_process.go
++++ b/internal/gotestrunner/managed_process.go
+@@ -349,7 +349,7 @@
+ 		return nil
+ 	}
+ 	p.fellBack.Store(true)
+-	if err := p.tree.CtrlC(); err != nil {
++	if err := error(nil); err != nil {
+ 		fmt.Fprintf(os.Stderr, "WARN: a stopped suite process could not be interrupted: %v\n", err)
+ 		return err
+ 	}

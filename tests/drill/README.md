@@ -758,6 +758,14 @@ shards of one run do not add up to every mutant exactly once.
 | `shared-stop-sent-by-signal-only` | the runner stops the shared fixture process by an interrupt, never by the stop line | canary: a signal reaches the shared fixture process |
 | `shared-force-verb-ignored` | the shared fixture process ignores the force line on its stdin | canary: the AfterAll's context does not end on the second stop, and a force before any stop stops nothing |
 | `shared-force-leaves-the-process-serving` | a force line before any stop ends the releases' context but leaves the shared fixture process serving | canary: the second stop does not stop the shared fixture process while its suite still runs |
+| `fallback-never-fires` | a suite that said no hello on its channel gets no Ctrl-C when the run stops, so the stop waits out its budget | canary: under a wrapper that closes descriptor 3 the run does not end within 15s of the stop, and the suite's group gets no SIGINT |
+| `failed-stop-write-not-noticed` | a stop line that cannot be written is taken as sent, and no Ctrl-C follows | canary: under a wrapper that said hello for the suite, its group gets no SIGINT and AfterAll never runs |
+| `stopped-line-unbooked` | a suite stopped by a signal from outside the runner is booked as a plain signal death | canary: stderr does not name the stop from outside the runner |
+| `converter-in-the-group` | the converter is started in the runner's process group, which the Ctrl-C that stops the run reaches | canary: the stop reaches the converter, whose stream is converted again |
+| `crash-tail-missing` | a stream the suite left without its final result line gets no crash tail, so the verdicts the converter holds back are lost | canary: a method that panics leaves its suite without the fail testing reported |
+| `reconversion-skipped` | a converter that ended early is not replaced | canary: what the suite wrote after the converter was killed is missing from the stream, and stderr says nothing |
+| `link-closed-at-wait` | the channel is closed once the root exits, before the tree is released | canary: a suite an `-exec` wrapper ran in the background stops when the wrapper exits |
+| `signalled-suite-read-as-passing` | a suite process ended by a signal is read as having exited 0 | canary: a suite process that kills itself leaves a passing package and exit 0 |
 
 ## Adding a mutant
 

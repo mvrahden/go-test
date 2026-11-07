@@ -1,0 +1,13 @@
+Expect: relay close3\.sh: the stop reached the converter
+Expect: relay hold3\.sh: the stop reached the converter
+Judge: ./tests/canary CanaryRelayTestSuite/TestASuiteWithoutItsChannelGetsACtrlC
+Clause: when a run is stopped while its suite, run by an -exec wrapper that closes descriptor 3, has said no hello → leaves the converter running, the suite's output converted once
+--- a/internal/gotestrunner/relay_unix.go
++++ b/internal/gotestrunner/relay_unix.go
+@@ -8,5 +8,5 @@
+ // the suite's group, or the terminal's to the CLI's, never reaches it. It gets
+ // no death signal: once the runner is gone its input ends, and it exits.
+ func converterAttr() *syscall.SysProcAttr {
+-	return &syscall.SysProcAttr{Setpgid: true}
++	return &syscall.SysProcAttr{}
+ }

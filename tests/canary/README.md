@@ -8,11 +8,13 @@ fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
 
-The checks are split by theme into five suites: `CanaryTestSuite` (verdicts,
+The checks are split by theme into six suites: `CanaryTestSuite` (verdicts,
 assertions, fixtures, goroutines, benchmarks), `CanaryBudgetsTestSuite`,
 `CanaryDagTestSuite`, `CanaryDiscoveryTestSuite` (the shapes discovery reads
-or refuses) and `CanaryLifecycleTestSuite` (stops and process lifetime). Each
-runs its methods one after another; the runner runs the five side by side,
+or refuses), `CanaryLifecycleTestSuite` (stops and process lifetime) and
+`CanaryRelayTestSuite` (a suite's stream when its channel, its converter or
+its process fails). Each
+runs its methods one after another; the runner runs the six side by side,
 each in its own process. None is `Parallel`, so the canary
 does not rest on the in-suite parallelism it guards.
 
@@ -77,6 +79,7 @@ Each directory under `testdata/` is one package with one suite:
 | `noisysetup` | a shared fixture that writes to stdout while coming up still hands its state to the suite whole |
 | `timeoutscale` | under `GOTEST_TIMEOUT_SCALE=2` a method and a fixture outlasting their 1s budget by half pass, those outlasting it past 2s fail naming 2s, and a method finds the scale gone from its environment; a scale that is no number fails both suites before anything runs |
 | `setupbudget` | a shared fixture slower than its declared 2s `Timeout` fails the run at that budget, not when it finishes |
+| `relay` | a suite whose stop line cannot reach it, under an `-exec` wrapper that runs it with descriptor 3 closed, holds the channel silent or said hello for it, is stopped by one SIGINT to its process group: the converter is not cut, every verdict is in the stream and `AfterAll` runs before the release; a converter killed mid-run is replaced by a conversion of the whole stream, saying so; a SIGTERM from outside fails the package, saying so; a crash under a method by `os.Exit(3)`, a goroutine panic or a kill fails the package and gives that method no verdict, and a method that panics keeps every verdict testing reported; a suite an `-exec` wrapper runs in the background runs on after the wrapper exits (Unix only, but the crash) |
 | `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
 | `killedcli` | the CLI killed while a shared fixture is up: the fixture's `AfterAll`, which logs and takes 2s, runs to its end and its process exits (Unix only) |
 | `sharedstop` | a stopped run asks its shared fixture process to stop by a line on its stdin: the fixture's `AfterAll` runs, no signal reaches the process and it exits on its own; a second stop ends the context of an `AfterAll` waiting on it, and stops the process first while its suite still runs (Unix only) |

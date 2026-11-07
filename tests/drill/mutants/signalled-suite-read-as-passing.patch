@@ -1,0 +1,15 @@
+Expect: crash kill: exit code 0, want 1
+Expect: crash kill: package verdict "pass", want fail
+Judge: ./tests/canary CanaryRelayTestSuite/TestACrashFailsItsPackage
+Clause: when a suite process ends by os.Exit(3), a panic on a goroutine or a SIGKILL while a method runs → fails its package and exits 1, the running method left without a verdict and the verdicts reported before the end kept
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -317,7 +317,7 @@
+ 	duration := time.Since(start)
+ 
+ 	exitCode := 0
+-	if cmd.ProcessState != nil {
++	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+ 		exitCode = cmd.ProcessState.ExitCode()
+ 	}
+ 	if s.relay != nil && s.relay.finish(exitCode) != nil && exitCode == 0 {
