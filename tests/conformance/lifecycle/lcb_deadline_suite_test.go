@@ -19,12 +19,14 @@ func (s *DeadlineNamingTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 // runUntilTimeout runs pkg until a short --timeout ends it. A first run with
 // LCB_WARM, under which nothing hangs, builds the binaries, so the timeout
-// covers the suites alone.
+// covers the suites alone. The timeout is scaled: on a slow machine a suite
+// that ended early is booked only once its output is drained, which must
+// land before the deadline for the census to leave it unnamed.
 func runUntilTimeout(ctx context.Context, dir, pkg string, args ...string) (testkit.Run, map[string]bool, error) {
 	if _, err := testkit.RunPackageWithEnv(ctx, dir, []string{"LCB_WARM=1"}, pkg, args...); err != nil {
 		return testkit.Run{}, nil, err
 	}
-	run, err := testkit.RunPackage(ctx, dir, pkg, append([]string{"--timeout=10s"}, args...)...)
+	run, err := testkit.RunPackage(ctx, dir, pkg, append([]string{"--timeout=" + testkit.Scaled(10*time.Second).String()}, args...)...)
 	named := map[string]bool{}
 	for _, ev := range run.Events {
 		if ev.Action == "output" && strings.Contains(ev.Output, "--timeout expired while this test was running") {
