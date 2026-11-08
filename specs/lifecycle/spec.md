@@ -275,11 +275,19 @@ A run interrupted while a method bound to a shared fixture ignores its context S
 - **THEN** exits 0 and lets the AfterAll finish
 
 ### Requirement: Every launcher stops cleanly
-A run stopped by SIGINT, SIGTERM or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
+A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool; a SIGHUP ignored at start SHALL NOT stop it. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
 
 #### Scenario: Each launcher and each signal
 - **WHEN** a run is stopped by a signal, however gotest was launched
 - **THEN** ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
+
+#### Scenario: A hangup
+- **WHEN** a run is stopped by SIGHUP, as when its terminal closes
+- **THEN** ends as a run stopped by SIGTERM does: the same exit code, the fixture teardown finished and the run booked as interrupted on its stream
+
+#### Scenario: A hangup ignored at start
+- **WHEN** a run started with SIGHUP ignored, as nohup starts it, gets a SIGHUP
+- **THEN** runs on until a SIGINT stops it
 
 ### Requirement: No process outlives the run
 A run SHALL leave no process a test started behind, even one the test never waits for.
@@ -352,6 +360,14 @@ A cancelled run SHALL send no signal to a pid the suite published that is outsid
 - **THEN** sends that process no signal
 - **AND** interrupts the suite's process group instead
 - **AND** runs AfterAll before the fixture is released
+
+### Requirement: A stop file that cannot be written
+A cancelled run that cannot write a suite's stop file SHALL say so on stderr and SHALL kill the suite's process alone, by the pid it published, so the converter in front of it carries the stream to its end and the run ends at once instead of at the suite's teardown budget.
+
+#### Scenario: A work dir that turned read-only
+- **WHEN** the run is interrupted while a method holds and the suite's stop file cannot be written
+- **THEN** kills the suite process alone, saying on stderr that the stop file could not be written
+- **AND** ends at once, the run booked as interrupted on its stream
 
 ### Requirement: A stop ends what the tests started
 A run stopped while a test has a process of its own running SHALL end that process before gotest exits: once the suite's process has torn down, what is left of its process tree is, on Unix, interrupted and, past the teardown budget, killed, and on Windows killed at once.

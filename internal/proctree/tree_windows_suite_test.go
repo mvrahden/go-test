@@ -3,8 +3,10 @@
 package proctree_test
 
 import (
+	"bufio"
 	"context"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -44,6 +46,47 @@ func (s *WindowsTreeTestSuite) TestRelease(t *gotest.T) {
 		w.It("kills that process", func(it *gotest.T) {
 			gotest.Eventually(it, exitWithin, 100*time.Millisecond, func(poll *gotest.R) {
 				gotest.True(poll, exited(), "the orphan survived the release")
+			})
+		})
+		stop()
+	})
+}
+
+func (s *WindowsTreeTestSuite) TestHoldJobWithRoot(t *gotest.T) {
+	t.When("the root holds the job and the caller lets go of it", func(w *gotest.T) {
+		cmd := exec.Command(os.Args[0]) //nolint:gosec // G204: this test binary
+		cmd.Env = append(childEnv("ignore"), envSpawn+"=1")
+		tree := proctree.New(cmd)
+		tree.HoldJobWithRoot()
+		out, err := cmd.StdoutPipe()
+		gotest.NoError(w, err)
+		gotest.NoError(w, tree.Start())
+		pids, ready := readUntilReady(bufio.NewScanner(out))
+		exited, stop := func() bool { return false }, func() {}
+		var watchErr error
+		heldOpen := false
+		if ready && len(pids) == 1 {
+			exited, stop, watchErr = watchExit(pids[0])
+		}
+		if ready && len(pids) == 1 && watchErr == nil {
+			// The caller's handles close while the root runs, as when it dies.
+			tree.Release()
+			time.Sleep(time.Second)
+			heldOpen = !exited()
+		}
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		tree.Release()
+		gotest.True(w, ready, "the root never became ready")
+		gotest.Len(w, pids, 1)
+		gotest.NoError(w, watchErr)
+
+		w.It("keeps the tree alive while the root lives", func(it *gotest.T) {
+			gotest.True(it, heldOpen, "the grandchild died with the caller's handle")
+		})
+		w.It("kills the tree once the root exits", func(it *gotest.T) {
+			gotest.Eventually(it, exitWithin, 100*time.Millisecond, func(poll *gotest.R) {
+				gotest.True(poll, exited(), "the grandchild outlived the root")
 			})
 		})
 		stop()

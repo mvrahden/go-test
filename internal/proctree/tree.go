@@ -23,6 +23,7 @@ type Tree struct {
 	released    bool
 	interrupted bool
 	ctrlC       bool
+	holdJob     bool
 	sys         sysTree
 }
 
@@ -70,6 +71,9 @@ func (t *Tree) adoptLocked() {
 	}
 	t.adopted = true
 	t.sys.adopt(t.cmd.Process.Pid)
+	if t.holdJob {
+		t.sys.holdJob(t.cmd.Process)
+	}
 }
 
 // Interrupt asks every process in the tree to shut down: SIGTERM to the process
@@ -98,6 +102,17 @@ func (t *Tree) InterruptLikeCtrlC() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.ctrlC = true
+}
+
+// HoldJobWithRoot keeps the tree whole while its root lives, also once the
+// caller has let go of it or died: on Windows the root is given a handle of
+// its own to the tree's job, so the job, and what runs in it, ends only when
+// the root and the caller have both let go. A process group on Unix needs no
+// holder. Call it before the command starts.
+func (t *Tree) HoldJobWithRoot() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.holdJob = true
 }
 
 // Linger waits, at most for timeout, until every process of an interrupted

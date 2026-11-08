@@ -79,6 +79,20 @@ func (s *sysTree) adopt(pid int) {
 	s.job = job
 }
 
+// holdJob gives the root a handle to the job that it never uses: the job
+// stays open while the root lives and closes, killing what is left, once the
+// root and the caller have both let go. The handle is not inheritable, so
+// nothing the root starts keeps the job open after the root has exited.
+func (s *sysTree) holdJob(root *os.Process) {
+	if s.job == 0 {
+		return
+	}
+	_ = root.WithHandle(func(h uintptr) {
+		var held windows.Handle
+		_ = windows.DuplicateHandle(windows.CurrentProcess(), s.job, windows.Handle(h), &held, 0, false, windows.DUPLICATE_SAME_ACCESS)
+	})
+}
+
 var errNoHandle = errors.New("proctree: the process could not be opened")
 
 func (s *sysTree) interrupt(pid int, _ bool) error {

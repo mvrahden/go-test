@@ -71,7 +71,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		}
 	}
 
-	workDir, err := os.MkdirTemp("", "gotest-work-*")
+	workDir, err := os.MkdirTemp(workDirParent(), "gotest-work-*")
 	if err == nil {
 		// The sweep of a later run removes the work dir of a run that died.
 		err = writePIDFile(workDir)
@@ -202,6 +202,13 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 
 type overlayJSON struct {
 	Replace map[string]string `json:"Replace"`
+}
+
+// workDirParent is the dir a run makes its work dir in: GOTMPDIR when set,
+// as the go command does, for a system temp dir mounted noexec; otherwise
+// empty, which names the system temp dir.
+func workDirParent() string {
+	return os.Getenv("GOTMPDIR")
 }
 
 // WriteOverlay writes overlay files to a stamped temporary directory of their
