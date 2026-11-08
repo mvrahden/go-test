@@ -1,0 +1,27 @@
+Expect: latesignal: markers .*, want lingered: the signal ended the process
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASignalAfterTheStopFileSettledTheRun
+Clause: when the runner's signal reaches the suite only after its stop file settled the run → ends with its tests' own status, every verdict in the stream
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -252,10 +252,6 @@
+ func (w *watcher) stop(sig os.Signal, requested bool) {
+ 	w.unasked = !requested
+ 	releaseEnd, settled := w.settle(sig, stopGrace)
+-	if settled && w.file != "" {
+-		w.absorb()
+-		return
+-	}
+ 	signal.Reset(w.sigs...)
+ 	if settled {
+ 		return
+@@ -363,10 +359,6 @@
+ // close stops the watcher.
+ func (w *watcher) close() {
+ 	if len(w.sigs) > 0 {
+-		// Closed by the last suite's end, under a stop the run is settling.
+-		if w.file != "" && stopping.Load() {
+-			w.absorb()
+-		}
+ 		signal.Stop(w.ch)
+ 	}
+ 	if w.death != nil {

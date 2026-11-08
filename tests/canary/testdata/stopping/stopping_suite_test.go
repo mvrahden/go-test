@@ -1,6 +1,8 @@
 package stopping
 
 import (
+	"os"
+	"testing"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -26,3 +28,15 @@ func (s *StopTestSuite) TestHolds(t *gotest.T) {
 
 func (s *StopTestSuite) TestSecond(t *gotest.T) { mark("second") }
 func (s *StopTestSuite) TestThird(t *gotest.T)  { mark("third") }
+
+// TestMain keeps the process up for a while after the tests when
+// STOPPING_LINGER is set, as a TestMain releasing what it set up would, and
+// marks its end, which a signal that ended the process never reaches.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if os.Getenv("STOPPING_LINGER") == "1" {
+		time.Sleep(2 * time.Second)
+		mark("lingered")
+	}
+	os.Exit(code)
+}
