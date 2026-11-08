@@ -30,6 +30,8 @@ export interface StubState {
   panels: StubPanel[];
   controllers?: unknown[];
   config?: Record<string, unknown>;
+  // What diagnostic collections hold, by collection name and file.
+  diagnostics?: Map<string, Map<string, unknown[]>>;
 }
 
 export function createStubState(): StubState {
@@ -124,6 +126,55 @@ export function buildVscodeStub(state: StubState) {
       ) {}
     },
     StatusBarAlignment: { Left: 1, Right: 2 },
+    DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+    Diagnostic: class {
+      source?: string;
+      code?: unknown;
+      constructor(
+        public range: unknown,
+        public message: string,
+        public severity?: number,
+      ) {}
+    },
+    CodeActionKind: { QuickFix: "quickfix" },
+    CodeAction: class {
+      edit?: unknown;
+      command?: unknown;
+      diagnostics?: unknown[];
+      constructor(
+        public title: string,
+        public kind?: unknown,
+      ) {}
+    },
+    // Records its replacements so a test can apply them to text itself.
+    WorkspaceEdit: class {
+      replacements: {
+        uri: { fsPath: string };
+        range: unknown;
+        text: string;
+      }[] = [];
+      replace(uri: { fsPath: string }, range: unknown, text: string) {
+        this.replacements.push({ uri, range, text });
+      }
+    },
+    languages: {
+      createDiagnosticCollection: (name: string) => {
+        const all = (state.diagnostics ??= new Map());
+        const files = new Map<string, unknown[]>();
+        all.set(name, files);
+        return {
+          set: (entries: [{ fsPath: string }, unknown[] | undefined][]) => {
+            for (const [uri, diags] of entries) {
+              if (diags) files.set(uri.fsPath, diags);
+              else files.delete(uri.fsPath);
+            }
+          },
+          delete: (uri: { fsPath: string }) => files.delete(uri.fsPath),
+          clear: () => files.clear(),
+          dispose: () => {},
+        };
+      },
+    },
     RelativePattern: class {
       constructor(
         public base: unknown,
@@ -163,6 +214,7 @@ export function buildVscodeStub(state: StubState) {
         dispose: () => {},
       }),
       onDidChangeWorkspaceFolders: () => ({ dispose: () => {} }),
+      textDocuments: [],
       onDidSaveTextDocument: () => ({ dispose: () => {} }),
     },
     window: {

@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { ChildProcess } from "node:child_process";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { parseTestEvents, type TestEvent } from "./outputParser.js";
+import { parseTestEvents } from "./outputParser.js";
 import {
   buildCliCommand,
   clearBinaryCache,
@@ -11,12 +11,10 @@ import {
   type CliCommand,
 } from "./cli.js";
 import {
-  resolveTestItem,
-  applyResults,
-  BuildOutputs,
   killProcessTree,
   resolveAncestorItems,
   skipUnresolved,
+  StreamApplier,
 } from "./runnerUtils.js";
 import { ManagedChild } from "./managedChild.js";
 import type { RunRegistry } from "./runRegistry.js";
@@ -49,6 +47,7 @@ class WatchProcess implements vscode.Disposable {
     private readonly outputChannel: vscode.LogOutputChannel,
     private readonly onCycleStart: () => void,
     private readonly onEvents: (jsonLines: string) => void,
+    private readonly onCycleEnd: (exitCode: number) => void,
     private readonly onError: (msg: string) => void,
     private readonly onExit: () => void,
   ) {
@@ -124,6 +123,17 @@ class WatchProcess implements vscode.Disposable {
 
         if (event.Action === "watch-error") {
           this.onError(event.Output ?? "Unknown watch error");
+          continue;
+        }
+
+        // The cycle's verdict is complete: hand on what it streamed, then
+        // close it, rather than waiting for the next save to start one.
+        if (event.Action === "watch-end") {
+          if (this.cycleBuffer) {
+            this.onEvents(this.cycleBuffer);
+            this.cycleBuffer = "";
+          }
+          this.onCycleEnd(typeof event.Exit === "number" ? event.Exit : 0);
           continue;
         }
 
@@ -227,13 +237,58 @@ class WatchProcess implements vscode.Disposable {
 }
 
 /**
+ * One watch cycle: the TestRun it drives and the stream it produced. The
+ * cycle's events arrive in whatever pieces the pipe delivers, so output and
+ * build diagnostics are kept for the whole cycle, not per piece.
+ */
+export class WatchCycle {
+  private stream = "";
+  private readonly applier: StreamApplier;
+
+  constructor(
+    readonly run: vscode.TestRun,
+    private readonly controller: GoTestController,
+    cache: DiscoveryCache,
+    cwd: string,
+  ) {
+    this.applier = new StreamApplier(
+      controller,
+      run,
+      (importPath) => cache.resolveImportPath(importPath),
+      cwd,
+    );
+  }
+
+  apply(jsonLines: string): void {
+    this.stream += jsonLines;
+    this.applier.apply(parseTestEvents(jsonLines));
+    resolveAncestorItems(this.run, this.controller);
+  }
+
+  // end closes the run and returns the cycle's stream.
+  end(exitCode?: number): string {
+    this.controller.testController.items.forEach((root) => {
+      skipUnresolved(this.run, root, this.controller);
+    });
+    resolveAncestorItems(this.run, this.controller);
+    if (exitCode !== undefined && exitCode !== 0) {
+      this.run.appendOutput(
+        `\r\n[watch] cycle ended with exit code ${exitCode}\r\n`,
+      );
+    }
+    this.run.end();
+    return this.stream;
+  }
+}
+
+/**
  * Manages the lifecycle of watch processes.
  * Spawns `gotest watch -json <scope>` processes, parses streaming JSON events,
  * and updates Test Explorer results in real-time.
  */
 export class WatchManager implements vscode.Disposable {
   private watchers = new Map<string, WatchProcess>();
-  private activeRuns = new Map<string, vscode.TestRun>();
+  private activeCycles = new Map<string, WatchCycle>();
   private watchRecordIds = new Map<string, string>();
   private readonly statusBar: vscode.StatusBarItem;
 
@@ -275,7 +330,15 @@ export class WatchManager implements vscode.Disposable {
       return;
     }
 
-    let cycleJsonAccumulator = "";
+    // finishCycle ends the open cycle, if any, and hands its stream on.
+    const finishCycle = (exitCode?: number) => {
+      const cycle = this.activeCycles.get(pkgScope);
+      if (!cycle) return;
+      this.activeCycles.delete(pkgScope);
+      const stream = cycle.end(exitCode);
+      this.controller.saveResults();
+      if (stream) this.onCycleComplete(stream, pkgScope, cwd);
+    };
 
     const watcher = new WatchProcess(
       pkgScope,
@@ -285,37 +348,23 @@ export class WatchManager implements vscode.Disposable {
       this.outputChannel,
       // onCycleStart
       () => {
-        // End previous TestRun if any
-        const existingRun = this.activeRuns.get(pkgScope);
-        if (existingRun) {
-          this.controller.testController.items.forEach((root) => {
-            skipUnresolved(existingRun, root, this.controller);
-          });
-          resolveAncestorItems(existingRun, this.controller);
-          existingRun.end();
-        }
-
-        if (cycleJsonAccumulator) {
-          this.onCycleComplete(cycleJsonAccumulator, pkgScope, cwd);
-        }
-        this.controller.saveResults();
-        cycleJsonAccumulator = "";
-
-        // Create new TestRun
+        // A CLI without watch-end closes a cycle only by starting the next.
+        finishCycle();
         const run = this.controller.createTestRun(
           new vscode.TestRunRequest(),
           `Watch: ${pkgScope}`,
         );
-        this.activeRuns.set(pkgScope, run);
+        this.activeCycles.set(
+          pkgScope,
+          new WatchCycle(run, this.controller, this.cache, cwd),
+        );
       },
       // onEvents
       (jsonLines: string) => {
-        cycleJsonAccumulator += jsonLines;
-        const run = this.activeRuns.get(pkgScope);
-        if (run) {
-          this.applyWatchEvents(run, jsonLines, cwd);
-        }
+        this.activeCycles.get(pkgScope)?.apply(jsonLines);
       },
+      // onCycleEnd
+      (exitCode: number) => finishCycle(exitCode),
       // onError
       (msg: string) => {
         this.outputChannel.error(`[watch] ${msg}`);
@@ -328,20 +377,12 @@ export class WatchManager implements vscode.Disposable {
           this.registry.crash(recordId);
           this.watchRecordIds.delete(pkgScope);
         }
-        const run = this.activeRuns.get(pkgScope);
-        if (run) {
-          run.appendOutput(
+        this.activeCycles
+          .get(pkgScope)
+          ?.run.appendOutput(
             "\r\n[watch] Process exited unexpectedly — results may be incomplete\r\n",
           );
-          run.end();
-          this.activeRuns.delete(pkgScope);
-        }
-        this.controller.saveResults();
-
-        // Fire cycle complete with accumulated JSON
-        if (cycleJsonAccumulator) {
-          this.onCycleComplete(cycleJsonAccumulator, pkgScope, cwd);
-        }
+        finishCycle();
 
         // Remove from map
         this.watchers.delete(pkgScope);
@@ -371,10 +412,10 @@ export class WatchManager implements vscode.Disposable {
       this.watchers.delete(pkgScope);
     }
 
-    const run = this.activeRuns.get(pkgScope);
-    if (run) {
-      run.end();
-      this.activeRuns.delete(pkgScope);
+    const cycle = this.activeCycles.get(pkgScope);
+    if (cycle) {
+      cycle.run.end();
+      this.activeCycles.delete(pkgScope);
     }
 
     this.updateStatusBar();
@@ -390,14 +431,11 @@ export class WatchManager implements vscode.Disposable {
         this.registry.cancel(recordId);
       }
       watcher.dispose(forceKill);
-      const run = this.activeRuns.get(scope);
-      if (run) {
-        run.end();
-      }
+      this.activeCycles.get(scope)?.run.end();
     }
     this.watchRecordIds.clear();
     this.watchers.clear();
-    this.activeRuns.clear();
+    this.activeCycles.clear();
     this.updateStatusBar();
   }
 
@@ -419,37 +457,5 @@ export class WatchManager implements vscode.Disposable {
       this.statusBar.tooltip = `${count} active watch process${count > 1 ? "es" : ""} — click to stop all`;
       this.statusBar.show();
     }
-  }
-
-  private applyWatchEvents(
-    run: vscode.TestRun,
-    jsonLines: string,
-    cwd: string,
-  ): void {
-    const events = parseTestEvents(jsonLines);
-
-    const builds = new BuildOutputs();
-    const byPackage = new Map<string, TestEvent[]>();
-    for (const event of events) {
-      if (builds.absorb(event)) continue;
-      let group = byPackage.get(event.Package);
-      if (!group) {
-        group = [];
-        byPackage.set(event.Package, group);
-      }
-      group.push(event);
-    }
-
-    for (const [importPath, pkgEvents] of byPackage) {
-      const pkgDir = this.cache.resolveImportPath(importPath);
-      if (pkgDir) {
-        applyResults(this.controller, run, pkgEvents, importPath, pkgDir, {
-          builds,
-          buildDir: cwd,
-        });
-      }
-    }
-
-    resolveAncestorItems(run, this.controller);
   }
 }

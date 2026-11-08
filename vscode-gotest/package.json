@@ -102,6 +102,10 @@
         }
       },
       {
+        "command": "gotest.openEventsFile",
+        "title": "Go Test: Open Events File…"
+      },
+      {
         "command": "gotest.startWatch",
         "title": "Go Test: Start Watch"
       },
@@ -140,6 +144,18 @@
         "command": "gotest.clearResults",
         "title": "Go Test: Clear Results",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "gotest.lintFixPackage",
+        "title": "Go Test: Fix lint findings in package"
+      },
+      {
+        "command": "gotest.lintWorkspace",
+        "title": "Go Test: Lint Workspace"
+      },
+      {
+        "command": "gotest.applyLintFix",
+        "title": "Go Test: Apply lint fix"
       }
     ],
     "menus": {
@@ -178,6 +194,12 @@
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",
           "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "gotest.applyLintFix",
+          "when": "false"
         }
       ]
     },
@@ -267,6 +289,12 @@
           "default": false,
           "scope": "resource",
           "description": "Re-run package coverage when a .go file is saved (opt-in)"
+        },
+        "gotest.lintOnSave": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Run gotest lint on the package of a saved _test.go file and show its findings as diagnostics. Rules are configured in .gotest.yml."
         },
         "gotest.specView.autoRefresh": {
           "type": "boolean",

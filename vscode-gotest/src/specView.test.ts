@@ -16,7 +16,13 @@ import {
   specDataToReport,
   interpretSpecExit,
   encodeStateForScript,
+  itemIdOf,
+  nearestItemId,
+  linkSources,
 } from "./specView.js";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 
 function leaf(
   name: string,
@@ -131,6 +137,43 @@ describe("specDataToReport with a fuzz target", () => {
     const report = specDataToReport(data as never, []);
     expect(report).toContain("RoundTrip — FUZZ (3 seeds)");
     expect(report).toContain("1 suite, 1 behavior, 1 fuzz target:");
+  });
+});
+
+describe("specDataToReport with a suite that failed in its own hooks", () => {
+  const failedSuite = {
+    ...suite("Store", [leaf("saves", "pass", 0.1), leaf("loads", "pass", 0.1)]),
+    status: "fail",
+    output: [
+      "=== RUN   TestStoreTestSuite\n",
+      "    store_test.go:40: AfterAll: close db: connection reset\n",
+      "--- FAIL: TestStoreTestSuite (0.20s)\n",
+    ],
+  };
+  const data = {
+    packages: [
+      {
+        path: "example.com/store",
+        status: "fail",
+        duration: 0.2,
+        nodes: [failedSuite],
+      },
+    ],
+    stats: {
+      suites: 1,
+      behaviors: 3,
+      tests: 0,
+      passed: 2,
+      failed: 1,
+      skipped: 0,
+    },
+  };
+
+  it("counts the suite as the failure and quotes what it said", () => {
+    const report = specDataToReport(data as never, []);
+    expect(report).toMatch(/Store\s+\S+\s+2 passed, 1 failed/);
+    expect(report).toContain("│ store_test.go:40: AfterAll: close db");
+    expect(report).not.toContain("--- FAIL");
   });
 });
 
@@ -501,5 +544,74 @@ describe("encodeStateForScript", () => {
     expect(
       JSON.parse(encodeStateForScript({ packages: [], stats: {} })),
     ).toEqual({ packages: [], stats: {} });
+  });
+});
+
+describe("itemIdOf", () => {
+  it("names a node by the id the Test Explorer gives it", () => {
+    expect(itemIdOf("example.com/cart", "TestCartTestSuite")).toBe(
+      "example.com/cart/CartTestSuite",
+    );
+    expect(
+      itemIdOf("example.com/cart", "TestCartTestSuite/TestAdd/when_empty"),
+    ).toBe("example.com/cart/CartTestSuite/TestAdd/when_empty");
+    expect(itemIdOf("example.com/cart", "TestPlain")).toBe(
+      "example.com/cart/Plain",
+    );
+  });
+
+  it("names no item for a fixture node", () => {
+    expect(itemIdOf("example.com/cart", "Test_DBFixture")).toBeUndefined();
+  });
+});
+
+describe("nearestItemId", () => {
+  it("falls back to the closest ancestor the tree holds", () => {
+    const tree = new Set(["p/S", "p/S/TestM"]);
+    const has = (id: string) => tree.has(id);
+    expect(nearestItemId("p/S/TestM", has)).toBe("p/S/TestM");
+    expect(nearestItemId("p/S/TestM/row_101", has)).toBe("p/S/TestM");
+    expect(nearestItemId("q/T", has)).toBeUndefined();
+  });
+});
+
+describe("linkSources", () => {
+  it("links the file:line tokens of failure output to files that are there", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-links-"));
+    try {
+      writeFileSync(path.join(dir, "store_test.go"), "package store\n");
+      const file = path.join(dir, "store_test.go");
+
+      // As go test names it: relative to the package.
+      expect(linkSources("    store_test.go:40: boom", dir)).toBe(
+        `    <a class="src-link" data-loc-file="${file}" data-loc-line="40">store_test.go:40</a>: boom`,
+      );
+      // As the compiler names it: relative to where it ran.
+      expect(
+        linkSources("store/store_test.go:13:22: undefined: x", dir),
+      ).toContain(`data-loc-file="${file}" data-loc-line="13"`);
+      // A stack frame names the file absolutely.
+      expect(linkSources(`\t${file}:7 +0x1d`, undefined)).toContain(
+        `data-loc-line="7"`,
+      );
+      // Windows names a temp dir by a short name, tilde included.
+      const short = path.join(dir, "RUNNER~1");
+      mkdirSync(short);
+      writeFileSync(path.join(short, "short_test.go"), "package short\n");
+      expect(
+        linkSources(
+          `\t${path.join(short, "short_test.go")}:5 +0x1d`,
+          undefined,
+        ),
+      ).toContain(
+        `data-loc-file="${path.join(short, "short_test.go")}" data-loc-line="5"`,
+      );
+      // Nothing to open, nothing to click.
+      expect(linkSources("    gone_test.go:3: boom", dir)).toBe(
+        "    gone_test.go:3: boom",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

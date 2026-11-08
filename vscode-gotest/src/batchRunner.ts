@@ -16,7 +16,10 @@ import {
   readWorkspacePatterns,
   type AppliedResult,
   BuildOutputs,
+  erroredItem,
+  itemTestPath,
 } from "./runnerUtils.js";
+import { coverOf, isRunLevelPackage, type RunPiece } from "./specStore.js";
 import {
   runGoToolCoverFunc,
   splitCoverByPackage,
@@ -51,6 +54,26 @@ export interface BatchConfig {
 
 export interface BatchResult {
   stdout: string;
+  // The run as the Spec View keeps it.
+  piece: RunPiece;
+}
+
+// runPiece says which packages a filtered batch ran in part, and what of
+// them the filter asked for.
+export function runPiece(
+  stdout: string,
+  config: Pick<BatchConfig, "pkgInfos" | "filter" | "workspaceDir">,
+): RunPiece {
+  const piece: RunPiece = { stream: stdout, folder: config.workspaceDir };
+  if (!config.filter) return piece;
+  piece.partial = new Map();
+  for (const info of config.pkgInfos) {
+    const paths = info.items
+      .map(itemTestPath)
+      .filter((p): p is string => p !== undefined);
+    if (paths.length > 0) piece.partial.set(info.importPath, coverOf(paths));
+  }
+  return piece;
 }
 
 export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
@@ -134,7 +157,21 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
 
       if (builds.absorb(event)) return;
       const dir = pkgDirMap.get(event.Package);
-      if (!dir) return;
+      if (!dir) {
+        // The CLI books a run's own failure (shared fixtures, an interrupt,
+        // the global deadline) under a name that is no package. No item
+        // holds it, so it is said in the run's output.
+        if (
+          isRunLevelPackage(event.Package) &&
+          event.Action === "output" &&
+          event.Output
+        ) {
+          run.appendOutput(
+            `[${event.Package}] ${event.Output.replace(/\n$/, "")}\r\n`,
+          );
+        }
+        return;
+      }
 
       let outputMap = pkgOutputMaps.get(event.Package);
       if (!outputMap) {
@@ -168,6 +205,12 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
     };
 
+    // What the CLI says on stderr — a note that a package was not run, a
+    // run's failure — belongs with the run, as it arrives.
+    const handleStderrLine = (line: string) => {
+      if (!/^exit status \d+$/.test(line)) run.appendOutput(line + "\r\n");
+    };
+
     const result = await spawnTestProcess(
       cmd.bin,
       cmd.args,
@@ -177,6 +220,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       label,
       env,
       handleStdoutLine,
+      handleStderrLine,
     );
 
     if (token.isCancellationRequested) {
@@ -194,7 +238,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           skipUnresolved(run, item, controller);
         }
       }
-      return { stdout: result.stdout };
+      return { stdout: result.stdout, piece: runPiece(result.stdout, config) };
     }
 
     if (result.exitCode !== 0) {
@@ -203,10 +247,6 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         .filter((line) => !/^exit status \d+$/.test(line.trim()))
         .join("\n")
         .trim();
-
-      if (stderrFiltered) {
-        run.appendOutput(stderrFiltered.replace(/\n/g, "\r\n") + "\r\n");
-      }
 
       let attributed = false;
       for (const info of pkgInfos) {
@@ -222,7 +262,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
           .filter(Boolean)
           .join("\n\n");
         for (const item of info.items) {
-          run.errored(item, new vscode.TestMessage(diagnostic));
+          erroredItem(run, controller, item, diagnostic);
           skipUnresolved(run, item, controller);
         }
         attributed = true;
@@ -247,7 +287,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
             const pkgItem = getPackageItem(item);
             if (seen.has(pkgItem.id)) continue;
             seen.add(pkgItem.id);
-            run.errored(pkgItem, new vscode.TestMessage(diagnostic));
+            erroredItem(run, controller, pkgItem, diagnostic);
           }
         }
       }
@@ -294,7 +334,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       }
     }
 
-    return { stdout: result.stdout };
+    return { stdout: result.stdout, piece: runPiece(result.stdout, config) };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof Error && "code" in err && err.code === "ENOENT") {
@@ -303,11 +343,11 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     outputChannel.error(`[${label}] ${message}`);
     for (const info of pkgInfos) {
       for (const item of info.items) {
-        run.errored(item, new vscode.TestMessage(message));
+        erroredItem(run, controller, item, message);
         skipUnresolved(run, item, controller);
       }
     }
-    return { stdout: "" };
+    return { stdout: "", piece: runPiece("", config) };
   } finally {
     if (coverFile) {
       rm(path.dirname(coverFile), { recursive: true, force: true }).catch(
