@@ -184,7 +184,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 		return 2
 	}
 
-	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events)))
+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
 
 	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)

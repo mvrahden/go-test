@@ -45,6 +45,10 @@ type OutputCollector struct {
 	starts *startWriter
 	// gate is held by every write of the stream; the exit takes it whole.
 	gate *writeGate
+	// runLevel holds the packages the run booked for itself, whose events
+	// carry RunLevel. It is what was booked, never a name: an import path
+	// may read like one of them.
+	runLevel map[string]bool
 	// events receives a copy of the JSON stream; nil for none.
 	events io.Writer
 }
@@ -77,12 +81,13 @@ func WithEvents(w io.Writer) OutputOption {
 
 func NewOutputCollector(mode RunMode, verbose bool, opts ...OutputOption) *OutputCollector {
 	c := &OutputCollector{
-		mode:    mode,
-		verbose: verbose,
-		pkgs:    map[string]*pkgState{},
-		stdout:  os.Stdout,
-		stderr:  os.Stderr,
-		gate:    &exitGate,
+		mode:     mode,
+		verbose:  verbose,
+		pkgs:     map[string]*pkgState{},
+		runLevel: map[string]bool{},
+		stdout:   os.Stdout,
+		stderr:   os.Stderr,
+		gate:     &exitGate,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -520,7 +525,15 @@ func (c *OutputCollector) bookRunFailure(pkg, msg string, details ...string) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.runLevel[pkg] = true
 	_, _ = c.jsonTarget().Write(runFailureEvents(pkg, msg, details...))
+}
+
+// markRunLevel records pkg as one the run books for itself.
+func (c *OutputCollector) markRunLevel(pkg string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.runLevel[pkg] = true
 }
 
 // reportFailure writes a run's failure line to the collector's stderr.
@@ -539,7 +552,7 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 		if c.events != nil {
 			w = io.MultiWriter(w, c.events)
 		}
-		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate}
+		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel}
 	}
 	return c.starts
 }
@@ -553,6 +566,8 @@ type startWriter struct {
 	buf     []byte
 	started map[string]bool
 	gate    *writeGate
+	// runLevel is the collector's: the packages the run booked for itself.
+	runLevel map[string]bool
 }
 
 func (s *startWriter) Write(p []byte) (int, error) {
@@ -587,6 +602,9 @@ func (s *startWriter) writeLine(line []byte) {
 			if len(ev.Time) == 0 {
 				start["Time"] = time.Now()
 			}
+			if s.runLevel[ev.Package] {
+				start["RunLevel"] = true
+			}
 			writeJSONLine(s.w, start)
 		case ev.Action == "start":
 			return
@@ -613,9 +631,7 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	default:
 		summaryLine = fmt.Sprintf("ok  \t%s\t%.3fs%s\n", pkg, dur.Seconds(), ranNothingNote(s))
 	}
-	writeJSONLine(w, map[string]any{
-		"Time": now, "Action": "output", "Package": pkg, "Output": summaryLine,
-	})
+	summary := map[string]any{"Time": now, "Action": "output", "Package": pkg, "Output": summaryLine}
 	action := "pass"
 	if failed {
 		action = "fail"
@@ -624,6 +640,11 @@ func (c *OutputCollector) emitJSONPackageSummary(w io.Writer, pkg string, s *pkg
 	if s.failedBuild != "" {
 		verdict["FailedBuild"] = s.failedBuild
 	}
+	if c.runLevel[pkg] {
+		summary["RunLevel"] = true
+		verdict["RunLevel"] = true
+	}
+	writeJSONLine(w, summary)
 	writeJSONLine(w, verdict)
 }
 

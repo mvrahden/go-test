@@ -69,6 +69,6 @@ func checkGenerationRejects(pass *analysis.Pass) {
 		if claimed[lineOf(pass.Fset, pos)] {
 			continue
 		}
-		report(pass, GenerationRejects, pos, "%s", ce.Err.Error())
+		report(pass, GenerationRejects, span{pos, pos}, "%s", ce.Err.Error())
 	}
 }

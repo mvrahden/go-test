@@ -211,6 +211,13 @@ gotest spec ./... --static
 gotest spec ./... --static --format=md --output=docs/behavior-spec.md
 ```
 
+Lay a saved run's verdicts over that specification with `--declared`: every behavior the source declares is listed, and what the run did not report shows without a verdict and is counted as not run ([The declared specification under a run's verdicts](specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)). `--hide=pass` (or `fail`, `skip`, `none`, comma-separated) leaves rows out of the rendering and none out of the counts ([Hiding rows by status](specs/spec/spec.md#requirement-hiding-rows-by-status)):
+
+```bash
+gotest spec --input=events.json --declared ./...
+gotest spec --input=events.json --hide=pass
+```
+
 ## Isolation
 
 Each suite runs in its own process with zero shared state.
@@ -1083,6 +1090,8 @@ Thirty-three rules in three tiers:
 - **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), suites and fixtures declared inside a `type ( … )` block (the fix gives each its own declaration), embedded suites, fixtures or hook-carrying types and suite-typed fields, direct calls of a lifecycle hook the harness already calls, every other shape the generator rejects, `//nolint` comments naming no rule a linter knows, and generated files checked into version control.
 - **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); `-diff` prints exactly what `-fix` would write, as a unified diff with paths relative to the current directory, and writes nothing — `gotest lint -diff ./... | git apply` applies it (a file outside that directory needs `git apply --unsafe-paths`; a symlink is named by the file it leads to, which `-fix` writes).
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
+
+`gotest lint -rules` lists them, and `gotest lint -rules -json` gives each rule's tier, scope, whether it can be skipped or fixed, and its description as a document an editor or a script reads ([The rules](specs/lint/spec.md#requirement-the-rules)).
 
 Suppress per line with `//nolint:<rule>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
 There is no golangci-lint plugin — run `gotest lint` as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), the plain-text report is replaced: findings are printed as `::error` annotations, which GitHub shows inline on the PR, and appended as a table to the step summary. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags, and `pkg/lint` exports the analyzer for external `go/analysis` drivers.)

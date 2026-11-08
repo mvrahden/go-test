@@ -34,6 +34,8 @@ type renderConfig struct {
 	benchEnvWarning string
 	benchGate       *BenchGate
 	groups          []GroupRun
+	hidden          map[Status]bool
+	packageStats    bool
 }
 
 type RenderOption func(*renderConfig)
@@ -155,21 +157,26 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 
 	multiPkg := len(packages) > 1
 
-	for i, pkg := range packages {
+	printed := 0
+	for _, pkg := range packages {
+		if !cfg.packageShown(pkg) {
+			continue
+		}
 		if multiPkg {
-			if i > 0 {
+			if printed > 0 {
 				fmt.Fprintln(w)
 			}
 			fmt.Fprintf(w, "%s=== %s ===%s\n", c.dim, pkg.Path, c.reset)
 			fmt.Fprintln(w)
 		}
-		for _, node := range pkg.Nodes {
-			renderNode(w, node, 0, &c, cfg.withoutVerdicts)
+		printed++
+		for _, node := range cfg.visible(pkg.Nodes) {
+			renderNode(w, node, 0, &c, &cfg)
 		}
 		// A verdict that sits on the package itself — a build failure, a death
 		// outside any test — has no node to render it; it must still show
 		// beside its diagnostics, or the spec reads green next to a red exit.
-		if PkgFailedOnItsOwn(pkg) {
+		if PkgFailedOnItsOwn(pkg) && !cfg.hidden[StatusFail] {
 			icon, clr := statusIcon(StatusFail, &c)
 			fmt.Fprintf(w, "%s%s%s %sFAIL%s\n", clr, icon, c.reset, c.bold+c.red, c.reset)
 			lines := filterOutput(pkg.Output)
@@ -202,9 +209,26 @@ func bareSuffix(n *Node) string {
 	return suffix
 }
 
-func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
+func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
+	bare := cfg.withoutVerdicts
 	indent := strings.Repeat("  ", depth)
-	isLeaf := len(n.Children) == 0
+	children := cfg.visible(n.Children)
+	isLeaf := len(children) == 0
+
+	// A declared node the stream did not report has no verdict and took no
+	// time; it says so instead of showing either.
+	if n.NotRun && !bare {
+		if isLeaf {
+			icon, clr := statusIcon(StatusNone, c)
+			fmt.Fprintf(w, "%s%s%s%s %s%s — NOT RUN%s\n", indent, clr, icon, c.reset, n.Display, c.dim, c.reset)
+			return
+		}
+		fmt.Fprintf(w, "%s%s\n", indent, branchLabel(n, c))
+		for _, child := range children {
+			renderNode(w, child, depth+1, c, cfg)
+		}
+		return
+	}
 
 	// A passing fuzz target reads as one line: its seeds are evidence, not
 	// behaviors. A failing one opens up so the offending entry is named.
@@ -253,10 +277,7 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 		return
 	}
 
-	label := n.Display
-	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark || n.Kind == KindFuzz {
-		label = c.bold + label + c.reset
-	}
+	label := branchLabel(n, c)
 
 	suffix := ""
 	if n.External {
@@ -272,8 +293,8 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 		// Nothing ran, so the container says what it is rather than what
 		// happened to it, and it says when its children are not the whole list.
 		fmt.Fprintf(w, "%s%s%s\n", indent, label, bareSuffix(n))
-		for _, child := range n.Children {
-			renderNode(w, child, depth+1, c, bare)
+		for _, child := range children {
+			renderNode(w, child, depth+1, c, cfg)
 		}
 		return
 	}
@@ -299,9 +320,18 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, bare bool) {
 		}
 	}
 
-	for _, child := range n.Children {
-		renderNode(w, child, depth+1, c, bare)
+	for _, child := range children {
+		renderNode(w, child, depth+1, c, cfg)
 	}
+}
+
+// branchLabel is a branch's display text, bold for what declares rather than
+// describes: suites, fixtures, methods, tests, benchmarks and fuzz targets.
+func branchLabel(n *Node, c *colors) string {
+	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark || n.Kind == KindFuzz {
+		return c.bold + n.Display + c.reset
+	}
+	return n.Display
 }
 
 func statusIcon(s Status, c *colors) (string, string) {
@@ -422,6 +452,9 @@ func renderSummary(w io.Writer, stats Stats, c colors) { //nolint:gocritic // hu
 	}
 	if stats.Skipped > 0 {
 		parts = append(parts, fmt.Sprintf("%s%d skipped%s", c.yellow, stats.Skipped, c.reset))
+	}
+	if stats.NotRun > 0 {
+		parts = append(parts, fmt.Sprintf("%s%d not run%s", c.dim, stats.NotRun, c.reset))
 	}
 	if stats.FailedPackages > 0 {
 		parts = append(parts, fmt.Sprintf("%s%s%s", c.red, countNoun(stats.FailedPackages, "failed package", "failed packages"), c.reset))

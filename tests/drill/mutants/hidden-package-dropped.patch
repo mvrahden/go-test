@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / keeps every package in the JSON document with all of its stats and none of its rows
+Clause: when a stream in which everything passed is rendered with --hide=pass → keeps every package in the JSON document with all of its stats and none of its rows
+--- a/internal/gotestspec/json.go
++++ b/internal/gotestspec/json.go
+@@ -101,6 +101,9 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
+ 	// Every package stays, with its stats: hiding leaves out rows, never a
+ 	// count. One whose rows are all hidden keeps no node.
+ 	for _, pkg := range packages {
++		if !cfg.packageShown(pkg) {
++			continue
++		}
+ 		output := pkg.Output
+ 		if output == nil || cfg.hidden[StatusFail] {
+ 			// The failure a package carries on its own is a row the

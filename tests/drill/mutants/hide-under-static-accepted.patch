@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / refuses with exit 2, naming what it needs or the statuses it accepts
+Clause: when --hide is given with --static or with a status it does not know, or --declared without --input or with --static → refuses with exit 2, naming what it needs or the statuses it accepts
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -403,7 +403,7 @@ func parseSpecView(own OwnFlags, input string) (specView, error) {
+ 		return view, fmt.Errorf("--declared requires --input: it lays a stream's verdicts over the source")
+ 	}
+ 	if own.Given("--hide") {
+-		if static {
++		if static && false {
+ 			return view, fmt.Errorf("--hide leaves out rows by their verdict, and --static has none")
+ 		}
+ 		var hidden []gotestspec.Status

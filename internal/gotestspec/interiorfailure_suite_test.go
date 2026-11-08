@@ -102,7 +102,7 @@ func (s *InteriorFailureTestSuite) TestRenderTerminal_BareFailIsMarked(t *gotest
 // every mismatched counter at once.
 type statCounts struct{ Failed, Passed, Total int }
 
-func countsOf(stats gotestspec.Stats) statCounts {
+func countsOf(stats gotestspec.Stats) statCounts { //nolint:gocritic // hugeParam: stable API
 	return statCounts{Failed: stats.Failed, Passed: stats.Passed, Total: stats.Total()}
 }
 

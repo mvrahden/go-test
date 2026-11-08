@@ -20,14 +20,15 @@ const JSONPath = "docs/design/catalog.json"
 const Pattern = "./tests/conformance/..."
 
 // Render reads the conformance suites from source and returns the catalog
-// JSON. Its version field names the CLI build that rendered it, so it is
-// dropped: the catalog describes behavior, not the binary that read it.
+// JSON. The version field names the CLI build that rendered it and each
+// package's dir the checkout it was read from, so both are dropped: the
+// catalog describes behavior, not the binary or the host that read it.
 func Render(ctx context.Context, repoRoot string) ([]byte, error) {
 	raw, err := render(ctx, repoRoot)
 	if err != nil {
 		return nil, err
 	}
-	return withoutVersion(raw)
+	return committed(raw)
 }
 
 // render reads the catalog as linux sees the source, on every host: a
@@ -54,12 +55,21 @@ func staticExitError(exit int, stderr string) error {
 	return fmt.Errorf("spec --static exited %s:\n%s", proctree.ExitStatus(exit), stderr)
 }
 
-func withoutVersion(raw []byte) ([]byte, error) {
+// committed is the document as the repository keeps it: without the
+// version and without the directories of the host that rendered it.
+func committed(raw []byte) ([]byte, error) {
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return nil, fmt.Errorf("spec --static json: %w", err)
 	}
 	delete(doc, "version")
+	if pkgs, ok := doc["packages"].([]any); ok {
+		for _, p := range pkgs {
+			if pkg, ok := p.(map[string]any); ok {
+				delete(pkg, "dir")
+			}
+		}
+	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return nil, err

@@ -232,38 +232,6 @@ export class DiscoveryService {
     return false;
   }
 
-  private async resolveWorkspacePatterns(
-    workspaceDir: string,
-  ): Promise<string[]> {
-    try {
-      const content = await readFile(
-        path.join(workspaceDir, "go.work"),
-        "utf-8",
-      );
-      const usePattern = /^\s*use\s*\(\s*([\s\S]*?)\s*\)/m;
-      const blockMatch = usePattern.exec(content);
-      if (blockMatch) {
-        const dirs = blockMatch[1]
-          .split("\n")
-          .map((l) => l.trim())
-          .filter((l) => l && !l.startsWith("//"));
-        if (dirs.length > 1) {
-          return dirs.map((d) => `${d}/...`);
-        }
-      }
-      const singleUse = /^\s*use\s+(\S+)/gm;
-      const singles: string[] = [];
-      let m: RegExpExecArray | null;
-      while ((m = singleUse.exec(content)) !== null) {
-        singles.push(m[1]);
-      }
-      if (singles.length > 1) {
-        return singles.map((d) => `${d}/...`);
-      }
-    } catch {}
-    return ["./..."];
-  }
-
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAYS_MS = [2_000, 4_000];
 
@@ -279,7 +247,7 @@ export class DiscoveryService {
     }
 
     const effectivePatterns =
-      patterns ?? (await this.resolveWorkspacePatterns(workspaceDir));
+      patterns ?? (await workspacePatterns(workspaceDir));
 
     for (let attempt = 1; attempt <= DiscoveryService.MAX_RETRIES; attempt++) {
       if (this.pending.some((p) => p.workspaceDir === workspaceDir)) {
@@ -398,4 +366,35 @@ export class DiscoveryService {
       }
     }
   }
+}
+
+// workspacePatterns are the packages a folder's discovery reads: every
+// module a go.work uses, else the folder's own tree.
+export async function workspacePatterns(
+  workspaceDir: string,
+): Promise<string[]> {
+  try {
+    const content = await readFile(path.join(workspaceDir, "go.work"), "utf-8");
+    const usePattern = /^\s*use\s*\(\s*([\s\S]*?)\s*\)/m;
+    const blockMatch = usePattern.exec(content);
+    if (blockMatch) {
+      const dirs = blockMatch[1]
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("//"));
+      if (dirs.length > 1) {
+        return dirs.map((d) => `${d}/...`);
+      }
+    }
+    const singleUse = /^\s*use\s+(\S+)/gm;
+    const singles: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = singleUse.exec(content)) !== null) {
+      singles.push(m[1]);
+    }
+    if (singles.length > 1) {
+      return singles.map((d) => `${d}/...`);
+    }
+  } catch {}
+  return ["./..."];
 }

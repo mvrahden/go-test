@@ -11,7 +11,7 @@ Clause: when a nolint comment names a rule lint does not have → the comment na
 -						Category: string(NolintUnknown),
 -						Message:  "unknown rule " + id + " in nolint comment",
 -					})
-+					report(pass, NolintUnknown, c.Pos(), "unknown rule %s in nolint comment", id)
++					report(pass, NolintUnknown, c, "unknown rule %s in nolint comment", id)
  				}
  			}
  		}

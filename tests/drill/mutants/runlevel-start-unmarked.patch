@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package
+Clause: when a -json run's shared fixture does not come up → marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -289,7 +289,7 @@ func runFailureEvents(pkg, msg string, details ...string) []byte {
+ 			Package  string `json:"Package"`
+ 			Output   string `json:"Output,omitempty"`
+ 			RunLevel bool   `json:"RunLevel"`
+-		}{Action: action, Package: pkg, Output: text, RunLevel: true}
++		}{Action: action, Package: pkg, Output: text, RunLevel: action != "start"}
+ 		b, _ := json.Marshal(e)
+ 		return append(b, '\n')
+ 	}

@@ -192,8 +192,8 @@ func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *
 
 		w.It("exits 1 and books the timeout into the stream every renderer reads", func(it *gotest.T) {
 			gotest.Equal(it, 1, result.ExitCode)
-			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"output","Package":"global --timeout","Output":"FAIL: global --timeout exceeded after 3s\n"}`)
-			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"fail","Package":"global --timeout"}`)
+			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"output","Package":"global --timeout","Output":"FAIL: global --timeout exceeded after 3s\n","RunLevel":true}`)
+			gotest.Contains(it, string(result.CapturedJSON), `{"Action":"fail","Package":"global --timeout","RunLevel":true}`)
 		})
 
 		w.It("books it into the live -json stream too", func(it *gotest.T) {
@@ -202,7 +202,7 @@ func (s *BuildFailureVerdictsTestSuite) TestDeadlineFailsTheRun(t *gotest.T, _ *
 			var result gotestrunner.PipelineResult
 			gotestrunner.ExportApplyDeadlineFailure(c, &result, 3*time.Second, context.DeadlineExceeded, nil)
 			gotest.Equal(it, 1, result.ExitCode)
-			gotest.Contains(it, stdout.String(), `{"Action":"fail","Package":"global --timeout"}`)
+			gotest.Contains(it, stdout.String(), `{"Action":"fail","Package":"global --timeout","RunLevel":true}`)
 		})
 	})
 
@@ -256,8 +256,8 @@ func (s *BuildFailureVerdictsTestSuite) TestAnInterruptBooksTheStop(t *gotest.T,
 		for sub, mode := range gotest.Each(w, []gotestrunner.RunMode{gotestrunner.RunStreamJSON, gotestrunner.RunCaptureJSON}) {
 			stream, stderr, result := stopped(mode, true, context.Canceled)
 			gotest.Equal(sub, "FAIL: run interrupted while running: example.com/pkg TestXTestSuite\n", stderr)
-			gotest.Contains(sub, stream, `{"Action":"output","Package":"interrupted","Output":"FAIL: run interrupted while running: example.com/pkg TestXTestSuite\n"}`)
-			gotest.Contains(sub, stream, `{"Action":"fail","Package":"interrupted"}`)
+			gotest.Contains(sub, stream, `{"Action":"output","Package":"interrupted","Output":"FAIL: run interrupted while running: example.com/pkg TestXTestSuite\n","RunLevel":true}`)
+			gotest.Contains(sub, stream, `{"Action":"fail","Package":"interrupted","RunLevel":true}`)
 			gotest.Contains(sub, stream, `{"Action":"pass","Package":"example.com/pkg","Test":"TestXTestSuite"}`, "the suite's own verdict is kept")
 			gotest.Equal(sub, 130, result.ExitCode)
 		}

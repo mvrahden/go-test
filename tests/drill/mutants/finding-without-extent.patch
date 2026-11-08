@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/lint .* / ends each past its posn, at the end of the call and of the function's signature
+Clause: when lint -json reports a finding on a call and one on a function → ends each past its posn, at the end of the call and of the function's signature
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -310,7 +310,6 @@ func reportWithFix(pass *analysis.Pass, rule Rule, rng analysis.Range, fixes []a
+ 	}
+ 	pass.Report(analysis.Diagnostic{
+ 		Pos:            rng.Pos(),
+-		End:            rng.End(),
+ 		Category:       string(rule),
+ 		Message:        fmt.Sprintf(format, args...),
+ 		SuggestedFixes: fixes,

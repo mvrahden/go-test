@@ -163,7 +163,15 @@ type Node struct {
 	// list — a statically read method that declares behaviors whose names or
 	// existence depend on runtime values. A tree stream never sets it, because
 	// what ran is by definition all there was.
-	Incomplete  bool
+	Incomplete bool
+	// NotRun marks a node the source declares that the stream laid over it
+	// did not report (see Overlay). It has no verdict and no duration.
+	NotRun bool
+	// File and Line say where the source declares the node: File relative
+	// to the package directory, as gotest discover gives it. Empty for a
+	// node only a run revealed.
+	File        string
+	Line        int
 	Variant     int
 	duplicate   bool
 	Iterations  int
@@ -178,7 +186,12 @@ type Node struct {
 }
 
 type Package struct {
-	Path     string
+	Path string
+	// Dir is the package's directory, when the tree was read from source.
+	Dir string
+	// RunLevel marks a package the run booked for itself (shared fixtures,
+	// an interrupt, …): its events said so.
+	RunLevel bool
 	Status   Status
 	Duration time.Duration
 	Nodes    []*Node
@@ -199,9 +212,12 @@ type Stats struct {
 	// carry no failing behavior, so folding them into Failed would break the
 	// Passed+Failed+Skipped arithmetic; they are counted as what they are.
 	FailedPackages int
+	// NotRun counts the declared behaviors and fuzz targets the stream laid
+	// over them did not report.
+	NotRun int
 }
 
-func (s Stats) Total() int {
+func (s Stats) Total() int { //nolint:gocritic // hugeParam: stable API
 	return s.Passed + s.Failed + s.Skipped
 }
 
@@ -238,6 +254,9 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			nodes[ev.Package] = map[string]*Node{}
 			topRunCount[ev.Package] = map[string]int{}
 			levels[ev.Package] = map[string][]string{}
+		}
+		if ev.RunLevel {
+			pkg.RunLevel = true
 		}
 
 		if ev.Test == "" {
@@ -381,6 +400,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 				n.External = true
 			}
 		}
+		FailBranches(pkg)
 	}
 
 	result := make([]*Package, 0, len(pkgs))
@@ -422,6 +442,32 @@ func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[st
 	return segments
 }
 
+// FailBranches fails every node a failure beneath it reached, and the package
+// when any node failed, as go test fails a test with its subtest. A stream
+// composed from several runs can hold a parent's pass over a child's newer
+// fail; every renderer and the exit code then read the same verdict. A skip
+// stays where it was reported.
+func FailBranches(pkg *Package) {
+	for _, n := range pkg.Nodes {
+		if failBranch(n) {
+			pkg.Status = StatusFail
+		}
+	}
+}
+
+func failBranch(n *Node) bool {
+	failed := n.Status == StatusFail
+	for _, c := range n.Children {
+		if failBranch(c) {
+			failed = true
+		}
+	}
+	if failed {
+		n.Status = StatusFail
+	}
+	return failed
+}
+
 // resolveDuplicateSegments checks if a child path belongs to a duplicate
 // top-level node (parent has #NN suffix pattern) and remaps it.
 func resolveDuplicateSegments(segments []string, nmap map[string]*Node) []string {
@@ -431,19 +477,25 @@ func resolveDuplicateSegments(segments []string, nmap map[string]*Node) []string
 		return segments
 	}
 
-	// Check if any child segment has the #NN suffix indicating it belongs to
-	// the duplicate run.
+	// A child carrying the #NN suffix belongs to the duplicate run, and so
+	// does any child reported once the first run has its verdict: go test
+	// reports a test only after its subtests. A suite of the external test
+	// package names methods the internal one lacks without a suffix.
+	second := nmap[topName] != nil && nmap[topName].Status != StatusNone
 	for _, seg := range segments[1:] {
 		if hasDuplicateSuffix(seg) {
-			out := make([]string, len(segments))
-			out[0] = topName + "\x00dup"
-			for i := 1; i < len(segments); i++ {
-				out[i] = stripDuplicateSuffix(segments[i])
-			}
-			return out
+			second = true
 		}
 	}
-	return segments
+	if !second {
+		return segments
+	}
+	out := make([]string, len(segments))
+	out[0] = topName + "\x00dup"
+	for i := 1; i < len(segments); i++ {
+		out[i] = stripDuplicateSuffix(segments[i])
+	}
+	return out
 }
 
 func hasDuplicateSuffix(s string) bool {
@@ -656,14 +708,7 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 	if n.Kind == KindFuzz {
 		// One verdict per target; its seeds are evidence, not behaviors.
 		s.Fuzzers++
-		switch n.Status {
-		case StatusPass:
-			s.Passed++
-		case StatusFail:
-			s.Failed++
-		case StatusSkip:
-			s.Skipped++
-		}
+		countVerdict(n, s)
 		return
 	}
 	if n.Kind == KindSuite {
@@ -686,17 +731,23 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 		} else {
 			s.Behaviors++
 		}
-		switch n.Status {
-		case StatusPass:
-			s.Passed++
-		case StatusFail:
-			s.Failed++
-		case StatusSkip:
-			s.Skipped++
-		}
+		countVerdict(n, s)
 	}
 	for _, c := range n.Children {
 		collectStats(c, s, inStdlib)
+	}
+}
+
+func countVerdict(n *Node, s *Stats) {
+	switch {
+	case n.NotRun:
+		s.NotRun++
+	case n.Status == StatusPass:
+		s.Passed++
+	case n.Status == StatusFail:
+		s.Failed++
+	case n.Status == StatusSkip:
+		s.Skipped++
 	}
 }
 

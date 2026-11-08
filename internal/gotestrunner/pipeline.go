@@ -205,7 +205,7 @@ func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg Pipeli
 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
 	}
 	if len(running) == 0 {
-		failRun(c, result, "global --timeout", msg)
+		failRun(c, result, globalTimeoutPkg, msg)
 		return
 	}
 	c.reportFailure("FAIL: %s while running: %s\n", msg, unitNames(running))
@@ -231,6 +231,10 @@ func failRun(c *OutputCollector, result *PipelineResult, pkg, msg string, detail
 // that belongs to no single package (e.g. the compile stage's own setup) is
 // booked. The space keeps it out of the import-path namespace.
 const stageFailurePkg = "go build"
+
+// globalTimeoutPkg names the synthetic package an expired run deadline is
+// booked under when no unit was running to name.
+const globalTimeoutPkg = "global --timeout"
 
 // brokenPackageMessage renders a load-broken package's diagnostics in the
 // `go build` shape: a `# path` header followed by one diagnostic per line.
@@ -259,6 +263,7 @@ func bookBuildFailures(c *OutputCollector, broken []gotestgen.BrokenPackage, fai
 		pkg := f.Package
 		if pkg == "" {
 			pkg = stageFailurePkg
+			c.markRunLevel(pkg)
 		}
 		c.RecordBuildFailure(pkg, f.Err.Error()+"\n")
 	}
@@ -270,10 +275,11 @@ func runFailureEvents(pkg, msg string, details ...string) []byte {
 	var stream []byte
 	ev := func(action, text string) []byte {
 		e := struct {
-			Action  string `json:"Action"`
-			Package string `json:"Package"`
-			Output  string `json:"Output,omitempty"`
-		}{Action: action, Package: pkg, Output: text}
+			Action   string `json:"Action"`
+			Package  string `json:"Package"`
+			Output   string `json:"Output,omitempty"`
+			RunLevel bool   `json:"RunLevel"`
+		}{Action: action, Package: pkg, Output: text, RunLevel: true}
 		b, _ := json.Marshal(e)
 		return append(b, '\n')
 	}

@@ -212,69 +212,6 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     expect(recorder.errors).toEqual([]);
   });
 
-  it("links a fuzz target's row to its method, as it does for test methods", async () => {
-    // The location map is fed by discovery; the fuzz target sits beside the
-    // methods there and must reach the row the same way.
-    const cache = new DiscoveryCache();
-    const fuzzingDir = path.join(
-      extensionDir,
-      "testdata",
-      "fixtures",
-      "fuzzing",
-    );
-    const method = {
-      parallel: false,
-      focused: false,
-      excluded: false,
-      file: "suite_test.go",
-      col: 1,
-    };
-    cache.update(
-      [
-        {
-          importPath: "gotest.fixtures/fuzzing",
-          dir: fuzzingDir,
-          suites: [
-            {
-              name: "FuzzingTestSuite",
-              parallel: false,
-              focused: false,
-              excluded: false,
-              guarded: false,
-              file: "suite_test.go",
-              line: 11,
-              col: 6,
-              lifecycle: [],
-              fixtures: [],
-              methods: [{ ...method, name: "TestTrim", line: 13 }],
-              benchmarks: [],
-              fuzzers: [{ ...method, name: "FuzzTrimIdempotent", line: 19 }],
-            },
-          ],
-        } as never,
-      ],
-      true,
-      path.join(extensionDir, "testdata", "fixtures"),
-    );
-    const recorder = createRecordingChannel();
-    const panel = new SpecViewPanel(recorder.channel as never, cache);
-    await panel.show();
-    await panel.refresh(run("fuzz"));
-
-    const html = renderedHtml();
-    const fuzzRow = html.slice(
-      html.indexOf('class="node fuzz"'),
-      html.indexOf("</summary>", html.indexOf('class="node fuzz"')),
-    );
-    expect(fuzzRow).toContain('data-loc-line="19"');
-    expect(fuzzRow).toContain("fuzzing");
-    const methodRow = html.slice(
-      html.indexOf('class="node method"'),
-      html.indexOf("</summary>", html.indexOf('class="node method"')),
-    );
-    expect(methodRow).toContain('data-loc-line="13"');
-  });
-
   it("renders a package that failed to build, which has no failing behaviour to speak for it", async () => {
     const { panel, recorder } = newPanel();
     await panel.show();
@@ -284,7 +221,7 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     expect(recorder.errors).toEqual([]);
     expect(html).toContain("FAIL");
     expect(html).toContain("undefined: helper");
-    expect(html).toContain("1 failed packages");
+    expect(html).toContain("1 failed package");
   });
 
   // The tree is the CLI's: a slash in an It is one subtest, so one row; a
@@ -602,102 +539,136 @@ describe("a branch's own verdict", () => {
   });
 });
 
-describe("go to source", () => {
-  it("links every declared When and It to its line, not only suites and methods", async () => {
-    const cache = new DiscoveryCache();
-    cache.update(
-      [
-        {
-          importPath: "example.com/cart",
-          dir: "/src/cart",
-          suites: [
-            {
-              name: "CartTestSuite",
-              parallel: false,
-              focused: false,
-              excluded: false,
-              guarded: false,
-              file: "cart_test.go",
-              line: 5,
-              col: 6,
-              lifecycle: [],
-              fixtures: [],
-              methods: [
-                {
-                  name: "TestAdd",
-                  parallel: false,
-                  focused: false,
-                  excluded: false,
-                  file: "add_test.go",
-                  line: 10,
-                  col: 1,
-                  behaviors: [
-                    {
-                      name: "an_empty_cart",
-                      display: "when an empty cart",
-                      kind: "when",
-                      line: 11,
-                      children: [
-                        {
-                          name: "holds_one_item",
-                          display: "holds one item",
-                          kind: "it",
-                          line: 12,
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-              benchmarks: [],
-              fuzzers: [],
-            },
-          ],
-        } as never,
-      ],
-      true,
-      "/src",
-    );
-    const nested = [
-      "TestCartTestSuite",
-      "TestCartTestSuite/TestAdd",
-      "TestCartTestSuite/TestAdd/an_empty_cart",
-      "TestCartTestSuite/TestAdd/an_empty_cart/holds_one_item",
-    ];
-    const events = [
-      ...nested.map((t) => ({
-        Action: "run",
-        Package: "example.com/cart",
-        Test: t,
-      })),
-      ...[...nested].reverse().map((t) => ({
-        Action: "pass",
-        Package: "example.com/cart",
-        Test: t,
-        Elapsed: 0.01,
-      })),
-      { Action: "pass", Package: "example.com/cart", Elapsed: 0.02 },
-    ];
+// discovered is what gotest discover says of packages: the oracle for where
+// the CLI's spec places the nodes the source declares.
+function discovered(patterns: string[]): Map<string, string> {
+  const out = spawnSync(
+    "go",
+    ["run", "./cmd/gotest", "discover", ...patterns],
+    { cwd: repoRoot, encoding: "utf-8" },
+  );
+  expect(out.status, out.stderr).toBe(0);
+  type Behavior = { name: string; line: number; children?: Behavior[] };
+  type Method = {
+    name: string;
+    file: string;
+    line: number;
+    behaviors?: Behavior[];
+  };
+  const doc = JSON.parse(out.stdout) as {
+    packages: {
+      importPath: string;
+      dir: string;
+      suites: {
+        name: string;
+        file: string;
+        line: number;
+        methods: Method[];
+        fuzzers: Method[];
+      }[];
+    }[];
+  };
+  // Test Explorer id to "file:line".
+  const at = new Map<string, string>();
+  const walk = (id: string, file: string, bs: Behavior[]) => {
+    for (const b of bs) {
+      at.set(`${id}/${b.name}`, `${file}:${b.line}`);
+      walk(`${id}/${b.name}`, file, b.children ?? []);
+    }
+  };
+  for (const pkg of doc.packages) {
+    for (const suite of pkg.suites) {
+      const id = `${pkg.importPath}/${suite.name}`;
+      at.set(id, `${path.join(pkg.dir, suite.file)}:${suite.line}`);
+      for (const m of [...suite.methods, ...suite.fuzzers]) {
+        const file = path.join(pkg.dir, m.file);
+        at.set(`${id}/${m.name}`, `${file}:${m.line}`);
+        walk(`${id}/${m.name}`, file, m.behaviors ?? []);
+      }
+    }
+  }
+  return at;
+}
+
+// linked reads each row's go-to-source target from the rendered panel.
+function linked(html: string): Map<string, string> {
+  const at = new Map<string, string>();
+  const row =
+    /data-id="([^"]+)">\s*<span class="icon [a-z]+" data-loc-file="([^"]+)" data-loc-line="(\d+)"/g;
+  for (const m of html.matchAll(row)) {
+    at.set(m[1].replace(/&quot;/g, '"'), `${m[2]}:${m[3]}`);
+  }
+  return at;
+}
+
+describe("the source under the runs", () => {
+  const patterns = ["./examples/search", "./examples/fuzzing"];
+  const declaredPanel = () => {
     const recorder = createRecordingChannel();
-    const panel = new SpecViewPanel(recorder.channel as never, cache);
+    const panel = new SpecViewPanel(
+      recorder.channel as never,
+      undefined,
+      undefined,
+      async () => patterns,
+    );
+    return { panel, recorder };
+  };
+
+  it("links every row the source declares to the line the CLI names, fuzz targets and When and It rows included", async () => {
+    const { panel, recorder } = declaredPanel();
     await panel.show();
-    await panel.refresh({
-      stream: events.map((e) => JSON.stringify(e)).join("\n"),
-      folder: state.workspaceDir,
-    });
+    await panel.refresh(run("declared-source"));
 
     const html = renderedHtml();
     expect(recorder.errors).toEqual([]);
-    const rowOf = (display: string) => {
-      const at = html.indexOf(`data-display="${display}"`);
-      return html.slice(at, html.indexOf("\n", html.indexOf("<span", at)));
-    };
-    expect(rowOf("an empty cart")).toContain(
-      `data-loc-file="${path.join("/src/cart", "add_test.go")}" data-loc-line="11"`,
+    const want = discovered(patterns);
+    const got = linked(html);
+    expect(want.size).toBeGreaterThan(10);
+    expect([...want.keys()].some((id) => /\/Fuzz[^/]*$/.test(id))).toBe(true);
+    for (const [id, loc] of want) expect(got.get(id), id).toBe(loc);
+  });
+
+  it("shows what the run did not report as not run, in the CLI's words and counts", async () => {
+    const { panel, recorder } = declaredPanel();
+    await panel.show();
+    await panel.refresh(run("declared-source"));
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    const spec = JSON.parse(
+      /const SPEC_STATE = (.*);\n/.exec(html)?.[1] ?? "null",
+    ) as { stats: { notRun?: number }; packages: { path: string }[] };
+    expect(spec.stats.notRun ?? 0).toBeGreaterThan(0);
+    expect(html).toContain(
+      `<span class="none">${spec.stats.notRun} not run</span>`,
     );
-    expect(rowOf("holds one item")).toContain(
-      `data-loc-file="${path.join("/src/cart", "add_test.go")}" data-loc-line="12"`,
+    expect(html).toContain('<span class="tag none">NOT RUN</span>');
+    expect(spec.packages.map((p) => p.path)).toContain(
+      "github.com/mvrahden/go-test/examples/fuzzing",
     );
+  });
+
+  it("leaves out what the toolbar hides, as the CLI renders it, and counts it still", async () => {
+    const { panel, recorder } = newPanel();
+    await panel.show();
+    await panel.refresh(run("mixed"));
+    expect(renderedHtml()).toMatch(/class="leaf [a-z]+ pass"/);
+
+    (panel as unknown as { handleMessage(m: unknown): void }).handleMessage({
+      type: "toggleHide",
+      status: "pass",
+    });
+    await vi.waitFor(() =>
+      expect(renderedHtml()).toContain(
+        'class="filter-btn pass" data-filter="pass"',
+      ),
+    );
+
+    const html = renderedHtml();
+    expect(recorder.errors).toEqual([]);
+    expect(html).not.toMatch(/class="leaf [a-z]+ pass"/);
+    expect(html).toMatch(/class="leaf [a-z]+ fail"/);
+    expect(html).toContain("1 passed");
   });
 });
 

@@ -93,7 +93,7 @@ func reportNondeterministicCalls(pass *analysis.Pass, body ast.Node, target stri
 			return true
 		}
 
-		report(pass, FuzzDeterminism, call.Pos(),
+		report(pass, FuzzDeterminism, call,
 			"fuzz target %s reads nondeterministic state (%s) — corpus replay and coverage guidance degrade",
 			target, id.Name+"."+sel.Sel.Name)
 		return true
@@ -173,7 +173,7 @@ func checkFuzzNoOracle(pass *analysis.Pass, insp *inspector.Inspector, suites ma
 				return true
 			}
 			if !hasOracleCall(pass, funcLit.Body, tParam) {
-				report(pass, FuzzNoOracle, call.Pos(),
+				report(pass, FuzzNoOracle, call,
 					"fuzz target %s only detects panics — assert a property (round-trip, idempotence, no-crash-plus-invariant)",
 					target)
 			}
@@ -270,7 +270,7 @@ func checkFuzzSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map[st
 			return
 		}
 
-		report(pass, FuzzSeed, fd.Pos(),
+		report(pass, FuzzSeed, funcHeader(fd),
 			"fuzz target %s declares no seeds — coverage-guided exploration starts blind (table-test harvesting may still seed it)",
 			recvName+"."+fd.Name.Name)
 	})
@@ -428,7 +428,7 @@ func checkFuzzStructCorpus(pass *analysis.Pass, insp *inspector.Inspector, suite
 		if count == 1 {
 			plural = "y"
 		}
-		report(pass, FuzzStructCorpus, fd.Pos(),
+		report(pass, FuzzStructCorpus, funcHeader(fd),
 			"fuzz target %s keeps %d corpus entr%s under testdata/fuzz/%s/ bound to the declaration order of %s's fields — a same-kind reorder silently reinterprets them and an added or removed field rejects them; delete them, or write their inputs as typed f.Add seeds (gotest fuzz promote does so for the crashers the latest gotest fuzz session wrote)",
 			recvName+"."+fd.Name.Name, count, plural, wrapper, shortTypeStr(boundArg))
 	})
@@ -531,7 +531,7 @@ func reportSlowHookCalls(pass *analysis.Pass, body ast.Node, hook string) {
 			return true
 		}
 
-		report(pass, FuzzHookIO, call.Pos(),
+		report(pass, FuzzHookIO, call,
 			"%s replays around every fuzz execution of this suite — %s here throttles the fuzzer to IO speed; move it to BeforeAll/AfterAll or a shared fixture",
 			hook, id.Name+"."+sel.Sel.Name)
 		return true
@@ -587,7 +587,7 @@ func checkFuzzRawSeed(pass *analysis.Pass, insp *inspector.Inspector, suites map
 				if isUnnamedByteSlice(want) || !isUnnamedByteSlice(pass.TypesInfo.Types[arg].Type) {
 					continue
 				}
-				report(pass, FuzzRawSeed, arg.Pos(),
+				report(pass, FuzzRawSeed, arg,
 					"raw []byte seed on fuzz target %s — the target takes %s and f.Fuzz rejects a seed of another type; write a typed %s literal instead (gotest fuzz promote emits one)",
 					target, shortTypeStr(want), shortTypeStr(want))
 			}
