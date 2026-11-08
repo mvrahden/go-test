@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / the loop and the assertion call the gotest.B directly( / .*)? \(
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / Setenv and TempDir through b\.B\(\) call the gotest\.B directly( / .*)? \(
+Clause: when lint -fix rewrites a benchmark that loops and asserts through b.B() → the loop and the assertion call the gotest.B directly
+Clause: when lint -fix rewrites a benchmark that loops and asserts through b.B() → Setenv and TempDir through b.B() call the gotest.B directly
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -828,7 +828,7 @@
+ 	if esc, ok := escapeConfigs[wrapper][sel.Sel.Name]; ok && (!esc.suiteOnly || isSuiteMethod) {
+ 		reported[call.Pos()] = true
+ 		cl.add(esc.rule, call.Pos())
+-		if esc.canAutofix && isDirect {
++		if esc.canAutofix && isDirect && wrapper == "T" {
+ 			inner := sel.X.(*ast.CallExpr)
+ 			innerSel := inner.Fun.(*ast.SelectorExpr)
+ 			target := sel.Sel.Name

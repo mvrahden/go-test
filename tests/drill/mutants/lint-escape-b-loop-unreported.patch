@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint reports Loop as a t-escape with a fix, Helper as a t-escape without one and Cleanup as suite-lifecycle, and leaves N unreported( / .*)? \(
+Clause: when a benchmark calls Loop, Helper, Cleanup, Setenv and TempDir through b.B() and reads b.B().N → lint reports Loop as a t-escape with a fix, Helper as a t-escape without one and Cleanup as suite-lifecycle, and leaves N unreported
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -655,7 +655,6 @@
+ 		"Run":      {SuiteLifecycle, "use It or When instead — T.Run bypasses gotest wrapping", false, false, false},
+ 	}),
+ 	"B": withEscapes(wrapperEscapeConfigs("B"), map[string]escapeConfig{
+-		"Loop":         availableOn("B", "Loop"),
+ 		"Name":         availableOn("B", "Name"),
+ 		"ReportAllocs": availableOn("B", "ReportAllocs"),
+ 		"SetBytes":     availableOn("B", "SetBytes"),

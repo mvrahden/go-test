@@ -123,8 +123,8 @@ func (s *SnapshotKeysTestSuite) TestBenchAndFuzzNames(t *gotest.T) {
 type FNameTestSuite struct{}
 
 func (s *FNameTestSuite) FuzzName(f *gotest.F) {
-	gotest.Regexp(f, "^FuzzFNameTestSuite.*Name$", f.F().Name())
-	gotest.Equal(f, f.F().Name(), f.Name())
+	gotest.Regexp(f, "^FuzzFNameTestSuite.*Name$", f.F().Name()) //nolint:t-escape // the test compares the escape's name with the wrapper's
+	gotest.Equal(f, f.F().Name(), f.Name())                      //nolint:t-escape // the test compares the escape's name with the wrapper's
 	f.Add(0)
 	f.Fuzz(func(*gotest.T, int) {})
 }

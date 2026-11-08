@@ -144,6 +144,27 @@ func (s *WaitBenchTestSuite) BenchmarkConsistentlyInNLoop(b *testing.B) {
 	}
 }
 
+// Looping through the escape is still the loop: no bench-loop, and the wait inside is seen.
+func (s *WaitBenchTestSuite) BenchmarkLoopThroughEscape(b *gotest.B) {
+	for b.B().Loop() { // want `Loop is available on gotest.B — unnecessary B escape`
+		time.Sleep(time.Millisecond) // want `benchmark WaitBenchTestSuite.BenchmarkLoopThroughEscape calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
+func (s *WaitBenchTestSuite) BenchmarkNThroughEscape(b *gotest.B) {
+	for i := 0; i < b.B().N; i++ {
+		time.Sleep(time.Millisecond) // want `benchmark WaitBenchTestSuite.BenchmarkNThroughEscape calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
+// An alias of the escape is followed to the loop it drives.
+func (s *WaitBenchTestSuite) BenchmarkLoopThroughAlias(b *gotest.B) {
+	tb := b.B()
+	for tb.Loop() { // want `Loop is available on gotest.B — unnecessary B escape`
+		time.Sleep(time.Millisecond) // want `benchmark WaitBenchTestSuite.BenchmarkLoopThroughAlias calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop`
+	}
+}
+
 // BenchmarkSleepAboveLoop settles before the measured region — clean.
 func (s *WaitBenchTestSuite) BenchmarkSleepAboveLoop(b *gotest.B) {
 	time.Sleep(time.Millisecond)

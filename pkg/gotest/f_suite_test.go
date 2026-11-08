@@ -299,6 +299,18 @@ func FuzzAddAfterFuzz(f *testing.F) {
 	}
 }
 
+// FuzzHandleTempDirInsideFuzz is armed by GOTEST_TEST_FUZZ_INNER_TEMPDIR:
+// f.TempDir inside the fuzz function panics, as testing has it.
+func FuzzHandleTempDirInsideFuzz(f *testing.F) {
+	gf := gotest.NewF(f, nil, nil, nil)
+	gf.Add("x")
+	gf.Fuzz(func(t *gotest.T, s string) {
+		if os.Getenv("GOTEST_TEST_FUZZ_INNER_TEMPDIR") != "" {
+			_ = gf.TempDir()
+		}
+	})
+}
+
 // FWrapperTestSuite covers what is assertable about *gotest.F outside a
 // real fuzz target: the assertion contract and the buffered-seed logic.
 type FWrapperTestSuite struct{}
@@ -483,6 +495,12 @@ func (s *FWrapperTestSuite) TestSeedGuards(t *gotest.T) {
 		gotest.NotContains(it, out, "fuzztarget.go:")
 	})
 
+	t.It("panics on f.TempDir inside the fuzz function, naming t.TempDir", func(it *gotest.T) {
+		out := runArmedFuzzTarget("FuzzHandleTempDirInsideFuzz", "GOTEST_TEST_FUZZ_INNER_TEMPDIR")
+		gotest.Contains(it, out, "testing: f.TempDir was called inside the fuzz target, use t.TempDir instead")
+		gotest.Contains(it, out, "FAIL")
+	})
+
 	t.It("fails the target when f.Add is called after f.Fuzz", func(it *gotest.T) {
 		out := runArmedFuzzTarget("FuzzAddAfterFuzz", "GOTEST_TEST_FUZZ_LATE_ADD")
 		gotest.Contains(it, out, "f.Add called after f.Fuzz")
@@ -515,5 +533,39 @@ func (s *FWrapperTestSuite) TestPanicOutlivesALeavingAfterEach(t *gotest.T) {
 			gotest.True(it, ok, "recovered %v", got)
 			gotest.Equal(it, any("boom"), p.Unwrap())
 		})
+	})
+}
+
+// FSeedingTestSuite: what F sets up while it seeds holds through the fuzz
+// function and is undone after the target; a hook outside the executions is
+// named after the target.
+type FSeedingTestSuite struct {
+	hookName string
+	dir      string
+}
+
+const fSeedingKey = "GOTEST_TEST_F_SETENV"
+
+func (s *FSeedingTestSuite) BeforeAll(t *gotest.T) {
+	s.hookName = t.Name()
+}
+
+func (s *FSeedingTestSuite) AfterAll(t *gotest.T) {
+	gotest.Equal(t, s.hookName, t.Name())
+	_, set := os.LookupEnv(fSeedingKey)
+	gotest.False(t, set, "the variable outlived the target")
+	_, err := os.Stat(s.dir)
+	gotest.True(t, os.IsNotExist(err), "%s outlived the target", s.dir)
+}
+
+func (s *FSeedingTestSuite) FuzzSetenvAndTempDir(f *gotest.F) {
+	gotest.Equal(f, f.Name(), s.hookName)
+	f.Setenv(fSeedingKey, "set")
+	s.dir = f.TempDir()
+	f.Add(0)
+	f.Fuzz(func(t *gotest.T, _ int) {
+		gotest.Equal(t, "set", os.Getenv(fSeedingKey)) //nolint:fuzz-determinism // the seeding phase's variable is what the test reads
+		_, err := os.Stat(s.dir)
+		gotest.NoError(t, err)
 	})
 }

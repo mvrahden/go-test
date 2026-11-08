@@ -103,12 +103,21 @@ func (t *T) Skipf(format string, args ...any) {
 	t.testingTB().Skipf(format, args...)
 }
 
+// Setenv sets the environment variable key to value and restores it when the
+// test ends.
 func (t *T) Setenv(key, value string) {
 	t.testingTB().Setenv(key, value)
 }
 
+// TempDir returns a new temporary directory, removed when the test ends.
 func (t *T) TempDir() string {
 	return t.testingTB().TempDir()
+}
+
+// Name returns the test's name as testing gave it; in a hook under a benchmark
+// or fuzz target, the wrapper's.
+func (t *T) Name() string {
+	return t.testingTB().Name()
 }
 
 //go:noinline

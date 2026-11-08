@@ -358,6 +358,36 @@ func (s *LinterRewritesTestSuite) TestRedundancies(t *gotest.T) {
 	})
 }
 
+func (s *LinterRewritesTestSuite) TestWrapperFixes(t *gotest.T) {
+	t.When("lint -fix rewrites a benchmark that loops and asserts through b.B()", func(w *gotest.T) {
+		src := fixedEscapes(w)
+		w.It("the loop and the assertion call the gotest.B directly", func(it *gotest.T) {
+			gotest.Contains(it, src, "for b.Loop() {\n\t\tgotest.Equal(b, 4, 2*2)")
+			gotest.Contains(it, src, "for b.Loop() {\n\t\ttime.Sleep(")
+			gotest.NotContains(it, src, "b.B().Loop")
+		})
+		w.It("Setenv and TempDir through b.B() call the gotest.B directly", func(it *gotest.T) {
+			gotest.Contains(it, src, "\tb.Setenv(\"GOTEST_ESCAPES\", \"1\")\n\t_ = b.TempDir()\n")
+			gotest.NotContains(it, src, "b.B().Setenv")
+			gotest.NotContains(it, src, "b.B().TempDir")
+		})
+	})
+}
+
+// fixedEscapes is the lintescapes fixture as lint -fix leaves it.
+func fixedEscapes(t *gotest.T) string {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	dir, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "lintescapes"), t.TempDir(), "lintescapesmod")
+	gotest.NoError(t, err)
+	fix, err := testkit.RunCLI(t.Context(), dir, "lint", "-fix", "./")
+	gotest.NoError(t, err)
+	gotest.NotEqual(t, 2, fix.Exit, "stderr: %s", fix.Stderr)
+	data, err := os.ReadFile(filepath.Join(dir, "escapes_suite_test.go"))
+	gotest.NoError(t, err)
+	return string(data)
+}
+
 // checkRows holds each row of group to its findings, its fix, and a verdict
 // the fix leaves as it was.
 func (s *LinterRewritesTestSuite) checkRows(t *gotest.T, group string) {

@@ -21,6 +21,7 @@ func (t *T) FailNow()                 {}
 func (t *T) Skipf(string, ...any)     {}
 func (t *T) Setenv(string, string)    {}
 func (t *T) TempDir() string          { return "" }
+func (t *T) Name() string             { return "" }
 func (t *T) Context() context.Context { return nil }
 func (t *T) T() *testing.T            { return nil }
 func (t *T) It(string, func(*T))      {}
@@ -28,11 +29,17 @@ func (t *T) When(string, func(*T))    {}
 
 type B struct{}
 
-func (b *B) Loop() bool                        { return false }
-func (b *B) B() *testing.B                     { return nil }
-func (b *B) ReportAllocs()                     {}
-func (b *B) Errorf(format string, args ...any) {}
-func (b *B) FailNow()                          {}
+func (b *B) Loop() bool                          { return false }
+func (b *B) B() *testing.B                       { return nil }
+func (b *B) ReportAllocs()                       {}
+func (b *B) Errorf(format string, args ...any)   {}
+func (b *B) FailNow()                            {}
+func (b *B) Context() context.Context            { return nil }
+func (b *B) SetBytes(n int64)                    {}
+func (b *B) ReportMetric(n float64, unit string) {}
+func (b *B) Name() string                        { return "" }
+func (b *B) Setenv(key, value string)            {}
+func (b *B) TempDir() string                     { return "" }
 
 type F struct{}
 
@@ -41,6 +48,9 @@ func (f *F) Add(args ...any)                   {}
 func (f *F) Errorf(format string, args ...any) {}
 func (f *F) FailNow()                          {}
 func (f *F) Skipf(format string, args ...any)  {}
+func (f *F) Name() string                      { return "" }
+func (f *F) Setenv(key, value string)          {}
+func (f *F) TempDir() string                   { return "" }
 
 func (f *F) Fuzz(fn any) {}
 

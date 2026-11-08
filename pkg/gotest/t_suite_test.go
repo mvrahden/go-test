@@ -192,6 +192,32 @@ func (s *TTestSuite) TestNewTFromTB(t *gotest.T) {
 	})
 }
 
+func (s *TTestSuite) TestName(t *gotest.T) {
+	t.When("a test method asks its T for its name", func(w *gotest.T) {
+		w.It("is the name testing gave the test", func(it *gotest.T) {
+			gotest.Equal(it, it.T().Name(), it.Name()) //nolint:t-escape // the test compares the escape's name with the wrapper's
+			gotest.Regexp(it, "/is_the_name_testing_gave_the_test$", it.Name())
+		})
+	})
+	t.When("a hook under a benchmark asks its T for its name", func(w *gotest.T) {
+		w.It("is the benchmark's name", func(it *gotest.T) {
+			var got string
+			testing.Benchmark(func(b *testing.B) {
+				got = gotest.NewTFromTB(namedB{b}).Name()
+				for b.Loop() {
+				}
+			})
+			gotest.Equal(it, "BenchmarkNamed", got)
+		})
+	})
+}
+
+// namedB is a benchmark's B under a name of its own: testing.Benchmark names
+// none.
+type namedB struct{ *testing.B }
+
+func (namedB) Name() string { return "BenchmarkNamed" }
+
 type deadlineKey struct{}
 
 // The deadline T descends from the suite's context, not from testing's: what

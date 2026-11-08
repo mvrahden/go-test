@@ -729,3 +729,16 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
    fix renames a suite in the files a build constraint leaves out too, and
    names, unapplied, a fix such a file would break
    ([the focus fix](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-the-focus-fix)).
+
+## v1.38
+
+Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
+
+1. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
+   like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
+   the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
+   loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw
+   only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
+   benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
+   `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
+   gains `Name`, so `t-escape` fixes those through every escape too.

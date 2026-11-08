@@ -17,6 +17,8 @@ type B struct {
 
 func NewB(b *testing.B) *B { return &B{b: b} }
 
+// B returns the underlying *testing.B; the methods after it delegate to it.
+// Errorf and Skipf name the caller's line, not gotest's.
 func (b *B) B() *testing.B                       { return b.b }
 func (b *B) Name() string                        { return b.b.Name() }
 func (b *B) Loop() bool                          { return b.b.Loop() }
@@ -30,3 +32,10 @@ func (b *B) Skipf(format string, args ...any) {
 	assert.SkipInternalFrames(b.b)
 	b.b.Skipf(format, args...)
 }
+
+// Setenv sets the environment variable key to value and restores it when the
+// benchmark ends, as testing.B does.
+func (b *B) Setenv(key, value string) { b.b.Setenv(key, value) }
+
+// TempDir returns a new temporary directory, removed when the benchmark ends.
+func (b *B) TempDir() string { return b.b.TempDir() }

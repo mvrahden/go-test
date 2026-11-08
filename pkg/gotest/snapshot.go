@@ -157,14 +157,7 @@ func matchSnapshot(t testingT, callerSkip int, value any, name ...string) {
 	}
 
 	testName := "unknown"
-	named, ok := t.(interface{ Name() string })
-	if !ok {
-		gt, ok := t.(*T)
-		if ok && gt.T() != nil {
-			named = gt.T()
-		}
-	}
-	if named != nil {
+	if named, ok := t.(interface{ Name() string }); ok {
 		testName = named.Name()
 	}
 	topLevel, sub := splitTestName(testName)

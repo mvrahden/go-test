@@ -187,6 +187,7 @@ func receiverIdentName(recv *ast.FieldList) string {
 // with timer stopped", so the shape cannot survive execution long enough for
 // a missed diagnostic to matter.
 func benchMeasuredRegion(body *ast.BlockStmt, param string) *ast.BlockStmt {
+	recv := newWrapperRecv(body, param, "B")
 	var region *ast.BlockStmt
 	ast.Inspect(body, func(n ast.Node) bool {
 		if region != nil {
@@ -196,7 +197,7 @@ func benchMeasuredRegion(body *ast.BlockStmt, param string) *ast.BlockStmt {
 		if !ok {
 			return true
 		}
-		if isBenchLoopCond(forStmt.Cond, param) || isBenchNCond(forStmt.Cond, param) {
+		if isBenchLoopCond(forStmt.Cond, recv) || isBenchNCond(forStmt.Cond, recv) {
 			region = forStmt.Body
 			return false
 		}
@@ -205,8 +206,9 @@ func benchMeasuredRegion(body *ast.BlockStmt, param string) *ast.BlockStmt {
 	return region
 }
 
-// isBenchLoopCond reports whether cond is a call to <param>.Loop().
-func isBenchLoopCond(cond ast.Expr, param string) bool {
+// isBenchLoopCond reports whether cond is a call to Loop() on the parameter,
+// its escape or an alias of it: b.Loop(), b.B().Loop(), tb.Loop().
+func isBenchLoopCond(cond ast.Expr, recv wrapperRecv) bool {
 	call, ok := cond.(*ast.CallExpr)
 	if !ok {
 		return false
@@ -215,12 +217,12 @@ func isBenchLoopCond(cond ast.Expr, param string) bool {
 	if !ok {
 		return false
 	}
-	id, ok := sel.X.(*ast.Ident)
-	return ok && id.Name == param && sel.Sel.Name == "Loop"
+	return recv.matches(sel.X) && sel.Sel.Name == "Loop"
 }
 
-// isBenchNCond reports whether cond is the classic `i < <param>.N` form.
-func isBenchNCond(cond ast.Expr, param string) bool {
+// isBenchNCond reports whether cond is the classic `i < <param>.N` form, on
+// the parameter, its escape or an alias of it.
+func isBenchNCond(cond ast.Expr, recv wrapperRecv) bool {
 	bin, ok := cond.(*ast.BinaryExpr)
 	if !ok || bin.Op != token.LSS {
 		return false
@@ -229,8 +231,67 @@ func isBenchNCond(cond ast.Expr, param string) bool {
 	if !ok {
 		return false
 	}
+	return recv.matches(sel.X) && sel.Sel.Name == "N"
+}
+
+// wrapperRecv matches what stands for a wrapper parameter in a method body:
+// the parameter, its escape <param>.<wrapper>() — b.B() or f.F() — or a name
+// assigned from that escape. Syntactic: a shadowed name is not told apart.
+type wrapperRecv struct {
+	param, wrapper string
+	aliases        map[string]bool
+}
+
+// newWrapperRecv scans body once for names assigned from the escape:
+// x := b.B(), x = b.B(), var x = b.B().
+func newWrapperRecv(body *ast.BlockStmt, param, wrapper string) wrapperRecv {
+	recv := wrapperRecv{param: param, wrapper: wrapper, aliases: map[string]bool{}}
+	alias := func(names, values []ast.Expr) {
+		if len(names) != len(values) {
+			return
+		}
+		for i, v := range values {
+			if id, ok := names[i].(*ast.Ident); ok && id.Name != "_" && recv.isEscape(v) {
+				recv.aliases[id.Name] = true
+			}
+		}
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.AssignStmt:
+			alias(n.Lhs, n.Rhs)
+		case *ast.ValueSpec:
+			names := make([]ast.Expr, len(n.Names))
+			for i, id := range n.Names {
+				names[i] = id
+			}
+			alias(names, n.Values)
+		}
+		return true
+	})
+	return recv
+}
+
+// matches reports whether expr is the parameter, its escape or an alias.
+func (w wrapperRecv) matches(expr ast.Expr) bool {
+	if id, ok := expr.(*ast.Ident); ok {
+		return id.Name == w.param || w.aliases[id.Name]
+	}
+	return w.isEscape(expr)
+}
+
+// isEscape reports whether expr is the zero-argument call <param>.<wrapper>().
+func (w wrapperRecv) isEscape(expr ast.Expr) bool {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || len(call.Args) != 0 {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != w.wrapper {
+		return false
+	}
 	id, ok := sel.X.(*ast.Ident)
-	return ok && id.Name == param && sel.Sel.Name == "N"
+	return ok && id.Name == w.param
 }
 
 // findFixtureRead walks region — including nested loops and closures —
@@ -282,11 +343,12 @@ func benchParamName(fd *ast.FuncDecl) string {
 	return field.Names[0].Name
 }
 
-// benchBodyUsesLoopOrN reports whether body references param.Loop or
-// param.N anywhere — a plain selector check, not requiring Loop to
-// actually be called, matching the shape used elsewhere in this package
-// for similar heuristics (e.g. isTMethodCall).
+// benchBodyUsesLoopOrN reports whether body references Loop or N on the
+// parameter, its escape or an alias anywhere — a plain selector check, not
+// requiring Loop to actually be called, matching the shape used elsewhere
+// in this package for similar heuristics (e.g. wrapperEscape).
 func benchBodyUsesLoopOrN(body *ast.BlockStmt, param string) bool {
+	recv := newWrapperRecv(body, param, "B")
 	found := false
 	ast.Inspect(body, func(n ast.Node) bool {
 		if found {
@@ -296,8 +358,7 @@ func benchBodyUsesLoopOrN(body *ast.BlockStmt, param string) bool {
 		if !ok {
 			return true
 		}
-		id, ok := sel.X.(*ast.Ident)
-		if !ok || id.Name != param {
+		if !recv.matches(sel.X) {
 			return true
 		}
 		if sel.Sel.Name == "Loop" || sel.Sel.Name == "N" {
