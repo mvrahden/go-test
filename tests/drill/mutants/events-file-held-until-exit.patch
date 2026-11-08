@@ -12,9 +12,9 @@ Clause: when a -json run with --events-file is killed while a suite holds → ke
  import (
 +	"bufio"
  	"fmt"
+ 	"io"
  	"os"
- 	"os/exec"
-@@ -195,6 +196,11 @@ func runTest(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+@@ -196,6 +197,11 @@
  	}
  	cfg.JSON = jsonMode
  	cfg.Events = eventsWriter(events)

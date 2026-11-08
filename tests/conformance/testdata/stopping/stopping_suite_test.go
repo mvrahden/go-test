@@ -29,6 +29,16 @@ func (s *StopTestSuite) TestHolds(t *gotest.T) {
 		}
 	}
 	mark("running")
+	if d, err := time.ParseDuration(os.Getenv("STOPPING_HOLD")); err == nil {
+		// Holds for d at most, then passes unless stopped.
+		select {
+		case <-t.Context().Done():
+			mark("context ended")
+		case <-time.After(d):
+			mark("held")
+		}
+		return
+	}
 	if os.Getenv("STOPPING_IGNORE_CONTEXT") == "1" {
 		// Ignores the stop, until something forces it.
 		time.Sleep(time.Minute)

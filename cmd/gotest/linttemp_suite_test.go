@@ -34,10 +34,11 @@ func (s *LintTempTestSuite) TestTheTempDirIsRemovedOnceNothingWritesThere(t *got
 	t.When("removing the dir succeeds at once", func(w *gotest.T) {
 		w.It("waits for nothing", func(it *gotest.T) {
 			calls := 0
+			dir := it.TempDir()
 			began := time.Now()
-			// No disk work inside the timing: a real removal can take 50ms
-			// on Windows, as long as the one sleep this guards against.
-			main.ExportRemoveLintTemp(it.TempDir(), 5*time.Second, func(string) error {
+			// No disk work inside the timing: making or removing a dir can
+			// take 50ms on Windows, as long as the one sleep this guards against.
+			main.ExportRemoveLintTemp(dir, 5*time.Second, func(string) error {
 				calls++
 				return nil
 			})

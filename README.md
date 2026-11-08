@@ -1182,6 +1182,8 @@ On Linux and macOS runners a cancelled or timed-out job stops the action's run a
 
 gotest also stops on SIGHUP, when its terminal closes or an ssh session drops, unless it was started under `nohup` ([Every launcher stops cleanly](specs/lifecycle/spec.md#requirement-every-launcher-stops-cleanly)), and on Windows when its console closes: the suites tear down and the summary is written.
 
+A program that drives gotest and cannot signal it, as on Windows, starts it with `--control=stdin` and writes lines to its standard input: `stop` is a first Ctrl-C and `force` a second, and the input's end, the program gone, is a stop as well ([Stopping gotest through its standard input](specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input)). Every command that stops on Ctrl-C takes the flag; without it gotest never reads its standard input. The VS Code extension cancels a run this way.
+
 ### Coverage Badge
 
 The action can add a coverage badge to your README. `gotest` draws the badge as an SVG file and the workflow commits it to a branch of your own repository using the built-in `GITHUB_TOKEN`. Nothing outside GitHub is involved and there is no account or secret to set up.

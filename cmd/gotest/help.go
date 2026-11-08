@@ -110,6 +110,8 @@ Flags (gotest — use --double-dash):
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
   --no-harvest            Disable fuzz seed harvesting for this run
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
 
 Flags (go test — use -single-dash, forwarded automatically):
   -v                      Verbose output
@@ -179,6 +181,8 @@ Flags:
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
 
 All standard go test flags (-single-dash) are forwarded automatically; -run also
 takes a Fuzz<Suite>_<Method> wrapper name, -p caps the suite processes, -exec wraps
@@ -281,6 +285,9 @@ Flags:
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
+                          (not with --input=-)
 
 Examples:
   gotest spec ./...                                Run and render spec
@@ -351,6 +358,9 @@ Flags:
                           -race/-msan/-asan)
   --group=<name>          Run only the suites of this ExclusiveGroup (repeatable)
   --skip-group=<name>     Leave the suites of this ExclusiveGroup out (repeatable)
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
+                          (not with --input=-)
 
 GitHub CI mode (--github):
   Emits ::error annotations for each failure, showing inline on PR diffs.
@@ -394,6 +404,8 @@ Flags:
                           halved under -race/-msan/-asan)
   --compile-parallel=<n>  Concurrent compilations (default: NumCPU, halved under
                           -race/-msan/-asan)
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
 
 Examples:
   gotest watch ./...                         Watch all packages
@@ -450,6 +462,8 @@ Flags:
                            (significant or not), and the gate verdict when a
                            gate is active. Suppresses --spec rendering;
                            intended for tooling (the VS Code extension).
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
 
 All standard go test flags (-single-dash) are forwarded automatically.
 Use a bare "--" to pass unrecognized flags without validation.
@@ -517,8 +531,10 @@ func printFuzzHelp() {
 
 Usage:
   gotest fuzz [flags] [packages...]
-  gotest fuzz triage [packages...]     Re-run each crasher, report if it still fails
-  gotest fuzz promote [packages...]    Splice crashers into f.Add(...) seeds
+  gotest fuzz triage [--control=stdin] [packages...]
+                                       Re-run each crasher, report if it still fails
+  gotest fuzz promote [--control=stdin] [packages...]
+                                       Splice crashers into f.Add(...) seeds
 
 Runs every Fuzz<SuiteName>_<MethodName> wrapper the target packages
 generate as its own "go test -fuzz" process, several at a time (--jobs),
@@ -543,6 +559,8 @@ Flags:
   --no-cache              Disable the test binary cache
   --debug                 Keep the overlay and work dir for inspection;
                           a later run removes them after 7 days
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
 
 --for is the session's only clock: the deadline follows it, so --timeout
 is refused here. With --for=0 only the first --jobs targets run, since
@@ -953,10 +971,15 @@ func printPrepareHelp() {
 	fmt.Print(`gotest prepare — prepare debug session
 
 Usage:
-  gotest prepare [packages...]
+  gotest prepare [--control=stdin] [packages...]
 
 Generates the test overlay and starts shared fixtures, then blocks until
-SIGTERM. Used by IDE extensions to prepare Delve debug sessions.
+SIGTERM, or with --control=stdin a stop line or the input's end. Used by IDE
+extensions to prepare Delve debug sessions.
+
+Flags:
+  --control=stdin         Read stop and force lines on stdin: stop is a first
+                          Ctrl-C, force a second; the input's end is a stop
 
 Outputs JSON to stdout:
   {"overlayFile": "...", "dir": "...", "stateFile": "..."}

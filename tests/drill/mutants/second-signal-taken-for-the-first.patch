@@ -3,11 +3,11 @@ Expect: ^FAIL .*conformance/lifecycle .* / direct, a second SIGINT \(
 Clause: when a run is stopped by a signal, however gotest was launched → ends with its exit code, or by the signal where go run dies of a SIGTERM, finishes the fixture teardown unless a second signal abandons it saying so, and leaves no suite process behind
 --- a/cmd/gotest/signals.go
 +++ b/cmd/gotest/signals.go
-@@ -93,7 +93,6 @@
+@@ -158,7 +158,6 @@
  			}
- 			// The first signal, delivered once more.
+ 			// Else the first signal, delivered once more.
  		case <-window.C:
 -			over = true
  		case <-done:
- 			return false
+ 			return false, false
  		}

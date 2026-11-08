@@ -79,6 +79,21 @@ Every command SHALL refuse with exit 2 a value flag given no value, a flag it do
 - **WHEN** a value flag or an unknown flag is given to a command
 - **THEN** refuses a missing value, an unknown flag and another command's flag with exit 2
 
+### Requirement: The control flag
+--control SHALL take one value, stdin, on every command that stops on a SIGINT: a run, spec, summary, watch, bench, fuzz, fuzz triage, fuzz promote and prepare. Any other value SHALL be a usage error with exit 2 naming the flag and stdin, and so SHALL --control=stdin beside --input=-. The cases are the table in `tests/conformance/cli/control_suite_test.go`.
+
+#### Scenario: A value other than stdin
+- **WHEN** --control is given a value other than stdin
+- **THEN** refuses it with exit 2, naming --control and stdin
+
+#### Scenario: Every command that stops on a SIGINT
+- **WHEN** --control=stdin is given to each command that stops on a SIGINT, its standard input at its end
+- **THEN** takes the flag and ends, stopped by the input's end where it was still running
+
+#### Scenario: Beside input from standard input
+- **WHEN** --control=stdin is given beside --input=-
+- **THEN** refuses it with exit 2: both read standard input
+
 ### Requirement: Test name patterns
 A -run, -skip, -bench or -list pattern the testing package would reject SHALL be refused with exit 2 before anything runs: each alternative and each level of a -run, -skip or -bench pattern is compiled on its own, as the testing package splits the pattern, a -list pattern is compiled whole, as the testing package reads it, and a repeated flag is judged by its last value.
 

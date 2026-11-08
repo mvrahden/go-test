@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,8 +32,10 @@ import (
 // delivered twice, not a second Ctrl-C: `go tool` forwards the terminal's
 // signal to the tool it runs, which is in the terminal's process group and
 // received it already.
-func shutdownContext() (context.Context, context.CancelFunc) {
-	return shutdownContextThen(func(hurry <-chan struct{}) {
+//
+// control, when not nil, carries stop and force lines too (see readControl).
+func shutdownContext(control io.Reader) (context.Context, context.CancelFunc) {
+	return shutdownContextThen(control, func(hurry <-chan struct{}) {
 		fmt.Fprintf(os.Stderr, abandonMessage, abandonBound)
 		gotestrunner.Abandon(abandonBound, hurry)
 	})
@@ -55,49 +60,110 @@ const duplicateWindow = 300 * time.Millisecond
 // shutdownContextThen is shutdownContext whose second signal runs last,
 // holding forcedExit, before it exits 130. hurry closes on a further signal,
 // one past the window of a repeat of the second.
-func shutdownContextThen(last func(hurry <-chan struct{})) (context.Context, context.CancelFunc) {
-	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
-	again := make(chan os.Signal, 1)
+func shutdownContextThen(control io.Reader, last func(hurry <-chan struct{})) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	// Caught from the start to the process's end, so no signal falls through
+	// to the default disposition; one past the run is dropped.
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, shutdownSignals...)
+	events := make(chan stopEvent)
+	go func() {
+		for range sigs {
+			events <- aStop
+		}
+	}()
+	if control != nil {
+		go readControl(control, events)
+	}
 	done := make(chan struct{})
 	go func() {
-		<-ctx.Done()
-		// Catch the second signal before releasing the first, so none
-		// falls through to the default disposition between the two.
-		signal.Notify(again, shutdownSignals...)
-		stop()
-		if !secondSignal(again, done) {
+		forced, ok := firstStop(events, done)
+		if !ok {
+			return
+		}
+		cancel()
+		second, further := secondStop(events, done, forced)
+		if !second {
 			return
 		}
 		hurry := make(chan struct{})
-		go closeOnFurther(again, hurry, time.Now())
+		if further {
+			close(hurry)
+		} else {
+			go closeOnFurther(events, hurry, time.Now())
+		}
 		forcedStop(hurry, done, last, endBound)
 	}()
 	var once sync.Once
 	return ctx, func() {
-		stop()
+		cancel()
 		once.Do(func() { close(done) })
 	}
 }
 
-// secondSignal waits for the second signal, past the window of a repeat of
-// the first: false when the run ends first.
-func secondSignal(again <-chan os.Signal, done <-chan struct{}) bool {
+// stopEvent is one event of the merged source: a signal or a control line.
+type stopEvent uint8
+
+const (
+	aStop    stopEvent = iota // a signal or a stop line
+	aForce                    // a force line: the second stop, never a repeat of the first
+	inputEnd                  // the control input ended: a stop when none is under way
+)
+
+// readControl sends the stop and force lines of control to events, and its
+// end; any other line is ignored. A trailing \r is tolerated.
+func readControl(control io.Reader, events chan<- stopEvent) {
+	lines := bufio.NewScanner(control)
+	for lines.Scan() {
+		switch strings.TrimSuffix(lines.Text(), "\r") {
+		case "stop":
+			events <- aStop
+		case "force":
+			events <- aForce
+		}
+	}
+	events <- inputEnd
+}
+
+// firstStop waits for the first stop, forced when it is a force line: false
+// when the run ends first.
+func firstStop(events <-chan stopEvent, done <-chan struct{}) (forced, ok bool) {
+	select {
+	case e := <-events:
+		return e == aForce, true
+	case <-done:
+		return false, false
+	}
+}
+
+// secondStop waits for the second stop, past the window of a repeat of the
+// first: false when the run ends first. A force counts at once, the first
+// one included, but acts only once the window is over, so the first stop
+// has reached the suites by then; further reports a force after it.
+func secondStop(events <-chan stopEvent, done <-chan struct{}, forced bool) (second, further bool) {
 	window := time.NewTimer(duplicateWindow)
 	defer window.Stop()
 	over := false
-	for {
+	for !forced || !over {
 		select {
-		case <-again:
-			if over {
-				return true
+		case e := <-events:
+			switch {
+			case e == aForce:
+				further = forced
+				forced = true
+			case e == inputEnd:
+				// The input ending changes no stop under way.
+			case over:
+				return true, false
 			}
-			// The first signal, delivered once more.
+			// Else the first signal, delivered once more.
 		case <-window.C:
 			over = true
 		case <-done:
-			return false
+			return false, false
 		}
 	}
+	return true, further
 }
 
 // forcedStop is the second signal's action. last gives the run's processes
@@ -128,10 +194,10 @@ const endMessage = "the run did not end within %s of its processes ending; exiti
 var exit = gotestrunner.Exit
 
 // closeOnFurther closes hurry on the first signal that is not the second,
-// sent at second, delivered once more.
-func closeOnFurther(again <-chan os.Signal, hurry chan<- struct{}, second time.Time) {
-	for range again {
-		if time.Since(second) >= duplicateWindow {
+// sent at second, delivered once more, or on a further force line.
+func closeOnFurther(events <-chan stopEvent, hurry chan<- struct{}, second time.Time) {
+	for e := range events {
+		if e == aForce || (e == aStop && time.Since(second) >= duplicateWindow) {
 			close(hurry)
 			return
 		}

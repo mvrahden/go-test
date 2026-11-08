@@ -156,9 +156,14 @@ export class DebugLauncher implements vscode.Disposable {
     token: vscode.CancellationToken,
   ): Promise<{ output: PrepareOutput; managed: ManagedChild }> {
     return new Promise((resolve, reject) => {
-      // A daemon: `prepare` blocks until SIGTERM holding shared fixtures open,
-      // so it gets the teardown grace when it is eventually ended.
-      const managed = new ManagedChild(bin, args, { cwd, kind: "prepare" });
+      // A daemon: `prepare` blocks until it is stopped, holding shared fixtures
+      // open, so it gets the teardown grace when it is eventually ended. Its
+      // stdin is ours, not the debug adapter's, so it takes control lines.
+      const managed = new ManagedChild(bin, args, {
+        cwd,
+        kind: "prepare",
+        control: true,
+      });
       const child = managed.child;
       let stdout = "";
       let stderr = "";

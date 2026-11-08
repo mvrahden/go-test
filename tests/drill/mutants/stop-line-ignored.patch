@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lifecycle ControlInput .* / exits 130 and finishes the fixture teardown \(
+Expect: ^FAIL .*conformance/lifecycle ControlInput .* / books the run as interrupted on its stream \(
+Clause: when a stop line reaches gotest's standard input while a method holds → exits 130 and finishes the fixture teardown
+Clause: when a stop line reaches gotest's standard input while a method holds → books the run as interrupted on its stream
+--- a/cmd/gotest/signals.go
++++ b/cmd/gotest/signals.go
+@@ -117,7 +117,6 @@
+ 	for lines.Scan() {
+ 		switch strings.TrimSuffix(lines.Text(), "\r") {
+ 		case "stop":
+-			events <- aStop
+ 		case "force":
+ 			events <- aForce
+ 		}

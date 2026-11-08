@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -57,17 +58,34 @@ func misplacedFuzzSubcommand(args []string) string {
 	return ""
 }
 
-// rejectFuzzSubcommandFlags returns an error when args carries any flag.
-// triage and promote take package patterns only; accepting-and-ignoring a
-// flag (the previous behavior) silently discarded whatever the user thought
-// it did.
-func rejectFuzzSubcommandFlags(sub string, args []string) error {
-	for _, a := range args {
-		if strings.HasPrefix(a, "-") {
-			return fmt.Errorf("fuzz %s takes no flags, only package patterns: unexpected %q", sub, a)
+// fuzzSubcommandArgs splits args into the input --control names and the
+// package patterns. triage and promote take no other flag; accepting-and-
+// ignoring one (the previous behavior) silently discarded whatever the user
+// thought it did.
+func fuzzSubcommandArgs(sub string, args []string) (io.Reader, []string, error) {
+	var ownArgs, patterns []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		name, _, hasEquals := strings.Cut(a, "=")
+		switch {
+		case name == "--control":
+			ownArgs = append(ownArgs, a)
+			if !hasEquals && i+1 < len(args) {
+				i++
+				ownArgs = append(ownArgs, args[i])
+			}
+		case strings.HasPrefix(a, "-"):
+			return nil, nil, fmt.Errorf("fuzz %s takes no flags but --control, only package patterns: unexpected %q", sub, a)
+		default:
+			patterns = append(patterns, a)
 		}
 	}
-	return nil
+	own, _, err := SplitArgs(ownArgs, controlAllowed)
+	if err != nil {
+		return nil, nil, err
+	}
+	control, err := parseControlFlag(own)
+	return control, patterns, err
 }
 
 // corpusArg is one decoded argument from a Go fuzz corpus file, as triage and
@@ -260,7 +278,8 @@ func pluralS(n int) string {
 // "no crashers here", so it must not be allowed to pass as exit 0. Mirrors
 // runFuzzPromote's equivalent `failed` handling below.
 func runFuzzTriage(args []string) (code int) {
-	if err := rejectFuzzSubcommandFlags("triage", args); err != nil {
+	control, args, err := fuzzSubcommandArgs("triage", args)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -295,7 +314,7 @@ func runFuzzTriage(args []string) (code int) {
 	}
 
 	// The re-runs read the shared fixtures their suites bind, as under fuzz.
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(control)
 	defer stop()
 	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, withCrashers, 0)
 	if err != nil {
@@ -518,7 +537,8 @@ func lookupSuiteMethod(overlay *gotestrunner.OverlayResult, pkg, funcName string
 // exits 1 if any crasher could not be promoted (its file is left in place)
 // and 0 when every one was, or there were none.
 func runFuzzPromote(args []string) (code int) {
-	if err := rejectFuzzSubcommandFlags("promote", args); err != nil {
+	control, args, err := fuzzSubcommandArgs("promote", args)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -601,7 +621,7 @@ func runFuzzPromote(args []string) (code int) {
 			rerun = append(rerun, p.target)
 		}
 	}
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(control)
 	defer stop()
 	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, rerun, 0)
 	if err != nil {

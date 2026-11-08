@@ -69,7 +69,7 @@ func runWatch(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	// environment auto-enable the F_ guard mid-iteration; --ci stays explicit.
 	cfg.CI = own.Bool("--ci")
 
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(cfg.Control)
 	defer stop()
 
 	if !jsonMode {

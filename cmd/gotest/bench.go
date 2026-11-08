@@ -143,7 +143,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 0
 	}
 
-	ctx, stop := shutdownContext()
+	ctx, stop := shutdownContext(cfg.Control)
 	defer stop()
 
 	if cfg.GlobalTimeout > 0 {

@@ -125,6 +125,7 @@ var (
 	ExportFuzzAllowed    = fuzzAllowed
 	ExportBenchAllowed   = benchAllowed
 	ExportMigrateAllowed = migrateAllowed
+	ExportControlAllowed = controlAllowed
 )
 
 // focusguard.go
@@ -250,7 +251,11 @@ func ExportRemoveLintTemp(dir string, bound time.Duration, remove func(string) e
 }
 
 // signals.go
-var ExportForcedStop = forcedStop
+var (
+	ExportForcedStop          = forcedStop
+	ExportShutdownContextThen = shutdownContextThen
+	ExportDuplicateWindow     = duplicateWindow
+)
 
 // ExportObserveExit has the second signal end the process by observe instead
 // of os.Exit, until the returned func restores it.

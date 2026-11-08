@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lifecycle ControlInput .* / stops the run and forces the stop as a stop line followed by a force line does \(
+Clause: when a force line reaches gotest with no stop under way while the method body ignores its context → stops the run and forces the stop as a stop line followed by a force line does
+--- a/cmd/gotest/signals.go
++++ b/cmd/gotest/signals.go
+@@ -130,7 +130,8 @@
+ func firstStop(events <-chan stopEvent, done <-chan struct{}) (forced, ok bool) {
+ 	select {
+ 	case e := <-events:
+-		return e == aForce, true
++		_ = e
++		return false, true
+ 	case <-done:
+ 		return false, false
+ 	}

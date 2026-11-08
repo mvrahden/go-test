@@ -5,9 +5,9 @@ Clause: when a run is stopped by a signal, however gotest was launched → ends 
 Clause: when a second SIGINT reaches gotest while a stopped method body ignores its context → exits 130 and leaves no suite process behind
 --- a/cmd/gotest/signals.go
 +++ b/cmd/gotest/signals.go
-@@ -30,7 +30,7 @@
- func shutdownContext() (context.Context, context.CancelFunc) {
- 	return shutdownContextThen(func(hurry <-chan struct{}) {
+@@ -37,7 +37,7 @@
+ func shutdownContext(control io.Reader) (context.Context, context.CancelFunc) {
+ 	return shutdownContextThen(control, func(hurry <-chan struct{}) {
  		fmt.Fprintf(os.Stderr, abandonMessage, abandonBound)
 -		gotestrunner.Abandon(abandonBound, hurry)
 +		_, _ = gotestrunner.Abandon, hurry

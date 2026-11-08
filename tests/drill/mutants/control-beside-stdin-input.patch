@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli ControlFlag .* / refuses it with exit 2: both read standard input / spec \(
+Clause: when --control=stdin is given beside --input=- → refuses it with exit 2: both read standard input
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -280,11 +280,7 @@
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return true
+ 	}
+-	if input != "-" || !own.Given("--control") {
+-		return false
+-	}
+-	fmt.Fprintln(os.Stderr, "FAIL: --control=stdin and --input=- both read standard input; save the stream to a file for --input")
+-	return true
++	return false
+ }
+ 
+ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectConfig) (ExecConfig, error) {

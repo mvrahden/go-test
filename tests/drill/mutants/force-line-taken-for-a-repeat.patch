@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lifecycle ControlInput .* / releases the fixture at once, without AfterAll, exits 130 before a single stop's five-second grace is over, saying so, and leaves no suite process behind \(
+Clause: when a force line follows a stop line at once while the stopped method body ignores its context → releases the fixture at once, without AfterAll, exits 130 before a single stop's five-second grace is over, saying so, and leaves no suite process behind
+--- a/cmd/gotest/signals.go
++++ b/cmd/gotest/signals.go
+@@ -148,9 +148,6 @@
+ 		select {
+ 		case e := <-events:
+ 			switch {
+-			case e == aForce:
+-				further = forced
+-				forced = true
+ 			case e == inputEnd:
+ 				// The input ending changes no stop under way.
+ 			case over:

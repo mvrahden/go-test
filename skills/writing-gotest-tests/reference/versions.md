@@ -756,6 +756,16 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
     directory ignored `GOTMPDIR`, and such a stop waited out the suite's
     shutdown budget, minutes, before the run ended.
 
+12. **`--control=stdin` stops gotest through its standard input** — every
+    command that stops on Ctrl-C takes it and then reads `stop` (a first
+    Ctrl-C) and `force` (a second) lines, counted with the signals; the
+    input's end is a stop
+    ([standard input](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input)).
+    The VS Code extension cancels runs, watches and debug sessions this
+    way, which gives it a graceful cancel on Windows. Below v1.37 the flag
+    is unknown (exit 2), and on Windows the extension's cancel killed the run
+    without teardown.
+
 ## v1.38
 
 Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:

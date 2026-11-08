@@ -332,7 +332,7 @@
           "default": 360,
           "minimum": 10,
           "scope": "resource",
-          "description": "Seconds to wait after SIGTERM before sending SIGKILL to a cancelled process. Must outlast the CLI's own shutdown budget (5m30s), which covers container fixture teardown"
+          "description": "Seconds a cancelled run gets to tear down after its stop, before the CLI is sent force, which releases the fixtures at once, and is killed five seconds later. Must outlast the CLI's own shutdown budget (5m30s), which covers container fixture teardown"
         }
       }
     },

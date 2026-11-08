@@ -7908,6 +7908,402 @@
           "name": "TestCLIVersionTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 23,
+                          "name": "a_run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "an empty value",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 24,
+                          "name": "an_empty_value",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "prepare",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 25,
+                          "name": "prepare",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fuzz triage",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 26,
+                          "name": "fuzz_triage",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "spec with --input",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 27,
+                          "name": "spec_with_--input",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses it with exit 2, naming --control and stdin",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "refuses_it_with_exit_2,_naming_--control_and_stdin",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --control is given a value other than stdin",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "--control_is_given_a_value_other_than_stdin",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AValueOtherThanStdin",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestAValueOtherThanStdin",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 53,
+                          "name": "a_run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 54,
+                          "name": "spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "summary",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 55,
+                          "name": "summary",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "watch",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 56,
+                          "name": "watch",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "bench",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 57,
+                          "name": "bench",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fuzz",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 58,
+                          "name": "fuzz",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fuzz triage",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 59,
+                          "name": "fuzz_triage",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "fuzz promote",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 60,
+                          "name": "fuzz_promote",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "prepare, which waits for a stop",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 61,
+                          "name": "prepare,_which_waits_for_a_stop",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "takes the flag and ends, stopped by the input's end where it was still running",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 51,
+                      "name": "takes_the_flag_and_ends,_stopped_by_the_input's_end_where_it_was_still_running",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --control=stdin is given to each command that stops on a SIGINT, its standard input at its end",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 50,
+                  "name": "--control=stdin_is_given_to_each_command_that_stops_on_a_SIGINT,_its_standard_input_at_its_end",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EveryCommandThatStopsOnASIGINT",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 49,
+              "name": "TestEveryCommandThatStopsOnASIGINT",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 84,
+                          "name": "spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "summary",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 85,
+                          "name": "summary",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses it with exit 2: both read standard input",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 82,
+                      "name": "refuses_it_with_exit_2:_both_read_standard_input",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --control=stdin is given beside --input=-",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 81,
+                  "name": "--control=stdin_is_given_beside_--input=-",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BesideInputFromStdin",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 80,
+              "name": "TestBesideInputFromStdin",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ControlFlag",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "control_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestControlFlagTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -14101,6 +14497,343 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "exits 130 and finishes the fixture teardown",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 72,
+                      "name": "exits_130_and_finishes_the_fixture_teardown",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "books the run as interrupted on its stream",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 78,
+                      "name": "books_the_run_as_interrupted_on_its_stream",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a stop line reaches gotest's standard input while a method holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "a_stop_line_reaches_gotest's_standard_input_while_a_method_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStopLine",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 65,
+              "name": "TestAStopLine",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "releases the fixture at once, without AfterAll, exits 130 before a single stop's five-second grace is over, saying so, and leaves no suite process behind",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 108,
+                      "name": "releases_the_fixture_at_once,_without_AfterAll,_exits_130_before_a_single_stop's_five-second_grace_is_over,_saying_so,_and_leaves_no_suite_process_behind",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a force line follows a stop line at once while the stopped method body ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 107,
+                  "name": "a_force_line_follows_a_stop_line_at_once_while_the_stopped_method_body_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AForceLineAfterAStop",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 98,
+              "name": "TestAForceLineAfterAStop",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "stops the run and forces the stop as a stop line followed by a force line does",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 123,
+                      "name": "stops_the_run_and_forces_the_stop_as_a_stop_line_followed_by_a_force_line_does",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a force line reaches gotest with no stop under way while the method body ignores its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 122,
+                  "name": "a_force_line_reaches_gotest_with_no_stop_under_way_while_the_method_body_ignores_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AForceLineAlone",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 114,
+              "name": "TestAForceLineAlone",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "stops the run as a SIGINT does: exit 130, the holding method's context ended and the fixture teardown finished",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 136,
+                      "name": "stops_the_run_as_a_SIGINT_does:_exit_130,_the_holding_method's_context_ended_and_the_fixture_teardown_finished",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest's standard input ends while a method holds",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 135,
+                  "name": "gotest's_standard_input_ends_while_a_method_holds",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheInputEnds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 129,
+              "name": "TestTheInputEnds",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs to its end, its exit the tests' own",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 152,
+                      "name": "runs_to_its_end,_its_exit_the_tests'_own",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest runs without --control and its standard input carries a stop line, then ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 151,
+                  "name": "gotest_runs_without_--control_and_its_standard_input_carries_a_stop_line,_then_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WithoutTheFlag",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 144,
+              "name": "TestWithoutTheFlag",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "at once, the same stop",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_unix_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 171,
+                          "name": "at_once,_the_same_stop",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "600ms later, while the fixture tears down, the second",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "control_unix_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 172,
+                          "name": "600ms_later,_while_the_fixture_tears_down,_the_second",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "is the same stop within 300ms, finishing the fixture teardown, and later the second, abandoning the teardown saying so",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "control_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 169,
+                      "name": "is_the_same_stop_within_300ms,_finishing_the_fixture_teardown,_and_later_the_second,_abandoning_the_teardown_saying_so",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a SIGINT follows a stop line",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "control_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 168,
+                  "name": "a_SIGINT_follows_a_stop_line",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStopLineAndASIGINT",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "control_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 167,
+              "name": "TestAStopLineAndASIGINT",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ControlInput",
+          "duration": 0,
+          "excluded": false,
+          "external": false,
+          "file": "control_unix_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 20,
+          "name": "TestControlInputTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "names only the hung test as running when the timeout expired",
                       "duration": 0,
                       "excluded": false,
@@ -14108,7 +14841,7 @@
                       "file": "lcb_deadline_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 42,
+                      "line": 44,
                       "name": "names_only_the_hung_test_as_running_when_the_timeout_expired",
                       "output": [],
                       "status": "none",
@@ -14122,7 +14855,7 @@
                   "file": "lcb_deadline_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 41,
+                  "line": 43,
                   "name": "one_suite's_process_crashed_on_its_own_and_another_suite_hangs_until_--timeout",
                   "output": [],
                   "status": "none",
@@ -14136,7 +14869,7 @@
               "file": "lcb_deadline_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 37,
+              "line": 39,
               "name": "TestACrashBeforeTheTimeout",
               "output": [],
               "status": "none"
@@ -14154,7 +14887,7 @@
                       "file": "lcb_deadline_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 54,
+                      "line": 56,
                       "name": "names_only_the_method_holding_the_slot,_not_those_still_waiting_for_it",
                       "output": [],
                       "status": "none",
@@ -14168,7 +14901,7 @@
                   "file": "lcb_deadline_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 53,
+                  "line": 55,
                   "name": "parallel_methods_wait_for_the_one_slot_-parallel=1_leaves_and_the_method_holding_it_hangs_until_--timeout",
                   "output": [],
                   "status": "none",
@@ -14182,7 +14915,7 @@
               "file": "lcb_deadline_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 49,
+              "line": 51,
               "name": "TestATestWaitingForAParallelSlot",
               "output": [],
               "status": "none"
@@ -14200,7 +14933,7 @@
                       "file": "lcb_deadline_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 66,
+                      "line": 68,
                       "name": "names_the_first_suite_itself_and_the_second_suite's_method",
                       "output": [],
                       "status": "none",
@@ -14214,7 +14947,7 @@
                   "file": "lcb_deadline_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 65,
+                  "line": 67,
                   "name": "one_suite_hangs_in_its_BeforeAll_and_another_in_a_test_method_until_--timeout",
                   "output": [],
                   "status": "none",
@@ -14228,7 +14961,7 @@
               "file": "lcb_deadline_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 61,
+              "line": 63,
               "name": "TestAHookThatHangs",
               "output": [],
               "status": "none"
@@ -23062,13 +23795,13 @@
     }
   ],
   "stats": {
-    "behaviors": 653,
+    "behaviors": 677,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 103,
+    "suites": 105,
     "tests": 0
   }
 }

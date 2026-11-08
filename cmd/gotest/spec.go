@@ -31,6 +31,9 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	output := own.Value("--output")
 	input := own.Value("--input")
+	if refuseControl(own, input) {
+		return 2
+	}
 	noColor := colorDisabled(own.Bool("--no-color"))
 	renderOnly := own.Bool("--render-only")
 
@@ -129,7 +132,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer cleanup()
 
-	ctx, cancel := shutdownContext()
+	ctx, cancel := shutdownContext(cfg.Control)
 	defer cancel()
 
 	if cfg.GlobalTimeout > 0 {

@@ -68,6 +68,10 @@ instead of default output. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` a flat shared-fixture
 setup budget (default: what the fixtures declare, v1.34+) — `0` disables either; `--min <pct>` gates
 coverage, `--no-cache` skips the test binary cache and forces a fresh link, `--debug` keeps the run's work dir and overlay.
+`--control=stdin` (**v1.37+**, every command that stops on Ctrl-C) reads
+`stop` and `force` lines on stdin, a first and a second Ctrl-C; the input's
+end is a stop. For a program driving gotest that cannot signal it (Windows);
+without the flag stdin is never read, and `--input=-` refuses it.
 
 ## Benchmarks — `gotest bench` (v1.29+)
 

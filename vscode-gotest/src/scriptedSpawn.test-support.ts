@@ -40,8 +40,11 @@ export interface SpawnScript {
 export interface FakeChild extends EventEmitter {
   stdout: PassThrough;
   stderr: PassThrough;
-  // Only the spec render writes to stdin, but every child has one.
+  // Every child has one; the spec render writes its input there, and a
+  // control child its stop and force lines.
   stdin: PassThrough;
+  // What was written to stdin, write by write.
+  written: string[];
   kill: (signal?: NodeJS.Signals) => void;
 }
 
@@ -57,6 +60,15 @@ export function createScriptedSpawn(
     child.stderr = new PassThrough();
     child.stdin = new PassThrough();
     child.stdin.resume();
+    child.written = [];
+    const write = child.stdin.write.bind(child.stdin) as (
+      chunk: unknown,
+      ...rest: unknown[]
+    ) => boolean;
+    child.stdin.write = ((chunk: unknown, ...rest: unknown[]) => {
+      child.written.push(String(chunk));
+      return write(chunk, ...rest);
+    }) as PassThrough["write"];
 
     const finish = () => {
       child.stdout.end();
