@@ -35,6 +35,7 @@ jobs:
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: ${{ steps.golangci.outputs.version }}
+          install-mode: goinstall
           args: --allow-parallel-runners ./... ./examples/...
       - name: Lint (windows)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
@@ -42,6 +43,7 @@ jobs:
           GOOS: windows
         with:
           version: ${{ steps.golangci.outputs.version }}
+          install-mode: goinstall
           args: --allow-parallel-runners ./... ./examples/...
       - name: Lint (darwin)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
@@ -49,6 +51,7 @@ jobs:
           GOOS: darwin
         with:
           version: ${{ steps.golangci.outputs.version }}
+          install-mode: goinstall
           args: --allow-parallel-runners ./... ./examples/...
       - name: Vet and lint (gotest)
         run: make lint
