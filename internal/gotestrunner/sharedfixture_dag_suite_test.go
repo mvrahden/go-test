@@ -419,9 +419,11 @@ func (s *SharedFixtureDAGTestSuite) TestAStartBesideAReleaseFollowsItsBudget(t *
 	t.Setenv(fixtures.EnvDagSetupDelay, (2 * time.Second).String())
 	t.Setenv(fixtures.EnvDagTeardownDelay, (3 * time.Second).String())
 	t.Setenv(fixtures.EnvDagTimeout, (10 * time.Second).String())
-	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
 	infos := append(dagFixtures(false, "DagA"), dagFixtures(true, "DagB")...)
 	proc, release := startDAG(t, infos)
+	// Lowered once the process is up: its start alone can outlast 1s on a
+	// slow machine, and the floor under test is the late start's.
+	restore := gotestrunner.ExportSetSetupReportFloor(time.Second)
 	released := make(chan error, 1)
 	go func() { released <- proc.TeardownKeys(t.Context(), []string{dagKey("DagA")}, time.Minute) }()
 	time.Sleep(200 * time.Millisecond)
