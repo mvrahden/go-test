@@ -47,6 +47,7 @@ func NewF(f *testing.F, beforeEach, afterEach func(*T), target *FuzzTarget) *F {
 	}
 }
 
+// F returns the underlying *testing.F; Context is its context.
 func (f *F) F() *testing.F            { return f.f }
 func (f *F) Context() context.Context { return f.f.Context() }
 
@@ -65,6 +66,16 @@ func (f *F) Skipf(format string, args ...any) {
 	assert.SkipInternalFrames(f.f)
 	f.f.Skipf(format, args...)
 }
+
+// Setenv sets the environment variable key to value and restores it when the
+// fuzz target ends. It belongs to the seeding phase, before Fuzz: inside the
+// fuzz function use the *T's own, as testing panics on this call there.
+func (f *F) Setenv(key, value string) { f.f.Setenv(key, value) }
+
+// TempDir returns a new temporary directory, removed when the fuzz target
+// ends. Like Setenv it belongs to the seeding phase; inside the fuzz function
+// use the *T's own.
+func (f *F) TempDir() string { return f.f.TempDir() }
 
 // Add records a seed. It is buffered rather than forwarded: a typed seed
 // such as a struct must be exploded into the target's leaves before
