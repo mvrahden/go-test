@@ -664,6 +664,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-escape-bench-loop-through-b` | the bench and fuzz rules do not read `b.B()` or `f.F()` as the benchmark or fuzz target | conformance: the lint It for a loop written through the escape finds `bench-loop` reporting the loop |
 | `lint-escape-own-b-method-reported` | a `B()` call on any type counts as the `*gotest.B` escape | conformance: the lint It for a type with its own `B` method finds `t-escape` findings |
 | `lint-escape-fix-on-t-only` | a method reached through an escape is fixed onto the wrapper only through `t.T()` | conformance: the lint `-fix` It for a benchmark looping through `b.B()` finds `b.B().Loop` left in place |
+| `lint-escape-env-through-b-unreported` | `Setenv` and `TempDir` are no escapes through any wrapper | conformance: the lint Its for `Name`, `Setenv` and `TempDir` through `t.T()`, `b.B()` and `f.F()` find no finding with a fix, and the `-fix` It finds `b.B().TempDir` left in place |
 | `lint-rule-poll-scope-misses-helpers` | `poll-scope` never reports the outer `t` passed to a helper | conformance: the lint It for a helper inside a polling callback finds no `poll-scope` finding |
 | `lint-rule-len-message-reads-equal` | `True(t, len(x) != 0)` is reported as a `len == 0` check | conformance: the lint It for `len(x) != 0` finds the message naming `== 0` |
 | `lint-rule-redundant-fix-drops-message` | the `assertion-redundant` fix drops the removed assertion's message | conformance: the lint `-fix` It finds the stronger assertion without the message |

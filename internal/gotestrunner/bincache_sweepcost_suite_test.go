@@ -18,7 +18,7 @@ type BinaryCacheSweepCostTestSuite struct{}
 // binaries each, every one fresh and their checkouts present, so each sweep
 // reads all of it and evicts nothing.
 func (s *BinaryCacheSweepCostTestSuite) BenchmarkSweepOf200KeysOf60Binaries(b *gotest.B) {
-	root := b.B().TempDir()
+	root := b.TempDir()
 	cwd, err := os.Getwd()
 	gotest.NoError(b, err)
 	for k := range 200 {

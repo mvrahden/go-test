@@ -16,6 +16,7 @@ func (s *EscapeTestSuite) TestMethodEscape(t *gotest.T) {
 	t.T().Skipf("reason")        // want `Skipf is available on gotest.T — unnecessary T escape`
 	t.T().Setenv("KEY", "VALUE") // want `Setenv is available on gotest.T — unnecessary T escape`
 	_ = t.T().TempDir()          // want `TempDir is available on gotest.T — unnecessary T escape`
+	_ = t.T().Name()             // want `Name is available on gotest.T — unnecessary T escape`
 	_ = t.T().Context()          // want `Context is available on gotest.T — t.T\(\).Context\(\) drops the suite's Timeout`
 	t.T().Helper()               // want `never call Helper — gotest resolves call sites automatically; Helper degrades failure locations`
 	t.T().Log("msg")             // want `use assertion message args instead — T.Log bypasses the failure report`
@@ -210,7 +211,8 @@ func (s *EscapeBenchTestSuite) BenchmarkDirect(b *gotest.B) {
 	_ = b.B().N                             // by design: no finding
 	b.B().ResetTimer()                      // by design: no finding
 	b.B().Run("sub", func(b *testing.B) {}) // by design: no finding
-	_ = b.B().TempDir()                     // not on gotest.B: no finding
+	_ = b.B().TempDir()                     // want `TempDir is available on gotest.B — unnecessary B escape`
+	b.B().Setenv("KEY", "VALUE")            // want `Setenv is available on gotest.B — unnecessary B escape`
 }
 
 func (s *EscapeBenchTestSuite) BenchmarkAlias(b *gotest.B) {
@@ -250,9 +252,10 @@ func (s *EscapeBenchTestSuite) BenchmarkStd(b *testing.B) {
 type EscapeFuzzTestSuite struct{}
 
 func (s *EscapeFuzzTestSuite) FuzzDirect(f *gotest.F) {
-	f.F().Add("seed") // want `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
-	_ = f.F().Name()  // want `Name is available on gotest.F — unnecessary F escape`
-	f.F().Log("x")    // want `use assertion message args instead — T.Log bypasses the failure report`
+	f.F().Add("seed")   // want `Add is available on gotest.F — f.F\(\).Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed`
+	_ = f.F().Name()    // want `Name is available on gotest.F — unnecessary F escape`
+	_ = f.F().TempDir() // want `TempDir is available on gotest.F — unnecessary F escape`
+	f.F().Log("x")      // want `use assertion message args instead — T.Log bypasses the failure report`
 	f.Fuzz(func(t *gotest.T, in string) { gotest.Equal(t, in, in) })
 }
 

@@ -1,5 +1,5 @@
 Expect: ^FAIL .*conformance/lint LinterRules .* / lint reports the seed as a t-escape with a fix and fuzz-seed stays silent( / .*)? \(
-Clause: when a fuzz target seeds through f.F().Add → lint reports the seed as a t-escape with a fix and fuzz-seed stays silent
+Clause: when a fuzz target seeds through f.F().Add and calls TempDir through f.F() → lint reports the seed as a t-escape with a fix and fuzz-seed stays silent
 --- a/internal/lint/lint.go
 +++ b/internal/lint/lint.go
 @@ -662,7 +662,6 @@

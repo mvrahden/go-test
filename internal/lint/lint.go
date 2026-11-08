@@ -653,8 +653,7 @@ type escapeConfig struct {
 // whose call through its escape the rules flag.
 var escapeConfigs = map[string]map[string]escapeConfig{
 	"T": withEscapes(wrapperEscapeConfigs("T"), map[string]escapeConfig{
-		"Setenv":   availableOn("T", "Setenv"),
-		"TempDir":  availableOn("T", "TempDir"),
+		"Name":     availableOn("T", "Name"),
 		"Context":  {TEscape, "Context is available on gotest.T — t.T().Context() drops the suite's Timeout", false, true, false},
 		"Deadline": {TEscape, "use t.Context().Deadline() — t.T().Deadline() reports go test's -timeout, not the suite's Timeout", false, true, false},
 		"Parallel": {SuiteLifecycle, "use SuiteConfig.Parallel instead — T.Parallel bypasses suite lifecycle coordination", true, false, false},
@@ -681,6 +680,8 @@ func wrapperEscapeConfigs(wrapper string) map[string]escapeConfig {
 		"FailNow": availableOn(wrapper, "FailNow"),
 		"Skipf":   availableOn(wrapper, "Skipf"),
 		"Context": availableOn(wrapper, "Context"),
+		"Setenv":  availableOn(wrapper, "Setenv"),
+		"TempDir": availableOn(wrapper, "TempDir"),
 		"Skip":    {TEscape, fmt.Sprintf("must use Skipf instead — unnecessary %s escape", wrapper), false, false, false},
 		"SkipNow": {TEscape, fmt.Sprintf("must use Skipf instead — unnecessary %s escape", wrapper), false, false, false},
 		"Cleanup": {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},

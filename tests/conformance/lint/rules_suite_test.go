@@ -61,7 +61,15 @@ func (s *LinterRulesTestSuite) TestOwnTMethod(t *gotest.T) {
 const escapesPkg = "../testdata/lintescapes/"
 
 func (s *LinterRulesTestSuite) TestWrapperEscapes(t *gotest.T) {
-	t.When("a benchmark calls Loop, Helper and Cleanup through b.B() and reads b.B().N", func(w *gotest.T) {
+	t.When("a test calls Name, Setenv and TempDir through t.T()", func(w *gotest.T) {
+		w.It("lint reports each as a t-escape with a fix", func(it *gotest.T) {
+			_, fixable := lintFindings(it, ".", escapesPkg)
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:67:6: Name is available on gotest.T — unnecessary T escape")
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:68:2: Setenv is available on gotest.T — unnecessary T escape")
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:69:6: TempDir is available on gotest.T — unnecessary T escape")
+		})
+	})
+	t.When("a benchmark calls Loop, Helper, Cleanup, Setenv and TempDir through b.B() and reads b.B().N", func(w *gotest.T) {
 		w.It("lint reports Loop as a t-escape with a fix, Helper as a t-escape without one and Cleanup as suite-lifecycle, and leaves N unreported", func(it *gotest.T) {
 			got, fixable := lintFindings(it, ".", escapesPkg)
 			loop := "t-escape escapes_suite_test.go:18:6: Loop is available on gotest.B — unnecessary B escape"
@@ -72,19 +80,28 @@ func (s *LinterRulesTestSuite) TestWrapperEscapes(t *gotest.T) {
 			gotest.Contains(it, got, "suite-lifecycle escapes_suite_test.go:22:2: use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle")
 			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:23:"))
 		})
+		w.It("lint reports Setenv and TempDir as t-escapes with a fix", func(it *gotest.T) {
+			_, fixable := lintFindings(it, ".", escapesPkg)
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:24:2: Setenv is available on gotest.B — unnecessary B escape")
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:25:6: TempDir is available on gotest.B — unnecessary B escape")
+		})
 	})
-	t.When("a fuzz target seeds through f.F().Add", func(w *gotest.T) {
+	t.When("a fuzz target seeds through f.F().Add and calls TempDir through f.F()", func(w *gotest.T) {
 		w.It("lint reports the seed as a t-escape with a fix and fuzz-seed stays silent", func(it *gotest.T) {
 			got, fixable := lintFindings(it, ".", escapesPkg)
-			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:43:2: Add is available on gotest.F — f.F().Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed")
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:45:2: Add is available on gotest.F — f.F().Add skips the seed buffer: a struct seed panics inside testing, and the Add-after-Fuzz check is bypassed")
 			gotest.Empty(it, findingsOf(got, "fuzz-seed "))
+		})
+		w.It("lint reports TempDir as a t-escape with a fix", func(it *gotest.T) {
+			_, fixable := lintFindings(it, ".", escapesPkg)
+			gotest.Contains(it, fixable, "t-escape escapes_suite_test.go:46:6: TempDir is available on gotest.F — unnecessary F escape")
 		})
 	})
 	t.When("a benchmark loops with b.B().Loop() and sleeps inside it", func(w *gotest.T) {
 		w.It("bench-loop stays silent and bench-wait reports the sleep", func(it *gotest.T) {
 			got := ruleFindings(it, ".", escapesPkg)
 			gotest.Empty(it, findingsOf(got, "bench-loop "))
-			gotest.Contains(it, got, "bench-wait escapes_suite_test.go:28:3: benchmark EscapesTestSuite.BenchmarkSleepThroughEscape calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop")
+			gotest.Contains(it, got, "bench-wait escapes_suite_test.go:30:3: benchmark EscapesTestSuite.BenchmarkSleepThroughEscape calls time.Sleep inside the measured loop — this times the wait, not the code; move it outside the loop")
 		})
 	})
 }
@@ -93,9 +110,9 @@ func (s *LinterRulesTestSuite) TestOwnBMethod(t *gotest.T) {
 	t.When("a type of its own has a B method", func(w *gotest.T) {
 		w.It("lint leaves calls through that B method unreported", func(it *gotest.T) {
 			got := ruleFindings(it, ".", escapesPkg)
-			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:34:"))
-			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:35:"))
-			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:56:"))
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:36:"))
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:37:"))
+			gotest.Empty(it, findingsAt(got, "escapes_suite_test.go:59:"))
 		})
 	})
 }

@@ -21,6 +21,8 @@ func (s *EscapesTestSuite) BenchmarkEscapes(b *gotest.B) {
 	b.B().Helper()
 	b.B().Cleanup(func() {})
 	_ = b.B().N
+	b.B().Setenv("GOTEST_ESCAPES", "1")
+	_ = b.B().TempDir()
 }
 
 func (s *EscapesTestSuite) BenchmarkSleepThroughEscape(b *gotest.B) {
@@ -41,6 +43,7 @@ type SeedsTestSuite struct{}
 
 func (s *SeedsTestSuite) FuzzEscapes(f *gotest.F) {
 	f.F().Add("s")
+	_ = f.F().TempDir()
 	f.Fuzz(func(t *gotest.T, in string) {
 		gotest.NotEmpty(t, in)
 	})
@@ -58,4 +61,10 @@ func (s *SeedsTestSuite) FuzzOwnF(f *gotest.F) {
 	f.Fuzz(func(t *gotest.T, in string) {
 		gotest.NotEmpty(t, in)
 	})
+}
+
+func (s *EscapesTestSuite) TestEscapes(t *gotest.T) {
+	_ = t.T().Name()
+	t.T().Setenv("GOTEST_ESCAPES", "1")
+	_ = t.T().TempDir()
 }

@@ -195,13 +195,19 @@ Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite 
 ### Requirement: Escapes from every wrapper
 The t-escape and suite-lifecycle rules SHALL report a method reached through `b.B()` on a gotest.B or `f.F()` on a gotest.F like one through `t.T()`: a method the wrapper has with a fix to call it there; Helper, Log, Fatal, Error, Fail, Skip and SkipNow without one; Cleanup as suite-lifecycle. They SHALL leave what gotest.B lacks by design, such as `N`, the timers or `Run`, unreported, and the bench and fuzz rules SHALL read a loop or seed written through the escape as one written directly.
 
+#### Scenario: A test escaping to testing.T
+- **WHEN** a test calls Name, Setenv and TempDir through t.T()
+- **THEN** lint reports each as a t-escape with a fix
+
 #### Scenario: A benchmark escaping to testing.B
-- **WHEN** a benchmark calls Loop, Helper and Cleanup through b.B() and reads b.B().N
+- **WHEN** a benchmark calls Loop, Helper, Cleanup, Setenv and TempDir through b.B() and reads b.B().N
 - **THEN** lint reports Loop as a t-escape with a fix, Helper as a t-escape without one and Cleanup as suite-lifecycle, and leaves N unreported
+- **AND** lint reports Setenv and TempDir as t-escapes with a fix
 
 #### Scenario: A fuzz target escaping to testing.F
-- **WHEN** a fuzz target seeds through f.F().Add
+- **WHEN** a fuzz target seeds through f.F().Add and calls TempDir through f.F()
 - **THEN** lint reports the seed as a t-escape with a fix and fuzz-seed stays silent
+- **AND** lint reports TempDir as a t-escape with a fix
 
 #### Scenario: A loop written through the escape
 - **WHEN** a benchmark loops with b.B().Loop() and sleeps inside it
@@ -210,6 +216,7 @@ The t-escape and suite-lifecycle rules SHALL report a method reached through `b.
 #### Scenario: The fix calls the wrapper
 - **WHEN** lint -fix rewrites a benchmark that loops and asserts through b.B()
 - **THEN** the loop and the assertion call the gotest.B directly
+- **AND** Setenv and TempDir through b.B() call the gotest.B directly
 
 ### Requirement: Misuse reached through a helper
 Lint SHALL report the test's outer t handed to a helper inside a polling callback.

@@ -1,0 +1,19 @@
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint reports each as a t-escape with a fix( / .*)? \(
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint reports Setenv and TempDir as t-escapes with a fix( / .*)? \(
+Expect: ^FAIL .*conformance/lint LinterRules .* / lint reports TempDir as a t-escape with a fix( / .*)? \(
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / Setenv and TempDir through b\.B\(\) call the gotest\.B directly( / .*)? \(
+Clause: when a test calls Name, Setenv and TempDir through t.T() → lint reports each as a t-escape with a fix
+Clause: when a benchmark calls Loop, Helper, Cleanup, Setenv and TempDir through b.B() and reads b.B().N → lint reports Setenv and TempDir as t-escapes with a fix
+Clause: when a fuzz target seeds through f.F().Add and calls TempDir through f.F() → lint reports TempDir as a t-escape with a fix
+Clause: when lint -fix rewrites a benchmark that loops and asserts through b.B() → Setenv and TempDir through b.B() call the gotest.B directly
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -680,8 +680,6 @@
+ 		"FailNow": availableOn(wrapper, "FailNow"),
+ 		"Skipf":   availableOn(wrapper, "Skipf"),
+ 		"Context": availableOn(wrapper, "Context"),
+-		"Setenv":  availableOn(wrapper, "Setenv"),
+-		"TempDir": availableOn(wrapper, "TempDir"),
+ 		"Skip":    {TEscape, fmt.Sprintf("must use Skipf instead — unnecessary %s escape", wrapper), false, false, false},
+ 		"SkipNow": {TEscape, fmt.Sprintf("must use Skipf instead — unnecessary %s escape", wrapper), false, false, false},
+ 		"Cleanup": {SuiteLifecycle, "use AfterEach or AfterAll for cleanup — T.Cleanup bypasses suite lifecycle", true, false, false},
