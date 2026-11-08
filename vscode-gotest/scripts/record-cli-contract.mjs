@@ -214,13 +214,15 @@ const spec = {};
 for (const [name, { stream, args }] of Object.entries(SPEC)) {
   const input = readFileSync(path.join(testdataDir, stream), "utf-8");
   const result = await run(bin, args, input);
-  const stdout = maskDir(result.stdout, repoRoot, "<repo>").trim();
+  const stdout = result.stdout.trim();
+  // The document's directories are masked as paths, so Windows spells them
+  // with slashes too, as the Linux recording does.
   spec[name] = {
     stream,
     args,
     exitCode: result.exitCode,
     stderr: maskDir(result.stderr, repoRoot, "<repo>"),
-    document: stdout ? JSON.parse(stdout) : null,
+    document: stdout ? maskPaths(JSON.parse(stdout), repoRoot, "<repo>") : null,
   };
 }
 
