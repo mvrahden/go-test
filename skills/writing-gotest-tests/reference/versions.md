@@ -740,3 +740,5 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw
    only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
    benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
+   `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
+   gains `Name`, so `t-escape` fixes those through every escape too.

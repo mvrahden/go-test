@@ -599,8 +599,28 @@ t.Context() context.Context                          // test context (respects d
 t.Skipf(format, args...)                             // skip the test with a formatted reason
 t.Setenv(key, value)                                 // set env var, restored after test
 t.TempDir() string                                   // create a temp dir, cleaned up after test
+t.Name() string                                      // the test's name (the wrapper's in a hook under a benchmark or fuzz target)
 t.It("description", func(it *gotest.T) { ... })     // BDD-style subtest
 t.When("condition", func(w *gotest.T) { ... })       // BDD-style subtest
+```
+
+`*gotest.B` and `*gotest.F` carry the same core; `f.Setenv` and `f.TempDir` are for the seeding phase, before `f.Fuzz` (inside the fuzz function use the `*gotest.T`'s):
+
+```go
+b.B() *testing.B / f.F() *testing.F                  // access the underlying testing type
+b.Context() / f.Context() context.Context            // the benchmark's or fuzz target's context
+b.Errorf / f.Errorf(format, args...)                 // fail, at the caller's line
+b.FailNow() / f.FailNow()                            // stop now
+b.Skipf / f.Skipf(format, args...)                   // skip with a formatted reason
+b.Name() / f.Name() string                           // the name testing gave it
+b.Setenv / f.Setenv(key, value)                      // set env var, restored when it ends
+b.TempDir() / f.TempDir() string                     // create a temp dir, removed when it ends
+b.Loop() bool                                        // the measured loop: for b.Loop() { ... }
+b.ReportAllocs()                                     // report allocations
+b.ReportMetric(n float64, unit string)               // report a custom metric
+b.SetBytes(n int64)                                  // bytes processed per iteration
+f.Add(args ...any)                                   // add a seed
+f.Fuzz(func(t *gotest.T, in ...) { ... })            // the fuzz function
 ```
 
 Table-driven tests with `Each`:

@@ -183,8 +183,8 @@ those are your job, below.
    `Failed`/`Message`; pass `poll` (not `t`) to assertions inside it.
 6. **Never call `t.T().Helper()`** — call sites resolve automatically; the
    linter flags it. Reach for `t.T()` only when nothing on `gotest.T`
-   (`It`, `When`, `Context`, `TempDir`, `Setenv`, `Skipf`, `Errorf`,
-   `FailNow`) covers the need — never for `t.T().Context()`, which carries
+   (`It`, `When`, `Context`, `TempDir`, `Setenv`, `Name`, `Skipf`,
+   `Errorf`, `FailNow`) covers the need — never for `t.T().Context()`, which carries
    no suite `Timeout` (v1.33+: `t-escape` flags it, `-fix` writes
    `t.Context()`). There is no `Log`: context goes into an assertion's
    message arguments (`gotest.Equal(t, want, got, "order %s", id)`), and
