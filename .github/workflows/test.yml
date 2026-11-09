@@ -65,7 +65,7 @@ jobs:
         with:
           packages: ${{ steps.shard.outputs.packages }}
           race: true
-          flags: "--parallel=${{ matrix.parallel || env.GATE_PARALLEL }}"
+          flags: "--parallel=${{ matrix.parallel || env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
           events-file: ${{ runner.temp }}/test-events.json
       - name: Upload the test event stream
         if: ${{ always() && steps.test.outputs.events-file != '' }}
@@ -131,6 +131,6 @@ jobs:
           # One matrix cell publishes the badge; the others would only race
           # it for the same number.
           badge: ${{ matrix.go == 'pinned' }}
-          flags: "--parallel=${{ env.GATE_PARALLEL }}"
+          flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
       - if: ${{ !cancelled() }}
         uses: ./.github/actions/save-go-cache
