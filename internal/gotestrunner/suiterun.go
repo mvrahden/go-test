@@ -10,12 +10,12 @@ import (
 	"regexp"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/control"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -35,8 +35,6 @@ type SuiteTarget struct {
 	BinaryPath   string   // path to compiled test binary
 	RunFlags     []string // test binary flags (with -test. prefix)
 	CoverProfile string   // per-suite cover profile path (empty if no -coverprofile)
-	BudgetFile   string   // sidecar path for teardown budget (empty = use default)
-	StopFile     string   // created before the process is interrupted, so it tears its fixtures down (empty = none)
 	Bench        bool     // when true, run the Benchmark<SuiteName> wrapper instead of the suite's tests
 	BenchFilter  string   // raw -test.bench value carrying the user's sub-benchmark segments (empty = the exact Benchmark<SuiteName> wrapper)
 	Exclusive    bool     // SuiteConfig{Exclusive: true}: dispatched strictly alone, after every non-exclusive suite of its group
@@ -57,23 +55,28 @@ type SuiteResult struct {
 	Duration time.Duration
 	// CutShort reports that the run's context ended while the process ran.
 	CutShort bool
+	// StoppedBy is the reason the suite process gave for a stop the runner
+	// did not send, such as "signal:SIGTERM"; empty when there was none.
+	StoppedBy string
 }
 
 // RunMode controls how a run executes its suites and collects their output.
 type RunMode int
 
 const (
-	// RunBatchText runs suites directly (no test2json). Output is batched
-	// per-package: when all suites for a package complete, their output is
-	// written to stdout followed by a package summary line.
+	// RunBatchText runs suites with no converter, their stdout and stderr
+	// apart. Output is batched per-package: when all suites for a package
+	// complete, their output is written to stdout followed by a package
+	// summary line.
 	RunBatchText RunMode = iota
 
-	// RunStreamJSON wraps each suite with test2json and streams its JSON
-	// events to stdout as soon as it completes.
+	// RunStreamJSON converts each suite's output to JSON events with
+	// test2json beside it (see relay) and streams them to stdout as soon as
+	// the suite completes.
 	RunStreamJSON
 
-	// RunCaptureJSON wraps each suite with test2json and captures all JSON
-	// events into a buffer (nothing written to stdout).
+	// RunCaptureJSON converts each suite's output as RunStreamJSON does and
+	// captures all JSON events into a buffer (nothing written to stdout).
 	RunCaptureJSON
 )
 
@@ -186,32 +189,12 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 		testArgs = insertBeforeWords(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
 
-	if test2json {
-		argv := test2jsonArgv(test2jsonPath(), target, testArgs)
-		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: the Go toolchain's own converter
-		cmd.Env = slices.Concat(env, sidecarEnv(target))
-		cmd.Dir = target.Dir
-		return cmd
-	}
-
 	argv := append(slices.Clone(target.Exec), target.BinaryPath)
 	argv = append(argv, testArgs...)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: binary built by this tool, under the -exec command the user named
-	cmd.Env = slices.Concat(env, sidecarEnv(target))
+	cmd.Env = slices.Clone(env)
 	cmd.Dir = target.Dir
 	return cmd
-}
-
-// sidecarEnv names the files a suite process shares with the runner.
-func sidecarEnv(target SuiteTarget) []string { //nolint:gocritic // hugeParam: stable API
-	var env []string
-	if target.BudgetFile != "" {
-		env = append(env, protocol.EnvTeardownBudgetFile+"="+target.BudgetFile)
-	}
-	if target.StopFile != "" {
-		env = append(env, protocol.EnvStopFile+"="+target.StopFile)
-	}
-	return env
 }
 
 // startRetryFirst and startRetryLimit bound the retries of a suite process
@@ -227,7 +210,12 @@ type startedSuite struct {
 	mp             *ManagedProcess
 	stdout, stderr *bytes.Buffer
 	cutShort       *atomic.Bool
+	relay          *relay // the converter beside a suite on a JSON pipeline
 }
+
+// attachChannel hands a suite process its end of the channel; a variable so
+// tests can start one that never takes it.
+var attachChannel = (*control.ChildEnd).Attach
 
 // suiteStart starts a suite process; a variable so tests can count starts.
 var suiteStart = startSuite
@@ -235,55 +223,40 @@ var suiteStart = startSuite
 func startSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) (startedSuite, error) { //nolint:gocritic // hugeParam: a copy per start is nothing beside the process it starts
 	cmd := buildSuiteCmd(ctx, target, env, test2json)
 	s := startedSuite{cmd: cmd, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, cutShort: &atomic.Bool{}}
-	cmd.Stdout = s.stdout
-	cmd.Stderr = s.stderr
+	link, child, err := control.New()
+	if err != nil {
+		return s, err
+	}
+	attachChannel(child, cmd)
+	if test2json {
+		// One writer for both streams gets one pipe, which keeps their order.
+		s.relay = startRelay(target, s.stdout, s.stderr)
+		cmd.Stdout, cmd.Stderr = s.relay, s.relay
+	} else {
+		cmd.Stdout, cmd.Stderr = s.stdout, s.stderr
+	}
 
 	mp := NewManagedProcess(cmd, ProcessConfig{
-		Grace:      GraceBudget,
-		BudgetFile: target.BudgetFile,
-		StopFile:   target.StopFile,
-		HoldJob:    true,
+		Grace:       GraceBudget,
+		Link:        link,
+		HoldJob:     true,
+		AwaitOutput: test2json && len(target.Exec) > 0,
 	})
 	s.mp = mp
 	// exec cancels only a process still running when ctx ends.
-	cancel := cmd.Cancel
 	cmd.Cancel = func() error {
 		s.cutShort.Store(true)
-		// Announced before the signal: the process reads it on the signal,
-		// or polls for it where no signal comes.
-		if target.StopFile != "" {
-			if err := os.WriteFile(target.StopFile, nil, 0o600); err != nil {
-				if killUnannounced(target, cmd.Process.Pid, err) {
-					mp.Stopped()
-					return nil
-				}
-				return cancel()
-			}
-			if pid := readPID(protocol.StopPIDPath(target.StopFile)); pid > 0 {
-				if err := signalSuite(pid, cmd.Process.Pid); err == nil {
-					mp.Stopped()
-					return nil
-				}
-			}
+		return mp.RequestStop()
+	}
+	err = mp.Start()
+	child.Close()
+	if err != nil {
+		if s.relay != nil {
+			s.relay.discard()
 		}
-		return cancel()
+		return s, err
 	}
-	return s, mp.Start()
-}
-
-// killUnannounced stops a suite whose stop file could not be written, which
-// no signal can stop then: its process is killed, by the pid it published
-// and alone, so the converter in front of it relays the stream to its end.
-// It reports false for a suite that published no pid, or one outside its
-// process group, whose group the caller interrupts instead.
-func killUnannounced(target SuiteTarget, group int, err error) bool { //nolint:gocritic // hugeParam: as startSuite
-	pid := readPID(protocol.StopPIDPath(target.StopFile))
-	if pid > 0 && killPID(pid, group) == nil {
-		fmt.Fprintf(os.Stderr, "WARN: %s %s: the stop file could not be written (%v), so the suite process was killed\n", target.Package, target.SuiteName, err)
-		return true
-	}
-	fmt.Fprintf(os.Stderr, "WARN: %s %s: the stop file could not be written (%v), so the suite's process group is interrupted\n", target.Package, target.SuiteName, err)
-	return false
+	return s, nil
 }
 
 // waitRetry waits d, or returns ctx's error once it ends.
@@ -298,20 +271,21 @@ func waitRetry(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// RunSingleSuite executes a single suite subprocess.
-// When test2json is true, the binary is wrapped with the test2json tool.
+// RunSingleSuite executes a single suite subprocess: the binary, behind the
+// -exec command if there is one, as the root of its own process tree. When
+// test2json is true its stdout and stderr are one stream, which a converter
+// beside it turns into JSON events (see relay); the result carries the
+// suite's own exit status either way.
 //
-// On context cancellation, cmd.Cancel announces the stop and signals the
-// suite process alone, by the pid it published on Unix and by the stop file
-// itself on Windows, so the converter in front of it relays the stream to its
-// end; a process that published no pid, or one outside the suite's process
-// group, gets the group's SIGTERM instead. A stop file that cannot be
-// written has the suite process killed by its pid, since no signal stops it
-// without the file. A suite stopped alone leaves what it started running; once the root has exited, the rest of the group
-// is interrupted and, past the budget, killed. A per-process kill timer (from
-// the teardown budget file) governs when the suite itself is killed. Output is
-// read by the managed process itself, so a grandchild outside the group that
-// keeps the pipes open holds the result for the drain delay at most.
+// On context cancellation, cmd.Cancel sends the suite process the stop line
+// on its channel, or, when it took none within helloWithin of its start or
+// the line cannot be written, a Ctrl-C to its tree. A suite stopped by the
+// line leaves what it started running; once the root has exited, the rest of
+// the group is interrupted and, past the budget, killed. The teardown budget
+// the process reports on its channel governs when the suite itself is
+// killed. Output is read by the managed process itself, so a grandchild
+// outside the group that keeps the pipes open holds the result for the drain
+// delay at most.
 func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2json bool) SuiteResult { //nolint:gocritic // hugeParam: stable API
 	start := time.Now()
 	s, err := suiteStart(ctx, target, env, test2json)
@@ -320,8 +294,8 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		// command writing a tool into the shared build cache in place.
 		// Unix reports it; Windows refuses such a file with a sharing
 		// violation instead.
-		// It covers starting the suite or test2json, which execs the suite
-		// binary itself; copyFile's ForkLock guards the runner's own writes.
+		// It covers the binary the runner starts itself, not one an -exec
+		// command starts; copyFile's ForkLock guards the runner's own writes.
 		retry = max(2*retry, startRetryFirst)
 		if err = waitRetry(ctx, retry); err != nil {
 			break // a cancelled start, as exec reports one
@@ -346,6 +320,9 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	if cmd.ProcessState != nil {
 		exitCode = cmd.ProcessState.ExitCode()
 	}
+	if s.relay != nil && s.relay.finish(exitCode) != nil && exitCode == 0 {
+		exitCode = 1 // no events to read a verdict from
+	}
 	// A failed test exits 1, a panic 2, os.Exit whatever it was given: each
 	// is a failed suite, 1, as go test reports it. A status the binary did
 	// not choose is left for RecordResult to read.
@@ -354,29 +331,15 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 	}
 
 	return SuiteResult{
-		Target:   target,
-		Stdout:   stdout.Bytes(),
-		Stderr:   stderr.Bytes(),
-		ExitCode: exitCode,
-		Started:  start,
-		Duration: duration,
-		CutShort: cutShort.Load(),
+		Target:    target,
+		Stdout:    stdout.Bytes(),
+		Stderr:    stderr.Bytes(),
+		ExitCode:  exitCode,
+		Started:   start,
+		Duration:  duration,
+		CutShort:  cutShort.Load(),
+		StoppedBy: mp.StoppedBy(),
 	}
-}
-
-func readTeardownBudget(path string) time.Duration {
-	if path == "" {
-		return GracefulShutdownDelay
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return GracefulShutdownDelay
-	}
-	d, err := time.ParseDuration(strings.TrimSpace(string(data)))
-	if err != nil || d <= 0 {
-		return GracefulShutdownDelay
-	}
-	return d
 }
 
 // StripTrailingStatus removes the binary's own PASS or FAIL status line, which
@@ -608,14 +571,4 @@ func insertBeforeWords(args []string, flag string) []string {
 		}
 	}
 	return append(slices.Clone(args), flag)
-}
-
-// readPID reads the pid a suite process published, 0 when there is none.
-func readPID(path string) int {
-	data, err := os.ReadFile(path) //nolint:gosec // G304: the runner's own sidecar file
-	if err != nil {
-		return 0
-	}
-	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-	return pid
 }

@@ -386,7 +386,6 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-nil-key-read-as-zero-key` | a nil needle is looked up as the zero key of a map whose keys cannot be nil | ring-0 predicates suite |
 | `contains-type-guard-silent` | a slice needle of a type the slice cannot hold is reported absent, not refused | canary: no failure message names both types |
 | `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
-| `crashed-suite-named-by-the-timeout` | a test whose suite process crashed on its own stays counted as cut short | lifecycle conformance: the `--timeout` names the crashed test besides the hung one |
 | `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
 | `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
 | `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
@@ -487,7 +486,7 @@ shards of one run do not add up to every mutant exactly once.
 | `failed-hydrate-not-dehydrated` | a shared fixture whose Hydrate failed gets no Dehydrate | canary: the failed Hydrate's Dehydrate marker is missing |
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
-| `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the parent or the stream reader is gone |
+| `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the runner is gone |
 | `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
 | `stop-releases-before-afterall` | a stop releases the fixtures before the suite's AfterAll runs | canary: the stopped fixture's markers show the release ahead of AfterAll |
 | `stop-grace-past-5s` | a stopped method body that ignores its context gets 15s instead of 5s | canary: the stopgrace run does not say the body was cut short after 5s |
@@ -498,30 +497,24 @@ shards of one run do not add up to every mutant exactly once.
 | `stopped-suite-fails-silently` | a suite a stop kept from starting is booked as failed, with no skip and no reason | lifecycle conformance: the later group's suite is not skipped with `run stopping` |
 | `group-starts-after-a-stop` | a group's shared fixtures start at its turn even after a stop | lifecycle conformance: the later group's fixture comes up after the stop |
 | `forced-release-gets-no-time` | a forced stop leaves the release none of the bound, so the fixtures are cut off mid-teardown | canary: the stopgrace slow release never ends |
-| `second-signal-waits-out-the-grace` | a second stop signal is ignored while the grace runs | canary: the stopgrace fixture is not released at once on the second signal |
+| `second-signal-waits-out-the-grace` | a second stop signal, or the runner's force line, is ignored while the grace runs | canary: the stopgrace fixture is not released at once on the second signal |
 | `stop-runs-the-benchmarks-not-started` | a stopped benchmark run still starts the benchmarks not started | canary: the stopbench second benchmark runs |
 | `stop-grace-skips-benchmarks` | a running benchmark body gets no grace and is never cut short | canary: the stopbench benchmark that ignores the stop is not cut short after 5s |
 | `stop-runs-the-seeds-not-started` | a stopped run still replays the fuzz seeds not started | canary: the stopbench second seed runs |
 | `cut-short-releases-nothing` | a stop that cuts a body short ends the process without releasing the fixtures | canary: the stopgrace fixture's release marker is missing |
 | `interrupt-exit-keeps-the-verdict` | an interrupted run exits with the suites' verdict instead of 130 | lifecycle conformance and canary: the stopped run's exit code is not 130 |
-| `stop-file-ignored` | the suite's watcher never polls for the stop file, so a stop no signal brings never comes | canary: the stopfile run's later methods have no skip verdict and the stream ends without the verdicts |
-| `late-signal-ends-the-settled-suite` | a settled stop gives the stop signals their default action back, so the runner's signal landing after its stop file settled the run ends the process by it | canary: the latesignal run never marks lingered |
-| `plain-run-taken-for-the-runner` | a run without the runner's stop file falls back to a default one, so a plain run watches its stream | canary: the plainreader method's context ends when its reader goes |
-| `parent-death-not-asked` | a suite process under the runner neither asks for its parent's death signal nor polls for its parent | canary: after the wrapper is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
-| `death-signal-is-a-stop-signal` | the death signal is SIGTERM, so landing during a requested stop it counts as the second signal | runtime: the parent's death abandons the teardown a stop it asked for runs |
-| `reader-loss-read-as-hangup` | a stream nobody reads is taken for one only on a hang-up, which a pipe's writer never gets | canary: after the runner and converter are killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
-| `stop-signals-a-stranger` | a cancelled run signals the pid the suite published even outside the suite's process group | lifecycle conformance: the stranger process gets the SIGTERM and the group none |
-| `unsignalled-suite-killed` | a suite that cannot be signalled alone is killed instead of its group being interrupted | lifecycle conformance: the group gets no interrupt, and AfterAll never runs before the fixture's release |
-| `unwritable-stop-file-kills-nothing` | a stop whose stop file cannot be written says it kills the suite and leaves it running | lifecycle conformance: the run with a read-only work dir is still running 20s after the stop and its stream never ends |
+| `late-signal-ends-the-settled-suite` | a settled stop gives the stop signals their default action back, so a signal landing after the runner's stop line settled the run ends the process by it | canary: the latesignal run never marks lingered |
+| `runner-end-not-heeded` | a suite process neither stops at the end of its runner's channel nor gets the death signal | canary: after the runner is killed the stopping fixture holds on, AfterAll never runs and the suite process lives |
+| `plain-run-taken-for-the-runner` | a run without the runner's channel is taken for one under the runner, so a plain run's Ctrl-C ends it with its tests' status | ring-0 lifecycle: a plain go test run stopped by Ctrl-C does not end by the signal |
 | `hangup-not-a-stop` | the CLI does not catch SIGHUP, so a closing terminal ends it by the signal with its suites and fixtures left to themselves | lifecycle conformance: the run stopped by SIGHUP does not exit 130 as the SIGTERM run does |
 | `ignored-hangup-taken-for-a-stop` | the CLI catches SIGHUP even when it was ignored at start, so a run under nohup stops when its terminal closes | lifecycle conformance: the nohup run's holding method sees its context end on the SIGHUP |
 | `second-signal-leaves-the-processes` | the CLI's second signal exits without killing the processes still running | lifecycle conformance: a suite process outlives the run after a second SIGINT |
-| `second-signal-not-forwarded` | the CLI's second signal kills the suites without sending them the second stop first | lifecycle conformance: the fixture of a method ignoring its context is never released |
+| `second-signal-not-forwarded` | the CLI's second signal kills the suites without sending them the force line first | lifecycle conformance: the fixture of a method ignoring its context is never released |
 | `second-signal-leaves-the-shared-fixture` | the shared fixture process is not among the trees the second signal kills | lifecycle conformance: the shared fixture process outlives the CLI after a second SIGINT during its teardown |
-| `second-signal-kills-the-shared-fixture` | the CLI's second signal kills a tree without a stop file instead of asking it to tear down | runner unit suite: the tree without a stop file never tears down |
+| `second-signal-kills-the-shared-fixture` | the CLI's second signal kills a tree with no way of its own to be stopped again instead of asking it to tear down | runner unit suite: that tree never tears down |
 | `third-signal-waits-out-the-bound` | a further signal while the second one waits for the suites is ignored | runner unit suite: the wait runs to its bound |
-| `stopped-suite-leaves-its-processes` | a suite stopped by its pid leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
-| `stop-kills-the-suite` | the runner stops a suite by its pid with SIGKILL | lifecycle conformance: AfterAll never runs before the fixture's release |
+| `stopped-suite-leaves-its-processes` | a suite stopped by its stop line leaves the rest of its process group running, and its release leaves it too | lifecycle conformance: a process the test started outlives the run, never interrupted |
+| `stop-kills-the-suite` | the runner stops a suite that took its channel by killing its tree instead of sending the stop line | lifecycle conformance: AfterAll never runs before the fixture's release |
 | `stopped-run-reads-as-a-pass` | an interrupted run books no stop into the stream | lifecycle and CLI conformance: the stopped run's stream has no failed package, and neither a forced stop's stream nor the events file ends with the run booked as interrupted |
 | `second-signal-taken-for-the-first` | the window for a repeat of the first signal never closes, so a second Ctrl-C is taken for the first delivered again | lifecycle conformance: the direct run's second SIGINT does not abandon the teardown |
 | `stop-line-ignored` | the CLI reads a `stop` line on its standard input and does nothing with it | lifecycle conformance: the run sent a `stop` line holds until it is killed, never exiting 130 or booking the stop |
@@ -540,7 +533,6 @@ shards of one run do not add up to every mutant exactly once.
 | `ledger-without-dependency-closure` | the fixture ledger counts a suite only for the shared fixtures it binds directly, not their dependencies | fixtures conformance: the dependency is released while its dependent is up, and the run fails |
 | `release-before-the-suite-is-gone` | a parallel suite frees its shared fixtures as its process starts, not once its process group is gone | fixtures conformance: the fixture is released while the suite, or what it started, still runs |
 | `tail-fixtures-start-at-the-first-slot` | every shared fixture the exclusive tail needs starts before its first suite, not just before the suite that reads it | fixtures conformance: a fixture only the second exclusive suite reads is up before the first runs |
-| `given-up-start-released-early` | a shared fixture whose late start timed out is released at once, so the release waits on its hung `BeforeAll` | fixtures conformance: the tail's and the bench slot's runs take 2m30s more |
 | `release-given-up-waited-again` | a shared fixture process holding nothing but releases given up at their budget is waited for that budget again at the end of the run | fixtures conformance: the tail's and the bench slot's runs take 32s more |
 | `slot-waits-for-releases` | an exclusive suite's slot waits for every release in flight before it starts its fixtures | fixtures conformance: the suite runs only after a slow release ends |
 | `ledger-without-the-tail` | the release ledger counts only the concurrent suites, so a fixture an exclusive suite still needs is released before it runs | fixtures conformance: the fixture is released before the exclusive suite reading it |
@@ -762,6 +754,32 @@ shards of one run do not add up to every mutant exactly once.
 | `lcs-abandon-leaves-the-fixture-process` | a second signal kills nothing once its bound has passed | lifecycle conformance: the shared fixture process outlives the CLI |
 | `lcs-abandon-kills-the-fixture-process` | a second signal kills the shared fixture process instead of asking it to tear down | lifecycle conformance: the shared fixture's AfterAll never runs |
 | `lcs-timeout-names-nothing` | an expired `--timeout` no longer names what was running | lifecycle conformance: no FAIL line names the method or the suite |
+| `shared-stop-verb-ignored` | the shared fixture process ignores the stop line on its stdin | canary: the stopped run does not end within 20s, the fixture process never stopped |
+| `shared-stop-sent-by-signal-only` | the runner stops the shared fixture process by an interrupt, never by the stop line | canary: a signal reaches the shared fixture process |
+| `shared-force-verb-ignored` | the shared fixture process ignores the force line on its stdin | canary: the AfterAll's context does not end on the second stop, and a force before any stop stops nothing |
+| `shared-force-leaves-the-process-serving` | a force line before any stop ends the releases' context but leaves the shared fixture process serving | canary: the second stop does not stop the shared fixture process while its suite still runs |
+| `fallback-never-fires` | a suite that said no hello on its channel gets no Ctrl-C when the run stops, so the stop waits out its budget | canary: under a wrapper that closes descriptor 3 the run does not end within 15s of the stop, and the suite's group gets no SIGINT |
+| `failed-stop-write-not-noticed` | a stop line that cannot be written is taken as sent, and no Ctrl-C follows | canary: under a wrapper that said hello for the suite, its group gets no SIGINT and AfterAll never runs |
+| `stopped-line-unbooked` | a suite stopped by a signal from outside the runner is booked as a plain signal death | canary: stderr does not name the stop from outside the runner |
+| `converter-in-the-group` | the converter is started in the runner's process group, which the Ctrl-C that stops the run reaches | canary: the stop reaches the converter, whose stream is converted again |
+| `crash-tail-missing` | a stream the suite left without its final result line gets no crash tail, so the verdicts the converter holds back are lost | canary: a method that panics leaves its suite without the fail testing reported |
+| `reconversion-skipped` | a converter that ended early is not replaced | canary: what the suite wrote after the converter was killed is missing from the stream, and stderr says nothing |
+| `link-closed-at-wait` | the channel is closed once the root exits, before the tree is released | canary: a suite an `-exec` wrapper ran in the background stops when the wrapper exits |
+| `signalled-suite-read-as-passing` | a suite process ended by a signal is read as having exited 0 | canary: a suite process that kills itself leaves a passing package and exit 0 |
+| `channel-stop-line-ignored` | a suite process drops the runner's stop line, so the stop never reaches the method that holds | canary: the stopline run holds until it is killed, its method's context never ended |
+| `hello-never-sent` | a suite process never says hello on its channel, so the runner falls back to a Ctrl-C and the suite ends by the signal | canary: the stopline run's stderr names the signal and the stream has no verdict for the suite |
+| `eof-ignored` | the end of a suite process's channel starts no stop | ring-0 lifecycle: the orphaned binary outlives its channel |
+| `runner-gone-leaves-the-group` | a suite process whose runner is gone does not end its process group | canary: the process the runnergone holding method started outlives the suite |
+| `drain-at-open-skipped` | a stop that reached the channel before the first suite opened is not read at the open | canary: the stopatopen suites are not skipped with the reason run stopping |
+| `reader-outlives-the-suite` | the channel's reader is neither stopped nor waited for when the last suite ends | canary: the channel fixture's TestMain finds the reader still running |
+| `budget-line-ignored` | a suite process never sends its teardown budget, so the runner waits the default | canary: the stopbudget suite outlives its 32s budget |
+| `budget-line-leaves-out-the-fixtures` | the teardown budget a suite process sends is its setup timeout alone | canary: the stopbudget suite whose budget outlasts its linger is killed first |
+| `channel-cloexec-dropped` | the channel is moved without close-on-exec, so a process a test starts inherits it | canary: the channel fixture's child finds a socket among its descriptors |
+| `channel-type-unchecked` | the channel's variable is taken for a descriptor of any type, so a regular file it names is closed | canary: the channel fixture's child cannot write to its descriptor 3 |
+| `signal-forces-under-the-runner` | under the runner a second signal during a stop forces it | canary: the outside run's second SIGTERM releases the fixture without AfterAll |
+| `signal-not-announced` | a stop a signal from outside began is neither told to the runner nor ends by the signal | canary: the outside run's stream names no stop from outside and the run passes |
+| `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |
+| `force-before-stop` | the runner's force line with no stop under way is ignored | ring-0 lifecycle: the process the force reached keeps running |
 
 ## Adding a mutant
 

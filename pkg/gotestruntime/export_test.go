@@ -2,6 +2,7 @@ package gotestruntime
 
 import (
 	"context"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -43,14 +44,19 @@ func ExportWatching() bool {
 	return active != nil
 }
 
-// ExportUseBudgetFile points the runtime at path for the budget it advertises,
-// as the runner's environment does at start, and forgets earlier budgets.
-func ExportUseBudgetFile(path string) {
+// ExportForgetBudgets forgets the budgets this process advertised so far.
+func ExportForgetBudgets() {
 	budgetMu.Lock()
-	budgetFile = path
 	maxBudget = 0
 	maxReserve = 0
 	budgetMu.Unlock()
+}
+
+// ExportBudget is the teardown budget this process advertises.
+func ExportBudget() time.Duration {
+	budgetMu.Lock()
+	defer budgetMu.Unlock()
+	return maxBudget
 }
 
 // ExportUserFrameBelowHarness reads a goroutine traceback as the overrun

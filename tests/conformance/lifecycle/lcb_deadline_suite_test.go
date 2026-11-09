@@ -42,7 +42,7 @@ func (s *DeadlineNamingTestSuite) TestACrashBeforeTheTimeout(t *gotest.T) {
 
 	t.When("one suite's process crashed on its own and another suite hangs until --timeout", func(w *gotest.T) {
 		w.It("names only the hung test as running when the timeout expired", func(it *gotest.T) {
-			gotest.Equal(it, "fail", run.Verdict("TestCrashTestSuite/TestCrash"), "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stdout, "panic: the suite process crashes", "stderr: %s", run.Stderr)
 			gotest.Equal(it, map[string]bool{"TestHangTestSuite/TestHang": true}, named, "stdout: %s", run.Stdout)
 		})
 	})

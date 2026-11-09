@@ -40,7 +40,9 @@ func init() {
 // interruptConsole sends CTRL_BREAK to every process on the console of pid. A
 // process can only send one to its own console, so a helper run of this
 // executable, started without a console, attaches to pid's console and sends
-// it there: the caller's console never carries the event.
+// it there: the caller's console never carries the event. A suite on its
+// channel is stopped by a line instead, and gets it only when that cannot be
+// sent.
 func interruptConsole(pid int) error {
 	exe, err := os.Executable()
 	if err != nil {

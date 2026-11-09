@@ -7,12 +7,7 @@ import (
 )
 
 const (
-	EnvSharedStateFile    = "GOTEST_SHARED_STATE_FILE"
-	EnvTeardownBudgetFile = "GOTEST_TEARDOWN_BUDGET_FILE"
-	// EnvStopFile names the file the runner creates before it interrupts a
-	// suite process. Its existence tells the process the interrupt is a stop
-	// request, not a signal the code under test sent itself.
-	EnvStopFile = "GOTEST_STOP_FILE"
+	EnvSharedStateFile = "GOTEST_SHARED_STATE_FILE"
 	// EnvSharedProtocolFD names the descriptor the shared fixture process
 	// writes its protocol lines to; unset, they go to its stdout (Windows,
 	// where exec passes no extra files).
@@ -43,22 +38,6 @@ const (
 	PrefixBenchmark     = "Benchmark"
 	PrefixFuzz          = "Fuzz"
 )
-
-func BudgetFilePath(binaryPath string) string {
-	return binaryPath + ".budget"
-}
-
-// StopFilePath returns the stop-request path for the given test binary.
-func StopFilePath(binaryPath string) string {
-	return binaryPath + ".stop"
-}
-
-// StopPIDPath is where the suite process writes its own pid once it watches
-// for a stop, so the runner can signal it and not the converter in front of
-// it, which must live on to relay the final events.
-func StopPIDPath(stopFile string) string {
-	return stopFile + ".pid"
-}
 
 // SplitTestPath cuts a go test name into its subtest levels. The separator is a
 // single slash: a run of them is left alone, so a description like

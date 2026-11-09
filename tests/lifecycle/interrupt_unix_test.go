@@ -58,5 +58,5 @@ func (s *InterruptTestSuite) TestCtrlCBeforeFuzzingReleasesTheFixture(t *gotest.
 	gotest.False(t, endedOnItsOwn(err), "under plain go test the process ends by the signal: %v", err)
 }
 
-// stopSignalsTheSuite: the runner sends a suite SIGTERM after its stop file.
-const stopSignalsTheSuite = true
+// interruptName is the signal proctree's interrupt sends, as a suite names it.
+const interruptName = "SIGTERM"

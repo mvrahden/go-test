@@ -23,7 +23,7 @@ type CLIEventsFileStopTestSuite struct {
 }
 
 func (s *CLIEventsFileStopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
+	return gotest.SuiteConfig{Timeout: 45 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
 func (s *CLIEventsFileStopTestSuite) BeforeAll(t *gotest.T) {
@@ -38,15 +38,16 @@ func (s *CLIEventsFileStopTestSuite) BeforeAll(t *gotest.T) {
 func (s *CLIEventsFileStopTestSuite) AfterAll(t *gotest.T) {}
 
 // holding starts a run of the stopping package through cmd and returns once
-// its first method holds. A run that never holds is killed before the test
-// fails, so nothing outlives it.
+// its first method holds. The wait covers building both packages, cold when
+// the runtime changed, so it scales with the run's budgets. A run that never
+// holds is killed before the test fails, so nothing outlives it.
 func holding(t *gotest.T, cmd *exec.Cmd, markerDir string) *proctree.Tree {
 	cmd.Stdout, cmd.Stderr = new(strings.Builder), new(strings.Builder)
 	cmd.WaitDelay = 15 * time.Second
 	tree, err := testkit.StartCLI(cmd)
 	gotest.NoError(t, err)
 	markers := filepath.Join(markerDir, testkit.MarkersFile)
-	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(testkit.Scaled(20 * time.Second)); ; time.Sleep(20 * time.Millisecond) {
 		got, _ := testkit.ReadMarkers(markers)
 		if slices.Contains(got, "running") {
 			return tree

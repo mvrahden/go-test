@@ -23,8 +23,8 @@ import {
 // Every other test reads the floor from cli.ts; this one pins its value, so
 // raising it is a deliberate edit here too.
 describe("MIN_CLI_VERSION", () => {
-  it("is v1.37.0", () => {
-    expect(MIN_CLI_VERSION).toBe("v1.37.0");
+  it("is v1.38.0", () => {
+    expect(MIN_CLI_VERSION).toBe("v1.38.0");
   });
 });
 

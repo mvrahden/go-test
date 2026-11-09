@@ -48,6 +48,7 @@ func (f *TestifyModuleSharedFixture) BeforeAll(ctx context.Context) error {
 		"replace github.com/mvrahden/go-test => " + root + "\n"
 	stub := "package m\n\nimport (\n" +
 		"\t_ \"github.com/mvrahden/go-test/pkg/gotest\"\n" +
+		"\t_ \"github.com/mvrahden/go-test/pkg/gotestruntime\"\n" +
 		"\t_ \"github.com/stretchr/testify/assert\"\n" +
 		"\t_ \"github.com/stretchr/testify/mock\"\n" +
 		"\t_ \"github.com/stretchr/testify/require\"\n" +

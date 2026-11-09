@@ -1,6 +1,7 @@
 package gotestrunner_test
 
 import (
+	"context"
 	"runtime"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -56,11 +57,12 @@ func (s *OwnedGoTestFlagsTestSuite) TestProcessCapAndExecPrefix(t *gotest.T) {
 			gotest.Equal(it, []string{"qemu-aarch64", "-L", "/sysroot"}, prefix)
 			gotest.Equal(it, []string{"-race", "-tags=x"}, rest)
 		})
-		w.It("leads the test2json command line ahead of the binary", func(it *gotest.T) {
+		w.It("leads the -json command line ahead of the binary", func(it *gotest.T) {
 			target := gotestrunner.SuiteTarget{BinaryPath: "/bin/p.test", Exec: []string{"env", "X=1"}}
 			target.Package = "example.com/p"
-			argv := gotestrunner.ExportTest2JSONArgv("/go/pkg/tool/test2json", target, []string{"-test.v=test2json"})
-			gotest.Equal(it, []string{"/go/pkg/tool/test2json", "-p", "example.com/p", "-t", "env", "X=1", "/bin/p.test", "-test.v=test2json"}, argv)
+			target.SuiteName = "TestP"
+			cmd := gotestrunner.ExportBuildSuiteCmd(context.Background(), target, nil, true)
+			gotest.Equal(it, []string{"env", "X=1", "/bin/p.test", "-test.paniconexit0", "-test.run=^TestP$", "-test.v=test2json"}, cmd.Args)
 		})
 	})
 }

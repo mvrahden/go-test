@@ -1,13 +1,13 @@
 Expect: ^FAIL .*conformance/lifecycle LauncherSignal .* / releases the fixture at once, without AfterAll \(
 Clause: when a second SIGINT reaches gotest while a stopped method body ignores its context → releases the fixture at once, without AfterAll
---- a/internal/gotestrunner/abandon.go
-+++ b/internal/gotestrunner/abandon.go
-@@ -92,7 +92,7 @@
- 		return tree.Interrupt() == nil
+--- a/internal/gotestrunner/managed_process.go
++++ b/internal/gotestrunner/managed_process.go
+@@ -380,7 +380,7 @@
+ 	if !p.saidHello() {
+ 		return errNoChannel
  	}
- 	pid := readPID(protocol.StopPIDPath(l.stopFile))
--	return pid > 0 && stopAgain(pid, l.root) == nil
-+	return pid > 0 && false
+-	return p.config.Link.Force()
++	return errNoChannel
  }
  
- // writeGate lets an event reach stdout and the events file whole before the
+ // StoppedBy is the reason the suite process gave for a stop the runner did

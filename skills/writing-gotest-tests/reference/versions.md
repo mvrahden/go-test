@@ -439,7 +439,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     Under `-json` the stream carries every verdict of the stopped run, on
     Windows too, and ends with a failed run naming the suites the stop cut
     short
-    ([stop file](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-by-the-stop-file-alone)).
+    ([stream](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-a-run)).
     Below v1.34 a stop released the fixtures and ended
     the process at once, without `AfterAll`, and only while fixtures were
     held. To migrate a `goleak.VerifyNone` inside a suite method, which now
@@ -474,7 +474,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     Below v1.34 the state shared the fixture process's stdout, so such
     output could break it, and a state line past 1 MiB failed the setup.
 23. **A suite or shared fixture whose CLI died tears down by itself**
-    ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-parent-is-gone),
+    ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone),
     [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)):
     after `kill -9`, an OOM kill or a crash of the CLI, a suite ends the
     holding method's context, starts no further method and runs
@@ -770,7 +770,66 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
 
 Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
 
-1. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
+1. **A signal from outside the runner stops the suite and fails its
+   package** — under gotest a SIGINT or SIGTERM that reaches a suite
+   process from anyone but the runner, its own tests included, is a first
+   stop: the methods not yet started are skipped with the reason
+   `run stopping`, `AfterAll` runs and the fixtures are released
+   ([stop](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-a-run)),
+   and the package fails, naming the signal:
+   `suite stopped by SIGTERM from outside the runner`. It never forces,
+   and a signal during a stop changes nothing
+   ([signal](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-signal-from-outside-the-runner)).
+   Before v1.38 gotest left such a signal to the code under test. A test
+   that signals its own process must use another signal or a child
+   process. Plain `go test` is unchanged.
+
+2. **Descriptor 3 is taken at start and released at init** — under gotest
+   a suite process starts with its control channel on descriptor 3 (on
+   Windows two inherited pipe handles), named by `GOTEST_CONTROL`; the runtime's
+   init moves it to descriptor 1000 or above and unsets the variable, so
+   the tests and the processes they start see neither
+   ([channel](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-reaches-the-suite-on-its-channel)).
+   Code that runs before that init, an `-exec` wrapper included, finds
+   descriptor 3 taken. Under a wrapper that does not pass it on (`sudo`,
+   `ssh`, `docker run`) a stop reaches the suite as one SIGINT to its
+   process group, and the stream still ends whole
+   ([wrapper](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-under-a-wrapper-that-drops-the-channel)).
+   Before v1.38 gotest passed a suite nothing on descriptor 3.
+
+3. **A crash fails the package by its exit status** — the suite runs as
+   the runner's own child, with `test2json` beside it as a filter, so a
+   suite process that ends by a signal, a panic or an `os.Exit` fails its
+   package by its real exit status, and the closing event no longer names
+   the test that was running
+   ([crash](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-crash-is-the-packages-failure)).
+   A converter that dies early costs no verdict: the runner converts the
+   output it kept again and says so on stderr
+   ([converter](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-converter-that-ends-early)).
+   Before v1.38 `test2json` ran the suite on the `-json`, `spec` and
+   `summary` pipelines, and its closing event named the test that was
+   running.
+
+4. **A second Ctrl-C releases the fixtures on Windows too** — gotest
+   sends each suite `force` on its channel, on every OS, which releases
+   its fixtures at once, and the shared fixture process `force` on its
+   standard input, which ends the contexts its releases run under; what
+   still runs two seconds later is killed
+   ([second Ctrl-C](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-second-ctrl-c-to-gotest),
+   [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-asked-to-stop)).
+   Before v1.38 a second Ctrl-C on Windows killed the suites at once,
+   without teardown, and the shared fixture process ignored a second
+   stop.
+
+5. **`goleak` ignores `(*watcher).read`** — the goroutine that waits for a
+   stop while a suite runs is now
+   `github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).read`, so a
+   `goleak.VerifyNone` inside a suite method passes it
+   `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).read")`;
+   `goleak.VerifyTestMain` still sees nothing. Before v1.38 it was
+   `(*watcher).loop`, and an ignore line naming that now matches nothing.
+
+6. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
    like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
    the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
    loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw
@@ -778,3 +837,34 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
    `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
    gains `Name`, so `t-escape` fixes those through every escape too.
+
+7. **The stop, pid and budget files are gone** — the runner sets neither
+   `GOTEST_STOP_FILE` nor `GOTEST_TEARDOWN_BUDGET_FILE`, and the work
+   directory holds no stop, pid or budget file beside a suite: the stop,
+   the force and the teardown budget travel as lines on its channel
+   ([channel](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-reaches-the-suite-on-its-channel)).
+   A stop raised while the process runs its `TestMain` is read when the
+   first suite opens, which skips every suite with the reason
+   `run stopping` and sets up no fixture
+   ([before the first suite](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-before-the-first-suite-opens)).
+   A dead runner is the channel's end, on every OS: the suite stops by
+   itself and, on Unix, after its release ends what its tests started,
+   SIGTERM to its own process group and SIGKILL 2s later
+   ([runner gone](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone)).
+   Before v1.38 the suite polled the stop file and watched its parent
+   and, on Linux and macOS, the reader of its stdout, and on Unix what its
+   tests started outlived a dead runner. Nothing user-facing read the
+   files; tooling that listed the work directory sees them gone.
+
+8. **The runtime floor and the extension floor are v1.38.0** — a v1.38
+   CLI refuses a runtime below v1.38.0 before it generates anything, with
+   exit 2 and the `go get -tool` command that fixes it. A v1.38 runtime
+   under an older CLI fails at the first suite open, with exit 1 and one
+   line naming both versions and `go tool gotest`. Plain `go test` runs
+   either as before. Through `go tool gotest` the CLI and the runtime come
+   from one module version, so only a global binary or the extension's
+   `cliPath` meets these. The extension from 1.38.0 needs a v1.38.0 CLI.
+   The runtime now depends on `golang.org/x/sys`, so a module upgrading to
+   v1.38 runs `go mod tidy` once, or `go test` stops with "missing go.sum
+   entry" until it does.
+   Before v1.38 the runtime floor was v1.35.0 and the extension's v1.37.0.

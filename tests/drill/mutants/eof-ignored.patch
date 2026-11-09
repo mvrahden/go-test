@@ -1,0 +1,14 @@
+Expect: the orphaned binary outlived its channel
+Judge: ./tests/lifecycle StoppingTestSuite/TestAnOrphanedSuiteStopsAtItsChannelsEnd
+Clause: when the runner of a suite process is killed while a method holds → ends the holding method's context
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -291,7 +291,7 @@
+ 			return
+ 		}
+ 		if err != nil {
+-			l = control.Line{Kind: endOfChannel}
++			return
+ 		}
+ 		select {
+ 		case w.lines <- l:

@@ -51,8 +51,11 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		// from the guard to BeforeAll, fails the benchmark instead.
 		defer ReleaseOnPanic(b)
 	}
-	// A suite opening after the run was stopped — another top-level function
-	// of a stopped process — has nothing to set up.
+	refuseLegacyRunner(tb)
+	// A stop the runner's channel brought while no suite was open counts
+	// first. A suite opening after the run was stopped — another top-level
+	// function of a stopped process — has nothing to set up.
+	drainLink()
 	if runstate.StopContext().Err() != nil {
 		tb.Skip("run stopping")
 	}

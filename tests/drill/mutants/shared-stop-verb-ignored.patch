@@ -1,0 +1,16 @@
+Expect: sharedstop: the run did not end within 20s of the stop
+Judge: ./tests/canary CanaryDagTestSuite/TestAStopReachesTheSharedFixtureAsALine
+Clause: when a run is interrupted while a suite bound to a shared fixture holds → the fixture's AfterAll runs and its process exits on its own
+Clause: when a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given → ends the run within 60s
+Clause: when a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given → ends the run within 60s
+--- a/internal/gotestgen/static/sharedfixture.go.tpl
++++ b/internal/gotestgen/static/sharedfixture.go.tpl
+@@ -97,8 +97,6 @@
+ 				continue
+ 			}
+ 			switch ƒc.Verb {
+-			case "stop":
+-				ƒend()
+ 			case "force":
+ 				ƒforce()
+ 				ƒend()

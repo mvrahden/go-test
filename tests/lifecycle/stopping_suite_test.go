@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
-	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -53,24 +52,24 @@ func (s *StoppingTestSuite) BeforeAll(t *gotest.T) {
 // AfterAll has nothing to release: the staged module is a temp dir.
 func (s *StoppingTestSuite) AfterAll(t *gotest.T) {}
 
-// announced starts the binary as the runner does, with a stop file, and
-// returns the file to create before interrupting.
-func (s *StoppingTestSuite) announced(t *gotest.T, pkg, run string, env ...string) (*exec.Cmd, string) {
-	stop := filepath.Join(t.TempDir(), "stop")
+// announced prepares the binary as the runner starts it, with its channel.
+func (s *StoppingTestSuite) announced(t *gotest.T, pkg, run string, env ...string) (*exec.Cmd, *channel) {
 	cmd := exec.Command(s.bin[pkg], "-test.run="+run) //nolint:gosec // G204: binary built by this suite
-	cmd.Env = append(append(ownEnv(), protocol.EnvStopFile+"="+stop), env...)
-	return cmd, stop
+	cmd.Env = append(ownEnv(), env...)
+	return cmd, attach(t, cmd)
 }
 
 // A stop while a fixture is still coming up cancels it; the fixtures that ran
 // their setup, the cancelled one included, are torn down in order, nothing is
 // left behind, and the process ends with the failure the cancelled setup is.
 func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) {
-	cmd, stop := s.announced(t, "setup", "TestSlowSetupTestSuite")
+	cmd, c := s.announced(t, "setup", "TestSlowSetupTestSuite")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "container starting")
+	c.started()
 
-	stopAsTheRunnerDoes(t, tree, stop)
+	stopAsTheRunnerDoes(t, c, tree, cmd)
 	err := wait(tree, cmd)
+	c.close()
 
 	// The container's setup was cancelled: it ran, so it is released, before
 	// the fixture it depends on.
@@ -81,25 +80,29 @@ func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) 
 // A test holding what a fixture's teardown waits for is told to stop first —
 // its context ends — so the teardown gets it back instead of waiting it out.
 func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
-	cmd, stop := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1")
+	cmd, c := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
+	c.started()
 
 	began := time.Now()
-	stopAsTheRunnerDoes(t, tree, stop)
+	stopAsTheRunnerDoes(t, c, tree, cmd)
 	err := wait(tree, cmd)
+	c.close()
 
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 10*time.Second, "the teardown waited for the test")
 	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
 }
 
-// The runner's sidecar variables are read once and taken out of the
-// environment: a process a test starts must not answer to them.
-func (s *StoppingTestSuite) TestTheRunnersFilesStayWithTheRunner(t *gotest.T) {
-	cmd, _ := s.announced(t, "quick", "TestEnvTestSuite", "STOPPING_ENV=1")
+// The runner's channel is taken once and its variable out of the
+// environment: a process a test starts must not answer to it.
+func (s *StoppingTestSuite) TestTheRunnersChannelStaysWithTheRunner(t *gotest.T) {
+	cmd, c := s.announced(t, "quick", "TestEnvTestSuite", "STOPPING_ENV=1")
 	log := filepath.Join(t.TempDir(), "events")
 	cmd.Env = append(cmd.Env, "STOPPING_LOG="+log)
 	out, err := cmd.CombinedOutput()
+	c.started()
+	c.close()
 	gotest.NoError(t, err, string(out))
 	gotest.Equal(t, []string{"env="}, readEvents(log))
 }
@@ -109,11 +112,13 @@ func (s *StoppingTestSuite) TestTheRunnersFilesStayWithTheRunner(t *gotest.T) {
 // process by the signal, so the runner books the method as cut short instead
 // of waiting its budget out.
 func (s *StoppingTestSuite) TestAMethodIgnoringItsContextIsCutShort(t *gotest.T) {
-	cmd, stop := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1", "STOPPING_IGNORE_CONTEXT=1")
+	cmd, c := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1", "STOPPING_IGNORE_CONTEXT=1")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
+	c.started()
 	began := time.Now()
-	stopAsTheRunnerDoes(t, tree, stop)
+	stopAsTheRunnerDoes(t, c, tree, cmd)
 	err := waitWithin(t, tree, cmd, 20*time.Second)
+	c.close()
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 15*time.Second, "the stop waited for the method")
 	gotest.False(t, endedOnItsOwn(err), "the process ends by the signal, its method cut short: %v", err)

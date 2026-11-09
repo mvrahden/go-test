@@ -1,0 +1,16 @@
+Expect: stopbudget: the suite was not killed at its 32s teardown budget
+Judge: ./tests/canary CanaryBudgetsTestSuite/TestAStoppedSuiteIsKilledAtTheBudgetItReported
+Clause: when the runner stops a suite that reported a 32s teardown budget and lingers past it → kills the suite once that budget is spent, not the default's
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -270,9 +270,7 @@
+ 	path := computeMaxDAGPath(cfg.Fixtures)
+ 	recordReserve(path)
+ 	budget := recordBudget(path + cfg.MaxSuiteSetupTimeout + 30*time.Second)
+-	if link != nil {
+-		_ = link.Budget(budget)
+-	}
++	_ = budget
+ }
+ 
+ func computeMaxDAGPath(fixtures []*FixtureNode) time.Duration {

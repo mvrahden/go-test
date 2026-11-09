@@ -53,6 +53,11 @@ func (s *GenerateScopeTestSuite) stage(t *gotest.T, workspace bool) scopeLayout 
 	if workspace {
 		files[filepath.Join(root, "go.work")] = "go 1.26.0\n\nuse (\n\t./main\n\t./dep\n)\n"
 	}
+	// The runtime's own dependencies need their sums; the repository's has them.
+	sums, err := os.ReadFile(filepath.Join(s.cli.repoRoot, "go.sum"))
+	gotest.NoError(t, err)
+	files[filepath.Join(l.dep, "go.sum")] = string(sums)
+	files[filepath.Join(l.main, "go.sum")] = string(sums)
 	for path, src := range files {
 		gotest.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
 		gotest.NoError(t, os.WriteFile(path, []byte(src), 0o600))

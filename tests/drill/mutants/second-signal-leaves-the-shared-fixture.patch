@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/lifecycle .* / exits 130 within 5s, leaving no share
 Clause: when a second SIGINT reaches gotest while a shared fixture's 20s AfterAll runs → exits 130 within 5s, leaving no shared fixture process behind 2s later
 --- a/internal/gotestrunner/sharedfixture.go
 +++ b/internal/gotestrunner/sharedfixture.go
-@@ -497,7 +497,7 @@
+@@ -948,7 +948,7 @@
  		failures:        newFailureLog(os.Stderr),
  	}
  
--	track(tree, liveTree{root: cmd.Process.Pid, done: waitDone})
+-	track(tree, liveTree{root: cmd.Process.Pid, again: proc.force, done: waitDone})
 +	_ = waitDone
  	scanned := make(chan struct{})
  	logged := make(chan struct{})

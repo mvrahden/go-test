@@ -1,0 +1,18 @@
+Expect: sharedforce: the AfterAll's context did not end on the second stop
+Expect: forcefirst: the second stop did not stop the shared fixture process
+Judge: ./tests/canary CanaryDagTestSuite/TestASecondStopEndsTheSharedReleasesContext CanaryDagTestSuite/TestASecondStopFirstStopsTheSharedFixture
+Clause: when a second SIGINT reaches gotest while a shared fixture's AfterAll waits on its context for 20s → the AfterAll's context ends and it returns, and gotest exits 130 within 1.5s
+Clause: when a second SIGINT reaches gotest while a shared fixture's AfterAll waits on its context for 20s → no process is killed and none is left behind
+Clause: when a second SIGINT reaches gotest while a suite bound to a shared fixture ignores the first and its package fixture takes 10s to release → the fixture's AfterAll runs with its context ended, and its process exits on its own
+--- a/internal/gotestgen/static/sharedfixture.go.tpl
++++ b/internal/gotestgen/static/sharedfixture.go.tpl
+@@ -99,9 +99,6 @@
+ 			switch ƒc.Verb {
+ 			case "stop":
+ 				ƒend()
+-			case "force":
+-				ƒforce()
+-				ƒend()
+ 			default:
+ 				select {
+ 				case ƒcmds <- ƒc:

@@ -42,6 +42,10 @@ cp -R "$root/tests/runtimecompat/testdata/corpus" "$work/corpus"
 cd "$work/corpus"
 export GOWORK=off
 go mod init example.com/runtimecompat 2>/dev/null
+# The harness gotest generates imports the runtime; its requirements must be
+# in the tidied module before that.
+mkdir -p runtimestub
+printf 'package runtimestub\n\nimport _ "%s/pkg/gotestruntime"\n' "$repo" >runtimestub/stub.go
 if [ -n "$target" ]; then
   go get "$repo@$target"
 else

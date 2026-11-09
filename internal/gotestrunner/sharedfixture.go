@@ -54,7 +54,8 @@ const unreportedTeardownBudget = 2 * time.Minute
 
 // SharedFixtureProcess manages a running shared fixture setup subprocess.
 // The subprocess starts shared fixtures, writes JSON state to stdout,
-// then blocks until SIGTERM/SIGINT triggers teardown.
+// then blocks until a stop line on its stdin, or SIGTERM/SIGINT, triggers
+// teardown.
 type SharedFixtureProcess struct {
 	cmd       *exec.Cmd
 	tree      *proctree.Tree
@@ -91,7 +92,7 @@ type SharedFixtureProcess struct {
 	// reports a longer teardown budget: a fixture started late came up.
 	teardownSeen chan struct{}
 
-	stdin io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys)
+	stdin io.WriteCloser // command channel for window verbs (StartKeys/TeardownKeys), stop and force
 	// Commands run concurrently in the process; each waits for the ack
 	// carrying its id. A command given up drops its waiter, and its late ack
 	// with it. Under cmdMu.
@@ -331,8 +332,46 @@ func (p *SharedFixtureProcess) shutdown() {
 		return
 	default:
 	}
-	_ = p.tree.Interrupt()
+	p.stop()
 	p.awaitExit(p.teardownBudget())
+}
+
+// The lines that stop the process and end its releases' contexts.
+const (
+	stopLine  = `{"verb":"stop"}` + "\n"
+	forceLine = `{"verb":"force"}` + "\n"
+)
+
+// send writes line on the process's stdin, beside the window commands.
+func (p *SharedFixtureProcess) send(line string) error {
+	if p.stdin == nil {
+		return errNoCommandChannel
+	}
+	p.cmdMu.Lock()
+	defer p.cmdMu.Unlock()
+	_, err := io.WriteString(p.stdin, line)
+	return err
+}
+
+// errNoCommandChannel is a process started without a stdin to command it by.
+var errNoCommandChannel = errors.New("shared fixture process has no command channel")
+
+// stop asks the process to stop by a line on its stdin, by an interrupt
+// when the line cannot be written.
+func (p *SharedFixtureProcess) stop() {
+	if p.send(stopLine) != nil {
+		_ = p.tree.Interrupt()
+	}
+}
+
+// force asks the process to end its releases' contexts, stopping it first
+// when no stop is under way: Abandon's second stop. An interrupt stands in
+// when the line cannot be written.
+func (p *SharedFixtureProcess) force() error {
+	if p.send(forceLine) == nil {
+		return nil
+	}
+	return p.tree.Interrupt()
 }
 
 // awaitExit waits up to budget for the subprocess to exit on its own,
@@ -563,7 +602,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		return nil
 	}
 	if p.stdin == nil {
-		return fmt.Errorf("shared fixture process has no command channel")
+		return errNoCommandChannel
 	}
 	resp := make(chan string, 1)
 	p.cmdMu.Lock()
@@ -669,7 +708,7 @@ func (p *SharedFixtureProcess) RefreshStateFile() error {
 	return nil
 }
 
-// Teardown signals the shared fixture subprocess to shut down and waits for it
+// Teardown asks the shared fixture subprocess to shut down and waits for it
 // to complete within its teardown budget (30 seconds if none was reported). A
 // process that outlives the budget is forcibly killed, and that is reported as
 // an error: its AfterAll never finished, so what it held is leaked.
@@ -685,9 +724,9 @@ func (p *SharedFixtureProcess) Teardown() error {
 	}
 	budget := p.teardownBudget()
 
-	// Noted before signalling: a process already gone is not signalled again,
-	// and an exit that predates the shutdown request happened while tests may
-	// still have been running, a different story than dying mid-teardown.
+	// Noted before asking: a process already gone is not asked again, and an
+	// exit that predates the shutdown request happened while tests may still
+	// have been running, a different story than dying mid-teardown.
 	diedEarly := false
 	select {
 	case <-p.done:
@@ -696,7 +735,7 @@ func (p *SharedFixtureProcess) Teardown() error {
 	}
 
 	if !diedEarly {
-		_ = p.tree.Interrupt()
+		p.stop()
 	}
 	var forceKilled bool
 	var allowed time.Duration
@@ -742,11 +781,11 @@ func exitVerdict(setupErr, tornErr, waitErr error, diedEarly bool) error {
 	}
 
 	// A clean exit is the only proof of a completed teardown: the epilogue runs
-	// on any shutdown signal — whoever sent it — and exits 0 only when every
-	// AfterAll passed. Everything else fails, with the most precise message the
-	// status supports. exec maps a success status under a canceled command
-	// context to ctx.Err() — and only a success status, so a context error here
-	// IS the clean exit, just relabeled.
+	// on any shutdown request — a stop line or a signal, whoever sent it — and
+	// exits 0 only when every AfterAll passed. Everything else fails, with the
+	// most precise message the status supports. exec maps a success status
+	// under a canceled command context to ctx.Err() — and only a success
+	// status, so a context error here IS the clean exit, just relabeled.
 	if waitErr == nil || errors.Is(waitErr, context.Canceled) || errors.Is(waitErr, context.DeadlineExceeded) {
 		return nil
 	}
@@ -909,7 +948,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 		failures:        newFailureLog(os.Stderr),
 	}
 
-	track(tree, liveTree{root: cmd.Process.Pid, done: waitDone})
+	track(tree, liveTree{root: cmd.Process.Pid, again: proc.force, done: waitDone})
 	scanned := make(chan struct{})
 	logged := make(chan struct{})
 	go func() {

@@ -43,7 +43,7 @@ func (s *StopGraceTestSuite) stopped(t *gotest.T, env []string, args ...string) 
 
 // stoppedRun is stopped over the CLI's whole argument list; then, when not
 // nil, runs with the markers file right after the interrupt.
-func (s *StopGraceTestSuite) stoppedRun(t *gotest.T, env, args []string, then func(markers string)) (testkit.Run, time.Duration) {
+func (s *StopGraceTestSuite) stoppedRun(t *gotest.T, env, args []string, then func(markers string, again func() error)) (testkit.Run, time.Duration) {
 	markerDir := t.TempDir()
 	cmd := exec.Command(s.cli, args...) //nolint:gosec // G204: binary built by this suite
 	cmd.Env = testkit.ChildEnv(markerDir, env...)
@@ -76,7 +76,7 @@ func (s *StopGraceTestSuite) stoppedRun(t *gotest.T, env, args []string, then fu
 		kill("signal: %v", err)
 	}
 	if then != nil {
-		then(markers)
+		then(markers, func() error { return testkit.Interrupt(cmd, tree) })
 	}
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }()
@@ -206,19 +206,20 @@ func (s *StopGraceTestSuite) TestAStopDuringAFuzzSeed(t *gotest.T) {
 	})
 }
 
-func (s *StopGraceTestSuite) TestASecondStopSignal(t *gotest.T) {
+func (s *StopGraceTestSuite) TestTheRunnersForce(t *gotest.T) {
 	if !suiteSignallable {
 		t.Skipf("only Unix signals a single process")
 	}
 	var sent error
-	run, took := s.stoppedRun(t, []string{"LCA_IGNORE=1"}, []string{"-json", "../testdata/lcastop/", "-run=TestGraceTestSuite"}, func(markers string) {
+	run, took := s.stoppedRun(t, []string{"LCA_IGNORE=1"}, []string{"-json", "../testdata/lcastop/", "-run=TestGraceTestSuite"}, func(_ string, again func() error) {
 		time.Sleep(500 * time.Millisecond)
-		sent = signalSuite(markers)
+		// A second Ctrl-C has the runner force the suite's stop.
+		sent = again()
 	})
-	t.When("a second stop signal reaches the suite while a stopped method body ignores its context", func(w *gotest.T) {
+	t.When("the runner forces the stop of a suite whose stopped method body ignores its context", func(w *gotest.T) {
 		w.It("releases the fixture at once, saying so, and the process ends by the signal", func(it *gotest.T) {
 			gotest.NoError(it, sent)
-			gotest.Contains(it, run.Stdout+run.Stderr, "a second stop signal")
+			gotest.Contains(it, run.Stdout+run.Stderr, "the runner forced the stop")
 			gotest.Contains(it, run.Markers, "fixture.AfterAll")
 			gotest.Less(it, took, 4*time.Second)
 		})

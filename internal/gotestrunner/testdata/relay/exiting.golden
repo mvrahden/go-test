@@ -1,0 +1,16 @@
+{"Action":"start","Package":"example.com/relay/exiting"}
+{"Action":"run","Package":"example.com/relay/exiting","Test":"TestBefore"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestBefore","Output":"=== RUN   TestBefore\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestBefore","Output":"--- PASS: TestBefore (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/exiting","Test":"TestBefore","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/exiting","Test":"TestExits"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestExits","Output":"=== RUN   TestExits\n","OutputType":"frame"}
+{"Action":"run","Package":"example.com/relay/exiting","Test":"TestExits/fine"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestExits/fine","Output":"=== RUN   TestExits/fine\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestExits/fine","Output":"--- PASS: TestExits/fine (0.00s)\n","OutputType":"frame"}
+{"Action":"pass","Package":"example.com/relay/exiting","Test":"TestExits/fine","Elapsed":0}
+{"Action":"run","Package":"example.com/relay/exiting","Test":"TestExits/gone"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestExits/gone","Output":"=== RUN   TestExits/gone\n","OutputType":"frame"}
+{"Action":"output","Package":"example.com/relay/exiting","Test":"TestExits/gone","Output":"leaving now\n"}
+{"Action":"output","Package":"example.com/relay/exiting","Output":"FAIL\n","OutputType":"frame"}
+{"Action":"fail","Package":"example.com/relay/exiting"}

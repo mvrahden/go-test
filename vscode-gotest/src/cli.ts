@@ -20,9 +20,11 @@ export { resolveGoBinary } from "./goBinary.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
-// v1.37.0 is the release whose spec reads --declared and --hide and whose
-// lint prints -rules -json, which the Spec View and the lint diagnostics
-// drive, so this floor sits there; the runtime floor stays at v1.35.0.
+// v1.38.0 is the release whose runner stops a suite on its control channel,
+// which its runtime requires, so the CLI's runtime floor moved there and this
+// floor with it. From v1.37.0 on spec reads --declared and --hide and lint
+// prints -rules -json, which the Spec View and the lint diagnostics drive,
+// and --control=stdin takes the stop and force lines a cancel writes.
 // From v1.31.0 on the stream carries
 // every verdict the tree shows, including a shared fixture that failed to
 // set up. Every
@@ -33,7 +35,7 @@ const DEFAULT_MODULE_PATH = "github.com/mvrahden/go-test/cmd/gotest";
 // that older versions do not have. Never below the CLI's
 // gotestgen.MinRuntimeVersion (a Go test guards the order): a CLI the
 // extension accepts must enforce a runtime floor no newer than itself.
-export const MIN_CLI_VERSION = "v1.37.0";
+export const MIN_CLI_VERSION = "v1.38.0";
 
 export interface CliCommand {
   bin: string;

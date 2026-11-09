@@ -1,0 +1,17 @@
+Expect: outside: the stream names no stop from outside the runner
+Expect: outside: exit code 0, package .pass., want 1 and fail
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASignalFromOutsideIsAStop
+Clause: when a SIGTERM from outside the runner reaches a suite while a method holds → names the stop in the stream as one from outside the runner
+Clause: when a SIGTERM from outside the runner reaches a suite while a method holds → fails the package and exits 1
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -369,8 +369,7 @@
+ 	if w.link == nil {
+ 		return
+ 	}
+-	bySignal.Store(true)
+-	_ = w.link.Stopped("signal:" + signalName(sig))
++	_ = sig
+ }
+ 
+ // signalsStopOnTheChannel: on the runner's channel, a signal landing while no

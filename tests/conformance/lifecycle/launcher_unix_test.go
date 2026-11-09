@@ -49,6 +49,11 @@ func (s *LauncherSignalTestSuite) BeforeAll(t *gotest.T) {
 	// An -exec wrapper that stays the suite's parent: the converter's death
 	// reaches neither, as where no death signal comes.
 	gotest.NoError(t, os.WriteFile(filepath.Join(s.staged, "wrap.sh"), []byte("#!/bin/sh\n\"$@\"\nexit $?\n"), 0o700)) //nolint:gosec // G306: the wrapper must be executable
+	// One that runs the suite with the channel's descriptor closed, so the
+	// suite never says hello and a stop reaches it only as a Ctrl-C. The
+	// close is an exec of its own: macOS's /bin/sh, bash 3.2, keeps a copy of
+	// a descriptor closed on an exec that also runs a command.
+	gotest.NoError(t, os.WriteFile(filepath.Join(s.staged, "close3.sh"), []byte("#!/bin/sh\nexec 3>&-\nexec \"$@\"\n"), 0o700)) //nolint:gosec // G306: the wrapper must be executable
 	for _, name := range []string{"fixture.go", "stopping_suite_test.go"} {
 		src, err := os.ReadFile(filepath.Join("..", "testdata", "stopping", name))
 		gotest.NoError(t, err)
@@ -61,7 +66,7 @@ func (s *LauncherSignalTestSuite) AfterAll(t *gotest.T) {}
 
 type launcherRow struct {
 	Desc     string
-	launcher string // direct, exec wrapper, go run, go tool
+	launcher string // direct, exec wrapper, closing wrapper, go run, go tool
 	signal   string // SIGINT, SIGTERM, SIGHUP, second
 }
 
@@ -75,6 +80,8 @@ func (s *LauncherSignalTestSuite) command(launcher string) *exec.Cmd {
 		cmd = exec.Command("go", "tool", "gotest", "-json", "./stopping/")
 	case "exec wrapper":
 		cmd = exec.Command(s.cli, "-json", "-exec", filepath.Join(s.staged, "wrap.sh"), "./stopping/") //nolint:gosec // G204: binary built by this suite
+	case "closing wrapper":
+		cmd = exec.Command(s.cli, "-json", "-exec", filepath.Join(s.staged, "close3.sh"), "./stopping/") //nolint:gosec // G204: binary built by this suite
 	default:
 		cmd = exec.Command(s.cli, "-json", "./stopping/") //nolint:gosec // G204: binary built by this suite
 	}
@@ -152,6 +159,7 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				{Desc: "direct, a second SIGINT", launcher: "direct", signal: "second"},
 				{Desc: "under an -exec wrapper, SIGINT", launcher: "exec wrapper", signal: "SIGINT"},
 				{Desc: "under an -exec wrapper, a second SIGINT", launcher: "exec wrapper", signal: "second"},
+				{Desc: "under an -exec wrapper that closes descriptor 3, SIGINT", launcher: "closing wrapper", signal: "SIGINT"},
 				{Desc: "go run, SIGINT", launcher: "go run", signal: "SIGINT"},
 				{Desc: "go run, SIGTERM", launcher: "go run", signal: "SIGTERM"},
 				{Desc: "go run, a second SIGINT", launcher: "go run", signal: "second"},
@@ -170,7 +178,8 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				cmd.Env = testkit.ChildEnv(markerDir, slow)
 				tree := holding(sub, cmd, markerDir)
 				deliver(sub, cmd, tree, markerDir, row.signal)
-				run := finished(cmd, tree, markerDir)
+				// A run that does not end is killed, its exit -2.
+				run := ended(cmd, tree, markerDir, 90*time.Second)
 				runs[row.Desc] = run
 
 				switch {
@@ -193,6 +202,18 @@ func (s *LauncherSignalTestSuite) TestEveryLauncherStopsCleanly(t *gotest.T) {
 				gotest.NotZero(sub, pid, "markers: %v", run.Markers)
 				gotest.True(sub, gone(pid), "the suite process %d outlived the run", pid)
 			}
+		})
+	})
+	t.When("a run under an -exec wrapper that runs the suite with descriptor 3 closed is stopped by SIGINT", func(w *gotest.T) {
+		run := runs["under an -exec wrapper that closes descriptor 3, SIGINT"]
+		w.It("exits 130, finishes the fixture teardown and leaves no suite process behind", func(it *gotest.T) {
+			gotest.Equal(it, 130, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			// The Ctrl-C ended the suite as under plain go test, by the signal.
+			gotest.Contains(it, run.Stderr, "gotest: suite binary terminated by signal")
+			gotest.True(it, run.MarkerOrder("context ended", "suite.AfterAll", "fixture.AfterAll", "teardown done"), "markers: %v", run.Markers)
+			pid := pidOf(run.Markers)
+			gotest.NotZero(it, pid, "markers: %v", run.Markers)
+			gotest.True(it, gone(pid), "the suite process %d outlived the run", pid)
 		})
 	})
 	t.When("a run is stopped by SIGHUP, as when its terminal closes", func(w *gotest.T) {

@@ -1,0 +1,9 @@
+=== RUN   TestGood
+--- PASS: TestGood (0.00s)
+=== NAME  
+=== RUN   TestBad
+plain stdout line
+    f_test.go:11: want 1, got 2
+--- FAIL: TestBad (0.00s)
+=== NAME  
+FAIL

@@ -1,0 +1,16 @@
+Expect: outside: stderr does not name the stop from outside the runner
+Judge: ./tests/canary CanaryRelayTestSuite/TestASignalFromOutsideFailsThePackage
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -152,10 +152,7 @@
+ 	// stop skipped never ran.
+ 	code, how := ExitStatusVerdict(r.ExitCode)
+ 	var note string
+-	if name, ok := strings.CutPrefix(r.StoppedBy, "signal:"); ok {
+-		r.ExitCode = max(code, 1)
+-		note = fmt.Sprintf("gotest: suite stopped by %s from outside the runner\n", name)
+-	} else if how != "" {
++	if how != "" {
+ 		r.ExitCode = code
+ 		note = fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+ 	}

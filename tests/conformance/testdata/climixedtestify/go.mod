@@ -11,3 +11,5 @@ require (
 replace github.com/mvrahden/go-test => REPO_ROOT
 
 replace github.com/stretchr/testify => ./testify
+
+require golang.org/x/sys v0.49.0 // indirect

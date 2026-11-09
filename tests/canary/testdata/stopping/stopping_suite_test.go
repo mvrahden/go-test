@@ -1,7 +1,10 @@
 package stopping
 
 import (
+	"bufio"
+	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -18,6 +21,14 @@ func (s *StopTestSuite) BeforeAll(t *gotest.T) { mark("suite.BeforeAll") }
 func (s *StopTestSuite) AfterAll(t *gotest.T)  { mark("suite.AfterAll") }
 
 func (s *StopTestSuite) TestHolds(t *gotest.T) {
+	if os.Getenv("STOPPING_CHILD") == "1" {
+		// A process of the test's own, left running when the stop comes; it
+		// marks an interrupt, which a kill gives it no chance to.
+		child := exec.Command("sh", "-c", `trap 'echo "child interrupted" >> "$GOTEST_CANARY_DIR/markers"; exit 0' INT TERM; echo ready; while :; do sleep 0.1; done`)
+		if startTrapped(child) {
+			mark(fmt.Sprintf("child=%d", child.Process.Pid))
+		}
+	}
 	mark("running")
 	<-t.Context().Done()
 	mark("context ended")
@@ -39,4 +50,16 @@ func TestMain(m *testing.M) {
 		mark("lingered")
 	}
 	os.Exit(code)
+}
+
+// startTrapped starts child, a shell that prints a line once its traps are
+// set, and returns once it has: a signal sent before then finds no trap and
+// ends the shell unmarked.
+func startTrapped(child *exec.Cmd) bool {
+	out, err := child.StdoutPipe()
+	if err != nil || child.Start() != nil {
+		return false
+	}
+	_, err = bufio.NewReader(out).ReadString('\n')
+	return err == nil
 }

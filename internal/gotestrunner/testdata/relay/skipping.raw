@@ -1,0 +1,8 @@
+=== RUN   TestSkipped
+    s_test.go:5: not here
+--- SKIP: TestSkipped (0.00s)
+=== NAME  
+=== RUN   TestRuns
+--- PASS: TestRuns (0.00s)
+=== NAME  
+PASS

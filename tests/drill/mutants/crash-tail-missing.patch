@@ -1,0 +1,14 @@
+Expect: method panic: TestCrashTestSuite verdict "", want fail: a verdict testing reported was lost
+Judge: ./tests/canary CanaryRelayTestSuite/TestAPanickingMethodKeepsItsVerdicts
+Clause: when a method panics, ending its suite process → fails the method, its suite and its package, every verdict testing reported kept
+--- a/internal/gotestrunner/relay.go
++++ b/internal/gotestrunner/relay.go
+@@ -131,7 +131,7 @@
+ // over the whole stream, whose events replace the first's. It fails when the
+ // stream could not be converted at all.
+ func (r *relay) finish(status int) error {
+-	tail := crashTail(r.raw.Bytes(), status)
++	var tail []byte
+ 	r.end(tail)
+ 	how := r.endedEarly()
+ 	if how == "" {

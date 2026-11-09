@@ -1,0 +1,14 @@
+Expect: channel: markers .*, want descriptor kept: a regular file named as the channel was closed
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestTheChannelStaysWithTheSuite
+Clause: when a process inherits the channel's variable naming a descriptor that is a regular file → leaves that descriptor open
+--- a/internal/control/control_unix.go
++++ b/internal/control/control_unix.go
+@@ -61,7 +61,7 @@
+ 		return nil
+ 	}
+ 	var st syscall.Stat_t
+-	if syscall.Fstat(fd, &st) != nil || st.Mode&syscall.S_IFMT != syscall.S_IFSOCK {
++	if syscall.Fstat(fd, &st) != nil {
+ 		return nil
+ 	}
+ 	if moved, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, movedFD); err == nil {

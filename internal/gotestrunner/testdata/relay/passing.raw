@@ -1,0 +1,8 @@
+=== RUN   TestOne
+    p_test.go:5: hello from one
+--- PASS: TestOne (0.00s)
+=== NAME  
+=== RUN   TestTwo
+--- PASS: TestTwo (0.00s)
+=== NAME  
+PASS

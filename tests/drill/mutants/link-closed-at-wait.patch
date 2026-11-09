@@ -1,0 +1,22 @@
+Expect: forked: the suite stopped when its wrapper exited
+Judge: ./tests/canary CanaryRelayTestSuite/TestASuiteOutlivingItsWrapperRunsOn
+--- a/internal/gotestrunner/managed_process.go
++++ b/internal/gotestrunner/managed_process.go
+@@ -398,6 +398,7 @@
+ // reused from then on, and only then drains what is left in the pipes.
+ func (p *ManagedProcess) wait() {
+ 	_ = p.cmd.Wait()
++	p.closeLink(true)
+ 	if p.stopped.Load() {
+ 		// The root is done, and so is its output: what it leaves running is
+ 		// interrupted, given the grace and killed.
+@@ -415,9 +416,6 @@
+ 	}
+ 	untrack(p.tree)
+ 	p.tree.Release()
+-	// Never before the release: a process still holding the channel reads
+-	// its end as the runner gone, and stops.
+-	p.closeLink(true)
+ 	p.drain()
+ 	close(p.done)
+ }

@@ -1,13 +1,13 @@
-Judge: ./internal/gotestrunner AbandonTestSuite/TestATreeWithoutAStopFileIsAskedFirst
+Judge: ./internal/gotestrunner AbandonTestSuite/TestATreeWithoutAWayOfItsOwnIsAskedFirst
 Expect: ^FAIL .*internal/gotestrunner Abandon .* / asks it to stop and waits for it \(
 --- a/internal/gotestrunner/abandon.go
 +++ b/internal/gotestrunner/abandon.go
-@@ -78,7 +78,7 @@
- // takes again however often it came.
- func askAgain(tree *proctree.Tree, l liveTree) bool {
- 	if l.stopFile == "" {
--		return tree.Interrupt() == nil
-+		return false
+@@ -89,7 +89,7 @@
+ 	if l.again != nil {
+ 		return l.again() == nil
  	}
- 	pid := readPID(protocol.StopPIDPath(l.stopFile))
- 	return pid > 0 && stopAgain(pid, l.root) == nil
+-	return tree.Interrupt() == nil
++	return false
+ }
+ 
+ // writeGate lets an event reach stdout and the events file whole before the

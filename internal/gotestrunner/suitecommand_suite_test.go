@@ -158,7 +158,6 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 	t.When("test2json mode", func(w *gotest.T) {
 		ctx := context.Background()
 		env := []string{"PATH=/usr/bin", "HOME=/home/test"}
-		converter := toolchainTest2JSON(w)
 
 		for sub, tc := range gotest.Each(w, []struct { //nolint:gocritic // rangeValCopy: intentional
 			Name     string
@@ -171,7 +170,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite"},
 					BinaryPath: "/tmp/pkg.test",
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
@@ -180,7 +179,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFooSuite", RunFilter: "^TestFooSuite$/^TestBar$"},
 					BinaryPath: "/tmp/pkg.test",
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json"},
 			},
 			{
@@ -190,7 +189,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 					RunFlags:   []string{"-test.v", "-test.timeout=30s"},
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json", "-test.timeout=30s"},
 			},
 			{
@@ -200,7 +199,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath: "/tmp/pkg.test",
 					RunFlags:   []string{"-test.v=true"},
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json"},
 			},
 			{
@@ -210,7 +209,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					BinaryPath:   "/tmp/pkg.test",
 					CoverProfile: "/tmp/cover.out",
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFooSuite$", "-test.v=test2json", "-test.coverprofile=/tmp/cover.out"},
 			},
 			{
@@ -221,7 +220,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					RunFlags:     []string{"-test.v", "-test.timeout=30s", "-test.count=1"},
 					CoverProfile: "/tmp/cover.out",
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFooSuite$/^TestBar$", "-test.v=test2json",
 					"-test.timeout=30s", "-test.count=1",
 					"-test.coverprofile=/tmp/cover.out"},
@@ -232,13 +231,13 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 					SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo.Bar+Baz"},
 					BinaryPath: "/tmp/pkg.test",
 				},
-				wantArgs: []string{converter, "-p", "example.com/pkg", "-t", "/tmp/pkg.test",
+				wantArgs: []string{"/tmp/pkg.test",
 					"-test.paniconexit0", "-test.run=^TestFoo\\.Bar\\+Baz$", "-test.v=test2json"},
 			},
 		}) {
 			cmd := gotestrunner.ExportBuildSuiteCmd(ctx, tc.target, env, true)
 
-			gotest.Equal(sub, converter, cmd.Path)
+			gotest.Equal(sub, "/tmp/pkg.test", cmd.Path, "the binary itself, nothing in front of it")
 			gotest.Equal(sub, tc.wantArgs, cmd.Args)
 
 			gotest.Len(sub, env, len(cmd.Env))
@@ -258,9 +257,10 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 
 			for i := range targets { //nolint:gocritic // hugeParam: stable API
 				target := targets[i]
-				_, refArgs := buildTest2JSONArgs(target)
+				refPath, refArgs := buildTest2JSONArgs(target)
 				cmd := gotestrunner.ExportBuildSuiteCmd(refCtx, target, refEnv, true)
 
+				gotest.Equal(it, refPath, cmd.Args[0])
 				gotArgs := cmd.Args[1:]
 				gotest.Len(it, refArgs, len(gotArgs))
 				for i := range gotArgs {
@@ -289,13 +289,18 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteCmd(t *gotest.T) {
 			got := gotestrunner.ExportResolveTest2JSON(func() ([]byte, error) { return []byte(missing), nil })
 			gotest.Empty(it, got)
 		})
+		w.It("runs it as a filter, with no command of its own", func(it *gotest.T) {
+			argv := gotestrunner.ExportConverterArgv("/go/pkg/tool/test2json", "example.com/pkg")
+			gotest.Equal(it, []string{"/go/pkg/tool/test2json", "-p", "example.com/pkg", "-t"}, argv)
+		})
+		w.It("starts the resolved converter", func(it *gotest.T) {
+			cmd := gotestrunner.ExportConverterCmd(context.Background(), "example.com/pkg", "/src/pkg")
+			gotest.Equal(it, []string{toolchainTest2JSON(it), "-p", "example.com/pkg", "-t"}, cmd.Args)
+			gotest.Equal(it, "/src/pkg", cmd.Dir)
+		})
 		w.It("falls back to the go tool launcher without a path", func(it *gotest.T) {
-			target := gotestrunner.SuiteTarget{
-				SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/pkg", SuiteName: "TestFoo"},
-				BinaryPath: "/tmp/pkg.test",
-			}
-			argv := gotestrunner.ExportTest2JSONArgv("", target, []string{"-test.run=^TestFoo$"})
-			gotest.Equal(it, []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t", "/tmp/pkg.test", "-test.run=^TestFoo$"}, argv)
+			argv := gotestrunner.ExportConverterArgv("", "example.com/pkg")
+			gotest.Equal(it, []string{"go", "tool", "test2json", "-p", "example.com/pkg", "-t"}, argv)
 		})
 	})
 

@@ -9,3 +9,5 @@ go 1.26.0
 replace github.com/mvrahden/go-test => ../../..
 
 require github.com/mvrahden/go-test v0.0.0-00010101000000-000000000000
+
+require golang.org/x/sys v0.49.0 // indirect

@@ -202,14 +202,14 @@ When a run is stopped, a method body or a suite's BeforeAll that has not returne
 - **THEN** leaves that context alone, so AfterEach runs to its end before AfterAll and the release
 
 ### Requirement: A forced stop
-A stopped run still going when only its fixtures' teardown time is left of the release bound SHALL be forced, saying so, and the fixture teardown SHALL still get that time; a second stop signal reaching the suite SHALL force the stop at once, saying so, releasing the fixtures before the process ends by the signal.
+A stopped run still going when only its fixtures' teardown time is left of the release bound SHALL be forced, saying so, and the fixture teardown SHALL still get that time; a second Ctrl-C under plain go test, or the runner's force under the runner, SHALL force the stop at once, saying so, releasing the fixtures before the process ends by the signal.
 
 #### Scenario: A run that outlasts its release bound
 - **WHEN** the run is stopped and an AfterEach ignores its context until only the fixtures' teardown time is left of the release bound
 - **THEN** forces the stop, saying so, and runs the fixture teardown to its end
 
-#### Scenario: A second stop signal
-- **WHEN** a second stop signal reaches the suite while a stopped method body ignores its context
+#### Scenario: The runner's force
+- **WHEN** the runner forces the stop of a suite whose stopped method body ignores its context
 - **THEN** releases the fixture at once, saying so, and the process ends by the signal
 
 ### Requirement: Stopping benchmarks and fuzz seeds
@@ -246,7 +246,7 @@ A run stopped while a group runs SHALL skip every suite not started, the later g
 - **AND** starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
 
 ### Requirement: Stopping a run
-A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the signal.
+A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the Ctrl-C that stopped it.
 
 #### Scenario: Interrupted while a method holds
 - **WHEN** the run is interrupted while a method holds
@@ -256,15 +256,61 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** runs AfterAll before the fixture is released
 - **AND** ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
 
-### Requirement: A signal after the stop settled
-The runner's signal reaching a suite only after its stop file settled the run SHALL NOT end the process: it ends with its tests' own status, every verdict in the stream.
+### Requirement: A signal from outside the runner
+Under the runner, a SIGINT or SIGTERM the runner did not send SHALL start a first stop, the holding method's context ended and AfterAll run before the fixture is released; the stream SHALL name it a stop from outside the runner and the package SHALL fail. A signal during a stop SHALL change nothing and SHALL never force it, and one landing after the runner's stop settled the run SHALL NOT end the process: it ends with its tests' own status, every verdict in the stream.
 
-#### Scenario: The signal lands after the stop file settled the run
-- **WHEN** the runner's signal reaches the suite only after its stop file settled the run
+#### Scenario: A signal while a method holds
+- **WHEN** a SIGTERM from outside the runner reaches a suite while a method holds
+- **THEN** ends the holding method's context and runs AfterAll before the fixture is released
+- **AND** names the stop in the stream as one from outside the runner
+- **AND** fails the package and exits 1
+
+#### Scenario: A second signal during the stop
+- **WHEN** a second SIGTERM from outside the runner reaches the suite during the stop the first began
+- **THEN** still runs AfterAll before the fixture is released, the stop not forced
+
+#### Scenario: The signal lands after the stop settled the run
+- **WHEN** a signal reaches the suite only after the runner's stop settled the run
 - **THEN** ends with its tests' own status, every verdict in the stream
 
+### Requirement: A stop reaches the suite on its channel
+The runner's first stop SHALL reach a suite process as a line on the control channel it inherited, never as a signal, so the converter beside it relays the stream to its end; the teardown budget the suite reports SHALL travel the same way and bound the runner's wait after the stop. A process a test starts SHALL inherit no part of the channel, a descriptor named as the channel that is none SHALL be left alone, and the last suite SHALL leave no reader of it behind.
+
+#### Scenario: The runner's stop
+- **WHEN** the runner stops a suite whose method holds
+- **THEN** sends it no signal: the run's stderr names none
+- **AND** ends the -json stream whole, a verdict for every test in it
+
+#### Scenario: A short teardown budget
+- **WHEN** the runner stops a suite that reported a 32s teardown budget and lingers past it
+- **THEN** kills the suite once that budget is spent, not the default's
+
+#### Scenario: A long teardown budget
+- **WHEN** the runner stops a suite that reported a teardown budget longer than its 40s linger
+- **THEN** lets the suite end on its own
+
+#### Scenario: A process a test starts
+- **WHEN** a test under the runner starts a process of its own
+- **THEN** the process inherits no descriptor of the channel
+
+#### Scenario: A descriptor that is no channel
+- **WHEN** a process inherits the channel's variable naming a descriptor that is a regular file
+- **THEN** leaves that descriptor open
+
+#### Scenario: The last suite's end
+- **WHEN** the last suite of a process under the runner ends
+- **THEN** leaves no goroutine reading the channel for a leak check in TestMain to find
+
+### Requirement: A stop before the first suite opens
+A stop the runner sends while a suite process runs its init or TestMain, before its first suite opens, SHALL be read when that suite opens: every suite the process opens then SHALL skip with the reason run stopping and set up no fixture.
+
+#### Scenario: Interrupted during TestMain
+- **WHEN** the run is interrupted while its suite processes run their TestMain, before their first suite opens
+- **THEN** skips every suite with the reason run stopping
+- **AND** sets up no fixture
+
 ### Requirement: A stopped run's shared fixtures
-A run interrupted while a method bound to a shared fixture ignores its context SHALL exit 130 and run the shared fixture's AfterAll before gotest exits, on the text, -json and spec pipelines alike; an interrupt that arrives once every verdict is in, while the shared fixtures tear down, SHALL keep the run's exit code and let their AfterAll finish.
+A run stopped while a method bound to a shared fixture ignores its context SHALL exit 130 and run the shared fixture's AfterAll before gotest exits, on the text, -json and spec pipelines alike; a stop that arrives once every verdict is in, while the shared fixtures tear down, SHALL keep the run's exit code and let their AfterAll finish.
 
 #### Scenario: Interrupted on every pipeline
 - **WHEN** the run is interrupted on the text, -json or spec pipeline while a method bound to a shared fixture ignores its context
@@ -275,7 +321,7 @@ A run interrupted while a method bound to a shared fixture ignores its context S
 - **THEN** exits 0 and lets the AfterAll finish
 
 ### Requirement: Every launcher stops cleanly
-A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it and says so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, through go run or through go tool; a SIGHUP ignored at start SHALL NOT stop it. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
+A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its exit code, or by the signal where go run dies of a SIGTERM, SHALL finish the fixture teardown unless a second signal abandons it, saying so, and SHALL leave no suite process behind, whether gotest runs directly, under an -exec wrapper, even one closing descriptor 3, through go run or go tool; a SIGHUP ignored at start SHALL NOT stop it. The cases are the table in `tests/conformance/lifecycle/launcher_unix_test.go`.
 
 #### Scenario: Each launcher and each signal
 - **WHEN** a run is stopped by a signal, however gotest was launched
@@ -289,6 +335,43 @@ A run stopped by SIGINT, SIGTERM, SIGHUP or a second SIGINT SHALL end with its e
 - **WHEN** a run started with SIGHUP ignored, as nohup starts it, gets a SIGHUP
 - **THEN** runs on until a SIGINT stops it
 
+#### Scenario: A wrapper that closes descriptor 3
+- **WHEN** a run under an -exec wrapper that runs the suite with descriptor 3 closed is stopped by SIGINT
+- **THEN** exits 130, finishes the fixture teardown and leaves no suite process behind
+
+### Requirement: A suite under a wrapper that drops the channel
+A suite process that has said no hello on its channel within 3s of its start SHALL be stopped by one SIGINT to its process group, as a terminal's Ctrl-C stops it, and so SHALL one whose stop line cannot be written; the converter beside it SHALL never receive that SIGINT. The stream SHALL end whole, and the suite SHALL tear down as under plain go test.
+
+#### Scenario: A wrapper that closes descriptor 3 behind it
+- **WHEN** a run is stopped while its suite, run by an -exec wrapper that closes descriptor 3, has said no hello
+- **THEN** interrupts the suite's process group with SIGINT
+- **AND** leaves the converter running, the suite's output converted once
+- **AND** ends the stream whole, the methods not started skipped with the reason run stopping
+- **AND** runs AfterAll before the fixture is released
+
+#### Scenario: A stop line that cannot be written
+- **WHEN** a run is stopped while the suite's channel, after its hello, is closed at the suite's end
+- **THEN** interrupts the suite's process group with SIGINT and runs AfterAll before the fixture is released
+
+### Requirement: A converter that ends early
+A converter that ends before the suite's output does, killed, crashed or refusing a write, SHALL be replaced once the suite has ended by a fresh conversion of every byte the suite wrote, which the runner keeps until then, so the stream carries every verdict; a note on stderr SHALL name the package, the suite and how the converter ended.
+
+#### Scenario: A converter killed mid-run
+- **WHEN** the converter is killed while a suite runs
+- **THEN** converts the suite's output again, every verdict in the stream
+- **AND** says so on stderr, naming the suite and how the converter ended
+
+### Requirement: A crash is the package's failure
+A suite process that ends by a signal, a panic or an os.Exit SHALL fail its package by its real exit status, the run exiting 1 and a signal named on stderr and in the stream, and SHALL NOT attribute the end to the test that was running, which gets no verdict unless testing reported one, as under go test -json; every verdict the stream reported before the end SHALL be kept.
+
+#### Scenario: A suite process that crashes
+- **WHEN** a suite process ends by os.Exit(3), a panic on a goroutine or a SIGKILL while a method runs
+- **THEN** fails its package and exits 1, the running method left without a verdict and the verdicts reported before the end kept
+
+#### Scenario: A method that panics
+- **WHEN** a method panics, ending its suite process
+- **THEN** fails the method, its suite and its package, every verdict testing reported kept
+
 ### Requirement: No process outlives the run
 A run SHALL leave no process a test started behind, even one the test never waits for.
 
@@ -297,7 +380,7 @@ A run SHALL leave no process a test started behind, even one the test never wait
 - **THEN** the test passes and no such process outlives the run
 
 ### Requirement: A second Ctrl-C to gotest
-A second SIGINT reaching gotest while its suites stop SHALL, on Unix, send each suite process a second stop signal, which releases the fixtures at once, and kill what still runs two seconds later or at a further SIGINT; on Windows, where no second stop reaches a suite, it SHALL kill the suites at once. It SHALL ask the shared fixture process to tear down within those two seconds, and SHALL exit 130 leaving no suite process behind.
+A second SIGINT reaching gotest while its suites stop SHALL, on every OS, force each suite process's stop, which releases the fixtures at once, and kill what still runs two seconds later or at a further SIGINT. It SHALL ask the shared fixture process to tear down within those two seconds, and SHALL exit 130 leaving no suite process behind.
 
 #### Scenario: A method that ignores the stop
 - **WHEN** a second SIGINT reaches gotest while a stopped method body ignores its context
@@ -347,55 +430,16 @@ With --control=stdin, gotest SHALL read its standard input by line: a stop line 
 - **WHEN** a SIGINT follows a stop line
 - **THEN** is the same stop within 300ms, finishing the fixture teardown, and later the second, abandoning the teardown saying so
 
-### Requirement: A stop by the stop file alone
-On Windows, where the runner stops a suite by its stop file alone, an interrupted run SHALL skip the methods that have not started with the reason run stopping, SHALL carry every verdict to the stream and SHALL run AfterAll before the fixture is released.
+### Requirement: A suite whose runner is gone
+A suite process whose runner is gone SHALL stop by itself on every OS once its channel ends: it SHALL end the holding method's context, run none of the methods that have not started, run AfterAll before the fixture is released, and exit; on Unix it SHALL then end what its tests started.
 
-#### Scenario: Interrupted on Windows
-- **WHEN** a run is interrupted on Windows, where only the stop file reaches the suite
-- **THEN** skips the methods that have not started with the reason run stopping
-- **AND** every verdict reaches the stream: the holding method's, the suite's and the package's
-- **AND** runs AfterAll before the fixture is released
-
-### Requirement: A suite whose parent is gone
-A suite process under the runner whose parent ends SHALL stop by itself: it SHALL end the holding method's context, run none of the methods that have not started, run AfterAll before the fixture is released, and exit.
-
-#### Scenario: The parent is killed
-- **WHEN** the parent of a suite process under the runner is killed while a method holds
+#### Scenario: The runner is killed
+- **WHEN** the runner of a suite process is killed while a method holds
 - **THEN** ends the holding method's context
 - **AND** the methods that have not started never run
 - **AND** runs AfterAll before the fixture is released
 - **AND** leaves no suite process behind
-
-### Requirement: A suite whose stream nobody reads
-A suite process under the runner whose stdout nobody reads any more, because the runner and its converter died while an -exec wrapper keeps the suite running, SHALL stop by itself the same way; outside the runner, a stdout nobody reads SHALL NOT stop a suite.
-
-#### Scenario: The runner and its converter are killed
-- **WHEN** the runner and its converter are killed under -json while an -exec wrapper waits on the suite
-- **THEN** ends the holding method's context
-- **AND** the methods that have not started never run
-- **AND** runs AfterAll before the fixture is released
-- **AND** leaves no suite process behind
-
-#### Scenario: Outside the runner
-- **WHEN** a suite run by its test binary outside the gotest runner loses the reader of its stdout
-- **THEN** the holding method runs on: its context does not end
-
-### Requirement: A stop signals only the suite's own processes
-A cancelled run SHALL send no signal to a pid the suite published that is outside the suite's process group, and SHALL interrupt the suite's process group instead.
-
-#### Scenario: A published pid outside the group
-- **WHEN** the run is interrupted and the pid the suite published names a process outside its group
-- **THEN** sends that process no signal
-- **AND** interrupts the suite's process group instead
-- **AND** runs AfterAll before the fixture is released
-
-### Requirement: A stop file that cannot be written
-A cancelled run that cannot write a suite's stop file SHALL say so on stderr and SHALL kill the suite's process alone, by the pid it published, so the converter in front of it carries the stream to its end and the run ends at once instead of at the suite's teardown budget.
-
-#### Scenario: A work dir that turned read-only
-- **WHEN** the run is interrupted while a method holds and the suite's stop file cannot be written
-- **THEN** kills the suite process alone, saying on stderr that the stop file could not be written
-- **AND** ends at once, the run booked as interrupted on its stream
+- **AND** ends a process the holding method started within 3s of the suite's exit, on Unix
 
 ### Requirement: A stop ends what the tests started
 A run stopped while a test has a process of its own running SHALL end that process before gotest exits: once the suite's process has torn down, what is left of its process tree is, on Unix, interrupted and, past the teardown budget, killed, and on Windows killed at once.

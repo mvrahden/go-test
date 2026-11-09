@@ -1,0 +1,14 @@
+Expect: channel: markers .*, want one socket fewer than the suite's: a process the test started inherited the channel
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestTheChannelStaysWithTheSuite
+Clause: when a test under the runner starts a process of its own → the process inherits no descriptor of the channel
+--- a/internal/control/control_unix.go
++++ b/internal/control/control_unix.go
+@@ -64,7 +64,7 @@
+ 	if syscall.Fstat(fd, &st) != nil || st.Mode&syscall.S_IFMT != syscall.S_IFSOCK {
+ 		return nil
+ 	}
+-	if moved, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, movedFD); err == nil {
++	if moved, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD, movedFD); err == nil {
+ 		_ = syscall.Close(fd)
+ 		fd = moved
+ 	} else {

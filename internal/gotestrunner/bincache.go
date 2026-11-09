@@ -19,9 +19,8 @@ import (
 // path is then stable across runs, and go skips the link when the binary's
 // build ID still matches. Each run copies the binary into its own work dir:
 // a concurrent run relinking the same key never replaces a file another run
-// is executing, and the budget file beside a binary stays the run's own. The
-// link runs under a per-binary lock so two runs cannot write one output at
-// once.
+// is executing. The link runs under a per-binary lock so two runs cannot
+// write one output at once.
 
 func binaryCacheKey(cwd string, buildFlags []string) string {
 	flags := slices.Clone(buildFlags)

@@ -1,0 +1,14 @@
+Expect: stopline: the run did not end within 10s of the stop
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestAStopReachesTheSuiteAsALine
+Clause: when the runner stops a suite whose method holds → ends the -json stream whole, a verdict for every test in it
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -338,8 +338,6 @@
+ 		return
+ 	}
+ 	switch l.Kind {
+-	case control.Stop:
+-		w.stop(runnerSignal())
+ 	case control.Force:
+ 		w.forced = true
+ 		w.stop(runnerSignal())

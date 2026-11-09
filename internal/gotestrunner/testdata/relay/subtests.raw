@@ -1,0 +1,22 @@
+=== RUN   TestTree
+=== RUN   TestTree/leaf_pass
+    s_test.go:6: a leaf
+--- PASS: TestTree/leaf_pass (0.00s)
+=== NAME  TestTree
+=== RUN   TestTree/branch
+=== RUN   TestTree/branch/deep_fail
+    s_test.go:8: deep failure
+--- FAIL: TestTree/branch/deep_fail (0.00s)
+=== NAME  TestTree/branch
+=== RUN   TestTree/branch/deep_skip
+    s_test.go:9: deep skip
+--- SKIP: TestTree/branch/deep_skip (0.00s)
+=== NAME  TestTree/branch
+--- FAIL: TestTree/branch (0.00s)
+=== NAME  TestTree
+=== RUN   TestTree/leaf_last
+--- PASS: TestTree/leaf_last (0.00s)
+=== NAME  TestTree
+--- FAIL: TestTree (0.00s)
+=== NAME  
+FAIL

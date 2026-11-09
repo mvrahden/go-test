@@ -8,11 +8,13 @@ fixture packages written to fail in specific ways, and compares what
 the binary reports with a checked-in expectation. It checks with plain Go
 only, so nothing under test takes part in the verdict.
 
-The checks are split by theme into five suites: `CanaryTestSuite` (verdicts,
+The checks are split by theme into six suites: `CanaryTestSuite` (verdicts,
 assertions, fixtures, goroutines, benchmarks), `CanaryBudgetsTestSuite`,
 `CanaryDagTestSuite`, `CanaryDiscoveryTestSuite` (the shapes discovery reads
-or refuses) and `CanaryLifecycleTestSuite` (stops and process lifetime). Each
-runs its methods one after another; the runner runs the five side by side,
+or refuses), `CanaryLifecycleTestSuite` (stops and process lifetime) and
+`CanaryRelayTestSuite` (a suite's stream when its channel, its converter or
+its process fails). Each
+runs its methods one after another; the runner runs the six side by side,
 each in its own process. None is `Parallel`, so the canary
 does not rest on the in-suite parallelism it guards.
 
@@ -70,16 +72,20 @@ Each directory under `testdata/` is one package with one suite:
 | `releasestop` | a run stopped while a shared fixture's `AfterAll` releases a failed attempt lets that `AfterAll` finish, starts no further attempt and releases the fixture once |
 | `releaseslow` | a package fixture whose `AfterAll` between its attempts outlives its declared `Timeout` fails the run, though the second attempt comes up |
 | `hydratefail` | a shared fixture whose `Hydrate` fails partway still gets its `Dehydrate` |
-| `stopping` | a run stopped while a method holds exits 130, skips the methods not started with the reason run stopping, ends the holding method's context and runs `AfterAll` before the fixture is released; a suite whose parent or whose stream reader is killed stops by itself the same way and leaves no process (Linux and macOS) |
+| `stopping` | a run stopped while a method holds exits 130, skips the methods not started with the reason run stopping, ends the holding method's context and runs `AfterAll` before the fixture is released; the runner's stop reaches the suite with no signal and the stream keeps every verdict; a suite whose runner is killed stops by itself the same way and leaves neither its own process nor one its test started (Linux and macOS); a SIGTERM from outside the runner is a stop the stream names and the run fails, a second one forces nothing, and one after the stop settled leaves the process to its own end (Unix only) |
+| `stopatopen` | a stop sent while the suite processes run their `TestMain` is read when their suite opens: every suite skips with the reason run stopping and no fixture is set up (Unix only) |
+| `stopbudget` | a stopped suite that reported a 32s teardown budget and lingers past it is killed once the budget is spent; one whose budget outlasts its 40s linger ends on its own (Unix only) |
+| `channel` | a process a test starts inherits no descriptor of the runner's channel, a regular file named as the channel is left open, and no reader of the channel outlives the last suite (Unix only) |
 | `orphan` | a process a test started and never waited for does not outlive the run (Unix only) |
-| `plainreader` | a test binary run outside the runner whose stdout reader goes keeps its method running (Linux and macOS) |
-| `stopgrace` | a stopped run cuts a body or a `BeforeAll` that ignores its context short after 5s, counted from a late body's own start, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace, or one waiting on its context, runs to its end before `AfterAll` and the release; a forced stop still gives the fixtures' release its time; a second stop signal releases at once |
+| `stopgrace` | a stopped run cuts a body or a `BeforeAll` that ignores its context short after 5s, counted from a late body's own start, saying so, and releases the fixture without `AfterAll`; an `AfterEach` slower than the grace, or one waiting on its context, runs to its end before `AfterAll` and the release; a forced stop still gives the fixtures' release its time; the runner's force releases at once |
 | `stopbench` | a stopped benchmark or fuzz seed run skips what has not started with the reason run stopping and runs `AfterAll` before the release; a benchmark that ignores the stop is cut short after 5s |
 | `noisysetup` | a shared fixture that writes to stdout while coming up still hands its state to the suite whole |
 | `timeoutscale` | under `GOTEST_TIMEOUT_SCALE=2` a method and a fixture outlasting their 1s budget by half pass, those outlasting it past 2s fail naming 2s, and a method finds the scale gone from its environment; a scale that is no number fails both suites before anything runs |
 | `setupbudget` | a shared fixture slower than its declared 2s `Timeout` fails the run at that budget, not when it finishes |
+| `relay` | a suite whose stop line cannot reach it, under an `-exec` wrapper that runs it with descriptor 3 closed, holds the channel silent or said hello for it, is stopped by one SIGINT to its process group: the converter is not cut, every verdict is in the stream and `AfterAll` runs before the release; a converter killed mid-run is replaced by a conversion of the whole stream, saying so; a SIGTERM from outside fails the package, saying so; a crash under a method by `os.Exit(3)`, a goroutine panic or a kill fails the package and gives that method no verdict, and a method that panics keeps every verdict testing reported; a suite an `-exec` wrapper runs in the background runs on after the wrapper exits (Unix only, but the crash) |
 | `detachedchild` | a process a shared fixture's setup starts sees no protocol variable, what it writes to descriptor 3 is not read, and the run does not wait for it (Unix only) |
 | `killedcli` | the CLI killed while a shared fixture is up: the fixture's `AfterAll`, which logs and takes 2s, runs to its end and its process exits (Unix only) |
+| `sharedstop` | a stopped run asks its shared fixture process to stop by a line on its stdin: the fixture's `AfterAll` runs, no signal reaches the process and it exits on its own; a second stop ends the context of an `AfterAll` waiting on it, and stops the process first while its suite still runs (Unix only) |
 | `slowretry` | a shared fixture whose attempts and the release between them each take 1.6s of its 2s `Timeout` is waited for: the budget counts the release |
 | `latebudget` | a shared fixture started for the exclusive tail is released under the teardown budget its declared 2s `Timeout` gives: its `AfterAll`, which never returns, is force-killed after 32s, not the default's 2m30s |
 | `dagrelease` | shared fixtures come up each after what they depend on and are released concurrently, a dependent before its dependency; with `DAGRELEASE_HANG=1` the release that never returns is force-killed after 30s plus the longest chain still resident, 35s, a fixture released at the barrier no longer counted |
