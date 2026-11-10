@@ -52,8 +52,9 @@ type discoverSuite struct {
 	Focused  bool   `json:"focused"`
 	Excluded bool   `json:"excluded"`
 	Guarded  bool   `json:"guarded"`
-	// External marks the suite of a package's external test files that the
-	// internal ones also declare: go test runs it as a second suite.
+	// External marks a suite of the package's external test files; go test
+	// runs it as a suite of its own, a second one when the internal files
+	// declare the same name.
 	External   bool             `json:"external,omitempty"`
 	File       string           `json:"file"`
 	Line       int              `json:"line"`
@@ -198,11 +199,13 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 			// Listed before the rejection check, which reduces each suite to the
 			// methods a run would select, in place: discover lists what the
 			// source declares, excluded and unfocused methods marked as such.
+			internalSuites := pkgEntry.Suites
 			for _, suite := range result.Suites {
 				ds := buildDiscoverSuite(suite)
 				ds.Fixtures = discoverFixtureNames(suite)
 				if pkg == lr.Pxtest {
-					markTwin(&ds, pkgEntry.Suites)
+					ds.External = true
+					nameTwinMethods(&ds, internalSuites)
 				}
 				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 			}
@@ -234,15 +237,13 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 	return out, nil
 }
 
-// markTwin marks ds external when an earlier suite of the package, one of the
-// internal test files, has its name, and gives its shared methods the names
-// go test reports.
-func markTwin(ds *discoverSuite, earlier []discoverSuite) {
-	for _, in := range earlier {
-		if in.External || in.Name != ds.Name {
+// nameTwinMethods gives the methods of an external suite that an internal
+// suite of the same name also declares the names go test reports.
+func nameTwinMethods(ds *discoverSuite, internalSuites []discoverSuite) {
+	for _, in := range internalSuites {
+		if in.Name != ds.Name {
 			continue
 		}
-		ds.External = true
 		var internal, external []string
 		for _, m := range in.Methods {
 			internal = append(internal, m.Name)

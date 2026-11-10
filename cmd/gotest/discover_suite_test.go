@@ -299,3 +299,19 @@ func (s *DiscoverTestSuite) TestTwinTestNamesMarksOnlySharedMethods(t *gotest.T)
 	gotest.Equal(t, map[string]string{"TestCreate": "TestCreate#01"},
 		ExportTwinTestNames([]string{"TestCreate", "TestList"}, []string{"TestCreate", "TestRemove"}))
 }
+
+func (s *DiscoverTestSuite) TestALoneExternalSuiteIsMarkedExternal(t *gotest.T) {
+	out, err := ExportDiscover([]string{filepath.Join(s.repoRoot, "cmd", "gotest", "testdata", "static", "loneext")}, nil)
+	gotest.NoError(t, err)
+	gotest.Len(t, out.Packages, 1)
+	gotest.Len(t, out.Packages[0].Suites, 1)
+	suite := out.Packages[0].Suites[0]
+
+	t.When("a suite is declared only in the external test package", func(w *gotest.T) {
+		w.It("marks it external and gives no method a run name", func(it *gotest.T) {
+			gotest.True(it, suite.External)
+			gotest.Len(it, suite.Methods, 1)
+			gotest.Zero(it, suite.Methods[0].TestName)
+		})
+	})
+}
