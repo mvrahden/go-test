@@ -57,6 +57,8 @@ func Overlay(declared, observed []*Package) []*Package {
 // skipped says a declared node the stream did not report was skipped: its
 // ancestor is excluded by the X_ prefix, or the run skipped it.
 func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
+	// Twins run internal first; the n-th match below depends on that order.
+	declared = internalFirst(declared)
 	used := make([]bool, len(observed))
 	ordinal := map[string]int{}
 	out := make([]*Node, 0, len(declared)+len(observed))
@@ -86,7 +88,7 @@ func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
 		o := observed[match]
 		d.Status, d.Duration, d.Start, d.End, d.Paused = o.Status, o.Duration, o.Start, o.End, o.Paused
 		d.Output = o.Output
-		d.External, d.Variant = o.External, o.Variant
+		d.External, d.Variant = d.External || o.External, o.Variant
 		d.Iterations, d.NsPerOp, d.BytesPerOp, d.AllocsPerOp = o.Iterations, o.NsPerOp, o.BytesPerOp, o.AllocsPerOp
 		d.Metrics, d.Procs = o.Metrics, o.Procs
 		d.Children = overlayNodes(d.Children, o.Children, skipped || d.Excluded || o.Status == StatusSkip)
@@ -95,6 +97,27 @@ func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
 	for i, o := range observed {
 		if !used[i] {
 			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// internalFirst returns nodes with same-named ones reordered internal before
+// external, each keeping the slots its name held.
+func internalFirst(nodes []*Node) []*Node {
+	slots := map[string][]int{}
+	for i, n := range nodes {
+		slots[n.Name] = append(slots[n.Name], i)
+	}
+	out := append([]*Node(nil), nodes...)
+	for _, idx := range slots {
+		group := make([]*Node, len(idx))
+		for k, i := range idx {
+			group[k] = nodes[i]
+		}
+		sort.SliceStable(group, func(a, b int) bool { return !group[a].External && group[b].External })
+		for k, i := range idx {
+			out[i] = group[k]
 		}
 	}
 	return out

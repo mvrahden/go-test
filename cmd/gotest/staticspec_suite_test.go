@@ -391,6 +391,8 @@ type specNode struct {
 	Status     string     `json:"status"`
 	Incomplete bool       `json:"incomplete"`
 	Excluded   bool       `json:"excluded"`
+	External   bool       `json:"external"`
+	Variant    int        `json:"variant"`
 	Children   []specNode `json:"children"`
 }
 
@@ -473,5 +475,29 @@ func (s *StaticSpecTestSuite) TestDeclaresFuzzTargets(t *gotest.T, ctx *staticCt
 		}
 		gotest.Contains(it, kinds, "FuzzFrameRoundTrip=FrameRoundTrip")
 		gotest.Len(it, kinds, 5)
+	})
+}
+
+// A suite declared in both test packages is two suites: the second, the
+// external one, is marked and ordered after the first.
+func (s *StaticSpecTestSuite) TestTwinSuitesReadAsTwoSuites(t *gotest.T, ctx *staticCtx) {
+	twins, err := filepath.Abs(filepath.Join("testdata", "static", "twins"))
+	gotest.NoError(t, err)
+	var doc specDocument
+	gotest.NoError(t, json.Unmarshal([]byte(s.render(t, ctx.dir, "json", twins)), &doc))
+	gotest.Len(t, doc.Packages, 1)
+	nodes := doc.Packages[0].Nodes
+
+	t.When("a suite is declared in the internal and the external test files", func(w *gotest.T) {
+		w.It("reads as two suites of one name, the second external", func(it *gotest.T) {
+			gotest.Len(it, nodes, 2)
+			gotest.Equal(it, "TestUserRepositoryTestSuite", nodes[0].Name)
+			gotest.Equal(it, "TestUserRepositoryTestSuite", nodes[1].Name)
+			gotest.False(it, nodes[0].External)
+			gotest.True(it, nodes[1].External)
+			gotest.Equal(it, 2, nodes[1].Variant)
+			gotest.Len(it, nodes[0].Children, 1)
+			gotest.Len(it, nodes[1].Children, 2)
+		})
 	})
 }

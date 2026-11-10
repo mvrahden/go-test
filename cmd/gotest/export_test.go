@@ -113,6 +113,7 @@ var (
 	ExportNewDiscoverOutput  = newDiscoverOutput
 	ExportBuildDiscoverSuite = buildDiscoverSuite
 	ExportDiscover           = discover
+	ExportTwinTestNames      = twinTestNames
 )
 
 // flags.go

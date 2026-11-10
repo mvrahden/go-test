@@ -59,6 +59,12 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 				if suiteNode == nil {
 					continue
 				}
+				if pkg == lr.Pxtest {
+					suiteNode.External = true
+					if hasSuiteNamed(pkgNode.Nodes, suiteNode.Name) {
+						suiteNode.Variant = 2
+					}
+				}
 				pkgNode.Nodes = append(pkgNode.Nodes, suiteNode)
 				notes = append(notes, suiteNotes...)
 			}
@@ -76,6 +82,17 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Path < out[b].Path })
 	return out, notes
+}
+
+// hasSuiteNamed reports whether nodes holds an internal suite of that name:
+// the external suite of the same name is then the run's second.
+func hasSuiteNamed(nodes []*gotestspec.Node, name string) bool {
+	for _, n := range nodes {
+		if !n.External && n.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // carryExcluded carries an excluded suite's or method's flag down to every
