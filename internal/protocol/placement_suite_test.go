@@ -98,8 +98,14 @@ func (s *PlacementTestSuite) TestATwinSuiteIsASecondInstance(t *gotest.T) {
 }
 
 func (s *PlacementTestSuite) TestASubBenchmarkStaysOpenUntilItsParentEnds(t *gotest.T) {
+	// Sub-benchmarks report no verdict, so B/a/x stays open until B ends: a
+	// later sibling labelled "x/..." would be read as its child.
 	got := place("run B", "run B/a", "run B/a/x", "run B/a/b", "fail B", "run C")
-	gotest.Equal(t, "B/a", got["B/a/b"].Parent) // documented limit: reads the child
+	gotest.Equal(t, "B/a", got["B/a/b"].Parent)
+
+	// B's verdict closes B/a and B/a/x too: neither adopts a later name.
+	got = place("run B", "run B/a", "run B/a/x", "fail B", "run B/a/x/y")
+	gotest.True(t, got["B/a/x/y"].Guessed)
 }
 
 func (s *PlacementTestSuite) TestANameWithoutAnOpenParentFallsBack(t *gotest.T) {

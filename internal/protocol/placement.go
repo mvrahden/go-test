@@ -34,6 +34,8 @@ type placed struct {
 	children []string
 }
 
+// NewPlacer returns a Placer for one process's stream; it is not safe for
+// concurrent use.
 func NewPlacer() *Placer {
 	return &Placer{
 		runs:      map[string]int{},
