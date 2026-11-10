@@ -115,7 +115,7 @@ func (s *PlacementTestSuite) TestANameWithoutAnOpenParentFallsBack(t *gotest.T) 
 
 // The fallback split cuts at single slashes only; a run of slashes stays in
 // its level, and a trailing slash is dropped.
-func (s *PlacementTestSuite) TestTheFallbackSplit(t *gotest.T) {
+func (s *PlacementTestSuite) TestSplitTestPathCutsAtSingleSlashes(t *gotest.T) {
 	for sub, tc := range gotest.Each(t, []struct {
 		Desc string
 		path string

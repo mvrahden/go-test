@@ -167,5 +167,5 @@ func slashLevelLabel(t *gotest.T, key string) string {
 // "a/b" written as one level and "a" then "b" are different declarations.
 func (s *DeclarationsTestSuite) TestOneLevelWithASlashIsNotTwoLevels(t *gotest.T, _ *declarationsCtx) {
 	gotest.Equal(t, "a/b", slashLevelLabel(t, gotestspec.DeclKey("TestS", "TestM", "a/b")))
-	gotest.Equal(t, "", slashLevelLabel(t, gotestspec.DeclKey("TestS", "TestM", "a", "b")))
+	gotest.Empty(t, slashLevelLabel(t, gotestspec.DeclKey("TestS", "TestM", "a", "b")))
 }
