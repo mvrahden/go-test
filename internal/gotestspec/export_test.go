@@ -39,7 +39,6 @@ func stripANSI(s string) string {
 }
 
 var (
-	ExportSplitTestPath    = splitTestPath
 	ExportNoDiagnosticNote = noDiagnosticNote
 	ExportEscapeData       = escapeData
 	ExportEscapeProperty   = escapeProperty

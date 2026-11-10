@@ -178,7 +178,6 @@ type Node struct {
 	File        string
 	Line        int
 	Variant     int
-	duplicate   bool
 	Iterations  int
 	NsPerOp     float64
 	BytesPerOp  int64
@@ -233,16 +232,12 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	}
 
 	pkgs := map[string]*Package{}
-	nodes := map[string]map[string]*Node{}
-	// Track top-level test run counts per package to detect ptest/pxtest duplicates.
-	topRunCount := map[string]map[string]int{}
+	builds := map[string]*treeBuild{}
 	// Build diagnostics are keyed by build, not by package: they go to every
 	// package that build failed.
 	buildOutput := map[string][]string{}
 	failedBuild := map[string]string{}
 	benchScans := map[*Node]*benchScan{}
-	// The levels each subtest was placed at when it started, by test name.
-	levels := map[string]map[string][]string{}
 
 	for i := range events {
 		ev := &events[i]
@@ -256,9 +251,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		if pkg == nil {
 			pkg = &Package{Path: ev.Package}
 			pkgs[ev.Package] = pkg
-			nodes[ev.Package] = map[string]*Node{}
-			topRunCount[ev.Package] = map[string]int{}
-			levels[ev.Package] = map[string][]string{}
+			builds[ev.Package] = newTreeBuild(pkg)
 		}
 		if ev.RunLevel {
 			pkg.RunLevel = true
@@ -280,85 +273,14 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			continue
 		}
 
-		nmap := nodes[ev.Package]
-		segments, placed := levels[ev.Package][ev.Test]
-		if !placed {
-			segments = splitTestPath(ev.Test)
-			if ev.Action == ActionRun {
-				segments = joinUnstartedLevels(segments, nmap, levels[ev.Package])
-				levels[ev.Package][ev.Test] = segments
-			}
-		}
-
-		// Detect duplicate top-level run (ptest/pxtest same-name suite).
-		if ev.Action == ActionRun && len(segments) == 1 {
-			topRunCount[ev.Package][segments[0]]++
-			if topRunCount[ev.Package][segments[0]] > 1 {
-				// Create a duplicate node; children with #NN suffixes will attach here.
-				dup := &Node{Name: segments[0], duplicate: true, Start: ev.Time}
-				dupPath := segments[0] + "\x00dup"
-				nmap[dupPath] = dup
-				pkg.Nodes = append(pkg.Nodes, dup)
-				continue
-			}
-		}
-
-		// Resolve parent for children with #NN suffix (belongs to duplicate node).
-		resolvedSegments := segments
-		if len(segments) > 1 {
-			resolvedSegments = resolveDuplicateSegments(segments, nmap)
-		}
-
-		// The index is keyed by the path go test would print for a first,
-		// undisambiguated run, so duplicate bookkeeping is stripped before
-		// lookup: a suite that runs twice declares its behaviors once.
-		cleanSegments := make([]string, len(resolvedSegments))
-		for i, seg := range resolvedSegments {
-			cleanSegments[i] = stripDuplicateSuffix(strings.TrimSuffix(seg, "\x00dup"))
-		}
-
-		for i := range resolvedSegments {
-			path := strings.Join(resolvedSegments[:i+1], "/")
-			if nmap[path] != nil {
-				continue
-			}
-			name := resolvedSegments[i]
-			// Strip #NN suffix from display for children of duplicate runs —
-			// except under a fuzz wrapper, where seed#N is the engine's own
-			// numbering, not a duplicate.
-			cleanName := stripDuplicateSuffix(name)
-			if _, _, wrapper := protocol.SplitFuzzWrapper(resolvedSegments[0]); i == 1 && wrapper {
-				cleanName = name
-			}
-			decl := cfg.decls.lookup(ev.Package, DeclKey(cleanSegments[:i+1]...))
-			n := &Node{
-				Name:        cleanName,
-				Vocab:       decl.Vocab,
-				SourceLabel: decl.Label,
-			}
-			nmap[path] = n
-			if i == 0 {
-				pkg.Nodes = append(pkg.Nodes, n)
-			} else {
-				parent := nmap[strings.Join(resolvedSegments[:i], "/")]
-				parent.Children = append(parent.Children, n)
-			}
-		}
-
-		node := nmap[strings.Join(resolvedSegments, "/")]
-		// Route top-level pass/fail/output to duplicate if original already resolved.
-		if len(resolvedSegments) == 1 && node.Status != StatusNone {
-			dupPath := resolvedSegments[0] + "\x00dup"
-			if dup := nmap[dupPath]; dup != nil {
-				node = dup
-			}
-		}
+		e := builds[ev.Package].place(ev.Action, ev.Test)
+		node := e.node
 		switch ev.Action {
 		case ActionOutput:
 			node.Output = append(node.Output, ev.Output)
-			// A sub-benchmark's segment is whatever b.Run was given; the
+			// A sub-benchmark's level is whatever b.Run was given; the
 			// benchmark above it is what makes its output a result line.
-			if slices.ContainsFunc(resolvedSegments, isBenchmarkName) {
+			if e.underBenchmark() {
 				scan := benchScans[node]
 				if scan == nil {
 					scan = &benchScan{}
@@ -390,20 +312,26 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		pkgs[path].Output = append(slices.Clone(buildOutput[build]), pkgs[path].Output...)
 	}
 
-	for _, pkg := range pkgs {
+	for path, pkg := range pkgs {
+		builds[path].prune()
+		if cfg.decls != nil {
+			declare(pkg.Nodes, nil, func(levels []string) Declaration {
+				return cfg.decls.lookup(path, DeclKey(levels...))
+			})
+		}
 		attachFuzzWrappers(pkg)
 		// Completion order is dispatch order, which parallel suite processes
-		// shuffle; by name, two runs of one package render alike. Stable, so
-		// a suite run twice (ptest and pxtest) keeps its first run first.
-		sort.SliceStable(pkg.Nodes, func(i, j int) bool { return pkg.Nodes[i].Name < pkg.Nodes[j].Name })
-		seen := map[string]int{}
+		// shuffle; by name, two runs of one package render alike. A suite run
+		// twice (ptest and pxtest) keeps its first run first.
+		sort.SliceStable(pkg.Nodes, func(i, j int) bool {
+			a, b := pkg.Nodes[i], pkg.Nodes[j]
+			if a.Name != b.Name {
+				return a.Name < b.Name
+			}
+			return a.Variant < b.Variant
+		})
 		for _, n := range pkg.Nodes {
 			classify(n, true)
-			seen[n.Name]++
-			if n.duplicate {
-				n.Variant = seen[n.Name]
-				n.External = true
-			}
 		}
 		FailBranches(pkg)
 	}
@@ -426,25 +354,125 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	return result
 }
 
-// joinUnstartedLevels keeps a slash in a subtest's own name. go test starts
-// every subtest under a parent that is still running, and reports no level
-// for a slash in a name: "reads a/b paths" is one subtest. So the levels below
-// the deepest running ancestor are one name, and the ancestor keeps the
-// levels it was placed at. A finished "a" is a sibling of "a/x", not its
-// parent. With no running ancestor the path is left as split.
-func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[string][]string) []string {
-	for i := len(segments) - 1; i >= 1; i-- {
-		parent := strings.Join(segments[:i], "/")
-		if n := nmap[parent]; n == nil || n.Status != StatusNone {
-			continue
-		}
-		head := segments[:i]
-		if levels, ok := placed[parent]; ok {
-			head = levels
-		}
-		return append(slices.Clone(head), strings.Join(segments[i:], "/"))
+// treeBuild assembles one package's nodes. A node is keyed by its instance
+// and full name, which testing keeps unique within an instance; where it
+// sits comes from the Placer, which reads the stream's order.
+type treeBuild struct {
+	pkg     *Package
+	placer  *protocol.Placer
+	entries map[treeKey]*treeEntry
+}
+
+type treeKey struct {
+	instance int
+	test     string
+}
+
+type treeEntry struct {
+	node   *Node
+	parent *treeEntry // nil for a top-level node
+	// placeholder marks a node made before its own run: for a child whose
+	// parent the stream had not started, or an event without a run.
+	placeholder bool
+	reported    bool // an event of its own arrived
+}
+
+func newTreeBuild(pkg *Package) *treeBuild {
+	return &treeBuild{pkg: pkg, placer: protocol.NewPlacer(), entries: map[treeKey]*treeEntry{}}
+}
+
+// place reads one test event in stream order and returns its node.
+func (b *treeBuild) place(action Action, test string) *treeEntry {
+	pl := b.placer.Place(string(action), test)
+	key := treeKey{pl.Instance, test}
+	e := b.entries[key]
+	switch {
+	case e == nil:
+		e = &treeEntry{node: &Node{Name: pl.Written}, placeholder: action != ActionRun}
+		b.entries[key] = e
+		b.link(e, pl)
+	case e.placeholder && action == ActionRun:
+		// Its run says where it sits; the guess it was made by goes.
+		b.unlink(e)
+		e.node.Name = pl.Written
+		e.placeholder = false
+		b.link(e, pl)
 	}
-	return segments
+	e.reported = true
+	return e
+}
+
+// link hangs e under its parent, making a placeholder for a parent not seen.
+// A top-level node of a later instance is the external twin.
+func (b *treeBuild) link(e *treeEntry, pl protocol.Placement) {
+	if pl.Parent == "" {
+		e.parent = nil
+		if pl.Instance >= 2 {
+			e.node.Variant, e.node.External = pl.Instance, true
+		}
+		b.pkg.Nodes = append(b.pkg.Nodes, e.node)
+		return
+	}
+	key := treeKey{pl.Instance, pl.Parent}
+	parent := b.entries[key]
+	if parent == nil {
+		guess := protocol.Guess(pl.Parent, pl.Instance)
+		parent = &treeEntry{node: &Node{Name: guess.Written}, placeholder: true}
+		b.entries[key] = parent
+		b.link(parent, guess)
+	}
+	e.parent = parent
+	parent.node.Children = append(parent.node.Children, e.node)
+}
+
+func (b *treeBuild) unlink(e *treeEntry) {
+	same := func(n *Node) bool { return n == e.node }
+	if e.parent == nil {
+		b.pkg.Nodes = slices.DeleteFunc(b.pkg.Nodes, same)
+		return
+	}
+	e.parent.node.Children = slices.DeleteFunc(e.parent.node.Children, same)
+}
+
+// prune drops placeholders left without an event or a child: guesses a
+// later run replaced.
+func (b *treeBuild) prune() {
+	empty := map[*Node]bool{}
+	for _, e := range b.entries {
+		if e.placeholder && !e.reported {
+			empty[e.node] = true
+		}
+	}
+	if len(empty) > 0 {
+		b.pkg.Nodes = pruneNodes(b.pkg.Nodes, empty)
+	}
+}
+
+func pruneNodes(nodes []*Node, empty map[*Node]bool) []*Node {
+	return slices.DeleteFunc(nodes, func(n *Node) bool {
+		n.Children = pruneNodes(n.Children, empty)
+		return empty[n] && len(n.Children) == 0
+	})
+}
+
+// underBenchmark reports whether e or a node above it is a benchmark.
+func (e *treeEntry) underBenchmark() bool {
+	for ; e != nil; e = e.parent {
+		if isBenchmarkName(e.node.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+// declare gives each node what source declares at its written levels.
+func declare(nodes []*Node, levels []string, lookup func([]string) Declaration) {
+	for _, n := range nodes {
+		own := append(slices.Clip(levels), n.Name)
+		d := lookup(own)
+		n.Vocab, n.SourceLabel = d.Vocab, d.Label
+		declare(n.Children, own, lookup)
+	}
 }
 
 // FailBranches fails every node a failure beneath it reached, and the package
@@ -473,57 +501,10 @@ func failBranch(n *Node) bool {
 	return failed
 }
 
-// resolveDuplicateSegments checks if a child path belongs to a duplicate
-// top-level node (parent has #NN suffix pattern) and remaps it.
-func resolveDuplicateSegments(segments []string, nmap map[string]*Node) []string {
-	topName := segments[0]
-	dupPath := topName + "\x00dup"
-	if nmap[dupPath] == nil {
-		return segments
-	}
-
-	// A child carrying the #NN suffix belongs to the duplicate run, and so
-	// does any child reported once the first run has its verdict: go test
-	// reports a test only after its subtests. A suite of the external test
-	// package names methods the internal one lacks without a suffix.
-	second := nmap[topName] != nil && nmap[topName].Status != StatusNone
-	for _, seg := range segments[1:] {
-		if hasDuplicateSuffix(seg) {
-			second = true
-		}
-	}
-	if !second {
-		return segments
-	}
-	out := make([]string, len(segments))
-	out[0] = topName + "\x00dup"
-	for i := 1; i < len(segments); i++ {
-		out[i] = stripDuplicateSuffix(segments[i])
-	}
-	return out
-}
-
-func hasDuplicateSuffix(s string) bool {
-	idx := strings.LastIndex(s, "#")
-	if idx < 0 {
-		return false
-	}
-	suffix := s[idx+1:]
-	if len(suffix) == 0 {
-		return false
-	}
-	for _, c := range suffix {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
-}
-
 // StripDuplicateSuffix removes the "#01" the testing package appends to a
 // subtest whose name repeats among its siblings. The tree shows both under the
 // name the developer wrote, so a tree assembled from a source other than a test
-// stream has to drop the suffix the same way rather than inventing its own rule.
+// stream has to drop the suffix as well.
 func StripDuplicateSuffix(s string) string { return stripDuplicateSuffix(s) }
 
 func stripDuplicateSuffix(s string) string {
@@ -851,12 +832,6 @@ func classifySubBenchmark(n *Node) {
 	}
 }
 
-// splitTestPath splits a go test -json Test field into subtest segments.
-// Go uses "/" as the subtest separator, but description strings may contain
-// "/" too (e.g. "https:// URI"). We treat consecutive slashes as literal
-// characters within a segment rather than multiple separators.
-func splitTestPath(path string) []string { return protocol.SplitTestPath(path) }
-
 // failedOnItsOwn reports whether an interior node carries a verdict of its own:
 // a suite whose AfterAll failed, a test method that blew its configured
 // Timeout, or a bare t.Fail() with no message at all.
@@ -1081,7 +1056,7 @@ func ClassifyRoots(nodes []*Node) {
 func attachFuzzWrappers(pkg *Package) {
 	suites := map[string]*Node{}
 	for _, n := range pkg.Nodes {
-		if strings.HasSuffix(n.Name, protocol.SuffixTestSuite) && strings.HasPrefix(n.Name, "Test") && !n.duplicate {
+		if strings.HasSuffix(n.Name, protocol.SuffixTestSuite) && strings.HasPrefix(n.Name, "Test") && n.Variant < 2 {
 			suites[n.Name] = n
 		}
 	}
@@ -1089,7 +1064,7 @@ func attachFuzzWrappers(pkg *Package) {
 	var synthesized []*Node
 	for _, n := range pkg.Nodes {
 		suiteType, method, ok := protocol.SplitFuzzWrapper(n.Name)
-		if !ok || n.duplicate {
+		if !ok || n.Variant >= 2 {
 			kept = append(kept, n)
 			continue
 		}

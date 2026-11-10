@@ -139,6 +139,10 @@ func (p *Placer) close(nodes map[string]*placed, test string) {
 	}
 }
 
+// Guess places a name by the fallback split alone: for a parent the stream
+// names only through its subtests.
+func Guess(test string, instance int) Placement { return fallback(test, instance) }
+
 // fallback splits a name at the last separator SplitTestPath finds.
 func fallback(test string, n int) Placement {
 	pl := Placement{Own: test, Written: test, Instance: n, Guessed: true}

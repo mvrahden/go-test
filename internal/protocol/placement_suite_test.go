@@ -112,3 +112,24 @@ func (s *PlacementTestSuite) TestANameWithoutAnOpenParentFallsBack(t *gotest.T) 
 	got := place("run S/M/a/b")
 	gotest.Equal(t, protocol.Placement{Parent: "S/M/a", Own: "b", Written: "b", Instance: 1, Guessed: true}, got["S/M/a/b"])
 }
+
+// The fallback split cuts at single slashes only; a run of slashes stays in
+// its level, and a trailing slash is dropped.
+func (s *PlacementTestSuite) TestTheFallbackSplit(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc string
+		path string
+		want []string
+	}{
+		{Desc: "single segment", path: "TestFoo", want: []string{"TestFoo"}},
+		{Desc: "two segments", path: "TestFoo/bar", want: []string{"TestFoo", "bar"}},
+		{Desc: "three segments", path: "TestFoo/bar/baz", want: []string{"TestFoo", "bar", "baz"}},
+		{Desc: "consecutive double slash preserved", path: "TestFoo/https://example.com", want: []string{"TestFoo", "https://example.com"}},
+		{Desc: "consecutive triple slash preserved", path: "TestFoo/a///b", want: []string{"TestFoo", "a///b"}},
+		{Desc: "empty string", path: "", want: nil},
+		{Desc: "trailing slash", path: "TestFoo/bar/", want: []string{"TestFoo", "bar"}},
+		{Desc: "mixed normal and double slash", path: "TestSuite/method/https://host/path", want: []string{"TestSuite", "method", "https://host", "path"}},
+	}) {
+		gotest.Equal(sub, tc.want, protocol.SplitTestPath(tc.path))
+	}
+}

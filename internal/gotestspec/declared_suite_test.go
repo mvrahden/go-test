@@ -34,8 +34,8 @@ func (s *DeclaredTestSuite) TestSameNamedSuitesPairInRunOrder(t *gotest.T) {
 {"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
 {"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
 {"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
-{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove#01"}
-{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove#01","Elapsed":0.01}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove"}
+{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove","Elapsed":0.01}
 {"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
 {"Action":"fail","Package":"example.com/unit","Elapsed":0.05}`)
 	declared := []*gotestspec.Package{declaredOf("example.com/unit",
