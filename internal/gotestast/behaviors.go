@@ -155,7 +155,7 @@ func (w *behaviorWalker) unique(parent []string, sub string) string {
 		w.used[base] = n + 1
 		if n == 0 && sub != "" {
 			stem, nn := parseSubtestNumber(base)
-			if len(stem) < len(base) && nn < int32(w.used[stem]) {
+			if len(stem) < len(base) && nn < w.used[stem] {
 				continue
 			}
 			return sub
@@ -171,7 +171,7 @@ func (w *behaviorWalker) unique(parent []string, sub string) string {
 // parseSubtestNumber ports testing's: it splits a "#NN" suffix that "%02d"
 // could have produced from the name before it. "#00" counts only after an
 // empty name.
-func parseSubtestNumber(s string) (prefix string, nn int32) {
+func parseSubtestNumber(s string) (prefix string, nn int) {
 	i := strings.LastIndex(s, "#")
 	if i < 0 {
 		return s, 0
@@ -187,7 +187,7 @@ func parseSubtestNumber(s string) (prefix string, nn int32) {
 	if err != nil || n < 0 {
 		return s, 0
 	}
-	return prefix, int32(n)
+	return prefix, int(n)
 }
 
 // flagHidden marks the tree incomplete if a construct we do not model

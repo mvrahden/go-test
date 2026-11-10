@@ -240,7 +240,8 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 // nameTwinMethods gives the methods of an external suite that an internal
 // suite of the same name also declares the names go test reports.
 func nameTwinMethods(ds *discoverSuite, internalSuites []discoverSuite) {
-	for _, in := range internalSuites {
+	for i := range internalSuites {
+		in := &internalSuites[i]
 		if in.Name != ds.Name {
 			continue
 		}
