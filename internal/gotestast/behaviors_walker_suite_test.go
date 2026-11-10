@@ -128,6 +128,41 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 			},
 		},
 		{
+			Desc:   "a sibling spelled like a nested path repeats its full name",
+			method: "TestFullNameRepeat",
+			want:   []string{"a", "a/b", "a/b#01"},
+		},
+		{
+			Desc:   "a repeated leaf is numbered",
+			method: "TestRepeatedLeaf",
+			want:   []string{"x", "x#01"},
+		},
+		{
+			Desc:   "an empty label is numbered from zero",
+			method: "TestEmptyLabel",
+			want:   []string{"#00"},
+		},
+		{
+			Desc:   "a written number alone stays as written",
+			method: "TestExplicitNumber",
+			want:   []string{"a#01"},
+		},
+		{
+			Desc:   "a repeat skips the number a label already took",
+			method: "TestExplicitNumberFirst",
+			want:   []string{"a#01", "a", "a#02"},
+		},
+		{
+			Desc:   "a written number a repeat already took is numbered again",
+			method: "TestExplicitNumberLast",
+			want:   []string{"a", "a#01", "a#01#01"},
+		},
+		{
+			Desc:   "repeated rows are numbered and their children are not",
+			method: "TestRepeatedRows",
+			want:   []string{"r", "r/y", "r#01", "r#01/y"},
+		},
+		{
 			Desc:   "a keyed table names its rows from Desc",
 			method: "TestKeyedTable",
 			want: []string{
@@ -286,6 +321,29 @@ func (s *BehaviorWalkerTestSuite) TestDisplayKeepsTheProse(t *gotest.T) {
 				written = append(written, b.Written())
 			}
 			gotest.Equal(it, []string{"b#01", "a", "a"}, written)
+		})
+	})
+
+	t.When("a sibling repeats a full name", func(w *gotest.T) {
+		w.It("writes the label without the suffix this reader added", func(it *gotest.T) {
+			spec := s.specs["TestFullNameRepeat"]
+			gotest.Equal(it, "a/b#01", spec.Behaviors[1].Name)
+			gotest.Equal(it, "a/b", spec.Behaviors[1].Written())
+		})
+
+		w.It("keeps a written number as written", func(it *gotest.T) {
+			spec := s.specs["TestExplicitNumber"]
+			gotest.Equal(it, "a#01", spec.Behaviors[0].Written())
+		})
+
+		w.It("shows an empty label by its number", func(it *gotest.T) {
+			spec := s.specs["TestEmptyLabel"]
+			gotest.Equal(it, "#00", spec.Behaviors[0].Written())
+		})
+
+		w.It("adds a suffix after a written number", func(it *gotest.T) {
+			spec := s.specs["TestExplicitNumberLast"]
+			gotest.Equal(it, "a#01", spec.Behaviors[2].Written())
 		})
 	})
 }

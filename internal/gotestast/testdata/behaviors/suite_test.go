@@ -55,6 +55,48 @@ func (s *WalkerTestSuite) TestWholeNames(t *gotest.T) {
 	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
 }
 
+// go test counts a name by the whole path, so a sibling spelled like a
+// nested path collides with it.
+func (s *WalkerTestSuite) TestFullNameRepeat(t *gotest.T) {
+	t.When("a", func(t *gotest.T) {
+		t.It("b", func(t *gotest.T) { gotest.True(t, true) })
+	})
+	t.It("a/b", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestRepeatedLeaf(t *gotest.T) {
+	t.It("x", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("x", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestEmptyLabel(t *gotest.T) {
+	t.It("", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestExplicitNumber(t *gotest.T) {
+	t.It("a#01", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+// A written "a#01" takes that number from a later repeat of "a".
+func (s *WalkerTestSuite) TestExplicitNumberFirst(t *gotest.T) {
+	t.It("a#01", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+// A written "a#01" after a repeat of "a" already took that number.
+func (s *WalkerTestSuite) TestExplicitNumberLast(t *gotest.T) {
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a#01", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestRepeatedRows(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []keyedRow{{"r", 1}, {"r", 2}}) {
+		sub.It("y", func(it *gotest.T) { gotest.NotZero(it, tc.N) })
+	}
+}
+
 type keyedRow struct {
 	Desc string
 	N    int

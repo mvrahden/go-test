@@ -35,10 +35,10 @@ const (
 
 type Behavior struct {
 	// Name is the subtest level go test will produce: the same sanitisation
-	// the testing package applies, plus the "#01" it appends to a name that
-	// repeats among its siblings. A slash in it stays in it. All of this has
-	// to match byte for byte, because it is how a statically-known behavior
-	// is reconciled with the one observed at run time.
+	// the testing package applies, plus the "#01" it appends to a name whose
+	// full path repeats within the method. A slash in it stays in it. All of
+	// this has to match byte for byte, because it is how a statically-known
+	// behavior is reconciled with the one observed at run time.
 	Name     string
 	Display  string
 	Kind     BehaviorKind
@@ -49,7 +49,7 @@ type Behavior struct {
 }
 
 // Written is Name without the repeat suffix this reader added for a repeated
-// sibling. A suffix the label itself holds is part of what was written.
+// full name. A suffix the label itself holds is part of what was written.
 func (b *Behavior) Written() string { return b.Name[:len(b.Name)-b.added] }
 
 // MethodSpec is the behavior tree of a single test method. Complete reports
@@ -73,8 +73,10 @@ func (ts *TestSuiteSpec) BehaviorsOf(m *TestSuiteMethod) MethodSpec {
 		info:     ts.pkg.TypesInfo,
 		fset:     ts.pkg.Fset,
 		complete: true,
+		used:     map[string]int{},
 	}
 	behaviors := w.walkBlock(fd.Body)
+	w.name(nil, behaviors)
 	return MethodSpec{Behaviors: behaviors, Complete: w.complete, Notes: w.notes}
 }
 
@@ -83,6 +85,8 @@ type behaviorWalker struct {
 	fset     *token.FileSet
 	complete bool
 	notes    []string
+	// used counts each full name inside the method, as testing's subNames does.
+	used map[string]int
 }
 
 func (w *behaviorWalker) incomplete(pos token.Pos, format string, args ...any) {
@@ -118,25 +122,72 @@ func (w *behaviorWalker) walkBlock(block *ast.BlockStmt) []*Behavior {
 			w.flagHidden(stmt)
 		}
 	}
-	return resolveSiblings(out)
+	return out
 }
 
-// resolveSiblings turns the behaviors written in one block into the subtests go
-// test will actually produce for them. A name that repeats among its siblings
-// gains a "#01" suffix, which is not visible in the source. A slash in a name
-// is part of it: go test reports one subtest, never a level per segment.
-func resolveSiblings(in []*Behavior) []*Behavior {
-	seen := make(map[string]int, len(in))
-	for _, b := range in {
-		name := b.Name
-		if n := seen[name]; n > 0 {
-			suffix := fmt.Sprintf("#%02d", n)
-			b.Name = name + suffix
-			b.added = len(suffix)
+// name gives each behavior the name go test reports, in the order the calls
+// run: a call is named before its children, its children before the next
+// sibling. Pre-order over the tree is that order, table rows included.
+func (w *behaviorWalker) name(parent []string, behaviors []*Behavior) {
+	for _, b := range behaviors {
+		written := b.Name
+		b.Name = w.unique(parent, written)
+		// An empty label has only its number to show, as a run shows it.
+		if written != "" {
+			b.added = len(b.Name) - len(written)
 		}
-		seen[name]++
+		w.name(append(parent[:len(parent):len(parent)], b.Name), b.Children)
 	}
-	return in
+}
+
+// unique ports testing's matcher.unique: it counts each full name, so a
+// repeat gains "#01", an empty name "#00", and a written "#NN" that an
+// earlier repeat already took is numbered again. The own level is returned.
+func (w *behaviorWalker) unique(parent []string, sub string) string {
+	// The method itself is the root, so every key starts with "/".
+	prefix := "/"
+	for _, level := range parent {
+		prefix += level + "/"
+	}
+	base := prefix + sub
+	for {
+		n := w.used[base]
+		w.used[base] = n + 1
+		if n == 0 && sub != "" {
+			stem, nn := parseSubtestNumber(base)
+			if len(stem) < len(base) && nn < int32(w.used[stem]) {
+				continue
+			}
+			return sub
+		}
+		name := fmt.Sprintf("%s#%02d", base, n)
+		if w.used[name] != 0 {
+			continue
+		}
+		return name[len(prefix):]
+	}
+}
+
+// parseSubtestNumber ports testing's: it splits a "#NN" suffix that "%02d"
+// could have produced from the name before it. "#00" counts only after an
+// empty name.
+func parseSubtestNumber(s string) (prefix string, nn int32) {
+	i := strings.LastIndex(s, "#")
+	if i < 0 {
+		return s, 0
+	}
+	prefix, suffix := s[:i], s[i+1:]
+	if len(suffix) < 2 || (len(suffix) > 2 && suffix[0] == '0') {
+		return s, 0
+	}
+	if suffix == "00" && !strings.HasSuffix(prefix, "/") {
+		return s, 0
+	}
+	n, err := strconv.ParseInt(suffix, 10, 32)
+	if err != nil || n < 0 {
+		return s, 0
+	}
+	return prefix, int32(n)
 }
 
 // flagHidden marks the tree incomplete if a construct we do not model
