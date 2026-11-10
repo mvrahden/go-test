@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
-	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // Behaviors are the `When`/`It` blocks a test method declares. They are the
@@ -36,21 +34,23 @@ const (
 )
 
 type Behavior struct {
-	// Name is the subtest segment go test will produce: the same sanitisation
+	// Name is the subtest level go test will produce: the same sanitisation
 	// the testing package applies, plus the "#01" it appends to a name that
-	// repeats among its siblings. A description containing a slash is split
-	// into one Behavior per level, the levels a -run pattern matches it by.
-	// All of this has to match byte for byte, because it is how a
-	// statically-known behavior is reconciled with the one observed at run time.
+	// repeats among its siblings. A slash in it stays in it. All of this has
+	// to match byte for byte, because it is how a statically-known behavior
+	// is reconciled with the one observed at run time.
 	Name     string
 	Display  string
 	Kind     BehaviorKind
 	Line     int
 	Children []*Behavior
-	// Implied marks a level no call declares: the text before a slash in the
-	// descriptions beneath it. go test reports no subtest for it.
-	Implied bool
+	// added is the length of the repeat suffix this reader appended to Name.
+	added int
 }
+
+// Written is Name without the repeat suffix this reader added for a repeated
+// sibling. A suffix the label itself holds is part of what was written.
+func (b *Behavior) Written() string { return b.Name[:len(b.Name)-b.added] }
 
 // MethodSpec is the behavior tree of a single test method. Complete reports
 // whether the tree is exhaustive: when false, the method declares behaviors
@@ -122,90 +122,21 @@ func (w *behaviorWalker) walkBlock(block *ast.BlockStmt) []*Behavior {
 }
 
 // resolveSiblings turns the behaviors written in one block into the subtests go
-// test will actually produce for them. Two rules of the testing package apply
-// here and neither is visible in the source: a name that repeats among its
-// siblings gains a "#01" suffix, and a name containing a slash becomes one
-// subtest level per segment. Skipping either would put a behavior in the tree
-// under a name no run will ever report.
+// test will actually produce for them. A name that repeats among its siblings
+// gains a "#01" suffix, which is not visible in the source. A slash in a name
+// is part of it: go test reports one subtest, never a level per segment.
 func resolveSiblings(in []*Behavior) []*Behavior {
-	if len(in) == 0 {
-		return nil
-	}
 	seen := make(map[string]int, len(in))
-	var out []*Behavior
 	for _, b := range in {
-		// The testing package uniquifies against the name as written, before
-		// any slash in it is read as a separator, so uniquing comes first.
 		name := b.Name
 		if n := seen[name]; n > 0 {
-			b.Name = fmt.Sprintf("%s#%02d", name, n)
+			suffix := fmt.Sprintf("#%02d", n)
+			b.Name = name + suffix
+			b.added = len(suffix)
 		}
 		seen[name]++
-		out = insertPath(out, splitSegments(b.Name), splitSegments(b.Display), b)
 	}
-	return out
-}
-
-// insertPath places a behavior at the end of its segment path, reusing a
-// grouping node a sibling already created. Two behaviors written as "a/b" and
-// "a/c" are one node with two children at run time, not two nodes that happen
-// to share a prefix. A behavior a call declares is never such a node: "a/b"
-// written after an It "a" is its sibling, as go test reports it.
-func insertPath(out []*Behavior, segments, displays []string, leaf *Behavior) []*Behavior {
-	if len(segments) <= 1 {
-		return append(out, leaf)
-	}
-	head := segments[0]
-	var node *Behavior
-	for _, existing := range out {
-		if existing.Name == head && existing.Implied {
-			node = existing
-			break
-		}
-	}
-	if node == nil {
-		node = &Behavior{
-			Name:    head,
-			Display: displayAt(displays, 0, head),
-			Kind:    BehaviorWhen,
-			Line:    leaf.Line,
-			Implied: true,
-		}
-		out = append(out, node)
-	}
-	rest := segments[1:]
-	if len(rest) == 1 {
-		leaf.Name = rest[0]
-		leaf.Display = displayAt(displays, 1, rest[0])
-	}
-	node.Children = insertPath(node.Children, rest, tailFrom(displays, 1), leaf)
-	return out
-}
-
-// splitSegments cuts a name at the separator go test uses between subtest
-// levels, by the same rule the stream parser applies. Sanitisation never adds
-// or removes a slash, so the description and the subtest name split into the
-// same number of pieces.
-func splitSegments(s string) []string {
-	segments := protocol.SplitTestPath(s)
-	if len(segments) == 0 {
-		return []string{s}
-	}
-	return segments
-}
-
-func displayAt(displays []string, i int, fallback string) string {
-	if i < len(displays) {
-		return displays[i]
-	}
-	return fallback
-}
-
-func tailFrom(displays []string, i int) []string {
-	if i < len(displays) {
-		return displays[i:]
-	}
-	return nil
+	return in
 }
 
 // flagHidden marks the tree incomplete if a construct we do not model

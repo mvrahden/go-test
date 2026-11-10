@@ -163,13 +163,10 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 
 func staticBehaviorNodes(behaviors []*gotestast.Behavior, file string) []*gotestspec.Node {
 	var out []*gotestspec.Node
-	for _, b := range reportedBehaviors(behaviors) {
-		// The behavior carries the exact go test segment, "#01" and all,
-		// because that is what an observed result is keyed by. The tree shows
-		// duplicates under the name the developer wrote, so it drops the
-		// suffix here exactly as the stream parser does.
+	for _, b := range behaviors {
+		// The tree shows duplicates under the name the developer wrote.
 		node := &gotestspec.Node{
-			Name:        gotestspec.StripDuplicateSuffix(b.Name),
+			Name:        b.Written(),
 			Vocab:       vocabOf(b.Kind),
 			SourceLabel: b.Display,
 			File:        file,

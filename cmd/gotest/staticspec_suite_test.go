@@ -341,6 +341,39 @@ func (s *StaticSpecTestSuite) TestAReplayKeepsASlashInALabel(t *gotest.T, ctx *s
 	})
 }
 
+// A label that ends in a slash is one subtest too, and its declaration is
+// found again by the name go test reported.
+func (s *StaticSpecTestSuite) TestAReplayKeepsATrailingSlashInALabel(t *gotest.T, ctx *staticCtx) {
+	const pkg = "github.com/mvrahden/go-test/cmd/gotest/testdata/static/slashes"
+	var stream strings.Builder
+	for _, ev := range []struct{ action, test string }{
+		{"run", "TestPathsTestSuite"},
+		{"run", "TestPathsTestSuite/TestTrailing"},
+		{"run", "TestPathsTestSuite/TestTrailing/names_each_file,_with_a/_and_b/"},
+		{"pass", "TestPathsTestSuite/TestTrailing/names_each_file,_with_a/_and_b/"},
+		{"pass", "TestPathsTestSuite/TestTrailing"},
+		{"pass", "TestPathsTestSuite"},
+		{"pass", ""},
+	} {
+		line, err := json.Marshal(map[string]string{"Action": ev.action, "Package": pkg, "Test": ev.test})
+		gotest.NoError(t, err)
+		stream.Write(append(line, '\n'))
+	}
+	in := filepath.Join(ctx.dir, "events.json")
+	gotest.NoError(t, os.WriteFile(in, []byte(stream.String()), 0o600))
+	out := filepath.Join(ctx.dir, "spec.json")
+	gotest.Equal(t, 0, ExportRunSpecFromInput(in, "json", out, true, false))
+	raw, err := os.ReadFile(out) //nolint:gosec // G304: path built in this test
+	gotest.NoError(t, err)
+
+	t.When("a replayed It's label ends in a slash", func(w *gotest.T) {
+		w.It("carries the It vocabulary and the source label", func(it *gotest.T) {
+			gotest.Contains(it, string(raw), `"vocab":"it"`)
+			gotest.Contains(it, string(raw), "names each file, with a/ and b/")
+		})
+	})
+}
+
 func (s *StaticSpecTestSuite) TestExitCodes(t *gotest.T, ctx *staticCtx) {
 	t.When("the source can be read", func(w *gotest.T) {
 		w.It("exits 0", func(it *gotest.T) {

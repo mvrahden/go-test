@@ -30,7 +30,7 @@ func (s *WalkerTestSuite) TestDuplicateSiblings(t *gotest.T) {
 	})
 }
 
-// A single slash is a level separator; a run of them is not.
+// A slash in a label is part of it: one subtest, however many slashes.
 func (s *WalkerTestSuite) TestSlashes(t *gotest.T) {
 	t.When("a/b grouping", func(t *gotest.T) {
 		t.It("works", func(t *gotest.T) { gotest.True(t, true) })
@@ -41,6 +41,18 @@ func (s *WalkerTestSuite) TestSlashes(t *gotest.T) {
 	t.When("https:// URI", func(t *gotest.T) {
 		t.It("stays one level", func(t *gotest.T) { gotest.True(t, true) })
 	})
+}
+
+// Labels that begin or end with a slash, beside a When whose own label ends in one.
+func (s *WalkerTestSuite) TestWholeNames(t *gotest.T) {
+	t.It("gets ./", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("/abs/pkg", func(t *gotest.T) { gotest.True(t, true) })
+	t.When("reads specs/", func(t *gotest.T) {
+		t.It("holds", func(t *gotest.T) { gotest.True(t, true) })
+	})
+	t.It("b#01", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
 }
 
 type keyedRow struct {

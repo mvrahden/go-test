@@ -501,26 +501,6 @@ func failBranch(n *Node) bool {
 	return failed
 }
 
-// StripDuplicateSuffix removes the "#01" the testing package appends to a
-// subtest whose name repeats among its siblings. The tree shows both under the
-// name the developer wrote, so a tree assembled from a source other than a test
-// stream has to drop the suffix as well.
-func StripDuplicateSuffix(s string) string { return stripDuplicateSuffix(s) }
-
-func stripDuplicateSuffix(s string) string {
-	idx := strings.LastIndex(s, "#")
-	if idx <= 0 {
-		return s
-	}
-	suffix := s[idx+1:]
-	for _, c := range suffix {
-		if c < '0' || c > '9' {
-			return s
-		}
-	}
-	return s[:idx]
-}
-
 // isBenchmarkName reports whether name is a Go benchmark identifier:
 // "Benchmark" followed by nothing or a non-lowercase character — mirroring
 // the stdlib's TestXxx/BenchmarkXxx convention. This is boundary-aware so

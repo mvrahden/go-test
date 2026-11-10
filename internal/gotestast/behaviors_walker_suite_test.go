@@ -101,18 +101,30 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 			},
 		},
 		{
-			// A single slash is a level separator, so "a/b" and "a/c" share one
-			// parent; a run of slashes is not, so "https://" stays one level.
-			Desc:   "a slash in a description is a level, a run of them is not",
+			// go test reports one subtest for a label with a slash, so the
+			// slash is part of the name and makes no level.
+			Desc:   "a slash in a description is part of its name",
 			method: "TestSlashes",
 			want: []string{
-				"a",
 				"a/b_grouping",
 				"a/b_grouping/works",
 				"a/c_grouping",
 				"a/c_grouping/also_works",
 				"https://_URI",
 				"https://_URI/stays_one_level",
+			},
+		},
+		{
+			Desc:   "a label that begins or ends with a slash is one name",
+			method: "TestWholeNames",
+			want: []string{
+				"gets_./",
+				"/abs/pkg",
+				"reads_specs/",
+				"reads_specs//holds",
+				"b#01",
+				"a",
+				"a#01",
 			},
 		},
 		{
@@ -256,12 +268,24 @@ func (s *BehaviorWalkerTestSuite) TestDisplayKeepsTheProse(t *gotest.T) {
 		})
 	})
 
-	t.When("a description is split across levels by a slash", func(w *gotest.T) {
+	t.When("a description holds a slash", func(w *gotest.T) {
 		spec := s.specs["TestSlashes"]
 
-		w.It("gives each level the piece of prose it came from", func(it *gotest.T) {
-			gotest.Equal(it, "a", spec.Behaviors[0].Display)
-			gotest.Equal(it, "b grouping", spec.Behaviors[0].Children[0].Display)
+		w.It("keeps the whole prose in one Display", func(it *gotest.T) {
+			gotest.Equal(it, "a/b grouping", spec.Behaviors[0].Display)
+			gotest.Equal(it, "works", spec.Behaviors[0].Children[0].Display)
+		})
+	})
+
+	t.When("a sibling repeats a name", func(w *gotest.T) {
+		spec := s.specs["TestWholeNames"]
+
+		w.It("writes the repeat without the suffix this reader added", func(it *gotest.T) {
+			var written []string
+			for _, b := range spec.Behaviors[3:] {
+				written = append(written, b.Written())
+			}
+			gotest.Equal(it, []string{"b#01", "a", "a"}, written)
 		})
 	})
 }

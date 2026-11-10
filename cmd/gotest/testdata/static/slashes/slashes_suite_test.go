@@ -18,6 +18,10 @@ func (s *PathsTestSuite) TestRead(t *gotest.T) {
 	}
 }
 
+func (s *PathsTestSuite) TestTrailing(t *gotest.T) {
+	t.It("names each file, with a/ and b/", func(it *gotest.T) { gotest.True(it, true) })
+}
+
 func (s *PathsTestSuite) X_TestParked(t *gotest.T) {
 	t.When("the method is parked", func(w *gotest.T) {
 		w.It("never runs", func(it *gotest.T) { gotest.True(it, true) })
