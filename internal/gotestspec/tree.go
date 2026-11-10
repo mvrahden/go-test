@@ -95,17 +95,22 @@ type Declaration struct {
 	Vocab Vocab
 }
 
-// DeclarationIndex maps a package's test paths ("TestUserServiceTestSuite/
-// TestCreate/email_is_valid") to what source declares about them. The paths are
-// the ones go test prints, which is what lets a declaration and an observation
-// of the same behavior be one node rather than two.
+// DeclKey keys a declaration by its written levels from the top-level test
+// down; "a/b" as one level and "a" then "b" are different keys.
+func DeclKey(levels ...string) string { return strings.Join(levels, "\x00") }
+
+// DeclarationIndex maps a package's declarations, by DeclKey of their levels
+// ("TestUserServiceTestSuite", "TestCreate", "email_is_valid"), to what source
+// declares about them. The levels are the ones go test prints, which is what
+// lets a declaration and an observation of the same behavior be one node
+// rather than two.
 type DeclarationIndex map[string]map[string]Declaration
 
-func (i DeclarationIndex) lookup(pkgPath, testPath string) Declaration {
+func (i DeclarationIndex) lookup(pkgPath, key string) Declaration {
 	if i == nil {
 		return Declaration{}
 	}
-	return i[pkgPath][testPath]
+	return i[pkgPath][key]
 }
 
 type buildConfig struct {
@@ -325,7 +330,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			if _, _, wrapper := protocol.SplitFuzzWrapper(resolvedSegments[0]); i == 1 && wrapper {
 				cleanName = name
 			}
-			decl := cfg.decls.lookup(ev.Package, strings.Join(cleanSegments[:i+1], "/"))
+			decl := cfg.decls.lookup(ev.Package, DeclKey(cleanSegments[:i+1]...))
 			n := &Node{
 				Name:        cleanName,
 				Vocab:       decl.Vocab,

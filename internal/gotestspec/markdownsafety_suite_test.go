@@ -209,8 +209,8 @@ func slashTree(t *gotest.T, opts ...gotestspec.BuildOption) []*gotestspec.Packag
 
 func (s *MarkdownSafetyTestSuite) TestBuildTree_ASlashInAnIt(t *gotest.T) {
 	decls := gotestspec.DeclarationIndex{"example.com/pkg": {
-		"TestPathsTestSuite/TestRead/a_path_is_read":                 {Label: "a path is read", Vocab: gotestspec.VocabWhen},
-		"TestPathsTestSuite/TestRead/a_path_is_read/reads_a/b_paths": {Label: "reads a/b paths", Vocab: gotestspec.VocabIt},
+		gotestspec.DeclKey("TestPathsTestSuite", "TestRead", "a_path_is_read"):                    {Label: "a path is read", Vocab: gotestspec.VocabWhen},
+		gotestspec.DeclKey("TestPathsTestSuite", "TestRead", "a_path_is_read", "reads_a/b_paths"): {Label: "reads a/b paths", Vocab: gotestspec.VocabIt},
 	}}
 	for _, c := range []struct {
 		name string

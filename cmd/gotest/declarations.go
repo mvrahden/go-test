@@ -87,8 +87,7 @@ func buildDeclarationIndex(loadResults []*gotestgen.LoadResult) gotestspec.Decla
 			for _, suite := range result.Suites {
 				suitePath := "Test" + suite.Identifier()
 				for _, method := range suite.TestCases() {
-					methodPath := suitePath + "/" + method.Identifier()
-					indexBehaviors(idx, lr.PkgPath, methodPath, suite.BehaviorsOf(method).Behaviors)
+					indexBehaviors(idx, lr.PkgPath, []string{suitePath, method.Identifier()}, suite.BehaviorsOf(method).Behaviors)
 				}
 			}
 		}
@@ -120,20 +119,20 @@ func reportedBehaviors(behaviors []*gotestast.Behavior) []*gotestast.Behavior {
 	return out
 }
 
-func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath, parentPath string, behaviors []*gotestast.Behavior) {
+func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath string, parent []string, behaviors []*gotestast.Behavior) {
 	for _, b := range reportedBehaviors(behaviors) {
 		// A declared behavior carries the exact go test segment, "#01" and all.
 		// The tree keys duplicates under the name the developer wrote, so the
 		// index drops the suffix the same way — otherwise the second of two
 		// same-named siblings would find no declaration and read differently
 		// from the first.
-		path := parentPath + "/" + gotestspec.StripDuplicateSuffix(b.Name)
+		path := append(append([]string(nil), parent...), gotestspec.StripDuplicateSuffix(b.Name))
 		paths := idx[pkgPath]
 		if paths == nil {
 			paths = map[string]gotestspec.Declaration{}
 			idx[pkgPath] = paths
 		}
-		paths[path] = gotestspec.Declaration{Label: b.Display, Vocab: vocabOf(b.Kind)}
+		paths[gotestspec.DeclKey(path...)] = gotestspec.Declaration{Label: b.Display, Vocab: vocabOf(b.Kind)}
 		indexBehaviors(idx, pkgPath, path, b.Children)
 	}
 }
