@@ -4,7 +4,10 @@
 // or has to admit it cannot see.
 package behaviors
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"github.com/mvrahden/go-test/internal/gotestast/testdata/behaviors/names"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type WalkerTestSuite struct{}
 
@@ -156,4 +159,66 @@ func (s *WalkerTestSuite) TestComputedDescription(t *gotest.T) {
 
 func (s *WalkerTestSuite) TestNoBehaviorsAtAll(t *gotest.T) {
 	gotest.True(t, true)
+}
+
+const localName = "local name"
+
+type typedName string
+
+const typedConst typedName = "typed name"
+
+const prefix = "pre "
+
+type bothRow struct {
+	Desc string
+	Name string
+}
+
+type intNameRow struct {
+	Name int
+}
+
+var runtimeName = "known late"
+
+// The type checker knows each of these rows' names.
+func (s *WalkerTestSuite) TestConstantRows(t *gotest.T) {
+	for sub := range gotest.Each(t, []bothRow{
+		{Name: names.PSuite},
+		{Name: localName},
+		{Name: prefix + "x"},
+		{Desc: "", Name: "n"},
+		{Desc: "d", Name: "n"},
+	}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+type typedRow struct{ Name typedName }
+
+// A field of a string kind counts, and the type checker knows its value.
+func (s *WalkerTestSuite) TestTypedConstantRows(t *gotest.T) {
+	for sub := range gotest.Each(t, []typedRow{{Name: typedConst}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// Only a run knows a variable's value, so the row is not listed.
+func (s *WalkerTestSuite) TestVariableRow(t *gotest.T) {
+	for sub := range gotest.Each(t, []bothRow{{Name: "first"}, {Name: runtimeName}, {Name: "third"}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// A Name that is not a string kind does not name the row.
+func (s *WalkerTestSuite) TestIntNameRow(t *gotest.T) {
+	for sub := range gotest.Each(t, []intNameRow{{Name: 3}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// A Desc a variable sets beats a Name the reader could read.
+func (s *WalkerTestSuite) TestVariableDescBeatsName(t *gotest.T) {
+	for sub := range gotest.Each(t, []bothRow{{Desc: runtimeName, Name: "n"}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
 }

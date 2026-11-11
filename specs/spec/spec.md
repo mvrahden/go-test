@@ -125,6 +125,19 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **WHEN** a package's specification is rendered as JSON with --static or with --declared
 - **THEN** gives the package its dir and each node the source declares the file and line gotest discover gives it, and a node only the stream holds neither
 
+### Requirement: Table rows named by constants
+The specification read from source SHALL name an Each table row as the run does: by its Desc field, else its Name field, each when it is a string and not empty, else by its index, and a constant the type checker evaluates, such as one imported from another package, names a row by its value. A row whose name only a run can know SHALL not be listed, and its method SHALL be marked incomplete; under --declared the row the run reported SHALL show with its verdict.
+
+#### Scenario: A row named by a constant
+- **WHEN** a table row is named by a constant
+- **THEN** the spec read from source names the row by the constant's value
+- **AND** the declared spec under the run shows the row with its verdict
+
+#### Scenario: A row named at run time
+- **WHEN** a table row's name is known only at run time
+- **THEN** the spec read from source lists no row for it and marks its method incomplete
+- **AND** the declared spec under the run shows the row the run reported
+
 ### Requirement: Hiding rows by status
 `--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared without --input or beside --static, SHALL exit 2.
 

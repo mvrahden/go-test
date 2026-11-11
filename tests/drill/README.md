@@ -741,6 +741,8 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-when-connective-dropped` | a When's label loses its when on every surface | conformance: the spec It for labels with underscores sees discover's When label without when |
 | `e2e-run-spec-labels-reconstructed` | a run's spec ignores the labels source declares | conformance: the spec It for a run's spec sees underscores turned into spaces |
 | `e2e-static-spec-labels-reconstructed` | the spec read from source ignores the labels as written | conformance: the spec It for --static sees underscores turned into spaces |
+| `each-row-constant-named-by-index` | the spec read from source names a table row a constant names by its index | conformance: the spec Its for a row named by a constant see `#0` rows |
+| `each-row-runtime-name-guessed` | the spec read from source names a table row only a run can name by its index | conformance: the spec Its for a row named at run time see a listed `#1` row |
 | `e2e-replay-labels-reconstructed` | a replayed stream's spec ignores the labels source declares | conformance: the spec It for a replay sees underscores turned into spaces |
 | `e2e-connective-doubled` | a label that opens with a connective gets a second when | conformance: the spec It for a connective of its own sees "when with …" |
 | `discover-splits-slash-labels` | discover keeps only the text after a label's last slash | conformance: the spec and discovery Its for discover see the label cut short |

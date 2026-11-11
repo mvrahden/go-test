@@ -101,6 +101,58 @@ func (s *SpecDeclaredTestSuite) TestRowsOnlyARunCanName(t *gotest.T) {
 	})
 }
 
+func (s *SpecDeclaredTestSuite) TestTableRowsNamedBeforeTheRun(t *gotest.T) {
+	const pkg = "../testdata/specrows/"
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), pkg)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	input := filepath.Join(t.TempDir(), "events.jsonl")
+	gotest.NoError(t, os.WriteFile(input, []byte(run.Stdout), 0o600))
+	t.When("a table row is named by a constant", func(w *gotest.T) {
+		w.It("the spec read from source names the row by the constant's value", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--static", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowsNamedByConstants")
+			gotest.False(it, method.Incomplete)
+			var rows []string
+			for _, row := range method.Children {
+				gotest.Equal(it, "none", row.Status)
+				rows = append(rows, row.Name)
+			}
+			gotest.Equal(it, []string{"p_suite", "local_name"}, rows)
+		})
+		w.It("the declared spec under the run shows the row with its verdict", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--input="+input, "--declared", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowsNamedByConstants")
+			gotest.False(it, method.Incomplete)
+			gotest.Len(it, method.Children, 2)
+			for _, row := range method.Children {
+				gotest.Equal(it, "pass", row.Status)
+			}
+			gotest.Equal(it, "p_suite", method.Children[0].Name)
+		})
+	})
+	t.When("a table row's name is known only at run time", func(w *gotest.T) {
+		w.It("the spec read from source lists no row for it and marks its method incomplete", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--static", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowNamedAtRunTime")
+			gotest.True(it, method.Incomplete)
+			gotest.Len(it, method.Children, 1)
+			gotest.Equal(it, "literal", method.Children[0].Name)
+		})
+		w.It("the declared spec under the run shows the row the run reported", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--input="+input, "--declared", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowNamedAtRunTime")
+			gotest.True(it, method.Incomplete)
+			var rows []string
+			for _, row := range method.Children {
+				gotest.Equal(it, "pass", row.Status)
+				rows = append(rows, row.Name)
+			}
+			gotest.Equal(it, []string{"literal", "known_late"}, rows)
+		})
+	})
+}
+
 func (s *SpecDeclaredTestSuite) TestASuiteItsGuardKeptFromRunning(t *gotest.T) {
 	const guarded = "../testdata/declaredguard/"
 	run, err := testkit.RunPackage(t.Context(), t.TempDir(), guarded)

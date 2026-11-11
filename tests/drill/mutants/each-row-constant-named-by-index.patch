@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / the spec read from source names the row by the constant's value
+Clause: when a table row is named by a constant → the spec read from source names the row by the constant's value
+Clause: when a table row is named by a constant → the declared spec under the run shows the row with its verdict
+--- a/internal/gotestast/behaviors.go
++++ b/internal/gotestast/behaviors.go
+@@ -386,7 +386,7 @@ func isStringField(st *types.Struct, field string) bool {
+ // the type checker evaluated.
+ func (w *behaviorWalker) stringConstant(expr ast.Expr) (string, bool) {
+ 	if w.info != nil {
+-		if tv, ok := w.info.Types[expr]; ok && tv.Value != nil && tv.Value.Kind() == constant.String {
++		if tv, ok := w.info.Types[expr]; ok && false && tv.Value.Kind() == constant.String {
+ 			return constant.StringVal(tv.Value), true
+ 		}
+ 	}

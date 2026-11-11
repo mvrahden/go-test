@@ -3,6 +3,7 @@ package gotestast
 import (
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"strconv"
@@ -298,7 +299,11 @@ func (w *behaviorWalker) eachRows(s *ast.RangeStmt) []*Behavior {
 
 	rows := make([]*Behavior, 0, len(composite.Elts))
 	for i, elt := range composite.Elts {
-		name := w.eachEntryName(elt, i)
+		name, known := w.eachEntryName(elt, i)
+		if !known {
+			w.incomplete(elt.Pos(), "Each row name is not a constant")
+			continue
+		}
 		rows = append(rows, &Behavior{
 			Name:     SubtestName(name),
 			Display:  name,
@@ -310,49 +315,82 @@ func (w *behaviorWalker) eachRows(s *ast.RangeStmt) []*Behavior {
 	return rows
 }
 
-// eachEntryName mirrors the runtime's eachEntryName: the Desc field wins, then
-// Name, then the index. Both the keyed and the positional literal forms are
-// resolved, because a table written as `{"too short", ...}` names its rows just
-// as surely as one written as `{Desc: "too short"}`.
-func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) string {
-	composite, ok := elt.(*ast.CompositeLit)
-	if !ok {
-		return fmt.Sprintf("#%d", index)
+// eachEntryName mirrors the runtime's eachEntryName: a Desc field of a string
+// kind and not empty wins, then Name, then the index. Keyed and positional
+// literals both resolve, and a value is known when it is a string literal or
+// any constant the type checker evaluated. known is false when a field the
+// runtime would read holds a value only a run has, and the row can not be
+// named.
+func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) (name string, known bool) {
+	byIndex := fmt.Sprintf("#%d", index)
+	composite, isLit := elt.(*ast.CompositeLit)
+	st := w.structOf(elt)
+	if st == nil {
+		if w.info != nil && w.info.TypeOf(elt) != nil {
+			return byIndex, true // rows that are not structs are named by index
+		}
+		if !isLit {
+			return "", false
+		}
+	}
+	if !isLit {
+		return "", false // a struct value the source does not spell out
 	}
 
 	for _, field := range []string{"Desc", "Name"} {
-		for _, e := range composite.Elts {
-			kv, ok := e.(*ast.KeyValueExpr)
-			if !ok {
-				continue
-			}
-			key, ok := kv.Key.(*ast.Ident)
-			if !ok || key.Name != field {
-				continue
-			}
-			if value, ok := stringLiteral(kv.Value); ok && value != "" {
-				return value
-			}
+		expr, ok := eachField(composite, st, field)
+		if !ok {
+			continue
+		}
+		if st != nil && !isStringField(st, field) {
+			continue
+		}
+		value, ok := w.stringConstant(expr)
+		if !ok {
+			return "", false
+		}
+		if value != "" {
+			return value, true
 		}
 	}
+	return byIndex, true
+}
 
-	if st := w.structOf(composite); st != nil {
-		for _, field := range []string{"Desc", "Name"} {
-			for i := 0; i < st.NumFields() && i < len(composite.Elts); i++ {
-				if st.Field(i).Name() != field {
-					continue
-				}
-				if _, keyed := composite.Elts[i].(*ast.KeyValueExpr); keyed {
-					continue
-				}
-				if value, ok := stringLiteral(composite.Elts[i]); ok && value != "" {
-					return value
-				}
+// eachField is the expression a literal sets a field to, keyed or positional.
+func eachField(composite *ast.CompositeLit, st *types.Struct, field string) (ast.Expr, bool) {
+	for i, e := range composite.Elts {
+		if kv, keyed := e.(*ast.KeyValueExpr); keyed {
+			if key, ok := kv.Key.(*ast.Ident); ok && key.Name == field {
+				return kv.Value, true
 			}
+			continue
+		}
+		if st != nil && i < st.NumFields() && st.Field(i).Name() == field {
+			return e, true
 		}
 	}
+	return nil, false
+}
 
-	return fmt.Sprintf("#%d", index)
+func isStringField(st *types.Struct, field string) bool {
+	for i := 0; i < st.NumFields(); i++ {
+		if st.Field(i).Name() == field {
+			basic, ok := st.Field(i).Type().Underlying().(*types.Basic)
+			return ok && basic.Info()&types.IsString != 0
+		}
+	}
+	return false
+}
+
+// stringConstant is the value of a string literal or of any string constant
+// the type checker evaluated.
+func (w *behaviorWalker) stringConstant(expr ast.Expr) (string, bool) {
+	if w.info != nil {
+		if tv, ok := w.info.Types[expr]; ok && tv.Value != nil && tv.Value.Kind() == constant.String {
+			return constant.StringVal(tv.Value), true
+		}
+	}
+	return stringLiteral(expr)
 }
 
 func (w *behaviorWalker) structOf(expr ast.Expr) *types.Struct {

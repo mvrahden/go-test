@@ -187,6 +187,37 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 			},
 		},
 		{
+			Desc:   "rows named by constants take the constant's value",
+			method: "TestConstantRows",
+			want: []string{
+				"p_suite", "p_suite/runs",
+				"local_name", "local_name/runs",
+				"pre_x", "pre_x/runs",
+				"n", "n/runs",
+				"d", "d/runs",
+			},
+		},
+		{
+			Desc:   "a typed string constant names its row",
+			method: "TestTypedConstantRows",
+			want:   []string{"typed_name", "typed_name/runs"},
+		},
+		{
+			Desc:   "a row named by a variable is not listed",
+			method: "TestVariableRow",
+			want:   []string{"first", "first/runs", "third", "third/runs"},
+		},
+		{
+			Desc:   "a Name that is not a string leaves the index",
+			method: "TestIntNameRow",
+			want:   []string{"#0", "#0/runs"},
+		},
+		{
+			Desc:   "a Desc only a run knows hides the row though Name is a constant",
+			method: "TestVariableDescBeatsName",
+			want:   nil,
+		},
+		{
 			Desc:   "only the unconditional behavior is declared",
 			method: "TestConditional",
 			want:   []string{"is_always_declared"},
@@ -230,6 +261,13 @@ func (s *BehaviorWalkerTestSuite) TestCompleteness(t *gotest.T) {
 		{
 			Desc: "a computed description is not", method: "TestComputedDescription",
 			complete: false, note: "not a string literal",
+		},
+		{
+			Desc: "a row named by constants is exhaustive", method: "TestConstantRows", complete: true,
+		},
+		{
+			Desc: "a row named by a variable is not", method: "TestVariableRow",
+			complete: false, note: "Each row name is not a constant",
 		},
 		{
 			Desc: "a table that is not a literal is not", method: "TestNonLiteralTable",
