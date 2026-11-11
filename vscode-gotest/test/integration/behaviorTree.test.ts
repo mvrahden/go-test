@@ -226,17 +226,23 @@ describe("declared names match the ones go test invents", () => {
     ]);
   });
 
-  it("makes a slash a level, and lets two descriptions share it", () => {
-    expect(
-      idsUnder(`${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping`),
-    ).toEqual([
-      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping`,
-      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a`,
-      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/b_grouping`,
-      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/b_grouping/shares_the_first_level`,
-      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/c_grouping`,
-      `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping/a/c_grouping/shares_it_too`,
+  // A slash in a description is part of its one level: "a/b grouping" and
+  // "a/c grouping" are siblings under the method, sharing no "a" level.
+  it("keeps a slash inside its description's level", () => {
+    const method = `${pkg("duplicates")}/DuplicatesTestSuite/TestSlashGrouping`;
+    expect(idsUnder(method)).toEqual([
+      method,
+      `${method}/a/b_grouping`,
+      `${method}/a/b_grouping/shares_the_first_level`,
+      `${method}/a/c_grouping`,
+      `${method}/a/c_grouping/shares_it_too`,
     ]);
+    expect(controller.findItem(`${method}/a/b_grouping`)?.parent?.id).toBe(
+      method,
+    );
+    expect(controller.findItem(`${method}/a/c_grouping`)?.parent?.id).toBe(
+      method,
+    );
   });
 
   // A run of slashes is not a separator: "https:// URIs" is one subtest whose
