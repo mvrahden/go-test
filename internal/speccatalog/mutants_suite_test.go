@@ -3,6 +3,7 @@ package speccatalog_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -179,6 +180,14 @@ func (s *MutantsTestSuite) TestAnExplicitBehaviorReplacesTheBroadConformanceRun(
 	gotest.Empty(t, problems)
 	gotest.Len(t, runs, 1)
 	gotest.Equal(t, "^(TestCLIVersionTestSuite)$/^(TestVersion)$/^(the_version_subcommand_runs)$", runs[0].RunFilter())
+}
+
+func (s *MutantsTestSuite) TestANestedBehaviorWithASlashInItsLabelIsFound(t *gotest.T) {
+	catalog := strings.Replace(judgeCatalog, `"name":"the_version_subcommand_runs"`, `"name":"the_version/subcommand_runs"`, 1)
+	specs := []speccatalog.Spec{speccatalog.ParseSpec("cli", "specs/cli/spec.md", []byte(sampleSpec))}
+	_, problems := speccatalog.JudgeRuns(specs, []byte(catalog), []byte("Expect: ^FAIL .*conformance/cli .* / exits 0\n"+versionClause+
+		"Judge: ./tests/conformance/cli CLIVersionTestSuite/TestVersion/the_version/subcommand_runs\n"+cliDiff))
+	gotest.Empty(t, problems)
 }
 
 func (s *MutantsTestSuite) TestAnUnknownNestedBehaviorIsRejected(t *gotest.T) {

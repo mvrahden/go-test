@@ -427,6 +427,9 @@ func (s *RenderTestSuite) TestWrapLabel(t *gotest.T, _ *renderCtx) {
 	t.It("does not wrap at width 0", func(it *gotest.T) {
 		gotest.Equal(it, []string{"a long label that wraps"}, gotestspec.ExportWrapLabel("a long label that wraps", 4, 6, 0))
 	})
+	t.It("keeps a label that fits as written", func(it *gotest.T) {
+		gotest.Equal(it, []string{"a  doubled\tgap"}, gotestspec.ExportWrapLabel("a  doubled\tgap", 4, 6, 20))
+	})
 	t.It("counts a rune as one column", func(it *gotest.T) {
 		gotest.Equal(it, []string{"ääää ääää", "ääää"}, gotestspec.ExportWrapLabel("ääää ääää ääää", 0, 0, 9))
 	})

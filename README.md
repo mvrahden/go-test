@@ -196,7 +196,7 @@ UserService — 4 passed, 1 skipped
 
 A row shows the wall clock it occupied once it reaches a second, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
 
-Generate a markdown specification document, an outline whose header says where its counts come from and lists what needs attention ([A report a person reads](specs/spec/spec.md#requirement-a-report-a-person-reads)):
+Generate a markdown specification document ([A report a person reads](specs/spec/spec.md#requirement-a-report-a-person-reads)):
 
 ```bash
 gotest spec ./... --format=md --output=docs/behavior-spec.md

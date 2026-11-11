@@ -1180,7 +1180,7 @@ UserService — 4 passed, 1 skipped
 1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
 
-Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
+Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from where each test sits ([Where a test event's test sits](../../specs/cli/spec.md#requirement-where-a-test-events-test-sits), [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label)), and strips Go naming conventions for display.
 
 **Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source, with the same walker that backs `--static` and `discover`, and shows each behavior under the words the developer wrote.
 
@@ -1228,7 +1228,7 @@ Builds the same tree from the source instead of from a run: no node carries a st
 The names are the ones `go test` would produce, including the `#01` it appends to a description repeated among its siblings — a statically read behavior and an observed one have to be the same node, not two. How a label with a slash and a suite declared in both test packages read on every surface: [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label), [Suites of both test packages](../../specs/spec/spec.md#requirement-suites-of-both-test-packages).
 
 Where a method declares behaviors whose names or existence depend on runtime values — a `When` behind a condition, a non-literal description, an `Each` over a table that is not a literal — the method node is marked incomplete and the detail goes to stderr as `incomplete: …` lines.
-That marking is on the node, not only on stderr, so it survives into every format: `— INCOMPLETE` in the terminal tree, an `_Incomplete: …_` note in markdown, and `"incomplete": true` in JSON.
+That marking is on the node, not only on stderr, so it survives into every format, as `"incomplete": true` in JSON ([Table rows named by constants](../../specs/spec/spec.md#requirement-table-rows-named-by-constants)).
 A run-derived tree never sets the field, since what ran is by definition all there was.
 
 `--static` and `--input` are mutually exclusive: one asks for the specification in the source, the other for the one in a recorded run.
@@ -1303,7 +1303,7 @@ No tests are executed.
 ```
 
 File paths are basenames; positions are 1-based.
-`external` is present, and true, on each suite of the external test package ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover)); `testName` is present on a method of such a suite when go test names it otherwise, as `TestCreate#01` for a method its internal twin also declares ([Suites of both test packages](../../specs/spec/spec.md#requirement-suites-of-both-test-packages)).
+`external` is present, and true, on each suite of the external test package ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover)); `testName` is present on a method of such a suite when go test names it otherwise, as `TestCreate#01` for a method its internal twin also declares.
 `warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
 
 - a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;

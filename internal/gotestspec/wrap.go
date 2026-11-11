@@ -13,10 +13,11 @@ func WithWidth(cols int) RenderOption {
 // wrapLabel breaks text at spaces so each line fits width-indent columns,
 // where lines after the first start at hang and the deeper of the two leaves
 // less room. A word longer than the room stays whole on its own line. Runes
-// count one column each; a width of 0 or less does not wrap.
+// count one column each; a width of 0 or less does not wrap. A label that
+// fits is kept as written, its runs of spaces included.
 func wrapLabel(text string, indent, hang, width int) []string {
 	words := strings.Fields(text)
-	if width <= 0 || len(words) == 0 {
+	if width <= 0 || len(words) == 0 || utf8.RuneCountInString(text) <= width-indent {
 		return []string{text}
 	}
 	room := max(width-max(indent, hang), 1)
