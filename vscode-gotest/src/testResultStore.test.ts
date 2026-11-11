@@ -120,6 +120,22 @@ describe("TestResultStore", () => {
       expect(reader.size).toBe(0);
     });
 
+    // A build before twin suites had ids of their own wrote version 5; its
+    // ids may name the other twin's item.
+    it("drops a store written before twin suites had ids of their own", async () => {
+      await writeFile(
+        path.join(tmpDir, "testResults.json"),
+        JSON.stringify({
+          version: 5,
+          data: { pkg: { status: "pass", timestamp: Date.now() } },
+        }),
+        "utf-8",
+      );
+      const reader = new TestResultStore({ fsPath: tmpDir });
+      await reader.load();
+      expect(reader.size).toBe(0);
+    });
+
     // The Test Explorer's "Clear all results" is in-memory only. Unless the
     // persisted copy is cleared too, the next window reload restores exactly
     // the results the developer just dismissed.

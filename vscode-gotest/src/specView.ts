@@ -12,7 +12,8 @@ import type { DiscoveryCache } from "./discovery.js";
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
 const RUNS_FILE = "specRuns.json";
-const RUNS_VERSION = 1;
+// 2: lines are kept per suite instance and in the order they were merged.
+const RUNS_VERSION = 2;
 
 // What the panel's node buttons do, given Test Explorer item ids.
 export interface SpecViewActions {

@@ -25,6 +25,7 @@ import {
   itemIdOf,
   nearestItemId,
   linkSources,
+  SpecViewPanel,
 } from "./specView.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -443,6 +444,58 @@ describe("linkSources", () => {
       expect(linkSources("    gone_test.go:3: boom", dir)).toBe(
         "    gone_test.go:3: boom",
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the kept runs on disk", () => {
+  const channel = {
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    debug: () => {},
+  } as never;
+  // A record as this build writes it, under the envelope version given.
+  const file = (version: number) =>
+    JSON.stringify({
+      version,
+      data: [
+        {
+          path: "example.com/cart",
+          folder: "/ws",
+          pkgLines: ['{"Action":"pass","Package":"example.com/cart"}'],
+          tests: [
+            [
+              "1\u0000TestCartTestSuite",
+              [
+                {
+                  seq: 0,
+                  line: '{"Action":"pass","Package":"example.com/cart","Test":"TestCartTestSuite"}',
+                },
+              ],
+            ],
+          ],
+          runLevel: false,
+        },
+      ],
+    });
+  const keptBy = (panel: SpecViewPanel) =>
+    (panel as unknown as { runs: { size: number } }).runs.size;
+
+  it("restore drops a store of the previous version", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-"));
+    try {
+      writeFileSync(path.join(dir, "specRuns.json"), file(1));
+      const old = new SpecViewPanel(channel, undefined, dir);
+      await old.load();
+      expect(keptBy(old)).toBe(0);
+
+      writeFileSync(path.join(dir, "specRuns.json"), file(2));
+      const current = new SpecViewPanel(channel, undefined, dir);
+      await current.load();
+      expect(keptBy(current)).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

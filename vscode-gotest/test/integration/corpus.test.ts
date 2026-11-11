@@ -57,6 +57,8 @@ interface Expectation {
 // by the completeness guard.
 const FIXTURES: Record<string, Expectation> = {
   passing: { status: "pass", passed: 2, failed: 0, skipped: 0 },
+  // A suite in both test packages, and labels where one extends the other.
+  twins: { status: "pass", passed: 6, failed: 0, skipped: 0 },
   // One behavior plus one fuzz target; its three seed rows are evidence.
   fuzzing: { status: "pass", passed: 2, failed: 0, skipped: 0 },
   nested: {
