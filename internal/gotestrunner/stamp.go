@@ -10,7 +10,8 @@ import (
 // stampBlock adds the Gotest object to the test events of one suite
 // process's -json block; every other byte is kept. The block is the
 // process's whole stream in its real order, which is what places a test.
-// A line that is no test event, or has nothing to stamp, is copied as is.
+// A line that is no test event, is stamped already or has nothing to stamp
+// is copied as is.
 // Each package is placed apart: a block the runner writes itself may hold
 // several.
 func stampBlock(block []byte) []byte {
@@ -33,9 +34,10 @@ func stampLine(placers map[string]*protocol.Placer, line []byte) []byte {
 		Action  string `json:"Action"`
 		Package string `json:"Package"`
 		Test    string `json:"Test"`
+		Gotest  json.RawMessage
 	}
 	body := bytes.TrimRight(line, " \t\r\n")
-	if !bytes.HasSuffix(body, []byte("}")) || json.Unmarshal(body, &ev) != nil || ev.Test == "" {
+	if !bytes.HasSuffix(body, []byte("}")) || json.Unmarshal(body, &ev) != nil || ev.Test == "" || ev.Gotest != nil {
 		return line
 	}
 	placer := placers[ev.Package]

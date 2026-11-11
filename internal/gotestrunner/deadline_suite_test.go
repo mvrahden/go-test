@@ -355,3 +355,44 @@ func (s *DeadlineAttributionTestSuite) TestUnitNames(t *gotest.T) {
 		gotest.Equal(it, "example.com/pkg TestXTestSuite/TestMa, example.com/pkg TestXTestSuite/TestMb, example.com/pkg TestXTestSuite/TestMc, example.com/pkg TestXTestSuite/TestMd, example.com/pkg TestXTestSuite/TestMe, … 2 more", gotestrunner.ExportUnitNames(units(7)))
 	})
 }
+
+// A suite of both test packages runs in one process: the deadline cut its
+// second run, the external twin.
+func (s *DeadlineAttributionTestSuite) TestADeadlineDuringTheExternalTwinFailsIt(t *gotest.T) {
+	twins := `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Elapsed":0.1}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite","Elapsed":0.2}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestHang"}
+`
+	t.When("the deadline expires while the external twin's method runs", func(w *gotest.T) {
+		var stdout, stderr bytes.Buffer
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+		c.Register(censusPkg, 1)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{
+			Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: censusPkg, SuiteName: "TestCartTestSuite"}},
+			Stdout: []byte(twins), ExitCode: 1, CutShort: true,
+		})
+		gotestrunner.ExportBookDeadlineOn(c, context.DeadlineExceeded)
+		events, err := gotestspec.ParseEvents(strings.NewReader(stdout.String()))
+		gotest.NoError(w, err)
+		tree := gotestspec.BuildTree(events)
+		gotest.Len(w, tree, 1)
+		gotest.Len(w, tree[0].Nodes, 2)
+		internal, external := tree[0].Nodes[0], tree[0].Nodes[1]
+
+		w.It("books the fail on the external twin's method and suite", func(it *gotest.T) {
+			gotest.True(it, external.External)
+			gotest.Equal(it, gotestspec.StatusFail, external.Status)
+			gotest.Len(it, external.Children, 1)
+			gotest.Equal(it, "TestHang", external.Children[0].Name)
+			gotest.Equal(it, gotestspec.StatusFail, external.Children[0].Status)
+		})
+		w.It("leaves the internal twin its own verdict and methods", func(it *gotest.T) {
+			gotest.Equal(it, gotestspec.StatusPass, internal.Status)
+			gotest.Len(it, internal.Children, 1)
+			gotest.Equal(it, "TestAdd", internal.Children[0].Name)
+		})
+	})
+}

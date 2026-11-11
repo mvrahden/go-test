@@ -356,7 +356,8 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 }
 
 // stampedPackages are the packages one of whose runs carries a Subtest:
-// their events say where each test sits.
+// their events say where each test sits. An unstamped run among them falls
+// back to the split, as a stream composed from an older CLI's has.
 func stampedPackages(events []TestEvent) map[string]bool {
 	stamped := map[string]bool{}
 	for i := range events {

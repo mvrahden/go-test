@@ -694,3 +694,28 @@ func (s *TreeTestSuite) TestAStampedStreamNeedsNoOrder(t *gotest.T, _ *treeCtx) 
 		t.Errorf("hoisting an unstamped stream changed nothing; the test does not reorder")
 	}
 }
+
+// A package that is stamped in part, as a stream composed from an older and
+// a newer CLI is, places its unstamped events by the fallback split.
+func (s *TreeTestSuite) TestAnUnstampedEventOfAStampedPackageFallsBack(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestATestSuite","Gotest":{"Subtest":"TestATestSuite"}}
+{"Action":"pass","Package":"p","Test":"TestATestSuite","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/a/b"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/a/b","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`)
+	mustLen(t, "root nodes", tree[0].Nodes, 2)
+	suite := tree[0].Nodes[1]
+	mustEq(t, "suite name", suite.Name, "TestSTestSuite")
+	mustEq(t, "suite status", suite.Status, gotestspec.StatusPass)
+	mustLen(t, "methods", suite.Children, 1)
+	m := suite.Children[0]
+	mustLen(t, "method children", m.Children, 1)
+	mustEq(t, "split level", m.Children[0].Name, "a")
+	mustLen(t, "split children", m.Children[0].Children, 1)
+	mustEq(t, "split leaf", m.Children[0].Children[0].Name, "b")
+	mustEq(t, "leaf status", m.Children[0].Children[0].Status, gotestspec.StatusPass)
+}
