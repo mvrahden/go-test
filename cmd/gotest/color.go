@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // stdoutIsTerminal reports whether stdout is a character device, the one
@@ -29,4 +30,20 @@ func checkFormat(format string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown --format %q: terminal, md or json", format)
+}
+
+// defaultWidth is the terminal spec's width when COLUMNS says nothing usable.
+const defaultWidth = 100
+
+// terminalWidth is the width the terminal spec wraps at: COLUMNS when it is a
+// positive integer, else 100, and 0 (no wrapping) when stdout is not a
+// terminal, so a file or a pipe keeps every behavior on one line.
+func terminalWidth() int {
+	if !stdoutIsTerminal() {
+		return 0
+	}
+	if n, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && n > 0 {
+		return n
+	}
+	return defaultWidth
 }

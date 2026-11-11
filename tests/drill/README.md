@@ -322,7 +322,7 @@ shards of one run do not add up to every mutant exactly once.
 | `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
 | `declared-node-shown-as-passed` | `--declared` gives a declared node the stream did not report a pass | spec conformance: the left-out method's rows carry a verdict |
 | `not-run-uncounted` | the behaviors without a verdict are not counted as not run | spec conformance: the declared package counts 0 not run, and a behavior that started without a verdict counts nowhere |
-| `no-verdict-row-timed` | the terminal spec times a behavior that started and reported no verdict | spec conformance: the row reads `? DeleteUser (<1ms)` instead of NOT RUN |
+| `no-verdict-row-timed` | the terminal spec times a behavior that started and reported no verdict | spec conformance: the row reads `○ DeleteUser` instead of NOT RUN |
 | `excluded-read-as-not-run` | a method the X_ prefix excludes reads as not run under `--declared` | spec conformance: the parked method has no skip verdict |
 | `observed-rows-dropped` | `--declared` drops the rows only the stream names | spec conformance: the method over a table that is no literal has no rows |
 | `hidden-hook-failure` | `--hide` keeps a branch only for a row shown beneath it | spec conformance: the suite whose AfterAll failed vanishes under `--hide=pass` |
@@ -594,7 +594,11 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
 | `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
 | `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own without a verdict | spec conformance: the failed When's item carries no FAIL and no message |
-| `report-attention-dropped` | the Markdown spec lists nothing under Needs attention | spec conformance: the failure and the row not run are missing before the packages |
+| `report-attention-dropped` | the spec lists nothing under Needs attention | spec conformance: the failure and the row not run are missing from the Markdown and the terminal spec |
+| `terminal-suite-counts-dropped` | the terminal spec's suite lines lose their counts | spec conformance: `UserRepository — 2 passed` reads `UserRepository` |
+| `terminal-label-never-wrapped` | the terminal spec's labels stay whole at any width | spec conformance: a label wider than the width stays on one line |
+| `terminal-wrapped-when-redirected` | the terminal spec wraps at 100 columns even when stdout is not a terminal | spec conformance: a 143-column behavior is broken over lines in a redirected spec |
+| `terminal-failures-not-listed` | the terminal spec leaves out its Needs attention block | spec conformance: no failure is listed after the packages |
 | `report-provenance-dropped` | the Markdown spec's header leaves out where its numbers come from | spec conformance: no time range, no commit and no hiding part |
 | `report-suite-counts-dropped` | the Markdown spec's suite headings lose their counts | spec conformance: `#### UserRepository` carries no counts |
 | `report-external-unmarked` | the Markdown spec heads an external suite like the internal one | spec conformance: no heading carries EXTERNAL |

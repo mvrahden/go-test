@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,4 +61,15 @@ func reportOptions() []gotestspec.RenderOption {
 		gotestspec.WithModule(modulePath(cwd)),
 		gotestspec.WithProvenance(readProvenance(cwd)),
 	}
+}
+
+// terminalOptions are what the terminal spec adds to a view: the module, the
+// checkout and the width it wraps at. A spec written to a file is not wrapped,
+// whatever stdout is.
+func terminalOptions(w io.Writer) []gotestspec.RenderOption {
+	width := terminalWidth()
+	if f, ok := w.(*os.File); ok && f != os.Stdout {
+		width = 0
+	}
+	return append(reportOptions(), gotestspec.WithWidth(width))
 }

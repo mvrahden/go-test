@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of a run with failures / lists every failure with its path and message after the packages \(
+Clause: when the terminal spec of a run with failures → lists every failure with its path and message after the packages
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -205,7 +205,7 @@
+ 	}
+ 
+ 	renderBenchDeltaTable(w, cfg.benchDeltas, c)
+-	if !cfg.withoutVerdicts {
++	if cfg.withoutVerdicts {
+ 		renderAttention(w, attention(packages, &cfg), &c, &cfg)
+ 	}
+ 	if line := provenanceLine(packages, &cfg); line != "" {

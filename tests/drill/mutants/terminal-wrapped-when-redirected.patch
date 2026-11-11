@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec is redirected / every behavior stays on one line \(
+Clause: when the terminal spec is redirected → every behavior stays on one line
+--- a/cmd/gotest/color.go
++++ b/cmd/gotest/color.go
+@@ -39,9 +39,6 @@
+ // positive integer, else 100, and 0 (no wrapping) when stdout is not a
+ // terminal, so a file or a pipe keeps every behavior on one line.
+ func terminalWidth() int {
+-	if !stdoutIsTerminal() {
+-		return 0
+-	}
+ 	if n, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && n > 0 {
+ 		return n
+ 	}

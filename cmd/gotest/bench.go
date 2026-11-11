@@ -254,7 +254,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		if againstPath != "" {
 			renderOpts = append(renderOpts, gotestspec.WithBenchDeltas(specDeltas))
 		}
-		gotestspec.RenderTerminal(os.Stdout, tree, renderOpts...)
+		gotestspec.RenderTerminal(os.Stdout, tree, append(renderOpts, terminalOptions(os.Stdout)...)...)
 	}
 
 	var gateVerdict *gotestbench.Gate

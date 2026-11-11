@@ -223,7 +223,7 @@ func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.Proj
 	case "json":
 		gotestspec.RenderJSON(w, tree, gotestspec.WithoutVerdicts())
 	default:
-		gotestspec.RenderTerminal(w, tree, renderOpts...)
+		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w)...)...)
 	}
 
 	// Behaviors the walker could not enumerate are reported rather than

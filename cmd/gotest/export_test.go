@@ -95,6 +95,8 @@ var (
 	ExportCheckFormat   = checkFormat
 )
 
+var ExportRenderSpec = renderSpec
+
 // ExportSetStdoutIsTerminal swaps the terminal probe and returns its restorer.
 func ExportSetStdoutIsTerminal(f func() bool) func() {
 	prev := stdoutIsTerminal

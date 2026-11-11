@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type colors struct {
@@ -38,6 +39,7 @@ type renderConfig struct {
 	packageStats    bool
 	module          string
 	provenance      Provenance
+	width           int
 }
 
 type RenderOption func(*renderConfig)
@@ -157,42 +159,127 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 		c = noColors
 	}
 
-	multiPkg := len(packages) > 1
-
 	printed := 0
 	for _, pkg := range packages {
 		if !cfg.packageShown(pkg) {
 			continue
 		}
-		if multiPkg {
-			if printed > 0 {
-				fmt.Fprintln(w)
-			}
-			fmt.Fprintf(w, "%s=== %s ===%s\n", c.dim, pkg.Path, c.reset)
+		if printed > 0 {
 			fmt.Fprintln(w)
 		}
 		printed++
+		name, _ := cfg.packageName(pkg)
+		own := !cfg.withoutVerdicts && PkgFailedOnItsOwn(pkg) && !cfg.hidden[StatusFail]
+		heading := name
+		if own {
+			heading += " — FAILED"
+		}
+		if !cfg.withoutVerdicts {
+			if counts := countsPhrase(CollectStats([]*Package{pkg})); counts != "" {
+				heading += " — " + counts
+			}
+		}
+		lines := wrapLabel(heading, 8, 8, cfg.width) // room for "=== " and " ==="
+		for i, l := range lines {
+			lead, end := "    ", ""
+			if i == 0 {
+				lead = "=== "
+			}
+			if i == len(lines)-1 {
+				end = " ==="
+			}
+			fmt.Fprintf(w, "%s%s%s%s%s\n", c.dim, lead, l, end, c.reset)
+		}
+		fmt.Fprintln(w)
 		for _, node := range cfg.visible(pkg.Nodes) {
 			renderNode(w, node, 0, &c, &cfg)
 		}
 		// A verdict that sits on the package itself — a build failure, a death
 		// outside any test — has no node to render it; it must still show
 		// beside its diagnostics, or the spec reads green next to a red exit.
-		if PkgFailedOnItsOwn(pkg) && !cfg.hidden[StatusFail] {
+		if own {
 			icon, clr := statusIcon(StatusFail, &c)
 			fmt.Fprintf(w, "%s%s%s %sFAIL%s\n", clr, icon, c.reset, c.bold+c.red, c.reset)
-			lines := filterOutput(pkg.Output)
-			if len(lines) == 0 {
-				lines = []string{noDiagnosticNote}
-			}
-			renderErrorOutput(w, lines, 1, &c)
+			renderErrorOutput(w, diagnostic(pkg.Output), 1, &c)
 		}
 	}
 
 	renderBenchDeltaTable(w, cfg.benchDeltas, c)
+	if !cfg.withoutVerdicts {
+		renderAttention(w, attention(packages, &cfg), &c, &cfg)
+	}
+	if line := provenanceLine(packages, &cfg); line != "" {
+		fmt.Fprintln(w)
+		for _, l := range wrapLabel(line, 0, 0, cfg.width) {
+			fmt.Fprintf(w, "%s%s%s\n", c.dim, l, c.reset)
+		}
+	}
 	fmt.Fprintln(w)
 	stats := cfg.stats(packages)
 	renderSummary(w, stats, c)
+}
+
+// renderAttention lists the failures and the rows not run after the packages:
+// each row's path under its mark, a failure's message beneath it.
+func renderAttention(w io.Writer, rows []attentionRow, c *colors, cfg *renderConfig) {
+	if len(rows) == 0 {
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "%sNeeds attention%s\n", c.bold, c.reset)
+	for _, r := range rows {
+		icon, clr := statusIcon(r.Status, c)
+		writeRow(w, &rowLine{lead: clr + icon + c.reset + " ", leadWidth: 2, text: strings.Join(r.Path, " › ")}, c, cfg)
+		renderErrorOutput(w, r.Output, 1, c)
+	}
+}
+
+// tailPart is text that follows a row's label, with its color.
+type tailPart struct{ text, color string }
+
+// rowLine is one row: an optional lead (a mark), a label, and what follows it.
+type rowLine struct {
+	indent    int
+	lead      string // as written, with color
+	leadWidth int    // its visible columns
+	text      string // the label, plain
+	style     string // color of the label
+	tail      []tailPart
+}
+
+// writeRow writes a row, its label wrapped at the configured width with the
+// lines after the first under the label's start. The tail follows the last
+// line, or takes a line of its own when it does not fit there.
+func writeRow(w io.Writer, r *rowLine, c *colors, cfg *renderConfig) {
+	hang := r.indent + max(r.leadWidth, 2)
+	lines := wrapLabel(r.text, r.indent+r.leadWidth, hang, cfg.width)
+	tail, tailWidth := "", 0
+	for _, p := range r.tail {
+		tail += p.color + p.text
+		if p.color != "" {
+			tail += c.reset
+		}
+		tailWidth += utf8.RuneCountInString(p.text)
+	}
+	for i, l := range lines {
+		pad := strings.Repeat(" ", hang)
+		if i == 0 {
+			pad = strings.Repeat(" ", r.indent) + r.lead
+		}
+		styled := l
+		if r.style != "" {
+			styled = r.style + l + c.reset
+		}
+		fmt.Fprint(w, pad, styled)
+		if i == len(lines)-1 && tail != "" {
+			if cfg.width > 0 && hang+utf8.RuneCountInString(l)+tailWidth > cfg.width && i > 0 {
+				fmt.Fprintf(w, "\n%s%s", strings.Repeat(" ", hang), strings.TrimLeft(tail, " "))
+			} else {
+				fmt.Fprint(w, tail)
+			}
+		}
+		fmt.Fprintln(w)
+	}
 }
 
 // bareSuffix annotates a node in a tree that has not run. Exclusion is a
@@ -213,65 +300,63 @@ func bareSuffix(n *Node) string {
 
 func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 	bare := cfg.withoutVerdicts
-	indent := strings.Repeat("  ", depth)
+	indent := 2 * depth
 	children := cfg.visible(n.Children)
 	isLeaf := len(children) == 0
 
+	mark := func(s Status) (string, int) {
+		icon, clr := statusIcon(s, c)
+		return clr + icon + c.reset + " ", 2
+	}
+	// A duration shows from one second up, and only beside a verdict.
+	duration := func() []tailPart {
+		if d := EffectiveDuration(n); d >= time.Second {
+			return []tailPart{{" (" + formatDuration(d) + ")", c.dim}}
+		}
+		return nil
+	}
+
 	// A node without a verdict, declared and not reported or started and
 	// never ended, took no time it can show; it says so instead.
-	if noVerdict(n) && !bare && (n.NotRun || n.Kind != KindBenchmark) {
-		if isLeaf {
-			icon, clr := statusIcon(StatusNone, c)
-			fmt.Fprintf(w, "%s%s%s%s %s%s — NOT RUN%s\n", indent, clr, icon, c.reset, n.Display, c.dim, c.reset)
-			return
-		}
-		fmt.Fprintf(w, "%s%s\n", indent, branchLabel(n, c))
-		for _, child := range children {
-			renderNode(w, child, depth+1, c, cfg)
-		}
+	unrun := noVerdict(n) && !bare && (n.NotRun || n.Kind != KindBenchmark)
+	if unrun && isLeaf {
+		lead, lw := mark(StatusNone)
+		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display,
+			tail: []tailPart{{" — NOT RUN", c.dim}}}, c, cfg)
 		return
 	}
 
 	// A passing fuzz target reads as one line: its seeds are evidence, not
 	// behaviors. A failing one opens up so the offending entry is named.
-	if n.Kind == KindFuzz && !anyDescendantFailed(n) && !bare {
-		icon, clr := statusIcon(n.Status, c)
-		fmt.Fprintf(w, "%s%s%s%s %s  %d seeds %s(%s)%s\n",
-			indent, clr, icon, c.reset, n.Display, len(n.Children),
-			c.dim, formatDuration(EffectiveDuration(n)), c.reset)
+	if !unrun && n.Kind == KindFuzz && !anyDescendantFailed(n) && !bare {
+		lead, lw := mark(n.Status)
+		tail := append([]tailPart{{fmt.Sprintf("  %d seeds", len(n.Children)), ""}}, duration()...)
+		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display, tail: tail}, c, cfg)
 		return
 	}
 
 	if isLeaf {
-		icon, clr := statusIcon(n.Status, c)
-
 		if n.Kind == KindBenchmark && n.Iterations > 0 {
-			fmt.Fprintf(w, "%s%s%s%s %s  %s ns/op · %d B/op · %d allocs/op%s%s\n",
-				indent, clr, icon, c.reset,
-				n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, formatMetrics(n.Metrics), c.reset)
-
+			lead, _ := mark(n.Status)
+			fmt.Fprintf(w, "%s%s%s  %s ns/op · %d B/op · %d allocs/op%s%s\n",
+				strings.Repeat(" ", indent), lead, n.Display, formatNs(n.NsPerOp), n.BytesPerOp, n.AllocsPerOp, formatMetrics(n.Metrics), c.reset)
 			if n.Status == StatusFail {
 				renderErrorOutput(w, n.Output, depth+2, c)
 			}
 			return
 		}
 
-		dur := formatDuration(EffectiveDuration(n))
-
-		suffix := ""
-		if n.Excluded || n.Status == StatusSkip {
-			suffix = " — SKIPPED"
-		}
-
 		if bare {
-			fmt.Fprintf(w, "%s%s%s\n", indent, n.Display, bareSuffix(n))
+			writeRow(w, &rowLine{indent: indent, text: n.Display, tail: []tailPart{{bareSuffix(n), ""}}}, c, cfg)
 			return
 		}
 
-		fmt.Fprintf(w, "%s%s%s%s %s%s %s(%s)%s\n",
-			indent, clr, icon, c.reset,
-			n.Display, suffix,
-			c.dim, dur, c.reset)
+		var tail []tailPart
+		if n.Excluded || n.Status == StatusSkip {
+			tail = append(tail, tailPart{" — SKIPPED", ""})
+		}
+		lead, lw := mark(n.Status)
+		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display, tail: append(tail, duration()...)}, c, cfg)
 
 		if n.Status == StatusFail {
 			renderErrorOutput(w, n.Output, depth+2, c)
@@ -279,22 +364,21 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 		return
 	}
 
-	label := branchLabel(n, c)
-
-	suffix := ""
+	row := rowLine{indent: indent, text: n.Display, style: branchStyle(n, c)}
 	if n.External {
-		suffix = fmt.Sprintf(" %s— EXTERNAL%s", c.dim, c.reset)
+		row.tail = append(row.tail, tailPart{" — EXTERNAL", c.dim})
 	}
 	if n.Focused {
-		suffix = fmt.Sprintf(" %s— FOCUSED%s", c.yellow, c.reset)
+		row.tail = append(row.tail, tailPart{" — FOCUSED", c.yellow})
 	} else if n.Excluded {
-		suffix = fmt.Sprintf(" %s— SKIPPED%s", c.yellow, c.reset)
+		row.tail = append(row.tail, tailPart{" — SKIPPED", c.yellow})
 	}
 
 	if bare {
 		// Nothing ran, so the container says what it is rather than what
 		// happened to it, and it says when its children are not the whole list.
-		fmt.Fprintf(w, "%s%s%s\n", indent, label, bareSuffix(n))
+		row.tail = append(row.tail, tailPart{bareSuffix(n), ""})
+		writeRow(w, &row, c, cfg)
 		for _, child := range children {
 			renderNode(w, child, depth+1, c, cfg)
 		}
@@ -304,22 +388,23 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 	// A node that failed on its own account must show a mark even when it left
 	// no output — a bare t.Fail() otherwise renders as a green line beside a
 	// red exit code.
-	ownFailure := hasOwnDiagnostic(n) || failedOnItsOwn(n)
+	ownFailure := !unrun && (hasOwnDiagnostic(n) || failedOnItsOwn(n))
 	if ownFailure {
 		icon, clr := statusIcon(StatusFail, c)
-		suffix += fmt.Sprintf(" %s%s%s", clr, icon, c.reset)
+		row.tail = append(row.tail, tailPart{" " + icon, clr})
 	}
-
-	fmt.Fprintf(w, "%s%s%s %s(%s)%s\n",
-		indent, label, suffix,
-		c.dim, formatDuration(EffectiveDuration(n)), c.reset)
+	if n.Kind == KindSuite {
+		// A suite line states its counts; its clock is the rows' to show.
+		if counts := countsPhrase(nodeStats(n)); counts != "" {
+			row.tail = append(row.tail, tailPart{" — " + counts, ""})
+		}
+	} else if !unrun {
+		row.tail = append(row.tail, duration()...)
+	}
+	writeRow(w, &row, c, cfg)
 
 	if ownFailure {
-		if len(filterOutput(n.Output)) > 0 {
-			renderErrorOutput(w, n.Output, depth+1, c)
-		} else {
-			renderErrorOutput(w, []string{noDiagnosticNote}, depth+1, c)
-		}
+		renderErrorOutput(w, diagnostic(n.Output), depth+1, c)
 	}
 
 	for _, child := range children {
@@ -327,13 +412,13 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 	}
 }
 
-// branchLabel is a branch's display text, bold for what declares rather than
+// branchStyle is a branch's color, bold for what declares rather than
 // describes: suites, fixtures, methods, tests, benchmarks and fuzz targets.
-func branchLabel(n *Node, c *colors) string {
+func branchStyle(n *Node, c *colors) string {
 	if n.Kind == KindSuite || n.Kind == KindFixture || n.Kind == KindMethod || n.Kind == KindTest || n.Kind == KindBenchmark || n.Kind == KindFuzz {
-		return c.bold + n.Display + c.reset
+		return c.bold
 	}
-	return n.Display
+	return ""
 }
 
 func statusIcon(s Status, c *colors) (string, string) {
@@ -343,9 +428,9 @@ func statusIcon(s Status, c *colors) (string, string) {
 	case StatusFail:
 		return "✗", c.red
 	case StatusSkip:
-		return "~", c.yellow
+		return "–", c.yellow
 	default:
-		return "?", c.dim
+		return "○", c.dim
 	}
 }
 

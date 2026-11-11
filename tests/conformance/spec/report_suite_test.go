@@ -1,10 +1,13 @@
 package spec_test
 
 import (
+	"bytes"
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -105,6 +108,51 @@ func (s *SpecReportTestSuite) TestAReportAPersonReads(t *gotest.T) {
 			hidden := spec(it, 1, "--format=md", "--hide=pass,skip", reportStream).Stdout
 			gotest.Regexp(it, "\n\n[^\n]* · hiding passed and skipped rows\n\n", hidden)
 			gotest.NotContains(it, md, "hiding")
+		})
+	})
+}
+
+func (s *SpecReportTestSuite) TestATerminalReportAPersonReads(t *gotest.T) {
+	t.When("the terminal spec of a run with failures", func(w *gotest.T) {
+		out := spec(w, 1, reportStream).Stdout
+		w.It("lists every failure with its path and message after the packages", func(it *gotest.T) {
+			packages := strings.LastIndex(out, "=== ")
+			want := "\nNeeds attention\n✗ example.com/report › UserRepository › CreateUser › when a user is created › has one entry\n" +
+				"  suite_ext_test.go:28: Len: expected 1, got 2\n"
+			at := strings.Index(out, want)
+			gotest.NotEqual(it, -1, at, "%s", out)
+			gotest.Greater(it, at, packages)
+			gotest.Greater(it, strings.Index(out, "○ example.com/report › UserRepository › DeleteUser\n"), at)
+		})
+		w.It("every package and suite line carries its counts", func(it *gotest.T) {
+			for _, line := range []string{
+				"=== example.com/report — 3 passed, 1 failed, 1 not run ===\n",
+				"\nUserRepository — 2 passed\n",
+				"\nUserRepository — EXTERNAL — 1 passed, 1 failed, 1 not run\n",
+			} {
+				gotest.Contains(it, out, line)
+			}
+		})
+	})
+
+	t.When("the terminal spec is written to a terminal", func(w *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderTerminal(&buf, []*gotestspec.Package{{Path: "p", Nodes: []*gotestspec.Node{{
+			Kind: gotestspec.KindSuite, Display: "Suite",
+			Children: []*gotestspec.Node{{Kind: gotestspec.KindBlock, Display: "a behavior whose label is longer than the terminal", Status: gotestspec.StatusPass}},
+		}}}}, gotestspec.WithNoColor(), gotestspec.WithWidth(30))
+		w.It("long labels wrap at its width", func(it *gotest.T) {
+			for _, line := range strings.Split(buf.String(), "\n") {
+				gotest.LessOrEqual(it, utf8.RuneCountInString(line), 30, "%q", line)
+			}
+			gotest.Contains(it, buf.String(), "  ✓ a behavior whose label is\n    longer than the terminal\n")
+		})
+	})
+
+	t.When("the terminal spec is redirected", func(w *gotest.T) {
+		out := spec(w, 0, "--input=../testdata/specstreams/longlabel.jsonl").Stdout
+		w.It("every behavior stays on one line", func(it *gotest.T) {
+			gotest.Contains(it, out, "\n    ✓ "+strings.Repeat("lengthy ", 17)+"lengthy\n")
 		})
 	})
 }

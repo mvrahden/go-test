@@ -68,7 +68,7 @@ func (s *SpecHidingTestSuite) TestHidingAGreenRun(t *gotest.T) {
 	t.When("a stream in which everything passed is rendered with --hide=pass", func(w *gotest.T) {
 		w.It("renders the trailer and no row", func(it *gotest.T) {
 			terminal := spec(it, 0, "--hide=pass", greenStream)
-			gotest.Equal(it, "\n3 suites, 5 behaviors: 5 passed\n", terminal.Stdout)
+			gotest.Regexp(it, "^\n[^\n]*hiding passed rows\n\n3 suites, 5 behaviors: 5 passed\n$", terminal.Stdout)
 			markdown := spec(it, 0, "--format=md", "--hide=pass", greenStream)
 			gotest.Regexp(it, "^# Behavior Specification\n\n3 suites, 5 behaviors: 5 passed\\.\n\n[^\n]*\n$", markdown.Stdout)
 		})
@@ -96,7 +96,7 @@ func (s *SpecHidingTestSuite) TestHidingAPackagesOwnFailure(t *gotest.T) {
 			shown := spec(it, 0, "--render-only", broken)
 			gotest.Contains(it, shown.Stdout, "syntax error")
 			terminal := spec(it, 0, "--render-only", "--hide=fail", broken)
-			gotest.Equal(it, "\n0 suites: 1 failed package\n", terminal.Stdout)
+			gotest.Regexp(it, "^\n[^\n]*hiding failed rows\n\n0 suites: 1 failed package\n$", terminal.Stdout)
 			markdown := spec(it, 0, "--render-only", "--format=md", "--hide=fail", broken)
 			gotest.NotContains(it, markdown.Stdout, "FAILED")
 			gotest.NotContains(it, markdown.Stdout, "syntax error")

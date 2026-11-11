@@ -478,7 +478,7 @@ func renderWatchRun(w io.Writer, capturedJSON []byte, jsonMode, specMode, bench 
 		if err != nil {
 			return benchNs, err
 		}
-		gotestspec.RenderTerminal(w, gotestspec.BuildTree(events, gotestspec.WithDeclarations(decls)))
+		gotestspec.RenderTerminal(w, gotestspec.BuildTree(events, gotestspec.WithDeclarations(decls)), terminalOptions(w)...)
 	}
 	return benchNs, nil
 }

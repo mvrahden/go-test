@@ -201,7 +201,7 @@ func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor 
 	case "json":
 		gotestspec.RenderJSON(w, tree, view...)
 	default:
-		gotestspec.RenderTerminal(w, tree, renderOpts...)
+		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w)...)...)
 	}
 }
 

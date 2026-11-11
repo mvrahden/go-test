@@ -58,7 +58,7 @@ func (s *SpecDeclaredTestSuite) TestARunOfSomeMethods(t *gotest.T) {
 				gotest.Zero(it, row.Duration)
 			}
 			terminal := spec(it, 0, "--input="+s.input, "--declared", declaredPkg)
-			gotest.Regexp(it, `\n      \? has no verdict — NOT RUN\n`, terminal.Stdout)
+			gotest.Regexp(it, `\n      ○ has no verdict — NOT RUN\n`, terminal.Stdout)
 			gotest.Regexp(it, `\n  LeftOut\n`, terminal.Stdout)
 		})
 		w.It("counts the behaviors the stream did not report as not run, and exits as without --declared", func(it *gotest.T) {

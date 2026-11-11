@@ -2,6 +2,8 @@ Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failu
 Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / lists every row not run with its path \(
 Clause: when the Markdown spec of a run with failures and rows not run → lists every failure with its path and message before the packages
 Clause: when the Markdown spec of a run with failures and rows not run → lists every row not run with its path
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of a run with failures / lists every failure with its path and message after the packages \(
+Clause: when the terminal spec of a run with failures → lists every failure with its path and message after the packages
 --- a/internal/gotestspec/report.go
 +++ b/internal/gotestspec/report.go
 @@ -72,6 +72,9 @@

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec is written to a terminal / long labels wrap at its width \(
+Clause: when the terminal spec is written to a terminal → long labels wrap at its width
+--- a/internal/gotestspec/wrap.go
++++ b/internal/gotestspec/wrap.go
+@@ -16,7 +16,7 @@
+ // count one column each; a width of 0 or less does not wrap.
+ func wrapLabel(text string, indent, hang, width int) []string {
+ 	words := strings.Fields(text)
+-	if width <= 0 || len(words) == 0 {
++	if width >= 0 || len(words) == 0 {
+ 		return []string{text}
+ 	}
+ 	room := max(width-max(indent, hang), 1)

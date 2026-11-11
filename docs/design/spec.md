@@ -1162,18 +1162,20 @@ Exit codes: 0 as above; 1 while any marker is left, including one an earlier run
 ```
 $ gotest spec ./pkg/user
 
-UserService (133ms)
-  Create (128ms)
-    when email is valid (128ms)
-      ✓ creates the user (8ms)
-      ✓ sends a welcome email (120ms)
-    when email already exists (<1ms)
-      ✓ returns ErrDuplicate (<1ms)
-  Delete (5ms)
-    ✓ soft-deletes the user (5ms)
-    ~ hard-deletes after 30 days — SKIPPED (<1ms)
+=== pkg/user — 4 passed, 1 skipped ===
 
-2 suites, 5 behaviors: 4 passed, 1 skipped
+UserService — 4 passed, 1 skipped
+  Create
+    when email is valid
+      ✓ creates the user
+      ✓ sends a welcome email
+    when email already exists
+      ✓ returns ErrDuplicate
+  Delete
+    ✓ soft-deletes the user
+    – hard-deletes after 30 days — SKIPPED
+
+1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
 
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
@@ -1184,7 +1186,7 @@ Internally runs `go test -json`, parses the event stream, reconstructs the suite
 - Behaviors the source cannot enumerate (a `When` behind a condition, a table that is not a literal) and packages a replay cannot reach (a stream from another module, a checkout without the source) fall back to reconstructing the label from the name. Loading never fails a render.
 - Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
 
-**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/~ icon plays the role of "it"). You write the condition; gotest supplies the connective.
+**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/– mark plays the role of "it"). You write the condition; gotest supplies the connective.
 
 - Which call declared a subtest is read from source alongside the description and travels with it, so `gotest spec`, `gotest discover` and a replayed stream render one behavior one way.
 - A label that already opens with a connective of its own is left alone rather than doubled. The connectives: when, with, without, given, if, unless, after, before, while, once, on, upon, as, for, during, under, whenever, matched as a whole word in any case, with a space or an underscore after it. "with an empty cache" stays as written; "withdrawing funds" becomes "when withdrawing funds".
@@ -1192,7 +1194,7 @@ Internally runs `go test -json`, parses the event stream, reconstructs the suite
 
 ### Durations
 
-Every row carries the wall clock it occupied, and never the sum of the rows beneath it.
+A row carries the wall clock it occupied from one second up, and never the sum of the rows beneath it.
 A sum is an integral over occupancy rather than an interval, so under parallelism it reports more time than the clock did: three 50ms methods sharing 58ms of one suite cost 58ms, not 160ms.
 The difference between a row and its children is therefore information — time the row held itself (the subprocess a `When` starts before its assertions), or children that overlapped.
 

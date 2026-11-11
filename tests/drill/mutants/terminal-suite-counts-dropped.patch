@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of a run with failures / every package and suite line carries its counts \(
+Clause: when the terminal spec of a run with failures → every package and suite line carries its counts
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -395,7 +395,7 @@
+ 	}
+ 	if n.Kind == KindSuite {
+ 		// A suite line states its counts; its clock is the rows' to show.
+-		if counts := countsPhrase(nodeStats(n)); counts != "" {
++		if counts := countsPhrase(nodeStats(n)); counts == "" {
+ 			row.tail = append(row.tail, tailPart{" — " + counts, ""})
+ 		}
+ 	} else if !unrun {

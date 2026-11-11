@@ -200,14 +200,14 @@ func (s *DurationTestSuite) TestRenderedTreeCarriesTheEffectiveTime(t *gotest.T)
 	t.When("a parallel suite is rendered", func(w *gotest.T) {
 		var buf bytes.Buffer
 		gotestspec.RenderTerminal(&buf, []*gotestspec.Package{{Path: "p", Nodes: []*gotestspec.Node{
-			at("Parallel", 0, 300*time.Millisecond, 0,
-				at("first", 0, 300*time.Millisecond, 300*time.Millisecond),
-				at("second", 0, 300*time.Millisecond, 300*time.Millisecond),
+			at("Parallel", 0, 3*time.Second, 0,
+				at("first", 0, 3*time.Second, 3*time.Second),
+				at("second", 0, 3*time.Second, 3*time.Second),
 			)}}}, gotestspec.WithNoColor())
 		out := buf.String()
 
 		w.It("shows the clock the suite occupied", func(it *gotest.T) {
-			gotest.Contains(it, lineWith(out, "Parallel"), "(300ms)",
+			gotest.Contains(it, lineWith(out, "Parallel"), "(3.0s)",
 				"the rendered row must not sum concurrent children:\n%s", out)
 		})
 	})

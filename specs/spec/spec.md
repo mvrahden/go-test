@@ -167,6 +167,22 @@ The Markdown spec SHALL be an outline: a header with the counts, the runs' time 
 - **WHEN** the Markdown spec hides rows
 - **THEN** the header names what is hidden
 
+### Requirement: A terminal report a person reads
+The terminal spec SHALL carry the Markdown spec's content laid out for a terminal: a heading per package and a line per suite, each with its counts, each behavior as one line led by its mark, then every failure and row not run with its path and message after the packages, then the provenance line. A label SHALL wrap at the terminal's width, COLUMNS or 100, and SHALL stay on one line when the spec is redirected.
+
+#### Scenario: A run with failures
+- **WHEN** the terminal spec of a run with failures
+- **THEN** lists every failure with its path and message after the packages
+- **AND** every package and suite line carries its counts
+
+#### Scenario: A terminal
+- **WHEN** the terminal spec is written to a terminal
+- **THEN** long labels wrap at its width
+
+#### Scenario: A redirected spec
+- **WHEN** the terminal spec is redirected
+- **THEN** every behavior stays on one line
+
 ### Requirement: Hiding rows by status
 `--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared without --input or beside --static, SHALL exit 2.
 

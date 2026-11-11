@@ -50,9 +50,10 @@ func renderTerminal(packages []*gotestspec.Package) string {
 
 func (s *RenderTestSuite) TestRenderTerminal_SuiteHierarchy(t *gotest.T, _ *renderCtx) {
 	out := renderTerminal(userServiceTree())
-	for _, want := range []string{"UserService", "Create", "✓ returns ok", "(8ms)"} {
+	for _, want := range []string{"UserService", "Create", "✓ returns ok"} {
 		gotest.Contains(t, out, want)
 	}
+	gotest.NotContains(t, out, "8ms", "a duration shows from one second up")
 }
 
 func (s *RenderTestSuite) TestRenderTerminal_FailedLeaf(t *gotest.T, _ *renderCtx) {
@@ -81,8 +82,8 @@ func (s *RenderTestSuite) TestRenderTerminal_MultiPackage(t *gotest.T, _ *render
 		{Path: "b/pkg", Nodes: []*gotestspec.Node{{Kind: gotestspec.KindTest, Display: "Bar", Status: gotestspec.StatusPass, Duration: time.Millisecond}}},
 	})
 
-	gotest.Contains(t, out, "=== a/pkg ===")
-	gotest.Contains(t, out, "=== b/pkg ===")
+	gotest.Contains(t, out, "=== a/pkg — 1 passed ===")
+	gotest.Contains(t, out, "=== b/pkg — 1 passed ===")
 }
 
 func (s *RenderTestSuite) TestRenderTerminal_SummaryLine(t *gotest.T, _ *renderCtx) {
@@ -390,4 +391,84 @@ func (s *RenderTestSuite) TestAMethodNamedWithAnUnderscoreReadsWithout(t *gotest
 	gotest.Len(t, tree[0].Nodes, 1)
 	gotest.Len(t, tree[0].Nodes[0].Children, 1)
 	gotest.Equal(t, "HelloWorld", tree[0].Nodes[0].Children[0].Display)
+}
+
+// repositoryTree is one package with a passing and a failing suite and a
+// method that did not run.
+func repositoryTree() []*gotestspec.Package {
+	return []*gotestspec.Package{{
+		Path: "example.com/mod/examples/repository",
+		Nodes: []*gotestspec.Node{{
+			Kind:     gotestspec.KindSuite,
+			Display:  "UserRepository",
+			External: true,
+			Children: []*gotestspec.Node{{
+				Kind:    gotestspec.KindMethod,
+				Display: "Create",
+				Children: []*gotestspec.Node{
+					{Kind: gotestspec.KindBlock, Display: "stores the email", Status: gotestspec.StatusPass, Duration: 1200 * time.Millisecond},
+					{Kind: gotestspec.KindBlock, Display: "rejects a duplicate", Status: gotestspec.StatusPass, Duration: 8 * time.Millisecond},
+					{Kind: gotestspec.KindBlock, Display: "hashes the password", Status: gotestspec.StatusFail, Output: []string{"    want 1, got 2\n"}},
+				},
+			}},
+		}},
+	}}
+}
+
+func (s *RenderTestSuite) TestWrapLabel(t *gotest.T, _ *renderCtx) {
+	t.It("breaks at spaces to fit the width", func(it *gotest.T) {
+		gotest.Equal(it, []string{"a long", "label that", "wraps"}, gotestspec.ExportWrapLabel("a long label that wraps", 4, 6, 16))
+	})
+	t.It("keeps a word longer than the width whole on its own line", func(it *gotest.T) {
+		gotest.Equal(it, []string{"see", "extraordinarily", "long"}, gotestspec.ExportWrapLabel("see extraordinarily long", 2, 2, 10))
+	})
+	t.It("does not wrap at width 0", func(it *gotest.T) {
+		gotest.Equal(it, []string{"a long label that wraps"}, gotestspec.ExportWrapLabel("a long label that wraps", 4, 6, 0))
+	})
+	t.It("counts a rune as one column", func(it *gotest.T) {
+		gotest.Equal(it, []string{"ääää ääää", "ääää"}, gotestspec.ExportWrapLabel("ääää ääää ääää", 0, 0, 9))
+	})
+}
+
+func (s *RenderTestSuite) TestTheTerminalListsFailuresLast(t *gotest.T, _ *renderCtx) {
+	pkgs := append(repositoryTree(), &gotestspec.Package{
+		Path:  "example.com/mod/examples/zeta",
+		Nodes: []*gotestspec.Node{{Kind: gotestspec.KindTest, Display: "TestZeta", Status: gotestspec.StatusPass}},
+	})
+	out := renderTerminalWith(pkgs, gotestspec.WithModule("example.com/mod"))
+
+	lastPkg := strings.Index(out, "=== examples/zeta")
+	attention := strings.Index(out, "Needs attention")
+	summary := strings.LastIndex(out, "suite")
+	gotest.Greater(t, lastPkg, -1)
+	gotest.Greater(t, attention, lastPkg)
+	gotest.Greater(t, summary, attention)
+	gotest.Contains(t, out[attention:], "✗ examples/repository › UserRepository › Create › hashes the password\n  want 1, got 2")
+}
+
+func (s *RenderTestSuite) TestTheTerminalCarriesCountsOnEveryPackageAndSuite(t *gotest.T, _ *renderCtx) {
+	out := renderTerminalWith(repositoryTree(), gotestspec.WithModule("example.com/mod"))
+	gotest.Contains(t, out, "=== examples/repository — 2 passed, 1 failed ===")
+	gotest.Contains(t, out, "UserRepository — EXTERNAL — 2 passed, 1 failed")
+	gotest.Contains(t, out, "✓ stores the email (1.2s)")
+	gotest.Contains(t, out, "✓ rejects a duplicate\n")
+	gotest.Contains(t, out, "✗ hashes the password\n")
+}
+
+func (s *RenderTestSuite) TestTheTerminalWrapsAtItsWidth(t *gotest.T, _ *renderCtx) {
+	pkgs := []*gotestspec.Package{{
+		Path: "p",
+		Nodes: []*gotestspec.Node{{
+			Kind: gotestspec.KindSuite, Display: "S",
+			Children: []*gotestspec.Node{{Kind: gotestspec.KindBlock, Display: "a long label that wraps over lines", Status: gotestspec.StatusPass}},
+		}},
+	}}
+	t.It("breaks a long label under its text", func(it *gotest.T) {
+		out := renderTerminalWith(pkgs, gotestspec.WithWidth(24))
+		gotest.Contains(it, out, "  ✓ a long label that\n    wraps over lines\n")
+	})
+	t.It("leaves it whole at width 0", func(it *gotest.T) {
+		out := renderTerminalWith(pkgs, gotestspec.WithWidth(0))
+		gotest.Contains(it, out, "✓ a long label that wraps over lines\n")
+	})
 }
