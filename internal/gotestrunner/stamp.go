@@ -28,6 +28,10 @@ func stampBlock(block []byte) []byte {
 	return out
 }
 
+// StampStream is stampBlock over a saved stream, such as an older CLI's or
+// plain go test's: the file's order is the order the stamps are placed by.
+func StampStream(stream []byte) []byte { return stampBlock(stream) }
+
 // stampLine splices ,"Gotest":{…} before the line's final }.
 func stampLine(placers map[string]*protocol.Placer, line []byte) []byte {
 	var ev struct {

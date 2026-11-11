@@ -225,6 +225,29 @@ func (s *CLIStreamsTestSuite) TestEventsSayWhereTheirTestSits(t *gotest.T) {
 	})
 }
 
+func (s *CLIStreamsTestSuite) TestASavedStreamIsStamped(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/specslashes/")
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	lines := strings.SplitAfter(run.Stdout, "\n")
+	for i, line := range lines {
+		end := strings.TrimSuffix(line, "\n")
+		lines[i] = gotestObject.ReplaceAllString(end, "}") + line[len(end):]
+	}
+	saved := filepath.Join(t.TempDir(), "saved.jsonl")
+	gotest.NoError(t, os.WriteFile(saved, []byte(strings.Join(lines, "")), 0o600))
+	gotest.NotEqual(t, run.Stdout, strings.Join(lines, ""))
+
+	t.When("a stream saved without its stamps is passed through spec --stamp", func(w *gotest.T) {
+		w.It("comes back as gotest -json wrote it", func(it *gotest.T) {
+			stamped, err := testkit.RunCLI(it.Context(), ".", "spec", "--input="+saved, "--stamp")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, stamped.Exit, "stderr: %s", stamped.Stderr)
+			gotest.Equal(it, run.Stdout, stamped.Stdout)
+		})
+	})
+}
+
 func (s *CLIStreamsTestSuite) TestColorFollowsTheTerminal(t *gotest.T) {
 	t.When("stdout is a pipe", func(w *gotest.T) {
 		w.It("prints no color codes, even with --no-color=false", func(it *gotest.T) {

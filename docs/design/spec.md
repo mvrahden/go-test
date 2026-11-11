@@ -154,6 +154,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--badge=<path>` | Write a self-contained coverage badge SVG (`summary`); adds `-coverprofile` when neither the caller nor `--min` did |
 | `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
+| `--stamp` | With `--input`, write the stream back with each test event placed as `gotest -json` places it, instead of rendering it (`spec`; [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream)) |
 | `--static` | Render the specification from source without running the suites (`spec`); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
 | `--declared` | With `--input`, lay the stream's verdicts over the specification the packages' source declares (`spec`; [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)) |
 | `--hide=<statuses>` | Leave out of the `spec` rendering the rows whose status is one of `pass`, `fail`, `skip`, `none`, without changing what is counted ([Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status)) |

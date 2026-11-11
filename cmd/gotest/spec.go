@@ -54,6 +54,14 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
+	if own.Bool("--stamp") {
+		if input == "" {
+			fmt.Fprintf(os.Stderr, "FAIL: --stamp requires --input\n")
+			return 2
+		}
+		return stampInput(input, output)
+	}
+
 	view, err := parseSpecView(own, input)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -243,6 +251,33 @@ func (s *declaredSource) overlay(events []gotestspec.TestEvent) ([]*gotestspec.P
 		idx[pkg] = paths
 	}
 	return gotestspec.Overlay(declared, gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx))), nil
+}
+
+// stampInput writes a saved stream back with the stamps gotest -json adds,
+// placed by the stream's own order; a stamped event is kept as it is.
+func stampInput(input, output string) int {
+	var data []byte
+	var err error
+	if input == "-" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(input) //nolint:gosec // G304: the file the caller names
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: reading input: %s\n", err)
+		return 2
+	}
+	stamped := gotestrunner.StampStream(data)
+	if output == "" {
+		_, err = os.Stdout.Write(stamped)
+	} else {
+		err = os.WriteFile(output, stamped, 0o600)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: writing output: %s\n", err)
+		return 2
+	}
+	return 0
 }
 
 func runSpecFromInput(input, format, output string, noColor, renderOnly bool, source *declaredSource, view []gotestspec.RenderOption) int {

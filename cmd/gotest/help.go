@@ -253,6 +253,10 @@ Flags:
   --render-only           With --input, exit 0 on a failing or incomplete
                           stream: report whether rendering succeeded, not the
                           test verdict
+  --stamp                 With --input, write the stream back with each test
+                          event placed as gotest -json places it, instead of
+                          rendering it: for a stream of an older gotest or of
+                          plain go test -json
   --static                Read the specification from source without running
                           the suites; nodes carry no verdict. In JSON each
                           package carries its dir and each node its file and
