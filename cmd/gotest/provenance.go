@@ -51,25 +51,34 @@ func modulePath(dir string) string {
 	}
 }
 
-// reportOptions are the module and the checkout a report names.
-func reportOptions() []gotestspec.RenderOption {
+// Whether a report is of a run made here or of a saved stream, which says
+// nothing of the checkout it was made in.
+const (
+	liveRun     = true
+	savedStream = false
+)
+
+// reportOptions are the module and, for a live run, the checkout a report
+// names.
+func reportOptions(live bool) []gotestspec.RenderOption {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil
 	}
-	return []gotestspec.RenderOption{
-		gotestspec.WithModule(modulePath(cwd)),
-		gotestspec.WithProvenance(readProvenance(cwd)),
+	opts := []gotestspec.RenderOption{gotestspec.WithModule(modulePath(cwd))}
+	if live {
+		opts = append(opts, gotestspec.WithProvenance(readProvenance(cwd)))
 	}
+	return opts
 }
 
 // terminalOptions are what the terminal spec adds to a view: the module, the
 // checkout and the width it wraps at. A spec written to a file is not wrapped,
 // whatever stdout is.
-func terminalOptions(w io.Writer) []gotestspec.RenderOption {
+func terminalOptions(w io.Writer, live bool) []gotestspec.RenderOption {
 	width := terminalWidth()
 	if f, ok := w.(*os.File); ok && f != os.Stdout {
 		width = 0
 	}
-	return append(reportOptions(), gotestspec.WithWidth(width))
+	return append(reportOptions(live), gotestspec.WithWidth(width))
 }

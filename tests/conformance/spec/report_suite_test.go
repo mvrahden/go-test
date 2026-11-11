@@ -3,11 +3,13 @@ package spec_test
 import (
 	"bytes"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/mvrahden/go-test/internal/gotestspec"
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -22,13 +24,50 @@ func (s *SpecReportTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 const reportStream = "--input=../testdata/specstreams/report.jsonl"
 
-// headCommit is the checkout's short commit, "" outside one.
-func headCommit() string {
-	out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
-	if err != nil {
-		return ""
+// checkout makes dir a git checkout with one commit and returns its short
+// commit.
+func checkout(t *gotest.T, dir string) string {
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"-c", "user.name=gotest", "-c", "user.email=gotest@example.com", "commit", "-q", "--allow-empty", "-m", "start"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		gotest.NoError(t, err, "git %v: %s", args, out)
 	}
+	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	gotest.NoError(t, err)
 	return strings.TrimSpace(string(out))
+}
+
+func (s *SpecReportTestSuite) TestWhereAReportWasMade(t *gotest.T) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	dir := t.TempDir()
+	_, err = testkit.StagePackage(root, filepath.Join("..", "testdata", "passing"), dir, "provenancemod")
+	gotest.NoError(t, err)
+	commit := checkout(t, dir)
+	stream, err := filepath.Abs(filepath.Join("..", "testdata", "specstreams", "report.jsonl"))
+	gotest.NoError(t, err)
+
+	t.When("the Markdown spec is rendered in a checkout", func(w *gotest.T) {
+		w.It("a live run's header names the checkout's commit", func(it *gotest.T) {
+			live, err := testkit.RunCLI(it.Context(), dir, "spec", "--no-color", "--format=md", "./passing/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, live.Exit, "stderr: %s", live.Stderr)
+			gotest.Regexp(it, `(?m)^Runs from .* · ([^ ]+ @ )?`+commit+`(, uncommitted changes)?$`, live.Stdout)
+		})
+		w.It("a saved stream's header names no checkout", func(it *gotest.T) {
+			saved, err := testkit.RunCLI(it.Context(), dir, "spec", "--no-color", "--format=md", "--render-only", "--input="+stream)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, saved.Exit, "stderr: %s", saved.Stderr)
+			gotest.Contains(it, saved.Stdout, "\nRuns from 2026-11-09 18:02 to 18:25 UTC\n")
+			gotest.NotContains(it, saved.Stdout, commit)
+		})
+	})
 }
 
 func (s *SpecReportTestSuite) TestABehaviorWithoutAVerdict(t *gotest.T) {
@@ -62,14 +101,9 @@ func (s *SpecReportTestSuite) TestAReportAPersonReads(t *gotest.T) {
 	packages := strings.Index(md, "\n### ")
 	gotest.NotEqual(t, -1, packages, "no package heading:\n%s", md)
 	t.When("the Markdown spec of a run with failures and rows not run", func(w *gotest.T) {
-		w.It("the header says the time range of the runs and the commit", func(it *gotest.T) {
+		w.It("the header says the time range of the runs", func(it *gotest.T) {
 			header := strings.SplitN(md, "\n", 6)[4]
-			want := "Runs from 2026-11-09 18:02 to 18:25 UTC"
-			if commit := headCommit(); commit != "" {
-				gotest.Regexp(it, "^"+want+" · ([^ ]+ @ )?"+commit+"(, uncommitted changes)?$", header)
-				return
-			}
-			gotest.Equal(it, want, header)
+			gotest.Equal(it, "Runs from 2026-11-09 18:02 to 18:25 UTC", header)
 		})
 		w.It("lists every failure with its path and message before the packages", func(it *gotest.T) {
 			want := "\n## Needs attention\n\n- **FAIL** example.com/report › UserRepository › CreateUser › when a user is created › has one entry\n" +

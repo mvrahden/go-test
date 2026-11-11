@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec is rendered in a checkout / a live run's header names the checkout's commit \(
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec is rendered in a checkout / a saved stream's header names no checkout \(
+Clause: when the Markdown spec is rendered in a checkout → a live run's header names the checkout's commit
+Clause: when the Markdown spec is rendered in a checkout → a saved stream's header names no checkout
+--- a/cmd/gotest/provenance.go
++++ b/cmd/gotest/provenance.go
+@@ -66,7 +66,7 @@
+ 		return nil
+ 	}
+ 	opts := []gotestspec.RenderOption{gotestspec.WithModule(modulePath(cwd))}
+-	if live {
++	if !live {
+ 		opts = append(opts, gotestspec.WithProvenance(readProvenance(cwd)))
+ 	}
+ 	return opts

@@ -604,7 +604,8 @@ shards of one run do not add up to every mutant exactly once.
 | `terminal-label-never-wrapped` | the terminal spec's labels stay whole at any width | spec conformance: a label wider than the width stays on one line |
 | `terminal-wrapped-when-redirected` | the terminal spec wraps at 100 columns even when stdout is not a terminal | spec conformance: a 143-column behavior is broken over lines in a redirected spec |
 | `terminal-failures-not-listed` | the terminal spec leaves out its Needs attention block | spec conformance: no failure is listed after the packages |
-| `report-provenance-dropped` | the Markdown spec's header leaves out where its numbers come from | spec conformance: no time range, no commit and no hiding part |
+| `report-provenance-dropped` | the Markdown spec's header leaves out where its numbers come from | spec conformance: no time range and no hiding part |
+| `report-checkout-on-the-wrong-render` | the spec names the checkout when rendered from a saved stream and not for a live run | spec conformance: a live run in a fresh checkout names no commit, a saved stream rendered there names it |
 | `report-suite-counts-dropped` | the Markdown spec's suite headings lose their counts | spec conformance: `#### UserRepository` carries no counts |
 | `report-external-unmarked` | the Markdown spec heads an external suite like the internal one | spec conformance: no heading carries EXTERNAL |
 | `report-short-durations-shown` | the Markdown spec shows durations under a second | spec conformance: the 300ms method reads `(300ms)` |

@@ -42,7 +42,7 @@ func (s *SpecWidthTestSuite) AfterEach(_ *gotest.T, ctx *widthCtx) { ctx.restore
 
 func render(label string) string {
 	var buf bytes.Buffer
-	ExportRenderSpec(&buf, widthTree(label), "terminal", true, nil)
+	ExportRenderSpec(&buf, widthTree(label), "terminal", true, nil, true)
 	return buf.String()
 }
 

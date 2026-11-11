@@ -156,11 +156,11 @@ The specification read from source SHALL name an Each table row as the run does:
 - **AND** the declared spec under the run shows the row the run reported
 
 ### Requirement: A report a person reads
-The Markdown spec SHALL be an outline: a header with the counts, the runs' time range, the checkout's branch and commit and its uncommitted changes, and what is hidden; then every failure with its path and message and every row not run with its path; then a heading per module, package and suite, each package and suite with its counts and an external suite marked EXTERNAL; then each behavior as one item that opens with its verdict. No duration under a second SHALL be shown.
+The Markdown spec SHALL be an outline: a header with the counts, the runs' time range, the checkout it was made in, and what is hidden; then every failure with its path and message and every row not run with its path; then a heading per module, package and suite, each package and suite with its counts and an external suite marked EXTERNAL; then each behavior as one item that opens with its verdict. No duration under a second SHALL be shown.
 
 #### Scenario: A run with failures and rows not run
 - **WHEN** the Markdown spec of a run with failures and rows not run
-- **THEN** the header says the time range of the runs and the commit
+- **THEN** the header says the time range of the runs
 - **AND** lists every failure with its path and message before the packages
 - **AND** lists every row not run with its path
 - **AND** every package and suite heading carries its counts
@@ -170,6 +170,14 @@ The Markdown spec SHALL be an outline: a header with the counts, the runs' time 
 #### Scenario: A report that hides rows
 - **WHEN** the Markdown spec hides rows
 - **THEN** the header names what is hidden
+
+### Requirement: The checkout a report was made in
+The spec of a live run SHALL name the checkout's branch, its commit and whether it has uncommitted changes. A spec rendered from a saved stream (--input) SHALL name no checkout: the stream does not say where it was made, and the checkout it is read in may be another.
+
+#### Scenario: Where a report was made
+- **WHEN** the Markdown spec is rendered in a checkout
+- **THEN** a live run's header names the checkout's commit
+- **AND** a saved stream's header names no checkout
 
 ### Requirement: A terminal report a person reads
 The terminal spec SHALL carry the Markdown spec's content laid out for a terminal: a heading per package and a line per suite, each with its counts, each behavior as one line led by its mark, then every failure and row not run with its path and message after the packages, then the provenance line. A label SHALL wrap at the terminal's width, COLUMNS or 100, and SHALL stay on one line when the spec is redirected.

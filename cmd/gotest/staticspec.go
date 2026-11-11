@@ -219,11 +219,11 @@ func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.Proj
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree, append(renderOpts, reportOptions()...)...)
+		gotestspec.RenderMarkdown(w, tree, append(renderOpts, reportOptions(liveRun)...)...)
 	case "json":
 		gotestspec.RenderJSON(w, tree, gotestspec.WithoutVerdicts())
 	default:
-		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w)...)...)
+		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w, liveRun)...)...)
 	}
 
 	// Behaviors the walker could not enumerate are reported rather than

@@ -1,6 +1,6 @@
-Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / the header says the time range of the runs and the commit \(
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / the header says the time range of the runs \(
 Expect: ^FAIL .*conformance/spec .* / when the Markdown spec hides rows / the header names what is hidden \(
-Clause: when the Markdown spec of a run with failures and rows not run → the header says the time range of the runs and the commit
+Clause: when the Markdown spec of a run with failures and rows not run → the header says the time range of the runs
 Clause: when the Markdown spec hides rows → the header names what is hidden
 --- a/internal/gotestspec/report.go
 +++ b/internal/gotestspec/report.go

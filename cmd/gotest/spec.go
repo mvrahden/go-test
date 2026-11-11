@@ -197,13 +197,14 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		w = f
 	}
 
-	renderSpec(w, tree, format, noColor, view.options)
+	renderSpec(w, tree, format, noColor, view.options, liveRun)
 
 	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
-// renderSpec renders tree in format, under the view's options.
-func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor bool, view []gotestspec.RenderOption) {
+// renderSpec renders tree in format, under the view's options; live says
+// whether the run was made here.
+func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor bool, view []gotestspec.RenderOption, live bool) {
 	renderOpts := slices.Clone(view)
 	if noColor {
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
@@ -211,11 +212,11 @@ func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor 
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree, append(slices.Clone(view), reportOptions()...)...)
+		gotestspec.RenderMarkdown(w, tree, append(slices.Clone(view), reportOptions(live)...)...)
 	case "json":
 		gotestspec.RenderJSON(w, tree, view...)
 	default:
-		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w)...)...)
+		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w, live)...)...)
 	}
 }
 
@@ -324,7 +325,7 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
 		w = of
 	}
 
-	renderSpec(w, tree, format, noColor, view)
+	renderSpec(w, tree, format, noColor, view, savedStream)
 
 	// The same exit rule as `summary --input`: a renderer fed a failing stream
 	// must not exit 0 — in a pipe without pipefail this exit code is the only
