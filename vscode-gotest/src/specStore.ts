@@ -183,6 +183,11 @@ export class SpecStore {
     return Array.from(groups.keys());
   }
 
+  // folderOf is the folder whose CLI renders a package.
+  folderOf(pkg: string): string | undefined {
+    return this.records.get(pkg)?.folder;
+  }
+
   // folders lists the folders whose CLI renders something.
   folders(): string[] {
     return Array.from(

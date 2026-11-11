@@ -167,3 +167,46 @@ describe("the Spec View's kept runs, rendered by the CLI", () => {
     ]);
   });
 });
+
+// copy is the panel's Copy: the Markdown the CLI writes for the same stream,
+// with the flags the panel adds for a search or a node.
+function copy(composed: string, ...extra: string[]): string {
+  return gotest(
+    [
+      "spec",
+      "--input=-",
+      "--format=md",
+      "--render-only",
+      "--hide=",
+      ...extra,
+      "--declared",
+      "./twins/",
+    ],
+    composed,
+  );
+}
+
+describe("the Spec View's Copy, rendered by the CLI", () => {
+  it("copying after typing a search holds only the matching behaviors", () => {
+    const whole = run();
+    const all = copy(whole);
+    const found = copy(whole, "--match=outside");
+    expect(all).toContain("creates inside");
+    expect(found).toContain("creates outside");
+    expect(found).toContain("lists outside");
+    expect(found).not.toContain("creates inside");
+    expect(found).not.toContain("./pkg");
+    expect(found).toContain('search "outside"');
+  });
+
+  it("copying one row holds that node alone, placed as the panel's JSON places it", () => {
+    const whole = run();
+    const at = render(whole).findIndex(
+      (n) => n.name === "TestPathsTestSuite" && !n.external,
+    );
+    expect(at).toBeGreaterThanOrEqual(0);
+    const one = copy(whole, `--only=${twins}:${at}`);
+    expect(one).toContain("./pkg");
+    expect(one).not.toContain("creates inside");
+  });
+});

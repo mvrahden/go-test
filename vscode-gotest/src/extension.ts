@@ -205,7 +205,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // The Spec View's buttons act on Test Explorer items; a node the tree does
   // not hold runs as its nearest ancestor that it does.
   const toItem = (id: string) => {
-    const nearest = nearestItemId(id, (i) => !!controller.findItem(i));
+    const nearest = nearestItemId(
+      id,
+      (i) => !!controller.findItem(i),
+      specView.ancestorsOf(id),
+    );
     if (nearest && nearest !== id) {
       outputChannel.info(
         `[specView] ${id} is not in the tree; using ${nearest}`,

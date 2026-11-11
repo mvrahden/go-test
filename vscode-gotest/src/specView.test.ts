@@ -147,6 +147,50 @@ describe("buildSpecBody", () => {
     );
   });
 
+  it("gives each branch its package and its place among the shown rows, with a copy button", () => {
+    const html = body([
+      {
+        path: "example.com/p",
+        status: "pass",
+        duration: 0,
+        nodes: [
+          node("TestAATestSuite", "pass", [node("x", "pass")]),
+          node("TestBBTestSuite", "pass", [
+            node("TestM", "pass", [node("gets_./", "pass")]),
+          ]),
+        ],
+      },
+    ]);
+    const summaries = html.match(/<summary class="node[^>]*>/g) ?? [];
+    expect(summaries).toHaveLength(3);
+    expect(summaries[0]).toContain('data-pkg="example.com/p"');
+    expect(summaries[0]).toContain('data-position="0"');
+    expect(summaries[1]).toContain('data-position="1"');
+    expect(summaries[2]).toContain('data-position="1.0"');
+    expect(html).toContain('data-act="copyNode"');
+  });
+
+  it("lists the item ids above a row, nearest last, so a slash in a name cannot mislead", () => {
+    const html = body([
+      {
+        path: "example.com/p",
+        status: "pass",
+        duration: 0,
+        nodes: [
+          node("TestSTestSuite", "pass", [
+            node("TestM", "pass", [node("gets_./", "pass")]),
+          ]),
+        ],
+      },
+    ]);
+    const leaf = html.match(
+      /<div class="leaf[^>]*data-display="gets_\.\/"[^>]*>/,
+    );
+    expect(leaf?.[0]).toContain(
+      'data-ancestors="[&quot;example.com/p/STestSuite&quot;,&quot;example.com/p/STestSuite/TestM&quot;]"',
+    );
+  });
+
   it("marks a node the run did not report NOT RUN, with no duration", () => {
     const html = body([
       {
@@ -406,6 +450,14 @@ describe("nearestItemId", () => {
     expect(nearestItemId("p/S/TestM", has)).toBe("p/S/TestM");
     expect(nearestItemId("p/S/TestM/row_101", has)).toBe("p/S/TestM");
     expect(nearestItemId("q/T", has)).toBeUndefined();
+  });
+
+  it("takes the nearest ancestor from the list, not from cutting at a slash", () => {
+    const tree = new Set(["p/S", "p/S/TestM", "p/S/TestM/gets_."]);
+    const has = (id: string) => tree.has(id);
+    const id = "p/S/TestM/gets_./";
+    expect(nearestItemId(id, has, ["p/S", "p/S/TestM"])).toBe("p/S/TestM");
+    expect(nearestItemId(id, has)).toBe("p/S/TestM/gets_.");
   });
 });
 

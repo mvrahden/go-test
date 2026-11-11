@@ -13,7 +13,10 @@ const { script, mockKill, buildCli } = vi.hoisted(() => ({
   })),
 }));
 
-const { clipboard } = vi.hoisted(() => ({ clipboard: { text: "" } }));
+const { clipboard, notes } = vi.hoisted(() => ({
+  clipboard: { text: "" },
+  notes: { info: [] as string[], warn: [] as string[] },
+}));
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -28,7 +31,14 @@ vi.mock("vscode", () => ({
     },
   },
   Uri: { file: (p: string) => ({ fsPath: p }) },
-  window: {},
+  window: {
+    showInformationMessage: async (m: string) => {
+      notes.info.push(m);
+    },
+    showWarningMessage: async (m: string) => {
+      notes.warn.push(m);
+    },
+  },
   EventEmitter: class {
     event = () => ({ dispose: () => {} });
     fire = () => {};
@@ -266,6 +276,11 @@ describe("what the panel asks the CLI for", () => {
     renderRuns(): Promise<unknown>;
     copy(): Promise<void>;
   };
+  // copies runs the panel's copy as the webview's message asks for it.
+  const copies = async (panel: SpecViewPanel, msg: unknown) => {
+    internalsOf(panel).handleMessage(msg);
+    await vi.waitFor(() => expect(notes.info.length).toBeGreaterThan(0));
+  };
   const internalsOf = (panel: SpecViewPanel) => panel as unknown as Internals;
   const argsOfCall = (i: number) => buildCli.mock.calls[i][0];
 
@@ -351,5 +366,79 @@ describe("what the panel asks the CLI for", () => {
       "./...",
     ]);
     expect(clipboard.text).toBe("# Behavior Specification\n");
+  });
+
+  async function loaded(md: string): Promise<SpecViewPanel> {
+    notes.info = [];
+    notes.warn = [];
+    script.always = { stdout: [md], code: 0 };
+    const panel = new SpecViewPanel(channel, undefined as never);
+    internalsOf(panel).runs.merge({
+      stream: runOf("example.com/pkg"),
+      folder: "/ws/a",
+    });
+    internalsOf(panel).runs.merge({
+      stream: runOf("example.com/other"),
+      folder: "/ws/b",
+    });
+    buildCli.mockClear();
+    return panel;
+  }
+
+  it("copies what the search leaves, as the CLI's match", async () => {
+    const panel = await loaded("# spec\n");
+    await copies(panel, { type: "copySpec", search: "  email " });
+    expect(buildCli.mock.calls.map((c) => c[0])).toEqual([
+      expect.arrayContaining(["--format=md", "--match=email"]),
+      expect.arrayContaining(["--format=md", "--match=email"]),
+    ]);
+  });
+
+  it("asks for no match when the search is empty", async () => {
+    const panel = await loaded("# spec\n");
+    await copies(panel, { type: "copySpec", search: "" });
+    expect(argsOfCall(0).some((a) => a.startsWith("--match"))).toBe(false);
+  });
+
+  it("copies one node from the folder of the row's package", async () => {
+    const panel = await loaded("## node\n");
+    await copies(panel, {
+      type: "copyNode",
+      pkg: "example.com/pkg",
+      position: [0, 1],
+    });
+    expect(buildCli.mock.calls).toHaveLength(1);
+    expect(argsOfCall(0)).toEqual(
+      expect.arrayContaining(["--format=md", "--only=example.com/pkg:0.1"]),
+    );
+    expect(buildCli.mock.calls[0][1]).toBe("/ws/a");
+    expect(clipboard.text).toBe("## node\n");
+  });
+
+  it("copies a whole package for an empty position", async () => {
+    const panel = await loaded("## pkg\n");
+    await copies(panel, {
+      type: "copyNode",
+      pkg: "example.com/other",
+      position: [],
+    });
+    expect(argsOfCall(0)).toContain("--only=example.com/other");
+    expect(buildCli.mock.calls[0][1]).toBe("/ws/b");
+  });
+
+  it("says how big the copy is", async () => {
+    const panel = await loaded("x".repeat(400));
+    await copies(panel, { type: "copySpec", search: "" });
+    expect(notes.info).toEqual(["Copied 801 characters (about 200 tokens)."]);
+    expect(notes.warn).toEqual([]);
+  });
+
+  it("warns when the copy is above GitHub's comment limit", async () => {
+    const panel = await loaded("x".repeat(35_000));
+    await copies(panel, { type: "copySpec", search: "" });
+    await vi.waitFor(() => expect(notes.warn).toHaveLength(1));
+    expect(notes.warn[0]).toContain(
+      "above GitHub's 65,536-character comment limit.",
+    );
   });
 });
