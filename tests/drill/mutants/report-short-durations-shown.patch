@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / no duration under a second is shown \(
+Clause: when the Markdown spec of a run with failures and rows not run → no duration under a second is shown
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -262,7 +262,7 @@
+ 		line += " — " + incompleteMark
+ 	}
+ 	if word != "" && (leaf || n.Kind == KindFuzz) && !n.NotRun && n.Status != StatusNone {
+-		if d := EffectiveDuration(n); d >= time.Second {
++		if d := EffectiveDuration(n); d >= 0*time.Second {
+ 			line += " (" + formatDuration(d) + ")"
+ 		}
+ 	}

@@ -1,0 +1,25 @@
+{"Time":"2026-11-09T18:02:00.000Z","Action":"start","Package":"example.com/report"}
+{"Time":"2026-11-09T18:02:00.001Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite"}
+{"Time":"2026-11-09T18:02:00.002Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser"}
+{"Time":"2026-11-09T18:02:00.003Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created"}
+{"Time":"2026-11-09T18:02:00.004Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created/stores_the_email"}
+{"Time":"2026-11-09T18:02:00.010Z","Action":"pass","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created/stores_the_email","Elapsed":0.01}
+{"Time":"2026-11-09T18:02:00.011Z","Action":"pass","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created","Elapsed":0.01}
+{"Time":"2026-11-09T18:02:00.012Z","Action":"pass","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser","Elapsed":0.01}
+{"Time":"2026-11-09T18:02:00.013Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestQuick"}
+{"Time":"2026-11-09T18:02:00.313Z","Action":"pass","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestQuick","Elapsed":0.3}
+{"Time":"2026-11-09T18:02:00.314Z","Action":"pass","Package":"example.com/report","Test":"TestUserRepositoryTestSuite","Elapsed":0.31}
+{"Time":"2026-11-09T18:20:00.000Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite"}
+{"Time":"2026-11-09T18:20:00.001Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01"}
+{"Time":"2026-11-09T18:20:00.002Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created"}
+{"Time":"2026-11-09T18:20:00.003Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry"}
+{"Time":"2026-11-09T18:20:00.004Z","Action":"output","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry","Output":"    suite_ext_test.go:28: Len: expected 1, got 2\n"}
+{"Time":"2026-11-09T18:20:00.005Z","Action":"output","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry","Output":"--- FAIL: TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry (0.00s)\n"}
+{"Time":"2026-11-09T18:20:00.005Z","Action":"fail","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry","Elapsed":0}
+{"Time":"2026-11-09T18:20:00.006Z","Action":"fail","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created","Elapsed":0}
+{"Time":"2026-11-09T18:20:00.007Z","Action":"fail","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestCreateUser#01","Elapsed":0}
+{"Time":"2026-11-09T18:20:00.008Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestPing"}
+{"Time":"2026-11-09T18:20:01.208Z","Action":"pass","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestPing","Elapsed":1.2}
+{"Time":"2026-11-09T18:25:00.000Z","Action":"run","Package":"example.com/report","Test":"TestUserRepositoryTestSuite/TestDeleteUser"}
+{"Time":"2026-11-09T18:25:30.000Z","Action":"fail","Package":"example.com/report","Test":"TestUserRepositoryTestSuite","Elapsed":330}
+{"Time":"2026-11-09T18:25:30.001Z","Action":"fail","Package":"example.com/report","Elapsed":1410}

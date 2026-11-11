@@ -1,17 +1,21 @@
 # Living Spec Specification
 
 ## Purpose
-How `gotest spec` writes the behavior specification of a run, and the one it reads from source with `--static`, as a Markdown document whose labels stay text; which verdict a branch and its package carry when a failure lies beneath them; how --declared lays a stream's verdicts over the specification the source declares and where the source declares each node; and which rows --hide leaves out of a rendering without changing what it counts.
+How `gotest spec` writes the behavior specification of a run, and the one it reads from source with `--static`, as a Markdown outline whose labels stay text and whose counts add up; which verdict a branch and its package carry when a failure lies beneath them; how --declared lays a stream's verdicts over the specification the source declares and where the source declares each node; and which rows --hide leaves out of a rendering without changing what it counts.
 
 ## Requirements
 
 ### Requirement: Labels are text
-Every label the Markdown spec writes, in a table cell or a heading, SHALL be escaped so that no pipe, backslash, angle bracket, backtick or line break in it can end a cell, break a row, open a code span or reach the reader as HTML, and no bracket, asterisk, underscore or ampersand can open a link, emphasis or an entity.
+Every label the Markdown spec writes, in a list item or a heading, SHALL be escaped so that no pipe, backslash, angle bracket, backtick or line break in it can break its line, open a code span or reach the reader as HTML, no bracket, asterisk, underscore or ampersand can open a link, emphasis or an entity, and none at the start of an item can open a list, a heading, a quote or a code block.
 
 #### Scenario: A label that holds Markdown syntax
 - **WHEN** a label holds a pipe, a backslash, an angle bracket, a backtick or a line break
-- **THEN** keeps each behavior on one row of its table
+- **THEN** keeps each behavior on one line of the outline
 - **AND** renders the label as text, with no HTML tag and no code span
+
+#### Scenario: A label that opens a block
+- **WHEN** a label opens a list, a heading, a quote or a code block
+- **THEN** the Markdown spec shows it as text
 
 #### Scenario: A label that holds link or emphasis syntax
 - **WHEN** a label holds brackets, asterisks, underscores or an ampersand
@@ -105,7 +109,7 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **AND** counts one failure and exits 1, or 0 with --render-only
 
 ### Requirement: The declared specification under a run's verdicts
-`spec --input=<file> --declared [packages]` SHALL render the specification the source declares, as --static reads it: a node the stream reported carries its verdict, duration and output, one it did not report neither, or skipped under a node the run skipped; what only the stream holds stays under its declared parent. Unreported behaviors SHALL count as not run, sparing the exit code. With --static or --declared each JSON package SHALL carry its dir and each declared node its file and line.
+`spec --input=<file> --declared [packages]` SHALL render the specification the source declares, as --static reads it: a node the stream reported carries its verdict, duration and output, one it did not report neither, or skipped under a node the run skipped; what only the stream holds stays under its declared parent. A behavior with no verdict, unreported or only started, SHALL count as not run, with no duration, sparing the exit code, so the counts add up to the behaviors.
 
 #### Scenario: A run of some of a package's methods
 - **WHEN** a stream of some of a package's methods is rendered with --declared
@@ -120,6 +124,15 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 #### Scenario: A suite its guard kept from running
 - **WHEN** a stream holds the skip of a suite its guard kept from running, rendered with --declared
 - **THEN** reads the suite's declared methods and rows as skipped, not as not run, and counts them so
+
+#### Scenario: A behavior without a verdict
+- **WHEN** a behavior started and reported no verdict
+- **THEN** counts as not run
+- **AND** shows no duration
+- **AND** the counts add up to the behaviors
+
+### Requirement: Where the source declares a node
+With --static or --declared each JSON package SHALL carry its dir and each node the source declares its file and line.
 
 #### Scenario: Where the source declares a node
 - **WHEN** a package's specification is rendered as JSON with --static or with --declared
@@ -137,6 +150,22 @@ The specification read from source SHALL name an Each table row as the run does:
 - **WHEN** a table row's name is known only at run time
 - **THEN** the spec read from source lists no row for it and marks its method incomplete
 - **AND** the declared spec under the run shows the row the run reported
+
+### Requirement: A report a person reads
+The Markdown spec SHALL be an outline: a header with the counts, the runs' time range, the checkout's branch and commit and its uncommitted changes, and what is hidden; then every failure with its path and message and every row not run with its path; then a heading per module, package and suite, each package and suite with its counts and an external suite marked EXTERNAL; then each behavior as one item that opens with its verdict. No duration under a second SHALL be shown.
+
+#### Scenario: A run with failures and rows not run
+- **WHEN** the Markdown spec of a run with failures and rows not run
+- **THEN** the header says the time range of the runs and the commit
+- **AND** lists every failure with its path and message before the packages
+- **AND** lists every row not run with its path
+- **AND** every package and suite heading carries its counts
+- **AND** an external suite's heading is marked EXTERNAL
+- **AND** no duration under a second is shown
+
+#### Scenario: A report that hides rows
+- **WHEN** the Markdown spec hides rows
+- **THEN** the header names what is hidden
 
 ### Requirement: Hiding rows by status
 `--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared without --input or beside --static, SHALL exit 2.

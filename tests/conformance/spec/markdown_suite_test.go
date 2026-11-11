@@ -38,59 +38,54 @@ func (s *SpecMarkdownTestSuite) BeforeAll(t *gotest.T) {
 
 func (s *SpecMarkdownTestSuite) AfterAll(t *gotest.T) {}
 
-// cells counts the cells of a table row: the pipes no backslash escapes, less
-// the closing one.
-func cells(row string) int {
-	n := 0
-	for i := 0; i < len(row); i++ {
-		switch row[i] {
-		case '\\':
-			i++
-		case '|':
-			n++
-		}
-	}
-	return n - 1
-}
-
-// tableRows is every table row of a Markdown document, header and rule included.
-func tableRows(md string) []string {
-	var rows []string
+// oneLine fails t unless every line of the outline outside a code block is a
+// heading, a paragraph of the header, an item or a benchmark row: a label
+// that broke its line would leave a line that is none of them.
+func oneLine(t *gotest.T, name, md string) {
+	fence := ""
+	headed := false
 	for _, line := range strings.Split(md, "\n") {
-		if strings.HasPrefix(line, "|") {
-			rows = append(rows, line)
+		text := strings.TrimLeft(line, " ")
+		switch {
+		case fence != "":
+			if strings.TrimRight(text, "`") == "" && len(text) >= len(fence) {
+				fence = ""
+			}
+		case strings.HasPrefix(text, "```"):
+			fence = strings.TrimRight(text, "abcdefghijklmnopqrstuvwxyz")
+		case text == "" || strings.HasPrefix(text, "- ") || strings.HasPrefix(text, "|"):
+		case strings.HasPrefix(line, "#"):
+			headed = headed || strings.HasPrefix(line, "## ")
+		default:
+			gotest.False(t, headed || len(text) != len(line), "%s: a line that is no item: %q", name, line)
 		}
 	}
-	return rows
 }
 
 func (s *SpecMarkdownTestSuite) TestLabels(t *gotest.T) {
 	t.When("a label holds a pipe, a backslash, an angle bracket, a backtick or a line break", func(w *gotest.T) {
-		w.It("keeps each behavior on one row of its table", func(it *gotest.T) {
+		w.It("keeps each behavior on one line of the outline", func(it *gotest.T) {
 			for _, doc := range []struct {
 				name, md string
-				width    int
-				rows     []string
+				lines    []string
 			}{
-				{"spec", s.live.Stdout, 3, []string{
-					"| **when a label holds a \\| b** | | |",
-					"| &nbsp;&nbsp;keeps &lt;b&gt;bold&lt;/b&gt; and \\`code\\` as text | PASS | ",
-					"| &nbsp;&nbsp;keeps a\\\\b and a line break in one row | PASS | ",
-					"| row \\| &lt;i&gt;x&lt;/i&gt; | PASS | ",
+				{"spec", s.live.Stdout, []string{
+					"\n  - when a label holds a \\| b\n",
+					"\n    - PASS keeps &lt;b&gt;bold&lt;/b&gt; and \\`code\\` as text\n",
+					"\n    - PASS keeps a\\\\b and a line break in one row\n",
+					"\n  - PASS row \\| &lt;i&gt;x&lt;/i&gt;\n",
 				}},
-				{"spec --static", s.static.Stdout, 1, []string{
-					"| **when a label holds a \\| b** |\n",
-					"| &nbsp;&nbsp;keeps &lt;b&gt;bold&lt;/b&gt; and \\`code\\` as text |\n",
-					"| &nbsp;&nbsp;keeps a\\\\b and a line break in one row |\n",
-					"| row \\| &lt;i&gt;x&lt;/i&gt; |\n",
+				{"spec --static", s.static.Stdout, []string{
+					"\n  - when a label holds a \\| b\n",
+					"\n    - keeps &lt;b&gt;bold&lt;/b&gt; and \\`code\\` as text\n",
+					"\n    - keeps a\\\\b and a line break in one row\n",
+					"\n  - row \\| &lt;i&gt;x&lt;/i&gt;\n",
 				}},
 			} {
-				for _, row := range doc.rows {
-					gotest.Contains(it, doc.md, row, "%s", doc.name)
+				for _, line := range doc.lines {
+					gotest.Contains(it, doc.md, line, "%s", doc.name)
 				}
-				for _, row := range tableRows(doc.md) {
-					gotest.Equal(it, doc.width, cells(row), "%s row %q", doc.name, row)
-				}
+				oneLine(it, doc.name, doc.md)
 			}
 		})
 
@@ -103,13 +98,27 @@ func (s *SpecMarkdownTestSuite) TestLabels(t *gotest.T) {
 			}
 		})
 	})
+
+	t.When("a label opens a list, a heading, a quote or a code block", func(w *gotest.T) {
+		w.It("the Markdown spec shows it as text", func(it *gotest.T) {
+			for _, md := range []string{s.live.Stdout, s.static.Stdout} {
+				for _, row := range []string{
+					`1\. a numbered row`, `\# a heading row`, `\> a quoted row`,
+					`\- a listed row`, `\+ a plussed row`, "\\`\\`\\` a fenced row",
+				} {
+					gotest.Contains(it, md, "\n  - "+row+"\n")
+				}
+				oneLine(it, "spec", md)
+			}
+		})
+	})
 }
 
 func (s *SpecMarkdownTestSuite) TestLinkSyntax(t *gotest.T) {
 	t.When("a label holds brackets, asterisks, underscores or an ampersand", func(w *gotest.T) {
 		w.It("renders the label as written, with no link, emphasis or entity", func(it *gotest.T) {
 			for _, md := range []string{s.live.Stdout, s.static.Stdout} {
-				gotest.Contains(it, md, "**when a label holds a \\[link\\](http://x)**")
+				gotest.Contains(it, md, "- when a label holds a \\[link\\](http://x)\n")
 				gotest.Contains(it, md, "keeps \\*stars\\*, \\_underscores\\_ and &amp;#124; as written")
 				gotest.NotContains(it, md, "[link](")
 				gotest.NotContains(it, md, " *stars*")
@@ -123,24 +132,22 @@ func (s *SpecMarkdownTestSuite) TestLinkSyntax(t *gotest.T) {
 func (s *SpecMarkdownTestSuite) TestSlashes(t *gotest.T) {
 	t.When("an It's label holds a slash", func(w *gotest.T) {
 		w.It("a run's spec shows it as one It under its When", func(it *gotest.T) {
-			gotest.Contains(it, s.live.Stdout, "| **when a path is read** | | |\n| &nbsp;&nbsp;reads a/b paths | PASS | ")
-			gotest.NotContains(it, s.live.Stdout, "reads a**")
+			gotest.Contains(it, s.live.Stdout, "\n  - when a path is read\n    - PASS reads a/b paths\n")
+			gotest.NotContains(it, s.live.Stdout, "- reads a\n")
 		})
 
 		w.It("the spec read from source shows it as one It under its When", func(it *gotest.T) {
-			gotest.Contains(it, s.static.Stdout, "| **when a path is read** |\n| &nbsp;&nbsp;reads a/b paths |\n")
-			gotest.NotContains(it, s.static.Stdout, "reads a**")
+			gotest.Contains(it, s.static.Stdout, "\n  - when a path is read\n    - reads a/b paths\n")
 		})
 	})
 
 	t.When("an It's label is an earlier It's label, a slash and more", func(w *gotest.T) {
 		w.It("a run's spec shows both as Its under their When", func(it *gotest.T) {
-			gotest.Contains(it, s.live.Stdout, "| **when a path is read after its parent** | | |\n| &nbsp;&nbsp;reads a | PASS | ")
-			gotest.Regexp(it, `\| &nbsp;&nbsp;reads a \| PASS \| [^\n]*\n\| &nbsp;&nbsp;reads a/b \| PASS \| `, s.live.Stdout)
+			gotest.Contains(it, s.live.Stdout, "\n  - when a path is read after its parent\n    - PASS reads a\n    - PASS reads a/b\n")
 		})
 
 		w.It("the spec read from source shows both as Its under their When", func(it *gotest.T) {
-			gotest.Contains(it, s.static.Stdout, "| **when a path is read after its parent** |\n| &nbsp;&nbsp;reads a |\n| &nbsp;&nbsp;reads a/b |\n")
+			gotest.Contains(it, s.static.Stdout, "\n  - when a path is read after its parent\n    - reads a\n    - reads a/b\n")
 		})
 	})
 }
@@ -151,8 +158,7 @@ func (s *SpecMarkdownTestSuite) TestGroupFailure(t *gotest.T) {
 	t.When("a group fails with every behavior under it passing", func(w *gotest.T) {
 		w.It("shows the failure and what it wrote on the group's row", func(it *gotest.T) {
 			gotest.Equal(it, 1, run.Exit, "spec: %s", run.Stderr)
-			gotest.Regexp(it, `\| \*\*when the disk \\\| is full\*\* — [^|]*no space &lt;left&gt; \| FAIL \| `, run.Stdout)
-			gotest.Contains(it, run.Stdout, "| &nbsp;&nbsp;starts | PASS | ")
+			gotest.Regexp(it, "\n  - \\*\\*FAIL\\*\\* when the disk \\\\\\| is full\n    ```text\n[^`]*no space <left>\n    ```\n    - PASS starts\n", run.Stdout)
 		})
 	})
 }
@@ -161,9 +167,9 @@ func (s *SpecMarkdownTestSuite) TestExcluded(t *gotest.T) {
 	t.When("the spec is read from source with X_ suites and methods", func(w *gotest.T) {
 		w.It("marks each excluded suite, method and behavior EXCLUDED", func(it *gotest.T) {
 			for _, want := range []string{
-				"## Parked — EXCLUDED\n\n### Anything — EXCLUDED\n\n| Behavior |\n|----------|\n| **when the suite is parked** — EXCLUDED |\n| &nbsp;&nbsp;never runs — EXCLUDED |\n",
-				"### Parked — EXCLUDED\n\n| Behavior |\n|----------|\n| **when the method is parked** — EXCLUDED |\n| &nbsp;&nbsp;never runs — EXCLUDED |\n",
-				"## Labels\n\n### Markup\n",
+				"#### Parked — EXCLUDED\n\n- **Anything** — EXCLUDED\n  - when the suite is parked — EXCLUDED\n    - never runs — EXCLUDED\n",
+				"- **Parked** — EXCLUDED\n  - when the method is parked — EXCLUDED\n    - never runs — EXCLUDED\n",
+				"#### Labels\n\n- **Markup**\n",
 			} {
 				gotest.Contains(it, s.static.Stdout, want)
 			}

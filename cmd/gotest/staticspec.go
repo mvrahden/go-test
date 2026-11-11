@@ -219,7 +219,7 @@ func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.Proj
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree, renderOpts...)
+		gotestspec.RenderMarkdown(w, tree, append(renderOpts, reportOptions()...)...)
 	case "json":
 		gotestspec.RenderJSON(w, tree)
 	default:

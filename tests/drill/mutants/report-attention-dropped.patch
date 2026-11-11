@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / lists every failure with its path and message before the packages \(
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / lists every row not run with its path \(
+Clause: when the Markdown spec of a run with failures and rows not run → lists every failure with its path and message before the packages
+Clause: when the Markdown spec of a run with failures and rows not run → lists every row not run with its path
+--- a/internal/gotestspec/report.go
++++ b/internal/gotestspec/report.go
+@@ -72,6 +72,9 @@
+ // not run, in tree order.
+ func attention(packages []*Package, cfg *renderConfig) []attentionRow {
+ 	var rows []attentionRow
++	if rows == nil {
++		return nil
++	}
+ 	for _, pkg := range packages {
+ 		if !cfg.packageShown(pkg) {
+ 			continue

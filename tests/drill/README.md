@@ -321,7 +321,8 @@ shards of one run do not add up to every mutant exactly once.
 | `branch-keeps-a-pass-over-a-failure` | a suite whose own line says pass stays passed above a failed method | spec conformance: the composed stream's suite renders unlike the one go test failed |
 | `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
 | `declared-node-shown-as-passed` | `--declared` gives a declared node the stream did not report a pass | spec conformance: the left-out method's rows carry a verdict |
-| `not-run-uncounted` | the behaviors the stream did not report are not counted as not run | spec conformance: the declared package counts 0 not run |
+| `not-run-uncounted` | the behaviors without a verdict are not counted as not run | spec conformance: the declared package counts 0 not run, and a behavior that started without a verdict counts nowhere |
+| `no-verdict-row-timed` | the terminal spec times a behavior that started and reported no verdict | spec conformance: the row reads `? DeleteUser (<1ms)` instead of NOT RUN |
 | `excluded-read-as-not-run` | a method the X_ prefix excludes reads as not run under `--declared` | spec conformance: the parked method has no skip verdict |
 | `observed-rows-dropped` | `--declared` drops the rows only the stream names | spec conformance: the method over a table that is no literal has no rows |
 | `hidden-hook-failure` | `--hide` keeps a branch only for a row shown beneath it | spec conformance: the suite whose AfterAll failed vanishes under `--hide=pass` |
@@ -582,15 +583,22 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-seed-error-at-flush` | a seed of the wrong type is reported where gotest flushes the seeds, not at its `f.Add` call | canary: the `fuzzseedtype` failure does not name the fixture's `f.Add` line |
 | `promote-splices-the-echo-whole` | a decoding target's echo of several arguments is spliced as one value | conformance: the fuzz promote It for a decoding target of several arguments finds no seed added |
 | `fuzz-session-drops-other-targets` | a fuzz session's record drops the crashers of targets it did not fuzz | conformance: the fuzz session It for another checkout finds its crasher not promoted |
-| `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: a label with a pipe breaks its table row; canary: the `specmarkdown` rows have the wrong number of cells |
+| `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: the When's line lacks its escaped pipe |
+| `spec-label-line-break-kept` | the Markdown spec keeps a line break in a label | spec conformance: a label's second half is a line of its own; canary: the `specmarkdown` spec has a line that is no item |
+| `spec-label-item-start-unescaped` | the Markdown spec leaves a label that opens a list, a heading, a quote or a code block as it is | spec conformance: the rows of `TestOpenings` open blocks inside their items |
 | `spec-label-html-unescaped` | the Markdown spec leaves angle brackets in a label unescaped | spec conformance: a label's tags reach the reader as HTML; canary: the `specmarkdown` spec carries `<b>` |
 | `spec-slash-splits-run` | the tree of a run splits every name at its slashes instead of placing it by the stream's order | spec conformance: the run's and the replay's spec show "reads a" as a level and labels that start or end with a slash, a When that ends with one and a parallel sibling cut into levels; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
 | `spec-slash-splits-source` | the spec read from source reads the text after a label's last slash as a level of its own | spec conformance: the static spec has no "reads a/b paths" row, splits labels that start or end with a slash into levels, and --declared sees rows the run never reported |
-| `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `### Parked — EXCLUDED` |
+| `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `- **Parked** — EXCLUDED` |
 | `spec-label-link-unescaped` | the Markdown spec leaves brackets, asterisks, underscores and ampersands in a label as they are | spec conformance: a label's link, emphasis and entity reach the reader |
 | `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
 | `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
-| `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own with an empty status | spec conformance: the failed When's row carries no FAIL and no message |
+| `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own without a verdict | spec conformance: the failed When's item carries no FAIL and no message |
+| `report-attention-dropped` | the Markdown spec lists nothing under Needs attention | spec conformance: the failure and the row not run are missing before the packages |
+| `report-provenance-dropped` | the Markdown spec's header leaves out where its numbers come from | spec conformance: no time range, no commit and no hiding part |
+| `report-suite-counts-dropped` | the Markdown spec's suite headings lose their counts | spec conformance: `#### UserRepository` carries no counts |
+| `report-external-unmarked` | the Markdown spec heads an external suite like the internal one | spec conformance: no heading carries EXTERNAL |
+| `report-short-durations-shown` | the Markdown spec shows durations under a second | spec conformance: the 300ms method reads `(300ms)` |
 | `shapes-grouped-suite-accepted` | a suite declared inside a type block is not refused | canary: the `shapes/grouped` package exits 0 instead of 2 |
 | `shapes-grouped-fixture-accepted` | a fixture declared inside a type block is not refused | canary: the `shapes/groupedfixture` package exits 0 instead of 2 |
 | `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |

@@ -197,7 +197,7 @@ func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor 
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree, view...)
+		gotestspec.RenderMarkdown(w, tree, append(slices.Clone(view), reportOptions()...)...)
 	case "json":
 		gotestspec.RenderJSON(w, tree, view...)
 	default:

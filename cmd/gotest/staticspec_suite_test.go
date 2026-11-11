@@ -192,9 +192,11 @@ func (s *StaticSpecTestSuite) TestCarriesNoVerdicts(t *gotest.T, _ *staticCtx) {
 	t.When("the markdown spec is rendered from source", func(w *gotest.T) {
 		out := s.rendered["md"]
 
-		w.It("drops the Status and Duration columns", func(it *gotest.T) {
-			gotest.Contains(it, out, "| Behavior |")
-			gotest.NotContains(it, out, "| Behavior | Status | Duration |")
+		w.It("drops the verdicts and durations", func(it *gotest.T) {
+			gotest.Contains(it, out, "\n  - when a group\n    - has a leaf\n")
+			for _, word := range []string{"PASS", "**FAIL**", "**SKIP**", "**NOT RUN**", "## Needs attention"} {
+				gotest.NotContains(it, out, word)
+			}
 			// The duration of something that never ran is not "<1ms".
 			gotest.NotContains(it, out, "<1ms")
 		})
@@ -228,14 +230,13 @@ func (s *StaticSpecTestSuite) TestDeclaresIncompletenessOnEverySurface(t *gotest
 		})
 
 		w.It("marks it in markdown", func(it *gotest.T) {
-			gotest.Contains(it, s.rendered["md"], "_Incomplete:")
+			gotest.Contains(it, s.rendered["md"], "- **Conditional** — INCOMPLETE: behaviors known only at run time\n  - is always declared\n")
 		})
 
 		w.It("marks a method whose behaviors are all runtime-dependent", func(it *gotest.T) {
-			// It has no table of its own, so it appears as a row of its suite's.
 			// Unmarked it reads as a behavior that simply has nothing beneath it.
 			gotest.Contains(it, s.rendered["md"],
-				"| NonLiteralTable — _incomplete: behaviors known only at run time_ |")
+				"- **NonLiteralTable** — INCOMPLETE: behaviors known only at run time\n")
 		})
 
 		w.It("marks it in JSON", func(it *gotest.T) {
@@ -291,8 +292,8 @@ func (s *StaticSpecTestSuite) TestASlashInALabelIsNoLevel(t *gotest.T, ctx *stat
 			gotest.Len(it, read.Children[0].Children, 2)
 		})
 
-		w.It("renders it as one row with no invented when", func(it *gotest.T) {
-			gotest.Contains(it, md, "| **when a path is read** |\n| &nbsp;&nbsp;reads a/b paths |\n| &nbsp;&nbsp;keeps snake\\_case/paths whole |\n| x/y |\n")
+		w.It("renders it as one line with no invented when", func(it *gotest.T) {
+			gotest.Contains(it, md, "  - when a path is read\n    - reads a/b paths\n    - keeps snake\\_case/paths whole\n  - x/y\n")
 			gotest.NotContains(it, md, "when reads a")
 			gotest.NotContains(it, md, "when x")
 		})
@@ -300,9 +301,8 @@ func (s *StaticSpecTestSuite) TestASlashInALabelIsNoLevel(t *gotest.T, ctx *stat
 
 	t.When("the static spec reads an X_ method", func(w *gotest.T) {
 		w.It("marks its heading and its behaviors EXCLUDED in markdown", func(it *gotest.T) {
-			gotest.Contains(it, md, "### Parked — EXCLUDED\n")
-			gotest.Contains(it, md, "| &nbsp;&nbsp;never runs — EXCLUDED |")
-			gotest.Contains(it, md, "### Read\n")
+			gotest.Contains(it, md, "- **Parked** — EXCLUDED\n  - when the method is parked — EXCLUDED\n    - never runs — EXCLUDED\n")
+			gotest.Contains(it, md, "- **Read**\n")
 		})
 	})
 }
@@ -335,8 +335,8 @@ func (s *StaticSpecTestSuite) TestAReplayKeepsASlashInALabel(t *gotest.T, ctx *s
 	gotest.NoError(t, err)
 
 	t.When("a replayed It's label holds a slash and an underscore", func(w *gotest.T) {
-		w.It("shows the declared label in one row", func(it *gotest.T) {
-			gotest.Contains(it, string(md), "| &nbsp;&nbsp;keeps snake\\_case/paths whole | PASS |")
+		w.It("shows the declared label on one line", func(it *gotest.T) {
+			gotest.Contains(it, string(md), "  - when a path is read\n    - PASS keeps snake\\_case/paths whole\n")
 		})
 	})
 }

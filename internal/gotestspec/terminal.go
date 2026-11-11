@@ -36,6 +36,8 @@ type renderConfig struct {
 	groups          []GroupRun
 	hidden          map[Status]bool
 	packageStats    bool
+	module          string
+	provenance      Provenance
 }
 
 type RenderOption func(*renderConfig)
@@ -215,9 +217,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 	children := cfg.visible(n.Children)
 	isLeaf := len(children) == 0
 
-	// A declared node the stream did not report has no verdict and took no
-	// time; it says so instead of showing either.
-	if n.NotRun && !bare {
+	// A node without a verdict, declared and not reported or started and
+	// never ended, took no time it can show; it says so instead.
+	if noVerdict(n) && !bare && (n.NotRun || n.Kind != KindBenchmark) {
 		if isLeaf {
 			icon, clr := statusIcon(StatusNone, c)
 			fmt.Fprintf(w, "%s%s%s%s %s%s — NOT RUN%s\n", indent, clr, icon, c.reset, n.Display, c.dim, c.reset)

@@ -216,8 +216,8 @@ type Stats struct {
 	// carry no failing behavior, so folding them into Failed would break the
 	// Passed+Failed+Skipped arithmetic; they are counted as what they are.
 	FailedPackages int
-	// NotRun counts the declared behaviors and fuzz targets the stream laid
-	// over them did not report.
+	// NotRun counts the behaviors and fuzz targets without a verdict: declared
+	// and not reported, or started and never ended.
 	NotRun int
 }
 
@@ -751,9 +751,11 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
 	}
 }
 
+// countVerdict counts a leaf or a fuzz target by its verdict; one the stream
+// gave none counts as not run, so the buckets add up to what was counted.
 func countVerdict(n *Node, s *Stats) {
 	switch {
-	case n.NotRun:
+	case n.NotRun || n.Status == StatusNone:
 		s.NotRun++
 	case n.Status == StatusPass:
 		s.Passed++
@@ -762,6 +764,12 @@ func countVerdict(n *Node, s *Stats) {
 	case n.Status == StatusSkip:
 		s.Skipped++
 	}
+}
+
+// noVerdict reports a leaf the stream gave no verdict: it counts as not run
+// and shows no duration.
+func noVerdict(n *Node) bool {
+	return n.NotRun || (len(n.Children) == 0 && n.Status == StatusNone)
 }
 
 func classify(n *Node, topLevel bool) {
@@ -816,7 +824,7 @@ func classify(n *Node, topLevel bool) {
 			n.Display = strings.TrimPrefix(name, protocol.PrefixBenchmark)
 		case strings.HasPrefix(name, "Test"):
 			n.Kind = KindMethod
-			n.Display = strings.TrimPrefix(name, "Test")
+			n.Display = strings.TrimPrefix(strings.TrimPrefix(name, "Test"), "_")
 		case strings.HasSuffix(name, protocol.SuffixFixture) && !strings.HasSuffix(name, protocol.SuffixTestSuite):
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(name, protocol.SuffixFixture)

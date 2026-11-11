@@ -1204,7 +1204,7 @@ Descendants of a parked node keep clean timestamps; only the parked node's own t
 A package row is not something that executes, so it is worth the clock during which one of its suites was running: the union of their windows, overlap counted once, which also drops the gap between windows when a tree holds results from more than one run.
 No row is ever shorter than what it contains — `go test` reports a parked node's measure to 10ms while a child's bracket is exact, so a row is floored by its children, which can only repair that rounding and never invent time.
 
-The same numbers reach `--format=md` and the `duration` field of `--format=json`, in seconds.
+The same numbers reach the `duration` field of `--format=json`, in seconds; `--format=md` shows them from one second up ([A report a person reads](../../specs/spec/spec.md#requirement-a-report-a-person-reads)).
 
 Output formats:
 

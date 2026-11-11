@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / the header says the time range of the runs and the commit \(
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec hides rows / the header names what is hidden \(
+Clause: when the Markdown spec of a run with failures and rows not run → the header says the time range of the runs and the commit
+Clause: when the Markdown spec hides rows → the header names what is hidden
+--- a/internal/gotestspec/report.go
++++ b/internal/gotestspec/report.go
+@@ -145,7 +145,7 @@
+ 	if q := cfg.provenance.Search; q != "" {
+ 		parts = append(parts, `search "`+q+`"`)
+ 	}
+-	return strings.Join(parts, " · ")
++	return strings.Join(parts[:0], " · ")
+ }
+ 
+ // runRange is "Runs from 2026-11-09 18:02 to 18:25 UTC": the earliest start

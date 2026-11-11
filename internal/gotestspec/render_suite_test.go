@@ -108,9 +108,9 @@ func (s *RenderTestSuite) TestRenderMarkdown_SuiteHierarchy(t *gotest.T, _ *rend
 
 	for _, want := range []string{
 		"# Behavior Specification",
-		"## UserService",
-		"### Create",
-		"| returns ok | PASS | 8ms |",
+		"#### UserService — 1 passed\n",
+		"\n- **Create**\n",
+		"\n  - PASS returns ok\n",
 	} {
 		gotest.Contains(t, out, want)
 	}
@@ -148,13 +148,13 @@ func (s *RenderTestSuite) TestRenderMarkdown_FailuresOutsideBehaviors(t *gotest.
 	out := buf.String()
 
 	t.It("marks a suite that failed without a behavior, with its reason", func(it *gotest.T) {
-		gotest.Contains(it, out, "## Orders — FAILED\n\n```\nTestOrdersTestSuite never ran: shared fixture DBSharedFixture did not come up\n```\n")
+		gotest.Contains(it, out, "#### Orders — FAILED\n\n```text\nTestOrdersTestSuite never ran: shared fixture DBSharedFixture did not come up\n```\n")
 	})
 	t.It("lists a package that failed on its own, with its output", func(it *gotest.T) {
-		gotest.Contains(it, out, "## shared fixtures — FAILED\n\n```\nFAIL: shared fixture setup failed\nDBSharedFixture.BeforeAll failed after 1 attempt(s): refused\n```\n")
+		gotest.Contains(it, out, "### shared fixtures — FAILED\n\n```text\nFAIL: shared fixture setup failed\nDBSharedFixture.BeforeAll failed after 1 attempt(s): refused\n```\n")
 	})
 	t.It("counts the failed package", func(it *gotest.T) {
-		gotest.Contains(it, out, "1 failed, 0 skipped, 1 failed package.")
+		gotest.Contains(it, out, ": 1 failed, 1 failed package.\n")
 	})
 	t.It("adds nothing to a specification read from source", func(it *gotest.T) {
 		var static bytes.Buffer
@@ -262,4 +262,132 @@ func (s *RenderTestSuite) TestRenderMarkdown_BenchmarkTable(t *gotest.T, _ *rend
 
 	gotest.Contains(t, out, "| Benchmark | ns/op | B/op | allocs/op |")
 	gotest.Contains(t, out, "| Parse | 985.2 | 24 | 3 |")
+}
+
+// outlineStream is a package with a suite of both test packages: the
+// internal one passes, the external one fails a behavior, runs Ping for 1.2s
+// and starts DeleteUser without reporting its verdict.
+const outlineStream = `{"Time":"2026-11-09T18:02:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite"}
+{"Time":"2026-11-09T18:02:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser"}
+{"Time":"2026-11-09T18:02:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created"}
+{"Time":"2026-11-09T18:02:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created/stores_the_email"}
+{"Time":"2026-11-09T18:02:00.01Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created/stores_the_email","Elapsed":0.01}
+{"Time":"2026-11-09T18:02:00.01Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created/has_one_entry"}
+{"Time":"2026-11-09T18:02:00.02Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created/has_one_entry","Elapsed":0.01}
+{"Time":"2026-11-09T18:02:00.02Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser/when_a_user_is_created","Elapsed":0.02}
+{"Time":"2026-11-09T18:02:00.02Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser","Elapsed":0.02}
+{"Time":"2026-11-09T18:02:00.02Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite","Elapsed":0.02}
+{"Time":"2026-11-09T18:20:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite"}
+{"Time":"2026-11-09T18:20:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01"}
+{"Time":"2026-11-09T18:20:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created"}
+{"Time":"2026-11-09T18:20:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/stores_the_email"}
+{"Time":"2026-11-09T18:20:00.01Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/stores_the_email","Elapsed":0.01}
+{"Time":"2026-11-09T18:20:00.01Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry"}
+{"Time":"2026-11-09T18:20:00.02Z","Action":"output","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry","Output":"    suite_ext_test.go:28: Len: expected 1, got 2\n"}
+{"Time":"2026-11-09T18:20:00.02Z","Action":"output","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry","Output":"--- FAIL: TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry (0.01s)\n"}
+{"Time":"2026-11-09T18:20:00.02Z","Action":"fail","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created/has_one_entry","Elapsed":0.01}
+{"Time":"2026-11-09T18:20:00.02Z","Action":"fail","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01/when_a_user_is_created","Elapsed":0.02}
+{"Time":"2026-11-09T18:20:00.02Z","Action":"fail","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestCreateUser#01","Elapsed":0.02}
+{"Time":"2026-11-09T18:20:00.02Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestPing"}
+{"Time":"2026-11-09T18:20:01.22Z","Action":"pass","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestPing","Elapsed":1.2}
+{"Time":"2026-11-09T18:25:00Z","Action":"run","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite/TestDeleteUser"}
+{"Time":"2026-11-09T18:25:30Z","Action":"fail","Package":"github.com/mvrahden/go-test/examples/repository","Test":"TestUserRepositoryTestSuite","Elapsed":330}
+{"Time":"2026-11-09T18:25:30Z","Action":"fail","Package":"github.com/mvrahden/go-test/examples/repository","Elapsed":1410}
+`
+
+// outlineWant is outlineStream's Markdown spec in a checkout of main with
+// uncommitted changes.
+const outlineWant = "# Behavior Specification\n" +
+	"\n" +
+	"2 suites, 6 behaviors: 4 passed, 1 failed, 1 not run.\n" +
+	"\n" +
+	"Runs from 2026-11-09 18:02 to 18:25 UTC · main @ c94f5cd5, uncommitted changes\n" +
+	"\n" +
+	"## Needs attention\n" +
+	"\n" +
+	"- **FAIL** examples/repository › UserRepository › CreateUser › when a user is created › has one entry\n" +
+	"  ```text\n" +
+	"  suite_ext_test.go:28: Len: expected 1, got 2\n" +
+	"  ```\n" +
+	"- **NOT RUN** examples/repository › UserRepository › DeleteUser\n" +
+	"\n" +
+	"## github.com/mvrahden/go-test\n" +
+	"\n" +
+	"### examples/repository — 4 passed, 1 failed, 1 not run\n" +
+	"\n" +
+	"#### UserRepository — 2 passed\n" +
+	"\n" +
+	"- **CreateUser**\n" +
+	"  - when a user is created\n" +
+	"    - PASS stores the email\n" +
+	"    - PASS has one entry\n" +
+	"\n" +
+	"#### UserRepository — EXTERNAL — 2 passed, 1 failed, 1 not run\n" +
+	"\n" +
+	"- **CreateUser**\n" +
+	"  - when a user is created\n" +
+	"    - PASS stores the email\n" +
+	"    - **FAIL** has one entry\n" +
+	"      ```text\n" +
+	"      suite_ext_test.go:28: Len: expected 1, got 2\n" +
+	"      ```\n" +
+	"- PASS **Ping** (1.2s)\n" +
+	"- **NOT RUN** **DeleteUser**\n"
+
+func (s *RenderTestSuite) TestTheOutlineMatchesTheContract(t *gotest.T, _ *renderCtx) {
+	out := renderMarkdownOf(treeOf(t, outlineStream),
+		gotestspec.WithModule("github.com/mvrahden/go-test"),
+		gotestspec.WithProvenance(gotestspec.Provenance{Branch: "main", Commit: "c94f5cd5", Dirty: true}))
+	gotest.Equal(t, outlineWant, out)
+}
+
+// countsStream starts a behavior that reports no verdict beside one that
+// passes.
+const countsStream = `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/passes"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/passes","Elapsed":0.01}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/hangs"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":2}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":2}
+{"Action":"pass","Package":"p","Elapsed":2}
+`
+
+func (s *RenderTestSuite) TestCountsAddUp(t *gotest.T, _ *renderCtx) {
+	tree := treeOf(t, countsStream)
+	stats := gotestspec.CollectStats(tree)
+	t.When("a behavior started and reported no verdict", func(w *gotest.T) {
+		w.It("counts as not run", func(it *gotest.T) {
+			gotest.Equal(it, 1, stats.NotRun)
+		})
+		w.It("adds up to the behaviors", func(it *gotest.T) {
+			gotest.Equal(it, stats.Behaviors, stats.Passed+stats.Failed+stats.Skipped+stats.NotRun)
+		})
+		w.It("reads NOT RUN with no duration", func(it *gotest.T) {
+			gotest.Contains(it, renderMarkdownOf(tree), "\n  - **NOT RUN** hangs\n")
+		})
+	})
+}
+
+func (s *RenderTestSuite) TestDurationsUnderASecondAreLeftOut(t *gotest.T, _ *renderCtx) {
+	out := renderMarkdownOf(treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestQuick"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestQuick","Elapsed":0.3}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0.3}
+{"Action":"pass","Package":"p","Elapsed":0.3}
+`))
+	gotest.Contains(t, out, "- PASS **Quick**\n")
+}
+
+func (s *RenderTestSuite) TestAMethodNamedWithAnUnderscoreReadsWithout(t *gotest.T, _ *renderCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/Test_HelloWorld"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/Test_HelloWorld","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0}
+`)
+	gotest.Len(t, tree, 1)
+	gotest.Len(t, tree[0].Nodes, 1)
+	gotest.Len(t, tree[0].Nodes[0].Children, 1)
+	gotest.Equal(t, "HelloWorld", tree[0].Nodes[0].Children[0].Display)
 }

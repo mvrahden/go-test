@@ -179,6 +179,6 @@ func (s *FuzzNodeTestSuite) TestRendering(t *gotest.T) {
 		var buf bytes.Buffer
 		gotestspec.RenderMarkdown(&buf, pkgs)
 		gotest.Contains(it, buf.String(), "1 fuzz target")
-		gotest.Contains(it, buf.String(), "RoundTrip")
+		gotest.Contains(it, buf.String(), "\n- PASS **RoundTrip** (fuzz)\n  - PASS seed #1\n")
 	})
 }

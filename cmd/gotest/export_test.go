@@ -271,3 +271,9 @@ func ExportHoldForcedExit() (release func()) {
 	forcedExit.Lock()
 	return forcedExit.Unlock
 }
+
+// provenance.go
+var (
+	ExportReadProvenance = readProvenance
+	ExportModulePath     = modulePath
+)

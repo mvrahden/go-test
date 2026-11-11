@@ -70,7 +70,7 @@ func (s *SpecDeclaredTestSuite) TestARunOfSomeMethods(t *gotest.T) {
 			terminal := spec(it, 0, "--input="+s.input, "--declared", declaredPkg)
 			gotest.Regexp(it, `: 3 passed, 1 skipped, 2 not run\n$`, terminal.Stdout)
 			markdown := spec(it, 0, "--format=md", "--input="+s.input, "--declared", declaredPkg)
-			gotest.Contains(it, markdown.Stdout, ": 3 passed, 0 failed, 1 skipped, 2 not run.")
+			gotest.Contains(it, markdown.Stdout, ": 3 passed, 1 skipped, 2 not run.\n")
 			without := specJSON(it, 0, "--input="+s.input)
 			gotest.Zero(it, without.Stats.NotRun)
 			spec(it, 0, "--render-only", "--input="+s.input, "--declared", declaredPkg)

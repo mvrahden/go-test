@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / every package and suite heading carries its counts \(
+Clause: when the Markdown spec of a run with failures and rows not run → every package and suite heading carries its counts
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -183,7 +183,7 @@
+ 		if own {
+ 			heading += " — FAILED"
+ 		}
+-		if c := countsPhrase(nodeStats(n)); c != "" {
++		if c := countsPhrase(nodeStats(n)); c == "" {
+ 			heading += " — " + c
+ 		}
+ 	}

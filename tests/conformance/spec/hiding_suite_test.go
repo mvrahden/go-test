@@ -43,8 +43,8 @@ func (s *SpecHidingTestSuite) TestHidingWhatPassed(t *gotest.T) {
 			gotest.Contains(it, terminal.Stdout, "could not release the database")
 			gotest.NotContains(it, terminal.Stdout, "✓")
 			markdown := spec(it, 1, "--format=md", "--hide=pass", hidingStream)
-			gotest.Contains(it, markdown.Stdout, "| Open | FAIL |")
-			gotest.Contains(it, markdown.Stdout, "## Boot — FAILED")
+			gotest.Contains(it, markdown.Stdout, "\n- **FAIL** **Open**\n")
+			gotest.Contains(it, markdown.Stdout, "#### Boot — FAILED")
 			gotest.NotContains(it, markdown.Stdout, "PASS")
 		})
 		w.It("counts every behavior that passed in the trailer and in its package's stats, as without --hide", func(it *gotest.T) {
@@ -58,7 +58,8 @@ func (s *SpecHidingTestSuite) TestHidingWhatPassed(t *gotest.T) {
 			terminal := spec(it, 1, "--hide=pass", hidingStream)
 			gotest.Regexp(it, `\n2 suites, 5 behaviors: 3 passed, 2 failed\n$`, terminal.Stdout)
 			markdown := spec(it, 1, "--format=md", "--hide=pass", hidingStream)
-			gotest.Contains(it, markdown.Stdout, "2 suites, 5 behaviors: 3 passed, 2 failed, 0 skipped.")
+			gotest.Contains(it, markdown.Stdout, "\n2 suites, 5 behaviors: 3 passed, 2 failed.\n")
+			gotest.Contains(it, markdown.Stdout, "\n### example.com/hiding — 3 passed, 2 failed\n")
 		})
 	})
 }
@@ -69,7 +70,7 @@ func (s *SpecHidingTestSuite) TestHidingAGreenRun(t *gotest.T) {
 			terminal := spec(it, 0, "--hide=pass", greenStream)
 			gotest.Equal(it, "\n3 suites, 5 behaviors: 5 passed\n", terminal.Stdout)
 			markdown := spec(it, 0, "--format=md", "--hide=pass", greenStream)
-			gotest.Equal(it, "# Behavior Specification\n\n3 suites, 5 behaviors: 5 passed, 0 failed, 0 skipped.\n\n", markdown.Stdout)
+			gotest.Regexp(it, "^# Behavior Specification\n\n3 suites, 5 behaviors: 5 passed\\.\n\n[^\n]*\n$", markdown.Stdout)
 		})
 		w.It("keeps every package in the JSON document with all of its stats and none of its rows", func(it *gotest.T) {
 			hidden := specJSON(it, 0, "--hide=pass", greenStream)

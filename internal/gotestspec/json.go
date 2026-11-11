@@ -163,6 +163,9 @@ func (c *renderConfig) convertNodes(all []*Node) []jsonNode {
 		if result[i].Output == nil {
 			result[i].Output = []string{}
 		}
+		if noVerdict(n) {
+			result[i].Duration = 0 // a row without a verdict took no time it can show
+		}
 	}
 	return result
 }
