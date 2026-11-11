@@ -175,9 +175,12 @@ type Node struct {
 	// File and Line say where the source declares the node: File relative
 	// to the package directory, as gotest discover gives it. Empty for a
 	// node only a run revealed.
-	File        string
-	Line        int
-	Variant     int
+	File    string
+	Line    int
+	Variant int
+	// Reported is the own level go test reported when it is not Name: a
+	// twin's TestCreate#01, whose #01 is testing's, not the developer's.
+	Reported    string
 	Iterations  int
 	NsPerOp     float64
 	BytesPerOp  int64
@@ -435,18 +438,26 @@ func (b *treeBuild) place(ev *TestEvent) *treeEntry {
 	e := b.entries[key]
 	switch {
 	case e == nil:
-		e = &treeEntry{node: &Node{Name: pl.Written}, placeholder: action != ActionRun}
+		e = &treeEntry{node: &Node{Name: pl.Written, Reported: reported(pl)}, placeholder: action != ActionRun}
 		b.entries[key] = e
 		b.link(e, pl)
 	case e.placeholder && action == ActionRun:
 		// Its run says where it sits; the guess it was made by goes.
 		b.unlink(e)
-		e.node.Name = pl.Written
+		e.node.Name, e.node.Reported = pl.Written, reported(pl)
 		e.placeholder = false
 		b.link(e, pl)
 	}
 	e.reported = true
 	return e
+}
+
+// reported is pl's own level when it differs from the written one.
+func reported(pl protocol.Placement) string {
+	if pl.Own == pl.Written {
+		return ""
+	}
+	return pl.Own
 }
 
 // link hangs e under its parent, making a placeholder for a parent not seen.

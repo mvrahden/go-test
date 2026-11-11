@@ -426,20 +426,95 @@ describe("encodeStateForScript", () => {
 });
 
 describe("itemIdOf", () => {
+  const leaf = (name: string, extra: Partial<Node> = {}) =>
+    node(name, "pass", [], extra);
+
   it("names a node by the id the Test Explorer gives it", () => {
-    expect(itemIdOf("example.com/cart", "TestCartTestSuite")).toBe(
-      "example.com/cart/CartTestSuite",
+    const suite = itemIdOf("example.com/cart", null, leaf("TestCartTestSuite"));
+    expect(suite).toBe("example.com/cart/CartTestSuite");
+    const method = itemIdOf("example.com/cart", suite, leaf("TestAdd"));
+    expect(itemIdOf("example.com/cart", method, leaf("when_empty"))).toBe(
+      "example.com/cart/CartTestSuite/TestAdd/when_empty",
     );
-    expect(
-      itemIdOf("example.com/cart", "TestCartTestSuite/TestAdd/when_empty"),
-    ).toBe("example.com/cart/CartTestSuite/TestAdd/when_empty");
-    expect(itemIdOf("example.com/cart", "TestPlain")).toBe(
+    expect(itemIdOf("example.com/cart", null, leaf("TestPlain"))).toBe(
       "example.com/cart/Plain",
     );
   });
 
-  it("names no item for a fixture node", () => {
-    expect(itemIdOf("example.com/cart", "Test_DBFixture")).toBeUndefined();
+  it("names no item for a fixture node or a row beneath one", () => {
+    expect(
+      itemIdOf("example.com/cart", null, leaf("Test_DBFixture")),
+    ).toBeUndefined();
+    expect(
+      itemIdOf("example.com/cart", undefined, leaf("TestAdd")),
+    ).toBeUndefined();
+  });
+
+  it("marks only an external twin's run, not a lone external suite", () => {
+    expect(
+      itemIdOf(
+        "p",
+        null,
+        leaf("TestTwinsTestSuite", { external: true, variant: 2 }),
+      ),
+    ).toBe("p/TwinsTestSuite~external");
+    expect(
+      itemIdOf("p", null, leaf("TestLoneTestSuite", { external: true })),
+    ).toBe("p/LoneTestSuite");
+  });
+});
+
+describe("an external twin's rows", () => {
+  const pkg: SpecPackage = {
+    path: "example.com/twins",
+    status: "pass",
+    duration: 0,
+    nodes: [
+      node("TestTwinsTestSuite", "pass", [
+        node("TestCreate", "pass", [], { kind: "method" }),
+      ]),
+      node(
+        "TestTwinsTestSuite",
+        "pass",
+        [
+          node("TestCreate", "pass", [node("when_empty", "pass")], {
+            kind: "method",
+            reported: "TestCreate#01",
+          }),
+        ],
+        { external: true, variant: 2 },
+      ),
+    ],
+  };
+  const twin = "example.com/twins/TwinsTestSuite~external";
+  const rows = () =>
+    [
+      ...body([pkg]).matchAll(
+        /data-id="([^"]+)"(?: data-ancestors="([^"]+)")?/g,
+      ),
+    ].map((m) => ({
+      id: m[1],
+      ancestors: m[2]
+        ? (JSON.parse(m[2].replace(/&quot;/g, '"')) as string[])
+        : [],
+    }));
+
+  it("name the twin's items, its method by the name go test reported", () => {
+    expect(rows().map((r) => r.id)).toEqual([
+      "example.com/twins/TwinsTestSuite",
+      "example.com/twins/TwinsTestSuite/TestCreate",
+      twin,
+      `${twin}/TestCreate#01`,
+      `${twin}/TestCreate#01/when_empty`,
+    ]);
+  });
+
+  it("resolve to the twin's nearest item", () => {
+    const tree = new Set(["example.com/twins", twin, `${twin}/TestCreate#01`]);
+    const behavior = rows().find((r) => r.id.endsWith("when_empty"))!;
+    expect(
+      nearestItemId(behavior.id, (id) => tree.has(id), behavior.ancestors),
+    ).toBe(`${twin}/TestCreate#01`);
   });
 });
 

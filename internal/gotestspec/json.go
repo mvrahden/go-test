@@ -55,6 +55,8 @@ type jsonNode struct {
 	// statically read tree can set it, so it is absent from a rendered run.
 	Incomplete bool `json:"incomplete,omitempty"`
 	Variant    int  `json:"variant,omitempty"`
+	// Reported is the own level go test reported when it differs from Name.
+	Reported string `json:"reported,omitempty"`
 	// File (relative to the package's dir) and Line say where the source
 	// declares the node; absent for a node only a run revealed.
 	File        string     `json:"file,omitempty"`
@@ -151,6 +153,7 @@ func (c *renderConfig) convertNodes(all []*Node) []jsonNode {
 			External:    n.External,
 			Incomplete:  n.Incomplete,
 			Variant:     n.Variant,
+			Reported:    n.Reported,
 			File:        n.File,
 			Line:        n.Line,
 			Output:      n.Output,

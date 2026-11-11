@@ -585,6 +585,9 @@ func (s *TreeTestSuite) TestTwinSuitesKeepTheirOwnMethods(t *gotest.T, _ *treeCt
 	mustLen(t, "external methods", external.Children, 2)
 	mustEq(t, "external first method", external.Children[0].Name, "TestCreate")
 	mustEq(t, "external second method", external.Children[1].Name, "TestRemove")
+	mustEq(t, "external first method reported", external.Children[0].Reported, "TestCreate#01")
+	mustEq(t, "external second method reported", external.Children[1].Reported, "")
+	mustEq(t, "internal method reported", internal.Children[0].Reported, "")
 	mustEq(t, "external status", external.Status, gotestspec.StatusFail)
 }
 

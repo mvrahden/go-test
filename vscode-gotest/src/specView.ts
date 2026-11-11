@@ -8,6 +8,7 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
+import { EXTERNAL_ID, methodItemId } from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -755,6 +756,11 @@ export interface SpecNode {
   focused: boolean;
   excluded: boolean;
   external: boolean;
+  // The run of its top-level name; 2 or more on an external twin's suite.
+  variant?: number;
+  // The own level go test reported, when it is not name: a twin's
+  // TestCreate#01.
+  reported?: string;
   incomplete?: boolean;
   // Where the source declares the node, relative to its package's dir.
   file?: string;
@@ -831,7 +837,9 @@ export function buildSpecBody(
     tree =
       buildPackageFailureHtml(pkg, env) +
       pkg.nodes
-        .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, pkg), [i], [pkg.path]))
+        .map((n, i) =>
+          buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]),
+        )
         .join("");
   } else if (groups.length === 1) {
     tree = groups[0].entries
@@ -983,7 +991,7 @@ function buildPackageSectionHtml(
   const failure = buildPackageFailureHtml(pkg, env);
   if (pkg.nodes.length === 0 && !failure) return "";
   const nodes = pkg.nodes
-    .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, pkg), [i], [pkg.path]))
+    .map((n, i) => buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]))
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
@@ -1045,7 +1053,7 @@ function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
       ? buildPackageFailureHtml(only, env) +
         only.nodes
           .map((n, i) =>
-            buildNodeHtml(n, "", nodeCtx(env, only), [i], [only.path]),
+            buildNodeHtml(n, null, nodeCtx(env, only), [i], [only.path]),
           )
           .join("")
       : group.entries
@@ -1080,17 +1088,25 @@ function nodeCtx(env: RenderEnv, pkg: SpecPackage): NodeCtx {
   };
 }
 
-// itemIdOf is the Test Explorer id of a node: the package, then the go test
-// path with the top-level test's Test prefix dropped, as discovery names
-// suites. A fuzz target sits under its suite in both trees.
+// itemIdOf is the Test Explorer id of a node under its parent's (null at the
+// top, undefined when the parent has none): a suite as discovery names it,
+// its Test prefix dropped and an external twin's run marked; below it the
+// level go test reported, as the router names a subtest's item. A fuzz
+// target sits under its suite in both trees.
 export function itemIdOf(
   pkgPath: string,
-  nodePath: string,
+  parentId: string | null | undefined,
+  node: Pick<SpecNode, "name" | "reported" | "external" | "variant">,
 ): string | undefined {
-  if (!nodePath.startsWith("Test") || nodePath.startsWith("Test_")) {
+  if (parentId === undefined) return undefined;
+  if (parentId !== null) {
+    return methodItemId(parentId, { name: node.name, testName: node.reported });
+  }
+  if (!node.name.startsWith("Test") || node.name.startsWith("Test_")) {
     return undefined;
   }
-  return `${pkgPath}/${nodePath.slice(4)}`;
+  const twin = node.external && (node.variant ?? 0) >= 2;
+  return `${pkgPath}/${node.name.slice(4)}${twin ? EXTERNAL_ID : ""}`;
 }
 
 // nearestItemId is id itself when the tree has it, else its closest
@@ -1136,20 +1152,21 @@ function idAttr(id: string | undefined, ancestors: string[] = []): string {
   return ` data-id="${escapeAttr(id)}"${above}`;
 }
 
-// Nodes are rendered with their go test path, the parent's path and their
-// own name, which names their Test Explorer item.
+// Nodes are rendered under the item id their parent's path names (null at
+// the top), which with their own reported level names their Test Explorer
+// item. A fixture row has no item, though the rows beneath it may.
 function buildNodeHtml(
   node: SpecNode,
-  parentPath: string,
+  parentBase: string | null | undefined,
   ctx: NodeCtx,
   position: number[],
   ancestors: string[],
 ): string {
-  const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+  const base = itemIdOf(ctx.pkgPath, parentBase, node);
   if (node.children.length === 0) {
-    return buildLeafHtml(node, nodePath, ctx, ancestors);
+    return buildLeafHtml(node, base, ctx, ancestors);
   }
-  return buildBranchHtml(node, nodePath, ctx, position, ancestors);
+  return buildBranchHtml(node, base, ctx, position, ancestors);
 }
 
 // sourceOf is where the CLI says the source declares a node; a node only a
@@ -1176,13 +1193,12 @@ function buildIconHtml(node: SpecNode, ctx: NodeCtx): string {
 
 function buildLeafHtml(
   node: SpecNode,
-  nodePath: string,
+  base: string | undefined,
   ctx: NodeCtx,
   ancestors: string[],
 ): string {
   const iconHtml = buildIconHtml(node, ctx);
-  const id =
-    node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
+  const id = node.kind === "fixture" ? undefined : base;
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
@@ -1204,18 +1220,17 @@ function buildLeafHtml(
 
 function buildBranchHtml(
   node: SpecNode,
-  nodePath: string,
+  base: string | undefined,
   ctx: NodeCtx,
   position: number[],
   ancestors: string[],
 ): string {
   const openAttr = node.status === "fail" ? " open" : "";
   const iconHtml = buildIconHtml(node, ctx);
-  const id =
-    node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
+  const id = node.kind === "fixture" ? undefined : base;
   const below = id ? [...ancestors, id] : ancestors;
   const children = node.children
-    .map((c, i) => buildNodeHtml(c, nodePath, ctx, [...position, i], below))
+    .map((c, i) => buildNodeHtml(c, base, ctx, [...position, i], below))
     .join("");
 
   let label = escapeHtml(node.display);
