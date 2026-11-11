@@ -25,8 +25,15 @@ export interface DiscoverPackage {
   suites: DiscoverSuite[];
 }
 
+// EXTERNAL_ID marks an external twin's id: a suite declared in both the
+// internal and the external test package shares one name, so one id would
+// lose the external copy's results.
+export const EXTERNAL_ID = "~external";
+
 export interface DiscoverSuite {
   name: string;
+  // Declared in the package's external (_test) test files.
+  external?: boolean;
   parallel: boolean;
   focused: boolean;
   excluded: boolean;
@@ -43,6 +50,9 @@ export interface DiscoverSuite {
 
 export interface DiscoverMethod {
   name: string;
+  // The name go test gives this method when it differs from `name`: an
+  // external twin's copy of a method the internal twin declares ("TestX#01").
+  testName?: string;
   parallel: boolean;
   focused: boolean;
   excluded: boolean;

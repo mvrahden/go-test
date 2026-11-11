@@ -57,6 +57,7 @@ import {
   resolveAncestorsOf,
   skipUnresolved,
   itemTestPath,
+  methodSegmentOf,
   restoreStoredResults,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
@@ -291,6 +292,67 @@ function makeTreeWithDirs() {
   );
   return { dir, pkg, suite, method, dynamic };
 }
+
+function makeTwinTree() {
+  const pkg = createItem("example.com/pkg", "pkg", undefined, [
+    { id: "package" },
+  ]);
+  const internal = createItem(
+    "example.com/pkg/UserRepositoryTestSuite",
+    "UserRepositoryTestSuite",
+    pkg,
+  );
+  const external = createItem(
+    "example.com/pkg/UserRepositoryTestSuite~external",
+    "UserRepositoryTestSuite",
+    pkg,
+    [{ id: "external" }],
+  );
+  const create = createItem(
+    "example.com/pkg/UserRepositoryTestSuite/TestCreate",
+    "TestCreate",
+    internal,
+  );
+  const externalCreate = createItem(
+    "example.com/pkg/UserRepositoryTestSuite~external/TestCreate#01",
+    "TestCreate",
+    external,
+  );
+  return { internal, external, create, externalCreate };
+}
+
+describe("external twins", () => {
+  it("filters the external copy of a shared method by testing's #01 name", () => {
+    const { externalCreate, create } = makeTwinTree();
+    expect(buildRunFilter([externalCreate as any])).toBe(
+      "^TestUserRepositoryTestSuite$/^TestCreate#01$",
+    );
+    expect(buildRunFilter([create as any])).toBe(
+      "^TestUserRepositoryTestSuite$/^TestCreate$",
+    );
+  });
+
+  it("filters a whole external suite by the shared top-level name", () => {
+    const { external } = makeTwinTree();
+    expect(buildRunFilter([external as any])).toBe(
+      "^TestUserRepositoryTestSuite$|^FuzzUserRepositoryTestSuite_.*$",
+    );
+  });
+
+  it("names the go test path of an external copy without the id marker", () => {
+    const { external, externalCreate } = makeTwinTree();
+    expect(itemTestPath(externalCreate as any)).toBe(
+      "TestUserRepositoryTestSuite/TestCreate#01",
+    );
+    expect(itemTestPath(external as any)).toBe("TestUserRepositoryTestSuite");
+  });
+
+  it("reads a method's id segment, not its label", () => {
+    const { externalCreate, create } = makeTwinTree();
+    expect(methodSegmentOf(externalCreate as any)).toBe("TestCreate#01");
+    expect(methodSegmentOf(create as any)).toBe("TestCreate");
+  });
+});
 
 describe("itemTestPath", () => {
   it("names the go test path a filter built from the item asks for", () => {

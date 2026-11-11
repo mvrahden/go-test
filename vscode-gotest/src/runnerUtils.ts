@@ -108,6 +108,8 @@ export function getItemDepth(item: vscode.TestItem): number {
 
 const PACKAGE_TAG = "package";
 
+export { EXTERNAL_ID } from "./types.js";
+
 export function getPackageItem(item: vscode.TestItem): vscode.TestItem {
   let current: vscode.TestItem = item;
   if (current.tags.some((t) => t.id === PACKAGE_TAG)) {
@@ -657,7 +659,9 @@ export function itemTestPath(item: vscode.TestItem): string | undefined {
     return `Fuzz${method.parent.label}_${method.label}${rest}`;
   }
   const pkg = getPackageItem(item);
-  return `Test${item.id.slice(pkg.id.length + 1)}`;
+  // The twin marker is an id detail; go test knows both twins by one name.
+  const rest = item.id.slice(pkg.id.length + 1);
+  return `Test${rest.replace(/~external(?=\/|$)/, "")}`;
 }
 
 export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
@@ -693,7 +697,7 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       if (isFuzzMethodLabel(item.label)) {
         group.fuzzers.push(item.label);
       } else {
-        group.methods.push(item.label);
+        group.methods.push(methodSegmentOf(item));
       }
     } else if (depth >= 3) {
       let current = item;
@@ -703,13 +707,14 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
         // the developer wrote ("classifying a number") while go test knows it
         // by its rewritten name ("classifying_a_number"). Filtering on the
         // label would never match.
-        subtestParts.unshift(subtestSegmentOf(current));
+        subtestParts.unshift(methodSegmentOf(current));
         current = current.parent!;
       }
-      const methodName = current.label;
+      const methodName = methodSegmentOf(current);
+      const methodLabel = current.label;
       const suiteName = current.parent!.label;
       const group = groupFor(suiteName);
-      if (isFuzzMethodLabel(methodName)) {
+      if (isFuzzMethodLabel(methodLabel)) {
         // Seed subtests of a fuzz target live under its top-level wrapper.
         group.subtests.push(
           `^Fuzz${suiteName}_${methodName}$/^${subtestParts
@@ -1082,9 +1087,9 @@ function resolveItemRecursive(
   return { anyFailed, anyResolved };
 }
 
-// subtestSegmentOf returns the single go test path segment an item adds to its
+// methodSegmentOf returns the single go test path segment an item adds to its
 // parent. Ids are the test path, so the segment is what follows the parent's id.
-function subtestSegmentOf(item: vscode.TestItem): string {
+export function methodSegmentOf(item: vscode.TestItem): string {
   const parentId = item.parent?.id;
   if (parentId && item.id.startsWith(parentId + "/")) {
     return item.id.slice(parentId.length + 1);
