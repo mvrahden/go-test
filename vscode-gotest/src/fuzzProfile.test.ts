@@ -97,6 +97,16 @@ describe("fuzzTargetFromItemId", () => {
       wrapper: "FuzzMyTestSuite_FuzzParse",
     });
   });
+  it("names an external twin's target by the wrapper go test runs", () => {
+    expect(
+      fuzzTargetFromItemId("example.com/p/TwinsTestSuite~external/FuzzParse"),
+    ).toEqual({
+      importPath: "example.com/p",
+      suiteName: "TwinsTestSuite",
+      methodName: "FuzzParse",
+      wrapper: "FuzzTwinsTestSuite_FuzzParse",
+    });
+  });
   it("rejects an id whose last segment is not a fuzz method", () => {
     expect(fuzzTargetFromItemId("example.com/p/S/TestX")).toBeUndefined();
   });

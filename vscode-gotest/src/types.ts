@@ -30,6 +30,12 @@ export interface DiscoverPackage {
 // lose the external copy's results.
 export const EXTERNAL_ID = "~external";
 
+// withoutExternalId is an id's path with the twin marker taken out: go test
+// knows both twins by one name.
+export function withoutExternalId(path: string): string {
+  return path.replace(new RegExp(`${EXTERNAL_ID}(?=/|$)`, "g"), "");
+}
+
 // suiteItemId is a suite's Test Explorer id. Only an external twin — one with
 // a same-named internal suite beside it — carries the marker; a lone external
 // suite has nothing to collide with.

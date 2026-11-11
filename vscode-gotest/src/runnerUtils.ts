@@ -13,7 +13,7 @@ import {
   parseExpectedActual,
   type TestEvent,
 } from "./outputParser.js";
-import { EXTERNAL_ID } from "./types.js";
+import { EXTERNAL_ID, withoutExternalId } from "./types.js";
 
 export { killProcessTree };
 
@@ -716,7 +716,7 @@ export function itemTestPath(item: vscode.TestItem): string | undefined {
   const pkg = getPackageItem(item);
   // The twin marker is an id detail; go test knows both twins by one name.
   const rest = item.id.slice(pkg.id.length + 1);
-  return `Test${rest.replace(/~external(?=\/|$)/, "")}`;
+  return `Test${withoutExternalId(rest)}`;
 }
 
 export function buildRunFilter(items: vscode.TestItem[]): string | undefined {

@@ -118,6 +118,16 @@ describe("benchTargetFromItemId", () => {
     });
   });
 
+  it("names an external twin's benchmark by the suite go test knows", () => {
+    expect(
+      benchTargetFromItemId("example.com/p/TwinsTestSuite~external/BenchmarkX"),
+    ).toEqual({
+      importPath: "example.com/p",
+      suiteName: "TwinsTestSuite",
+      methodName: "BenchmarkX",
+    });
+  });
+
   it("refuses ids whose leaf is not a benchmark method", () => {
     expect(
       benchTargetFromItemId("github.com/x/y/pkg/CacheTestSuite/TestGet"),
