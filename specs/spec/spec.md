@@ -18,7 +18,7 @@ Every label the Markdown spec writes, in a table cell or a heading, SHALL be esc
 - **THEN** renders the label as written, with no link, emphasis or entity
 
 ### Requirement: A slash in a label
-An It whose label holds a slash SHALL be one It under its When, in the spec of a run and in the spec read from source, because go test reports one subtest for it; an It whose label begins with another It's label and a slash SHALL be that It's sibling.
+An It or a When whose label holds a slash, at its start, inside or at its end, SHALL be one node under its parent, in the spec of a run, in the spec read from source and in the spec replayed from a run's -json stream, and discover SHALL report it as one behavior, because go test reports one subtest for it; an It whose label begins with another It's label and a slash SHALL be that It's sibling, also when that It runs in parallel.
 
 #### Scenario: An It with a slash
 - **WHEN** an It's label holds a slash
@@ -29,6 +29,44 @@ An It whose label holds a slash SHALL be one It under its When, in the spec of a
 - **WHEN** an It's label is an earlier It's label, a slash and more
 - **THEN** a run's spec shows both as Its under their When
 - **AND** the spec read from source shows both as Its under their When
+
+#### Scenario: An It that starts with a slash
+- **WHEN** an It's label starts with a slash
+- **THEN** a run's spec shows it as one It under its When
+- **AND** the spec read from source shows it as one It under its When
+- **AND** the spec replayed from the run's -json stream shows it as one It under its When
+- **AND** discover reports it as one behavior
+
+#### Scenario: An It that ends with a slash
+- **WHEN** an It's label ends with a slash
+- **THEN** a run's spec shows it as one It under its When
+- **AND** the spec read from source shows it as one It under its When
+- **AND** the spec replayed from the run's -json stream shows it as one It under its When
+- **AND** discover reports it as one behavior
+
+#### Scenario: A When that ends with a slash
+- **WHEN** a When's label ends with a slash and holds Its
+- **THEN** a run's spec shows its Its under it
+- **AND** the spec read from source shows its Its under it
+
+#### Scenario: An It that extends a parallel sibling's label
+- **WHEN** an It's label extends a parallel sibling's label
+- **THEN** a run's spec shows both as Its under their When
+
+### Requirement: Suites of both test packages
+A suite name declared in a package's test files and in its external test package SHALL read as two suites, the external one marked, each with its own behaviors, in a run's spec, in the spec replayed from its -json stream, in the declared spec and in discover, the internal one first, as go test runs it first.
+
+#### Scenario: A suite declared twice
+- **WHEN** a suite is declared in both test packages
+- **THEN** a run's spec shows two suites, the external one marked
+- **AND** each shows only its own methods
+- **AND** the spec replayed from the run's -json stream shows the same two suites
+- **AND** the declared spec under the run shows every behavior with its verdict
+- **AND** discover marks the external suite
+
+#### Scenario: The order go test runs them in
+- **WHEN** go test runs a suite of both test packages
+- **THEN** the internal suite runs first
 
 ### Requirement: A group's own failure
 A When or an It that fails while every behavior under it passes SHALL show, on its own row of a run's spec, that it failed and what it wrote.

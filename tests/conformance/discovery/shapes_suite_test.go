@@ -1,6 +1,7 @@
 package discovery_test
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -9,7 +10,8 @@ import (
 
 // DiscoveryShapesTestSuite: a suite or fixture is one type declaration of its
 // own, composed through named fields; every other shape is rejected where it
-// is written, with the alternative named.
+// is written, with the alternative named. discover reads a slash label as one
+// behavior and marks the external test package's suites.
 type DiscoveryShapesTestSuite struct{}
 
 func (s *DiscoveryShapesTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -73,4 +75,84 @@ func checkShape(t *gotest.T, sh shape) {
 	if sh.shows != "" {
 		gotest.Regexp(t, sh.shows, run.Stdout+run.Stderr)
 	}
+}
+
+func (s *DiscoveryShapesTestSuite) TestSlashesAndTwins(t *gotest.T) {
+	run, err := testkit.RunCLI(t.Context(), ".", "discover", "../testdata/specslashes/")
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "discover: %s", run.Stderr)
+	var doc struct {
+		Packages []struct {
+			Suites []struct {
+				Name     string `json:"name"`
+				External bool   `json:"external"`
+				File     string `json:"file"`
+				Methods  []struct {
+					Name      string             `json:"name"`
+					Behaviors []declaredBehavior `json:"behaviors"`
+				} `json:"methods"`
+			} `json:"suites"`
+		} `json:"packages"`
+	}
+	gotest.NoError(t, json.Unmarshal([]byte(run.Stdout), &doc), "discover: %s", run.Stdout)
+	gotest.Len(t, doc.Packages, 1)
+	suites := doc.Packages[0].Suites
+
+	t.When("a method declares Its and a When whose labels start or end with a slash", func(w *gotest.T) {
+		w.It("discover reports each label as one behavior under the call around it", func(it *gotest.T) {
+			// Each behavior as kind, name and the names under it.
+			var got []string
+			var walk func(prefix string, bs []declaredBehavior)
+			walk = func(prefix string, bs []declaredBehavior) {
+				for _, b := range bs {
+					got = append(got, prefix+b.Kind+" "+b.Name)
+					walk(prefix+b.Name+" › ", b.Children)
+				}
+			}
+			for _, su := range suites {
+				for _, m := range su.Methods {
+					if su.Name == "SlashesTestSuite" && m.Name == "TestLabels" {
+						walk("", m.Behaviors)
+					}
+				}
+			}
+			gotest.Equal(it, []string{
+				"when an_address_is_absolute",
+				"an_address_is_absolute › it /abs/pkg",
+				"an_address_is_absolute › it /usr/local/go/src",
+				"an_address_is_absolute › it https://_URI",
+				"an_address_is_absolute › it C:/go/bin",
+				`an_address_is_absolute › it C:\go\bin`,
+				"when a_directory_is_named",
+				"a_directory_is_named › it gets_./",
+				"a_directory_is_named › it lists_pkg/",
+				"when reads_specs/",
+				"reads_specs/ › it holds_clauses",
+				"reads_specs/ › it holds_scenarios",
+			}, got, "discover: %s", run.Stdout)
+		})
+	})
+
+	t.When("a package's external test package declares suites", func(w *gotest.T) {
+		w.It("discover marks each of them external", func(it *gotest.T) {
+			var external []string
+			for _, su := range suites {
+				if su.File == "slashes_ext_test.go" {
+					gotest.True(it, su.External, "%s is not marked external", su.Name)
+					external = append(external, su.Name)
+				}
+			}
+			gotest.Equal(it, []string{"TwinTestSuite", "LoneTestSuite"}, external)
+		})
+		w.It("discover leaves the internal suite of the same name unmarked", func(it *gotest.T) {
+			var internal []string
+			for _, su := range suites {
+				if su.File == "slashes_test.go" {
+					gotest.False(it, su.External, "%s is marked external", su.Name)
+					internal = append(internal, su.Name)
+				}
+			}
+			gotest.Contains(it, internal, "TwinTestSuite")
+		})
+	})
 }

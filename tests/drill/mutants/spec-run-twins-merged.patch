@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when a suite is declared in both test packages / each shows only its own methods \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when a suite is declared in both test packages / the spec replayed from the run's -json stream shows the same two suites \(
+Clause: when a suite is declared in both test packages → each shows only its own methods
+Clause: when a suite is declared in both test packages → the spec replayed from the run's -json stream shows the same two suites
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -384,7 +384,7 @@ func newTreeBuild(pkg *Package) *treeBuild {
+ // place reads one test event in stream order and returns its node.
+ func (b *treeBuild) place(action Action, test string) *treeEntry {
+ 	pl := b.placer.Place(string(action), test)
+-	key := treeKey{pl.Instance, test}
++	key := treeKey{1, test}
+ 	e := b.entries[key]
+ 	switch {
+ 	case e == nil:

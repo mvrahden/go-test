@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when go test runs a suite of both test packages / the internal suite runs first \(
+Clause: when go test runs a suite of both test packages → the internal suite runs first
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -407,8 +407,8 @@ func (b *treeBuild) place(action Action, test string) *treeEntry {
+ func (b *treeBuild) link(e *treeEntry, pl protocol.Placement) {
+ 	if pl.Parent == "" {
+ 		e.parent = nil
+-		if pl.Instance >= 2 {
+-			e.node.Variant, e.node.External = pl.Instance, true
++		if pl.Instance == 1 {
++			e.node.Variant, e.node.External = 2, true
+ 		}
+ 		b.pkg.Nodes = append(b.pkg.Nodes, e.node)
+ 		return

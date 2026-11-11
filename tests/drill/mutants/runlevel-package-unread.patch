@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/cli .* / spec's JSON document of that stream marks t
 Clause: when a -json run's shared fixture does not come up → spec's JSON document of that stream marks the shared fixtures package runLevel, and no other
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -256,7 +256,7 @@
- 			levels[ev.Package] = map[string][]string{}
+@@ -254,7 +254,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
+ 			builds[ev.Package] = newTreeBuild(pkg)
  		}
  		if ev.RunLevel {
 -			pkg.RunLevel = true

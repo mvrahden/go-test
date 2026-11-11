@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/spec SpecSlashes / LeadingSlash / when an It's label starts with a slash / discover reports it as one behavior \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / TrailingSlash / when an It's label ends with a slash / discover reports it as one behavior \(
+Expect: ^FAIL .*conformance/discovery DiscoveryShapes / SlashesAndTwins / when a method declares Its and a When whose labels start or end with a slash / discover reports each label as one behavior under the call around it \(
+Clause: when an It's label starts with a slash → discover reports it as one behavior
+Clause: when an It's label ends with a slash → discover reports it as one behavior
+Clause: when a method declares Its and a When whose labels start or end with a slash → discover reports each label as one behavior under the call around it
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -410,7 +410,7 @@ func discoverBehaviors(in []*gotestast.Behavior) []discoverBehavior {
+ 	out := make([]discoverBehavior, 0, len(in))
+ 	for _, b := range in {
+ 		out = append(out, discoverBehavior{
+-			Name:     b.Name,
++			Name:     strings.TrimSuffix(b.Name, "/")[strings.LastIndex(strings.TrimSuffix(b.Name, "/"), "/")+1:],
+ 			Display:  renderedBehaviorLabel(b),
+ 			Kind:     behaviorKindString(b.Kind),
+ 			Line:     b.Line,

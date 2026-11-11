@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/spec .* / renders the suite and its package as faile
 Clause: when a stream holds a suite's pass line above a fail line of one of its methods → renders the suite and its package as failed in the terminal, Markdown and JSON formats, as when their own lines say fail
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -371,7 +371,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
- 				n.External = true
- 			}
+@@ -333,7 +333,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
+ 		for _, n := range pkg.Nodes {
+ 			classify(n, true)
  		}
 -		FailBranches(pkg)
 +		// the branch keeps the verdict its own line says

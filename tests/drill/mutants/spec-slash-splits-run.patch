@@ -2,13 +2,27 @@ Expect: ^FAIL .*conformance/spec .* / when an It's label holds a slash / a run's
 Judge: ./tests/canary CanaryTestSuite/TestSpecMarkdownASlashIsNoLevel
 Expect: specmarkdown: an It with a slash is split into levels
 Clause: when an It's label holds a slash → a run's spec shows it as one It under its When
+Expect: ^FAIL .*conformance/spec SpecSlashes / LeadingSlash / when an It's label starts with a slash / a run's spec shows it as one It under its When \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / LeadingSlash / when an It's label starts with a slash / the spec replayed from the run's -json stream shows it as one It under its When \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / TrailingSlash / when an It's label ends with a slash / a run's spec shows it as one It under its When \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / TrailingSlash / when an It's label ends with a slash / the spec replayed from the run's -json stream shows it as one It under its When \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / WhenWithASlash / when a When's label ends with a slash and holds Its / a run's spec shows its Its under it \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / ParallelSibling / when an It's label extends a parallel sibling's label / a run's spec shows both as Its under their When \(
+Clause: when an It's label starts with a slash → a run's spec shows it as one It under its When
+Clause: when an It's label starts with a slash → the spec replayed from the run's -json stream shows it as one It under its When
+Clause: when an It's label ends with a slash → a run's spec shows it as one It under its When
+Clause: when an It's label ends with a slash → the spec replayed from the run's -json stream shows it as one It under its When
+Clause: when a When's label ends with a slash and holds Its → a run's spec shows its Its under it
+Clause: when an It's label extends a parallel sibling's label → a run's spec shows both as Its under their When
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -261,7 +261,6 @@
- 		if !placed {
- 			segments = splitTestPath(ev.Test)
- 			if ev.Action == ActionRun {
--				segments = joinUnstartedLevels(segments, nmap, levels[ev.Package])
- 				levels[ev.Package][ev.Test] = segments
- 			}
- 		}
+@@ -384,6 +384,9 @@ func newTreeBuild(pkg *Package) *treeBuild {
+ // place reads one test event in stream order and returns its node.
+ func (b *treeBuild) place(action Action, test string) *treeEntry {
+ 	pl := b.placer.Place(string(action), test)
++	if segs := protocol.SplitTestPath(test); len(segs) >= 2 {
++		pl.Parent, pl.Own, pl.Written = strings.Join(segs[:len(segs)-1], "/"), segs[len(segs)-1], segs[len(segs)-1]
++	}
+ 	key := treeKey{pl.Instance, test}
+ 	e := b.entries[key]
+ 	switch {

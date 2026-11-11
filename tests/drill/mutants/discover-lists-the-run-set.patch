@@ -2,29 +2,39 @@ Expect: ^FAIL .*conformance/discovery .* / discover lists the excluded method ma
 Clause: when a suite declares an excluded method and a focused one → discover lists the excluded method marked excluded and the unfocused methods beside the focused one
 --- a/cmd/gotest/discover.go
 +++ b/cmd/gotest/discover.go
-@@ -189,14 +189,6 @@
+@@ -196,19 +196,6 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
  				continue
  			}
  			result := c.CollectSuiteSpecs(pkg)
 -			// Listed before the rejection check, which reduces each suite to the
 -			// methods a run would select, in place: discover lists what the
 -			// source declares, excluded and unfocused methods marked as such.
+-			internalSuites := pkgEntry.Suites
 -			for _, suite := range result.Suites {
 -				ds := buildDiscoverSuite(suite)
 -				ds.Fixtures = discoverFixtureNames(suite)
+-				if pkg == lr.Pxtest {
+-					ds.External = true
+-					nameTwinMethods(&ds, internalSuites)
+-				}
 -				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 -			}
  			if rejected := c.Rejections(pkg, result); len(rejected) > 0 {
  				for _, ce := range rejected {
  					warn(pkg, ce.Pos, ce.Err.Error())
-@@ -213,6 +205,12 @@
+@@ -225,6 +212,17 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
  			for _, ce := range gotestgen.FuzzRejections(pkg, result.Suites) {
  				warn(pkg, ce.Pos, ce.Err.Error())
  			}
 +
++			internalSuites := pkgEntry.Suites
 +			for _, suite := range result.Suites {
 +				ds := buildDiscoverSuite(suite)
 +				ds.Fixtures = discoverFixtureNames(suite)
++				if pkg == lr.Pxtest {
++					ds.External = true
++					nameTwinMethods(&ds, internalSuites)
++				}
 +				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 +			}
  		}

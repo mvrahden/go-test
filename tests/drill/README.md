@@ -584,8 +584,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-session-drops-other-targets` | a fuzz session's record drops the crashers of targets it did not fuzz | conformance: the fuzz session It for another checkout finds its crasher not promoted |
 | `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: a label with a pipe breaks its table row; canary: the `specmarkdown` rows have the wrong number of cells |
 | `spec-label-html-unescaped` | the Markdown spec leaves angle brackets in a label unescaped | spec conformance: a label's tags reach the reader as HTML; canary: the `specmarkdown` spec carries `<b>` |
-| `spec-slash-splits-run` | the tree of a run reads a slash in an It's name as a level | spec conformance: the run's spec shows "reads a" as a level; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
-| `spec-slash-splits-source` | the spec read from source keeps the level a slash implies | spec conformance: the static spec shows "reads a" as a level |
+| `spec-slash-splits-run` | the tree of a run splits every name at its slashes instead of placing it by the stream's order | spec conformance: the run's and the replay's spec show "reads a" as a level and labels that start or end with a slash, a When that ends with one and a parallel sibling cut into levels; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
+| `spec-slash-splits-source` | the spec read from source reads the text after a label's last slash as a level of its own | spec conformance: the static spec has no "reads a/b paths" row, splits labels that start or end with a slash into levels, and --declared sees rows the run never reported |
 | `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `### Parked — EXCLUDED` |
 | `spec-label-link-unescaped` | the Markdown spec leaves brackets, asterisks, underscores and ampersands in a label as they are | spec conformance: a label's link, emphasis and entity reach the reader |
 | `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
@@ -743,6 +743,11 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-static-spec-labels-reconstructed` | the spec read from source ignores the labels as written | conformance: the spec It for --static sees underscores turned into spaces |
 | `e2e-replay-labels-reconstructed` | a replayed stream's spec ignores the labels source declares | conformance: the spec It for a replay sees underscores turned into spaces |
 | `e2e-connective-doubled` | a label that opens with a connective gets a second when | conformance: the spec It for a connective of its own sees "when with …" |
+| `discover-splits-slash-labels` | discover keeps only the text after a label's last slash | conformance: the spec and discovery Its for discover see the label cut short |
+| `discover-external-flag-inverted` | discover marks the internal test package's suites external and the external one's not | conformance: the spec and discovery Its for discover see the external flag on the wrong suites |
+| `spec-run-twin-unmarked` | a suite's second run in one process is not marked external | conformance: the spec It for a suite of both test packages sees neither suite marked |
+| `spec-run-twins-merged` | a suite's second run lands on the first one's nodes | conformance: the spec Its for a suite of both test packages see one suite holding both suites' methods |
+| `spec-run-twin-order-reversed` | the first of a suite's two runs is marked external | conformance: the spec It for go test's order sees the external suite holding the internal suite's method |
 | `e2e-bench-sample-iterations-lost` | a saved sample records 1 iteration, not the ones it ran | conformance: the bench It for saving with --json sees iterations other than 10 |
 | `e2e-bench-report-drops-gate` | the --json report leaves out the gate verdict | conformance: the bench It for comparing under a gate sees no gate |
 | `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |

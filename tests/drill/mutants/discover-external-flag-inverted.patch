@@ -1,0 +1,18 @@
+Expect: ^FAIL .*conformance/discovery DiscoveryShapes / SlashesAndTwins / when a package's external test package declares suites / discover marks each of them external \(
+Expect: ^FAIL .*conformance/discovery DiscoveryShapes / SlashesAndTwins / when a package's external test package declares suites / discover leaves the internal suite of the same name unmarked \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when a suite is declared in both test packages / discover marks the external suite \(
+Clause: when a package's external test package declares suites → discover marks each of them external
+Clause: when a package's external test package declares suites → discover leaves the internal suite of the same name unmarked
+Clause: when a suite is declared in both test packages → discover marks the external suite
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -203,8 +203,8 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
+ 			for _, suite := range result.Suites {
+ 				ds := buildDiscoverSuite(suite)
+ 				ds.Fixtures = discoverFixtureNames(suite)
++				ds.External = pkg != lr.Pxtest
+ 				if pkg == lr.Pxtest {
+-					ds.External = true
+ 					nameTwinMethods(&ds, internalSuites)
+ 				}
+ 				pkgEntry.Suites = append(pkgEntry.Suites, ds)

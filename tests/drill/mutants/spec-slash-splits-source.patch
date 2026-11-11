@@ -1,13 +1,25 @@
 Expect: ^FAIL .*conformance/spec .* / when an It's label holds a slash / the spec read from source shows it as one It under its When \(
 Clause: when an It's label holds a slash → the spec read from source shows it as one It under its When
---- a/cmd/gotest/declarations.go
-+++ b/cmd/gotest/declarations.go
-@@ -105,7 +105,7 @@
- func reportedBehaviors(behaviors []*gotestast.Behavior) []*gotestast.Behavior {
- 	var out []*gotestast.Behavior
- 	for _, b := range behaviors {
--		if !b.Implied {
-+		if b != nil {
- 			out = append(out, b)
- 			continue
+Expect: ^FAIL .*conformance/spec SpecSlashes / LeadingSlash / when an It's label starts with a slash / the spec read from source shows it as one It under its When \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / TrailingSlash / when an It's label ends with a slash / the spec read from source shows it as one It under its When \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / WhenWithASlash / when a When's label ends with a slash and holds Its / the spec read from source shows its Its under it \(
+Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when a suite is declared in both test packages / the declared spec under the run shows every behavior with its verdict \(
+Clause: when an It's label starts with a slash → the spec read from source shows it as one It under its When
+Clause: when an It's label ends with a slash → the spec read from source shows it as one It under its When
+Clause: when a When's label ends with a slash and holds Its → the spec read from source shows its Its under it
+Clause: when a suite is declared in both test packages → the declared spec under the run shows every behavior with its verdict
+--- a/cmd/gotest/staticspec.go
++++ b/cmd/gotest/staticspec.go
+@@ -173,6 +173,12 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior, file string) []*gotest
+ 			Line:        b.Line,
  		}
+ 		node.Children = staticBehaviorNodes(b.Children, file)
++		if i, j := strings.LastIndex(node.Name, "/"), strings.LastIndex(b.Display, "/"); i >= 0 && j >= 0 {
++			child := *node
++			child.Name, child.SourceLabel = node.Name[i+1:], b.Display[j+1:]
++			node.Name, node.SourceLabel = node.Name[:i], b.Display[:j]
++			node.Children = []*gotestspec.Node{&child}
++		}
+ 		out = append(out, node)
+ 	}
+ 	return out

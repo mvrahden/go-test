@@ -1221,7 +1221,7 @@ gotest ./... -v --spec                               # spec view instead of defa
 ### `--static`
 
 Builds the same tree from the source instead of from a run: no node carries a status or a duration, because nothing executed.
-The names are the ones `go test` would produce, including the `#01` it appends to a description repeated among its siblings and the extra level a single slash introduces — a statically read behavior and an observed one have to be the same node, not two.
+The names are the ones `go test` would produce, including the `#01` it appends to a description repeated among its siblings — a statically read behavior and an observed one have to be the same node, not two. How a label with a slash and a suite declared in both test packages read on every surface: [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label), [Suites of both test packages](../../specs/spec/spec.md#requirement-suites-of-both-test-packages).
 
 Where a method declares behaviors whose names or existence depend on runtime values — a `When` behind a condition, a non-literal description, an `Each` over a table that is not a literal — the method node is marked incomplete and the detail goes to stderr as `incomplete: …` lines.
 That marking is on the node, not only on stderr, so it survives into every format: `— INCOMPLETE` in the terminal tree, an `_Incomplete: …_` note in markdown, and `"incomplete": true` in JSON.
@@ -1271,7 +1271,7 @@ No tests are executed.
 
 `behaviors` carries the `When`/`It` tree each method declares, read from source:
 
-- `name` is the subtest segment `go test` will produce, so it matches an observed run byte for byte. Two rewrites the source does not spell out make that true: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level).
+- `name` is the subtest level `go test` will produce, so it matches an observed run byte for byte: a description repeated among its siblings gains the `#01` suffix the testing package appends, which the source does not spell out. A label with a slash is one behavior ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover), [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label)).
 - `display` is the text the developer wrote, spoken in its vocabulary: the same string `gotest spec` renders for this node, so an editor showing both spells one behavior one way.
 - `kind` names the call it came from (`when`, `it`, `each`); `line` locates it.
 - `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears once the method has run. Consumers must not present an incomplete list as the whole specification.
@@ -1282,10 +1282,10 @@ No tests are executed.
     "importPath": …, "dir": …, "modulePath": …, "testOnly": bool, "broken": bool,
     "suites": [ {
       "name": …, "file": …, "line": …, "col": …,
-      "parallel": bool, "focused": bool, "excluded": bool, "guarded": bool,
+      "parallel": bool, "focused": bool, "excluded": bool, "guarded": bool, "external": bool,
       "lifecycle": ["BeforeAll", …],
       "fixtures": ["E2ESetupFixture", …],
-      "methods": [ { "name": …, "file": …, "line": …, "col": …,
+      "methods": [ { "name": …, "testName": …, "file": …, "line": …, "col": …,
                      "focused": bool, "excluded": bool, "parallel": bool,
                      "behaviors": [ { "name": …, "display": …, "kind": …, "line": …,
                                       "children": [ … ] } ],
@@ -1299,6 +1299,7 @@ No tests are executed.
 ```
 
 File paths are basenames; positions are 1-based.
+`external` is present, and true, on each suite of the external test package ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover)); `testName` is present on a method of such a suite when go test names it otherwise, as `TestCreate#01` for a method its internal twin also declares ([Suites of both test packages](../../specs/spec/spec.md#requirement-suites-of-both-test-packages)).
 `warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
 
 - a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;
