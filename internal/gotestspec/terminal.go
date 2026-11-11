@@ -253,8 +253,9 @@ type rowLine struct {
 func writeRow(w io.Writer, r *rowLine, c *colors, cfg *renderConfig) {
 	hang := r.indent + max(r.leadWidth, 2)
 	lines := wrapLabel(r.text, r.indent+r.leadWidth, hang, cfg.width)
-	tail, tailWidth := "", 0
+	tail, plainTail, tailWidth := "", "", 0
 	for _, p := range r.tail {
+		plainTail += p.text
 		tail += p.color + p.text
 		if p.color != "" {
 			tail += c.reset
@@ -272,8 +273,11 @@ func writeRow(w io.Writer, r *rowLine, c *colors, cfg *renderConfig) {
 		}
 		fmt.Fprint(w, pad, styled)
 		if i == len(lines)-1 && tail != "" {
-			if cfg.width > 0 && hang+utf8.RuneCountInString(l)+tailWidth > cfg.width && i > 0 {
-				fmt.Fprintf(w, "\n%s%s", strings.Repeat(" ", hang), strings.TrimLeft(tail, " "))
+			if cfg.width > 0 && hang+utf8.RuneCountInString(l)+tailWidth > cfg.width {
+				// It takes lines of its own, wrapped like the label.
+				for _, tl := range wrapLabel(strings.TrimSpace(plainTail), hang, hang, cfg.width) {
+					fmt.Fprintf(w, "\n%s%s", strings.Repeat(" ", hang), tl)
+				}
 			} else {
 				fmt.Fprint(w, tail)
 			}

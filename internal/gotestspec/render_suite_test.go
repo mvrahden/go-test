@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -471,4 +472,25 @@ func (s *RenderTestSuite) TestTheTerminalWrapsAtItsWidth(t *gotest.T, _ *renderC
 		out := renderTerminalWith(pkgs, gotestspec.WithWidth(0))
 		gotest.Contains(it, out, "✓ a long label that wraps over lines\n")
 	})
+}
+
+func (s *RenderTestSuite) TestTheTerminalKeepsATailWithinItsWidth(t *gotest.T, _ *renderCtx) {
+	pkgs := []*gotestspec.Package{{
+		Path: "p",
+		Nodes: []*gotestspec.Node{{
+			Kind: gotestspec.KindSuite, Display: "LongSuiteName", External: true,
+			Children: []*gotestspec.Node{
+				{Kind: gotestspec.KindBlock, Display: "ok", Status: gotestspec.StatusPass},
+				{Kind: gotestspec.KindBlock, Display: "bad", Status: gotestspec.StatusFail},
+				{Kind: gotestspec.KindBlock, Display: "later", Status: gotestspec.StatusNone, NotRun: true},
+			},
+		}},
+	}}
+	out := renderTerminalWith(pkgs, gotestspec.WithWidth(30))
+	rows, _, _ := strings.Cut(out, "Needs attention") // its path and the summary are not rows
+	for _, line := range strings.Split(rows, "\n") {
+		gotest.LessOrEqual(t, utf8.RuneCountInString(line), 30, "line %q", line)
+	}
+	gotest.Contains(t, out, "LongSuiteName\n")
+	gotest.Contains(t, out, "— EXTERNAL")
 }
