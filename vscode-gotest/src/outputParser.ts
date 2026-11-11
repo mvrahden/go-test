@@ -26,6 +26,10 @@ export interface TestEvent {
   // fixtures, an interrupt, the global deadline, the build stage) rather
   // than for an import path.
   RunLevel?: boolean;
+  // Where the test sits, stamped by the CLI. Subtest (on every run) is the
+  // own level as reported, testing's #NN included; Repeat is that NN;
+  // Instance (2 and up) the run of a top-level name the event belongs to.
+  Gotest?: { Subtest?: string; Repeat?: number; Instance?: number };
 }
 
 export interface TestMessage {

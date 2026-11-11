@@ -92,7 +92,16 @@ describe("WatchCycle", () => {
     );
 
     cycle.apply(
-      ev({ Action: "run", Test: "TestMySuite/TestFail" }) +
+      ev({
+        Action: "run",
+        Test: "TestMySuite",
+        Gotest: { Subtest: "TestMySuite" },
+      }) +
+        ev({
+          Action: "run",
+          Test: "TestMySuite/TestFail",
+          Gotest: { Subtest: "TestFail" },
+        }) +
         ev({
           Action: "output",
           Test: "TestMySuite/TestFail",

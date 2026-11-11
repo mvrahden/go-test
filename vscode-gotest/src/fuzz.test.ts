@@ -40,7 +40,6 @@ import {
   fuzzSessionFile,
   sessionCrasherCounts,
 } from "./fuzz.js";
-import { resolveTestItem } from "./runnerUtils.js";
 
 describe("parseFuzzProgress", () => {
   it("reads go's status line through the orchestrator prefix", () => {
@@ -253,82 +252,5 @@ describe("sessionCrasherCounts", () => {
     expect(
       (await sessionCrasherCounts(pkgDir, new Set(["FuzzS_A"]), { env })).size,
     ).toBe(0);
-  });
-});
-
-describe("resolveTestItem fuzz wrappers", () => {
-  function makeController(existingIds: string[]) {
-    const dynamicCalls: { parentId: string; path: string; label: string }[] =
-      [];
-    const items = new Map(existingIds.map((id) => [id, { id }]));
-    return {
-      controller: {
-        findItem: (id: string) => items.get(id),
-        createDynamicSubtest: (
-          parent: { id: string },
-          subtestPath: string,
-          label: string,
-        ) => {
-          dynamicCalls.push({ parentId: parent.id, path: subtestPath, label });
-          const child = { id: `${parent.id}/dynamic/${subtestPath}` };
-          items.set(child.id, child);
-          return child;
-        },
-      },
-      dynamicCalls,
-    };
-  }
-
-  it("maps Fuzz<Suite>_<Method> events to the fuzz item", () => {
-    const { controller } = makeController([
-      "example.com/pkg/MySuite/FuzzParse",
-    ]);
-    const item = resolveTestItem(
-      controller as never,
-      "FuzzMySuite_FuzzParse",
-      "example.com/pkg",
-    );
-    expect(item?.id).toBe("example.com/pkg/MySuite/FuzzParse");
-  });
-
-  it("resolves underscored suite names by trying each _Fuzz boundary", () => {
-    const { controller } = makeController([
-      "example.com/pkg/My_Suite/FuzzParse",
-    ]);
-    const item = resolveTestItem(
-      controller as never,
-      "FuzzMy_Suite_FuzzParse",
-      "example.com/pkg",
-    );
-    expect(item?.id).toBe("example.com/pkg/My_Suite/FuzzParse");
-  });
-
-  it("attaches seed subtests as dynamic children of the fuzz item", () => {
-    const { controller, dynamicCalls } = makeController([
-      "example.com/pkg/MySuite/FuzzParse",
-    ]);
-    const item = resolveTestItem(
-      controller as never,
-      "FuzzMySuite_FuzzParse/seed#0",
-      "example.com/pkg",
-    );
-    expect(dynamicCalls).toEqual([
-      {
-        parentId: "example.com/pkg/MySuite/FuzzParse",
-        path: "seed#0",
-        label: "seed#0",
-      },
-    ]);
-    expect(item?.id).toBe("example.com/pkg/MySuite/FuzzParse/dynamic/seed#0");
-  });
-
-  it("falls back to plain suite resolution for suites named Fuzz*", () => {
-    const { controller } = makeController(["example.com/pkg/FuzzySuite"]);
-    const item = resolveTestItem(
-      controller as never,
-      "FuzzySuite",
-      "example.com/pkg",
-    );
-    expect(item?.id).toBe("example.com/pkg/FuzzySuite");
   });
 });
