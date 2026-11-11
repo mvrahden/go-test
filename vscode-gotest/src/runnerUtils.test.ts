@@ -2698,6 +2698,21 @@ describe("TestItemRouter", () => {
     );
   });
 
+  it("says what its caller gives for an unstamped subtest, not the floor", () => {
+    const { controller } = makeRouterFixture();
+    const log = vi.fn();
+    const router = new TestItemRouter(
+      controller as any,
+      "example.com/pkg",
+      new OnceLog(log),
+      "[import] not placed",
+    );
+
+    expect(router.route(ev("run", "TestS/TestM/x"))).toBeUndefined();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith("[import] not placed");
+  });
+
   it("finds a fuzz wrapper by its top-level name and places its seeds", () => {
     const { controller, created } = makeRouterFixture();
     const fuzz = createItem("example.com/pkg/My_Suite/FuzzParse", "FuzzParse");

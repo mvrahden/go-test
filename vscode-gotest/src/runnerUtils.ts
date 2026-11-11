@@ -166,6 +166,9 @@ export class OnceLog {
   }
 }
 
+export const UNSTAMPED_LIVE =
+  "[runner] unstamped subtest events; CLI below the floor?";
+
 // TestItemRouter finds the Test Explorer item a package's events belong to,
 // by where the CLI says each test sits: a name's slashes cannot say it, since
 // a label may hold slashes. One router per package per run: later events of
@@ -183,6 +186,9 @@ export class TestItemRouter {
     private readonly controller: GoTestController,
     private readonly importPath: string,
     private readonly log: OnceLog = new OnceLog(),
+    // What is said of subtest events without stamps: a live run's CLI is
+    // below the floor, an imported stream is one the CLI could not place.
+    private readonly unstamped = UNSTAMPED_LIVE,
   ) {}
 
   // The item an event's results belong to, by its stamps.
@@ -209,7 +215,7 @@ export class TestItemRouter {
     const own = stamp?.Subtest;
     if (own === undefined || own === "") {
       if (!test.includes("/")) return this.topLevel(test, instance);
-      this.log.note("[runner] unstamped subtest events; CLI below the floor?");
+      this.log.note(this.unstamped);
       return undefined;
     }
     if (own === test) return this.topLevel(test, instance);
@@ -532,6 +538,7 @@ export class StreamApplier {
     private readonly buildDir: string,
     // Says once per run what could not be routed.
     private readonly log: OnceLog = new OnceLog(),
+    private readonly unstamped = UNSTAMPED_LIVE,
   ) {}
 
   apply(events: TestEvent[]): AppliedResult[] {
@@ -551,7 +558,12 @@ export class StreamApplier {
       }
       let router = this.routers.get(event.Package);
       if (!router) {
-        router = new TestItemRouter(this.controller, event.Package, this.log);
+        router = new TestItemRouter(
+          this.controller,
+          event.Package,
+          this.log,
+          this.unstamped,
+        );
         this.routers.set(event.Package, router);
       }
       const result = applyEvent(
