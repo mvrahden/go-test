@@ -222,3 +222,42 @@ func (s *WalkerTestSuite) TestVariableDescBeatsName(t *gotest.T) {
 		sub.It("runs", func(it *gotest.T) {})
 	}
 }
+
+type baseName struct{ Name string }
+
+type embeddedRow struct {
+	baseName
+	N int
+}
+
+type shadowRow struct {
+	baseName
+	Name string
+}
+
+// A Name promoted from an embedded struct names the row, so a run knows it.
+func (s *WalkerTestSuite) TestPromotedNameSet(t *gotest.T) {
+	for sub := range gotest.Each(t, []embeddedRow{{baseName: baseName{Name: "promoted"}}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+func (s *WalkerTestSuite) TestPromotedNameUnset(t *gotest.T) {
+	for sub := range gotest.Each(t, []embeddedRow{{N: 1}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// A Name declared on the row itself hides the promoted one.
+func (s *WalkerTestSuite) TestShadowedName(t *gotest.T) {
+	for sub := range gotest.Each(t, []shadowRow{{Name: "direct"}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// Rows that are not structs have no field to name them.
+func (s *WalkerTestSuite) TestNonStructRows(t *gotest.T) {
+	for sub := range gotest.Each(t, []string{"a", "b"}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}

@@ -218,6 +218,26 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 			want:   nil,
 		},
 		{
+			Desc:   "a Name promoted from an embedded struct hides the row",
+			method: "TestPromotedNameSet",
+			want:   nil,
+		},
+		{
+			Desc:   "a promoted Name left unset hides the row too",
+			method: "TestPromotedNameUnset",
+			want:   nil,
+		},
+		{
+			Desc:   "a Name on the row itself hides the promoted one",
+			method: "TestShadowedName",
+			want:   []string{"direct", "direct/runs"},
+		},
+		{
+			Desc:   "rows that are not structs are named by index",
+			method: "TestNonStructRows",
+			want:   []string{"#0", "#0/runs", "#1", "#1/runs"},
+		},
+		{
 			Desc:   "only the unconditional behavior is declared",
 			method: "TestConditional",
 			want:   []string{"is_always_declared"},
@@ -267,6 +287,10 @@ func (s *BehaviorWalkerTestSuite) TestCompleteness(t *gotest.T) {
 		},
 		{
 			Desc: "a row named by a variable is not", method: "TestVariableRow",
+			complete: false, note: "Each row name is not a constant",
+		},
+		{
+			Desc: "a promoted row name is not", method: "TestPromotedNameSet",
 			complete: false, note: "Each row name is not a constant",
 		},
 		{

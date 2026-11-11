@@ -338,6 +338,17 @@ func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) (name string, kn
 	}
 
 	for _, field := range []string{"Desc", "Name"} {
+		// A field promoted from an embedded struct names the row too; its
+		// value is not spelled at this level, so the row's name is unknown.
+		if st != nil {
+			obj, index, _ := types.LookupFieldOrMethod(w.info.TypeOf(elt), true, nil, field)
+			if v, ok := obj.(*types.Var); ok && len(index) > 1 {
+				if basic, ok := v.Type().Underlying().(*types.Basic); ok && basic.Info()&types.IsString != 0 {
+					return "", false
+				}
+				continue
+			}
+		}
 		expr, ok := eachField(composite, st, field)
 		if !ok {
 			continue
