@@ -564,3 +564,25 @@ func (s *RenderTestSuite) TestOnlyPositionsAreThoseOfTheShownRows(t *gotest.T, _
 	gotestspec.RenderJSON(&md, tree, hide, gotestspec.WithOnly(outlinePkg, []int{0, 1}))
 	gotest.Contains(t, md.String(), `"display":"`+want+`"`)
 }
+
+func (s *RenderTestSuite) TestMatchReadsTheRowsHideLeavesShown(t *gotest.T, _ *renderCtx) {
+	tree := []*gotestspec.Package{{
+		Path: "example.com/pkg",
+		Nodes: []*gotestspec.Node{{
+			Kind: gotestspec.KindSuite, Display: "Cart", Status: gotestspec.StatusFail,
+			Children: []*gotestspec.Node{{
+				Kind: gotestspec.KindBlock, Display: "totals", Status: gotestspec.StatusFail,
+				Children: []*gotestspec.Node{{Kind: gotestspec.KindBlock, Display: "adds up", Status: gotestspec.StatusPass}},
+			}},
+		}},
+	}}
+	hide := gotestspec.WithHidden(gotestspec.StatusPass)
+	// The failing group has only a passing child: hidden, the group is a leaf.
+	var kept bytes.Buffer
+	gotestspec.RenderJSON(&kept, tree, hide, gotestspec.WithMatch("TOTALS"))
+	gotest.Contains(t, kept.String(), `"display":"totals"`)
+	// A hidden leaf that matches does not keep its group.
+	var dropped bytes.Buffer
+	gotestspec.RenderJSON(&dropped, tree, hide, gotestspec.WithMatch("adds up"))
+	gotest.NotContains(t, dropped.String(), `"display":"totals"`)
+}

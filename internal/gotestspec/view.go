@@ -53,6 +53,8 @@ func CheckView(packages []*Package, opts ...RenderOption) error {
 
 // narrow applies WithOnly and WithMatch: copies of the packages and nodes
 // that are kept, the originals untouched. Without either it is packages.
+// With a match, a package with no matching row is left out, its own failure
+// included.
 func (c *renderConfig) narrow(packages []*Package) ([]*Package, error) {
 	if c.only == nil && c.match == "" {
 		return packages, nil
@@ -132,17 +134,19 @@ func joinPosition(position []int) string {
 }
 
 // matching is the nodes that are a leaf holding the match, or have one
-// beneath them.
+// beneath them. A leaf is a node with no shown child, as the panel reads the
+// --hide-trimmed rows.
 func (c *renderConfig) matching(nodes []*Node) []*Node {
 	var out []*Node
-	for _, n := range nodes {
-		if len(n.Children) == 0 {
+	for _, n := range c.visible(nodes) {
+		shown := c.visible(n.Children)
+		if len(shown) == 0 {
 			if strings.Contains(strings.ToLower(n.Display), strings.ToLower(c.match)) {
 				out = append(out, n)
 			}
 			continue
 		}
-		if kids := c.matching(n.Children); len(kids) > 0 {
+		if kids := c.matching(shown); len(kids) > 0 {
 			cp := *n
 			cp.Children = kids
 			if n.Status == StatusFail && !ownFailure(n) {
