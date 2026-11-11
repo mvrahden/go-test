@@ -172,6 +172,12 @@ export class OnceLog {
 // a test are looked up by the item its run placed.
 export class TestItemRouter {
   private readonly placed = new Map<string, vscode.TestItem | undefined>();
+  // Per parent item and written level: the run that first reached it, the
+  // own levels it reported in order, and how many each run has placed.
+  private readonly occurrences = new Map<
+    string,
+    { first: number; owns: string[]; counts: Map<number, number> }
+  >();
 
   constructor(
     private readonly controller: GoTestController,
@@ -211,15 +217,41 @@ export class TestItemRouter {
     const parentName = test.slice(0, test.length - own.length - 1);
     const parent = this.placed.get(`${instance}\u0000${parentName}`);
     if (!parent) return undefined;
-    const declared = parent.children.get(`${parent.id}/${own}`);
-    if (declared) return declared;
     // The repeat suffix testing appended is part of the id, not the label.
     const suffix = stamp?.Repeat
       ? `#${String(stamp.Repeat).padStart(2, "0")}`
       : "";
-    const label =
+    const written =
       suffix && own.endsWith(suffix) ? own.slice(0, -suffix.length) : own;
-    return this.controller.createDynamicSubtest(parent, own, label);
+    const level = this.levelOf(parent.id, written, own, instance);
+    const declared = parent.children.get(`${parent.id}/${level}`);
+    if (declared) return declared;
+    return this.controller.createDynamicSubtest(parent, level, written);
+  }
+
+  // levelOf is the own level a repeated run's test takes under parent: the
+  // one its occurrence had in the first run that reached parent. testing
+  // numbers a repeat's names on from the earlier runs' (TestX#01 in the
+  // second), so the nth "TestX" of every run is one item.
+  private levelOf(
+    parentId: string,
+    written: string,
+    own: string,
+    instance: number,
+  ): string {
+    const key = `${parentId}\u0000${written}`;
+    let seen = this.occurrences.get(key);
+    if (!seen) {
+      seen = { first: instance, owns: [], counts: new Map() };
+      this.occurrences.set(key, seen);
+    }
+    const n = seen.counts.get(instance) ?? 0;
+    seen.counts.set(instance, n + 1);
+    if (instance === seen.first) {
+      seen.owns.push(own);
+      return own;
+    }
+    return seen.owns[n] ?? own;
   }
 
   // topLevel is a suite's item, or a generated fuzz wrapper's. Instance 2 is
@@ -246,15 +278,14 @@ export class TestItemRouter {
       }
     }
     const suite = name.startsWith("Test") ? name.slice(4) : name;
-    if (instance === 1) {
-      return this.controller.findItem(`${this.importPath}/${suite}`);
+    const plain = `${this.importPath}/${suite}`;
+    if (instance % 2 === 0) {
+      // Under -count go alternates a twin's runs: internal, external, ...
+      // Without a twin every run is the plain suite's.
+      const twin = this.controller.findItem(`${plain}${EXTERNAL_ID}`);
+      if (twin) return twin;
     }
-    if (instance === 2) {
-      return this.controller.findItem(
-        `${this.importPath}/${suite}${EXTERNAL_ID}`,
-      );
-    }
-    return undefined;
+    return this.controller.findItem(plain);
   }
 }
 

@@ -6,7 +6,7 @@ import type { DiscoveryCache } from "./discovery.js";
 import type { SpecViewPanel } from "./specView.js";
 import type { TestResult } from "./testResultStore.js";
 import { parseTestEvents } from "./outputParser.js";
-import { StreamApplier, resolveAncestorItems } from "./runnerUtils.js";
+import { OnceLog, StreamApplier, resolveAncestorItems } from "./runnerUtils.js";
 
 export interface ImportDeps {
   controller: GoTestController;
@@ -103,6 +103,7 @@ export async function openEventsFile(
     run,
     (importPath) => deps.cache.getPackage(importPath)?.dir,
     folder,
+    new OnceLog((m) => deps.outputChannel.warn(m)),
   );
   applier.apply(events);
   resolveAncestorItems(run, controller);

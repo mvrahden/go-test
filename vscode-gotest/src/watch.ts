@@ -13,6 +13,7 @@ import {
 import {
   resolveAncestorItems,
   skipUnresolved,
+  OnceLog,
   StreamApplier,
 } from "./runnerUtils.js";
 import { ManagedChild } from "./managedChild.js";
@@ -247,12 +248,14 @@ export class WatchCycle {
     private readonly controller: GoTestController,
     cache: DiscoveryCache,
     cwd: string,
+    log?: (message: string) => void,
   ) {
     this.applier = new StreamApplier(
       controller,
       run,
       (importPath) => cache.resolveImportPath(importPath),
       cwd,
+      new OnceLog(log),
     );
   }
 
@@ -353,7 +356,9 @@ export class WatchManager implements vscode.Disposable {
         );
         this.activeCycles.set(
           pkgScope,
-          new WatchCycle(run, this.controller, this.cache, cwd),
+          new WatchCycle(run, this.controller, this.cache, cwd, (m) =>
+            this.outputChannel.warn(m),
+          ),
         );
       },
       // onEvents

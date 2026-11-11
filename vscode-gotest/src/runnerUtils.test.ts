@@ -2599,6 +2599,68 @@ describe("TestItemRouter", () => {
     expect(message).not.toContain("internal says");
   });
 
+  it("lands a repeated run of a suite without a twin on its items, the last verdict last", () => {
+    const { controller, suite, method } = makeRouterFixture();
+    controller.findItem = ((find) => (id: string) =>
+      id.endsWith("~external") ? undefined : find(id))(controller.findItem);
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
+    const ctl = { ...controller, recordResult: vi.fn(), noteStart: vi.fn() };
+    applyResults(
+      ctl as any,
+      run as any,
+      [
+        ev("run", "TestS", { Subtest: "TestS" }),
+        ev("run", "TestS/TestM", { Subtest: "TestM" }),
+        ev("run", "TestS/TestM/x", { Subtest: "x" }),
+        ev("pass", "TestS/TestM/x"),
+        ev("pass", "TestS/TestM"),
+        ev("run", "TestS", { Subtest: "TestS", Instance: 2 }),
+        ev("run", "TestS/TestM#01", {
+          Subtest: "TestM#01",
+          Repeat: 1,
+          Instance: 2,
+        }),
+        ev("run", "TestS/TestM#01/x", { Subtest: "x", Instance: 2 }),
+        ev("fail", "TestS/TestM#01/x", { Instance: 2 }),
+        ev("fail", "TestS/TestM#01", { Instance: 2 }),
+      ],
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    const x = method.children.get("example.com/pkg/S/TestM/x");
+    expect(run.passed.mock.calls.map((c) => c[0])).toEqual([x, method]);
+    expect(run.failed.mock.calls.map((c) => c[0])).toEqual([x, method]);
+    expect(method.children.size).toBe(1);
+    expect(suite.children.size).toBe(2);
+  });
+
+  it("alternates a twin's repeated runs: odd internal, even external", () => {
+    const { controller, suite, create, twin, twinCreate } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    const got = [1, 2, 3, 4].map((n) => {
+      const Instance = n > 1 ? n : undefined;
+      const own = n === 1 ? "TestCreate" : `TestCreate#0${n - 1}`;
+      return [
+        router.route(ev("run", "TestS", { Subtest: "TestS", Instance })),
+        router.route(
+          ev("run", `TestS/${own}`, {
+            Subtest: own,
+            Repeat: n > 1 ? n - 1 : undefined,
+            Instance,
+          }),
+        ),
+      ];
+    });
+
+    expect(got).toEqual([
+      [suite, create],
+      [twin, twinCreate],
+      [suite, create],
+      [twin, twinCreate],
+    ]);
+  });
+
   it("routes an unstamped subtest to nothing and says so once", () => {
     const { controller } = makeRouterFixture();
     const log = vi.fn();
