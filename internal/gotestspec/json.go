@@ -90,7 +90,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 	for _, o := range opts {
 		o(&cfg)
 	}
-	stats := CollectStats(packages)
+	stats := cfg.stats(packages)
 
 	root := jsonRoot{
 		Version:  about.ResolvedVersion(),
@@ -117,7 +117,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 			Output:   output,
 		}
 		if cfg.packageStats {
-			own := jsonStats(CollectStats([]*Package{pkg}))
+			own := jsonStats(cfg.stats([]*Package{pkg}))
 			jp.Stats = &own
 		}
 		root.Packages = append(root.Packages, jp)

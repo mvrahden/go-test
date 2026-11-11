@@ -221,7 +221,7 @@ func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.Proj
 	case "md", "markdown":
 		gotestspec.RenderMarkdown(w, tree, append(renderOpts, reportOptions()...)...)
 	case "json":
-		gotestspec.RenderJSON(w, tree)
+		gotestspec.RenderJSON(w, tree, gotestspec.WithoutVerdicts())
 	default:
 		gotestspec.RenderTerminal(w, tree, renderOpts...)
 	}

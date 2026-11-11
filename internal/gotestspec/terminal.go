@@ -191,7 +191,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 
 	renderBenchDeltaTable(w, cfg.benchDeltas, c)
 	fmt.Fprintln(w)
-	stats := CollectStats(packages)
+	stats := cfg.stats(packages)
 	renderSummary(w, stats, c)
 }
 

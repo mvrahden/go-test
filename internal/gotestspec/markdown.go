@@ -290,7 +290,9 @@ func verdictWord(s Status) string {
 
 // escapeItemStart is EscapeLabel for a label that opens an item's text, where
 // a heading, quote, list marker or ordered-list number would start a block.
+// Leading blanks go: four of them would open a code block.
 func escapeItemStart(label string) string {
+	label = strings.TrimLeft(label, " \t")
 	if label == "" {
 		return ""
 	}
@@ -302,7 +304,9 @@ func escapeItemStart(label string) string {
 	for i < len(label) && label[i] >= '0' && label[i] <= '9' {
 		i++
 	}
-	if i > 0 && i < len(label) && (label[i] == '.' || label[i] == ')') {
+	// "1. x" and "1)" are list markers; "1.5x" is not.
+	if i > 0 && i < len(label) && (label[i] == '.' || label[i] == ')') &&
+		(i+1 == len(label) || label[i+1] == ' ' || label[i+1] == '\t') {
 		return label[:i] + `\` + label[i:i+1] + EscapeLabel(label[i+1:])
 	}
 	return EscapeLabel(label)
@@ -377,13 +381,15 @@ var markdownEscaper = strings.NewReplacer(
 )
 
 // labelEscaper is markdownEscaper that also keeps a label from opening a
-// link, emphasis or an entity, so the spec shows it as written.
+// link, emphasis, strikethrough, a tilde fence or an entity, so the spec
+// shows it as written.
 var labelEscaper = strings.NewReplacer(
 	`\`, `\\`,
 	"|", `\|`,
 	"`", "\\`",
 	"*", `\*`,
 	"_", `\_`,
+	"~", `\~`,
 	"[", `\[`,
 	"]", `\]`,
 	"&", "&amp;",

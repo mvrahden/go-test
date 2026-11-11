@@ -24,7 +24,7 @@ line break in one row`, func(it *gotest.T) {})
 }
 
 func (s *LabelsTestSuite) TestOpenings(t *gotest.T) {
-	for it, r := range gotest.Each(t, []row{{"1. a numbered row"}, {"# a heading row"}, {"> a quoted row"}, {"- a listed row"}, {"+ a plussed row"}, {"``` a fenced row"}}) {
+	for it, r := range gotest.Each(t, []row{{"1. a numbered row"}, {"# a heading row"}, {"> a quoted row"}, {"- a listed row"}, {"+ a plussed row"}, {"``` a fenced row"}, {"~~~ a tilde-fenced row"}, {"    an indented row"}}) {
 		it.It("holds", func(h *gotest.T) { gotest.NotEmpty(h, r.Desc) })
 	}
 }

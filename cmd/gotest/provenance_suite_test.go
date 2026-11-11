@@ -37,9 +37,13 @@ func (s *ProvenanceTestSuite) TestReadProvenance(t *gotest.T) {
 		gotest.Zero(it, main.ExportReadProvenance(it.TempDir()))
 	})
 	t.It("names the checkout's commit", func(it *gotest.T) {
-		want, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
-		gotest.NoError(it, err)
 		got := main.ExportReadProvenance(".")
+		want, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+		if err != nil {
+			// Not a checkout, or no git: nothing to name.
+			gotest.Zero(it, got)
+			return
+		}
 		gotest.Equal(it, strings.TrimSpace(string(want)), got.Commit)
 		gotest.NotZero(it, got.Branch)
 	})

@@ -41,6 +41,7 @@ func (s *MarkdownSafetyTestSuite) TestEscapeMarkdown(t *gotest.T) {
 			{Desc: "ampersand", in: "a&#124;b", want: "a&amp;#124;b"},
 			{Desc: "asterisk", in: "a*b", want: `a\*b`},
 			{Desc: "underscore", in: "a_b", want: `a\_b`},
+			{Desc: "tilde", in: "~~a~~", want: `\~\~a\~\~`},
 			{Desc: "brackets", in: "[l](http://x)", want: `\[l\](http://x)`},
 			{Desc: "plain text", in: "returns ok", want: "returns ok"},
 		}) {
@@ -383,11 +384,11 @@ func openingTree(labels ...string) []*gotestspec.Package {
 }
 
 // opensABlock matches item text that Markdown reads as a block of its own.
-var opensABlock = regexp.MustCompile("^([#>+-] |[0-9]+[.)] |```)")
+var opensABlock = regexp.MustCompile("^([#>+-] |[0-9]+[.)]( |$)|```|~~~| )")
 
 func (s *MarkdownSafetyTestSuite) TestLabelsAtTheStartOfAnItemStayText(t *gotest.T) {
-	labels := []string{"1. x", "2) x", "# x", "> x", "- x", "+ x", "```"}
-	want := []string{`1\. x`, `2\) x`, `\# x`, `\> x`, `\- x`, `\+ x`, "\\`\\`\\`"}
+	labels := []string{"1. x", "2) x", "3.", "# x", "> x", "- x", "+ x", "```", "~~~ x", "    four", "1.5x faster"}
+	want := []string{`1\. x`, `2\) x`, `3\.`, `\# x`, `\> x`, `\- x`, `\+ x`, "\\`\\`\\`", `\~\~\~ x`, "four", "1.5x faster"}
 	for _, mode := range []struct {
 		name string
 		opts []gotestspec.RenderOption

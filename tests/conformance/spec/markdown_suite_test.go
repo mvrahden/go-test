@@ -105,6 +105,7 @@ func (s *SpecMarkdownTestSuite) TestLabels(t *gotest.T) {
 				for _, row := range []string{
 					`1\. a numbered row`, `\# a heading row`, `\> a quoted row`,
 					`\- a listed row`, `\+ a plussed row`, "\\`\\`\\` a fenced row",
+					`\~\~\~ a tilde-fenced row`, "an indented row",
 				} {
 					gotest.Contains(it, md, "\n  - "+row+"\n")
 				}

@@ -38,6 +38,16 @@ func countsPhrase(s Stats) string { //nolint:gocritic // hugeParam: stable API
 	return strings.Join(parts, ", ")
 }
 
+// stats counts packages as the rendering reads them: a tree read from source
+// has no verdicts, so nothing in it counts as not run.
+func (c *renderConfig) stats(packages []*Package) Stats {
+	s := CollectStats(packages)
+	if c.withoutVerdicts {
+		s.NotRun = 0
+	}
+	return s
+}
+
 // nodeStats counts one node and what is beneath it.
 func nodeStats(n *Node) Stats {
 	var s Stats

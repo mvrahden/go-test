@@ -184,6 +184,7 @@ func (s *StaticSpecTestSuite) TestCarriesNoVerdicts(t *gotest.T, _ *staticCtx) {
 		w.It("counts what it read without claiming a verdict", func(it *gotest.T) {
 			gotest.Contains(it, out, "behaviors")
 			gotest.NotContains(it, out, "passed")
+			gotest.NotContains(it, out, "not run")
 			// A count line ending in a colon reads as a line that lost its tail.
 			gotest.NotContains(it, out, "behaviors: \n")
 		})
@@ -217,6 +218,11 @@ func (s *StaticSpecTestSuite) TestCarriesNoVerdicts(t *gotest.T, _ *staticCtx) {
 					assertStatusNone(it, node)
 				}
 			}
+		})
+
+		w.It("counts nothing as not run", func(it *gotest.T) {
+			gotest.NotContains(it, s.rendered["json"], `"notRun"`)
+			gotest.Contains(it, s.rendered["json"], `"behaviors":`)
 		})
 	})
 }

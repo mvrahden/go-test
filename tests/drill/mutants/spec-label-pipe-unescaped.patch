@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/spec .* / when a label holds a pipe, a backslash, an
 Clause: when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break → keeps each behavior on one line of the outline
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -380,7 +380,6 @@
- // link, emphasis or an entity, so the spec shows it as written.
+@@ -385,7 +385,6 @@
+ // shows it as written.
  var labelEscaper = strings.NewReplacer(
  	`\`, `\\`,
 -	"|", `\|`,
