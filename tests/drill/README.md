@@ -769,6 +769,7 @@ shards of one run do not add up to every mutant exactly once.
 | `stamp-remarshals-the-event` | the runner re-marshals a stamped event instead of splicing the object in, reordering go test's fields | cli conformance: a stamped line minus its `Gotest` object is not the line go test wrote |
 | `stamp-subtest-drops-the-repeat` | the runner stamps the written name as `Gotest.Subtest`, without testing's `#NN` | cli conformance: the twin's `TestShared#01` and the repeated `example.com/m/pkg#01` run events carry no suffix |
 | `spec-run-twins-merged` | a suite's second run lands on the first one's nodes | conformance: the spec Its for a suite of both test packages see one suite holding both suites' methods |
+| `placement-twin-method-repeat-unread` | a suite method's `#NN` is read as testing's only when its earlier name was seen, so a rerun of the external twin's shared method keeps `#01` | spec conformance: the declared spec under that rerun shows `TestShared#01` beside a not-run `TestShared` |
 | `spec-run-twin-order-reversed` | the first of a suite's two runs is marked external | conformance: the spec It for go test's order sees the external suite holding the internal suite's method |
 | `e2e-bench-sample-iterations-lost` | a saved sample records 1 iteration, not the ones it ran | conformance: the bench It for saving with --json sees iterations other than 10 |
 | `e2e-bench-report-drops-gate` | the --json report leaves out the gate verdict | conformance: the bench It for comparing under a gate sees no gate |

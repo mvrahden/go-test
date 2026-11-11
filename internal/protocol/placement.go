@@ -1,6 +1,9 @@
 package protocol
 
-import "strings"
+import (
+	"go/token"
+	"strings"
+)
 
 // Placement is where a go test name sits.
 type Placement struct {
@@ -118,12 +121,33 @@ func (p *Placer) underOpenParent(nodes map[string]*placed, test string, n int) (
 			continue
 		}
 		pl := Placement{Parent: parent, Own: test[i+1:], Written: test[i+1:], Instance: n}
-		if prefix, nn, ok := repeatSuffix(pl.Own); ok && p.used[joinName(parent, prefix)] {
+		if prefix, nn, ok := repeatSuffix(pl.Own); ok && (p.used[joinName(parent, prefix)] || suiteMethod(parent, prefix)) {
 			pl.Written, pl.Repeat = prefix, nn
 		}
 		return pl, true
 	}
 	return Placement{}, false
+}
+
+// suiteMethod reports whether own names a method of the suite parent runs.
+// Its #NN can only be testing's: an identifier holds no '#', and testing
+// reserves a twin's method name even when -run filters that method out.
+func suiteMethod(parent, own string) bool {
+	if strings.Contains(parent, "/") || !strings.HasSuffix(parent, SuffixTestSuite) || !token.IsIdentifier(own) {
+		return false
+	}
+	name := own
+	if rest, ok := strings.CutPrefix(name, "F_"); ok {
+		name = rest
+	} else if rest, ok := strings.CutPrefix(name, "X_"); ok {
+		name = rest
+	}
+	for _, kind := range []string{"Test", "Benchmark", "Fuzz"} {
+		if strings.HasPrefix(name, kind) {
+			return true
+		}
+	}
+	return false
 }
 
 // close ends a test and every open test beneath it: sub-benchmarks never

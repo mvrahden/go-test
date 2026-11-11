@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when the external twin's shared method is rerun alone / the declared spec under the rerun shows it under its own name, with its verdict \(
+Clause: when the external twin's shared method is rerun alone → the declared spec under the rerun shows it under its own name, with its verdict
+--- a/internal/protocol/placement.go
++++ b/internal/protocol/placement.go
+@@ -121,7 +121,7 @@
+ 			continue
+ 		}
+ 		pl := Placement{Parent: parent, Own: test[i+1:], Written: test[i+1:], Instance: n}
+-		if prefix, nn, ok := repeatSuffix(pl.Own); ok && (p.used[joinName(parent, prefix)] || suiteMethod(parent, prefix)) {
++		if prefix, nn, ok := repeatSuffix(pl.Own); ok && p.used[joinName(parent, prefix)] {
+ 			pl.Written, pl.Repeat = prefix, nn
+ 		}
+ 		return pl, true

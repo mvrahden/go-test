@@ -192,8 +192,9 @@ export class SpecStore {
 
   // compose writes the kept lines of a folder's packages as one stream: a
   // package's test lines in the order they were merged, then its own lines.
-  // A single run thus reaches the CLI as written; lines of several runs are
-  // stamped, and the CLI places those by their stamps.
+  // A single run's test lines thus reach the CLI as written (its package
+  // lines go last); lines of several runs are stamped, and the CLI places
+  // those by their stamps.
   compose(folder: string): string {
     const out: string[] = [];
     for (const record of this.records.values()) {

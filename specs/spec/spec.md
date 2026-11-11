@@ -58,7 +58,7 @@ An It or a When whose label holds a slash, at its start, inside or at its end, S
 - **THEN** a run's spec shows both as Its under their When
 
 ### Requirement: Suites of both test packages
-A suite name declared in a package's test files and in its external test package SHALL read as two suites, the external one marked, each with its own behaviors, in a run's spec, in the spec replayed from its -json stream, in the declared spec and in discover, the internal one first, as go test runs it first.
+A suite name declared in a package's test files and in its external test package SHALL read as two suites, the external one marked, each with its own behaviors, in a run's spec, in the spec replayed from its -json stream, a rerun of the external one's shared method included, in the declared spec and in discover, the internal one first, as go test runs it first.
 
 #### Scenario: A suite declared twice
 - **WHEN** a suite is declared in both test packages
@@ -71,6 +71,10 @@ A suite name declared in a package's test files and in its external test package
 #### Scenario: The order go test runs them in
 - **WHEN** go test runs a suite of both test packages
 - **THEN** the internal suite runs first
+
+#### Scenario: A rerun of the external twin's shared method
+- **WHEN** the external twin's shared method is rerun alone
+- **THEN** the declared spec under the rerun shows it under its own name, with its verdict
 
 ### Requirement: A group's own failure
 A When or an It that fails while every behavior under it passes SHALL show, on its own row of a run's spec, that it failed and what it wrote.

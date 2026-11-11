@@ -97,6 +97,26 @@ func (s *PlacementTestSuite) TestATwinSuiteIsASecondInstance(t *gotest.T) {
 	gotest.Equal(t, 2, evs[8].Instance) // the second top-level verdict goes to the open instance
 }
 
+func (s *PlacementTestSuite) TestATwinMethodRerunAloneKeepsItsRepeat(t *gotest.T) {
+	// -run ^STestSuite$/^TestCreate#01$: the internal twin's TestCreate is
+	// filtered out, yet testing reserved its name.
+	evs := place2("run STestSuite", "pass STestSuite",
+		"run STestSuite", "run STestSuite/TestCreate#01", "run STestSuite/X_TestRead#02")
+	gotest.Equal(t, protocol.Placement{Parent: "STestSuite", Own: "TestCreate#01", Written: "TestCreate", Repeat: 1, Instance: 2}, evs[3])
+	gotest.Equal(t, "X_TestRead", evs[4].Written)
+	gotest.Equal(t, 2, evs[4].Repeat)
+	gotest.Equal(t, protocol.Stamp{Subtest: "TestCreate#01", Repeat: 1, Instance: 2}, protocol.StampOf("run", evs[3]))
+}
+
+func (s *PlacementTestSuite) TestALoneSuffixOutsideASuiteMethodStaysAsWritten(t *gotest.T) {
+	got := place("run TestX", "run TestX/TestCreate#01",
+		"run STestSuite", "run STestSuite/TestM", "run STestSuite/TestM/a#01", "run STestSuite/in_a_TestSuite", "run STestSuite/in_a_TestSuite/TestB#01", "run STestSuite/when x#01")
+	gotest.Equal(t, protocol.Placement{Parent: "TestX", Own: "TestCreate#01", Written: "TestCreate#01", Instance: 1}, got["TestX/TestCreate#01"])
+	gotest.Equal(t, "a#01", got["STestSuite/TestM/a#01"].Written)
+	gotest.Equal(t, "TestB#01", got["STestSuite/in_a_TestSuite/TestB#01"].Written)
+	gotest.Equal(t, "when x#01", got["STestSuite/when x#01"].Written)
+}
+
 func (s *PlacementTestSuite) TestASubBenchmarkStaysOpenUntilItsParentEnds(t *gotest.T) {
 	// Sub-benchmarks report no verdict, so B/a/x stays open until B ends: a
 	// later sibling labelled "x/..." would be read as its child.

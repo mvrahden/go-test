@@ -183,6 +183,7 @@ func (s *SpecMarkdownTestSuite) TestExcluded(t *gotest.T) {
 // spec and discover.
 type SpecSlashesTestSuite struct {
 	live, replay, static, declared specDoc
+	rerun                          specDoc // the external twin's shared method alone
 	stream                         string
 	discover                       discoverDoc
 }
@@ -208,6 +209,12 @@ func (s *SpecSlashesTestSuite) BeforeAll(t *gotest.T) {
 	s.replay = specJSON(t, 0, "--input="+events)
 	s.static = specJSON(t, 0, "--static", slashesFixture)
 	s.declared = specJSON(t, 0, "--input="+events, "--declared", slashesFixture)
+	rerun, err := testkit.RunCLI(t.Context(), ".", "-json", "-run", "^TestTwinTestSuite$/^TestShared#01$", slashesFixture)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, rerun.Exit, "-json -run: %s", rerun.Stderr)
+	rerunEvents := filepath.Join(t.TempDir(), "rerun.json")
+	gotest.NoError(t, os.WriteFile(rerunEvents, []byte(rerun.Stdout), 0o600))
+	s.rerun = specJSON(t, 0, "--input="+rerunEvents, "--declared", slashesFixture)
 	disc, err := testkit.RunCLI(t.Context(), ".", "discover", slashesFixture)
 	gotest.NoError(t, err)
 	gotest.Equal(t, 0, disc.Exit, "discover: %s", disc.Stderr)
@@ -447,6 +454,18 @@ func (s *SpecSlashesTestSuite) TestSuitesOfBothTestPackages(t *gotest.T) {
 			gotest.NotEqual(it, -1, internal)
 			gotest.NotEqual(it, -1, external)
 			gotest.Less(it, internal, external)
+		})
+	})
+
+	t.When("the external twin's shared method is rerun alone", func(w *gotest.T) {
+		w.It("the declared spec under the rerun shows it under its own name, with its verdict", func(it *gotest.T) {
+			var shared []string
+			for _, row := range twins(it, s.rerun) {
+				if strings.HasPrefix(row, "external: TestShared") {
+					shared = append(shared, row)
+				}
+			}
+			gotest.Equal(it, twinsRun[4:8], shared)
 		})
 	})
 }

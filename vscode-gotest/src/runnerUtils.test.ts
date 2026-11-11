@@ -2635,6 +2635,26 @@ describe("TestItemRouter", () => {
     expect(suite.children.size).toBe(2);
   });
 
+  it("lands a rerun of the external twin's shared method on its item", () => {
+    const { controller, twin, twinCreate } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    // -run ^TestS$/^TestCreate#01$: the internal instance runs no method.
+    router.route(ev("run", "TestS", { Subtest: "TestS" }));
+    router.route(ev("pass", "TestS"));
+    expect(
+      router.route(ev("run", "TestS", { Subtest: "TestS", Instance: 2 })),
+    ).toBe(twin);
+    expect(
+      router.route(
+        ev("run", "TestS/TestCreate#01", {
+          Subtest: "TestCreate#01",
+          Repeat: 1,
+          Instance: 2,
+        }),
+      ),
+    ).toBe(twinCreate);
+  });
+
   it("alternates a twin's repeated runs: odd internal, even external", () => {
     const { controller, suite, create, twin, twinCreate } = makeRouterFixture();
     const router = new TestItemRouter(controller as any, "example.com/pkg");

@@ -36,10 +36,19 @@ function gotest(args: string[], input?: string): string {
 
 const run = (...filter: string[]) => gotest(["-json", ...filter, "./twins/"]);
 
-// render is the panel's call: the composed stream, rendered as it ran.
+// render is the panel's call: the composed stream laid over what the
+// fixture declares, so a declared row the stream misses shows as not run.
 function render(composed: string): Node[] {
   const out = gotest(
-    ["spec", "--input=-", "--format=json", "--render-only"],
+    [
+      "spec",
+      "--input=-",
+      "--format=json",
+      "--render-only",
+      "--hide=",
+      "--declared",
+      "./twins/",
+    ],
     composed,
   );
   const doc = JSON.parse(out) as {
@@ -120,22 +129,20 @@ describe("the Spec View's kept runs, rendered by the CLI", () => {
       r.includes("TestTwinsTestSuite"),
     );
     // Every row of both twins ran, and kept its verdict.
-    expect(twinRows.filter((r) => !r.endsWith(" pass"))).toEqual([]);
     expect(twinRows).toEqual(
-      expect.arrayContaining([
+      [
         "TestTwinsTestSuite pass",
+        "TestTwinsTestSuite/TestCreate pass",
         "TestTwinsTestSuite/TestCreate/creates_inside pass",
+        "TestTwinsTestSuite/TestRead pass",
         "TestTwinsTestSuite/TestRead/reads_inside pass",
         "ext:TestTwinsTestSuite pass",
+        "ext:TestTwinsTestSuite/TestCreate pass",
+        "ext:TestTwinsTestSuite/TestCreate/creates_outside pass",
+        "ext:TestTwinsTestSuite/TestList pass",
         "ext:TestTwinsTestSuite/TestList/lists_outside pass",
-      ]),
+      ].sort(),
     );
-    expect(twinRows.filter((r) => r.endsWith("/creates_outside pass"))).toEqual(
-      [expect.stringMatching(/^ext:TestTwinsTestSuite\/TestCreate/)],
-    );
-    expect(twinRows.filter((r) => r.endsWith("/creates_inside pass"))).toEqual([
-      "TestTwinsTestSuite/TestCreate/creates_inside pass",
-    ]);
   });
 
   it("rerunning . keeps ./pkg", () => {
