@@ -491,7 +491,7 @@ export class SpecViewPanel implements vscode.Disposable {
       ? undefined
       : await this.patternsFor?.(folder);
     // --declared takes the rest of the line, so the flags come before it.
-    args.splice(args.length, 0, ...extra);
+    args.push(...extra);
     if (patterns && patterns.length > 0) args.push("--declared", ...patterns);
     return args;
   }
@@ -831,7 +831,7 @@ export function buildSpecBody(
     tree =
       buildPackageFailureHtml(pkg, env) +
       pkg.nodes
-        .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, pkg), [i], []))
+        .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, pkg), [i], [pkg.path]))
         .join("");
   } else if (groups.length === 1) {
     tree = groups[0].entries
@@ -983,7 +983,7 @@ function buildPackageSectionHtml(
   const failure = buildPackageFailureHtml(pkg, env);
   if (pkg.nodes.length === 0 && !failure) return "";
   const nodes = pkg.nodes
-    .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, pkg), [i], []))
+    .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, pkg), [i], [pkg.path]))
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
@@ -1044,7 +1044,9 @@ function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
     group.entries.length === 1
       ? buildPackageFailureHtml(only, env) +
         only.nodes
-          .map((n, i) => buildNodeHtml(n, "", nodeCtx(env, only), [i], []))
+          .map((n, i) =>
+            buildNodeHtml(n, "", nodeCtx(env, only), [i], [only.path]),
+          )
           .join("")
       : group.entries
           .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))

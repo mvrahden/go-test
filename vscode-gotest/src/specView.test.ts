@@ -187,7 +187,7 @@ describe("buildSpecBody", () => {
       /<div class="leaf[^>]*data-display="gets_\.\/"[^>]*>/,
     );
     expect(leaf?.[0]).toContain(
-      'data-ancestors="[&quot;example.com/p/STestSuite&quot;,&quot;example.com/p/STestSuite/TestM&quot;]"',
+      'data-ancestors="[&quot;example.com/p&quot;,&quot;example.com/p/STestSuite&quot;,&quot;example.com/p/STestSuite/TestM&quot;]"',
     );
   });
 
@@ -450,6 +450,13 @@ describe("nearestItemId", () => {
     expect(nearestItemId("p/S/TestM", has)).toBe("p/S/TestM");
     expect(nearestItemId("p/S/TestM/row_101", has)).toBe("p/S/TestM");
     expect(nearestItemId("q/T", has)).toBeUndefined();
+  });
+
+  it("falls to the package item when neither the node nor its suite is an item", () => {
+    const has = (id: string) => id === "p";
+    expect(
+      nearestItemId("p/S/TestM/gets_./", has, ["p", "p/S", "p/S/TestM"]),
+    ).toBe("p");
   });
 
   it("takes the nearest ancestor from the list, not from cutting at a slash", () => {
