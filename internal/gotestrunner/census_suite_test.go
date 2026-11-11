@@ -239,12 +239,12 @@ func (s *CensusTestSuite) TestMissingUnitsAreBookedIntoTheStream(t *gotest.T) {
 		w.It("books each as a failed test with the census as its output, then fails its suite and package with their own time and duration", func(it *gotest.T) {
 			// A package the stream had not opened yet is opened first.
 			stamped := regexp.MustCompile(`("Action":"start","Package":"example.com/other","Time":)"[^"]+"`)
-			gotest.Equal(it, `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal"}
+			gotest.Equal(it, `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal","Gotest":{"Subtest":"TestTotal"}}
 {"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal","Output":"    census: declared test never ran\n"}
 {"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestTotal"}
 {"Time":"2026-09-13T10:00:01.5Z","Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite","Elapsed":1.5}
 {"Action":"start","Package":"example.com/other","Time":"now"}
-{"Action":"run","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted"}
+{"Action":"run","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted","Gotest":{"Subtest":"FuzzCartTestSuite_FuzzStarted"}}
 {"Action":"output","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted","Output":"    census: declared fuzz target never ran\n"}
 {"Action":"fail","Package":"example.com/other","Test":"FuzzCartTestSuite_FuzzStarted"}
 {"Time":"2026-09-13T10:00:04.21Z","Action":"fail","Package":"example.com/pkg","Elapsed":4.21}

@@ -238,6 +238,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	buildOutput := map[string][]string{}
 	failedBuild := map[string]string{}
 	benchScans := map[*Node]*benchScan{}
+	stamped := stampedPackages(events)
 
 	for i := range events {
 		ev := &events[i]
@@ -251,7 +252,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 		if pkg == nil {
 			pkg = &Package{Path: ev.Package}
 			pkgs[ev.Package] = pkg
-			builds[ev.Package] = newTreeBuild(pkg)
+			builds[ev.Package] = newTreeBuild(pkg, stamped[ev.Package])
 		}
 		if ev.RunLevel {
 			pkg.RunLevel = true
@@ -273,7 +274,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 			continue
 		}
 
-		e := builds[ev.Package].place(ev.Action, ev.Test)
+		e := builds[ev.Package].place(ev)
 		node := e.node
 		switch ev.Action {
 		case ActionOutput:
@@ -354,12 +355,27 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	return result
 }
 
+// stampedPackages are the packages one of whose runs carries a Subtest:
+// their events say where each test sits.
+func stampedPackages(events []TestEvent) map[string]bool {
+	stamped := map[string]bool{}
+	for i := range events {
+		ev := &events[i]
+		if ev.Action == ActionRun && ev.Gotest != nil && ev.Gotest.Subtest != "" {
+			stamped[ev.Package] = true
+		}
+	}
+	return stamped
+}
+
 // treeBuild assembles one package's nodes. A node is keyed by its instance
 // and full name, which testing keeps unique within an instance; where it
-// sits comes from the Placer, which reads the stream's order.
+// sits comes from the stamps, else from the Placer, which reads the
+// stream's order.
 type treeBuild struct {
 	pkg     *Package
-	placer  *protocol.Placer
+	placer  *protocol.Placer // nil when the package is stamped
+	placed  map[treeKey]protocol.Placement
 	entries map[treeKey]*treeEntry
 }
 
@@ -377,13 +393,43 @@ type treeEntry struct {
 	reported    bool // an event of its own arrived
 }
 
-func newTreeBuild(pkg *Package) *treeBuild {
-	return &treeBuild{pkg: pkg, placer: protocol.NewPlacer(), entries: map[treeKey]*treeEntry{}}
+func newTreeBuild(pkg *Package, stamped bool) *treeBuild {
+	b := &treeBuild{pkg: pkg, entries: map[treeKey]*treeEntry{}}
+	if stamped {
+		b.placed = map[treeKey]protocol.Placement{}
+	} else {
+		b.placer = protocol.NewPlacer()
+	}
+	return b
 }
 
-// place reads one test event in stream order and returns its node.
-func (b *treeBuild) place(action Action, test string) *treeEntry {
-	pl := b.placer.Place(string(action), test)
+// placement is where ev's test sits. A stamped non-run event takes its
+// run's placement; one that comes before its run is guessed, and the run
+// replaces the guess.
+func (b *treeBuild) placement(ev *TestEvent) protocol.Placement {
+	if b.placer != nil {
+		return b.placer.Place(string(ev.Action), ev.Test)
+	}
+	var st protocol.Stamp
+	if ev.Gotest != nil {
+		st = *ev.Gotest
+	}
+	if ev.Action == ActionRun {
+		pl := protocol.PlacementFromStamp(ev.Test, st)
+		b.placed[treeKey{pl.Instance, ev.Test}] = pl
+		return pl
+	}
+	n := max(st.Instance, 1)
+	if pl, ok := b.placed[treeKey{n, ev.Test}]; ok {
+		return pl
+	}
+	return protocol.Guess(ev.Test, n)
+}
+
+// place reads one test event and returns its node.
+func (b *treeBuild) place(ev *TestEvent) *treeEntry {
+	action, test := ev.Action, ev.Test
+	pl := b.placement(ev)
 	key := treeKey{pl.Instance, test}
 	e := b.entries[key]
 	switch {

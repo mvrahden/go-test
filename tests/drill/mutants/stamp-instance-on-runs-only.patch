@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestEventsSayWhereTheirTestSits/gotest_-json_runs_a_suite_of_both_test_packages/every_event_of_the_external_suite_carries_Gotest.Instance_2
+Expect: ^FAIL .*conformance/cli .* / when gotest -json runs a suite of both test packages / every event of the external suite carries Gotest.Instance 2 \(
+Clause: when gotest -json runs a suite of both test packages → every event of the external suite carries Gotest.Instance 2
+--- a/internal/protocol/placement.go
++++ b/internal/protocol/placement.go
+@@ -195,7 +195,7 @@
+ // is stamped with its guess, the split a reader would fall back to.
+ func StampOf(action string, pl Placement) Stamp {
+ 	var s Stamp
+-	if pl.Instance >= 2 {
++	if pl.Instance >= 2 && action == "run" {
+ 		s.Instance = pl.Instance
+ 	}
+ 	if action == "run" {

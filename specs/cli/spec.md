@@ -180,6 +180,18 @@ The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. 
 - **THEN** marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package
 - **AND** spec's JSON document of that stream marks the shared fixtures package runLevel, and no other
 
+### Requirement: Where a test event's test sits
+Every test event of a suite process in the go test -json stream SHALL carry an object `"Gotest"` before its final `}`: `Subtest`, the own level as reported, on every `run`; `Repeat`, the NN of testing's `#NN`, on a run that has it; `Instance` on every event of the second or later run of a top-level name, the 1-based run. A field that does not apply is left out. Every other byte SHALL be go test's.
+
+#### Scenario: Where a subtest sits
+- **WHEN** gotest -json runs a subtest
+- **THEN** its run event carries its own level in Gotest.Subtest
+- **AND** every field go test wrote is kept as go test wrote it
+
+#### Scenario: A suite of both test packages in the stream
+- **WHEN** gotest -json runs a suite of both test packages
+- **THEN** every event of the external suite carries Gotest.Instance 2
+
 ### Requirement: JSON documents
 A JSON document gotest is asked for SHALL be one document on stdout, with no color codes and no annotations, inside GitHub Actions too. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
 

@@ -182,3 +182,47 @@ func joinName(parent, own string) string {
 	}
 	return parent + "/" + own
 }
+
+// Stamp is the object gotest adds to a test event as "Gotest": where its
+// test sits, so the event can be placed without the stream's order.
+type Stamp struct {
+	Subtest  string `json:"Subtest,omitempty"`  // on every run: own level as reported
+	Repeat   int    `json:"Repeat,omitempty"`   // on a run whose own level has testing's suffix
+	Instance int    `json:"Instance,omitempty"` // on every event of instance >= 2
+}
+
+// StampOf is the stamp of an event the Placer placed as pl. A guessed run
+// is stamped with its guess, the split a reader would fall back to.
+func StampOf(action string, pl Placement) Stamp {
+	var s Stamp
+	if pl.Instance >= 2 {
+		s.Instance = pl.Instance
+	}
+	if action == "run" {
+		s.Subtest, s.Repeat = pl.Own, pl.Repeat
+	}
+	return s
+}
+
+// PlacementFromStamp places an event of a stamped stream; for a non-run
+// event the caller reuses the placement of the same (instance, test). A run
+// without a Subtest, or one Test does not end in, falls back to the split.
+func PlacementFromStamp(test string, s Stamp) Placement {
+	n := max(s.Instance, 1)
+	if s.Subtest == "" {
+		return fallback(test, n)
+	}
+	var parent string
+	if test != s.Subtest {
+		p, ok := strings.CutSuffix(test, "/"+s.Subtest)
+		if !ok || p == "" {
+			return fallback(test, n)
+		}
+		parent = p
+	}
+	pl := Placement{Parent: parent, Own: s.Subtest, Written: s.Subtest, Instance: n}
+	if prefix, nn, ok := repeatSuffix(s.Subtest); ok && s.Repeat == nn {
+		pl.Written, pl.Repeat = prefix, nn
+	}
+	return pl
+}

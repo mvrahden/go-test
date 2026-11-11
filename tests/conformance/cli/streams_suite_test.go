@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -113,6 +114,113 @@ func (s *CLIStreamsTestSuite) TestRunLevelPackagesAreMarked(t *gotest.T) {
 				"shared fixtures": true,
 				"github.com/mvrahden/go-test/tests/conformance/testdata/failingshared": false,
 			}, marked)
+		})
+	})
+}
+
+// stampedEvent is an event of the stream with the object gotest adds.
+type stampedEvent struct {
+	Action string
+	Test   string
+	Gotest *struct {
+		Subtest  string
+		Repeat   int
+		Instance int
+	}
+}
+
+// goTestEvent mirrors the event go test's test2json writes, field for field.
+type goTestEvent struct {
+	Time        *time.Time `json:",omitempty"`
+	Action      string
+	Package     string   `json:",omitempty"`
+	Test        string   `json:",omitempty"`
+	Elapsed     *float64 `json:",omitempty"`
+	Output      *string  `json:",omitempty"`
+	OutputType  string   `json:",omitempty"`
+	FailedBuild string   `json:",omitempty"`
+	Key         string   `json:",omitempty"`
+	Value       string   `json:",omitempty"`
+	Path        string   `json:",omitempty"`
+}
+
+var gotestObject = regexp.MustCompile(`,"Gotest":\{[^{}]*\}\}$`)
+
+func (s *CLIStreamsTestSuite) TestEventsSayWhereTheirTestSits(t *gotest.T) {
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/specslashes/")
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	lines := strings.Split(strings.TrimSpace(run.Stdout), "\n")
+	events := make([]stampedEvent, len(lines))
+	for i, line := range lines {
+		gotest.NoError(t, json.Unmarshal([]byte(line), &events[i]), "line: %s", line)
+	}
+	const twin = "TestTwinTestSuite"
+
+	t.When("gotest -json runs a subtest", func(w *gotest.T) {
+		w.It("its run event carries its own level in Gotest.Subtest", func(it *gotest.T) {
+			subtests := map[string]string{}
+			for _, ev := range events {
+				if ev.Action != "run" {
+					continue
+				}
+				gotest.NotZero(it, ev.Gotest, "run %s carries no Gotest object", ev.Test)
+				gotest.Regexp(it, "(^|/)"+regexp.QuoteMeta(ev.Gotest.Subtest)+"$", ev.Test)
+				subtests[ev.Test] = ev.Gotest.Subtest
+			}
+			gotest.Equal(it, "/usr/local/go/src", subtests["TestSlashesTestSuite/TestLabels/an_address_is_absolute//usr/local/go/src"])
+			gotest.Equal(it, "example.com/m/pkg#01", subtests["TestSlashesTestSuite/TestRepeats/a_module_is_listed_twice/example.com/m/pkg#01"])
+			gotest.Equal(it, "TestShared#01", subtests[twin+"/TestShared#01"])
+			gotest.Equal(it, twin, subtests[twin])
+		})
+		w.It("every field go test wrote is kept as go test wrote it", func(it *gotest.T) {
+			stamped := 0
+			for i, line := range lines {
+				if events[i].Test == "" {
+					continue
+				}
+				if events[i].Gotest != nil {
+					gotest.Regexp(it, gotestObject, line)
+					line = gotestObject.ReplaceAllString(line, "}")
+					stamped++
+				}
+				var ev goTestEvent
+				dec := json.NewDecoder(strings.NewReader(line))
+				dec.DisallowUnknownFields()
+				gotest.NoError(it, dec.Decode(&ev), "line: %s", line)
+				again, err := json.Marshal(ev)
+				gotest.NoError(it, err)
+				gotest.Equal(it, line, string(again))
+			}
+			gotest.NotZero(it, stamped)
+		})
+	})
+
+	t.When("gotest -json runs a suite of both test packages", func(w *gotest.T) {
+		w.It("every event of the external suite carries Gotest.Instance 2", func(it *gotest.T) {
+			runs, external, internal := 0, 0, 0
+			for _, ev := range events {
+				if ev.Test != twin && !strings.HasPrefix(ev.Test, twin+"/") {
+					continue
+				}
+				if ev.Test == twin && ev.Action == "run" {
+					runs++
+				}
+				instance := 0
+				if ev.Gotest != nil {
+					instance = ev.Gotest.Instance
+				}
+				if runs == 2 {
+					gotest.Equal(it, 2, instance, "%s %s", ev.Action, ev.Test)
+					external++
+				} else {
+					gotest.Zero(it, instance, "%s %s", ev.Action, ev.Test)
+					internal++
+				}
+			}
+			gotest.Equal(it, 2, runs)
+			gotest.NotZero(it, internal)
+			gotest.NotZero(it, external)
 		})
 	})
 }

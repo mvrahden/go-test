@@ -418,11 +418,7 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 		code = 2
 	}
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
-	w := c.jsonTarget()
-	for i := range booked {
-		line, _ := json.Marshal(booked[i])
-		_, _ = w.Write(append(line, '\n'))
-	}
+	writeBooked(c.jsonTarget(), booked)
 	return code
 }
 
@@ -492,11 +488,7 @@ func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
 	}
 	booked = append(booked, c.verdicts.suiteFailures(running)...)
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
-	w := c.jsonTarget()
-	for i := range booked {
-		line, _ := json.Marshal(booked[i])
-		_, _ = w.Write(append(line, '\n'))
-	}
+	writeBooked(c.jsonTarget(), booked)
 	return running
 }
 
@@ -542,4 +534,15 @@ func (x *verdictIndex) packageFailures(booked []streamEvent) []streamEvent {
 		fail = append(fail, streamEvent{Time: v.Time, Action: "fail", Package: pkg, Elapsed: v.Elapsed})
 	}
 	return fail
+}
+
+// writeBooked writes the events the run booked itself, stamped like a suite
+// process's.
+func writeBooked(w io.Writer, booked []streamEvent) {
+	var block []byte
+	for i := range booked {
+		line, _ := json.Marshal(booked[i])
+		block = append(append(block, line...), '\n')
+	}
+	_, _ = w.Write(stampBlock(block))
 }

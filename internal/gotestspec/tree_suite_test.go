@@ -2,6 +2,7 @@
 package gotestspec_test //nolint:fail-guard
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -634,4 +635,62 @@ func (s *TreeTestSuite) TestAParentsLateRunReplacesItsGuess(t *gotest.T, _ *tree
 	mustEq(t, "group status", group.Status, gotestspec.StatusPass)
 	mustLen(t, "group children", group.Children, 1)
 	mustEq(t, "leaf name", group.Children[0].Name, "leaf")
+}
+
+// stampedTwins is a stamped stream: a suite of both test packages, and a
+// paused "." beside "./pkg", which only the stream's order told apart.
+var stampedTwins = []string{
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite","Gotest":{"Subtest":"TestSTestSuite"}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate","Gotest":{"Subtest":"TestCreate"}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate/.","Gotest":{"Subtest":"."}}`,
+	`{"Action":"pause","Package":"p","Test":"TestSTestSuite/TestCreate/."}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate/./pkg","Gotest":{"Subtest":"./pkg"}}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestCreate/./pkg","Elapsed":0}`,
+	`{"Action":"cont","Package":"p","Test":"TestSTestSuite/TestCreate/."}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestCreate/.","Elapsed":0}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestCreate","Elapsed":0}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite","Gotest":{"Subtest":"TestSTestSuite","Instance":2}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate#01","Gotest":{"Subtest":"TestCreate#01","Repeat":1,"Instance":2}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate#01/when_x","Gotest":{"Subtest":"when_x","Instance":2}}`,
+	`{"Action":"output","Package":"p","Test":"TestSTestSuite/TestCreate#01/when_x","Output":"    boom\n","Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Test":"TestSTestSuite/TestCreate#01/when_x","Elapsed":0,"Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Test":"TestSTestSuite/TestCreate#01","Elapsed":0,"Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Test":"TestSTestSuite","Elapsed":0,"Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Elapsed":0.01}`,
+}
+
+// hoistRuns puts every run event first, as a stream composed of several
+// runs can.
+func hoistRuns(lines []string) []string {
+	var runs, rest []string
+	for _, l := range lines {
+		if strings.Contains(l, `"Action":"run"`) {
+			runs = append(runs, l)
+		} else {
+			rest = append(rest, l)
+		}
+	}
+	return append(runs, rest...)
+}
+
+func renderedTree(t *gotest.T, lines []string) string {
+	var b strings.Builder
+	gotestspec.RenderJSON(&b, treeOf(t, strings.Join(lines, "\n")))
+	return b.String()
+}
+
+func (s *TreeTestSuite) TestAStampedStreamNeedsNoOrder(t *gotest.T, _ *treeCtx) {
+	want := renderedTree(t, stampedTwins)
+	mustEq(t, "hoisted stamped tree", renderedTree(t, hoistRuns(stampedTwins)), want)
+
+	unstamped := make([]string, len(stampedTwins))
+	for i, l := range stampedTwins {
+		unstamped[i] = regexp.MustCompile(`,"Gotest":\{[^{}]*\}`).ReplaceAllString(l, "")
+	}
+	mustEq(t, "unstamped tree in stream order", renderedTree(t, unstamped), want)
+	// The hoisting matters: without stamps it misplaces.
+	if renderedTree(t, hoistRuns(unstamped)) == want {
+		t.Errorf("hoisting an unstamped stream changed nothing; the test does not reorder")
+	}
 }

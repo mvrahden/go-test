@@ -133,3 +133,16 @@ func (s *PlacementTestSuite) TestSplitTestPathCutsAtSingleSlashes(t *gotest.T) {
 		gotest.Equal(sub, tc.want, protocol.SplitTestPath(tc.path))
 	}
 }
+
+func (s *PlacementTestSuite) TestAStampPlacesWithoutTheOrder(t *gotest.T) {
+	gotest.Equal(t, protocol.Placement{Parent: "S", Own: "TestCreate#01", Written: "TestCreate", Repeat: 1, Instance: 2},
+		protocol.PlacementFromStamp("S/TestCreate#01", protocol.Stamp{Subtest: "TestCreate#01", Repeat: 1, Instance: 2}))
+	gotest.Equal(t, protocol.Placement{Parent: "S/M", Own: "a#01", Written: "a#01", Instance: 1},
+		protocol.PlacementFromStamp("S/M/a#01", protocol.Stamp{Subtest: "a#01"}))
+	gotest.Equal(t, protocol.Placement{Parent: "S/M", Own: "./pkg", Written: "./pkg", Instance: 1},
+		protocol.PlacementFromStamp("S/M/./pkg", protocol.Stamp{Subtest: "./pkg"}))
+	gotest.Equal(t, protocol.Placement{Own: "S", Written: "S", Instance: 1},
+		protocol.PlacementFromStamp("S", protocol.Stamp{Subtest: "S"}))
+	// A stamp the name does not end in is no placement.
+	gotest.True(t, protocol.PlacementFromStamp("S/M/b", protocol.Stamp{Subtest: "a"}).Guessed)
+}
