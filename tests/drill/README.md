@@ -329,6 +329,11 @@ shards of one run do not add up to every mutant exactly once.
 | `hidden-package-kept` | `--hide` keeps a package none of whose rows is shown | spec conformance: the green run's package stays in the document |
 | `hide-under-static-accepted` | `--hide` is accepted beside `--static` | spec conformance: the static run exits 0 instead of 2 |
 | `hiding-recounts` | the trailer and each package's stats count only the rows `--hide` shows | spec conformance: the hidden passes are missing from the counts |
+| `match-case-sensitive` | `--match` compares the label in the case it was typed | spec conformance: the uppercase search finds no behavior |
+| `only-position-unchecked` | `--only` renders nothing instead of refusing a position the stream does not hold | spec conformance: the pick exits 0 instead of 2 |
+| `match-header-unnamed` | the header leaves out the search it was made with | spec conformance: the Markdown header lacks `search "…"` |
+| `only-keeps-the-whole-package` | `--only` names a node and renders the whole package | spec conformance: the picked package shows the rows of the node's neighbours |
+| `only-position-ignores-hide` | `--only` counts positions among all children, hidden rows included | spec conformance: the position under `--hide` picks another node |
 | `finding-without-extent` | a lint finding ends where it starts | lint conformance: the call's and the signature's findings end at their posn |
 | `runlevel-start-unmarked` | the start line of a package the run books for itself carries no RunLevel | cli conformance: the shared fixtures package's start line is unmarked |
 | `runlevel-package-unread` | the spec tree drops the RunLevel its events carry | cli conformance: the spec document does not mark the shared fixtures package |

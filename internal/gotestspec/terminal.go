@@ -36,6 +36,8 @@ type renderConfig struct {
 	benchGate       *BenchGate
 	groups          []GroupRun
 	hidden          map[Status]bool
+	match           string
+	only            *onlyView
 	packageStats    bool
 	module          string
 	provenance      Provenance
@@ -154,6 +156,7 @@ func RenderTerminal(w io.Writer, packages []*Package, opts ...RenderOption) {
 	for _, o := range opts {
 		o(&cfg)
 	}
+	packages, _ = cfg.narrow(packages)
 	c := ansiColors
 	if !cfg.color {
 		c = noColors

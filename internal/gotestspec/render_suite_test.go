@@ -2,6 +2,7 @@ package gotestspec_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -493,4 +494,73 @@ func (s *RenderTestSuite) TestTheTerminalKeepsATailWithinItsWidth(t *gotest.T, _
 	}
 	gotest.Contains(t, out, "LongSuiteName\n")
 	gotest.Contains(t, out, "— EXTERNAL")
+}
+
+const outlinePkg = "github.com/mvrahden/go-test/examples/repository"
+
+func (s *RenderTestSuite) TestMatchKeepsTheLeavesHoldingTheTextAndTheirGroups(t *gotest.T, _ *renderCtx) {
+	out := renderMarkdownOf(treeOf(t, outlineStream),
+		gotestspec.WithModule("github.com/mvrahden/go-test"), gotestspec.WithMatch("EMAIL"))
+	gotest.Contains(t, out, "- PASS stores the email\n")
+	gotest.Contains(t, out, "- **CreateUser**\n  - when a user is created\n")
+	gotest.NotContains(t, out, "has one entry")
+	gotest.NotContains(t, out, "Ping")
+	gotest.Contains(t, out, "2 suites, 2 behaviors: 2 passed.\n")
+	gotest.Contains(t, out, `search "EMAIL"`)
+}
+
+func (s *RenderTestSuite) TestMatchWithoutAHitLeavesNoRow(t *gotest.T, _ *renderCtx) {
+	var buf bytes.Buffer
+	gotestspec.RenderTerminal(&buf, treeOf(t, outlineStream), gotestspec.WithMatch("nothing like it"))
+	gotest.NotContains(t, buf.String(), "CreateUser")
+}
+
+func (s *RenderTestSuite) TestOnlyRendersOneNodeAndItsSubtree(t *gotest.T, _ *renderCtx) {
+	tree := treeOf(t, outlineStream)
+	var out bytes.Buffer
+	gotestspec.RenderJSON(&out, tree, gotestspec.WithOnly(outlinePkg, []int{1, 1}))
+	gotest.Contains(t, out.String(), `"display":"Ping"`)
+	gotest.NotContains(t, out.String(), "CreateUser")
+	gotest.NotContains(t, out.String(), "DeleteUser")
+	md := renderMarkdownOf(tree, gotestspec.WithModule("github.com/mvrahden/go-test"),
+		gotestspec.WithOnly(outlinePkg, []int{1, 0, 0}))
+	gotest.Contains(t, md, "- when a user is created\n")
+	gotest.Contains(t, md, "**FAIL** has one entry")
+	gotest.NotContains(t, md, "Ping")
+	gotest.Contains(t, md, "only "+outlinePkg+":1.0.0")
+	gotest.Contains(t, md, "2 behaviors: 1 passed, 1 failed")
+}
+
+func (s *RenderTestSuite) TestOnlyAPackageRendersItWhole(t *gotest.T, _ *renderCtx) {
+	md := renderMarkdownOf(treeOf(t, outlineStream), gotestspec.WithOnly(outlinePkg, nil))
+	gotest.Contains(t, md, "Ping")
+	gotest.Contains(t, md, "only "+outlinePkg+"\n")
+}
+
+func (s *RenderTestSuite) TestOnlyNamesWhatIsNotThere(t *gotest.T, _ *renderCtx) {
+	tree := treeOf(t, outlineStream)
+	gotest.ErrorContains(t, gotestspec.CheckView(tree, gotestspec.WithOnly(outlinePkg, []int{1, 7})),
+		"--only: no node at 1.7 in "+outlinePkg)
+	gotest.ErrorContains(t, gotestspec.CheckView(tree, gotestspec.WithOnly("nope", nil)), "no package nope")
+	gotest.NoError(t, gotestspec.CheckView(tree, gotestspec.WithOnly(outlinePkg, []int{1, 1})))
+}
+
+func (s *RenderTestSuite) TestOnlyPositionsAreThoseOfTheShownRows(t *gotest.T, _ *renderCtx) {
+	tree := treeOf(t, outlineStream)
+	hide := gotestspec.WithHidden(gotestspec.StatusPass)
+	var doc bytes.Buffer
+	gotestspec.RenderJSON(&doc, tree, hide)
+	var got struct {
+		Packages []struct {
+			Nodes []struct {
+				Display  string
+				Children []struct{ Display string }
+			}
+		}
+	}
+	gotest.NoError(t, json.Unmarshal(doc.Bytes(), &got))
+	want := got.Packages[0].Nodes[0].Children[1].Display
+	var md bytes.Buffer
+	gotestspec.RenderJSON(&md, tree, hide, gotestspec.WithOnly(outlinePkg, []int{0, 1}))
+	gotest.Contains(t, md.String(), `"display":"`+want+`"`)
 }

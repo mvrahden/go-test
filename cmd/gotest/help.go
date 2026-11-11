@@ -269,6 +269,15 @@ Flags:
                           whole run's; --hide= hides nothing. Not with
                           --static. With --hide or --declared every JSON
                           package carries its own stats, whatever is hidden
+  --match=<text>          Show only the behaviors whose label holds text (any case)
+                          and the groups they sit in, as the editor's search
+                          does. Unlike --hide, counts are those of what is
+                          shown. Not with --static
+  --only=<path>[:<i>.<j>] Show one package, or one node of it by its position
+                          among the shown children at each level (the JSON
+                          document's order), with what is under it. Counts are
+                          those of what is shown. Exit 2 when nothing is there.
+                          Not with --static
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
   --debug                 Keep the overlay and work dir; a later run

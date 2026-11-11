@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / shows the behaviors whose label holds the text and their groups
+Clause: when the spec is rendered with --match → shows the behaviors whose label holds the text and their groups
+--- a/internal/gotestspec/view.go
++++ b/internal/gotestspec/view.go
+@@ -137,7 +137,7 @@
+ 	var out []*Node
+ 	for _, n := range nodes {
+ 		if len(n.Children) == 0 {
+-			if strings.Contains(strings.ToLower(n.Display), strings.ToLower(c.match)) {
++			if strings.Contains(n.Display, c.match) {
+ 				out = append(out, n)
+ 			}
+ 			continue

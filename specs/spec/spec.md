@@ -203,3 +203,20 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 #### Scenario: A view that cannot apply
 - **WHEN** --hide is given with --static or with a status it does not know, or --declared without --input or with --static
 - **THEN** refuses with exit 2, naming what it needs or the statuses it accepts
+
+### Requirement: Searching and picking rows
+`--match=<text>` SHALL keep, in every format, the behaviors whose label holds the text in any letter case and the groups they sit in; `--only=<import path>[:<i>.<j>…]` SHALL keep one package, or the node at that position among the shown children at each level, as the JSON lists them, with what is under it. Unlike --hide, the counts SHALL be those of what is kept, and the header names the search or the pick. A position nothing holds, or --match or --only under --static, SHALL exit 2.
+
+#### Scenario: Searching behaviors
+- **WHEN** the spec is rendered with --match
+- **THEN** shows the behaviors whose label holds the text and their groups
+- **AND** the header names the search
+
+#### Scenario: Picking one node
+- **WHEN** the spec is rendered with --only and a node's position
+- **THEN** shows that node and what is under it
+- **AND** the position counts the rows --hide leaves shown
+
+#### Scenario: A pick that finds nothing
+- **WHEN** --only names a package or position the stream does not hold, or --match or --only is given with --static
+- **THEN** refuses with exit 2 and says what it did not find

@@ -152,8 +152,15 @@ func provenanceLine(packages []*Package, cfg *renderConfig) string {
 	if h := hiddenPhrase(cfg.hidden); h != "" {
 		parts = append(parts, h)
 	}
-	if q := cfg.provenance.Search; q != "" {
+	q := cfg.match
+	if q == "" {
+		q = cfg.provenance.Search
+	}
+	if q != "" {
 		parts = append(parts, `search "`+q+`"`)
+	}
+	if o := cfg.only; o != nil {
+		parts = append(parts, "only "+strings.TrimSuffix(o.pkg+":"+joinPosition(o.position), ":"))
 	}
 	return strings.Join(parts, " · ")
 }

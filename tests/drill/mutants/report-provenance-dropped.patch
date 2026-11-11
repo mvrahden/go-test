@@ -4,9 +4,9 @@ Clause: when the Markdown spec of a run with failures and rows not run → the h
 Clause: when the Markdown spec hides rows → the header names what is hidden
 --- a/internal/gotestspec/report.go
 +++ b/internal/gotestspec/report.go
-@@ -145,7 +145,7 @@
- 	if q := cfg.provenance.Search; q != "" {
- 		parts = append(parts, `search "`+q+`"`)
+@@ -162,7 +162,7 @@
+ 	if o := cfg.only; o != nil {
+ 		parts = append(parts, "only "+strings.TrimSuffix(o.pkg+":"+joinPosition(o.position), ":"))
  	}
 -	return strings.Join(parts, " · ")
 +	return strings.Join(parts[:0], " · ")

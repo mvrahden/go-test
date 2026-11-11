@@ -24159,6 +24159,235 @@
               "name": "TestAViewThatCannotApply",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "shows the behaviors whose label holds the text and their groups",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hiding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 137,
+                      "name": "shows_the_behaviors_whose_label_holds_the_text_and_their_groups",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the header names the search",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hiding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 147,
+                      "name": "the_header_names_the_search",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the spec is rendered with --match",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hiding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 136,
+                  "name": "the_spec_is_rendered_with_--match",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SearchingBehaviors",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hiding_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 135,
+              "name": "TestSearchingBehaviors",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "shows that node and what is under it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hiding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 157,
+                      "name": "shows_that_node_and_what_is_under_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the position counts the rows --hide leaves shown",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hiding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 166,
+                      "name": "the_position_counts_the_rows_--hide_leaves_shown",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the spec is rendered with --only and a node's position",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hiding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 156,
+                  "name": "the_spec_is_rendered_with_--only_and_a_node's_position",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "PickingOneNode",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hiding_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 155,
+              "name": "TestPickingOneNode",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a position",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "hiding_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 183,
+                          "name": "a_position",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a package",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "hiding_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 184,
+                          "name": "a_package",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a position that is no number",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "hiding_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 185,
+                          "name": "a_position_that_is_no_number",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "--match under --static",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "hiding_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 186,
+                          "name": "--match_under_--static",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses with exit 2 and says what it did not find",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hiding_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 177,
+                      "name": "refuses_with_exit_2_and_says_what_it_did_not_find",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --only names a package or position the stream does not hold, or --match or --only is given with --static",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hiding_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 176,
+                  "name": "--only_names_a_package_or_position_the_stream_does_not_hold,_or_--match_or_--only_is_given_with_--static",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APickThatFindsNothing",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hiding_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 175,
+              "name": "TestAPickThatFindsNothing",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "SpecHiding",
@@ -25598,7 +25827,7 @@
     }
   ],
   "stats": {
-    "behaviors": 738,
+    "behaviors": 746,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

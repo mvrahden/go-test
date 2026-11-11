@@ -131,3 +131,64 @@ func (s *SpecHidingTestSuite) TestAViewThatCannotApply(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SpecHidingTestSuite) TestSearchingBehaviors(t *gotest.T) {
+	t.When("the spec is rendered with --match", func(w *gotest.T) {
+		w.It("shows the behaviors whose label holds the text and their groups", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--match=OPE", hidingStream)
+			gotest.Equal(it, []string{"TestAccountTestSuite", "TestOpen"}, names(doc.Packages[0].Nodes))
+			terminal := spec(it, 1, "--match=OPE", hidingStream)
+			gotest.Contains(it, terminal.Stdout, "✗ Open")
+			gotest.NotContains(it, terminal.Stdout, "Close")
+			gotest.NotContains(it, terminal.Stdout, "Boot")
+			gotest.Equal(it, 1, doc.Stats.Failed)
+			gotest.Equal(it, 0, doc.Stats.Passed)
+		})
+		w.It("the header names the search", func(it *gotest.T) {
+			markdown := spec(it, 1, "--format=md", "--match=OPE", hidingStream)
+			gotest.Contains(it, markdown.Stdout, `search "OPE"`)
+			gotest.Contains(it, markdown.Stdout, "\n1 suite, 1 behavior: 1 failed.\n")
+		})
+	})
+}
+
+func (s *SpecHidingTestSuite) TestPickingOneNode(t *gotest.T) {
+	t.When("the spec is rendered with --only and a node's position", func(w *gotest.T) {
+		w.It("shows that node and what is under it", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--only=example.com/hiding:1", hidingStream)
+			gotest.Equal(it, []string{"TestBootTestSuite", "TestStart", "TestStop"}, names(doc.Packages[0].Nodes))
+			markdown := spec(it, 1, "--format=md", "--only=example.com/hiding:1", hidingStream)
+			gotest.Contains(it, markdown.Stdout, "only example.com/hiding:1")
+			gotest.NotContains(it, markdown.Stdout, "Account")
+			whole := spec(it, 1, "--format=md", "--only=example.com/hiding", hidingStream)
+			gotest.Contains(it, whole.Stdout, "Account")
+		})
+		w.It("the position counts the rows --hide leaves shown", func(it *gotest.T) {
+			// Under --hide=pass the shown suites are Account (0) and Boot (1),
+			// and Account shows only Open.
+			doc := specJSON(it, 1, "--hide=pass", "--only=example.com/hiding:0.0", hidingStream)
+			gotest.Equal(it, []string{"TestOpen"}, names(doc.Packages[0].Nodes))
+		})
+	})
+}
+
+func (s *SpecHidingTestSuite) TestAPickThatFindsNothing(t *gotest.T) {
+	t.When("--only names a package or position the stream does not hold, or --match or --only is given with --static", func(w *gotest.T) {
+		w.It("refuses with exit 2 and says what it did not find", func(it *gotest.T) {
+			for sub, r := range gotest.Each(it, []struct {
+				Desc   string
+				args   []string
+				stderr string
+			}{
+				{Desc: "a position", args: []string{"--only=example.com/hiding:0.5", hidingStream}, stderr: "FAIL: --only: no node at 0.5 in example.com/hiding"},
+				{Desc: "a package", args: []string{"--only=example.com/other", hidingStream}, stderr: "--only: no package example.com/other"},
+				{Desc: "a position that is no number", args: []string{"--only=example.com/hiding:a", hidingStream}, stderr: "is not a position"},
+				{Desc: "--match under --static", args: []string{"--static", "--match=x", "../testdata/declared/"}, stderr: "--static has none"},
+			}) {
+				run := spec(sub, 2, r.args...)
+				gotest.Empty(sub, strings.TrimSpace(run.Stdout))
+				gotest.Contains(sub, run.Stderr, r.stderr)
+			}
+		})
+	})
+}

@@ -90,6 +90,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 	for _, o := range opts {
 		o(&cfg)
 	}
+	packages, _ = cfg.narrow(packages)
 	stats := cfg.stats(packages)
 
 	root := jsonRoot{
