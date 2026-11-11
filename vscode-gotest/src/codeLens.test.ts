@@ -288,3 +288,79 @@ describe("Promote CodeLens", () => {
     expect(await promoteLenses()).toEqual(["⚠ Promote 1 crasher"]);
   });
 });
+
+describe("CodeLens on an external twin", () => {
+  let dir = "";
+
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("aims each lens at its own twin's item", async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "gotest-lens-"));
+    const flags = {
+      parallel: false,
+      focused: false,
+      excluded: false,
+      col: 1,
+    };
+    const suite = (file: string, external: boolean, testName?: string) => ({
+      name: "RepoTestSuite",
+      parallel: false,
+      focused: false,
+      excluded: false,
+      guarded: false,
+      external,
+      file,
+      line: 5,
+      col: 6,
+      lifecycle: [],
+      fixtures: [],
+      methods: [{ ...flags, file, name: "TestCreate", testName, line: 8 }],
+      benchmarks: [],
+      fuzzers: [],
+    });
+    const cache = new DiscoveryCache();
+    cache.update(
+      [
+        {
+          importPath: "example.com/repo",
+          dir,
+          suites: [
+            suite("a_test.go", false),
+            suite("b_test.go", true, "TestCreate#01"),
+          ],
+        } as never,
+      ],
+      true,
+      dir,
+    );
+    const provider = new GoTestCodeLensProvider(cache);
+    const lensesFor = async (file: string) =>
+      (
+        await provider.provideCodeLenses(
+          {
+            fileName: path.join(dir, file),
+            getText: () => "package repo\n",
+            lineCount: 30,
+            offsetAt: () => 0,
+          } as never,
+          {} as never,
+        )
+      )
+        .filter(
+          (l) =>
+            l.command!.title === "▶ Run" || l.command!.title === "▶ Run Suite",
+        )
+        .map((l) => l.command!.arguments![0]);
+
+    expect(await lensesFor("a_test.go")).toEqual([
+      "example.com/repo/RepoTestSuite",
+      "example.com/repo/RepoTestSuite/TestCreate",
+    ]);
+    expect(await lensesFor("b_test.go")).toEqual([
+      "example.com/repo/RepoTestSuite~external",
+      "example.com/repo/RepoTestSuite~external/TestCreate#01",
+    ]);
+  });
+});

@@ -30,6 +30,28 @@ export interface DiscoverPackage {
 // lose the external copy's results.
 export const EXTERNAL_ID = "~external";
 
+// suiteItemId is a suite's Test Explorer id. Only an external twin — one with
+// a same-named internal suite beside it — carries the marker; a lone external
+// suite has nothing to collide with.
+export function suiteItemId(
+  importPath: string,
+  suite: { name: string; external?: boolean },
+  suites: readonly { name: string; external?: boolean }[],
+): string {
+  const twin =
+    !!suite.external &&
+    suites.some((s) => !s.external && s.name === suite.name);
+  return `${importPath}/${suite.name}${twin ? EXTERNAL_ID : ""}`;
+}
+
+// methodItemId is a method's id under its suite's: the name go test gives it.
+export function methodItemId(
+  suiteId: string,
+  method: { name: string; testName?: string },
+): string {
+  return `${suiteId}/${method.testName ?? method.name}`;
+}
+
 export interface DiscoverSuite {
   name: string;
   // Declared in the package's external (_test) test files.

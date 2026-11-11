@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
-import { EXTERNAL_ID, type DiscoverBehavior } from "./types.js";
+import {
+  EXTERNAL_ID,
+  methodItemId,
+  suiteItemId,
+  type DiscoverBehavior,
+} from "./types.js";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import { TestResultStore, type TestResult } from "./testResultStore.js";
@@ -411,12 +416,8 @@ export class GoTestController implements vscode.Disposable {
     const seenSuiteIds = new Set<string>();
 
     for (const suite of pkg.suites) {
-      // Only a twin needs the marker: a lone external suite has no
-      // same-named internal one to collide with.
-      const isTwin =
-        !!suite.external &&
-        pkg.suites.some((s) => !s.external && s.name === suite.name);
-      const suiteId = `${importPath}/${suite.name}${isTwin ? EXTERNAL_ID : ""}`;
+      const suiteId = suiteItemId(importPath, suite, pkg.suites);
+      const isTwin = suiteId.endsWith(EXTERNAL_ID);
       seenSuiteIds.add(suiteId);
 
       const suiteUri = vscode.Uri.file(path.join(pkg.dir, suite.file));
@@ -445,7 +446,7 @@ export class GoTestController implements vscode.Disposable {
       const seenMethodIds = new Set<string>();
 
       for (const method of suite.methods) {
-        const methodId = `${suiteId}/${method.testName ?? method.name}`;
+        const methodId = methodItemId(suiteId, method);
         seenMethodIds.add(methodId);
 
         const methodUri = vscode.Uri.file(path.join(pkg.dir, method.file));
