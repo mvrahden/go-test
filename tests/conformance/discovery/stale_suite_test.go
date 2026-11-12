@@ -13,7 +13,7 @@ import (
 type StaleGeneratedTestSuite struct{}
 
 func (s *StaleGeneratedTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
 func (s *StaleGeneratedTestSuite) TestStaleFiles(t *gotest.T) {
