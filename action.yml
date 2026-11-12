@@ -96,12 +96,24 @@ runs:
       if: ${{ inputs.version == 'gomod' }}
       shell: bash
       run: |
-        # Bare `go run <pkg>` fails on a tidy consumer (the CLI's own deps are
-        # pruned from go.sum); -mod=mod lets this throwaway checkout add them,
-        # except in workspace mode, where the flag is rejected and the
-        # workspace go.sum is the union of its modules'.
+        # The CLI is built once, from the module go.mod selects. Without a
+        # declared tool its dependencies are resolved in a copy of go.mod, so
+        # the checkout's go.sum stays as committed; workspace mode refuses
+        # -modfile and needs neither flag.
         pkg=github.com/mvrahden/go-test/cmd/gotest
         notice="::notice title=gotest::go.mod does not declare the gotest tool; declare it with: go get -tool $pkg@<pinned version>"
+        bin="${RUNNER_TEMP}/gotest-bin"
+        exe="$bin/gotest"
+        if [ "$RUNNER_OS" = "Windows" ]; then exe="$exe.exe"; fi
+        mkdir -p "$bin"
+        build() {
+          mkdir -p "$bin"
+          if ! go build "$@" -o "$exe" "$pkg"; then
+            echo "::error title=gotest::could not build $pkg as go.mod selects it; run go mod tidy, or declare the tool with: go get -tool $pkg@<pinned version>"
+            exit 2
+          fi
+          echo "GOTEST_BIN=$exe" >> "$GITHUB_ENV"
+        }
         # Read from go.mod, of every use module in a workspace: the go tool
         # listing differs between Go releases.
         declared=
@@ -110,13 +122,15 @@ runs:
           case "$json" in *"\"Path\": \"$pkg\""*) declared=1 ;; esac
         done < <(go list -m -f '{{.GoMod}}' 2>/dev/null)
         if [ -n "$declared" ]; then
-          echo "GOTEST_CMD=go tool $pkg" >> "$GITHUB_ENV"
+          build
         elif [ -n "$(go env GOWORK)" ]; then
           go list -m 2>/dev/null | grep -qx github.com/mvrahden/go-test || echo "$notice"
-          echo "GOTEST_CMD=go run $pkg" >> "$GITHUB_ENV"
+          build
         else
           echo "$notice"
-          echo "GOTEST_CMD=go run -mod=mod $pkg" >> "$GITHUB_ENV"
+          cp go.mod "$bin/go.mod"
+          if [ -f go.sum ]; then cp go.sum "$bin/go.sum"; fi
+          build -mod=mod -modfile="$bin/go.mod"
         fi
 
     - name: Run tests
@@ -136,7 +150,7 @@ runs:
         if [ "$INPUT_VERSION" != "gomod" ]; then
           cmd=(gotest)
         else
-          read -ra cmd <<< "$GOTEST_CMD"
+          cmd=("$GOTEST_BIN")
         fi
 
         args=(summary --github)
@@ -361,7 +375,7 @@ runs:
         if [ "$INPUT_VERSION" != "gomod" ]; then
           cmd=(gotest)
         else
-          read -ra cmd <<< "$GOTEST_CMD"
+          cmd=("$GOTEST_BIN")
         fi
 
         # gotest bench writes its own markdown to $GITHUB_STEP_SUMMARY
@@ -463,7 +477,7 @@ runs:
         if [ "$INPUT_VERSION" != "gomod" ]; then
           cmd=(gotest)
         else
-          read -ra cmd <<< "$GOTEST_CMD"
+          cmd=("$GOTEST_BIN")
         fi
 
         # gotest fuzz writes its own session table to $GITHUB_STEP_SUMMARY.
