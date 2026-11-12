@@ -14,11 +14,11 @@
 Specification-driven test suites for Go with isolation and parallelism as first-class citizens.
 
 Write test suites as Go structs.
-`gotest` generates the lifecycle wiring, `t.Run` nesting, and process isolation that you'd write by hand.
-What runs is standard `go test`.
+`gotest` generates the test functions that hand them to its runtime, and runs each suite in a process of its own.
+The compiler, the `testing` package and the output are `go test`'s; the runner is `gotest`.
 What you read back is a behavioral specification.
 
-No third-party runtime dependencies. No reflection in discovery or registration. Pure code generation.
+The code your tests link imports only the standard library. Suites are found and registered by code generation, never by reflection.
 
 ## Install
 
@@ -124,28 +124,28 @@ Test output is standard — but the mechanism behind it isn't.
 **gotest** takes a different approach:
 
 - **Specification-driven.** BDD vocabulary (`When`/`It`) structures tests as readable behavioral contracts. `gotest spec` renders them as documentation — in the terminal, as markdown, or as structured JSON. Always in sync, never stale.
-- **Isolated by default.** Each suite runs in its own process. Each test gets fresh state through lifecycle hooks. Shared mutable state between tests isn't a discipline problem — it's structurally impossible.
-- **Safely parallel.** Suite-level parallelism is automatic. Method-level is opt-in. Because isolation is built in, parallel tests can't interfere with each other.
+- **Isolated by default.** Each suite runs in its own process, so suites share no memory, no package-level state and no `init` side effects. Within a suite the methods share one struct value: `BeforeEach` gives each method fresh state, and a field one method writes is there for the next unless a hook resets it.
+- **Parallel on two levels.** Suites run in parallel automatically, as separate processes. Methods run in parallel when the suite opts in, and each then gets its own state from a `BeforeEach` that returns it. The generator refuses a parallel suite whose `BeforeEach` returns nothing; it cannot see a method that writes a suite field, so run parallel suites under `-race`.
 
-Under the hood, `gotest` generates the same `t.Run`, `t.Cleanup`, and `defer` code you'd write by hand.
-Generated files never touch your source tree — they're created hidden before tests run and cleaned up after.
+Under the hood, `gotest` generates one `func Test<Suite>(t *testing.T)` per suite: a table of the suite's hooks and methods, handed to the `pkg/gotestruntime` library, which runs each method as a subtest, keeps setup and teardown in order and holds the timeouts.
+Generated files never touch your source tree: they reach the compiler through a build overlay and are removed after the run.
 
 gotest's own behavioral promises are stated once in [`specs/`](specs/README.md), each scenario bound to a test; this README explains them and links there.
 
 ## How It Works
 
 ```
-you write:          gotest generates:         go test runs:
-                    (hidden, auto-cleaned)
+you write:          gotest generates:              gotest runs:
+                    (in a build overlay)
 
-MySuite struct      gotest_psuite_test.go     func TestMySuite(t *testing.T)
-  BeforeAll()   →     lifecycle wiring    →     t.Cleanup(AfterAll)
-  TestFoo()           t.Run nesting              BeforeAll()
-  AfterAll()          process isolation          t.Run("TestFoo", ...)
+MySuite struct      gotest_psuite_test.go          one process per suite:
+  BeforeAll()   →     func TestMySuite(t)      →     BeforeAll()
+  TestFoo()             OpenSuite(hooks)             t.Run("TestFoo", ...)
+  AfterAll()            RunMethods(methods)          AfterAll()
 ```
 
-The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `t.Parallel`.
-No reflection or interface dispatch in the generated wiring.
+The generated file is short: a wrapper type and one call each to `gotestruntime.OpenSuite` and `gotestruntime.RunMethods`, with your hooks and methods passed as plain function values. `gotest generate ./...` writes it to disk when you want to read it.
+Suites are found by reading the source, and the generated code calls your methods directly: no reflection finds or dispatches a test. Assertions such as `Equal` use `reflect` to compare values.
 
 ## Specification
 
@@ -344,7 +344,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 ```
 
 Fixtures support the same lifecycle hook names as suites — with `(ctx context.Context) error` signatures instead of `*gotest.T`.
-`BeforeAll`/`AfterAll` run once around all suites bound to the fixture.
+`BeforeAll`/`AfterAll` run once for each suite that binds the fixture, around that suite's own `BeforeAll` and `AfterAll`.
 `BeforeEach`/`AfterEach` wrap every individual test case, running outside the suite's own hooks:
 
 ```
@@ -582,7 +582,7 @@ func (s *Suite) TestParsing(t *gotest.T) {
 }
 ```
 
-Each entry becomes a subtest.
+Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Testing a Callback
@@ -642,11 +642,13 @@ Update all snapshots with:
 gotest --update-snapshots ./...
 ```
 
-Or when running `go test` directly:
+For snapshots taken in plain `func Test*` tests, which run under `go test`:
 
 ```bash
 GOTEST_UPDATE_SNAPSHOTS=1 go test ./...
 ```
+
+Suites do not run under `go test`, so this command leaves their snapshots as they are.
 
 ## Benchmarking
 
@@ -708,10 +710,14 @@ gotest bench --spec ./examples/notification -benchtime=10x
 ```
 
 ```
+=== examples/notification ===
+
 BenchmarkNotificationDispatchBench
   ✓ Dispatch  810.6 ns/op · 596 B/op · 2 allocs/op
 
-1 suite, 1 benchmark: 
+Runs from 2026-11-12 14:14 to 14:14 UTC · main @ 380769e1
+
+1 suite, 1 benchmark
 ```
 
 Each line reports `ns/op`, `B/op`, and `allocs/op` — the same numbers `go test -bench` prints, rendered as a spec.
@@ -924,7 +930,7 @@ Its README records a real crash-to-regression-test cycle — the fuzzer finding 
 
 ## Configuration
 
-Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
+Every fixture and suite runs with defaults: a fixture's setup has two minutes, and a test's `t.Context()` ends after 30 seconds. A default only ends the context; a test is failed for overrunning only a `Timeout` its suite declares ([A context the default deadline ended](specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended)).
 Override with optional marker methods:
 
 ```go
@@ -1057,7 +1063,7 @@ gotest watch ./... -v
 gotest watch ./... --spec     # watch + spec view
 ```
 
-Only the affected package is re-run.
+The changed package and the packages that depend on it are re-run.
 Combine with `F_` prefix for a tight feedback loop — only focused tests run on each save.
 
 ### Scaffold
@@ -1258,7 +1264,7 @@ To feed a JUnit consumer, run the tests through a converter that reads the event
 | `F_` prefix | Focus (run only this) |
 | `X_` prefix | Exclude (skip this) |
 | `SuiteGuard()` method | Runtime-conditional suite skipping |
-| `*Fixture` suffix | Package-scoped fixture |
+| `*Fixture` suffix | Package fixture: one instance for each suite that binds it |
 | `*SharedFixture` suffix | Cross-package shared fixture |
 | `FixtureConfig()` method | Fixture timeout/retry config |
 | `SharedFixtureConfig()` method | Shared fixture timeout/retry config |
