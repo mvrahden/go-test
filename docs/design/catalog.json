@@ -24621,6 +24621,67 @@
               "name": "TestAssertionsWithAnExactGotestForm",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 631,
+                      "name": "the_summary_counts_the_assertions_that_now_stop_the_test_and_the_stdlib_tests_left,_and_lists_the_id_that_changed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a migration with none of these prints no such section",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 663,
+                      "name": "a_migration_with_none_of_these_prints_no_such_section",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 630,
+                  "name": "migrate_converts_a_suite_with_soft_assertions,_under_a_runner_of_another_name,_beside_a_plain_testify_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatMigrateDidNotKeep",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 629,
+              "name": "TestWhatMigrateDidNotKeep",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "MigrateVerdicts",
@@ -27046,7 +27107,7 @@
     }
   ],
   "stats": {
-    "behaviors": 785,
+    "behaviors": 787,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

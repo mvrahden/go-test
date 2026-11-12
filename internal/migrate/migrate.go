@@ -154,6 +154,15 @@ type MigrateResult struct {
 	// Helper marks a base suite no suite.Run ran, migrated as a helper
 	// type the suites embedding it call: gotest does not run it.
 	Helper bool
+	// Soft counts the file's assertions that let a test go on after
+	// failing (s.X, s.Assert().X, assert.X) and now stop it.
+	Soft int
+	// StdlibTests counts the stdlib tests left in the file, which gotest
+	// does not run.
+	StdlibTests int
+	// OldID and NewID are the go test id of the suite before and after,
+	// set where they differ.
+	OldID, NewID string
 }
 
 // DeriveNewName computes the new suite name from an old one, exported:
@@ -501,24 +510,75 @@ func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int
 		if s.file != uf || !s.migrated() {
 			continue
 		}
-		results = append(results, MigrateResult{
+		r := MigrateResult{
 			File:    shown,
 			OldName: s.obj.Name(),
 			NewName: s.newName,
 			Markers: markers,
 			Helper:  s.helper,
-		})
+		}
+		if id := "Test" + s.newName; s.runner != "" && s.runner != id {
+			r.OldID, r.NewID = s.runner, id
+		}
+		results = append(results, r)
 		markers = 0 // the file's markers are counted once, on its first suite
+	}
+	stdlib := 0
+	if u.anyMigrated() {
+		stdlib = stdlibTests(uf.f)
 	}
 	switch {
 	case len(results) > 0:
+		results[0].Soft, results[0].StdlibTests = uf.soft, stdlib
 		return results
+	case stdlib > 0 && !changed && markers == 0:
+		return []MigrateResult{{File: shown, StdlibTests: stdlib}}
 	case changed:
-		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true}}
+		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true, Soft: uf.soft, StdlibTests: stdlib}}
 	case markers > 0:
-		return []MigrateResult{{File: shown, Markers: markers}}
+		return []MigrateResult{{File: shown, Markers: markers, StdlibTests: stdlib}}
 	}
 	return nil
+}
+
+// anyMigrated reports whether a suite of the unit migrates.
+func (u *unit) anyMigrated() bool {
+	for _, s := range u.suites {
+		if s.migrated() {
+			return true
+		}
+	}
+	return false
+}
+
+// stdlibTests counts f's top-level tests go test runs and gotest does not:
+// func TestX(t *testing.T), TestMain apart.
+func stdlibTests(f *ast.File) int {
+	n := 0
+	for _, decl := range f.Decls {
+		fd, ok := decl.(*ast.FuncDecl)
+		if !ok || fd.Recv != nil || fd.Name.Name == "TestMain" || !strings.HasPrefix(fd.Name.Name, "Test") {
+			continue
+		}
+		if rest := strings.TrimPrefix(fd.Name.Name, "Test"); rest != "" && unicode.IsLower([]rune(rest)[0]) {
+			continue
+		}
+		params := fd.Type.Params.List
+		if len(params) != 1 || len(params[0].Names) > 1 || fd.Type.Results != nil {
+			continue
+		}
+		if star, ok := params[0].Type.(*ast.StarExpr); ok {
+			if sel, ok := star.X.(*ast.SelectorExpr); ok && sel.Sel.Name == "T" && isIdent(sel.X, "testing") {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func isIdent(e ast.Expr, name string) bool {
+	id, ok := e.(*ast.Ident)
+	return ok && id.Name == name
 }
 
 // leftoverResults reports the markers an earlier run left in files with

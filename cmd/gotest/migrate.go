@@ -47,11 +47,16 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if opts.DryRun {
 		verb = "Would migrate"
 	}
-	markers, suites := 0, 0
-	var lines, refused, leftover, uncompiled, unplaced, generated []string
+	markers, suites, soft, stdlib := 0, 0, 0, 0
+	var lines, refused, leftover, uncompiled, unplaced, generated, ids []string
 	for i := range results {
 		r := &results[i]
 		markers += r.Markers
+		soft += r.Soft
+		stdlib += r.StdlibTests
+		if r.OldID != "" {
+			ids = append(ids, "    "+r.OldID+" → "+r.NewID)
+		}
 		switch {
 		case len(r.Uncompiled) > 0:
 			uncompiled = append(uncompiled, "  "+r.File+":")
@@ -68,6 +73,8 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 			refused = append(refused, fmt.Sprintf("  %s: %s", r.File, r.Refusal))
 		case r.RefsOnly:
 			lines = append(lines, fmt.Sprintf("  %s: updated for suites other files declare", r.File))
+		case r.OldName == "" && r.Markers == 0:
+			// Counts only, summed above.
 		case r.OldName == "":
 			// No suite left to convert; only an earlier run's markers.
 			leftover = append(leftover, fmt.Sprintf("  %s: %d marker%s", r.File, r.Markers, plural(r.Markers)))
@@ -110,6 +117,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if markers > 0 {
 		fmt.Printf("%d TODO(gotest-migrate) marker%s left; resolve them by hand\n", markers, plural(markers))
 	}
+	printNotKept(soft, stdlib, ids)
 	switch {
 	case len(uncompiled) > 0:
 		return 2
@@ -134,4 +142,23 @@ func holdSignals(write func() error) error {
 	signal.Notify(held, shutdownSignals...)
 	defer signal.Stop(held)
 	return write()
+}
+
+// printNotKept prints what a migration did not keep, each line only where
+// it has something to say.
+func printNotKept(soft, stdlib int, ids []string) {
+	if soft == 0 && stdlib == 0 && len(ids) == 0 {
+		return
+	}
+	fmt.Println("Not kept, check by hand:")
+	if soft > 0 {
+		fmt.Printf("  assertions that let a test go on after failing and now stop it (s.X, s.Assert().X, assert.X): %d\n", soft)
+	}
+	if stdlib > 0 {
+		fmt.Printf("  stdlib tests left as they are, which gotest does not run (go test still does): %d\n", stdlib)
+	}
+	if len(ids) > 0 {
+		fmt.Println("  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:")
+		printLines(ids)
+	}
 }

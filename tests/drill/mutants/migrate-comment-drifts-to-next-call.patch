@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/migrate MigrateVerdicts / CommentsTrailingConvertedC
 Clause: when line comments trail assertions migrate converts and an s.Run call it turns into t.It → each comment stays at the end of its own statement
 --- a/internal/migrate/transform.go
 +++ b/internal/migrate/transform.go
-@@ -664,7 +664,7 @@
- 		return nil
+@@ -677,7 +677,7 @@
+ 		}
  	}
  	return &ast.CallExpr{
 -		Fun:      anchor(fun, call.Pos()),

@@ -26,8 +26,11 @@ func (u *unit) transformFile(f *ast.File) bool {
 	// The runners gotest generates instead, judged before the rewrites.
 	runners := map[*ast.FuncDecl]bool{}
 	for _, decl := range f.Decls {
-		if fd, ok := decl.(*ast.FuncDecl); ok && u.runnerSuite(fd) != nil {
-			runners[fd] = true
+		if fd, ok := decl.(*ast.FuncDecl); ok {
+			if s := u.runnerSuite(fd); s != nil {
+				runners[fd] = true
+				s.runner = fd.Name.Name
+			}
 		}
 	}
 	changed := u.derefPtrEmbeds(f)
@@ -626,12 +629,14 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 		return nil
 	}
 	args := call.Args
+	soft := true // testify's assert went on after a failure; require stopped
 	switch x := sel.X.(type) {
 	case *ast.CallExpr:
 		inner, ok := x.Fun.(*ast.SelectorExpr)
 		if !ok || !r.isSuiteVar(inner.X, []*ast.Ident{recv}) || (inner.Sel.Name != "Require" && inner.Sel.Name != "Assert") {
 			return nil
 		}
+		soft = inner.Sel.Name == "Assert"
 	case *ast.Ident:
 		switch {
 		case r.u.isPkg(x, assertPkg, requirePkg):
@@ -639,6 +644,7 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 				return nil
 			}
 			args = args[1:]
+			soft = r.u.isPkg(x, assertPkg)
 		case r.isSuiteVar(x, []*ast.Ident{recv}):
 			// The suite's own assertion methods, promoted from the
 			// *assert.Assertions suite.Suite embeds.
@@ -662,6 +668,13 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 	fun, err := parser.ParseExpr("gotest." + name)
 	if err != nil {
 		return nil
+	}
+	if soft {
+		for _, uf := range r.u.files {
+			if uf.f == r.f {
+				uf.soft++
+			}
+		}
 	}
 	return &ast.CallExpr{
 		Fun:      anchor(fun, call.Pos()),

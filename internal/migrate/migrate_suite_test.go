@@ -598,7 +598,7 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 
 		w.It("migrates the child and reports the base as a helper", func(it *gotest.T) {
 			gotest.Len(it, run.results, 2)
-			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true}, run.results[0])
+			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true, Soft: 1}, run.results[0])
 			gotest.Equal(it, "OrderTestSuite", run.results[1].NewName)
 			gotest.Zero(it, run.markers())
 		})

@@ -785,6 +785,8 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-comment-drifts-to-next-call` | the converted assertion's callee keeps the positions of the source it was parsed from | conformance: the migrate It for trailing comments finds `// one` inside the next call |
 | `migrate-exact-forms-unmapped` | `WithinDuration` is left unmapped | conformance: the migrate It for exact gotest forms sees exit 1 and a marker |
 | `migrate-positive-float-translated` | `Positive` on a float is translated into `Greater` against 0 | conformance: the migrate It for the forms left unconverted finds no marker on `s.Positive(f)` |
+| `migrate-summary-silent` | migrate prints no closing summary of what it did not keep | conformance: the migrate It for the closing summary finds no `Not kept` section |
+| `migrate-summary-always` | the `Not kept` header is printed with nothing under it | conformance: the migrate It for a migration with nothing to say finds the header |
 | `e2e-bench-note-dropped` | a test run drops the note on the benchmarks it left out | conformance: the CLI It for a package that declares a benchmark sees no note on stderr |
 | `e2e-excluded-suite-passes` | an X_ suite is booked as passed, not skipped | conformance: the discovery It for an X_ suite sees it not reported skipped |
 | `e2e-discover-when-kind-misnamed` | discover reports a When's kind as it | conformance: the discovery It for a When with Its sees the wrong kind |

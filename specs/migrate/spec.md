@@ -47,7 +47,7 @@ Migrate SHALL leave a suite's file unconverted under a marker giving the reason 
 - **THEN** migrate exits 2 naming the base's package and writes nothing
 
 ### Requirement: Kept verdicts
-Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way.
+Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way. An assertion that let the test go on after failing is translated into gotest's, which stops it, and counted in the closing summary.
 
 #### Scenario: An assertion on a goroutine
 - **WHEN** an assertion runs on a goroutine a go statement starts
@@ -155,3 +155,11 @@ Migrate SHALL keep a comment that trails a statement at the end of that statemen
 #### Scenario: Comments trailing converted calls
 - **WHEN** line comments trail assertions migrate converts and an s.Run call it turns into t.It
 - **THEN** each comment stays at the end of its own statement
+
+### Requirement: The closing summary
+After it migrates a suite, migrate SHALL say on stdout what it did not keep: the number of assertions that let a test go on after failing and now stop it, the number of stdlib tests it left in the migrated files, which gotest does not run, and each go test id that changed beside its new id. It SHALL print none of this where there is none.
+
+#### Scenario: What migrate did not keep
+- **WHEN** migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test
+- **THEN** the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed
+- **AND** a migration with none of these prints no such section

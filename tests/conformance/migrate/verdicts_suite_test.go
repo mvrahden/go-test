@@ -625,3 +625,61 @@ func (s *MigrateVerdictsTestSuite) TestAssertionsWithAnExactGotestForm(t *gotest
 		})
 	})
 }
+
+func (s *MigrateVerdictsTestSuite) TestWhatMigrateDidNotKeep(t *gotest.T) {
+	t.When("migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test", func(w *gotest.T) {
+		w.It("the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed", func(it *gotest.T) {
+			dir := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(dir, map[string]string{"p/a_test.go": `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type HooksSuite struct{ suite.Suite }
+
+func (s *HooksSuite) TestA() {
+	s.Equal(1, 1)
+	s.Assert().True(true)
+	s.Require().True(true)
+}
+
+func TestHooks(t *testing.T) { suite.Run(t, new(HooksSuite)) }
+
+func TestPlain(t *testing.T) { require.True(t, true) }
+`}))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.Contains(it, mig.Stdout, "Not kept, check by hand:\n"+
+				"  assertions that let a test go on after failing and now stop it (s.X, s.Assert().X, assert.X): 2\n"+
+				"  stdlib tests left as they are, which gotest does not run (go test still does): 1\n"+
+				"  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:\n"+
+				"    TestHooks → TestHooksTestSuite\n")
+		})
+		w.It("a migration with none of these prints no such section", func(it *gotest.T) {
+			dir := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(dir, map[string]string{"p/a_test.go": `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type VSuite struct{ suite.Suite }
+
+func (s *VSuite) TestA() { s.Require().True(true) }
+
+func TestVTestSuite(t *testing.T) { suite.Run(t, new(VSuite)) }
+`}))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.NotContains(it, mig.Stdout, "Not kept")
+		})
+	})
+}
