@@ -301,7 +301,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
 | `go-goexit-unexplained` | a goroutine that left through `runtime.Goexit` with no verdict fails the method without saying why | canary: no failure of the goroutines fixture names the Goexit |
 | `go-skip-reported-as-a-failure` | a goroutine that skipped the test fails the method at the wait | canary: the goroutines fixture's skipping method fails |
-| `go-wait-outside-the-method-timeout` | the method's watch ends before its cleanups, so the wait on a `gotest.Go` goroutine is held to no `Timeout` | lifecycle holds suite: the lingering goroutine's method passes |
+| `go-wait-outside-the-method-timeout` | the wait on a `gotest.Go` goroutine among the method's cleanups is held to no `Timeout` | lifecycle holds suite: the lingering goroutine's method passes |
+| `method-cleanups-held-to-the-timeout` | the method's watch runs through all its cleanups, so a helper's slow cleanup fails it, named as a `gotest.Go` wait | lifecycle holds suite: the slow-cleanup method fails |
 | `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |

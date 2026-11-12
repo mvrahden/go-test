@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/runstate"
+	"github.com/mvrahden/go-test/internal/setupwaits"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -27,6 +28,7 @@ type method struct {
 	mu      sync.Mutex
 	watch   *phaseWatch // the watch running now, nil when none
 	expired bool        // the deadline has passed
+	judged  atomic.Bool // the watch failed the method for an overrun
 }
 
 // phaseWatch is one run of a method's watch: done ends it, stopped closes
@@ -34,11 +36,11 @@ type method struct {
 type phaseWatch struct{ done, stopped chan struct{} }
 
 // openMethod builds the T of the method it runs and, with a positive budget,
-// starts its watch, which ends after the method's cleanups; end names the
-// phase that follows the hooks and the body. The T's context ends at
-// timeout, or at the budget when there is one: then only after the watch has
-// judged an overrun, so a hook waiting on that context is still waiting, and
-// located, when the verdict is written.
+// starts its watch; end stops it after the hooks and the body, and from then
+// on only the waits on the method's gotest.Go goroutines restart it. The T's
+// context ends at timeout, or at the budget when there is one: then only
+// after the watch has judged an overrun, so a hook waiting on that context is
+// still waiting, and located, when the verdict is written.
 func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end func()) {
 	if budget <= 0 {
 		m = &method{it: it, t: TestT(it, timeout)}
@@ -62,28 +64,47 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 	m.enter("")
 	// Watching before the timer starts: the deadline then always finds the
 	// watch that judges it.
-	m.watchOn()
+	m.startWatch()
 	timer := time.AfterFunc(budget, m.deadlinePassed)
-	// The watch ends here, not in end: registered ahead of the method's own
-	// cleanups, this runs after them, so the waits on its gotest.Go
-	// goroutines are held to the budget too.
+	// Registered ahead of the method's own cleanups, this runs after them:
+	// until then the waits on its gotest.Go goroutines are held to the budget.
 	it.Cleanup(func() {
+		setupwaits.Unhold(it)
 		afterTs.Delete(m.t)
 		m.watchOff()
 		timer.Stop()
 		stop()
 		cancel()
 	})
-	return m, func() { m.enter("cleanup (the wait on a goroutine started with gotest.Go) ") }
+	return m, func() {
+		m.watchOff()
+		m.enter("cleanup (the wait on a goroutine started with gotest.Go) ")
+		setupwaits.Hold(it, m.holdWait)
+	}
 }
 
-// watchOn starts the method's watch unless one runs or the deadline has
-// passed, which leaves nothing to hold the method to.
-func (m *method) watchOn() {
+// holdWait holds the wait on a gotest.Go goroutine, running until done
+// closes, to the budget: one the deadline passed while it ran fails the
+// method, unless an overrun failed it already.
+func (m *method) holdWait(done <-chan struct{}) (release func()) {
+	select {
+	case <-done:
+		return func() {}
+	default:
+	}
+	if m.judged.Load() || !m.startWatch() {
+		return func() {}
+	}
+	return m.watchOff
+}
+
+// startWatch starts the method's watch unless one runs, and reports whether
+// it did.
+func (m *method) startWatch() bool {
 	m.mu.Lock()
-	if m.watch != nil || m.expired {
+	if m.watch != nil {
 		m.mu.Unlock()
-		return
+		return false
 	}
 	w := &phaseWatch{done: make(chan struct{}), stopped: make(chan struct{})}
 	m.watch = w
@@ -93,10 +114,12 @@ func (m *method) watchOn() {
 	go func() {
 		defer close(w.stopped)
 		if watchDeadline(m.it, m.gid, m.budget, m.phaseName, "Timeout", m.due, w.done) {
+			m.judged.Store(true)
 			m.ctx.end(context.DeadlineExceeded)
 			m.after.end(context.DeadlineExceeded)
 		}
 	}()
+	return true
 }
 
 // watchOff ends the watch running now, if any. Only the method's goroutine

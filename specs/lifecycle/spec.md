@@ -74,7 +74,7 @@ Every row of an Each table SHALL be its own subtest with its own verdict; a row 
 - **THEN** stops at the break and the method goes on
 
 ### Requirement: Goroutines started by gotest.Go
-A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at the wait, a skip there SHALL skip the method at the wait, and a goroutine that leaves through runtime.Goexit with neither SHALL fail the method with a message that says so; the wait SHALL be held to the method's declared Timeout.
+A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at the wait, a skip there SHALL skip the method at the wait, and a goroutine that leaves through runtime.Goexit with neither SHALL fail the method with a message that says so; the wait SHALL be held to the method's declared Timeout, and no other cleanup of the method SHALL be.
 
 #### Scenario: A goroutine fails a fatal assertion
 - **WHEN** a goroutine started by gotest.Go fails a fatal assertion
@@ -91,6 +91,10 @@ A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at t
 #### Scenario: A goroutine outlasts the method's Timeout
 - **WHEN** a goroutine a method started with gotest.Go is still running when the method's declared Timeout passes
 - **THEN** fails the method with a verdict naming the wait and its Timeout
+
+#### Scenario: Another cleanup outlasts the method's Timeout
+- **WHEN** a cleanup a method's helper registered on its testing.T runs past the method's declared Timeout
+- **THEN** the method passes
 
 ### Requirement: Goroutines BeforeAll starts
 A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived from it, SHALL be waited for after AfterAll, as SHALL one it starts while that wait runs; the wait SHALL cover every goroutine before the fixture is released, even when the last one fails or panics, and SHALL be held to a declared SetupTimeout. The cases of the last goroutine are the table in `tests/conformance/lifecycle/goroutines_suite_test.go`.

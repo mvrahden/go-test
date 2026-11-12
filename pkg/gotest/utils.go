@@ -218,6 +218,10 @@ func Go(t *T, fn func()) (wait func()) {
 			return
 		}
 		waited = true
+		// Among a method's cleanups only this wait is held to its Timeout.
+		if hold := setupwaits.Held(tb); hold != nil {
+			defer hold(done)()
+		}
 		<-done
 		if captured != nil {
 			panic(captured)

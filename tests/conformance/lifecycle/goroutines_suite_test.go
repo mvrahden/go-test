@@ -48,6 +48,11 @@ func (s *GoroutinesTestSuite) TestWaits(t *gotest.T) {
 			gotest.Contains(it, run.Stdout, "cleanup (the wait on a goroutine started with gotest.Go) exceeded its configured Timeout of 200ms")
 		})
 	})
+	t.When("a cleanup a method's helper registered on its testing.T runs past the method's declared Timeout", func(w *gotest.T) {
+		w.It("the method passes", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestSlowCleanupTestSuite/TestSlowCleanup"), "stdout: %s", run.Stdout)
+		})
+	})
 }
 
 type lastGoroutineRow struct {

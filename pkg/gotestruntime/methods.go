@@ -90,7 +90,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				skipStopping(it)
 			}
 			// The budget covers the fixture hooks, the suite hooks, the body and
-			// the method's cleanups, where a gotest.Go goroutine is waited for.
+			// the waits on the method's gotest.Go goroutines among its cleanups.
 			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
 			defer end()
 			for _, f := range m.Fixtures {

@@ -178,6 +178,12 @@ func (s *HoldsTestSuite) TestAGoWaitIsHeldToTheMethodsTimeout(t *gotest.T) {
 	gotest.Equal(t, 1, code, out)
 }
 
+func (s *HoldsTestSuite) TestAHelpersCleanupIsNotHeldToTheMethodsTimeout(t *gotest.T) {
+	code, out := s.edges(t, nil, "-run", "TestSlowCleanupTestSuite")
+	gotest.NotContains(t, out, "exceeded its configured Timeout", "a helper's cleanup was held to the method's Timeout")
+	gotest.Equal(t, 0, code, out)
+}
+
 func (s *HoldsTestSuite) TestAnAfterAllLeavingThroughGoexitFailsTheSuite(t *gotest.T) {
 	code, out := s.edges(t, nil, "-run", "TestGoexitAfterAllTestSuite")
 	gotest.Equal(t, 1, code, "an AfterAll that left through runtime.Goexit passed:\n%s", out)

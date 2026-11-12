@@ -5,7 +5,7 @@ Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or ove
 +++ b/pkg/gotestruntime/methods.go
 @@ -92,7 +92,6 @@
  			// The budget covers the fixture hooks, the suite hooks, the body and
- 			// the method's cleanups, where a gotest.Go goroutine is waited for.
+ 			// the waits on the method's gotest.Go goroutines among its cleanups.
  			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
 -			defer end()
  			for _, f := range m.Fixtures {
@@ -19,17 +19,3 @@ Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or ove
  			if mt.overran() {
  				return
  			}
---- a/pkg/gotestruntime/methodbudget.go
-+++ b/pkg/gotestruntime/methodbudget.go
-@@ -74,7 +74,10 @@
- 		stop()
- 		cancel()
- 	})
--	return m, func() { m.enter("cleanup (the wait on a goroutine started with gotest.Go) ") }
-+	return m, func() {
-+		m.watchOff()
-+		m.enter("cleanup (the wait on a goroutine started with gotest.Go) ")
-+	}
- }
- 
- // watchOn starts the method's watch unless one runs or the deadline has

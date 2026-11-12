@@ -20,6 +20,18 @@ func (s *LingerTestSuite) TestLingers(t *gotest.T) {
 	gotest.Go(t, func() { time.Sleep(time.Second) })
 }
 
+// SlowCleanupTestSuite's helper registers a cleanup that runs 500ms, past
+// the 300ms Timeout, as a container's terminate would.
+type SlowCleanupTestSuite struct{}
+
+func (s *SlowCleanupTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Timeout: 300 * time.Millisecond}
+}
+
+func (s *SlowCleanupTestSuite) TestSlowCleanup(t *gotest.T) {
+	t.T().Cleanup(func() { time.Sleep(500 * time.Millisecond) }) //nolint:suite-lifecycle // stands for a third-party helper's cleanup
+}
+
 // GoexitAfterAllTestSuite's AfterAll leaves through runtime.Goexit, as a
 // FailNow on some other testing.TB would make it.
 type GoexitAfterAllTestSuite struct{}
