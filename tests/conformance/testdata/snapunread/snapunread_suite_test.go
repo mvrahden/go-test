@@ -1,8 +1,13 @@
-// Package snapunread reads two of the three sections its committed baseline
-// holds: the third belongs to a test that is gone.
+// Package snapunread reads three of the four sections its committed baseline
+// holds, or two when SNAP_SKIP gates one method out: the fourth belongs to a
+// test that is gone.
 package snapunread
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"os"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type UnreadTestSuite struct{}
 
@@ -18,4 +23,12 @@ func (s *UnreadTestSuite) TestKept(t *gotest.T) {
 
 func (s *UnreadTestSuite) TestOther(t *gotest.T) {
 	gotest.MatchSnapshot(t, "other")
+}
+
+// TestGated skips itself under SNAP_SKIP, as an environment gate would.
+func (s *UnreadTestSuite) TestGated(t *gotest.T) {
+	if os.Getenv("SNAP_SKIP") != "" {
+		t.Skipf("gated")
+	}
+	gotest.MatchSnapshot(t, "gated")
 }

@@ -421,7 +421,7 @@ MatchSnapshot SHALL refuse a name that spans lines or spells a section header, b
 - **THEN** is refused before anything is written
 
 ### Requirement: Sections no test read
-When a suite ran whole and passed under GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS, MatchSnapshot SHALL name in one line the sections of the suite's snapshot file that no test of the run read, and SHALL leave the file and the verdict as they are. A run that -run narrows to a subtest, or -skip narrows at all, names none.
+When a suite ran whole and passed under GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS, MatchSnapshot SHALL name in one line the sections of the suite's snapshot file that no test of the run read, and SHALL leave the file and the verdict as they are. A run that -run narrows to a subtest, or -skip narrows at all, names none, and a section of a method that skipped itself is not unread.
 
 #### Scenario: A section whose test is gone
 - **WHEN** a suite that ran whole and passed under GOTEST_CI leaves a section of its snapshot file unread
@@ -430,3 +430,7 @@ When a suite ran whole and passed under GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS, Ma
 #### Scenario: A run narrowed to one method
 - **WHEN** -run names one method of the suite
 - **THEN** names no unread section
+
+#### Scenario: A method that skipped itself
+- **WHEN** a method of a suite that ran whole and passed under GOTEST_CI skips itself before it reads its section
+- **THEN** names the sections no test read but not that method's

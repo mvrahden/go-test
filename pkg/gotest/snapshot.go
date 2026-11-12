@@ -307,7 +307,7 @@ func unreadSections(suite string) []string {
 	claims.Range(func(k, v any) bool {
 		path := k.(string)
 		if base := filepath.Base(path); base == suite+".snap" || base == suite+"_ext.snap" {
-			if note := unreadIn(path, v.(map[string]bool)); note != "" {
+			if note := unreadIn(path, suite, v.(map[string]bool)); note != "" {
 				notes = append(notes, note)
 			}
 		}
@@ -318,8 +318,9 @@ func unreadSections(suite string) []string {
 }
 
 // unreadIn is the note on path's unclaimed sections, "" for none or a file
-// that cannot be read.
-func unreadIn(path string, claimed map[string]bool) string {
+// that cannot be read. A section of a test of suite that skipped is not
+// unread.
+func unreadIn(path, suite string, claimed map[string]bool) string {
 	mu := fileMutex(path)
 	mu.Lock()
 	defer mu.Unlock()
@@ -329,7 +330,7 @@ func unreadIn(path string, claimed map[string]bool) string {
 	}
 	var keys []string
 	for _, s := range snapfile.Parse(data) {
-		if !claimed[s.Key] {
+		if !claimed[s.Key] && !runstate.Skipped(testOf(suite, s.Key)) {
 			keys = append(keys, "["+s.Key+"]")
 		}
 	}
@@ -350,6 +351,16 @@ func unreadIn(path string, claimed map[string]bool) string {
 		}
 	}
 	return fmt.Sprintf("MatchSnapshot: %s holds %d %s no test of this run read: %s%s; delete them if their tests are gone", path, len(keys), noun, strings.Join(shown, ", "), more)
+}
+
+// testOf is the full name of the test of suite a section key belongs to: the
+// key's subtest path, which holds no space, before the snapshot's name.
+func testOf(suite, key string) string {
+	sub, _, _ := strings.Cut(key, " ")
+	if sub == "" || sub == "_" {
+		return suite
+	}
+	return suite + "/" + sub
 }
 
 func claimsOf(snapPath string) map[string]bool {

@@ -152,6 +152,15 @@ func (s *SnapshotKeysTestSuite) TestSectionsNoTestRead(t *gotest.T) {
 			gotest.NotContains(it, said(&run), "no test of this run read")
 		})
 	})
+	t.When("a method of a suite that ran whole and passed under GOTEST_CI skips itself before it reads its section", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"GOTEST_CI=1", "SNAP_SKIP=1"}, "../testdata/snapunread/")
+		gotest.NoError(w, err)
+		w.It("names the sections no test read but not that method's", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "skip", run.Verdict("TestUnreadTestSuite/TestGated"))
+			gotest.Contains(it, said(&run), "TestUnreadTestSuite.snap holds 1 section no test of this run read: [TestGone];")
+		})
+	})
 }
 
 // readFile reads a file of a staged fixture, failing t when it cannot.

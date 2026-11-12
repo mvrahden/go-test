@@ -1,9 +1,14 @@
 package edges
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"os"
 
-// UnreadTestSuite reads two of the three sections its baseline holds: the
-// third belongs to a test that is gone.
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
+
+// UnreadTestSuite reads three of the four sections its baseline holds, or
+// two when SNAP_SKIP gates one method out: the fourth belongs to a test that
+// is gone.
 type UnreadTestSuite struct{}
 
 func (s *UnreadTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -18,4 +23,12 @@ func (s *UnreadTestSuite) TestKept(t *gotest.T) {
 
 func (s *UnreadTestSuite) TestOther(t *gotest.T) {
 	gotest.MatchSnapshot(t, "other")
+}
+
+// TestGated skips itself under SNAP_SKIP, as an environment gate would.
+func (s *UnreadTestSuite) TestGated(t *gotest.T) {
+	if os.Getenv("SNAP_SKIP") != "" {
+		t.Skipf("gated")
+	}
+	gotest.MatchSnapshot(t, "gated")
 }

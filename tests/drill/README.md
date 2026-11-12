@@ -491,6 +491,7 @@ shards of one run do not add up to every mutant exactly once.
 | `snapshot-dir-from-file-only` | the snapshot dir is always beside the caller's file path | canary: under `-trimpath` the `snapshotting` baselines are not found |
 | `snapshot-ext-from-file-only` | the `_ext` suffix comes from opening the caller's file alone | canary: under `-trimpath` the `snapshotting` baselines are not found |
 | `snapshot-poll-recorder-unnamed` | a poll's recorder carries no test name, so a snapshot taken in a poll is filed under `unknown` | ring-0 snapshot internals suite |
+| `snapshot-skipped-method-section-unread` | a method that skipped itself is not recorded, so its section is named unread | lifecycle holds suite: the gated method's section is named |
 | `snapshot-unread-sections-unnamed` | a section no test of the run read is never named | ring-0 snapshot internals suite |
 | `snapshot-unread-named-in-a-narrowed-run` | a run that `-run` narrows to one method names the sections of the others as unread | lifecycle: the narrowed edges run names an unread section |
 | `snapshot-keys-strip-twin-suffix` | a snapshot key drops testing's `#01` and `#0` | canary: twins and unnamed rows share one baseline and the second fails |

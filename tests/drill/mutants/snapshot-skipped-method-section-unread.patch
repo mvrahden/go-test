@@ -1,0 +1,14 @@
+Expect: a skipped method's section was named unread
+Judge: ./tests/lifecycle HoldsTestSuite/TestASkippedMethodsSectionIsNotUnread
+Clause: when a method of a suite that ran whole and passed under GOTEST_CI skips itself before it reads its section → names the sections no test read but not that method's
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -75,7 +75,7 @@
+ 		passed := t.Run(c.Name, func(it *testing.T) {
+ 			// What a skipped method would have read is not unread.
+ 			it.Cleanup(func() {
+-				if it.Skipped() {
++				if false {
+ 					runstate.MarkSkipped(it.Name())
+ 				}
+ 			})

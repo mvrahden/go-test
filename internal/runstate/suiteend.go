@@ -1,6 +1,9 @@
 package runstate
 
-import "sync"
+import (
+	"strings"
+	"sync"
+)
 
 // What other packages have to say when a suite ran whole and passed.
 var (
@@ -14,6 +17,26 @@ func AtSuiteEnd(fn func(suite string) (notes []string)) {
 	suiteEndMu.Lock()
 	defer suiteEndMu.Unlock()
 	suiteEnd = append(suiteEnd, fn)
+}
+
+// skipped holds the tests that skipped, by full name.
+var skipped sync.Map // string -> struct{}
+
+// MarkSkipped records that test, by its full name, skipped.
+func MarkSkipped(test string) { skipped.Store(test, struct{}{}) }
+
+// Skipped reports whether test, or a test it runs under, skipped.
+func Skipped(test string) bool {
+	for {
+		if _, ok := skipped.Load(test); ok {
+			return true
+		}
+		i := strings.LastIndexByte(test, '/')
+		if i < 0 {
+			return false
+		}
+		test = test[:i]
+	}
 }
 
 // SuiteEnded returns every registered function's notes on suite, in the

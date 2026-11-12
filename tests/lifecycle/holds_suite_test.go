@@ -199,6 +199,12 @@ func (s *HoldsTestSuite) TestANarrowedRunNamesNoUnreadSection(t *gotest.T) {
 	gotest.Contains(t, out, "TestUnreadTestSuite.snap holds 1 section no test of this run read: [TestGone]")
 }
 
+func (s *HoldsTestSuite) TestASkippedMethodsSectionIsNotUnread(t *gotest.T) {
+	code, out := s.edges(t, []string{"GOTEST_CI=1", "SNAP_SKIP=1"}, "-run", "TestUnreadTestSuite")
+	gotest.Equal(t, 0, code, out)
+	gotest.Contains(t, out, "TestUnreadTestSuite.snap holds 1 section no test of this run read: [TestGone]", "a skipped method's section was named unread")
+}
+
 func (s *HoldsTestSuite) TestAFixtureSetupFailureIsNotLocatedInTheRuntime(t *gotest.T) {
 	code, out := s.edges(t, []string{"EDGES_FAIL=setup"}, "-run", "TestBoundTestSuite")
 	gotest.Contains(t, out, "fixture setup: EdgeFixture.BeforeAll: the edge fixture would not come up")

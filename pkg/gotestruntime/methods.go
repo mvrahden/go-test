@@ -73,6 +73,12 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			continue
 		}
 		passed := t.Run(c.Name, func(it *testing.T) {
+			// What a skipped method would have read is not unread.
+			it.Cleanup(func() {
+				if it.Skipped() {
+					runstate.MarkSkipped(it.Name())
+				}
+			})
 			if m.Parallel {
 				it.Parallel()
 				// The first cleanup runs last: it sees the failures the others
