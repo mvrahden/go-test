@@ -8,7 +8,13 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { EXTERNAL_ID, methodItemId, type DiscoverPackage } from "./types.js";
+import {
+  EXTERNAL_ID,
+  externalInstance,
+  externalTwinNode,
+  methodItemId,
+  type DiscoverPackage,
+} from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -778,8 +784,12 @@ export interface SpecNode {
   focused: boolean;
   excluded: boolean;
   external: boolean;
-  // The run of its top-level name; 2 or more on an external twin's suite.
+  // The instance of its top-level name in the run, from 2 on.
   variant?: number;
+  // Which run of a repeated suite this is (-count); absent when it ran once
+  // and from an older CLI's document.
+  run?: number;
+  runs?: number;
   // The own level go test reported, when it is not name: a twin's
   // TestCreate#01.
   reported?: string;
@@ -1153,7 +1163,7 @@ function nodeCtx(env: RenderEnv, pkg: SpecPackage): NodeCtx {
 export function itemIdOf(
   pkgPath: string,
   parentId: string | null | undefined,
-  node: Pick<SpecNode, "name" | "reported" | "external" | "variant">,
+  node: Pick<SpecNode, "name" | "reported" | "external" | "variant" | "run">,
 ): string | undefined {
   if (parentId === undefined) return undefined;
   if (parentId !== null) {
@@ -1162,8 +1172,15 @@ export function itemIdOf(
   if (!node.name.startsWith("Test") || node.name.startsWith("Test_")) {
     return undefined;
   }
-  const twin = node.external && (node.variant ?? 0) >= 2;
+  const twin = externalTwinNode(node);
   return `${pkgPath}/${node.name.slice(4)}${twin ? EXTERNAL_ID : ""}`;
+}
+
+// runTagHtml names which run of a repeated suite a node is, as the CLI's
+// own views do; a suite run once has none.
+function runTagHtml(node: SpecNode): string {
+  if (!node.runs || !node.run) return "";
+  return ` <span class="tag run">RUN ${node.run} OF ${node.runs}</span>`;
 }
 
 // nearestItemId is id itself when the tree has it, else its closest
@@ -1258,6 +1275,7 @@ function buildLeafHtml(
   const id = node.kind === "fixture" ? undefined : base;
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
+  suffix += runTagHtml(node);
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded || node.status === "skip") suffix += " — SKIPPED";
   // A declared behavior the run did not report took no time.
@@ -1303,6 +1321,7 @@ function buildBranchHtml(
 
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
+  suffix += runTagHtml(node);
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
   else if (node.excluded) suffix += ` <span class="tag skipped">SKIPPED</span>`;
 
@@ -1411,16 +1430,15 @@ export function declaredTests(
   if (pkg.broken) return undefined;
   const suites = pkg.suites ?? [];
   const hasSuite = (name: string) => suites.some((s) => s.name === name);
-  // The suites a row of this instance belongs to: with both twins declared,
-  // go alternates their runs (internal, external, ...), as the router reads
-  // them; a lone suite takes every instance.
+  // The suites a row of this instance belongs to, read as the router reads
+  // the stream; a lone suite takes every instance.
   const suitesOf = (name: string, instance: number) => {
     const named = suites.filter((s) => s.name === name);
     const twins =
       named.some((s) => s.external) && named.some((s) => !s.external);
-    return twins
-      ? named.filter((s) => !!s.external === (instance % 2 === 0))
-      : named;
+    if (!twins) return named;
+    const external = externalInstance(instance, true);
+    return named.filter((s) => !!s.external === external);
   };
   const hasMethod = (name: string, instance: number, method: string) =>
     suitesOf(name, instance).some((s) =>
@@ -1688,6 +1706,7 @@ summary.node.block { color: var(--vscode-terminal-ansiYellow); }
 .tag.focused { color: var(--vscode-testing-iconSkipped); }
 .tag.skipped { color: var(--vscode-testing-iconSkipped); }
 .tag.external { color: var(--vscode-descriptionForeground); }
+.tag.run { color: var(--vscode-descriptionForeground); }
 .tag.fuzz { color: var(--vscode-textLink-foreground); }
 .tag.none { color: var(--vscode-descriptionForeground); }
 .leaf.none { color: var(--vscode-descriptionForeground); }

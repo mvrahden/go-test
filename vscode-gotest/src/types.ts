@@ -50,6 +50,28 @@ export function suiteItemId(
   return `${importPath}/${suite.name}${twin ? EXTERNAL_ID : ""}`;
 }
 
+// externalInstance reads instance n of a top-level name in a go test stream:
+// go runs the list once per -count, a twin pair internal then external, so
+// with both twins declared an even instance is the external one, else every
+// instance is a later run of the one suite. A stream carries no spec
+// document; the declared twin stands in for the CLI's reading of it.
+export function externalInstance(n: number, twins: boolean): boolean {
+  return twins && n % 2 === 0;
+}
+
+// externalTwinNode says whether a top-level node of the CLI's spec document
+// is an external twin's run, not a lone external suite's. Under -count the
+// document numbers runs (run, runs): a twin pair has two instances per run,
+// a lone suite one. An older CLI's document has no run: its second instance
+// is read as the twin.
+export function externalTwinNode(node: {
+  external: boolean;
+  variant?: number;
+  run?: number;
+}): boolean {
+  return node.external && (node.variant ?? 0) > Math.max(node.run ?? 1, 1);
+}
+
 // methodItemId is a method's id under its suite's: the name go test gives it.
 export function methodItemId(
   suiteId: string,

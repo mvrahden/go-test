@@ -522,6 +522,76 @@ describe("an external twin's rows", () => {
   });
 });
 
+describe("repeated runs of a suite", () => {
+  const suiteNode = (extra: Partial<Node>) =>
+    node("TestCartTestSuite", "pass", [node("TestAdd", "pass")], extra);
+  const shown = (nodes: Node[]) => {
+    const html = body([
+      { path: "example.com/cart", status: "pass", duration: 0, nodes },
+    ]);
+    return [
+      ...html.matchAll(
+        /<summary class="node suite" data-id="([^"]+)"[^>]*>(.*?)<\/summary>/g,
+      ),
+    ].map((m) => ({
+      id: m[1],
+      external: m[2].includes("EXT."),
+      run: /RUN (\d+ OF \d+)/.exec(m[2])?.[1],
+    }));
+  };
+  const suite = "example.com/cart/CartTestSuite";
+  const twin = `${suite}~external`;
+
+  it("shows a second run as run 2 of 2 of the same item", () => {
+    expect(
+      shown([
+        suiteNode({ run: 1, runs: 2 }),
+        suiteNode({ variant: 2, run: 2, runs: 2 }),
+      ]),
+    ).toEqual([
+      { id: suite, external: false, run: "1 OF 2" },
+      { id: suite, external: false, run: "2 OF 2" },
+    ]);
+  });
+
+  it("shows both twins with their runs under -count=2", () => {
+    expect(
+      shown([
+        suiteNode({ run: 1, runs: 2 }),
+        suiteNode({ external: true, variant: 2, run: 1, runs: 2 }),
+        suiteNode({ variant: 3, run: 2, runs: 2 }),
+        suiteNode({ external: true, variant: 4, run: 2, runs: 2 }),
+      ]),
+    ).toEqual([
+      { id: suite, external: false, run: "1 OF 2" },
+      { id: twin, external: true, run: "1 OF 2" },
+      { id: suite, external: false, run: "2 OF 2" },
+      { id: twin, external: true, run: "2 OF 2" },
+    ]);
+  });
+
+  it("keeps a lone external suite's second run on its own item", () => {
+    // --declared marks it external from the source; it has no twin.
+    expect(
+      itemIdOf("p", null, {
+        name: "TestLoneTestSuite",
+        external: true,
+        variant: 2,
+        run: 2,
+      }),
+    ).toBe("p/LoneTestSuite");
+  });
+
+  it("reads an older CLI's document, without run or runs, as before", () => {
+    expect(
+      shown([suiteNode({}), suiteNode({ external: true, variant: 2 })]),
+    ).toEqual([
+      { id: suite, external: false, run: undefined },
+      { id: twin, external: true, run: undefined },
+    ]);
+  });
+});
+
 describe("nearestItemId", () => {
   it("falls back to the closest ancestor the tree holds", () => {
     const tree = new Set(["p/S", "p/S/TestM"]);
