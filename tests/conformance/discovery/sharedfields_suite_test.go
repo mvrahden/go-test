@@ -20,6 +20,10 @@ func (s *SharedFieldsTestSuite) TestEmbeddedFields(t *gotest.T) {
 			checkShape(it, shape{pkg: "sharedembed", exit: 2,
 				shows: `fixture\.go:10:2: shared fixture "StateSharedFixture" embeds Info, whose exported fields are not transferred to the suites; hold it in a named field \(Info Info\), or assign it in Hydrate`})
 		})
+		w.It("one of an unexported type is refused, told to hold it in an exported field of an exported type or assign it in Hydrate", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharedembedunexp", exit: 2,
+				shows: `fixture\.go:10:2: shared fixture "StateSharedFixture" embeds info, whose exported fields are not transferred to the suites; hold it in an exported field of an exported type, or assign it in Hydrate`})
+		})
 		w.It("one without exported fields and one Hydrate assigns are left out, and the suite runs with its state", func(it *gotest.T) {
 			checkShape(it, shape{pkg: "sharedembedok", verdict: "TestStateTestSuite/TestState"})
 		})

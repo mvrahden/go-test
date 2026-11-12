@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / one marked X_ is not refused \(
+Clause: when a test file declares a generic suite → one marked X_ is not refused
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -159,7 +159,7 @@
+ 		return genericOrphan{}, false
+ 	}
+ 	// an excluded suite says itself that it never runs
+-	if strings.HasPrefix(ts.Name.Name, protocol.PrefixExcluded) {
++	if false && strings.HasPrefix(ts.Name.Name, protocol.PrefixExcluded) {
+ 		return genericOrphan{}, false
+ 	}
+ 	obj, ok := pkg.TypesInfo.Defs[ts.Name].(*types.TypeName)

@@ -179,7 +179,7 @@ A generated file left on disk by an earlier generate SHALL neither break nor be 
 - **THEN** --tags= selects the files built with that tag
 
 ### Requirement: Cases no run reaches
-A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it or converts a value of the type to an interface holding it: one error per type, at its first such method, naming the suite suffix. A generic suite in a _test.go file SHALL be refused at its declaration unless a suite alias instantiates it. A type in a non-test file SHALL be left alone.
+A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it or converts a value of the type to an interface holding it: one error per type, at its first such method, naming the suite suffix. A generic suite in a _test.go file, X_ aside, SHALL be refused at its declaration unless a suite alias instantiates it. A type in a non-test file SHALL be left alone.
 
 #### Scenario: Case-named methods on a type that is no suite
 - **WHEN** a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite
@@ -197,6 +197,7 @@ A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a
 - **WHEN** a test file declares a generic suite
 - **THEN** one no alias instantiates is refused at its declaration, told to declare an alias
 - **AND** one an alias instantiates runs
+- **AND** one marked X_ is not refused
 
 ### Requirement: Callers the build leaves out
 A test file of the package that the build constraints leave out of the run SHALL count as a caller for the refusal of cases no run reaches: a case-named method whose name such a file selects, and a generic suite such a file names, SHALL NOT be refused, with the tag off or on. A helper that no file names, constrained or not, SHALL still be refused.
@@ -239,6 +240,7 @@ gotest SHALL refuse with exit 2, at the field and naming the way out, a shared f
 #### Scenario: A shared fixture embeds a type
 - **WHEN** a shared fixture embeds a type
 - **THEN** one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate
+- **AND** one of an unexported type is refused, told to hold it in an exported field of an exported type or assign it in Hydrate
 - **AND** one without exported fields and one Hydrate assigns are left out, and the suite runs with its state
 
 #### Scenario: Hydrate assigns an embedded struct's fields

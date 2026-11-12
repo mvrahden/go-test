@@ -25,7 +25,7 @@ func EmbeddedFieldError(fixture string, f *types.Var, hydrated map[string]bool, 
 		if types.IsInterface(embedded) {
 			return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, an interface the state cannot carry, so the suites read nil; assign it in Hydrate", fixture, typ))
 		}
-		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose value is not transferred to the suites; hold it in a named field (%s %s), or assign it in Hydrate", fixture, typ, f.Name(), typ))
+		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose value is not transferred to the suites; hold it in %s, or assign it in Hydrate", fixture, typ, namedFieldAdvice(f, typ)))
 	}
 	fields := promotedExported(f.Type(), hydrated, map[types.Type]bool{})
 	var missing []string
@@ -39,9 +39,19 @@ func EmbeddedFieldError(fixture string, f *types.Var, hydrated map[string]bool, 
 	}
 	typ := types.TypeString(f.Type(), types.RelativeTo(in))
 	if len(missing) < len(fields) {
-		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields %s are neither transferred to the suites nor assigned in Hydrate; hold it in a named field (%s %s), or assign them in Hydrate", fixture, typ, joinAnd(missing), f.Name(), typ))
+		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields %s are neither transferred to the suites nor assigned in Hydrate; hold it in %s, or assign them in Hydrate", fixture, typ, joinAnd(missing), namedFieldAdvice(f, typ)))
 	}
-	return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields are not transferred to the suites; hold it in a named field (%s %s), or assign it in Hydrate", fixture, typ, f.Name(), typ))
+	return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields are not transferred to the suites; hold it in %s, or assign it in Hydrate", fixture, typ, namedFieldAdvice(f, typ)))
+}
+
+// namedFieldAdvice names the field that would carry an embedded type: a
+// field named after it, or, for an unexported type, whose field of that
+// name would not be transferred either, an exported field of an exported type.
+func namedFieldAdvice(f *types.Var, typ string) string {
+	if !f.Exported() {
+		return "an exported field of an exported type"
+	}
+	return fmt.Sprintf("a named field (%s %s)", f.Name(), typ)
 }
 
 // derefOnce is t through an alias and one pointer.

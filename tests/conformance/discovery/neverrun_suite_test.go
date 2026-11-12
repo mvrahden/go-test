@@ -57,6 +57,9 @@ func (s *NeverRunTestSuite) TestGenericSuites(t *gotest.T) {
 		w.It("one an alias instantiates runs", func(it *gotest.T) {
 			checkShape(it, shape{pkg: "aliasalias", verdict: "TestIntTestSuite/TestZero"})
 		})
+		w.It("one marked X_ is not refused", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "orphangenericx", verdict: "TestRealTestSuite/TestRuns"})
+		})
 	})
 }
 

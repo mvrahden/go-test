@@ -158,6 +158,10 @@ func uninstantiated(gd *ast.GenDecl, pkg *packages.Package, suiteKeys map[string
 	if !ok || ts.TypeParams == nil || ts.TypeParams.NumFields() == 0 || !IS_TEST_SUITE.MatchString(ts.Name.Name) {
 		return genericOrphan{}, false
 	}
+	// an excluded suite says itself that it never runs
+	if strings.HasPrefix(ts.Name.Name, protocol.PrefixExcluded) {
+		return genericOrphan{}, false
+	}
 	obj, ok := pkg.TypesInfo.Defs[ts.Name].(*types.TypeName)
 	if !ok {
 		return genericOrphan{}, false
