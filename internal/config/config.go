@@ -50,6 +50,9 @@ type ProjectConfig struct {
 type LintConfig struct {
 	// Skip lists lint rule names to disable (e.g. "stdlib-test", "testify").
 	Skip []string `yaml:"skip"`
+	// NolintAllow lists the names a //nolint directive may carry without
+	// lint reporting them as unknown.
+	NolintAllow []string `yaml:"nolint-allow"`
 }
 
 // BenchConfig controls default baseline comparison settings for
@@ -165,5 +168,47 @@ func parse(path string) (ProjectConfig, error) {
 		}
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
+	if err := checkStringLists(data); err != nil {
+		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+	}
 	return cfg, nil
+}
+
+// checkStringLists refuses a list element that is not a string: YAML
+// decodes a number or a boolean into a string field without a word.
+func checkStringLists(data []byte) error {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil || len(root.Content) == 0 {
+		return err
+	}
+	list := lookup(root.Content[0], "lint", "nolint-allow")
+	if list == nil || list.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for _, el := range list.Content {
+		if el.Kind != yaml.ScalarNode || el.Tag != "!!str" {
+			return fmt.Errorf("line %d: lint.nolint-allow: %q is not a string", el.Line, el.Value)
+		}
+	}
+	return nil
+}
+
+// lookup follows keys through nested mappings; nil when one is missing.
+func lookup(n *yaml.Node, keys ...string) *yaml.Node {
+	for _, key := range keys {
+		if n.Kind != yaml.MappingNode {
+			return nil
+		}
+		var next *yaml.Node
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == key {
+				next = n.Content[i+1]
+			}
+		}
+		if next == nil {
+			return nil
+		}
+		n = next
+	}
+	return n
 }
