@@ -139,6 +139,15 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **THEN** refuses it with exit 2 before anything is built, saying gotest compiles its harness through an overlay of its own
 - **AND** still compiles its harness when GOFLAGS carries an -overlay
 
+#### Scenario: A build-only mode or the fuzz engine
+- **WHEN** -c, -n or -fuzz is given to a run
+- **THEN** refuses each with exit 2, naming what does that job instead
+
+#### Scenario: A profile flag over several suite processes
+- **WHEN** -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes
+- **THEN** refuses it with exit 2, naming the flag and how many processes would write its file
+- **AND** a run of one suite writes the profile
+
 ### Requirement: Flags for the test binary
 A flag only the test binary declares SHALL reach the binary after -- or -args. Every word after -args SHALL reach the binary as written: gotest reads none of them as a flag of its own, as a go test flag or as a package. After a bare -- gotest SHALL read no flag of its own, while go test flags and packages still count. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
 

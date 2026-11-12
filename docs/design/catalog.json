@@ -5571,6 +5571,159 @@
               "name": "TestAUserOverlay",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "-c is refused with what builds a binary",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "goflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 72,
+                          "name": "-c_is_refused_with_what_builds_a_binary",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-n is refused with what keeps the work dir",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "goflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 73,
+                          "name": "-n_is_refused_with_what_keeps_the_work_dir",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-fuzz is refused with the command that fuzzes",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "goflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 74,
+                          "name": "-fuzz_is_refused_with_the_command_that_fuzzes",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "refuses each with exit 2, naming what does that job instead",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "goflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 70,
+                      "name": "refuses_each_with_exit_2,_naming_what_does_that_job_instead",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -c, -n or -fuzz is given to a run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "goflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 69,
+                  "name": "-c,_-n_or_-fuzz_is_given_to_a_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABuildOnlyModeOrTheFuzzEngine",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "goflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 68,
+              "name": "TestABuildOnlyModeOrTheFuzzEngine",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refuses it with exit 2, naming the flag and how many processes would write its file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "goflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 92,
+                      "name": "refuses_it_with_exit_2,_naming_the_flag_and_how_many_processes_would_write_its_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run of one suite writes the profile",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "goflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 96,
+                      "name": "a_run_of_one_suite_writes_the_profile",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "goflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 91,
+                  "name": "-cpuprofile,_-memprofile,_-blockprofile,_-mutexprofile_or_-trace_is_given_to_a_run_that_starts_two_suite_processes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AProfileFlagOverSeveralSuiteProcesses",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "goflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 85,
+              "name": "TestAProfileFlagOverSeveralSuiteProcesses",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIGoTestFlags",
@@ -28535,7 +28688,7 @@
     }
   ],
   "stats": {
-    "behaviors": 826,
+    "behaviors": 831,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

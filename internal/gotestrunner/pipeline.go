@@ -315,6 +315,11 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	if cfg.Bench {
 		return runBench(ctx, cfg, overlay, pf)
 	}
+	if name := sharedProfileFlag(pf.RunFlags); name != "" {
+		if n := plannedSuiteCount(planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)); n > 1 {
+			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
+		}
+	}
 	return runStreaming(ctx, cfg, overlay, pf)
 }
 

@@ -82,3 +82,18 @@ func (s *OwnedGoTestFlagsTestSuite) TestUserParallelKeepsTheBudget(t *gotest.T) 
 		})
 	})
 }
+
+func (s *OwnedGoTestFlagsTestSuite) TestAProfileFlagNamesOneFile(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc  string
+		flags []string
+		want  string
+	}{
+		{"joined", []string{"-v", "-cpuprofile=cpu.out"}, "-cpuprofile"},
+		{"separate", []string{"-trace", "t.out"}, "-trace"},
+		{"a coverage profile is merged, not shared", []string{"-coverprofile=c.out"}, ""},
+		{"after -args it is the binary's", []string{"-args", "-cpuprofile=x"}, ""},
+	}) {
+		gotest.Equal(sub, tc.want, gotestrunner.ExportSharedProfileFlag(tc.flags))
+	}
+}

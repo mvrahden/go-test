@@ -394,3 +394,6 @@ func ExportOnConverterStart(seen func(*os.Process)) (restore func()) {
 	converterStarted = seen
 	return func() { converterStarted = prev }
 }
+
+// profileflags.go
+var ExportSharedProfileFlag = sharedProfileFlag

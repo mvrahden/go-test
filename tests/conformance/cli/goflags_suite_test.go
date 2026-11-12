@@ -64,3 +64,39 @@ func (s *CLIGoTestFlagsTestSuite) TestAUserOverlay(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIGoTestFlagsTestSuite) TestABuildOnlyModeOrTheFuzzEngine(t *gotest.T) {
+	t.When("-c, -n or -fuzz is given to a run", func(w *gotest.T) {
+		w.It("refuses each with exit 2, naming what does that job instead", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "-c is refused with what builds a binary", args: []string{"-c", "../testdata/passing/"}, exit: 2, stderrHas: "-c is not supported"},
+				{Desc: "-n is refused with what keeps the work dir", args: []string{"-n", "../testdata/passing/"}, exit: 2, stderrHas: "-n is not supported"},
+				{Desc: "-fuzz is refused with the command that fuzzes", args: []string{"-fuzz=FuzzX", "../testdata/passing/"}, exit: 2, stderrHas: "-fuzz is not a run flag"},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, row.stderrHas)
+			}
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestAProfileFlagOverSeveralSuiteProcesses(t *gotest.T) {
+	dir := t.TempDir()
+	two, err := testkit.RunCLI(t.Context(), ".", "-cpuprofile", filepath.Join(dir, "two.out"), "../testdata/passing/", "../testdata/covered/")
+	gotest.NoError(t, err)
+	one, err := testkit.RunCLI(t.Context(), ".", "-cpuprofile", filepath.Join(dir, "one.out"), "../testdata/passing/")
+	gotest.NoError(t, err)
+	t.When("-cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes", func(w *gotest.T) {
+		w.It("refuses it with exit 2, naming the flag and how many processes would write its file", func(it *gotest.T) {
+			gotest.Equal(it, 2, two.Exit, "stdout: %s\nstderr: %s", two.Stdout, two.Stderr)
+			gotest.Contains(it, two.Stderr, "FAIL: -cpuprofile writes one file, and this run starts 2 suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'")
+		})
+		w.It("a run of one suite writes the profile", func(it *gotest.T) {
+			gotest.Equal(it, 0, one.Exit, "stdout: %s\nstderr: %s", one.Stdout, one.Stderr)
+			_, statErr := os.Stat(filepath.Join(dir, "one.out"))
+			gotest.NoError(it, statErr)
+		})
+	})
+}

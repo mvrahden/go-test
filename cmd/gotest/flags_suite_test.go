@@ -743,3 +743,25 @@ func (s *FlagParsingTestSuite) TestAUserOverlay(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FlagParsingTestSuite) TestModesARunDoesNotHave(t *gotest.T) {
+	cfg := &config.ProjectConfig{}
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		err  string
+	}{
+		{Desc: "-c", args: []string{"-c", "./p"}, err: "-c is not supported: gotest builds and runs each suite's binary itself; gotest generate writes the harness for a go test -c of your own"},
+		{Desc: "-n", args: []string{"-n", "./p"}, err: "-n is not supported: gotest has no dry run; --debug keeps the generated sources and the work dir of a real one"},
+		{Desc: "-fuzz", args: []string{"-fuzz=FuzzX", "./p"}, err: "-fuzz is not a run flag: gotest fuzz --target=<FuzzSuite_Method> fuzzes a target, and a run replays its seeds"},
+		{Desc: "-c after -args", args: []string{"./p", "-args", "-c"}, err: ""},
+		{Desc: "-count is no -c", args: []string{"-count=2", "./p"}, err: ""},
+	}) {
+		_, err := ExportParseExecFlags(nil, tc.args, cfg)
+		if tc.err != "" {
+			gotest.ErrorContains(sub, err, tc.err)
+		} else {
+			gotest.NoError(sub, err)
+		}
+	}
+}

@@ -9,6 +9,6 @@ Clause: when -overlay is given to a run → refuses it with exit 2 before anythi
 -	if hasFlag(goTestArgs, "-overlay") {
 -		return ExecConfig{}, fmt.Errorf("-overlay is not supported: gotest compiles its generated harness through an overlay of its own, and the go command reads only one; put the replacement files in the tree, or run with --debug to inspect the overlay gotest writes")
 -	}
- 	patterns, err := ExtractPackagePatterns(goTestArgs)
- 	if err != nil {
- 		return ExecConfig{}, err
+ 	if hasFlag(goTestArgs, "-c") {
+ 		return ExecConfig{}, fmt.Errorf("-c is not supported: gotest builds and runs each suite's binary itself; gotest generate writes the harness for a go test -c of your own")
+ 	}

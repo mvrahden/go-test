@@ -462,6 +462,9 @@ shards of one run do not add up to every mutant exactly once.
 | `args-words-read-by-gotest` | `-json` after `-args` is stripped and read as gotest's own | CLI conformance: the run streams JSON and the binary never sees `-json` |
 | `user-overlay-accepted` | a user `-overlay` reaches the build and replaces the generated harness | CLI conformance: the run exits 0 with no tests to run |
 | `goflags-overlay-refused` | an `-overlay` in `GOFLAGS` is refused as if given on the command line | CLI conformance: the run exits 2 instead of running the suite |
+| `profile-file-shared-by-suite-processes` | a profile flag reaches every suite process of a run, each writing the one file | CLI conformance: the two-package run exits 0 |
+| `profile-flag-refused-for-one-suite` | a profile flag is refused even when the run starts one suite process | CLI conformance: the one-suite run exits 2 |
+| `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | fixtures conformance: the fixture of a suite -skip names whole still starts |

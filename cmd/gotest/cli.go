@@ -321,6 +321,15 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	if hasFlag(goTestArgs, "-overlay") {
 		return ExecConfig{}, fmt.Errorf("-overlay is not supported: gotest compiles its generated harness through an overlay of its own, and the go command reads only one; put the replacement files in the tree, or run with --debug to inspect the overlay gotest writes")
 	}
+	if hasFlag(goTestArgs, "-c") {
+		return ExecConfig{}, fmt.Errorf("-c is not supported: gotest builds and runs each suite's binary itself; gotest generate writes the harness for a go test -c of your own")
+	}
+	if hasFlag(goTestArgs, "-n") {
+		return ExecConfig{}, fmt.Errorf("-n is not supported: gotest has no dry run; --debug keeps the generated sources and the work dir of a real one")
+	}
+	if hasFlag(goTestArgs, "-fuzz") {
+		return ExecConfig{}, fmt.Errorf("-fuzz is not a run flag: gotest fuzz --target=<FuzzSuite_Method> fuzzes a target, and a run replays its seeds")
+	}
 	patterns, err := ExtractPackagePatterns(goTestArgs)
 	if err != nil {
 		return ExecConfig{}, err
