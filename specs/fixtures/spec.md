@@ -287,6 +287,13 @@ The state a shared fixture's setup produces SHALL reach the suites that bind it 
 - **WHEN** every protocol fixture comes up despite its output
 - **THEN** the run passes
 
+### Requirement: A shared fixture is built with the run's build flags
+gotest SHALL build the shared fixture process with the build flags of the run, leaving out the flags only go test takes, so a shared fixture declared behind a build tag comes up when the run sets the tag. The cases are the table in `tests/conformance/fixtures/fixs_buildflags_suite_test.go`.
+
+#### Scenario: A shared fixture behind a build tag
+- **WHEN** a shared fixture is declared in a file behind a build tag and the run sets the tag
+- **THEN** the fixture comes up and the suite that binds it passes
+
 ### Requirement: A process a shared fixture's setup starts
 A process a shared fixture's setup starts SHALL get neither the protocol descriptor nor the variable naming it, and the run SHALL NOT wait for it, on Unix.
 

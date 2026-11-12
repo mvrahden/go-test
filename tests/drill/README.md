@@ -778,6 +778,7 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |
 | `e2e-assertion-line-left-to-testing` | testing's location for a failure points into gotest | canary: the trimpath helper check sees the failure not naming both lines |
 | `fixs-external-overlay-dropped` | the overlay leaves out the external test package's harness | fixtures conformance: the external test package's suite never runs |
+| `fixture-program-built-without-the-run-flags` | the shared fixture program is built without the run's build flags | conformance: a fixture behind a build tag does not come up |
 | `lcs-spec-ignores-the-interrupt` | `spec` runs without the shutdown handling | lifecycle conformance: an interrupted spec run does not exit 130 |
 | `lcs-failed-run-kills-the-shared-fixture` | a failed run kills the shared fixture process instead of releasing it | lifecycle conformance: the FailFast run never runs the shared fixture's AfterAll |
 | `lcs-stop-during-teardown-reads-as-interrupt` | the exit code reads the stop that arrived after the last verdict | lifecycle conformance: a green run interrupted during its teardown exits 130 |

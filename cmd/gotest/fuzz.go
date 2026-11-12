@@ -135,7 +135,7 @@ func runFuzz(inv Invocation) (code int) { //nolint:gocritic // hugeParam: stable
 
 	// Up before the budget starts, for the whole session: the --for deadline
 	// stops the targets, never the fixtures they read.
-	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, targets, cfg.SetupTimeout)
+	fixtures, err := gotestrunner.StartFuzzFixtures(ctx, overlay, targets, cfg.SetupTimeout, classified.BuildFlags...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 1

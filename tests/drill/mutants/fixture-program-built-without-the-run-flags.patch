@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/fixtures .* / the fixture comes up and the suite that binds it passes / the tag alone \(
+Clause: when a shared fixture is declared in a file behind a build tag and the run sets the tag → the fixture comes up and the suite that binds it passes
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -861,7 +861,6 @@
+ // flags without those only go test takes.
+ func setupBuildArgs(buildFlags []string, bin, src string) []string {
+ 	args := []string{"build", "-o", bin}
+-	args = append(args, StripNonLoadFlags(buildFlags)...)
+ 	return append(args, src)
+ }
+ 

@@ -62,7 +62,7 @@ func runPrepare(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	var setupProc *gotestrunner.SharedFixtureProcess
 	if len(overlay.SharedFixtures) > 0 {
-		setupProc, err = gotestrunner.StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, 0)
+		setupProc, err = gotestrunner.StartSharedFixtures(ctx, overlay.WorkDir, overlay.SharedFixtures, 0, buildFlags...)
 		if err != nil {
 			stop()
 			cleanup()

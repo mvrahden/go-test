@@ -10611,6 +10611,98 @@
                 {
                   "children": [
                     {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "the tag alone",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "fixs_buildflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 25,
+                          "name": "the_tag_alone",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the tag beside a flag only go test takes",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "fixs_buildflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 26,
+                          "name": "the_tag_beside_a_flag_only_go_test_takes",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "the fixture comes up and the suite that binds it passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixs_buildflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "the_fixture_comes_up_and_the_suite_that_binds_it_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture is declared in a file behind a build tag and the run sets the tag",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "fixs_buildflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 19,
+                  "name": "a_shared_fixture_is_declared_in_a_file_behind_a_build_tag_and_the_run_sets_the_tag",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFixtureBehindABuildTag",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "fixs_buildflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 18,
+              "name": "TestAFixtureBehindABuildTag",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureBuildFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "fixs_buildflags_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestFixtureBuildFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [],
                       "display": "runs no AfterAll for the fixture, and the dependency's AfterAll",
                       "duration": 0,
@@ -26026,13 +26118,13 @@
     }
   ],
   "stats": {
-    "behaviors": 751,
+    "behaviors": 753,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 109,
+    "suites": 110,
     "tests": 0
   }
 }

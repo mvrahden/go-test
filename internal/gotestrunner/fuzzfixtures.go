@@ -21,7 +21,7 @@ type FuzzFixtures struct {
 // waits for their setup; setupTimeout is as for a run, 0 the default. It
 // returns nil when no target binds one. A fixture that fails to come up gives
 // up the targets that read it, not the session: see Env.
-func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []FuzzTarget, setupTimeout time.Duration) (*FuzzFixtures, error) {
+func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []FuzzTarget, setupTimeout time.Duration, buildFlags ...string) (*FuzzFixtures, error) {
 	suites := map[string][]string{}
 	for i := range targets {
 		suites[targets[i].Package] = append(suites[targets[i].Package], "Test"+targets[i].Suite)
@@ -37,7 +37,7 @@ func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []Fu
 		}
 	}
 	setupTimeout = resolveSetupTimeout(setupTimeout)
-	proc, err := StartSharedFixtures(ctx, overlay.WorkDir, fixtures, setupTimeout)
+	proc, err := StartSharedFixtures(ctx, overlay.WorkDir, fixtures, setupTimeout, buildFlags...)
 	if err != nil {
 		return nil, fmt.Errorf("shared fixture setup failed: %w", err)
 	}

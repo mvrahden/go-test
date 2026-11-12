@@ -809,7 +809,8 @@ func exitVerdict(setupErr, tornErr, waitErr error, diedEarly bool) error {
 // individual Ready() channels (streaming) or call WaitAllReady (batch).
 // setupTimeout is stored as the initial teardownTimeout, which sets the
 // force-kill window until the process reports its own (see teardownBudget).
-func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
+// buildFlags are the run's build flags: the program is built as the suites are.
+func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration, buildFlags ...string) (*SharedFixtureProcess, error) {
 	src, err := gotestgen.GenerateSharedSetup(fixtures)
 	if err != nil {
 		return nil, fmt.Errorf("generate shared setup: %w", err)
@@ -830,7 +831,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 		setupBin += ".exe"
 	}
 	defer logSlowBuild(os.Stderr, "shared fixture setup binary", slowBuildThreshold())()
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", setupBin, setupFile)
+	buildCmd := exec.CommandContext(ctx, "go", setupBuildArgs(buildFlags, setupBin, setupFile)...) //nolint:gosec // G204: go tool with the run's own build flags
 	buildCmd.Stderr = os.Stderr
 	buildMp := NewManagedProcess(buildCmd, ProcessConfig{Grace: GraceKill})
 	if err := buildMp.Start(); err != nil {
@@ -854,6 +855,14 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 	}
 	proc.held = held
 	return proc, nil
+}
+
+// setupBuildArgs is the go build line of the setup program: the run's build
+// flags without those only go test takes.
+func setupBuildArgs(buildFlags []string, bin, src string) []string {
+	args := []string{"build", "-o", bin}
+	args = append(args, StripNonLoadFlags(buildFlags)...)
+	return append(args, src)
 }
 
 // launchSharedFixtures starts cmd as the shared fixture process serving the
