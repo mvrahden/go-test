@@ -335,6 +335,9 @@ export interface RunEnd {
   // What the CLI said the run failed for: its stderr or run-level output,
   // without go run's "exit status N" echo.
   reason: string;
+  // How the CLI ended when its exit code does not say it failed: a watch
+  // process that died during a cycle. Said in place of the exit code.
+  ended?: string;
 }
 
 // markFailedRun holds the one rule for a run the CLI failed: a non-zero exit
@@ -347,8 +350,9 @@ export function markFailedRun(
   end: RunEnd,
   store?: Pick<GoTestController, "recordResult">,
 ): boolean {
-  if (end.exitCode === 0 || end.cancelled || end.failed) return false;
-  const message = [end.reason.trim(), `exit code ${end.exitCode}`]
+  if (end.exitCode === 0 && end.ended === undefined) return false;
+  if (end.cancelled || end.failed) return false;
+  const message = [end.reason.trim(), end.ended ?? `exit code ${end.exitCode}`]
     .filter(Boolean)
     .join("\n\n");
   const seen = new Set<string>();
