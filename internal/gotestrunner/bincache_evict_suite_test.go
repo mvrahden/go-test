@@ -223,3 +223,20 @@ func (s *BinaryCacheEvictionTestSuite) TestNothingKeepsADeadKeyForever(t *gotest
 		})
 	})
 }
+
+func (s *BinaryCacheEvictionTestSuite) TestARecordGoesWithItsBinary(t *gotest.T) {
+	t.When("an evicted binary has a record", func(w *gotest.T) {
+		w.It("removes the record with it, and the key dir that held only them", func(it *gotest.T) {
+			root := isolated(it)
+			gone := filepath.Join(it.TempDir(), "deleted-worktree")
+			dir := cacheKey(it, root, "dddddddddddddddd", gone, "a.test")
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, "a.test.sum"), []byte("crc32c=00000000 size=6\n"), 0o600))
+			gotest.NoError(it, os.WriteFile(filepath.Join(dir, "a.test.sum.tmp-1"), nil, 0o600))
+
+			gotestrunner.CleanStaleOverlays()
+
+			gotest.False(it, exists(filepath.Join(dir, "a.test.sum")))
+			gotest.False(it, exists(dir), "the key dir %s is left", dir)
+		})
+	})
+}

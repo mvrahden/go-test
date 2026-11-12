@@ -1,8 +1,10 @@
 package cli_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
@@ -11,11 +13,11 @@ import (
 )
 
 // CLIBinaryCacheTestSuite: what a run's start evicts from the test binary
-// cache.
+// cache, and what it reuses. Each method has a cache of its own.
 type CLIBinaryCacheTestSuite struct{}
 
 func (s *CLIBinaryCacheTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 30 * time.Second}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
 // staleKey makes a key dir in cache's bin dir that records checkout and
@@ -51,6 +53,69 @@ func (s *CLIBinaryCacheTestSuite) TestWhatARunEvicts(t *gotest.T) {
 		w.It("a run removes it and keeps the binaries used since", func(it *gotest.T) {
 			gotest.False(it, present(aged), "%s outlived the run", aged)
 			gotest.True(it, present(fresh), "%s was evicted", fresh)
+		})
+	})
+}
+
+// cachedLink matches a link action in the build trace GOFLAGS=-x prints.
+var cachedLink = regexp.MustCompile(`(?m)(^|[/\\])link(\.exe)?"? `)
+
+// cachedRun runs the passing package with cache as the binary cache.
+func cachedRun(t *gotest.T, cache string, env ...string) testkit.Run {
+	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), append([]string{protocol.EnvCacheDir + "=" + cache}, env...), "../testdata/passing/")
+	gotest.NoError(t, err)
+	return run
+}
+
+// cachedBinary is the one test binary a run left in cache.
+func cachedBinary(t *gotest.T, cache string) string {
+	bins, err := filepath.Glob(filepath.Join(cache, "bin", "*", "*.test"))
+	gotest.NoError(t, err)
+	gotest.Len(t, bins, 1)
+	return bins[0]
+}
+
+func (s *CLIBinaryCacheTestSuite) TestACachedBinaryDamagedSinceItWasLinked(t *gotest.T) {
+	t.When("a cached test binary is truncated, or zero-filled at its end, after a run linked it", func(w *gotest.T) {
+		w.It("the next run links it again, says so on stderr, and passes", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []struct {
+				Desc   string
+				damage func(f *os.File, size int64) error
+			}{
+				{"truncated to half", func(f *os.File, n int64) error { return f.Truncate(n / 2) }},
+				{"its last 4 KiB zero-filled", func(f *os.File, n int64) error { _, err := f.WriteAt(make([]byte, 4096), n-4096); return err }},
+			}) {
+				cache := sub.TempDir()
+				first := cachedRun(sub, cache)
+				gotest.Equal(sub, 0, first.Exit, "stderr: %s", first.Stderr)
+				bin := cachedBinary(sub, cache)
+				info, err := os.Stat(bin)
+				gotest.NoError(sub, err)
+				f, err := os.OpenFile(bin, os.O_WRONLY, 0)
+				gotest.NoError(sub, err)
+				gotest.NoError(sub, errors.Join(row.damage(f, info.Size()), f.Close()))
+				run := cachedRun(sub, cache)
+				gotest.Equal(sub, 0, run.Exit, "stderr: %s", run.Stderr)
+				gotest.Contains(sub, run.Stderr, "gotest: the cached test binary of")
+			}
+		})
+	})
+}
+
+func (s *CLIBinaryCacheTestSuite) TestACachedBinaryNoRunRecorded(t *gotest.T) {
+	t.When("a cached test binary has no record beside it", func(w *gotest.T) {
+		cache := w.TempDir()
+		first := cachedRun(w, cache)
+		gotest.Equal(w, 0, first.Exit, "stderr: %s", first.Stderr)
+		bin := cachedBinary(w, cache)
+		gotest.NoError(w, os.Remove(bin+".sum"))
+		run := cachedRun(w, cache, "GOFLAGS=-x")
+		_, recorded := os.Stat(bin + ".sum")
+		w.It("the next run links it again without a word and records it", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+			gotest.NotContains(it, run.Stderr, "gotest: the cached test binary of")
+			gotest.Len(it, cachedLink.FindAllString(run.Stderr, -1), 1, run.Stderr)
+			gotest.NoError(it, recorded)
 		})
 	})
 }

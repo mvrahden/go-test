@@ -64,26 +64,57 @@ func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags
 	args = append(args, buildFlags...)
 	args = append(args, pkgPath)
 
-	cmd := exec.CommandContext(ctx, "go", args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
 	defer logSlowBuild(os.Stderr, "test binary for "+pkgPath, slowBuildThreshold())()
 
-	mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
-	if err := mp.Start(); err != nil {
-		return CompileResult{}, compileError(pkgPath, err, stderr.Bytes())
+	link := func() error {
+		cmd := exec.CommandContext(ctx, "go", args...)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
+		if err := mp.Start(); err != nil {
+			return compileError(pkgPath, err, stderr.Bytes())
+		}
+		if err := mp.WaitWithGrace(ctx); err != nil {
+			return compileError(pkgPath, err, stderr.Bytes())
+		}
+		if stderr.Len() > 0 {
+			_, _ = os.Stderr.Write(stderr.Bytes())
+		}
+		return nil
 	}
-	if err := mp.WaitWithGrace(ctx); err != nil {
-		return CompileResult{}, compileError(pkgPath, err, stderr.Bytes())
+	if outputPath == binaryPath {
+		if err := link(); err != nil {
+			return CompileResult{}, err
+		}
+		return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
 	}
-	if stderr.Len() > 0 {
-		_, _ = os.Stderr.Write(stderr.Bytes())
+
+	// The go command touches an up-to-date target and keeps its build id
+	// through truncation, so the bytes tell a skipped link from a new one:
+	// unchanged, they must match the record of the last link.
+	before, beforeErr := sumFile(outputPath)
+	if err := link(); err != nil {
+		return CompileResult{}, err
 	}
-	if outputPath != binaryPath {
-		if err := copyFile(outputPath, binaryPath); err != nil {
+	after, err := copyFileSum(outputPath, binaryPath)
+	if err != nil {
+		return CompileResult{}, compileError(pkgPath, err, nil)
+	}
+	record, recorded := readSum(outputPath)
+	if beforeErr == nil && before == after && (!recorded || record != after) {
+		_ = os.Remove(outputPath)
+		if err := link(); err != nil {
+			return CompileResult{}, err
+		}
+		if after, err = copyFileSum(outputPath, binaryPath); err != nil {
 			return CompileResult{}, compileError(pkgPath, err, nil)
 		}
+		if recorded {
+			fmt.Fprintf(os.Stderr, "gotest: the cached test binary of %s did not match its record and was linked again\n", pkgPath)
+		}
+	}
+	if !recorded || record != after {
+		_ = writeSum(outputPath, after) // the cache is an optimization
 	}
 
 	return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil

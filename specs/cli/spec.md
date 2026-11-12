@@ -405,7 +405,7 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 - **THEN** leaves no coverage profile in the temp directory
 
 ### Requirement: The test binary cache
-A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most 5 GiB, and an eviction SHALL never fail a run or take a binary a run is linking or copying.
+A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most 5 GiB, and an eviction SHALL never fail a run or take a binary a run is linking or copying. A run SHALL reuse a cached binary only when it still has the size and checksum recorded when it was last linked; one that does not, or has no record, SHALL be linked again.
 
 #### Scenario: A checkout that no longer exists
 - **WHEN** a cache key records a checkout that no longer exists
@@ -414,6 +414,14 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 #### Scenario: A binary unused for 7 days
 - **WHEN** a cached binary has not been used for 7 days
 - **THEN** a run removes it and keeps the binaries used since
+
+#### Scenario: A cached binary damaged since it was linked
+- **WHEN** a cached test binary is truncated, or zero-filled at its end, after a run linked it
+- **THEN** the next run links it again, says so on stderr, and passes
+
+#### Scenario: A cached binary no run recorded
+- **WHEN** a cached test binary has no record beside it
+- **THEN** the next run links it again without a word and records it
 
 ### Requirement: Saving the event stream
 A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.

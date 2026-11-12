@@ -48,6 +48,15 @@ var ExportBinaryCacheKey = binaryCacheKey
 var ExportBinaryCacheDir = binaryCacheDir
 var ExportLockFile = lockFile
 var ExportCopyFile = copyFile
+
+type ExportBinarySum = binarySum
+
+var (
+	ExportSumFile     = sumFile
+	ExportCopyFileSum = copyFileSum
+	ExportReadSum     = readSum
+	ExportWriteSum    = writeSum
+)
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 var ExportComputeDispatchConcurrency = computeDispatchConcurrency

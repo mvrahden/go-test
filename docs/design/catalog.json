@@ -3898,7 +3898,7 @@
                       "file": "binarycache_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 46,
+                      "line": 48,
                       "name": "a_run_removes_its_binaries",
                       "output": [],
                       "status": "none",
@@ -3912,7 +3912,7 @@
                   "file": "binarycache_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 45,
+                  "line": 47,
                   "name": "a_cache_key_records_a_checkout_that_no_longer_exists",
                   "output": [],
                   "status": "none",
@@ -3929,7 +3929,7 @@
                       "file": "binarycache_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 51,
+                      "line": 53,
                       "name": "a_run_removes_it_and_keeps_the_binaries_used_since",
                       "output": [],
                       "status": "none",
@@ -3943,7 +3943,7 @@
                   "file": "binarycache_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 50,
+                  "line": 52,
                   "name": "a_cached_binary_has_not_been_used_for_7_days",
                   "output": [],
                   "status": "none",
@@ -3957,8 +3957,131 @@
               "file": "binarycache_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 35,
+              "line": 37,
               "name": "TestWhatARunEvicts",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "truncated to half",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "binarycache_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 85,
+                          "name": "truncated_to_half",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "its last 4 KiB zero-filled",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "binarycache_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 86,
+                          "name": "its_last_4_KiB_zero-filled",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "the next run links it again, says so on stderr, and passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binarycache_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 80,
+                      "name": "the_next_run_links_it_again,_says_so_on_stderr,_and_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a cached test binary is truncated, or zero-filled at its end, after a run linked it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binarycache_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 79,
+                  "name": "a_cached_test_binary_is_truncated,_or_zero-filled_at_its_end,_after_a_run_linked_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ACachedBinaryDamagedSinceItWasLinked",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "binarycache_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 78,
+              "name": "TestACachedBinaryDamagedSinceItWasLinked",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the next run links it again without a word and records it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binarycache_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 114,
+                      "name": "the_next_run_links_it_again_without_a_word_and_records_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a cached test binary has no record beside it",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binarycache_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 106,
+                  "name": "a_cached_test_binary_has_no_record_beside_it",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ACachedBinaryNoRunRecorded",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "binarycache_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 105,
+              "name": "TestACachedBinaryNoRunRecorded",
               "output": [],
               "status": "none"
             }
@@ -3970,7 +4093,7 @@
           "file": "binarycache_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 15,
+          "line": 17,
           "name": "TestCLIBinaryCacheTestSuite",
           "output": [],
           "status": "none"
@@ -29390,7 +29513,7 @@
     }
   ],
   "stats": {
-    "behaviors": 852,
+    "behaviors": 855,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

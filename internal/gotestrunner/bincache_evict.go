@@ -158,6 +158,7 @@ func evictBinary(b cachedBinary) bool {
 		unlock()
 		return false
 	}
+	_ = os.Remove(b.path + sumSuffix)
 	releaseEvicted(lock, unlock)
 	return true
 }
@@ -176,9 +177,9 @@ func evictLock(l cachedBinary) {
 }
 
 // removeEmptyKey removes a key dir that holds no binary and no lock file:
-// its .cwd and any temp file a run that died left writing it first, then
-// the dir itself, which fails if a run created a lock meanwhile. That run's
-// next use writes .cwd again.
+// its .cwd, the records of binaries gone and any temp file a run that died
+// left writing them first, then the dir itself, which fails if a run created
+// a lock meanwhile. That run's next use writes .cwd again.
 func removeEmptyKey(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -190,8 +191,9 @@ func removeEmptyKey(dir string) {
 		}
 	}
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), checkoutFile+".tmp-") {
-			_ = os.Remove(filepath.Join(dir, e.Name()))
+		name := e.Name()
+		if strings.HasPrefix(name, checkoutFile+".tmp-") || strings.HasSuffix(name, ".test"+sumSuffix) || strings.Contains(name, ".test"+sumSuffix+".tmp-") {
+			_ = os.Remove(filepath.Join(dir, name))
 		}
 	}
 	_ = os.Remove(filepath.Join(dir, checkoutFile))

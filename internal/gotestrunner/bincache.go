@@ -4,12 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
-	"syscall"
 	"time"
 )
 
@@ -94,21 +92,6 @@ var lockOpened = func(path string) {}
 // write handle until it execs, and the kernel refuses to execute a file
 // anyone holds open for writing ("text file busy").
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	syscall.ForkLock.RLock()
-	defer syscall.ForkLock.RUnlock()
-	_ = os.Remove(dst)
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o755)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return err
-	}
-	return out.Close()
+	_, err := copyFileSum(src, dst)
+	return err
 }
