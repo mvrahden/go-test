@@ -69,6 +69,7 @@ Test results persist across sessions, so you see pass/fail state immediately aft
 The tree itself is restored from disk on startup, so suites are browsable straight away instead of waiting for the Go toolchain to finish discovery.
 A run the CLI failed is never green: when it exits non-zero and no test or package carries a failing verdict, the packages (for a fuzz or bench run, the selected targets) are marked errored with what the CLI said and its exit code.
 A test that started and got no verdict because its process died — a test timeout, a panic on a goroutine — is marked errored with what it printed, and its package's message names it. The Spec View shows such a test as NOT RUN until the CLI reports it otherwise.
+When a Go file of a package changes, the verdicts shown for that package are marked outdated (VS Code dims them) until it runs again. Packages that import the changed one are not marked: the extension does not know the import graph.
 
 ### CodeLens
 

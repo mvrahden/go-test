@@ -729,6 +729,14 @@ export class GoTestController implements vscode.Disposable {
     return this.resultStore.get(itemId);
   }
 
+  // invalidateResults marks a package's shown verdicts outdated; the stored
+  // ones are kept, so a reload restores them as before.
+  invalidateResults(importPath: string): void {
+    const item = this.findItem(importPath);
+    if (!item) return;
+    this.controller.invalidateTestResults(item);
+  }
+
   clearResults(item: vscode.TestItem): void {
     this.resultStore.delete(item.id);
     item.children.forEach((child) => this.clearResults(child));

@@ -302,6 +302,7 @@ export function activate(context: vscode.ExtensionContext): void {
     coverOnSave,
     outputChannel,
     active,
+    controller,
   );
 
   context.subscriptions.push(
@@ -890,6 +891,17 @@ function registerLintCommands(
   ];
 }
 
+// staleOnChange marks the verdicts of a changed file's package outdated.
+// Packages that import it are not marked: the import graph is not known here.
+export function staleOnChange(
+  filePath: string,
+  cache: Pick<DiscoveryCache, "resolveFileToPackage">,
+  controller: Pick<GoTestController, "invalidateResults">,
+): void {
+  const importPath = cache.resolveFileToPackage(filePath);
+  if (importPath) controller.invalidateResults(importPath);
+}
+
 function setupFileWatchers(
   cache: DiscoveryCache,
   discoveryService: DiscoveryService,
@@ -897,6 +909,7 @@ function setupFileWatchers(
   coverOnSave: CoverOnSave,
   outputChannel: vscode.LogOutputChannel,
   active: ActiveFolders,
+  controller: GoTestController,
 ): vscode.Disposable[] {
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
@@ -918,6 +931,7 @@ function setupFileWatchers(
 
   const testWatcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = (uri: vscode.Uri) => {
+    staleOnChange(uri.fsPath, cache, controller);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (!folder) return;
     const wsDir = folder.uri.fsPath;
@@ -938,6 +952,7 @@ function setupFileWatchers(
     if (importPath) triggerCoverOnSave(importPath, uri);
   };
   const onFileDelete = (uri: vscode.Uri) => {
+    staleOnChange(uri.fsPath, cache, controller);
     const discoverOnSave =
       vscode.workspace
         .getConfiguration("gotest")
@@ -954,6 +969,7 @@ function setupFileWatchers(
   const sourceWatcher = vscode.workspace.createFileSystemWatcher("**/*.go");
   const onSourceChange = (uri: vscode.Uri) => {
     if (uri.fsPath.endsWith("_test.go")) return;
+    staleOnChange(uri.fsPath, cache, controller);
     const importPath = cache.resolveFileToPackage(uri.fsPath);
     if (!importPath) return;
 

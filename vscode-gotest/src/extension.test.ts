@@ -27,7 +27,7 @@ vi.mock("vscode", () => {
   };
 });
 
-import { registerCommands } from "./extension.js";
+import { registerCommands, staleOnChange } from "./extension.js";
 
 const srcDir = __dirname;
 const manifest = JSON.parse(
@@ -115,5 +115,28 @@ describe("the command palette", () => {
       .map((e) => e.command)
       .sort();
     expect(hidden).toEqual(NEEDS_ARGUMENTS);
+  });
+});
+
+describe("staleOnChange", () => {
+  const controller = { invalidateResults: vi.fn() };
+  it("invalidates the package of a changed file", () => {
+    staleOnChange(
+      "/ws/cart/cart.go",
+      { resolveFileToPackage: () => "example.com/cart" },
+      controller,
+    );
+    expect(controller.invalidateResults).toHaveBeenCalledWith(
+      "example.com/cart",
+    );
+  });
+  it("ignores a file outside every discovered package", () => {
+    controller.invalidateResults.mockClear();
+    staleOnChange(
+      "/ws/README.go",
+      { resolveFileToPackage: () => undefined },
+      controller,
+    );
+    expect(controller.invalidateResults).not.toHaveBeenCalled();
   });
 });

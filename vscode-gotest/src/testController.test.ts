@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockWorkspaceFolders: Array<{ name: string; uri: { fsPath: string } }> =
   [];
 const mockGetWorkspaceFolder = vi.fn();
+const mock = vi.hoisted(() => ({ invalidateTestResults: vi.fn() }));
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -29,6 +30,7 @@ vi.mock("vscode", () => ({
           description: undefined,
         }),
         createRunProfile: () => ({}),
+        invalidateTestResults: mock.invalidateTestResults,
         dispose: vi.fn(),
       };
     },
@@ -824,5 +826,44 @@ describe("GoTestController benchmark items", () => {
     expect(
       suiteItem.children.get("example.com/proj/pkg/CacheSuite/BenchmarkGetHit"),
     ).toBeUndefined();
+  });
+});
+
+describe("GoTestController.invalidateResults", () => {
+  let controller: GoTestController;
+
+  beforeEach(() => {
+    mockWorkspaceFolders.length = 0;
+    mockWorkspaceFolders.push({ name: "ws", uri: { fsPath: "/ws" } });
+    mockGetWorkspaceFolder.mockReset();
+    mockGetWorkspaceFolder.mockReturnValue({
+      name: "ws",
+      uri: { fsPath: "/ws" },
+    });
+    mock.invalidateTestResults.mockClear();
+    controller = createController(
+      createMockCache([
+        {
+          importPath: "example.com/pkg",
+          dir: "/ws/pkg",
+          wsDir: "/ws",
+          suites: [makeSuite("MySuite")],
+        },
+      ]),
+    );
+    controller.rebuild();
+  });
+
+  it("marks a package's verdicts outdated by its item", () => {
+    controller.invalidateResults("example.com/pkg");
+    expect(mock.invalidateTestResults).toHaveBeenCalledTimes(1);
+    expect(mock.invalidateTestResults.mock.calls[0][0].id).toBe(
+      "example.com/pkg",
+    );
+  });
+
+  it("does nothing for a package the tree does not hold", () => {
+    controller.invalidateResults("example.com/absent");
+    expect(mock.invalidateTestResults).not.toHaveBeenCalled();
   });
 });
