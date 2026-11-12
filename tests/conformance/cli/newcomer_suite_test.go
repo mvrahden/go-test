@@ -48,6 +48,7 @@ func (s *CLINewcomerTestSuite) TestAMistypedCommandIsSuggested(t *gotest.T) {
 				{Desc: "sumary suggests summary", args: []string{"sumary", "../testdata/passing/"}, exit: 2, stderrHas: `did you mean "summary"`},
 				{Desc: "test suggests dropping the word", args: []string{"test", "../testdata/passing/"}, exit: 2, stderrHas: "gotest ../testdata/passing/"},
 				{Desc: "a package named like nothing runs as a pattern", args: []string{"../testdata/passing/"}, exit: 0},
+				{Desc: "a standard-library package runs as a pattern", args: []string{"sync"}, exit: 0},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
 				gotest.NoError(sub, err)

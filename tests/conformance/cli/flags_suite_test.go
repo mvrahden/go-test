@@ -62,6 +62,7 @@ func (s *CLIFlagsTestSuite) TestValueFlagsAndUnknownFlags(t *gotest.T) {
 				{Desc: "an unknown flag is a usage error for discover", args: []string{"discover", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
 				{Desc: "an unknown flag is a usage error for prepare", args: []string{"prepare", "--bogus", "../testdata/passing/"}, exit: 2, stderrHas: "--bogus"},
 				{Desc: "a flag another command owns is refused", args: []string{"clean", "--debug", "../testdata/passing/"}, exit: 2, stderrHas: "not valid for this subcommand"},
+				{Desc: "--parallel= is a missing value", args: []string{"--parallel=", "../testdata/passing/"}, exit: 2, stderrHas: `invalid --parallel value ""`},
 			}) {
 				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
 				gotest.NoError(sub, err)

@@ -46,7 +46,7 @@ A timeout or setup-timeout in .gotest.yml SHALL apply only to the commands that 
 - **AND** still refuses --timeout given as a flag, with exit 2
 
 ### Requirement: Mistyped subcommands
-gotest SHALL suggest the command meant when the first word is almost a subcommand or is the word test, and SHALL run any other word as a package pattern. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+gotest SHALL suggest the command meant when the first word is almost a subcommand or is the word test, and SHALL run any other word as a package pattern, a word the go command resolves to a package included. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
 
 #### Scenario: A first word that is almost a command
 - **WHEN** the first word is almost a subcommand or is a help topic

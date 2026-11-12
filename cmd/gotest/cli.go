@@ -115,10 +115,16 @@ func commandHint(args []string) string {
 			best, bestDist = name, d
 		}
 	}
-	if best == "" {
+	if best == "" || packageKnown(word) {
 		return ""
 	}
 	return fmt.Sprintf("unknown command %q; did you mean %q? (gotest help lists the subcommands)", word, best)
+}
+
+// packageKnown reports whether the go command resolves word to a package,
+// such as a standard-library one; asked only for a word near a subcommand.
+var packageKnown = func(word string) bool {
+	return exec.Command("go", "list", "--", word).Run() == nil //nolint:gosec // G204: a word the user typed, as a package
 }
 
 // editDistance is the Levenshtein distance between a and b.
@@ -241,12 +247,12 @@ func parseParallelFlag(own OwnFlags) (int, error) {
 }
 
 // parsePositiveIntFlag reads an integer flag that must be positive; an
-// absent or empty flag is 0, the default.
+// absent flag is 0, the default, and an empty one is refused.
 func parsePositiveIntFlag(own OwnFlags, name string) (int, error) {
-	raw := own.Value(name)
-	if raw == "" {
+	if !own.Given(name) {
 		return 0, nil
 	}
+	raw := own.Value(name)
 	v, err := strconv.Atoi(raw)
 	if err != nil {
 		return 0, fmt.Errorf("invalid %s value %q: must be a positive integer", name, raw)

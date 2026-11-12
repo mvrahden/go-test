@@ -286,3 +286,6 @@ var (
 	ExportStripJSONFlag    = stripJSONFlag
 	ExportContainsHelpFlag = containsHelpFlag
 )
+
+// cli.go
+var ExportCommandHint = commandHint

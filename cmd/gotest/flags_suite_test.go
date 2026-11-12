@@ -435,6 +435,7 @@ func (s *FlagParsingTestSuite) TestParseParallelFlag(t *gotest.T) {
 		{Desc: "invalid value", args: []string{"--parallel=abc"}, expectErr: true},
 		{Desc: "zero value", args: []string{"--parallel=0"}, expectErr: true},
 		{Desc: "negative value", args: []string{"--parallel=-4"}, expectErr: true},
+		{Desc: "empty value", args: []string{"--parallel="}, expectErr: true},
 	}) {
 		got, err := ExportParseParallelFlag(tc.args)
 		if tc.expectErr {
@@ -460,6 +461,7 @@ func (s *FlagParsingTestSuite) TestParseCompileParallelFlag(t *gotest.T) {
 		{Desc: "invalid value", args: []string{"--compile-parallel=abc"}, expectErr: true},
 		{Desc: "zero value", args: []string{"--compile-parallel=0"}, expectErr: true},
 		{Desc: "negative value", args: []string{"--compile-parallel=-1"}, expectErr: true},
+		{Desc: "empty value", args: []string{"--compile-parallel="}, expectErr: true},
 	}) {
 		got, err := ExportParseCompileParallelFlag(tc.args)
 		if tc.expectErr {
@@ -772,6 +774,26 @@ func (s *FlagParsingTestSuite) TestModesARunDoesNotHave(t *gotest.T) {
 			gotest.ErrorContains(sub, err, tc.err)
 		} else {
 			gotest.NoError(sub, err)
+		}
+	}
+}
+
+func (s *FlagParsingTestSuite) TestCommandHint(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		want string
+	}{
+		{"a word that is almost a command and no package", []string{"sumary", "./p"}, `unknown command "sumary"; did you mean "summary"?`},
+		{"a standard-library package two edits from a command", []string{"sync"}, ""},
+		{"another", []string{"math"}, ""},
+		{"the word test", []string{"test", "./p"}, `"test" is not a subcommand`},
+	}) {
+		got := ExportCommandHint(tc.args)
+		if tc.want == "" {
+			gotest.Empty(sub, got)
+		} else {
+			gotest.Contains(sub, got, tc.want)
 		}
 	}
 }
