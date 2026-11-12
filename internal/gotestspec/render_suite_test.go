@@ -629,3 +629,48 @@ func (s *RenderTestSuite) TestSkipReasons(t *gotest.T, _ *renderCtx) {
 		gotest.Contains(it, markdown(guarded), `#### Guarded — SKIPPED: suite guard: DATABASE\_URL not set`)
 	})
 }
+
+func (s *RenderTestSuite) TestRunMarks(t *gotest.T, _ *renderCtx) {
+	suite := func(run, runs int, external bool, leaf *gotestspec.Node) *gotestspec.Node {
+		return &gotestspec.Node{Kind: gotestspec.KindSuite, Name: "TestFlakyTestSuite", Display: "Flaky", Run: run, Runs: runs, External: external, Children: []*gotestspec.Node{leaf}}
+	}
+	pass := func() *gotestspec.Node {
+		return &gotestspec.Node{Kind: gotestspec.KindMethod, Name: "TestPasses", Display: "Passes", Status: gotestspec.StatusPass}
+	}
+	fails := &gotestspec.Node{Kind: gotestspec.KindMethod, Name: "TestFails", Display: "Fails", Status: gotestspec.StatusFail, Output: []string{"    flaky_test.go:3: boom\n"}}
+	tree := []*gotestspec.Package{{Path: "p", Status: gotestspec.StatusFail, Nodes: []*gotestspec.Node{
+		suite(1, 2, false, pass()),
+		suite(2, 2, false, fails),
+	}}}
+
+	t.It("marks each run in the terminal spec and names the failing run", func(it *gotest.T) {
+		out := renderTerminal(tree)
+		gotest.Contains(it, out, "Flaky — RUN 1 OF 2")
+		gotest.Contains(it, out, "Flaky — RUN 2 OF 2")
+		gotest.NotContains(it, out, "EXTERNAL")
+		gotest.Contains(it, out, "Flaky (run 2 of 2) › Fails")
+	})
+	t.It("marks each run in the Markdown spec", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderMarkdown(&buf, tree)
+		gotest.Contains(it, buf.String(), "#### Flaky — RUN 2 OF 2")
+	})
+	t.It("puts run and runs on a repeated node of the JSON document only", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderJSON(&buf, tree)
+		gotest.Contains(it, buf.String(), `"run":2,"runs":2`)
+		var single bytes.Buffer
+		gotestspec.RenderJSON(&single, userServiceTree())
+		gotest.NotContains(it, single.String(), `"run":`)
+		gotest.NotContains(it, single.String(), `"runs":`)
+	})
+	t.It("names the run in the summary's failure path", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderSummary(&buf, tree, gotestspec.WithNoColor())
+		gotest.Contains(it, buf.String(), "Flaky (run 2 of 2) / Fails")
+	})
+	t.It("marks an external twin's run after EXTERNAL", func(it *gotest.T) {
+		twin := []*gotestspec.Package{{Path: "p", Nodes: []*gotestspec.Node{suite(2, 2, true, pass())}}}
+		gotest.Contains(it, renderTerminal(twin), "Flaky — EXTERNAL — RUN 2 OF 2")
+	})
+}

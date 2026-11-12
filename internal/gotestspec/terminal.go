@@ -360,6 +360,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 		}
 
 		var tail []tailPart
+		if mark := runMark(n); mark != "" {
+			tail = append(tail, tailPart{" — " + mark, ""})
+		}
 		if n.Excluded || n.Status == StatusSkip {
 			skipped := " — SKIPPED"
 			if reason := skipReason(n); reason != "" {
@@ -379,6 +382,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 	row := rowLine{indent: indent, text: n.Display, style: branchStyle(n, c)}
 	if n.External {
 		row.tail = append(row.tail, tailPart{" — EXTERNAL", c.dim})
+	}
+	if mark := runMark(n); mark != "" {
+		row.tail = append(row.tail, tailPart{" — " + mark, c.dim})
 	}
 	if n.Focused {
 		row.tail = append(row.tail, tailPart{" — FOCUSED", c.yellow})

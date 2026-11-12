@@ -76,6 +76,19 @@ A suite name declared in a package's test files and in its external test package
 - **WHEN** the external twin's shared method is rerun alone
 - **THEN** the declared spec under the rerun shows it under its own name, with its verdict
 
+### Requirement: A suite run more than once
+A suite a run holds more than once, as under -count, SHALL read as one suite per run, each marked with its run and the number of runs and each with its own verdicts and output, and never as an external suite; a failure SHALL name the run it happened in. A suite of both test packages run more than once SHALL read as its two suites per run, the external one marked in each.
+
+#### Scenario: A method that fails in one run of three
+- **WHEN** a suite is run three times and one of its methods fails in the second
+- **THEN** the spec shows three suites marked run 1, 2 and 3 of 3, none external
+- **AND** shows the method failed, with its message, in the second run and passed in the others
+- **AND** the summary names the failure with its run
+
+#### Scenario: A suite of both test packages run twice
+- **WHEN** a suite of both test packages is run twice
+- **THEN** each run shows the internal suite and the external one, marked
+
 ### Requirement: A group's own failure
 A When or an It that fails while every behavior under it passes SHALL show, on its own row of a run's spec, that it failed and what it wrote.
 

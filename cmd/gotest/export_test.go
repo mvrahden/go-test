@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/config"
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
+	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/internal/lint"
 )
 
@@ -295,3 +297,14 @@ var ExportFocusGate = focusGate
 
 // color.go
 var ExportReportColorDisabled = reportColorDisabled
+
+// declarations.go
+// ExportDeclarationIndexOf loads patterns as a run loads them and returns
+// the declaration index read from them.
+func ExportDeclarationIndexOf(patterns []string) (gotestspec.DeclarationIndex, error) {
+	pkgs, err := gotestgen.LoadRunPackages(patterns, nil)
+	if err != nil {
+		return nil, err
+	}
+	return buildDeclarationIndex(pkgs.Loaded), nil
+}

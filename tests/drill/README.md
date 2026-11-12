@@ -912,6 +912,7 @@ shards of one run do not add up to every mutant exactly once.
 | `bench-numbered-name-read-as-procs` | the repetitions of a benchmark named with a trailing number are keyed without that number | bench conformance: a sub-benchmark named size-1024 under -cpu=1 -count=2 keeps both samples |
 | `spec-skip-reason-dropped` | a skipped row no longer shows the reason its skip gave | spec conformance: the terminal spec shows a skipped row's reason after SKIPPED |
 | `spec-live-declared-not-overlaid` | `spec --declared` on a live run renders the run alone, without the declared specification under it | spec conformance: the rows of a table after its failing row show as not run |
+| `spec-repeated-run-read-as-twin` | every repeated top-level suite is read as a twin pair, its later runs as external suites | spec conformance: three runs of a suite show as runs 1, 2 and 3 of 3, none external |
 
 ## Adding a mutant
 

@@ -156,6 +156,9 @@ func renderMarkdownSuite(doc *mdDoc, n *Node, cfg *renderConfig) {
 	if n.External {
 		heading += " — EXTERNAL"
 	}
+	if mark := runMark(n); mark != "" {
+		heading += " — " + mark
+	}
 	if bare && n.Excluded {
 		// Read from source, a parked suite still lists what it declares;
 		// unmarked, those behaviors read as live ones.
@@ -258,6 +261,9 @@ func markdownItem(list []string, n *Node, depth int, cfg *renderConfig) []string
 	line += label
 	if n.Kind == KindFuzz {
 		line += " (fuzz)"
+	}
+	if mark := runMark(n); mark != "" {
+		line += " — " + mark
 	}
 	if bare && n.Excluded {
 		line += " — EXCLUDED"

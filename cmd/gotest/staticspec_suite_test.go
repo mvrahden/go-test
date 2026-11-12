@@ -540,3 +540,15 @@ func (s *StaticSpecTestSuite) TestTwinSuitesReadAsTwoSuites(t *gotest.T, ctx *st
 		})
 	})
 }
+
+func (s *StaticSpecTestSuite) TestTheDeclarationIndexNamesTwins(t *gotest.T, _ *staticCtx) {
+	const static = "github.com/mvrahden/go-test/cmd/gotest/testdata/static/"
+	idx, err := ExportDeclarationIndexOf([]string{"./testdata/static/twins", "./testdata/static/loneext"})
+	gotest.NoError(t, err)
+	t.It("marks a suite both test packages declare as twins", func(it *gotest.T) {
+		gotest.True(it, idx[static+"twins"][gotestspec.DeclKey("TestUserRepositoryTestSuite")].Twin)
+	})
+	t.It("marks no suite only the external test package declares", func(it *gotest.T) {
+		gotest.False(it, idx[static+"loneext"][gotestspec.DeclKey("TestNameTestSuite")].Twin)
+	})
+}

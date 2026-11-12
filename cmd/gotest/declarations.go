@@ -76,6 +76,9 @@ func buildDeclarationIndex(loadResults []*gotestgen.LoadResult) gotestspec.Decla
 	collector := gotestgen.NewCollector()
 
 	for _, lr := range loadResults {
+		// A suite both test packages declare is a twin pair: its second
+		// instance in a run is the external suite, not a repeat.
+		declaredIn := map[string]int{}
 		for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
 			if pkg == nil {
 				continue
@@ -86,10 +89,20 @@ func buildDeclarationIndex(loadResults []*gotestgen.LoadResult) gotestspec.Decla
 			}
 			for _, suite := range result.Suites {
 				suitePath := "Test" + suite.Identifier()
+				declaredIn[suitePath]++
 				for _, method := range suite.TestCases() {
 					indexBehaviors(idx, lr.PkgPath, []string{suitePath, method.Identifier()}, suite.BehaviorsOf(method).Behaviors)
 				}
 			}
+		}
+		for suitePath, n := range declaredIn {
+			if n < 2 {
+				continue
+			}
+			if idx[lr.PkgPath] == nil {
+				idx[lr.PkgPath] = map[string]gotestspec.Declaration{}
+			}
+			idx[lr.PkgPath][gotestspec.DeclKey(suitePath)] = gotestspec.Declaration{Twin: true}
 		}
 	}
 

@@ -30,6 +30,8 @@ type specNode struct {
 	Incomplete bool       `json:"incomplete"`
 	External   bool       `json:"external"`
 	Variant    int        `json:"variant"`
+	Run        int        `json:"run"`
+	Runs       int        `json:"runs"`
 	File       string     `json:"file"`
 	Line       int        `json:"line"`
 	Children   []specNode `json:"children"`

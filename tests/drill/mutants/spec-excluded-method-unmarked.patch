@@ -4,9 +4,9 @@ Expect: specmarkdown: an excluded node is not marked EXCLUDED: "- [*][*]Parked
 Clause: when the spec is read from source with X_ suites and methods → marks each excluded suite, method and behavior EXCLUDED
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -255,9 +255,6 @@
- 	if n.Kind == KindFuzz {
- 		line += " (fuzz)"
+@@ -265,9 +265,6 @@
+ 	if mark := runMark(n); mark != "" {
+ 		line += " — " + mark
  	}
 -	if bare && n.Excluded {
 -		line += " — EXCLUDED"

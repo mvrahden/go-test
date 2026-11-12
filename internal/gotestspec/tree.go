@@ -93,6 +93,9 @@ func opensWithConnective(label string) bool {
 type Declaration struct {
 	Label string
 	Vocab Vocab
+	// Twin marks a top-level suite both test packages declare: its second
+	// instance in a run is the external suite, not a second run.
+	Twin bool
 }
 
 // DeclKey keys a declaration by its written levels from the top-level test
@@ -178,6 +181,10 @@ type Node struct {
 	File    string
 	Line    int
 	Variant int
+	// Run and Runs say which run of a repeated top-level node this is, as
+	// under -count; both 0 when the stream holds one run.
+	Run  int
+	Runs int
 	// Reported is the own level go test reported when it is not Name: a
 	// twin's TestCreate#01, whose #01 is testing's, not the developer's.
 	Reported    string
@@ -314,6 +321,9 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 
 	for path, pkg := range pkgs {
 		builds[path].prune()
+		splitRuns(pkg.Nodes, func(name string) bool {
+			return cfg.decls.lookup(path, DeclKey(name)).Twin
+		})
 		if cfg.decls != nil {
 			declare(pkg.Nodes, nil, func(levels []string) Declaration {
 				return cfg.decls.lookup(path, DeclKey(levels...))
@@ -457,12 +467,13 @@ func reported(pl protocol.Placement) string {
 }
 
 // link hangs e under its parent, making a placeholder for a parent not seen.
-// A top-level node of a later instance is the external twin.
+// A top-level node of a later instance keeps it; splitRuns reads whether it
+// is the external twin or a later run.
 func (b *treeBuild) link(e *treeEntry, pl protocol.Placement) {
 	if pl.Parent == "" {
 		e.parent = nil
 		if pl.Instance >= 2 {
-			e.node.Variant, e.node.External = pl.Instance, true
+			e.node.Variant = pl.Instance
 		}
 		b.pkg.Nodes = append(b.pkg.Nodes, e.node)
 		return
@@ -507,6 +518,78 @@ func pruneNodes(nodes []*Node, empty map[*Node]bool) []*Node {
 		n.Children = pruneNodes(n.Children, empty)
 		return empty[n] && len(n.Children) == 0
 	})
+}
+
+// splitRuns tells the instances of each top-level name apart. Under -count
+// go test runs the list once per count, and a twin pair runs internal then
+// external within one pass, so with T = 2 for a twin pair and 1 otherwise,
+// instance k is run (k-1)/T+1 and, under T = 2, external when k is even.
+// A pair is a twin when the source says so, when its second instance
+// carries testing's repeat mark on a child, when both instances hold
+// children and share none (a repeat reruns the same methods), or when the
+// stream holds no first instance (a fragment).
+func splitRuns(nodes []*Node, twin func(name string) bool) {
+	groups := map[string][]*Node{}
+	for _, n := range nodes {
+		groups[n.Name] = append(groups[n.Name], n)
+	}
+	inst := func(n *Node) int { return max(n.Variant, 1) }
+	for name, group := range groups {
+		byInst := map[int]*Node{}
+		maxInst := 0
+		for _, n := range group {
+			byInst[inst(n)] = n
+			maxInst = max(maxInst, inst(n))
+		}
+		if maxInst < 2 {
+			continue
+		}
+		first, second := byInst[1], byInst[2]
+		t := 1
+		switch {
+		case twin(name), first == nil, second != nil && repeatMarked(second),
+			first != nil && second != nil && len(first.Children) > 0 && len(second.Children) > 0 && !shareChildName(first, second):
+			t = 2
+		}
+		runs := (maxInst + t - 1) / t
+		for _, n := range group {
+			n.External = t == 2 && inst(n)%2 == 0
+			if runs > 1 {
+				n.Run, n.Runs = (inst(n)-1)/t+1, runs
+			}
+		}
+	}
+}
+
+// repeatMarked reports whether a direct child of n carries testing's repeat
+// mark (a twin's TestCreate#01) that no sibling lacks under the same name;
+// two t.Run("a") in one test give a and a#01 side by side.
+func repeatMarked(n *Node) bool {
+	plain := map[string]bool{}
+	for _, c := range n.Children {
+		if c.Reported == "" {
+			plain[c.Name] = true
+		}
+	}
+	for _, c := range n.Children {
+		if c.Reported != "" && !plain[c.Name] {
+			return true
+		}
+	}
+	return false
+}
+
+func shareChildName(a, b *Node) bool {
+	names := map[string]bool{}
+	for _, c := range a.Children {
+		names[c.Name] = true
+	}
+	for _, c := range b.Children {
+		if names[c.Name] {
+			return true
+		}
+	}
+	return false
 }
 
 // underBenchmark reports whether e or a node above it is a benchmark.

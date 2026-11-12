@@ -29348,6 +29348,143 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the spec shows three suites marked run 1, 2 and 3 of 3, none external",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "repeat_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "the_spec_shows_three_suites_marked_run_1,_2_and_3_of_3,_none_external",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "shows the method failed, with its message, in the second run and passed in the others",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "repeat_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 48,
+                      "name": "shows_the_method_failed,_with_its_message,_in_the_second_run_and_passed_in_the_others",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the summary names the failure with its run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "repeat_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 60,
+                      "name": "the_summary_names_the_failure_with_its_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite is run three times and one of its methods fails in the second",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "repeat_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "a_suite_is_run_three_times_and_one_of_its_methods_fails_in_the_second",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodThatFailsInOneRunOfThree",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "repeat_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 31,
+              "name": "TestAMethodThatFailsInOneRunOfThree",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each run shows the internal suite and the external one, marked",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "repeat_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 71,
+                      "name": "each_run_shows_the_internal_suite_and_the_external_one,_marked",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite of both test packages is run twice",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "repeat_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 70,
+                  "name": "a_suite_of_both_test_packages_is_run_twice",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASuiteOfBothTestPackagesRunTwice",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "repeat_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 69,
+              "name": "TestASuiteOfBothTestPackagesRunTwice",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecRepeat",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "repeat_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 10,
+          "name": "TestSpecRepeatTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a live run's header names the checkout's commit",
                       "duration": 0,
                       "excluded": false,
@@ -30475,13 +30612,13 @@
     }
   ],
   "stats": {
-    "behaviors": 885,
+    "behaviors": 889,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 123,
+    "suites": 124,
     "tests": 0
   }
 }
