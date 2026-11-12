@@ -423,6 +423,8 @@ shards of one run do not add up to every mutant exactly once.
 | `jsoneq-numbers-as-float64` | `JSONEq` decodes numbers into float64 | canary: the failing fixture's big-integer method passes |
 | `jsoneq-numbers-by-spelling` | `JSONEq` compares numbers by spelling | canary: the passing fixture's `1` against `1.0` fails |
 | `jsoneq-trailing-data-accepted` | `JSONEq` ignores what follows the value | ring-0 predicates suite |
+| `jsoneq-invalid-utf8-accepted` | `JSONEq` decodes JSON text that is not valid UTF-8 | ring-0 predicates suite |
+| `jsoneq-named-string-marshaled` | `JSONEq` marshals a named string type instead of reading it as JSON text | ring-0 predicates suite |
 | `long-bytes-unpointed` | two long single-line byte slices of text show no offset of their first difference | ring-0 equal suite |
 | `long-line-unpointed` | a long changed line is shown cut instead of around its first difference | ring-0 equal suite |
 | `long-string-unpointed` | two long single-line strings that differ show no offset of their first difference | ring-0 equal suite |

@@ -1951,6 +1951,83 @@
               "name": "TestEmptyOnPointers",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "reads it as JSON, as it reads a string",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 663,
+                      "name": "reads_it_as_JSON,_as_it_reads_a_string",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when JSONEq is given JSON text of a named string type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 662,
+                  "name": "JSONEq_is_given_JSON_text_of_a_named_string_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails naming the offset of that byte",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 672,
+                      "name": "fails_naming_the_offset_of_that_byte",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when JSONEq is given JSON text holding a byte that is not valid UTF-8",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 671,
+                  "name": "JSONEq_is_given_JSON_text_holding_a_byte_that_is_not_valid_UTF-8",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "JSONText",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "typing_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 661,
+              "name": "TestJSONText",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "AssertionTyping",
@@ -27337,7 +27414,7 @@
     }
   ],
   "stats": {
-    "behaviors": 793,
+    "behaviors": 795,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

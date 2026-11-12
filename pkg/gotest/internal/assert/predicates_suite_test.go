@@ -253,6 +253,32 @@ func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
 	if _, err := assert.NormalizeJSON("{\"a\":1}\n \t"); err != nil {
 		t.Errorf("NormalizeJSON(trailing whitespace): %v", err)
 	}
+	if got, err := assert.NormalizeJSON(jsonText(`{"a":1}`)); err != nil {
+		t.Errorf("NormalizeJSON(named string): %v", err)
+	} else if m, ok := got.(map[string]any); !ok || m["a"] != want["a"] {
+		t.Errorf("NormalizeJSON(named string): got %#v, want %#v", got, want)
+	}
+	if _, err := assert.NormalizeJSON(jsonText("{not json")); err == nil || !strings.Contains(err.Error(), "is read as JSON text, as a string is; marshal it to compare it as a value") {
+		t.Errorf("NormalizeJSON(invalid named string): got %v, want the hint", err)
+	}
+	if got, err := assert.NormalizeJSON(shout("a")); err != nil || got != "A" {
+		t.Errorf("NormalizeJSON(named string with MarshalJSON): got %#v, %v, want \"A\"", got, err)
+	}
+	for _, in := range []any{"\"a\xff\"", []byte("\"a\xff\""), jsonText("\"a\xff\"")} {
+		if _, err := assert.NormalizeJSON(in); err == nil || !strings.Contains(err.Error(), "invalid UTF-8 at byte 2") {
+			t.Errorf("NormalizeJSON(%T with an invalid byte): got %v, want invalid UTF-8 at byte 2", in, err)
+		}
+	}
+}
+
+// jsonText is JSON text of a named string type.
+type jsonText string
+
+// shout is a named string that marshals itself.
+type shout string
+
+func (s shout) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + strings.ToUpper(string(s)) + `"`), nil
 }
 
 func (s *PredicatesTestSuite) TestReadAndRestore(t *gotest.T, _ *predicatesCtx) {

@@ -654,3 +654,25 @@ func (s *AssertionTypingTestSuite) TestEmptyOnPointers(t *gotest.T) {
 		})
 	})
 }
+
+// doc is JSON text of a named string type.
+type doc string
+
+func (s *AssertionTypingTestSuite) TestJSONText(t *gotest.T) {
+	t.When("JSONEq is given JSON text of a named string type", func(w *gotest.T) {
+		w.It("reads it as JSON, as it reads a string", func(it *gotest.T) {
+			same := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"a":1,"b":2}`, doc(`{"b":2,"a":1}`)) })
+			gotest.False(it, same.Failed(), same.Message())
+			bad := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, doc("{not json"), doc("{not json")) })
+			gotest.True(it, bad.Failed())
+			gotest.Contains(it, bad.Message(), "a assertions_test.doc is read as JSON text, as a string is; marshal it to compare it as a value")
+		})
+	})
+	t.When("JSONEq is given JSON text holding a byte that is not valid UTF-8", func(w *gotest.T) {
+		w.It("fails naming the offset of that byte", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, "\"\xff\"", "\"\xfe\"") })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "could not normalize expected: failed to unmarshal JSON: invalid UTF-8 at byte 1")
+		})
+	})
+}

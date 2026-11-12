@@ -26,7 +26,7 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **THEN** the failure names the helper's line and the caller's
 
 ### Requirement: Named string types
-Regexp and Contains SHALL treat a value of a named string type as the string it holds.
+Regexp, Contains and JSONEq SHALL treat a value of a named string type as the string it holds; JSONEq marshals one that implements json.Marshaler or encoding.TextMarshaler.
 
 #### Scenario: A named pattern type
 - **WHEN** Regexp is given a pattern of a named string type
@@ -35,6 +35,10 @@ Regexp and Contains SHALL treat a value of a named string type as the string it 
 #### Scenario: Named string haystack and needle
 - **WHEN** Contains compares named string kinds
 - **THEN** checks the substring as it does for strings
+
+#### Scenario: JSON text of a named string type
+- **WHEN** JSONEq is given JSON text of a named string type
+- **THEN** reads it as JSON, as it reads a string
 
 ### Requirement: A needle of the wrong type
 Contains and NotContains SHALL fail, naming the haystack's type and the needle's, when the needle could be no element or key of the haystack, and SHALL name the type to convert it to only when the conversion keeps its value: a string kind to a string kind, a number that converts to the element type and back unchanged, sign included, and a rune, byte or byte slice to the string it is looked for in.
@@ -166,6 +170,13 @@ JSONEq SHALL fail when an input holds anything but whitespace after its JSON val
 #### Scenario: A stray closing bracket
 - **WHEN** JSONEq is given a value followed by a stray } or ]
 - **THEN** fails: the input is not valid JSON
+
+### Requirement: JSON text in UTF-8
+JSONEq SHALL fail when JSON text it is given is not valid UTF-8.
+
+#### Scenario: Bytes that are not UTF-8
+- **WHEN** JSONEq is given JSON text holding a byte that is not valid UTF-8
+- **THEN** fails naming the offset of that byte
 
 ### Requirement: Mismatch diffs
 When Equal fails on values that do not each render on one short line, its message SHALL render both one field, element or entry per line and SHALL mark the lines that differ under "diff (-expected +actual):" in hunks with three lines of context, without file headers or line numbers, each hunk led by the path of its first change; that diff SHALL show a final newline only one side ends in, and a long changed line around its first difference, marking a missing final newline on it too.

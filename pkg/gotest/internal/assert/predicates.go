@@ -2,6 +2,7 @@ package assert
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // The predicates decide what every assertion that asks counts as nil, empty,
@@ -219,9 +221,13 @@ func ReadAndRestore(r io.Reader) ([]byte, error) {
 }
 
 // NormalizeJSON converts a value to a JSON-comparable form.
-// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
+// Accepts string, []byte, json.RawMessage, io.Reader, a named string type
+// (read as JSON text unless it implements json.Marshaler or
+// encoding.TextMarshaler), or any JSON-marshalable value. Text must be UTF-8.
 func NormalizeJSON(v any) (any, error) {
 	var raw []byte
+	// A named string is JSON text, unless it marshals itself.
+	named := ""
 	switch val := v.(type) {
 	case string:
 		raw = []byte(val)
@@ -236,18 +242,61 @@ func NormalizeJSON(v any) (any, error) {
 		}
 		raw = b
 	default:
+		if isJSONText(v) {
+			named = fmt.Sprintf("%T", v)
+			raw = []byte(reflect.ValueOf(v).String())
+			break
+		}
 		var err error
 		raw, err = json.Marshal(val)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal value: %w", err)
 		}
+		return decodeJSON(raw, "")
 	}
+	// Marshalled values are valid UTF-8; text given as is may not be.
+	if at := invalidUTF8(raw); at >= 0 {
+		return nil, fmt.Errorf("failed to unmarshal JSON: invalid UTF-8 at byte %d", at)
+	}
+	return decodeJSON(raw, named)
+}
+
+// isJSONText reports whether v is of a named string type that implements
+// neither json.Marshaler nor encoding.TextMarshaler.
+func isJSONText(v any) bool {
+	if reflect.ValueOf(v).Kind() != reflect.String {
+		return false
+	}
+	_, m := v.(json.Marshaler)
+	_, tm := v.(encoding.TextMarshaler)
+	return !m && !tm
+}
+
+// invalidUTF8 is the offset of the first byte of b that is not valid UTF-8,
+// or -1.
+func invalidUTF8(b []byte) int {
+	for i := 0; i < len(b); {
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError && size == 1 {
+			return i
+		}
+		i += size
+	}
+	return -1
+}
+
+// decodeJSON decodes the one JSON value raw holds; named, when not empty, is
+// the named string type raw came from, which a decoder error names.
+func decodeJSON(raw []byte, named string) (any, error) {
 	// Numbers stay as written: decoding them into float64 would make
 	// 9007199254740993 and 9007199254740992 the same JSON.
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	var out any
 	if err := dec.Decode(&out); err != nil {
+		if named != "" {
+			return nil, fmt.Errorf("failed to unmarshal JSON: %w (a %s is read as JSON text, as a string is; marshal it to compare it as a value)", err, named)
+		}
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	// Anything but whitespace after the value, a stray } or ] included, is an error.
