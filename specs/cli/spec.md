@@ -33,6 +33,14 @@ When .gotest.yml does not parse, version and help SHALL still print, and a run S
 - **WHEN** .gotest.yml does not parse
 - **THEN** still prints version and help, and a run reports the config error with exit 2
 
+### Requirement: Config defaults a command cannot take
+A timeout or setup-timeout in .gotest.yml SHALL apply only to the commands that take --timeout or --setup-timeout. gotest fuzz, whose clock is --for, SHALL ignore both and SHALL still refuse --timeout given as a flag.
+
+#### Scenario: A config timeout under gotest fuzz
+- **WHEN** .gotest.yml sets timeout and setup-timeout and gotest fuzz runs
+- **THEN** starts the session as without them
+- **AND** still refuses --timeout given as a flag, with exit 2
+
 ### Requirement: Mistyped subcommands
 gotest SHALL suggest the command meant when the first word is almost a subcommand or is the word test, and SHALL run any other word as a package pattern. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
 

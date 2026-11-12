@@ -118,3 +118,33 @@ func (s *CLINewcomerTestSuite) TestBenchmarksLeftOutAreNotedInEveryMode(t *gotes
 		})
 	})
 }
+
+func (s *CLINewcomerTestSuite) TestAConfigTimeoutUnderFuzz(t *gotest.T) {
+	dir := t.TempDir()
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	gotest.NoError(t, testkit.WriteModule(root, dir, "example.com/cfgfuzz"))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "cfgfuzz_suite_test.go"), []byte(`package cfgfuzz_test
+
+import "github.com/mvrahden/go-test/pkg/gotest"
+
+type CfgFuzzTestSuite struct{}
+
+func (s *CfgFuzzTestSuite) TestOne(t *gotest.T) { gotest.True(t, true) }
+`), 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, ".gotest.yml"), []byte("timeout: 10m\nsetup-timeout: 1m\n"), 0o600))
+	run, err := testkit.RunCLI(t.Context(), dir, "fuzz", ".")
+	gotest.NoError(t, err)
+	flagged, err := testkit.RunCLI(t.Context(), dir, "fuzz", "--timeout=10m", ".")
+	gotest.NoError(t, err)
+	t.When(".gotest.yml sets timeout and setup-timeout and gotest fuzz runs", func(w *gotest.T) {
+		w.It("starts the session as without them", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, run.Stdout, "no fuzz targets found")
+		})
+		w.It("still refuses --timeout given as a flag, with exit 2", func(it *gotest.T) {
+			gotest.Equal(it, 2, flagged.Exit)
+			gotest.Contains(it, flagged.Stderr, "--timeout is not a fuzz flag")
+		})
+	})
+}

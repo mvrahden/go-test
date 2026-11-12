@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / still refuses --timeout given as a flag, with exit 2 \(
+Clause: when .gotest.yml sets timeout and setup-timeout and gotest fuzz runs → still refuses --timeout given as a flag, with exit 2
+--- a/cmd/gotest/fuzz.go
++++ b/cmd/gotest/fuzz.go
+@@ -38,7 +38,7 @@
+ 		return 2
+ 	}
+ 
+-	if hasFlag(inv.Args, "--timeout") {
++	if false {
+ 		fmt.Fprintln(os.Stderr, "FAIL: --timeout is not a fuzz flag: --for is the session's clock and the deadline follows it (--for=0 fuzzes until interrupted)")
+ 		return 2
+ 	}

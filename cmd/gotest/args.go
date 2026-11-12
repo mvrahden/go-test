@@ -32,11 +32,17 @@ func (inv Invocation) TagArgs() []string { //nolint:gocritic // hugeParam: stabl
 // DefaultArgs returns args with tags and setup-timeout from config,
 // each only if not already set via CLI flags.
 func (inv Invocation) DefaultArgs() []string { //nolint:gocritic // hugeParam: stable API
+	return inv.DefaultArgsFor(testAllowed)
+}
+
+// DefaultArgsFor is DefaultArgs for a command that takes the flags in
+// allowed: a config duration whose flag the command lacks is left out.
+func (inv Invocation) DefaultArgsFor(allowed map[string]bool) []string { //nolint:gocritic // hugeParam: stable API
 	out := inv.TagArgs()
-	if inv.Config.SetupTimeout != nil && !hasFlag(out, "--setup-timeout") {
+	if inv.Config.SetupTimeout != nil && allowed["--setup-timeout"] && !hasFlag(out, "--setup-timeout") {
 		out = append([]string{"--setup-timeout=" + inv.Config.SetupTimeout.Duration().String()}, out...)
 	}
-	if inv.Config.Timeout != nil && !hasFlag(out, "--timeout") {
+	if inv.Config.Timeout != nil && allowed["--timeout"] && !hasFlag(out, "--timeout") {
 		out = append([]string{"--timeout=" + inv.Config.Timeout.Duration().String()}, out...)
 	}
 	return out

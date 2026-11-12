@@ -38,11 +38,11 @@ func runFuzz(inv Invocation) (code int) { //nolint:gocritic // hugeParam: stable
 		return 2
 	}
 
-	if hasFlag(inv.DefaultArgs(), "--timeout") {
+	if hasFlag(inv.Args, "--timeout") {
 		fmt.Fprintln(os.Stderr, "FAIL: --timeout is not a fuzz flag: --for is the session's clock and the deadline follows it (--for=0 fuzzes until interrupted)")
 		return 2
 	}
-	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
+	own, goTestArgs, err := SplitArgs(inv.DefaultArgsFor(fuzzAllowed), fuzzAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

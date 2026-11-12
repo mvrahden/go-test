@@ -1041,6 +1041,7 @@ Fields:
   tags: <string>            Build tags, comma-separated (e.g., "integration,e2e")
   setup-timeout: <duration> Total budget for all shared fixture setup (default: the fixtures' declared budgets, 30s until the first reports; 0 to disable)
   timeout: <duration>       Global pipeline deadline (default: 15m, 0 to disable)
+                            gotest fuzz ignores timeout and setup-timeout: --for is its clock.
   min-coverage: <int>       Minimum coverage percentage, 0-100
   parallel: <int>           Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan)
   compile-parallel: <int>   Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan)

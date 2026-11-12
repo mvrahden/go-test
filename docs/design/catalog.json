@@ -6748,6 +6748,67 @@
               "name": "TestBenchmarksLeftOutAreNotedInEveryMode",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "starts the session as without them",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "newcomer_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 141,
+                      "name": "starts_the_session_as_without_them",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "still refuses --timeout given as a flag, with exit 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "newcomer_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 145,
+                      "name": "still_refuses_--timeout_given_as_a_flag,_with_exit_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when .gotest.yml sets timeout and setup-timeout and gotest fuzz runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "newcomer_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 140,
+                  "name": ".gotest.yml_sets_timeout_and_setup-timeout_and_gotest_fuzz_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AConfigTimeoutUnderFuzz",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "newcomer_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 122,
+              "name": "TestAConfigTimeoutUnderFuzz",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLINewcomer",
@@ -28749,7 +28810,7 @@
     }
   ],
   "stats": {
-    "behaviors": 833,
+    "behaviors": 835,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

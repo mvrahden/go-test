@@ -163,6 +163,16 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 			gotest.Equal(sub, tc.expect, got)
 		}
 	})
+
+	t.When("the command takes neither --timeout nor --setup-timeout", func(w *gotest.T) {
+		inv := Invocation{Args: []string{"./..."}, Config: config.ProjectConfig{Tags: "x", Timeout: config.Dur(10 * time.Minute), SetupTimeout: config.Dur(time.Minute)}}
+		w.It("adds the tags and neither duration", func(it *gotest.T) {
+			gotest.Equal(it, []string{"-tags=x", "./..."}, inv.DefaultArgsFor(ExportFuzzAllowed))
+		})
+		w.It("adds both for a command that takes them", func(it *gotest.T) {
+			gotest.Equal(it, []string{"--timeout=10m0s", "--setup-timeout=1m0s", "-tags=x", "./..."}, inv.DefaultArgsFor(ExportTestAllowed))
+		})
+	})
 }
 
 func (s *FlagParsingTestSuite) TestSplitArgs(t *gotest.T) {
