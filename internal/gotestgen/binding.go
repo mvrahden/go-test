@@ -856,7 +856,7 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		for i := 0; i < st.NumFields(); i++ {
 			f := st.Field(i)
 			if f.Name() == fieldName {
-				if err := validateTransferFieldType(identifier, f); err != nil {
+				if err := gotestast.TransferFieldError(identifier, f); err != nil {
 					return err
 				}
 				break
@@ -922,54 +922,6 @@ func (r *binder) findLocalSpec(rf *BoundFixture) *gotestast.FixtureSpec {
 		}
 	}
 	return nil
-}
-
-func validateTransferFieldType(fixtureName string, field *types.Var) error {
-	if reason := nonSerializable(field.Type()); reason != "" {
-		return fmt.Errorf("shared fixture %q: transfer field %q has non-JSON-serializable type %s (%s) — assign it in Hydrate to make it a local field instead", fixtureName, field.Name(), field.Type(), reason)
-	}
-	return nil
-}
-
-func nonSerializable(t types.Type) string {
-	switch u := t.Underlying().(type) {
-	case *types.Chan:
-		return "channel"
-	case *types.Signature:
-		return "function"
-	case *types.Array:
-		return nonSerializable(u.Elem())
-	case *types.Slice:
-		return nonSerializable(u.Elem())
-	case *types.Map:
-		if r := nonSerializable(u.Key()); r != "" {
-			return r + " in map key"
-		}
-		if !isJSONMapKey(u.Key()) {
-			return "non-string/integer map key"
-		}
-		return nonSerializable(u.Elem())
-	case *types.Pointer:
-		return nonSerializable(u.Elem())
-	case *types.Struct:
-		for i := 0; i < u.NumFields(); i++ {
-			f := u.Field(i)
-			if !f.Exported() {
-				continue
-			}
-			if r := nonSerializable(f.Type()); r != "" {
-				return r + " in field " + f.Name()
-			}
-		}
-	}
-	return ""
-}
-
-func isJSONMapKey(t types.Type) bool {
-	if u, ok := t.Underlying().(*types.Basic); ok {
-		return u.Info()&(types.IsString|types.IsInteger) != 0
-	}
-	return false
 }
 
 // topoSortSharedFixtures returns shared fixtures sorted in topological order

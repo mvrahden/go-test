@@ -56,3 +56,65 @@ func promotesExported(t types.Type, seen map[types.Type]bool) bool {
 	}
 	return false
 }
+
+// TransferFieldError refuses a transfer field of the shared fixture named
+// fixture whose type JSON cannot carry to the suites and back.
+func TransferFieldError(fixture string, f *types.Var) error {
+	if reason := nonSerializable(f.Type(), map[*types.Named]bool{}); reason != "" {
+		return At(f.Pos(), fmt.Errorf("shared fixture %q: transfer field %q has non-JSON-serializable type %s (%s) — assign it in Hydrate to make it a local field, or unexport it when only the setup process uses it", fixture, f.Name(), f.Type(), reason))
+	}
+	return nil
+}
+
+// nonSerializable names what in t JSON cannot carry, or "". A named type is
+// read once: a type that refers to itself is read no deeper.
+func nonSerializable(t types.Type, seen map[*types.Named]bool) string {
+	if n, ok := types.Unalias(t).(*types.Named); ok {
+		if seen[n] {
+			return ""
+		}
+		seen[n] = true
+	}
+	switch u := t.Underlying().(type) {
+	case *types.Chan:
+		return "channel"
+	case *types.Signature:
+		return "function"
+	case *types.Interface:
+		if !u.Empty() {
+			return "interface with methods"
+		}
+	case *types.Array:
+		return nonSerializable(u.Elem(), seen)
+	case *types.Slice:
+		return nonSerializable(u.Elem(), seen)
+	case *types.Map:
+		if r := nonSerializable(u.Key(), seen); r != "" {
+			return r + " in map key"
+		}
+		if !isJSONMapKey(u.Key()) {
+			return "non-string/integer map key"
+		}
+		return nonSerializable(u.Elem(), seen)
+	case *types.Pointer:
+		return nonSerializable(u.Elem(), seen)
+	case *types.Struct:
+		for i := 0; i < u.NumFields(); i++ {
+			f := u.Field(i)
+			if !f.Exported() {
+				continue
+			}
+			if r := nonSerializable(f.Type(), seen); r != "" {
+				return r + " in field " + f.Name()
+			}
+		}
+	}
+	return ""
+}
+
+func isJSONMapKey(t types.Type) bool {
+	if u, ok := t.Underlying().(*types.Basic); ok {
+		return u.Info()&(types.IsString|types.IsInteger) != 0
+	}
+	return false
+}

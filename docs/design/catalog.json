@@ -10672,6 +10672,67 @@
               "name": "TestEmbeddedFields",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the field is refused at the field, told to assign it in Hydrate or unexport it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 31,
+                      "name": "the_field_is_refused_at_the_field,_told_to_assign_it_in_Hydrate_or_unexport_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an interface field Hydrate assigns and a field of a type that refers to itself reach the suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "an_interface_field_Hydrate_assigns_and_a_field_of_a_type_that_refers_to_itself_reach_the_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture transfers a field whose type holds an interface with methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 30,
+                  "name": "a_shared_fixture_transfers_a_field_whose_type_holds_an_interface_with_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "InterfaceFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 29,
+              "name": "TestInterfaceFields",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "SharedFields",
@@ -26574,7 +26635,7 @@
     }
   ],
   "stats": {
-    "behaviors": 768,
+    "behaviors": 770,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

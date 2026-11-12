@@ -25,3 +25,15 @@ func (s *SharedFieldsTestSuite) TestEmbeddedFields(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SharedFieldsTestSuite) TestInterfaceFields(t *gotest.T) {
+	t.When("a shared fixture transfers a field whose type holds an interface with methods", func(w *gotest.T) {
+		w.It("the field is refused at the field, told to assign it in Hydrate or unexport it", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharediface", exit: 2,
+				shows: `fixture\.go:10:2: shared fixture "ClockSharedFixture": transfer field "Clock" has non-JSON-serializable type \S*sharediface\.Clock \(interface with methods\) — assign it in Hydrate to make it a local field, or unexport it when only the setup process uses it`})
+		})
+		w.It("an interface field Hydrate assigns and a field of a type that refers to itself reach the suite", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharedifaceok", verdict: "TestChainTestSuite/TestState"})
+		})
+	})
+}
