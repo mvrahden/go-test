@@ -229,7 +229,7 @@ When Equal fails on values that do not each render on one short line, its messag
 - **THEN** the hunk names the first differing byte, such as at [12]:, not the start of its row
 
 ### Requirement: Renderings
-A rendering SHALL follow pointers, include unexported fields and show no addresses; SHALL order map entries by key, and keys that render alike by their values; SHALL split text at its newlines, show bytes that are not text in hex, values of package sync by their type alone and unsigned integers in decimal; SHALL indent no deeper than level 32, naming the depth of the lines below it; and SHALL stop at 50,000 lines or 4 MiB, naming where the values first differ.
+A rendering SHALL follow pointers, include unexported fields and show no addresses; SHALL order map entries by key, and keys that render alike by their values; SHALL split text at its newlines, show bytes that are not text in hex, values of package sync by their type alone and unsigned integers in decimal; SHALL indent no deeper than level 32, naming the depth of the lines below it; and SHALL stop at 50,000 lines or 4 MiB, naming where the values first differ and the two values there.
 
 #### Scenario: Elements holding pointers
 - **WHEN** Equal fails on slices whose elements hold distinct pointers to equal values and one element differs
@@ -270,6 +270,7 @@ A rendering SHALL follow pointers, include unexported fields and show no address
 #### Scenario: Values too large to render
 - **WHEN** Equal fails on values whose renderings pass 50,000 lines and agree up to there
 - **THEN** the message says where they are cut and names the path of their first difference
+- **AND** shows the two values at that path
 
 ### Requirement: Mismatches without a diff
 When Equal fails on values that each render on one short line, its message SHALL show both and no diff; on two long single-line strings, or byte slices of text, it SHALL name the byte offset of their first difference and show both around it, with a caret under it that counts a wide character as two columns; on other values that each render on one line, one of them longer than 160 bytes, it SHALL show both around their first difference with a caret under it.

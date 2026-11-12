@@ -9,9 +9,16 @@ import (
 // in, as a path such as [3].Name; "" at the top. Its notion of a
 // difference is reflect.DeepEqual's.
 func firstDifference(x, y any) *step {
-	l := &locator{seen: map[seenPair]bool{}, r: &renderer{onPath: map[visit]bool{}}}
-	at, _ := l.find(reflect.ValueOf(x), reflect.ValueOf(y), nil)
+	at, _, _ := firstDifferenceValues(x, y)
 	return at
+}
+
+// firstDifferenceValues is [firstDifference] with the two values found
+// there; a side that has no element or entry there is the zero Value.
+func firstDifferenceValues(x, y any) (at *step, xv, yv reflect.Value) {
+	l := &locator{seen: map[seenPair]bool{}, r: &renderer{onPath: map[visit]bool{}}}
+	at, _ = l.find(reflect.ValueOf(x), reflect.ValueOf(y), nil)
+	return at, l.xv, l.yv
 }
 
 type seenPair struct {
@@ -22,11 +29,37 @@ type seenPair struct {
 type locator struct {
 	seen map[seenPair]bool
 	r    *renderer // renders map keys, to order them as a rendering does
+
+	// The values at the first difference: the operands of the innermost
+	// find that reported one, unless a slice or map named them first.
+	xv, yv reflect.Value
+	found  bool
 }
 
 // find reports whether x and y differ and, if they do, the path of their
 // first difference below at.
 func (l *locator) find(x, y reflect.Value, at *step) (*step, bool) {
+	s, d := l.findIn(x, y, at)
+	if d && !l.found {
+		l.xv, l.yv, l.found = x, y, true
+	}
+	return s, d
+}
+
+// there records the values at a difference the caller located itself.
+func (l *locator) there(x, y reflect.Value) {
+	l.xv, l.yv, l.found = x, y, true
+}
+
+// elementAt is v's element i, or the zero Value past its end.
+func elementAt(v reflect.Value, i int) reflect.Value {
+	if i < v.Len() {
+		return v.Index(i)
+	}
+	return reflect.Value{}
+}
+
+func (l *locator) findIn(x, y reflect.Value, at *step) (*step, bool) {
 	if !x.IsValid() || !y.IsValid() {
 		return at, x.IsValid() != y.IsValid()
 	}
@@ -60,7 +93,9 @@ func (l *locator) find(x, y reflect.Value, at *step) (*step, bool) {
 			return s, true
 		}
 		if x.Len() != y.Len() {
-			return &step{up: at, index: min(x.Len(), y.Len())}, true
+			n := min(x.Len(), y.Len())
+			l.there(elementAt(x, n), elementAt(y, n))
+			return &step{up: at, index: n}, true
 		}
 		return at, false
 	case reflect.Interface:
@@ -136,8 +171,9 @@ func (l *locator) mapDifference(x, y reflect.Value, at *step) (*step, bool) {
 		return at, false
 	}
 	type found struct {
-		e  entry
-		at *step
+		e      entry
+		at     *step
+		xv, yv reflect.Value // the values at the entry's first difference
 	}
 	var all []found
 	keyStep := func(e *entry) *step { return &step{up: at, field: l.r.keyText(e, keyMax), key: true} }
@@ -146,17 +182,20 @@ func (l *locator) mapDifference(x, y reflect.Value, at *step) (*step, bool) {
 		e := entry{key: iter.Key(), val: iter.Value()}
 		yv := y.MapIndex(e.key)
 		if !yv.IsValid() {
-			all = append(all, found{e, nil})
+			all = append(all, found{e, nil, e.val, reflect.Value{}})
 			continue
 		}
+		// Map order is random: each entry's values are taken apart, and
+		// the first in rendering order are kept below.
+		l.found = false
 		if s, d := l.find(e.val, yv, nil); d {
-			all = append(all, found{e, s})
+			all = append(all, found{e, s, l.xv, l.yv})
 		}
 	}
 	iter = y.MapRange()
 	for iter.Next() {
 		if !x.MapIndex(iter.Key()).IsValid() {
-			all = append(all, found{entry{key: iter.Key(), val: iter.Value()}, nil})
+			all = append(all, found{entry{key: iter.Key(), val: iter.Value()}, nil, reflect.Value{}, iter.Value()})
 		}
 	}
 	if len(all) == 0 {
@@ -176,6 +215,7 @@ func (l *locator) mapDifference(x, y reflect.Value, at *step) (*step, bool) {
 		}
 	}
 	f := all[first]
+	l.there(f.xv, f.yv)
 	return graft(f.at, keyStep(&f.e)), true
 }
 

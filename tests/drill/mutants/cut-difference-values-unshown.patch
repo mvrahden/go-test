@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Equal / .*CheckEqual_CutRenderings_ShowTheValuesThere
+Judge: ./pkg/gotest/internal/assert
+Clause: when Equal fails on values whose renderings pass 50,000 lines and agree up to there → shows the two values at that path
+--- a/pkg/gotest/internal/assert/equal.go
++++ b/pkg/gotest/internal/assert/equal.go
+@@ -63,7 +63,7 @@
+ 		fmt.Fprintf(&sb, "  the renderings are cut at %s; the values first differ %s", cut, where(at))
+ 		// Values of different types there are named with their types.
+ 		typedThere := typed || xv.IsValid() && yv.IsValid() && xv.Type() != yv.Type()
+-		fmt.Fprintf(&sb, "\n  expected there: %s\n  actual there:   %s", valueThere(xv, typedThere), valueThere(yv, typedThere))
++		_ = typedThere
+ 		if !re.equal(ra) {
+ 			sb.WriteString("\n")
+ 			writeDiff(&sb, re, ra)

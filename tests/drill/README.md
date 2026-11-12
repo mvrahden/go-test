@@ -408,6 +408,7 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-type-guard-silent` | a slice needle of a type the slice cannot hold is reported absent, not refused | canary: no failure message names both types |
 | `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
 | `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
+| `cut-difference-values-unshown` | renderings cut before they differ name the path but not the two values there | ring-0 equal suite |
 | `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
 | `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
 | `depth-unnamed` | lines deeper than the indented levels do not name their depth | ring-0 format suite |

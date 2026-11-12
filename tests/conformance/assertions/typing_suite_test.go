@@ -461,6 +461,12 @@ func (s *AssertionTypingTestSuite) TestDiffShapes(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "the renderings are cut at 50000 lines; the values first differ at [59999]")
 		})
+		w.It("shows the two values at that path", func(it *gotest.T) {
+			a, b := make([]int, 60000), make([]int, 60000)
+			a[59999], b[59999] = 7, 8
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, a, b) })
+			gotest.Contains(it, m.Message(), "the values first differ at [59999]\n  expected there: 7\n  actual there:   8")
+		})
 	})
 }
 
