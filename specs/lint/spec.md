@@ -129,7 +129,7 @@ Lint --github SHALL escape each annotation's message and properties as a workflo
 - **THEN** annotation paths are relative to the workspace
 
 ### Requirement: Assertion rewrites keep the verdict
-An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go.
+An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. Lint SHALL report an assertion as redundant only where both operands are the same name, field, element or literal, which reading twice cannot change.
 
 #### Scenario: Nil checks
 - **WHEN** an assertion checks an operand against nil
@@ -172,6 +172,7 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 #### Scenario: Redundant assertions
 - **WHEN** an assertion is followed by one that checks the same operand
 - **THEN** the first is removed only where the second fails on every input the first fails
+- **AND** operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own
 
 ### Requirement: Rules skip what is not gotest's
 Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, SHALL leave a failure guard unreported where a local variable shadows the gotest import, and SHALL leave calls through a user type's own B or F method unreported.

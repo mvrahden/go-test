@@ -122,3 +122,26 @@ func TestRedundantBothMessages(t *testing.T) {
 	gotest.Error(t, err, "guard") // want `Error is redundant before ErrorContains`
 	gotest.ErrorContains(t, err, "msg", "contains")
 }
+
+// === Operands each assertion evaluates anew are no repeat ===
+
+var errSentinel = errors.New("sentinel")
+
+func load() error { return errSentinel }
+
+func TestCallOperand(t *testing.T) {
+	gotest.Error(t, load())
+	gotest.ErrorIs(t, load(), errSentinel)
+}
+
+func TestReceiveOperand(t *testing.T) {
+	ch := make(chan []int, 2)
+	gotest.NotEmpty(t, <-ch)
+	gotest.Len(t, <-ch, 3)
+}
+
+func TestConversionOperand(t *testing.T) {
+	s := "abc"
+	gotest.NotNil(t, []byte(s))
+	gotest.NotEmpty(t, []byte(s))
+}
