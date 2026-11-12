@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / TheHeadline / when gotest summary runs a package whose tests are all skipped / the headline says no tests passed, names the skipped ones and exits 0 \(
+Clause: when gotest summary runs a package whose tests are all skipped → the headline says no tests passed, names the skipped ones and exits 0
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -86,7 +86,7 @@
+ 	case s.Passed > 0:
+ 		return strings.Join(append([]string{countNoun(s.Passed, "test passed", "tests passed")}, rest...), ", "), len(rest) == 0
+ 	case len(rest) > 0:
+-		return "No tests passed: " + strings.Join(rest, ", "), false
++		return strings.Join(rest, ", "), false
+ 	default:
+ 		return "No tests ran", false
+ 	}

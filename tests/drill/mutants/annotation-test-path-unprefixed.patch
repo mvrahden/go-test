@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / Annotations / when gotest summary --github runs a package with a failed test / annotates the failure at the test file in its package's directory \(
+Clause: when gotest summary --github runs a package with a failed test → annotates the failure at the test file in its package's directory
+--- a/internal/gotestspec/annotations.go
++++ b/internal/gotestspec/annotations.go
+@@ -82,7 +82,7 @@
+ 		}
+ 	}
+ 	if pkgDir != "" {
+-		return pkgDir + "/" + file
++		return file
+ 	}
+ 	return file
+ }

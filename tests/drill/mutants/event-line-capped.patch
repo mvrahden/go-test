@@ -1,3 +1,5 @@
+Expect: ^FAIL .*conformance/spec SpecLongLine / ALineLongerThanAMebibyte / when a saved stream holds an event line longer than a mebibyte / summary renders it and exits by its verdict \(
+Clause: when a saved stream holds an event line longer than a mebibyte → summary renders it and exits by its verdict
 Expect: ^FAIL .*conformance/spec SpecLongLine / ALineLongerThanAMebibyte / when a saved stream holds an event line longer than a mebibyte / spec renders the stream, the long line's test with its verdict \(
 Clause: when a saved stream holds an event line longer than a mebibyte → spec renders the stream, the long line's test with its verdict
 --- a/internal/gotestspec/event.go
