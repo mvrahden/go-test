@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics / RuleNames / when lint reports a finding / the -json finding carries the rule as its category and a message without it \(
+Clause: when lint reports a finding → the -json finding carries the rule as its category and a message without it
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -350,7 +350,7 @@
+ 		Pos:            rng.Pos(),
+ 		End:            rng.End(),
+ 		Category:       string(rule),
+-		Message:        fmt.Sprintf(format, args...),
++		Message:        fmt.Sprintf(format, args...) + " (" + string(rule) + ")",
+ 		SuggestedFixes: fixes,
+ 	})
+ }

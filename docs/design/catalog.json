@@ -24416,6 +24416,67 @@
               "name": "TestSkipFlags",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the plain line ends with the rule in parentheses",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "ergonomics_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 98,
+                      "name": "the_plain_line_ends_with_the_rule_in_parentheses",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the -json finding carries the rule as its category and a message without it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "ergonomics_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 105,
+                      "name": "the_-json_finding_carries_the_rule_as_its_category_and_a_message_without_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint reports a finding",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "ergonomics_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 97,
+                  "name": "lint_reports_a_finding",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RuleNames",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "ergonomics_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 96,
+              "name": "TestRuleNames",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterErgonomics",
@@ -30887,7 +30948,7 @@
     }
   ],
   "stats": {
-    "behaviors": 898,
+    "behaviors": 900,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

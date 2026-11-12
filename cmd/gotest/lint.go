@@ -519,7 +519,11 @@ func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, sou
 		// As token.Position prints it: a //line directive without a
 		// column leaves none.
 		pos := token.Position{Filename: f.File, Line: f.Line, Column: f.Col}
-		fmt.Fprintf(stderr, "%s: %s\n", pos, f.Message)
+		if f.Rule == "" {
+			fmt.Fprintf(stderr, "%s: %s\n", pos, f.Message)
+		} else {
+			fmt.Fprintf(stderr, "%s: %s (%s)\n", pos, f.Message, f.Rule)
+		}
 		if context < 0 {
 			continue
 		}

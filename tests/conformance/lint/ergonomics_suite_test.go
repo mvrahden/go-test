@@ -93,6 +93,21 @@ func (s *LinterErgonomicsTestSuite) TestSkipFlags(t *gotest.T) {
 	})
 }
 
+func (s *LinterErgonomicsTestSuite) TestRuleNames(t *gotest.T) {
+	t.When("lint reports a finding", func(w *gotest.T) {
+		w.It("the plain line ends with the rule in parentheses", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "lint", nolintPkg)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Regexp(it, `(?m)nolint_test\.go:13:1: stdlib test TestForeign — consider using a gotest suite \(stdlib-test\)$`, run.Stderr)
+			gotest.Regexp(it, `(?m)nolint_test\.go:9:35: unknown rule not-a-rule in nolint comment \(nolint-unknown\)$`, run.Stderr)
+		})
+		w.It("the -json finding carries the rule as its category and a message without it", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", nolintPkg), "stdlib-test nolint_test.go:13:1: stdlib test TestForeign — consider using a gotest suite")
+		})
+	})
+}
+
 // onLine is the findings whose position starts with fileLine.
 func onLine(findings []string, fileLine string) []string {
 	var got []string

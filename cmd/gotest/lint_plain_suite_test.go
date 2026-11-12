@@ -28,7 +28,7 @@ func (s *LintPlainTestSuite) TestPlainMode(t *gotest.T) {
 			gotest.Equal(it, 3, code)
 		})
 		w.It("prints each finding once, behind its position", func(it *gotest.T) {
-			gotest.Regexp(it, `^\S*probe_test\.go:5:1: .+\n$`, stderr.String())
+			gotest.Regexp(it, `^\S*probe_test\.go:5:1: stdlib test TestProbe — consider using a gotest suite \(stdlib-test\)\n$`, stderr.String())
 		})
 	})
 

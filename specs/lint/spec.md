@@ -260,3 +260,11 @@ In the findings `gotest lint -json` prints, each finding's `end` SHALL lie past 
 #### Scenario: A finding's extent
 - **WHEN** lint -json reports a finding on a call and one on a function
 - **THEN** ends each past its posn, at the end of the call and of the function's signature
+
+### Requirement: A finding names its rule
+Lint's plain report SHALL end each finding's line with its rule in parentheses, the id a nolint comment takes. Lint -json SHALL carry the rule as the finding's `category` and leave its `message` without it.
+
+#### Scenario: The rule a finding is reported under
+- **WHEN** lint reports a finding
+- **THEN** the plain line ends with the rule in parentheses
+- **AND** the -json finding carries the rule as its category and a message without it
