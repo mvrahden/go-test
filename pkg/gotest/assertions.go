@@ -177,20 +177,8 @@ func Contains(t testingT, s, contains any, msgAndArgs ...any) {
 
 // ElementsMatch asserts that listA and listB contain the same elements regardless of order.
 func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any) {
-	if len(listA) != len(listB) {
-		fail(t, fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB)), msgAndArgs)
-		return
-	}
-	counts := make(map[V]int, len(listA))
-	for _, v := range listA {
-		counts[v]++
-	}
-	for _, v := range listB {
-		counts[v]--
-		if counts[v] < 0 {
-			fail(t, fmt.Sprintf("ElementsMatch failed:\n  element %#v is in listB but not enough times in listA", v), msgAndArgs)
-			return
-		}
+	if msg := assert.CheckElementsMatch(listA, listB); msg != "" {
+		fail(t, msg, msgAndArgs)
 	}
 }
 
@@ -245,8 +233,8 @@ func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
 		fail(t, "ErrorContains failed:\n  expected an error but got nil", msgAndArgs)
 		return
 	}
-	if !strings.Contains(err.Error(), contains) {
-		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", err.Error(), contains), msgAndArgs)
+	if text := assert.ErrorText(err); !strings.Contains(text, contains) {
+		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", text, contains), msgAndArgs)
 	}
 }
 
@@ -374,7 +362,7 @@ func LessOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 // NoError asserts that err is nil.
 func NoError(t testingT, err error, msgAndArgs ...any) {
 	if err != nil {
-		fail(t, fmt.Sprintf("NoError failed:\n  unexpected error: %s", err.Error()), msgAndArgs)
+		fail(t, "NoError failed:\n  unexpected error: "+assert.ErrorText(err), msgAndArgs)
 	}
 }
 
@@ -530,15 +518,8 @@ func compilePattern(pattern string) (*regexp.Regexp, error) {
 
 // Subset asserts that every element of subset exists in list.
 func Subset[V comparable](t testingT, list, subset []V, msgAndArgs ...any) {
-	set := make(map[V]struct{}, len(list))
-	for _, v := range list {
-		set[v] = struct{}{}
-	}
-	for _, v := range subset {
-		if _, ok := set[v]; !ok {
-			fail(t, fmt.Sprintf("Subset failed:\n  element %#v from subset not found in list", v), msgAndArgs)
-			return
-		}
+	if msg := assert.CheckSubset(list, subset); msg != "" {
+		fail(t, msg, msgAndArgs)
 	}
 }
 

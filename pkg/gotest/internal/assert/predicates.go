@@ -414,3 +414,76 @@ func allDigits(s string) bool {
 	}
 	return true
 }
+
+// ErrorText is err.Error(), or, when that panics, a text naming err's type
+// and the panic: a nil pointer in a non-nil error is the usual cause.
+func ErrorText(err error) (text string) {
+	defer func() {
+		if r := recover(); r != nil {
+			if rv := reflect.ValueOf(err); rv.Kind() == reflect.Ptr && rv.IsNil() {
+				text = fmt.Sprintf("%T(nil), a nil pointer in a non-nil error; its Error method panicked: %v", err, r)
+				return
+			}
+			text = fmt.Sprintf("%T, whose Error method panicked: %v", err, r)
+		}
+	}()
+	return err.Error()
+}
+
+// CheckElementsMatch returns "" if listA and listB hold the same elements
+// the same number of times, in any order. Otherwise it returns a formatted
+// error string.
+func CheckElementsMatch[V comparable](listA, listB []V) (msg string) {
+	if len(listA) != len(listB) {
+		return fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB))
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			msg = unhashable("ElementsMatch", r, listA, listB)
+		}
+	}()
+	counts := make(map[V]int, len(listA))
+	for _, v := range listA {
+		counts[v]++
+	}
+	for _, v := range listB {
+		counts[v]--
+		if counts[v] < 0 {
+			return fmt.Sprintf("ElementsMatch failed:\n  element %#v is in listB but not enough times in listA", v)
+		}
+	}
+	return ""
+}
+
+// CheckSubset returns "" if every element of subset is in list. Otherwise it
+// returns a formatted error string.
+func CheckSubset[V comparable](list, subset []V) (msg string) {
+	defer func() {
+		if r := recover(); r != nil {
+			msg = unhashable("Subset", r, list, subset)
+		}
+	}()
+	set := make(map[V]struct{}, len(list))
+	for _, v := range list {
+		set[v] = struct{}{}
+	}
+	for _, v := range subset {
+		if _, ok := set[v]; !ok {
+			return fmt.Sprintf("Subset failed:\n  element %#v from subset not found in list", v)
+		}
+	}
+	return ""
+}
+
+// unhashable names the first element of lists that == cannot compare, which
+// made a map of them panic with r; any other panic goes on.
+func unhashable[V comparable](name string, r any, lists ...[]V) string {
+	for _, l := range lists {
+		for _, v := range l {
+			if !reflect.ValueOf(v).Comparable() {
+				return fmt.Sprintf("%s failed:\n  an element of type %T cannot be compared with ==; compare such lists with Equal", name, any(v))
+			}
+		}
+	}
+	panic(r)
+}

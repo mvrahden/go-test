@@ -145,6 +145,17 @@ A failure message SHALL format the extra arguments by the first when it is of an
 - **WHEN** ErrorAs is given an error of another type
 - **THEN** names the type it expected
 
+### Requirement: Values an assertion cannot read
+An assertion SHALL fail with a message, not panic, when an error's Error method panics or when list elements cannot be compared with ==.
+
+#### Scenario: A nil pointer in a non-nil error
+- **WHEN** NoError is given a non-nil error holding a nil pointer whose Error method panics
+- **THEN** fails naming the error's type and the panic
+
+#### Scenario: Elements that cannot be compared
+- **WHEN** ElementsMatch or Subset is given elements of an interface type that hold slices
+- **THEN** fails naming the element's type and Equal
+
 ### Requirement: JSON numbers
 JSONEq SHALL compare numbers by value: integers beyond float64's exact range stay distinct, an integer equals its decimal spelling at any exponent, and -0 equals 0.
 

@@ -2028,6 +2028,83 @@
               "name": "TestJSONText",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails naming the error's type and the panic",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 687,
+                      "name": "fails_naming_the_error's_type_and_the_panic",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when NoError is given a non-nil error holding a nil pointer whose Error method panics",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 686,
+                  "name": "NoError_is_given_a_non-nil_error_holding_a_nil_pointer_whose_Error_method_panics",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails naming the element's type and Equal",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 695,
+                      "name": "fails_naming_the_element's_type_and_Equal",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when ElementsMatch or Subset is given elements of an interface type that hold slices",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 694,
+                  "name": "ElementsMatch_or_Subset_is_given_elements_of_an_interface_type_that_hold_slices",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ValuesAnAssertionCannotRead",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "typing_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 685,
+              "name": "TestValuesAnAssertionCannotRead",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "AssertionTyping",
@@ -27414,7 +27491,7 @@
     }
   ],
   "stats": {
-    "behaviors": 795,
+    "behaviors": 797,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

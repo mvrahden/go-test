@@ -371,3 +371,38 @@ func (s *PredicatesTestSuite) TestJSONEqual(t *gotest.T, _ *predicatesCtx) {
 		}
 	}
 }
+
+// nilErr is an error whose Error method reads through its receiver.
+type nilErr struct{ msg string }
+
+func (e *nilErr) Error() string { return e.msg }
+
+func (s *PredicatesTestSuite) TestErrorText(t *gotest.T, _ *predicatesCtx) {
+	if got := assert.ErrorText(io.EOF); got != "EOF" {
+		t.Errorf("ErrorText(io.EOF): got %q", got)
+	}
+	var typedNil *nilErr
+	got := assert.ErrorText(typedNil)
+	for _, want := range []string{"*assert_test.nilErr(nil), a nil pointer in a non-nil error; its Error method panicked:", "nil pointer dereference"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ErrorText(typed nil): got %q, want it to hold %q", got, want)
+		}
+	}
+}
+
+func (s *PredicatesTestSuite) TestCheckElementsMatch_Unhashable(t *gotest.T, _ *predicatesCtx) {
+	a, b := []any{[]int{1}, "x"}, []any{"x", []int{1}}
+	const want = "an element of type []int cannot be compared with ==; compare such lists with Equal"
+	if got := assert.CheckElementsMatch(a, b); !strings.Contains(got, "ElementsMatch failed:") || !strings.Contains(got, want) {
+		t.Errorf("CheckElementsMatch(unhashable): got %q", got)
+	}
+	if got := assert.CheckSubset(a, b); !strings.Contains(got, "Subset failed:") || !strings.Contains(got, want) {
+		t.Errorf("CheckSubset(unhashable): got %q", got)
+	}
+	if got := assert.CheckElementsMatch([]any{1, "x"}, []any{"x", 1}); got != "" {
+		t.Errorf("CheckElementsMatch(hashable any): got %q", got)
+	}
+	if got := assert.CheckElementsMatch([]int{1, 1, 2}, []int{1, 2, 2}); !strings.Contains(got, "is in listB but not enough times in listA") {
+		t.Errorf("CheckElementsMatch(duplicate counts): got %q", got)
+	}
+}

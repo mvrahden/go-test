@@ -676,3 +676,31 @@ func (s *AssertionTypingTestSuite) TestJSONText(t *gotest.T) {
 		})
 	})
 }
+
+// missing is an error whose Error method reads through its receiver.
+type missing struct{ what string }
+
+func (e *missing) Error() string { return e.what }
+
+func (s *AssertionTypingTestSuite) TestValuesAnAssertionCannotRead(t *gotest.T) {
+	t.When("NoError is given a non-nil error holding a nil pointer whose Error method panics", func(w *gotest.T) {
+		w.It("fails naming the error's type and the panic", func(it *gotest.T) {
+			var e *missing
+			m := gotest.Record(func(r *gotest.R) { gotest.NoError(r, e) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "NoError failed:\n  unexpected error: *assertions_test.missing(nil), a nil pointer in a non-nil error; its Error method panicked:")
+		})
+	})
+	t.When("ElementsMatch or Subset is given elements of an interface type that hold slices", func(w *gotest.T) {
+		w.It("fails naming the element's type and Equal", func(it *gotest.T) {
+			a := []any{[]int{1}}
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, a, a) }),
+				gotest.Record(func(r *gotest.R) { gotest.Subset(r, a, a) }),
+			} {
+				gotest.True(it, m.Failed())
+				gotest.Contains(it, m.Message(), "an element of type []int cannot be compared with ==; compare such lists with Equal")
+			}
+		})
+	})
+}

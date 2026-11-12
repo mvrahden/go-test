@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / ErrorText
+Judge: ./pkg/gotest/internal/assert
+Clause: when NoError is given a non-nil error holding a nil pointer whose Error method panics → fails naming the error's type and the panic
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -420,6 +420,8 @@
+ func ErrorText(err error) (text string) {
+ 	defer func() {
+ 		if r := recover(); r != nil {
++			text = "<nil>"
++			return
+ 			if rv := reflect.ValueOf(err); rv.Kind() == reflect.Ptr && rv.IsNil() {
+ 				text = fmt.Sprintf("%T(nil), a nil pointer in a non-nil error; its Error method panicked: %v", err, r)
+ 				return

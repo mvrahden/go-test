@@ -275,6 +275,8 @@ shards of one run do not add up to every mutant exactly once.
 | `each-method-t-reported-as-a-goexit` | a row that skips or fails the method's own T is reported as leaving through Goexit without a verdict | canary: the eachskip method that skips in a row fails, saying its row left without a verdict |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
 | `notempty-pointer-to-a-number-passes` | `IsEmptyable` takes every pointer as one that can be empty, so `NotEmpty` on a pointer to a number is a nil check | ring-0 predicates suite |
+| `noerror-error-method-panics` | `ErrorText` reads `<nil>` for an error whose `Error` method panicked, naming neither its type nor the panic | ring-0 predicates suite |
+| `elementsmatch-unhashable-panics` | `CheckElementsMatch` passes lists whose elements `==` cannot compare | ring-0 predicates suite |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-reads-before-cleanup` | a parallel FailFast method's verdict is read before its cleanups ran | canary: both methods of the cleanup-failing FailFast fixture run under `-parallel=1` |
