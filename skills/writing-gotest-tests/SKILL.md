@@ -35,7 +35,8 @@ without go-test yet, `go.work`, vendoring). A `FAIL:` refusal about a
 drifted binary is never a fault in the tests: switch to `go tool gotest`;
 never upgrade just to silence it.
 
-This skill describes **v1.38**. On a release you could not upgrade from,
+This skill describes **v1.37**, the newest release; a rule tagged with a
+later version waits for that release. On a release you could not upgrade from,
 read `reference/versions.md` before writing anything: it lists what each
 older release lacks or does differently, including rules below that fail
 there (on v1.25.x, rules 2, 3 and 10). A rule tagged **v1.27+** (or later)
@@ -190,7 +191,7 @@ those are your job, below.
    message arguments (`gotest.Equal(t, want, got, "order %s", id)`), and
    `t-escape` flags `t.T().Log`. `b.B()` and `f.F()` follow the same rule:
    reach for them only for what `gotest.B`/`gotest.F` lack (`N`, timers,
-   `Run` on `*testing.B`); `t-escape` flags the rest (v1.38+).
+   `Run` on `*testing.B`); `t-escape` flags the rest (v1.37+).
 7. **Ask "why is this wall-clock-asserting suite NOT Exclusive?"
    (v1.27+)** — the counterpart to rule 4. A suite whose assertions or
    timeout budgets measure elapsed time (latency bounds, timing budgets,

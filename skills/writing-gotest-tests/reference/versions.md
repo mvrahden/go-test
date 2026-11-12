@@ -766,6 +766,15 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
     is unknown (exit 2), and on Windows the extension's cancel killed the run
     without teardown.
 
+13. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
+    like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
+    the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
+    loop and seed they are. Below v1.37 `t-escape`/`suite-lifecycle` saw
+    only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
+    benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
+    `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
+    gains `Name`, so `t-escape` fixes those through every escape too.
+
 ## v1.38
 
 Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
@@ -829,16 +838,7 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    `goleak.VerifyTestMain` still sees nothing. Before v1.38 it was
    `(*watcher).loop`, and an ignore line naming that now matches nothing.
 
-6. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
-   like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
-   the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
-   loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw
-   only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
-   benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
-   `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
-   gains `Name`, so `t-escape` fixes those through every escape too.
-
-7. **The stop, pid and budget files are gone** — the runner sets neither
+6. **The stop, pid and budget files are gone** — the runner sets neither
    `GOTEST_STOP_FILE` nor `GOTEST_TEARDOWN_BUDGET_FILE`, and the work
    directory holds no stop, pid or budget file beside a suite: the stop,
    the force and the teardown budget travel as lines on its channel
@@ -856,7 +856,7 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    tests started outlived a dead runner. Nothing user-facing read the
    files; tooling that listed the work directory sees them gone.
 
-8. **The runtime floor and the extension floor are v1.38.0** — a v1.38
+7. **The runtime floor and the extension floor are v1.38.0** — a v1.38
    CLI refuses a runtime below v1.38.0 before it generates anything, with
    exit 2 and the `go get -tool` command that fixes it. A v1.38 runtime
    under an older CLI fails at the first suite open, with exit 1 and one
