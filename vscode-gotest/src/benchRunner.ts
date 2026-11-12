@@ -11,6 +11,7 @@ import * as path from "node:path";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { withoutExternalId } from "./types.js";
+import { ManagedChild } from "./managedChild.js";
 import {
   buildCliCommand,
   buildBenchArgs,
@@ -462,6 +463,8 @@ export class BenchRunner {
           workspaceDir,
           token,
         );
+        // A cancelled run's numbers are partial: none are recorded.
+        if (token.isCancellationRequested) return;
         if (stderr.trim()) this.outputChannel.warn(stderr.trimEnd());
         if (code !== 0 && !stdout.trim()) {
           throw new Error(`gotest bench exited with code ${code}`);
@@ -520,31 +523,40 @@ export class BenchRunner {
     }
   }
 
-  private spawnBench(
+  // spawnBench runs the CLI as a test run is run: a cancel stops it through
+  // its stdin, and a suite's teardown gets its grace.
+  private async spawnBench(
     cmd: CliCommand,
     cwd: string,
     token: vscode.CancellationToken,
   ): Promise<{ stdout: string; stderr: string; code: number | null }> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(cmd.bin, cmd.args, { cwd });
-      const sub = token.onCancellationRequested(() => child.kill("SIGTERM"));
-      let stdout = "";
-      let stderr = "";
-
-      child.stdout.on("data", (data: Buffer) => {
-        stdout += data.toString();
-      });
-      child.stderr.on("data", (data: Buffer) => {
-        stderr += data.toString();
-      });
-      child.on("close", (code) => {
-        sub.dispose();
-        resolve({ stdout, stderr, code });
-      });
-      child.on("error", (err: Error) => {
-        sub.dispose();
-        reject(err);
-      });
+    const mc = new ManagedChild(cmd.bin, cmd.args, {
+      cwd,
+      kind: "bench",
+      control: true,
     });
+    let stdout = "";
+    let stderr = "";
+    let spawnError: Error | undefined;
+    mc.child.stdout?.on("data", (data: string) => {
+      stdout += data;
+    });
+    mc.child.stderr?.on("data", (data: string) => {
+      stderr += data;
+    });
+    mc.child.on("error", (err: Error) => {
+      spawnError = err;
+    });
+    const sub = token.onCancellationRequested(
+      () => void mc.terminate("teardown"),
+    );
+    try {
+      const { code } = await mc.exited;
+      if (spawnError) throw spawnError;
+      return { stdout, stderr, code };
+    } finally {
+      sub.dispose();
+      mc.dispose();
+    }
   }
 }

@@ -158,6 +158,8 @@ by the CLI, never re-derived in the extension:
 
 Benchmarks are deliberate acts: there is no bench-on-save and watch mode
 never benchmarks.
+Cancelling a bench run stops the CLI through its stdin, as a test run is
+stopped; a cancelled run records no numbers.
 
 ### Fuzzing
 

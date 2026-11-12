@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import type { EventEmitter } from "node:events";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 
@@ -24,37 +23,34 @@ vi.mock("vscode", () => {
   return {
     EventEmitter: class {},
     CancellationTokenSource,
+    Uri: { file: (p: string) => ({ fsPath: p }) },
     window: { showErrorMessage: vi.fn() },
+    workspace: { getConfiguration: () => ({ get: () => undefined }) },
   };
 });
 
-/** FakeChild is a spawned process the test drives by hand. */
-interface FakeChild extends EventEmitter {
-  stdout: EventEmitter;
-  stderr: EventEmitter;
-  kill: Mock;
-}
-
 const h = vi.hoisted(() => ({
-  spawned: [] as { bin: string; child: FakeChild }[],
+  script: { once: [], always: undefined, calls: [] } as SpawnScript,
+  children: [] as (FakeChild & { unref: () => void })[],
   cliArgs: [] as string[],
 }));
 
 vi.mock("node:child_process", async (importOriginal) => {
   // Imported here: the factory runs before the imports.
-  const { EventEmitter: Emitter } = await import("node:events");
+  const { createScriptedSpawn } =
+    await import("./scriptedSpawn.test-support.js");
+  const spawn = createScriptedSpawn(h.script);
   return {
     ...(await importOriginal<typeof import("node:child_process")>()),
-    spawn: vi.fn((bin: string) => {
-      const child = Object.assign(new Emitter(), {
-        stdout: new Emitter(),
-        stderr: new Emitter(),
-        kill: vi.fn(),
+    spawn: (bin: string, args: string[], opts?: Record<string, unknown>) => {
+      const child = Object.assign(spawn(bin, args, opts), {
         unref: vi.fn(),
       });
-      h.spawned.push({ bin, child });
+      const kill = child.kill;
+      child.kill = vi.fn((signal?: NodeJS.Signals) => kill(signal));
+      h.children.push(child);
       return child;
-    }),
+    },
   };
 });
 
@@ -67,6 +63,7 @@ vi.mock("./cli.js", async (importOriginal) => ({
   offerCliUpgrade: vi.fn(() => false),
 }));
 
+import type { SpawnScript, FakeChild } from "./scriptedSpawn.test-support.js";
 import {
   BenchRunner,
   planBenchInvocations,
@@ -177,15 +174,21 @@ describe("profileTarget", () => {
     baseline: { results: [] },
   });
   let runner: BenchRunner;
+  let store: { recordReport: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    h.spawned.length = 0;
+    h.script.once = [];
+    // pprof: runs until the test ends it.
+    h.script.always = { neverExits: true };
+    h.script.calls = [];
+    h.children = [];
     h.cliArgs = [];
-    const log = { info: vi.fn(), warn: vi.fn() };
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    store = { recordReport: vi.fn() };
     runner = new BenchRunner(
       {} as never,
       { getWorkspaceDir: () => "/ws" } as never,
-      { recordReport: vi.fn() } as never,
+      store as never,
       log as never,
     );
   });
@@ -196,42 +199,49 @@ describe("profileTarget", () => {
     return path.dirname(flag!.slice("-cpuprofile=".length));
   }
 
-  /** benchStarted waits until the bench process is spawned. */
-  async function benchStarted(): Promise<FakeChild> {
-    await vi.waitFor(() => expect(h.spawned).toHaveLength(1));
-    return h.spawned[0].child;
-  }
-
   it("removes the profile directory once pprof is done with it", async () => {
-    const run = runner.profileTarget(target, "cpu");
-    const bench = await benchStarted();
-    bench.stdout.emit("data", Buffer.from(report));
-    bench.emit("close", 0);
-    await run;
-    expect(h.spawned[1].bin).toBe("go");
+    h.script.once = [{ stdout: [report], code: 0 }];
+    await runner.profileTarget(target, "cpu");
+    expect(h.script.calls?.[1].bin).toBe("go");
     expect(existsSync(outDir())).toBe(true);
-    h.spawned[1].child.emit("exit", 0);
+    h.children[1].emit("exit", 0);
     await vi.waitFor(() => expect(existsSync(outDir())).toBe(false));
   });
 
   it("removes the profile directory when the run fails", async () => {
-    const run = runner.profileTarget(target, "cpu");
-    const bench = await benchStarted();
-    bench.emit("close", 1);
-    await run;
-    expect(h.spawned).toHaveLength(1);
+    h.script.once = [{ code: 1 }];
+    await runner.profileTarget(target, "cpu");
+    expect(h.children).toHaveLength(1);
     expect(existsSync(outDir())).toBe(false);
   });
 
   it("removes the profile directory and opens no pprof when the run is cancelled", async () => {
+    h.script.once = [{ stdout: [report], neverExits: true }];
     const run = runner.profileTarget(target, "cpu");
-    const bench = await benchStarted();
-    bench.stdout.emit("data", Buffer.from(report));
+    await vi.waitFor(() => expect(h.children).toHaveLength(1));
     runner.dispose();
-    expect(bench.kill).toHaveBeenCalled();
-    bench.emit("close", null);
+    expect(h.children[0].written).toEqual(["stop\n"]);
+    h.children[0].emit("close", null, null);
     await run;
-    expect(h.spawned).toHaveLength(1);
+    expect(h.children).toHaveLength(1);
     expect(existsSync(outDir())).toBe(false);
+  });
+
+  it("starts bench with --control=stdin, last", async () => {
+    h.script.once = [{ stdout: [report], code: 0 }];
+    await runner.runTarget(target);
+    expect(h.script.calls?.[0].args.at(-1)).toBe("--control=stdin");
+  });
+
+  it("stops a cancelled bench by its stdin and records nothing", async () => {
+    h.script.once = [{ stdout: [report], neverExits: true }];
+    const run = runner.runTarget(target);
+    await vi.waitFor(() => expect(h.children).toHaveLength(1));
+    runner.dispose();
+    expect(h.children[0].written).toEqual(["stop\n"]);
+    expect(h.children[0].kill).not.toHaveBeenCalled();
+    h.children[0].emit("close", 0, null);
+    await run;
+    expect(store.recordReport).not.toHaveBeenCalled();
   });
 });
