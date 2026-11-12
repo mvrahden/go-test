@@ -1,0 +1,14 @@
+Expect: an AfterAll that left through runtime.Goexit passed
+Judge: ./tests/lifecycle HoldsTestSuite/TestAnAfterAllLeavingThroughGoexitFailsTheSuite
+Clause: when a suite's AfterAll leaves through runtime.Goexit without a verdict → fails the suite, saying AfterAll left through runtime.Goexit
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -266,7 +266,7 @@
+ 		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" AfterAll", "SetupTimeout", timeout)()
+ 	}
+ 	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() {
+-		returned := false
++		returned := true
+ 		defer func() {
+ 			if returned {
+ 				return

@@ -142,6 +142,13 @@ A panic in a test method or its BeforeEach SHALL be reported and fail the test e
 - **WHEN** a test method's BeforeEach panics and its AfterEach fails a fatal assertion
 - **THEN** the test fails with the panic reported, and its AfterEach still runs
 
+### Requirement: A suite's AfterAll that leaves through runtime.Goexit
+A suite's AfterAll that leaves through runtime.Goexit without failing or skipping its own T SHALL fail the suite with a message that says so.
+
+#### Scenario: AfterAll leaves without a verdict
+- **WHEN** a suite's AfterAll leaves through runtime.Goexit without a verdict
+- **THEN** fails the suite, saying AfterAll left through runtime.Goexit
+
 ### Requirement: A context the default deadline ended
 When the default deadline of a suite that declares no Timeout or SetupTimeout ends the context of a test method, BeforeAll or AfterAll still running, the harness SHALL write one line naming it and the default, unbuffered on stderr or, under -json, with its test, and SHALL leave its verdict as it is. A declared budget reports its own verdict, so it gets no such line, and neither does a context a stop or the end of its phase ended.
 

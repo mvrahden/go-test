@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -1745,4 +1747,41 @@ func under(parent *gotestruntime.FixtureNode, children ...*gotestruntime.Fixture
 		c.DependsOn = append(c.DependsOn, parent.Name)
 	}
 	return append([]*gotestruntime.FixtureNode{parent}, children...)
+}
+
+func (s *RuntimeTestSuite) TestSetupDAG_BeforeAllLeavingThroughGoexitFails(t *gotest.T) {
+	released := false
+	node := &gotestruntime.FixtureNode{
+		Name:      "Probe",
+		Config:    gotest.DefaultFixtureConfig(),
+		BeforeAll: func(context.Context) error { runtime.Goexit(); return nil },
+		AfterAll:  func(context.Context) error { released = true; return nil },
+	}
+	dag, err := gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+	if err == nil {
+		dag.Teardown()
+		fatalf(t, "a fixture BeforeAll that left through runtime.Goexit came up without an error")
+	}
+	if !strings.Contains(err.Error(), "Probe.BeforeAll left through runtime.Goexit") {
+		t.Errorf("the setup error does not say how the hook left: %v", err)
+	}
+	if !released {
+		t.Errorf("the fixture whose BeforeAll left through runtime.Goexit was not released")
+	}
+}
+
+func (s *RuntimeTestSuite) TestTeardownDAG_AfterAllLeavingThroughGoexitFails(t *gotest.T) {
+	node := &gotestruntime.FixtureNode{
+		Name:      "Probe",
+		Config:    gotest.DefaultFixtureConfig(),
+		BeforeAll: func(context.Context) error { return nil },
+		AfterAll:  func(context.Context) error { runtime.Goexit(); return nil },
+	}
+	dag, err := gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+	if err != nil {
+		fatalf(t, "setup: %v", err)
+	}
+	if !dag.Teardown() {
+		t.Errorf("a fixture AfterAll that left through runtime.Goexit was counted as a clean teardown")
+	}
 }

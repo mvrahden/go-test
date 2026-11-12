@@ -56,6 +56,17 @@ A package fixture whose BeforeAll returns an error or panics SHALL fail the run 
 - **WHEN** a package fixture's BeforeAll or AfterAll returns an error or panics
 - **THEN** fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names
 
+### Requirement: A fixture hook that leaves through runtime.Goexit
+A package fixture's BeforeAll or AfterAll that leaves through runtime.Goexit, as a FailNow on a testing.TB does, SHALL fail the run as one that returned an error does.
+
+#### Scenario: BeforeAll leaves through runtime.Goexit
+- **WHEN** a package fixture's BeforeAll leaves through runtime.Goexit
+- **THEN** fails the suite, which never opens, saying how the hook left, and still runs the fixture's AfterAll
+
+#### Scenario: AfterAll leaves through runtime.Goexit
+- **WHEN** a package fixture's AfterAll leaves through runtime.Goexit
+- **THEN** fails the run after every other hook ran
+
 ### Requirement: Where a fixture hook failure is reported
 An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook's declaration, not inside the runtime, wherever it is declared: in the suite's package or in another package. The file is named by its base name, or by its full path under -fullpath.
 

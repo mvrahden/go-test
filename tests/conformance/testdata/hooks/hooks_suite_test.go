@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -20,7 +21,7 @@ func (s *GridTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 // suiteHook marks the hook and goes wrong when told to: a failed assertion,
-// a panic, an overrun or a wait.
+// a panic, an overrun, a wait or a runtime.Goexit.
 func suiteHook(t *gotest.T, hook string) {
 	mark(hook)
 	if !misbehaves(hook) {
@@ -33,6 +34,8 @@ func suiteHook(t *gotest.T, hook string) {
 		time.Sleep(time.Second)
 	case "wait":
 		waitOn(t.Context(), hook)
+	case "goexit":
+		runtime.Goexit()
 	default:
 		gotest.Fail(t, "%s failed", hook)
 	}

@@ -46,44 +46,54 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 		go func(node *FixtureNode) {
 			defer wg.Done()
 			defer close(done[node.Name])
+			// Set on every way out of the setup but runtime.Goexit, which a
+			// FailNow or SkipNow on a testing.TB in the hook causes.
+			finished := false
 			defer func() {
-				if r := recover(); r != nil {
-					err := fmt.Errorf("%s: panic: %v", node.Name, r)
+				r := recover()
+				if r == nil && finished {
+					return
+				}
+				err := goexited(node, "BeforeAll", "Hydrate")
+				if r != nil {
+					err = fmt.Errorf("%s: panic: %v", node.Name, r)
+				}
+				mu.Lock()
+				errs[node.Name] = err
+				mu.Unlock()
+				cancel(err)
+			}()
+			func() {
+				for _, dep := range node.DependsOn {
+					select {
+					case <-done[dep]:
+						mu.Lock()
+						depErr := errs[dep]
+						mu.Unlock()
+						if depErr != nil {
+							err := fmt.Errorf("skipped: dependency %q failed", dep)
+							mu.Lock()
+							errs[node.Name] = err
+							mu.Unlock()
+							cancel(err)
+							return
+						}
+					case <-childCtx.Done():
+						mu.Lock()
+						errs[node.Name] = context.Cause(childCtx)
+						mu.Unlock()
+						return
+					}
+				}
+
+				if err := setupNodeDAG(childCtx, node, sharedState, tracker); err != nil {
 					mu.Lock()
 					errs[node.Name] = err
 					mu.Unlock()
 					cancel(err)
 				}
 			}()
-
-			for _, dep := range node.DependsOn {
-				select {
-				case <-done[dep]:
-					mu.Lock()
-					depErr := errs[dep]
-					mu.Unlock()
-					if depErr != nil {
-						err := fmt.Errorf("skipped: dependency %q failed", dep)
-						mu.Lock()
-						errs[node.Name] = err
-						mu.Unlock()
-						cancel(err)
-						return
-					}
-				case <-childCtx.Done():
-					mu.Lock()
-					errs[node.Name] = context.Cause(childCtx)
-					mu.Unlock()
-					return
-				}
-			}
-
-			if err := setupNodeDAG(childCtx, node, sharedState, tracker); err != nil {
-				mu.Lock()
-				errs[node.Name] = err
-				mu.Unlock()
-				cancel(err)
-			}
+			finished = true
 		}(f)
 	}
 	wg.Wait()
@@ -184,12 +194,24 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 				<-done[dep]
 			}
 
+			// As in setupDAG: unset only when the hook left through
+			// runtime.Goexit, which counts as a failed teardown.
+			finished := false
+			defer func() {
+				if !finished {
+					fmt.Fprintln(os.Stderr, goexited(node, "AfterAll", "Dehydrate"))
+					mu.Lock()
+					failed[node.Name] = true
+					mu.Unlock()
+				}
+			}()
 			if node.SharedState != nil {
 				if tracker.isAttempted(node) && runDehydrate(node) {
 					mu.Lock()
 					failed[node.Name] = true
 					mu.Unlock()
 				}
+				finished = true
 				return // shared state nodes don't have AfterAll in test process
 			}
 			// A fixture whose BeforeAll ran is released whether it succeeded
@@ -199,6 +221,7 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 				failed[node.Name] = true
 				mu.Unlock()
 			}
+			finished = true
 		}(f)
 	}
 	wg.Wait()
@@ -209,6 +232,15 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 		}
 	}
 	return false
+}
+
+// goexited is the error of node's hook that left through runtime.Goexit:
+// hook for a package fixture, shared for a shared one's.
+func goexited(node *FixtureNode, hook, shared string) error {
+	if node.SharedState != nil {
+		hook = shared
+	}
+	return fmt.Errorf("%s.%s left through runtime.Goexit, as a FailNow or SkipNow on a testing.TB does; return an error from the hook instead", node.Name, hook)
 }
 
 // runBeforeAllWithRetry adapts a DAG node onto RunFixtureSetup, the single

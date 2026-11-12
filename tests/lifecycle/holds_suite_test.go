@@ -177,3 +177,9 @@ func (s *HoldsTestSuite) TestAGoWaitIsHeldToTheMethodsTimeout(t *gotest.T) {
 	gotest.Contains(t, out, "cleanup (the wait on a goroutine started with gotest.Go) exceeded its configured Timeout of 200ms", "the wait on the goroutine was not held to the Timeout")
 	gotest.Equal(t, 1, code, out)
 }
+
+func (s *HoldsTestSuite) TestAnAfterAllLeavingThroughGoexitFailsTheSuite(t *gotest.T) {
+	code, out := s.edges(t, nil, "-run", "TestGoexitAfterAllTestSuite")
+	gotest.Equal(t, 1, code, "an AfterAll that left through runtime.Goexit passed:\n%s", out)
+	gotest.Contains(t, out, "AfterAll left through runtime.Goexit without a verdict")
+}

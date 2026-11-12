@@ -265,7 +265,25 @@ func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*got
 	if defaultApplies(timeout, budget) {
 		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" AfterAll", "SetupTimeout", timeout)()
 	}
-	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() {
+		returned := false
+		defer func() {
+			if returned {
+				return
+			}
+			// A panic goes on as it came; testing reports it.
+			if r := recover(); r != nil {
+				panic(r)
+			}
+			// A FailNow or SkipNow on t's own T leaves its verdict; one on
+			// another test's leaves none.
+			if !t.Failed() && !t.Skipped() {
+				reportAt(t, "", "AfterAll left through runtime.Goexit without a verdict, as a FailNow or SkipNow on another test's T does; use the t the hook was given")
+			}
+		}()
+		afterAll(tt)
+		returned = true
+	})
 }
 
 // watchWhile runs a lifecycle phase and fails tb the moment timeout passes with

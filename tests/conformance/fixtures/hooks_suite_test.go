@@ -156,3 +156,22 @@ func (s *FixtureHooksTestSuite) TestTheContextAFixtureAfterEachGets(t *gotest.T)
 		})
 	})
 }
+
+func (s *FixtureHooksTestSuite) TestAFixtureHookLeavesThroughGoexit(t *gotest.T) {
+	t.When("a package fixture's BeforeAll leaves through runtime.Goexit", func(w *gotest.T) {
+		run, out := runHooks(w, "fixture.BeforeAll", "goexit")
+		w.It("fails the suite, which never opens, saying how the hook left, and still runs the fixture's AfterAll", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "fail", run.Verdict(gridSuite))
+			gotest.Equal(it, []string{"fixture.BeforeAll", "fixture.AfterAll"}, run.Markers)
+			gotest.Contains(it, out, "GridFixture.BeforeAll left through runtime.Goexit")
+		})
+	})
+	t.When("a package fixture's AfterAll leaves through runtime.Goexit", func(w *gotest.T) {
+		run, _ := runHooks(w, "fixture.AfterAll", "goexit")
+		w.It("fails the run after every other hook ran", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, gridCleanRun, run.Markers)
+		})
+	})
+}

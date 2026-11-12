@@ -283,6 +283,8 @@ shards of one run do not add up to every mutant exactly once.
 | `failfast-skip-located-in-runtime` | a FailFast skip is located in the runtime's `methods.go` | canary: the FailFast fixture's skips name a runtime file |
 | `failfast-trips-before-a-failure` | a FailFast suite trips before any method failed, so its first method is skipped | canary: the FailFast fixture's run exits 0 and its first method has no fail verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
+| `fixture-afterall-goexit-passes` | a fixture `AfterAll` that left through `runtime.Goexit` counts as a clean teardown | ring-0 runtime suite |
+| `fixture-beforeall-goexit-passes` | a fixture `BeforeAll` that left through `runtime.Goexit` comes up without an error | ring-0 runtime suite |
 | `fixture-aftereach-context-unbounded` | a fixture's `AfterEach` gets `context.Background()`, so the method's Timeout does not end it | ring-0 lifetimes suite |
 | `fixture-aftereach-only-never-runs` | a fixture with only an `AfterEach` never runs it | canary: the fixtureorder `AfterEach` ahead of the failed `BeforeEach` does not run |
 | `fixture-aftereach-only-runs-out-of-turn` | a fixture with only an `AfterEach` runs it whether or not its turn came | canary: the fixtureorder `AfterEach` behind the failed `BeforeEach` runs |
@@ -316,6 +318,7 @@ shards of one run do not add up to every mutant exactly once.
 | `overrun-names-no-phase` | an overrun's verdict does not name the hook that overran | canary: the slow fixture's verdict does not name its `BeforeEach` |
 | `setup-waits-unwatched` | the wait on BeforeAll's goroutines is not held to the SetupTimeout | canary: the setupwaits slow suite gets no SetupTimeout verdict |
 | `shared-fixture-each-hooks-accepted` | a shared fixture another package declares with a `BeforeEach` passes generation, and the hook never runs | cli conformance: the cross-package shared fixture row exits 0 instead of 2 |
+| `suite-afterall-goexit-passes` | a suite `AfterAll` that left through `runtime.Goexit` without a verdict passes | lifecycle holds suite: the Goexit AfterAll suite exits 0 |
 | `suite-beforeeach-after-a-fixture-overran` | the suite's `BeforeEach` runs after a fixture's `BeforeEach` overran the `Timeout` | canary: the slow fixture's suite marks its `BeforeEach` |
 | `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a cleanup before AfterAll | canary: the setupwaits `*testing.T` suite does not pass |
 | `timeout-scale-any-value` | a `GOTEST_TIMEOUT_SCALE` that is no number runs the suites unscaled instead of failing them | canary: the `fast` run's methods run instead of failing their suites |
