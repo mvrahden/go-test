@@ -906,7 +906,7 @@ export function staleOnChange(
   if (importPath) controller.invalidateResults(importPath);
 }
 
-function setupFileWatchers(
+export function setupFileWatchers(
   cache: DiscoveryCache,
   discoveryService: DiscoveryService,
   coverageStore: CoverageStore,
@@ -1041,7 +1041,7 @@ function setupFileWatchers(
   ];
 }
 
-async function initializeAsync(deps: {
+export async function initializeAsync(deps: {
   workspaceFolders: readonly vscode.WorkspaceFolder[];
   outputChannel: vscode.LogOutputChannel;
   discoveryService: DiscoveryService;
