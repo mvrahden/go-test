@@ -11,6 +11,8 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 )
 
+// NewT wraps a *testing.T, for a helper or a hook written against
+// *testing.T that calls code taking a *T.
 func NewT(t *testing.T) *T {
 	return &T{t: t, tb: t}
 }
@@ -22,6 +24,9 @@ func NewT(t *testing.T) *T {
 // benchmark or fuzz methods.
 func NewTFromTB(tb testing.TB) *T { return &T{tb: tb} }
 
+// T is the test a suite method runs as: assertions report to it, Context
+// carries the suite's deadline and stop, and It, When and Each nest
+// behaviors below it.
 type T struct {
 	t   *testing.T
 	tb  testing.TB
@@ -43,6 +48,10 @@ func (t *T) testingTB() testing.TB {
 	return t.tb
 }
 
+// Context is the test's context. It ends at the suite's Timeout, at a stop
+// and when the test ends. In BeforeAll the SetupTimeout bounds it while
+// BeforeAll runs; once BeforeAll returned it has no deadline and ends when
+// the methods are done, before AfterAll.
 func (t *T) Context() context.Context {
 	if t.ctx != nil {
 		return t.ctx
@@ -80,6 +89,7 @@ func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 	return &T{t: t, tb: tb, ctx: ctx}
 }
 
+// Errorf fails the test at the caller's line and goes on.
 func (t *T) Errorf(format string, args ...any) {
 	report(t.testingTB(), fmt.Sprintf(format, args...))
 }
@@ -94,10 +104,12 @@ func report(tb testing.TB, msg string) {
 	tb.Errorf("%s", msg)
 }
 
+// FailNow ends the test now, as failed.
 func (t *T) FailNow() {
 	t.testingTB().FailNow()
 }
 
+// Skipf skips the test at the caller's line, with the formatted reason.
 func (t *T) Skipf(format string, args ...any) {
 	assert.SkipInternalFrames(t.testingTB())
 	t.testingTB().Skipf(format, args...)
@@ -143,6 +155,9 @@ func (t *T) sub(tt *testing.T) *T {
 	return NewTWithContext(tt, ctx)
 }
 
+// It runs testFn as a subtest named by description, the outcome a behavior
+// promises. A When and its Its are what gotest spec renders and what a
+// scenario in specs/ is bound to. It panics on a T that has no *testing.T.
 func (t *T) It(description string, testFn func(it *T)) {
 	if t.t == nil {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")
@@ -152,6 +167,10 @@ func (t *T) It(description string, testFn func(it *T)) {
 	})
 }
 
+// When runs fn as a subtest named by description, the condition the Its
+// inside it hold under. A When and its Its are what gotest spec renders and
+// what a scenario in specs/ is bound to. It panics on a T that has no
+// *testing.T.
 func (t *T) When(description string, fn func(w *T)) {
 	if t.t == nil {
 		panic("gotest: It/When are unavailable in benchmark/fuzz lifecycle hooks")

@@ -392,6 +392,12 @@ func splitTestName(name string) (topLevel, rest string) {
 	return name, ""
 }
 
+// MatchSnapshot compares value, rendered as text, with the section of the
+// test's baseline in testdata/__snapshots__/<TestName>.snap beside the
+// calling file (<TestName>_ext.snap from an external test package). A
+// missing section is written as the baseline, except under GOTEST_CI;
+// GOTEST_UPDATE_SNAPSHOTS rewrites it. The optional name tells several
+// snapshots of one test apart.
 func MatchSnapshot(t testingT, value any, name ...string) {
 	matchSnapshot(t, 2, value, name...)
 }
