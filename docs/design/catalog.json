@@ -10618,6 +10618,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 19,
+                      "name": "one_with_exported_fields_is_refused_at_the_field,_told_to_hold_it_in_a_named_field_or_assign_it_in_Hydrate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one without exported fields and one Hydrate assigns are left out, and the suite runs with its state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "one_without_exported_fields_and_one_Hydrate_assigns_are_left_out,_and_the_suite_runs_with_its_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture embeds a type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 18,
+                  "name": "a_shared_fixture_embeds_a_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EmbeddedFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestEmbeddedFields",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SharedFields",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "sharedfields_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestSharedFieldsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a stale generated file on disk neither breaks the run nor is compiled",
                       "duration": 0,
                       "excluded": false,
@@ -26498,13 +26574,13 @@
     }
   ],
   "stats": {
-    "behaviors": 766,
+    "behaviors": 768,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 112,
+    "suites": 113,
     "tests": 0
   }
 }

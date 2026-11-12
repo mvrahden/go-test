@@ -772,14 +772,6 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		return nil
 	}
 
-	var allExported []string
-	for i := 0; i < st.NumFields(); i++ {
-		f := st.Field(i)
-		if f.Exported() && !f.Anonymous() {
-			allExported = append(allExported, f.Name())
-		}
-	}
-
 	var localFields map[string]bool
 	if hasHydrate {
 		pkg := r.findPackageForType(named)
@@ -788,6 +780,20 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 			if hydrateDecl != nil {
 				localFields = gotestast.ClassifyLocalFieldsRaw(hydrateDecl, baseName, pkg.Syntax, pkg.TypesInfo)
 			}
+		}
+	}
+
+	var allExported []string
+	for i := 0; i < st.NumFields(); i++ {
+		f := st.Field(i)
+		if f.Anonymous() {
+			if err := gotestast.EmbeddedFieldError(identifier, f, localFields, typePkg); err != nil {
+				return err
+			}
+			continue
+		}
+		if f.Exported() {
+			allExported = append(allExported, f.Name())
 		}
 	}
 

@@ -217,3 +217,11 @@ gotest SHALL refuse with exit 2 a suite with Parallel: true whose test method, B
 - **WHEN** a suite with Parallel: true calls Setenv on a T
 - **THEN** a call in a test method, in BeforeEach, in a nested It and through t.T() is refused at the call, told to set it in BeforeAll or drop Parallel
 - **AND** a call in BeforeAll runs and its value reaches every method
+
+### Requirement: Shared fixture fields the state cannot carry
+gotest SHALL refuse with exit 2 a shared fixture that embeds a type with exported fields, unless Hydrate assigns the embedded field: only named fields are transferred, so the suites would read zero values. The error is located at the field and names the way out. An embedded type without exported fields SHALL be left out of the transfer.
+
+#### Scenario: A shared fixture embeds a type
+- **WHEN** a shared fixture embeds a type
+- **THEN** one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate
+- **AND** one without exported fields and one Hydrate assigns are left out, and the suite runs with its state
