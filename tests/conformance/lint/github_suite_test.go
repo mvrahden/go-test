@@ -48,3 +48,23 @@ func (s *LinterGitHubTestSuite) TestWorkspacePaths(t *gotest.T) {
 		})
 	})
 }
+
+func (s *LinterGitHubTestSuite) TestSwitchedOff(t *gotest.T) {
+	t.When("lint runs with --github=false inside GitHub Actions", func(w *gotest.T) {
+		w.It("lint prints the plain report and no annotation", func(it *gotest.T) {
+			run, err := testkit.RunCLIWithEnv(it.Context(), ".", []string{"GITHUB_ACTIONS=true", "GITHUB_STEP_SUMMARY="}, "lint", "--github=false", "../testdata/lintgh/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
+			gotest.NotContains(it, run.Stdout, "::error")
+			gotest.Regexp(it, `fixture,shared\.go:8:6: shared fixture "TagSharedFixture"`, run.Stderr)
+		})
+	})
+	t.When("--github is given a value that is no boolean", func(w *gotest.T) {
+		w.It("lint refuses it with exit 2, naming the value", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "lint", "--github=maybe", "../testdata/lintgh/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, run.Exit)
+			gotest.Equal(it, "FAIL: invalid value \"maybe\" for flag --github\n", run.Stderr)
+		})
+	})
+}

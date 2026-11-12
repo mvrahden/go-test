@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lint LinterGitHub / SwitchedOff / when lint runs with --github=false inside GitHub Actions / lint prints the plain report and no annotation \(
+Clause: when lint runs with --github=false inside GitHub Actions → lint prints the plain report and no annotation
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -431,8 +431,8 @@
+ // is no boolean does not arm.
+ func lintGitHubArmed(args []string) bool {
+ 	if v, ok := lintGitHubFlag(args); ok {
+-		on, err := strconv.ParseBool(v)
+-		return err == nil && on
++		_ = v
++		return true
+ 	}
+ 	return os.Getenv("GITHUB_ACTIONS") == "true"
+ }

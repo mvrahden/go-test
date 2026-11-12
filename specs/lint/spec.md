@@ -117,7 +117,7 @@ Lint SHALL report each shape the generator rejects at the position the generator
 - **AND** discover marks the package broken and names each rejection at its position
 
 ### Requirement: GitHub annotations
-Lint --github SHALL escape each annotation's message and properties as a workflow command needs, SHALL cut a long annotation on a rune boundary, and SHALL name each file relative to the workspace.
+Lint --github SHALL escape each annotation's message and properties as a workflow command needs, SHALL cut a long annotation on a rune boundary, and SHALL name each file relative to the workspace. --github=false SHALL print the plain report, inside GitHub Actions too, and a value that is no boolean SHALL be refused with exit 2.
 
 #### Scenario: Characters a workflow command escapes
 - **WHEN** a finding's message and file carry characters a workflow command escapes
@@ -127,6 +127,14 @@ Lint --github SHALL escape each annotation's message and properties as a workflo
 #### Scenario: A step in a subdirectory
 - **WHEN** lint --github runs in a subdirectory of the workspace
 - **THEN** annotation paths are relative to the workspace
+
+#### Scenario: Annotations switched off
+- **WHEN** lint runs with --github=false inside GitHub Actions
+- **THEN** lint prints the plain report and no annotation
+
+#### Scenario: A value that is no boolean
+- **WHEN** --github is given a value that is no boolean
+- **THEN** lint refuses it with exit 2, naming the value
 
 ### Requirement: Assertion rewrites keep the verdict
 An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. Lint SHALL report an assertion as redundant only where both operands are the same name, field, element or literal, which reading twice cannot change.

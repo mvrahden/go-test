@@ -790,6 +790,8 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
 | `lint-gh-paths-from-working-directory` | annotation paths are relative to the working directory, not `$GITHUB_WORKSPACE` | conformance: the lint `--github` It for a step in a subdirectory finds a `../` path |
 | `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |
+| `lint-gh-false-still-arms` | `--github=false` arms the annotations like a bare `--github` | conformance: the lint It for `--github=false` finds `::error` on stdout |
+| `lint-gh-bad-value-accepted` | a `--github` value that is no boolean is accepted | conformance: the lint It for a value that is no boolean sees exit 3, not 2 |
 | `toggle-focus-declaring-file-only` | `refactor toggle-focus` renames only the references in the file that declares the suite | conformance: the discovery It for a suite spread over several files finds receivers left unrenamed |
 | `rename-skips-instantiations` | the rename engine does not look inside a type instantiation, so `X[T]` receivers, literals and aliases keep the old name | conformance: the discovery It for a generic suite finds them unrenamed |
 | `toggle-focus-external-package-skipped` | `refactor toggle-focus` leaves the external test package out | conformance: the discovery It for the external test package finds its reference unrenamed |

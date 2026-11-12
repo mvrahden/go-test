@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/lint LinterGitHub / SwitchedOff / when --github is given a value that is no boolean / lint refuses it with exit 2, naming the value \(
+Clause: when --github is given a value that is no boolean → lint refuses it with exit 2, naming the value
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -457,7 +457,8 @@
+ 	for _, a := range args {
+ 		if v, ok := strings.CutPrefix(a, "--github="); ok {
+ 			if _, err := strconv.ParseBool(v); err != nil {
+-				return fmt.Errorf("invalid value %q for flag --github", v)
++				_ = err
++				return nil
+ 			}
+ 		}
+ 	}

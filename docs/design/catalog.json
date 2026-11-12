@@ -25058,6 +25058,83 @@
               "name": "TestWorkspacePaths",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint prints the plain report and no annotation",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "github_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 54,
+                      "name": "lint_prints_the_plain_report_and_no_annotation",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when lint runs with --github=false inside GitHub Actions",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "github_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 53,
+                  "name": "lint_runs_with_--github=false_inside_GitHub_Actions",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint refuses it with exit 2, naming the value",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "github_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 63,
+                      "name": "lint_refuses_it_with_exit_2,_naming_the_value",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --github is given a value that is no boolean",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "github_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 62,
+                  "name": "--github_is_given_a_value_that_is_no_boolean",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SwitchedOff",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "github_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 52,
+              "name": "TestSwitchedOff",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterGitHub",
@@ -30810,7 +30887,7 @@
     }
   ],
   "stats": {
-    "behaviors": 896,
+    "behaviors": 898,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

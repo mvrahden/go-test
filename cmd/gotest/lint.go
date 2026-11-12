@@ -25,6 +25,10 @@ import (
 )
 
 func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+	if err := lintGitHubFlagError(inv.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	github := lintGitHubArmed(inv.Args)
 	args := stripFlag(inv.Args, "--github")
 
@@ -422,10 +426,42 @@ func lintChangedSource(changes []lint.Change) func(string) ([]byte, error) {
 }
 
 // lintGitHubArmed reports whether lint should render GitHub annotations:
-// explicitly via --github, or implicitly inside a GitHub Actions runner,
-// mirroring the summary subcommand's arming.
+// as the last --github flag says (bare is true), or else inside a GitHub
+// Actions runner, mirroring the summary subcommand's arming. A value that
+// is no boolean does not arm.
 func lintGitHubArmed(args []string) bool {
-	return hasFlag(args, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
+	if v, ok := lintGitHubFlag(args); ok {
+		on, err := strconv.ParseBool(v)
+		return err == nil && on
+	}
+	return os.Getenv("GITHUB_ACTIONS") == "true"
+}
+
+// lintGitHubFlag returns the value of the last --github flag in args,
+// "true" for a bare one, and whether there is one.
+func lintGitHubFlag(args []string) (string, bool) {
+	v, ok := "", false
+	for _, a := range args {
+		switch {
+		case a == "--github":
+			v, ok = "true", true
+		case strings.HasPrefix(a, "--github="):
+			v, ok = strings.TrimPrefix(a, "--github="), true
+		}
+	}
+	return v, ok
+}
+
+// lintGitHubFlagError refuses the first --github value that is no boolean.
+func lintGitHubFlagError(args []string) error {
+	for _, a := range args {
+		if v, ok := strings.CutPrefix(a, "--github="); ok {
+			if _, err := strconv.ParseBool(v); err != nil {
+				return fmt.Errorf("invalid value %q for flag --github", v)
+			}
+		}
+	}
+	return nil
 }
 
 // stripFlag returns args without any occurrence of name or name=value.
