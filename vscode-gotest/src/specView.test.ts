@@ -592,6 +592,93 @@ describe("repeated runs of a suite", () => {
   });
 });
 
+describe("durations, as the CLI's spec shows them", () => {
+  // The row of the node displayed as name: its own line, not its children.
+  const rowOf = (html: string, name: string) => {
+    const row = new RegExp(
+      `data-display="${name}"[\\s\\S]*?(?:</summary>|</div>)`,
+    ).exec(html);
+    expect(row).not.toBeNull();
+    return row![0];
+  };
+  const durationOf = (html: string, name: string) =>
+    /class="dur">\(([^)]+)\)/.exec(rowOf(html, name))?.[1];
+  const tree = (seconds: number, status = "pass") => {
+    const pkg: SpecPackage = {
+      path: "example.com/cart",
+      status: "pass",
+      duration: 0,
+      nodes: [
+        node(
+          "TestCartTestSuite",
+          status,
+          [
+            node(
+              "TestAdd",
+              status,
+              [
+                // The CLI gives every When and It the kind "block".
+                node("when_empty", status, [node("it_adds", status)], {
+                  kind: "block",
+                  duration: seconds,
+                }),
+                node("it_counts", status, [], { duration: seconds }),
+              ],
+              { kind: "method", duration: seconds },
+            ),
+            node("TestTotal", status, [], {
+              kind: "method",
+              duration: seconds,
+            }),
+          ],
+          { duration: seconds },
+        ),
+        node("TestPlain", status, [], { kind: "test", duration: seconds }),
+        node("FuzzParse", status, [node("seed#0", status)], {
+          kind: "fuzz",
+          duration: seconds,
+        }),
+      ],
+    };
+    return body([pkg]);
+  };
+
+  it("shows a suite's, a method's, a test's and a fuzz target's time at any length", () => {
+    for (const [seconds, shown] of [
+      [0.128, "128ms"],
+      [1.2, "1.2s"],
+    ] as const) {
+      const html = tree(seconds);
+      for (const name of [
+        "TestCartTestSuite",
+        "TestAdd",
+        "TestTotal",
+        "TestPlain",
+        "FuzzParse",
+      ]) {
+        expect([name, durationOf(html, name)]).toEqual([name, shown]);
+      }
+    }
+  });
+
+  it("shows a When's and a behavior's time from one second up", () => {
+    const slow = tree(1.2);
+    expect(durationOf(slow, "when_empty")).toBe("1.2s");
+    expect(durationOf(slow, "it_counts")).toBe("1.2s");
+    const fast = tree(0.128);
+    expect(durationOf(fast, "when_empty")).toBeUndefined();
+    expect(durationOf(fast, "it_counts")).toBeUndefined();
+  });
+
+  it("shows no time on a row without a verdict, which says NOT RUN", () => {
+    const html = tree(1.2, "none");
+    for (const name of ["TestTotal", "it_counts", "TestAdd", "when_empty"]) {
+      expect([name, durationOf(html, name)]).toEqual([name, undefined]);
+    }
+    expect(rowOf(html, "it_counts")).toContain("NOT RUN");
+  });
+});
+
 describe("nearestItemId", () => {
   it("falls back to the closest ancestor the tree holds", () => {
     const tree = new Set(["p/S", "p/S/TestM"]);

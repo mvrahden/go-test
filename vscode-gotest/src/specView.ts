@@ -1282,7 +1282,7 @@ function buildLeafHtml(
   const dur =
     node.status === "none"
       ? ` <span class="tag none">NOT RUN</span>`
-      : ` <span class="dur">(${formatDuration(node.duration)})</span>`;
+      : durationHtml(node);
 
   const errorBlock =
     node.status === "fail" ? errorBlockHtml(node, ctx.outputDir) : "";
@@ -1291,6 +1291,18 @@ function buildLeafHtml(
   ${iconHtml} ${escapeHtml(node.display)}${suffix}${dur}${actionsHtml(id)}
   ${errorBlock}
 </div>`;
+}
+
+// The kinds whose rows show their time at any length, as the CLI's spec does.
+const TIMED_KINDS = new Set(["suite", "method", "test", "fuzz"]);
+
+// durationHtml is a row's time as the CLI's spec shows it: a suite, a
+// method, a stdlib test or a fuzz target with a verdict at any length, any
+// other row from one second up, a row without a verdict none.
+function durationHtml(node: SpecNode): string {
+  if (!["pass", "fail", "skip"].includes(node.status)) return "";
+  if (!TIMED_KINDS.has(node.kind) && node.duration < 1) return "";
+  return ` <span class="dur">(${formatDuration(node.duration)})</span>`;
 }
 
 function buildBranchHtml(
@@ -1331,7 +1343,7 @@ function buildBranchHtml(
     node.status === "fail" ? errorBlockHtml(node, ctx.outputDir) : "";
 
   return `<details class="branch ${node.status}" data-display="${escapeAttr(node.display)}"${openAttr}>
-  <summary class="node ${node.kind}"${idAttr(id, ancestors)} data-pkg="${escapeAttr(ctx.pkgPath)}" data-position="${position.join(".")}">${iconHtml} ${label}${suffix}${actionsHtml(id)}${copyNodeHtml()}</summary>
+  <summary class="node ${node.kind}"${idAttr(id, ancestors)} data-pkg="${escapeAttr(ctx.pkgPath)}" data-position="${position.join(".")}">${iconHtml} ${label}${suffix}${durationHtml(node)}${actionsHtml(id)}${copyNodeHtml()}</summary>
   ${errorBlock}${children}
 </details>`;
 }
