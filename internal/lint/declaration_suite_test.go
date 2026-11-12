@@ -53,6 +53,11 @@ func (s *DeclarationRulesTestSuite) TestDroppedCase(t *gotest.T) {
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcase")
 		})
 	})
+	t.When("the driver hands the analyzer one test package of a directory that has two", func(w *gotest.T) {
+		w.It("reports none of its cases, leaving them to the generator", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcaseext")
+		})
+	})
 }
 
 func (s *DeclarationRulesTestSuite) TestTiers(t *gotest.T) {

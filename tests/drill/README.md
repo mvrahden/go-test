@@ -801,6 +801,10 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-dropped-case-silent` | `dropped-case` never runs | conformance: the lint Its for cases that never run find no `dropped-case` finding |
 | `lint-dropped-case-called-helper-reported` | `dropped-case` reports a helper's case the package calls | conformance: the lint It for a called helper finds `Harness.TestConnection` reported |
 | `lint-dropped-case-aliased-generic-reported` | `dropped-case` reports a generic suite an alias instantiates | conformance: the lint It for an aliased generic finds `StoreContractTestSuite` reported |
+| `lint-dropped-case-own-package-uses` | gotest lint reads the uses of the internal test package only | conformance: the lint It for cases the external package reaches finds them reported |
+| `lint-dropped-case-silenced-by-other-files` | any other test file in the directory silences the rule, a comment included | conformance: the lint It for a case reached from nowhere finds none reported |
+| `lint-dropped-case-one-package-unproven` | a driver seeing one test package reports as if it saw all | conformance: the go vet It finds `never runs` in a directory with an external test package |
+| `lint-dropped-case-one-package-silent` | a driver seeing one test package never reports | conformance: the go vet It finds no finding in a directory with one test package |
 | `lint-exported-analyzer-reports-nothing` | the analyzer `pkg/lint` exports reports nothing | conformance: the lint It for `go vet -vettool` sees go vet pass |
 | `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
 | `lint-gh-paths-from-working-directory` | annotation paths are relative to the working directory, not `$GITHUB_WORKSPACE` | conformance: the lint `--github` It for a step in a subdirectory finds a `../` path |

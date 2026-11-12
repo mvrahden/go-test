@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules / DroppedCasesOfTheExternalPackage / when the external test package takes a case of a type that is no suite as a value, a method expression or an interface method, calls it, or aliases the type as a suite / lint leaves each unreported, as the generator runs it \(
+Clause: when the external test package takes a case of a type that is no suite as a value, a method expression or an interface method, calls it, or aliases the type as a suite → lint leaves each unreported, as the generator runs it
+--- a/internal/lint/casevariants.go
++++ b/internal/lint/casevariants.go
+@@ -109,7 +109,7 @@
+ 				vs = append(vs, variant{p.TypesInfo, p.Syntax})
+ 			}
+ 		}
+-		c := newCaseUses(vs...)
++		c := newCaseUses(vs[:1]...)
+ 		c.orphans = map[*types.TypeName]bool{}
+ 		for _, o := range gotestast.Orphans(pr.internal, pr.external) {
+ 			if obj := receiverAt(o.Pos, pr.internal, pr.external); obj != nil {

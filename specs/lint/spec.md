@@ -299,7 +299,7 @@ bench-loop SHALL read a loop as the benchmark's own when the benchmark hands its
 - **AND** bench-loop still reports a benchmark whose helper only asserts on b
 
 ### Requirement: Cases that never run
-Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a gotest.T, B or F that no suite runs: on a test file's type whose name lacks the TestSuite suffix, named exactly Test, Benchmark or Fuzz on a suite, or on a test file's generic suite that no alias ending in TestSuite instantiates. It SHALL leave unreported a method its package calls, a method or generic suite an external test file of the directory spells, and what a non-test file declares.
+Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a gotest.T, B or F no suite runs: on a test file's type without the TestSuite suffix, named just Test, Benchmark or Fuzz on a suite, or on a test file's generic suite no alias instantiates. It SHALL leave unreported a method either test package of the directory refers to, a type either aliases as a suite, and a non-test file's declarations; a driver seeing one test package SHALL report only where there is no other.
 
 #### Scenario: A case on a type that is no suite
 - **WHEN** a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix
@@ -314,6 +314,16 @@ Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a
 - **WHEN** a test file declares a generic suite with a case
 - **THEN** lint reports the suite no alias instantiates at its declaration
 - **AND** lint leaves the suite an alias instantiates unreported
+
+#### Scenario: A case only the external test package reaches
+- **WHEN** the external test package takes a case of a type that is no suite as a value, a method expression or an interface method, calls it, or aliases the type as a suite
+- **THEN** lint leaves each unreported, as the generator runs it
+- **AND** lint reports a case the external package reaches from nowhere, a comment naming it included
+
+#### Scenario: A driver that sees one test package
+- **WHEN** go vet runs the exported analyzer on directories with cases no suite runs
+- **THEN** dropped-case reports nothing in a directory with an external test package, leaving it to the generator
+- **AND** dropped-case reports the cases of a directory with no external test package
 
 ### Requirement: Other drivers
 The analyzer pkg/lint exports SHALL report under go vet -vettool what gotest lint reports.

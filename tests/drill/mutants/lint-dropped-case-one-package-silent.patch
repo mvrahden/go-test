@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lint LinterDrivers / DroppedCasesUnderVet / when go vet runs the exported analyzer on directories with cases no suite runs / dropped-case reports the cases of a directory with no external test package \(
+Clause: when go vet runs the exported analyzer on directories with cases no suite runs → dropped-case reports the cases of a directory with no external test package
+--- a/internal/lint/droppedcase.go
++++ b/internal/lint/droppedcase.go
+@@ -38,9 +38,7 @@
+ func checkDroppedCase(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+ 	v := casesOfDir(pass.Pkg)
+ 	if v == nil {
+-		if !onlyTestPackage(pass) {
+-			return
+-		}
++		return
+ 		v = newCaseUses(variant{pass.TypesInfo, pass.Files})
+ 	}
+ 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil), (*ast.TypeSpec)(nil)}, func(n ast.Node) {

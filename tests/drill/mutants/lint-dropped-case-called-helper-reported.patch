@@ -2,12 +2,21 @@ Expect: ^FAIL .*conformance/lint LinterRules / DroppedCases / when a test file d
 Clause: when a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix → lint leaves such a method unreported where the package calls it
 --- a/internal/lint/droppedcase.go
 +++ b/internal/lint/droppedcase.go
-@@ -47,7 +47,7 @@
+@@ -58,7 +58,7 @@
  		return
  	}
  	fn, ok := pass.TypesInfo.Defs[fd.Name].(*types.Func)
--	if !ok || used[fn] || calledByName[fd.Name.Name] {
-+	if !ok || calledByName[fd.Name.Name] {
+-	if !ok || v.called[fn] || v.byName[fd.Name.Name] {
++	if !ok || v.byName[fd.Name.Name] {
  		return
  	}
  	named := namedReceiver(fn)
+@@ -86,8 +86,6 @@
+ 	case isSuite || stdlib || gotestast.IS_TEST_SUITE.MatchString(typ) || isTestifySuite(pass, typ):
+ 	case !bare && !isCaseMethodName(name):
+ 	case !inTestFile(pass, fd.Pos()):
+-	case v.orphans != nil && !v.orphans[named.Obj()]:
+-		// The generator's own verdict over both test packages runs it.
+ 	default:
+ 		report(pass, DroppedCase, funcHeader(fd),
+ 			"%s on %s never runs: %s is no suite; end its name in TestSuite, or give the helper a name that does not begin with %s",

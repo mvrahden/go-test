@@ -85,6 +85,8 @@ func analyze(ctx context.Context, t *Targets, overlay map[string][]byte) (*Resul
 		return nil, err
 	}
 
+	// dropped-case judges a case over both test packages of its directory.
+	defer registerDirCases(pkgs)()
 	graph, err := checker.Analyze([]*analysis.Analyzer{Analyzer}, pkgs, nil)
 	if err != nil {
 		return nil, fmt.Errorf("analyze: %w", err)

@@ -12,11 +12,6 @@ type helper struct{}
 
 func (h helper) TestReady(t *gotest.T) {}
 
-// Probe's case is called only by the external test package.
-type Probe struct{}
-
-func (p *Probe) TestProbe(t *gotest.T) {}
-
 // Named has a method that only begins like a case.
 type Named struct{}
 
@@ -38,11 +33,6 @@ func (s *CountTestSuite) Test(n int) {} // want `test method CountTestSuite.Test
 type LoneContractTestSuite[T any] struct{} // want `generic suite LoneContractTestSuite never runs`
 
 func (s *LoneContractTestSuite[T]) TestHolds(t *gotest.T) {}
-
-// ExtContractTestSuite is aliased by the external test package.
-type ExtContractTestSuite[T any] struct{}
-
-func (s *ExtContractTestSuite[T]) TestHolds(t *gotest.T) {}
 
 // AliasedContractTestSuite's alias names no suite.
 type AliasedContractTestSuite[T any] struct{} // want `generic suite AliasedContractTestSuite never runs`

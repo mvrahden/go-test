@@ -45,6 +45,13 @@
 // the generation-rejects rule runs gotest's generator, which must be the
 // one that generates the module's harness.
 //
+// Both drivers hand the analyzer one test package of a directory at a
+// time. dropped-case, which judges whether anything runs a case, needs both
+// the internal and the external test package: gotest lint loads them
+// together and agrees with the generator; under go vet and golangci-lint the
+// rule reports only in a directory with no external test package and leaves
+// the rest to the generator's refusal.
+//
 // Under golangci-lint, //nolint:gotestlint silences the whole linter and
 // //nolint:<rule> one of its rules; nolintlint does not know the rule ids,
 // so tell it about them (allow-unused, or its exclusions) where it runs.
