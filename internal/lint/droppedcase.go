@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -42,6 +43,7 @@ func checkDroppedCase(pass *analysis.Pass, insp *inspector.Inspector, suites map
 			return
 		}
 		v = newCaseUses(variant{pass.TypesInfo, pass.Files})
+		v.orphans = passOrphans(pass)
 	}
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil), (*ast.TypeSpec)(nil)}, func(n ast.Node) {
 		switch n := n.(type) {
@@ -51,6 +53,36 @@ func checkDroppedCase(pass *analysis.Pass, insp *inspector.Inspector, suites map
 			checkUnaliasedGeneric(pass, n, suites, v.aliased)
 		}
 	})
+}
+
+// passOrphans is the generator's verdict over the one test package the pass
+// holds: the types whose cases it refuses. A value handed to an interface
+// that holds a case reaches it there, as the generator reads it.
+func passOrphans(pass *analysis.Pass) map[*types.TypeName]bool {
+	pkg := passPackage(pass)
+	orphans := map[*types.TypeName]bool{}
+	for _, o := range gotestast.Orphans(pkg) {
+		if obj := receiverAt(o.Pos, pkg); obj != nil {
+			orphans[obj] = true
+		}
+	}
+	return orphans
+}
+
+// refusedAt reports whether the generator refuses what is declared at pos
+// in the pass's package, a file the build constraints leave out counting
+// as a possible alias.
+func refusedAt(pass *analysis.Pass, pos token.Pos) bool {
+	for _, o := range gotestast.Orphans(passPackage(pass)) {
+		if o.Pos == pos {
+			return true
+		}
+	}
+	return false
+}
+
+func passPackage(pass *analysis.Pass) *packages.Package {
+	return &packages.Package{Fset: pass.Fset, Syntax: pass.Files, Types: pass.Pkg, TypesInfo: pass.TypesInfo, IgnoredFiles: pass.IgnoredFiles}
 }
 
 func checkDroppedMethod(pass *analysis.Pass, fd *ast.FuncDecl, suites map[string]*suiteInfo, v *caseUses) {
@@ -87,7 +119,7 @@ func checkDroppedMethod(pass *analysis.Pass, fd *ast.FuncDecl, suites map[string
 	case !bare && !isCaseMethodName(name):
 	case !inTestFile(pass, fd.Pos()):
 	case v.orphans != nil && !v.orphans[named.Obj()]:
-		// The generator's own verdict over both test packages runs it.
+		// The generator's own verdict over the test packages seen runs it.
 	default:
 		report(pass, DroppedCase, funcHeader(fd),
 			"%s on %s never runs: %s is no suite; end its name in TestSuite, or give the helper a name that does not begin with %s",
@@ -106,7 +138,7 @@ func checkUnaliasedGeneric(pass *analysis.Pass, ts *ast.TypeSpec, suites map[str
 		return
 	}
 	named, ok := obj.Type().(*types.Named)
-	if !ok || !hasCaseMethod(named) {
+	if !ok || !hasCaseMethod(named) || !refusedAt(pass, ts.Name.Pos()) {
 		return
 	}
 	report(pass, DroppedCase, span{ts.Name.Pos(), ts.Name.End()},

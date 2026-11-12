@@ -24589,6 +24589,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lint leaves each unreported, as the generator runs it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "droppedgated_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "lint_leaves_each_unreported,_as_the_generator_runs_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lint reports beside them a case reached from nowhere",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "droppedgated_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "lint_reports_beside_them_a_case_reached_from_nowhere",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a helper's only caller or a generic suite's only alias sits in a test file the build constraints leave out, or a helper is handed to an interface that holds its case",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "droppedgated_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "a_helper's_only_caller_or_a_generic_suite's_only_alias_sits_in_a_test_file_the_build_constraints_leave_out,_or_a_helper_is_handed_to_an_interface_that_holds_its_case",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CasesReachedWhereTheBuildLeavesThemOut",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "droppedgated_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestCasesReachedWhereTheBuildLeavesThemOut",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterDroppedGated",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "droppedgated_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestLinterDroppedGatedTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a bare nolint comment suppresses every rule on its line",
                       "duration": 0,
                       "excluded": false,
@@ -32152,13 +32228,13 @@
     }
   ],
   "stats": {
-    "behaviors": 937,
+    "behaviors": 939,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 131,
+    "suites": 132,
     "tests": 0
   }
 }

@@ -473,6 +473,8 @@ shards of one run do not add up to every mutant exactly once.
 | `focus-narrows-in-silence` | a run narrowed by `F_` outside CI mode says nothing | CLI conformance: stderr holds no note |
 | `focus-note-fails-the-run` | the focus note outside CI mode ends the run with exit 1 | CLI conformance: the focused run exits 1 |
 | `suite-that-ran-nothing-passes` | a text run never holds a suite to the tests it runs | CLI conformance: the wrapped binary that ran nothing passes |
+| `dropped-case-gated-alias-reported` | lint reports a generic suite whose only alias sits in a test file the build constraints leave out | lint conformance: the gated generic suite is reported |
+| `dropped-case-generator-verdict-silences-all` | wherever the generator's verdict is known, lint reports no case of a type that is no suite | lint conformance: the case reached from nowhere beside the gated ones is not reported |
 | `nothing-to-run-unnoted` | a package whose suites a `-run` deselected passes without `[no tests to run]` | CLI conformance: the `-run` that matches nothing is not noted as no tests to run |
 | `ran-nothing-rule-matches-substrings` | the no-tests rule matches the testing package's warning inside a longer line | runner unit: a child's line that quotes the warning fails the suite |
 | `binary-count-zero-held-to-tests` | the no-tests rule ignores `-test.count=0` after `-args` | CLI conformance: the run exits 2 naming the suite |

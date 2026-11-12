@@ -7,6 +7,16 @@ type OrderTests struct{}
 
 func (o *OrderTests) TestPlaced(t *gotest.T) {} // want `TestPlaced on OrderTests never runs: OrderTests is no suite`
 
+// probe is handed to an interface that holds its case: the generator counts
+// that as reaching it, wherever the interface is called.
+type probe struct{}
+
+func (p *probe) TestProbes(t *gotest.T) {}
+
+type prober interface{ TestProbes(t *gotest.T) }
+
+var _ prober = (*probe)(nil)
+
 // helper's case is called by the suite below.
 type helper struct{}
 
