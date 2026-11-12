@@ -188,7 +188,7 @@ func (s *WorkflowsTestSuite) TestPullRequestsJudgeTheMutantsTheirChangeTouches(t
 	at := slices.IndexFunc(drill.Steps, func(st workflowStep) bool { return strings.Contains(st.Run, "DRILL_CHANGED=") })
 	gotest.GreaterOrEqual(t, at, 0, "quality.yml's drill lists no changed files")
 	gotest.Contains(t, drill.Steps[at].Run, "--no-renames")
-	for _, name := range []string{"release.yml"} {
+	for _, name := range []string{"release.yml", "nightly.yml"} {
 		data, err := os.ReadFile(filepath.Join(workflowsDir, name))
 		gotest.NoError(t, err)
 		gotest.NotContains(t, string(data), "DRILL_CHANGED", "%s must judge every mutant", name)
