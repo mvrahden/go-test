@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules / DroppedCases / when a test file declares a Test method taking a gotest\.T on a type named without the TestSuite suffix / lint leaves such a method unreported where the package calls it \(
+Clause: when a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix → lint leaves such a method unreported where the package calls it
+--- a/internal/lint/droppedcase.go
++++ b/internal/lint/droppedcase.go
+@@ -47,7 +47,7 @@
+ 		return
+ 	}
+ 	fn, ok := pass.TypesInfo.Defs[fd.Name].(*types.Func)
+-	if !ok || used[fn] || calledByName[fd.Name.Name] {
++	if !ok || calledByName[fd.Name.Name] {
+ 		return
+ 	}
+ 	named := namedReceiver(fn)

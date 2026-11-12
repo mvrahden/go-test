@@ -26512,6 +26512,144 @@
               "name": "TestBenchHelpers",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports that the method never runs and names the suffix the type lacks",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 358,
+                      "name": "lint_reports_that_the_method_never_runs_and_names_the_suffix_the_type_lacks",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lint leaves such a method unreported where the package calls it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 361,
+                      "name": "lint_leaves_such_a_method_unreported_where_the_package_calls_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rules_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 357,
+                  "name": "a_test_file_declares_a_Test_method_taking_a_gotest.T_on_a_type_named_without_the_TestSuite_suffix",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports each as a case that never runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 366,
+                      "name": "lint_reports_each_as_a_case_that_never_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares methods named exactly Test, Benchmark and Fuzz",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rules_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 365,
+                  "name": "a_suite_declares_methods_named_exactly_Test,_Benchmark_and_Fuzz",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports the suite no alias instantiates at its declaration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 374,
+                      "name": "lint_reports_the_suite_no_alias_instantiates_at_its_declaration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lint leaves the suite an alias instantiates unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 377,
+                      "name": "lint_leaves_the_suite_an_alias_instantiates_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file declares a generic suite with a case",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rules_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 373,
+                  "name": "a_test_file_declares_a_generic_suite_with_a_case",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "DroppedCases",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "rules_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 355,
+              "name": "TestDroppedCases",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterRules",
@@ -31162,7 +31300,7 @@
     }
   ],
   "stats": {
-    "behaviors": 906,
+    "behaviors": 911,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

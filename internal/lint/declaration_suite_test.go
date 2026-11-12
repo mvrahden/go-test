@@ -47,6 +47,14 @@ func (s *DeclarationRulesTestSuite) TestFixtureHookCall(t *gotest.T) {
 	})
 }
 
+func (s *DeclarationRulesTestSuite) TestDroppedCase(t *gotest.T) {
+	t.When("a test file declares a case no suite runs", func(w *gotest.T) {
+		w.It("reports it, and no helper the package calls, an external test spells, or a non-test file declares", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcase")
+		})
+	})
+}
+
 func (s *DeclarationRulesTestSuite) TestTiers(t *gotest.T) {
 	t.When("the declaration rules are registered", func(w *gotest.T) {
 		w.It("are integrity rules with no skip flag", func(it *gotest.T) {

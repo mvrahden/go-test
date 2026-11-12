@@ -69,6 +69,8 @@ const (
 	// GenerationRejects is integrity: a package the generator rejects does
 	// not run at all.
 	GenerationRejects Rule = "generation-rejects"
+	// DroppedCase is integrity: a case no suite runs passes by never running.
+	DroppedCase Rule = "dropped-case"
 	// NolintUnknown is integrity: a nolint comment naming a rule that does
 	// not exist suppresses nothing, whatever it was meant to.
 	NolintUnknown Rule = "nolint-unknown"
@@ -130,6 +132,10 @@ var registry = []struct {
 		"field (only declared fixtures are started)",
 	}}},
 	{GenerationRejects, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Shapes the generator rejects, where and as it rejects them"}}},
+	{DroppedCase, ruleInfo{TierIntegrity, ScopeGotestFiles, false, []string{
+		"Test/Benchmark/Fuzz methods no suite runs: a type that is",
+		"no suite, a bare name, a generic suite without an alias",
+	}}},
 	{NolintUnknown, ruleInfo{TierIntegrity, ScopeEverywhere, false, []string{"//nolint ids that name no gotest rule or golangci-lint linter"}}},
 	{SuiteDeclaration, ruleInfo{TierIntegrity, ScopeSuites, true, []string{"Suites/fixtures declared inside a type ( … ) block"}}},
 	{NoEmbedding, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
@@ -279,6 +285,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkSuiteDeclaration(pass, insp, reached)
 	checkNoEmbedding(pass, insp, reached)
 	checkFixtureHookCall(pass, insp)
+	checkDroppedCase(pass, insp, suites)
 
 	checkOrphanedFiles(pass)
 	checkNolintIDs(pass)

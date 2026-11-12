@@ -795,6 +795,9 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-generation-rejects-never-stands-down` | the generator's rejection is reported beside an integrity finding shown on its line | conformance: the lint It for an integrity finding on the line finds two findings on line 9 |
 | `lint-bench-loop-ignores-helpers` | bench-loop reads only the benchmark's own body, not the helper it hands `b` to | conformance: the lint It for helpers finds `BenchmarkDelegated` reported |
 | `lint-bench-loop-any-handoff` | any call the benchmark hands `b` to counts as its loop | conformance: the lint It for a helper that only asserts finds `BenchmarkAsserted` unreported |
+| `lint-dropped-case-silent` | `dropped-case` never runs | conformance: the lint Its for cases that never run find no `dropped-case` finding |
+| `lint-dropped-case-called-helper-reported` | `dropped-case` reports a helper's case the package calls | conformance: the lint It for a called helper finds `Harness.TestConnection` reported |
+| `lint-dropped-case-aliased-generic-reported` | `dropped-case` reports a generic suite an alias instantiates | conformance: the lint It for an aliased generic finds `StoreContractTestSuite` reported |
 | `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
 | `lint-gh-paths-from-working-directory` | annotation paths are relative to the working directory, not `$GITHUB_WORKSPACE` | conformance: the lint `--github` It for a step in a subdirectory finds a `../` path |
 | `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |

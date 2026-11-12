@@ -52,14 +52,14 @@ type X_InactiveTestSuite struct{}
 func (s *X_InactiveTestSuite) TestSkipped() {} // want `test method X_InactiveTestSuite.TestSkipped has wrong signature`
 
 // Generic suite with single type param — pointer receiver must be recognized.
-type TypedTestSuite[T any] struct{}
+type TypedTestSuite[T any] struct{} // want `generic suite TypedTestSuite never runs`
 
 func (s *TypedTestSuite[T]) TestTyped()            {} // want `test method TypedTestSuite.TestTyped has wrong signature`
 func (s TypedTestSuite[T]) TestTypedByValue()      {} // want `suite method TypedTestSuite.TestTypedByValue should use a pointer receiver` `test method TypedTestSuite.TestTypedByValue has wrong signature`
 func (s *TypedTestSuite[T]) F_TestFocusedGeneric() {} // want `focused method TypedTestSuite.F_TestFocusedGeneric should not be committed` `test method TypedTestSuite.F_TestFocusedGeneric has wrong signature`
 
 // Generic suite with multiple type params — pointer receiver must be recognized.
-type PairTestSuite[K comparable, V any] struct{}
+type PairTestSuite[K comparable, V any] struct{} // want `generic suite PairTestSuite never runs`
 
 func (s *PairTestSuite[K, V]) TestPair()       {} // want `test method PairTestSuite.TestPair has wrong signature`
 func (s PairTestSuite[K, V]) TestPairByValue() {} // want `suite method PairTestSuite.TestPairByValue should use a pointer receiver` `test method PairTestSuite.TestPairByValue has wrong signature`

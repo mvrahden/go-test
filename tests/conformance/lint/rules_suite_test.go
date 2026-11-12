@@ -349,3 +349,33 @@ func (s *LinterRulesTestSuite) TestBenchHelpers(t *gotest.T) {
 		})
 	})
 }
+
+const droppedPkg = "../testdata/lintdropped/"
+
+func (s *LinterRulesTestSuite) TestDroppedCases(t *gotest.T) {
+	const f = "dropped-case dropped_suite_test.go:"
+	t.When("a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix", func(w *gotest.T) {
+		w.It("lint reports that the method never runs and names the suffix the type lacks", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", droppedPkg), f+"8:1: TestCreate on UserSuite never runs: UserSuite is no suite; end its name in TestSuite, or give the helper a name that does not begin with Test")
+		})
+		w.It("lint leaves such a method unreported where the package calls it", func(it *gotest.T) {
+			gotest.Empty(it, findingsAt(ruleFindings(it, ".", droppedPkg), "dropped_suite_test.go:13:"))
+		})
+	})
+	t.When("a suite declares methods named exactly Test, Benchmark and Fuzz", func(w *gotest.T) {
+		w.It("lint reports each as a case that never runs", func(it *gotest.T) {
+			got := ruleFindings(it, ".", droppedPkg)
+			gotest.Contains(it, got, f+"19:1: Test on PayTestSuite never runs: a case needs a name after Test; rename it, or give the helper a name that does not begin with Test")
+			gotest.Contains(it, got, f+"21:1: Benchmark on PayTestSuite never runs: a case needs a name after Benchmark; rename it, or give the helper a name that does not begin with Benchmark")
+			gotest.Contains(it, got, f+"26:1: Fuzz on PayTestSuite never runs: a case needs a name after Fuzz; rename it, or give the helper a name that does not begin with Fuzz")
+		})
+	})
+	t.When("a test file declares a generic suite with a case", func(w *gotest.T) {
+		w.It("lint reports the suite no alias instantiates at its declaration", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", droppedPkg), f+"29:6: generic suite OrphanContractTestSuite never runs: no alias instantiates it; declare one (type …TestSuite = OrphanContractTestSuite[…]), or delete it")
+		})
+		w.It("lint leaves the suite an alias instantiates unreported", func(it *gotest.T) {
+			gotest.Empty(it, findingsAt(ruleFindings(it, ".", droppedPkg), "dropped_suite_test.go:34:"))
+		})
+	})
+}

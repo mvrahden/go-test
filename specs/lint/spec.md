@@ -292,3 +292,20 @@ bench-loop SHALL read a loop as the benchmark's own when the benchmark hands its
 - **WHEN** a benchmark hands its b to a helper of its package that holds the loop
 - **THEN** bench-loop stays silent on it, through a second helper too
 - **AND** bench-loop still reports a benchmark whose helper only asserts on b
+
+### Requirement: Cases that never run
+Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a gotest.T, B or F that no suite runs: on a test file's type whose name lacks the TestSuite suffix, named exactly Test, Benchmark or Fuzz on a suite, or on a test file's generic suite that no alias ending in TestSuite instantiates. It SHALL leave unreported a method its package calls, a method or generic suite an external test file of the directory spells, and what a non-test file declares.
+
+#### Scenario: A case on a type that is no suite
+- **WHEN** a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix
+- **THEN** lint reports that the method never runs and names the suffix the type lacks
+- **AND** lint leaves such a method unreported where the package calls it
+
+#### Scenario: A method named exactly Test
+- **WHEN** a suite declares methods named exactly Test, Benchmark and Fuzz
+- **THEN** lint reports each as a case that never runs
+
+#### Scenario: A generic suite without an alias
+- **WHEN** a test file declares a generic suite with a case
+- **THEN** lint reports the suite no alias instantiates at its declaration
+- **AND** lint leaves the suite an alias instantiates unreported
