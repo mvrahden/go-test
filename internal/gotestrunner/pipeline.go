@@ -205,6 +205,11 @@ func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg Pipeli
 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
 	}
 	if len(running) == 0 {
+		// No method was left running: name the suites the deadline stopped.
+		if cut := c.cutShortUnits(); len(cut) > 0 {
+			failRun(c, result, globalTimeoutPkg, msg+" while running: "+unitNames(cut))
+			return
+		}
 		failRun(c, result, globalTimeoutPkg, msg)
 		return
 	}

@@ -396,3 +396,42 @@ func (s *DeadlineAttributionTestSuite) TestADeadlineDuringTheExternalTwinFailsIt
 		})
 	})
 }
+
+func (s *DeadlineAttributionTestSuite) TestASuiteTheDeadlineCut(t *gotest.T) {
+	record := func(mode gotestrunner.RunMode, deadline bool) (*gotestrunner.OutputCollector, *bytes.Buffer, *bytes.Buffer) {
+		var o, e bytes.Buffer
+		c := gotestrunner.NewOutputCollector(mode, false, gotestrunner.WithWriters(&o, &e))
+		c.Register("example.com/p", 1)
+		c.RecordResult("example.com/p", 0, gotestrunner.SuiteResult{
+			Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: "example.com/p", SuiteName: "TestWaitsTestSuite"}},
+			Stdout: []byte("PASS\n"), CutShort: true, DeadlineCut: deadline,
+		})
+		return c, &o, &e
+	}
+	t.When("a suite whose tests passed was cut short by the deadline", func(w *gotest.T) {
+		c, out, errw := record(gotestrunner.RunBatchText, true)
+		w.It("fails its package in the text run and says why", func(it *gotest.T) {
+			gotest.Equal(it, 1, c.WorstExitCode())
+			gotest.Contains(it, out.String(), "FAIL\texample.com/p\t")
+			gotest.Contains(it, errw.String(), "gotest: --timeout expired while this suite was running\n")
+		})
+	})
+	t.When("it was cut short by an interrupt", func(w *gotest.T) {
+		c, out, _ := record(gotestrunner.RunBatchText, false)
+		w.It("keeps the tests' own status", func(it *gotest.T) {
+			gotest.Equal(it, 0, c.WorstExitCode())
+			gotest.Contains(it, out.String(), "ok  \texample.com/p\t")
+		})
+	})
+	t.When("the deadline is applied to a stream with no test left running", func(w *gotest.T) {
+		c, out, errw := record(gotestrunner.RunStreamJSON, true)
+		var result gotestrunner.PipelineResult
+		gotestrunner.ExportApplyDeadlineFailure(c, &result, 3*time.Second, context.DeadlineExceeded, nil)
+		w.It("names the suite it cut, on stderr and in the stream", func(it *gotest.T) {
+			const line = "FAIL: global --timeout exceeded after 3s while running: example.com/p TestWaitsTestSuite\n"
+			gotest.Contains(it, errw.String(), line)
+			gotest.Contains(it, out.String(), `"Package":"global --timeout","Output":"FAIL: global --timeout exceeded after 3s while running: example.com/p TestWaitsTestSuite\n"`)
+			gotest.Equal(it, 1, result.ExitCode)
+		})
+	})
+}

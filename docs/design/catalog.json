@@ -9571,6 +9571,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails the package and the run with exit 1, on the text and -json pipelines",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "timeout_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 37,
+                      "name": "fails_the_package_and_the_run_with_exit_1,_on_the_text_and_-json_pipelines",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "names the suite in the run's FAIL line, on stderr and in the stream",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "timeout_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 43,
+                      "name": "names_the_suite_in_the_run's_FAIL_line,_on_stderr_and_in_the_stream",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when --timeout expires while a method waits for its context to end, and the method then returns",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "timeout_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "--timeout_expires_while_a_method_waits_for_its_context_to_end,_and_the_method_then_returns",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodThatReturnsWhenItsContextEnds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "timeout_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestAMethodThatReturnsWhenItsContextEnds",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLITimeout",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "timeout_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLITimeoutTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails to build with exit 2, naming the blank import to add and -mod=mod",
                       "duration": 0,
                       "excluded": false,
@@ -29314,13 +29390,13 @@
     }
   ],
   "stats": {
-    "behaviors": 850,
+    "behaviors": 852,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 117,
+    "suites": 118,
     "tests": 0
   }
 }

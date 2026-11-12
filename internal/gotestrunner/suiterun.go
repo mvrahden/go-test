@@ -55,6 +55,9 @@ type SuiteResult struct {
 	Duration time.Duration
 	// CutShort reports that the run's context ended while the process ran.
 	CutShort bool
+	// DeadlineCut reports that the process was cut short and the run's
+	// context ended by its deadline: the suite did not finish.
+	DeadlineCut bool
 	// StoppedBy is the reason the suite process gave for a stop the runner
 	// did not send, such as "signal:SIGTERM"; empty when there was none.
 	StoppedBy string
@@ -328,15 +331,19 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		exitCode = 1
 	}
 
+	// A method the stop ended may still return and pass: the suite did not
+	// finish.
+	deadlineCut := cutShort.Load() && errors.Is(ctx.Err(), context.DeadlineExceeded)
 	return SuiteResult{
-		Target:    target,
-		Stdout:    stdout.Bytes(),
-		Stderr:    stderr.Bytes(),
-		ExitCode:  exitCode,
-		Started:   start,
-		Duration:  duration,
-		CutShort:  cutShort.Load(),
-		StoppedBy: mp.StoppedBy(),
+		Target:      target,
+		Stdout:      stdout.Bytes(),
+		Stderr:      stderr.Bytes(),
+		ExitCode:    exitCode,
+		Started:     start,
+		Duration:    duration,
+		CutShort:    cutShort.Load(),
+		DeadlineCut: deadlineCut,
+		StoppedBy:   mp.StoppedBy(),
 	}
 }
 
