@@ -279,3 +279,10 @@ var (
 	ExportReadProvenance = readProvenance
 	ExportModulePath     = modulePath
 )
+
+// the words after -args
+var (
+	ExportSpecRequested    = specRequested
+	ExportStripJSONFlag    = stripJSONFlag
+	ExportContainsHelpFlag = containsHelpFlag
+)

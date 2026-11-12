@@ -6748,6 +6748,113 @@
               "name": "TestUnknownFlagsReachTheBinary",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "-json",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "passthrough_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 44,
+                          "name": "-json",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "--spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "passthrough_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 45,
+                          "name": "--spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-o",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "passthrough_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 46,
+                          "name": "-o",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-h",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "passthrough_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 47,
+                          "name": "-h",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "each reaches the test binary, which refuses it as a flag it does not define, and gotest keeps its text mode",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "passthrough_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 40,
+                      "name": "each_reaches_the_test_binary,_which_refuses_it_as_a_flag_it_does_not_define,_and_gotest_keeps_its_text_mode",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -json, --spec, -o or -h follows -args",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "passthrough_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 39,
+                  "name": "-json,_--spec,_-o_or_-h_follows_-args",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WordsAfterArgsThatGotestAlsoKnows",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "passthrough_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 38,
+              "name": "TestWordsAfterArgsThatGotestAlsoKnows",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIPassthrough",
@@ -28367,7 +28474,7 @@
     }
   ],
   "stats": {
-    "behaviors": 820,
+    "behaviors": 824,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

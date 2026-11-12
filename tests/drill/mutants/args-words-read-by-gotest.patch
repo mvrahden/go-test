@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/cli .* / each reaches the test binary, which refuses it as a flag it does not define, and gotest keeps its text mode / -json \(
+Clause: when -json, --spec, -o or -h follows -args → each reaches the test binary, which refuses it as a flag it does not define, and gotest keeps its text mode
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -439,11 +439,7 @@
+ func stripJSONFlag(args []string) (bool, []string) {
+ 	found := false
+ 	var out []string
+-	for i, arg := range args {
+-		if arg == "-args" {
+-			// The test binary's words, as written.
+-			return found, append(out, args[i:]...)
+-		}
++	for _, arg := range args {
+ 		if arg == "-json" {
+ 			found = true
+ 			continue

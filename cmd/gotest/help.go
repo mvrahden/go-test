@@ -10,7 +10,7 @@ import (
 
 func containsHelpFlag(args []string) bool {
 	for _, a := range args {
-		if a == "--" {
+		if a == "--" || a == "-args" {
 			return false
 		}
 		if a == "--help" || a == "-h" || a == "-help" {
@@ -128,6 +128,7 @@ Flags (go test — use -single-dash, forwarded automatically):
 
 Use a bare "--" to separate gotest flags from go test flags,
 or to pass unrecognized flags to go test without validation.
+Everything after "-args" goes to the test binary as written.
 
 Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset

@@ -42,8 +42,14 @@ func (inv Invocation) DefaultArgs() []string { //nolint:gocritic // hugeParam: s
 	return out
 }
 
+// hasFlag reports whether the run was given the flag: the words after -args
+// are the test binary's, and after a bare -- no gotest (--) flag is read,
+// while go test flags still count.
 func hasFlag(args []string, name string) bool {
 	for _, arg := range args {
+		if arg == "-args" || (arg == "--" && strings.HasPrefix(name, "--")) {
+			return false
+		}
 		if arg == name || strings.HasPrefix(arg, name+"=") {
 			return true
 		}

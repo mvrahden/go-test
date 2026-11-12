@@ -135,11 +135,15 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **THEN** keeps the meaning go test gives the flag, or refuses it with a reason
 
 ### Requirement: Flags for the test binary
-A flag only the test binary declares SHALL reach the binary after -- or -args, as under go test. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
+A flag only the test binary declares SHALL reach the binary after -- or -args. Every word after -args SHALL reach the binary as written: gotest reads none of them as a flag of its own, as a go test flag or as a package. After a bare -- gotest SHALL read no flag of its own, while go test flags and packages still count. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
 
 #### Scenario: A flag gotest does not know
 - **WHEN** a flag only the test binary declares is passed
 - **THEN** reaches the test binary after -- or -args, and the binary fails its check without it
+
+#### Scenario: Words after -args that gotest also knows
+- **WHEN** -json, --spec, -o or -h follows -args
+- **THEN** each reaches the test binary, which refuses it as a flag it does not define, and gotest keeps its text mode
 
 ### Requirement: Coverage profile spellings
 gotest SHALL find a coverage profile in every spelling go test accepts, for the run's --min gate and for summary. The cases are the table in `tests/conformance/cli/coverage_suite_test.go`.

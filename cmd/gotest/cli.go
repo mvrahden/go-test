@@ -416,7 +416,7 @@ func parseGlobalTimeoutFlag(own OwnFlags) (time.Duration, error) {
 func specRequested(args []string) bool {
 	on := false
 	for _, a := range args {
-		if a == "--" {
+		if a == "--" || a == "-args" {
 			break
 		}
 		name, value, hasEquals := strings.Cut(a, "=")
@@ -439,7 +439,11 @@ func specRequested(args []string) bool {
 func stripJSONFlag(args []string) (bool, []string) {
 	found := false
 	var out []string
-	for _, arg := range args {
+	for i, arg := range args {
+		if arg == "-args" {
+			// The test binary's words, as written.
+			return found, append(out, args[i:]...)
+		}
 		if arg == "-json" {
 			found = true
 			continue

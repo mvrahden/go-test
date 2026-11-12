@@ -699,3 +699,31 @@ func (s *FlagParsingTestSuite) TestScaffoldUsageErrorsExit2(t *gotest.T) {
 		gotest.Equal(t, 2, ExportRunScaffold(Invocation{Args: tc.args}))
 	}
 }
+
+func (s *FlagParsingTestSuite) TestTheBinarysWordsAreNotRead(t *gotest.T) {
+	t.When("a word gotest knows follows -args", func(w *gotest.T) {
+		w.It("is not read as --spec", func(it *gotest.T) { gotest.False(it, ExportSpecRequested([]string{"./p", "-args", "--spec"})) })
+		w.It("is not stripped as -json", func(it *gotest.T) {
+			on, rest := ExportStripJSONFlag([]string{"./p", "-args", "-json"})
+			gotest.False(it, on)
+			gotest.Equal(it, []string{"./p", "-args", "-json"}, rest)
+		})
+		w.It("is not a flag the run was given", func(it *gotest.T) { gotest.False(it, ExportHasFlag([]string{"./p", "-args", "-o", "x"}, "-o")) })
+		w.It("is not a request for help", func(it *gotest.T) { gotest.False(it, ExportContainsHelpFlag([]string{"./p", "-args", "-h"})) })
+	})
+	t.When("the same word comes before -args", func(w *gotest.T) {
+		w.It("is read", func(it *gotest.T) {
+			gotest.True(it, ExportSpecRequested([]string{"--spec", "./p", "-args", "x"}))
+			on, rest := ExportStripJSONFlag([]string{"-json", "./p", "-args", "-json"})
+			gotest.True(it, on)
+			gotest.Equal(it, []string{"./p", "-args", "-json"}, rest)
+			gotest.True(it, ExportHasFlag([]string{"-o", "x", "-args", "y"}, "-o"))
+		})
+	})
+	t.When("a go test flag follows a bare --", func(w *gotest.T) {
+		w.It("still counts, as the editor's watch -- -json relies on", func(it *gotest.T) {
+			gotest.True(it, ExportHasFlag([]string{"--", "-tags=x"}, "-tags"))
+			gotest.False(it, ExportHasFlag([]string{"--", "--timeout=1m"}, "--timeout"))
+		})
+	})
+}
