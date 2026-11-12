@@ -59,6 +59,17 @@ gotest SHALL note on stderr, in every mode, that a package has only stdlib tests
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
 
+### Requirement: A suite that ran no tests
+In a text run given no -run, -skip, -list or -count=0, a suite process whose binary reports that it ran no tests SHALL fail its package and the run with exit 2, naming the suite: the function gotest generated for it was not in the binary. A suite that is guarded, whose methods are all excluded, that focus leaves out or that the user's pattern does not match SHALL NOT fail this way.
+
+#### Scenario: A suite whose binary runs none of its tests
+- **WHEN** a suite's binary runs none of its tests in a text run without a pattern
+- **THEN** fails the package and exits 2, naming the suite as one that ran no tests
+
+#### Scenario: Suites that legitimately run nothing
+- **WHEN** a text run covers a guarded suite, a suite whose methods are all excluded, a run narrowed by focus and a -run that matches nothing
+- **THEN** passes each, the last noted as no tests to run
+
 ### Requirement: Benchmarks a test run leaves out
 A test run SHALL note on stderr, in every mode, how many benchmarks its packages declare that it did not run, and that gotest bench runs them. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
 

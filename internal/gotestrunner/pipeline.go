@@ -769,6 +769,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	collector.holdToTests = cfg.OutputMode == RunBatchText && !hasSelectionFlag(cfg.GoTestArgs, testSelectionFlags) && extractFlag(pf.RunFlags, "-count") != "0"
 	// The flush order holds every package the collector will report on.
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
 	order := flushOrder(cfg, overlay, noSuite)

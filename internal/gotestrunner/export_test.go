@@ -397,3 +397,6 @@ func ExportOnConverterStart(seen func(*os.Process)) (restore func()) {
 
 // profileflags.go
 var ExportSharedProfileFlag = sharedProfileFlag
+
+// ExportHoldToTests holds the collector's text run to the tests it runs.
+func ExportHoldToTests(c *OutputCollector) { c.holdToTests = true }

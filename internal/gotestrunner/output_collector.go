@@ -40,9 +40,12 @@ type OutputCollector struct {
 	// test -bench passes them: without a note.
 	bench bool
 	// list marks a -list run, whose passing output is the answer.
-	list   bool
-	stdout io.Writer
-	stderr io.Writer
+	list bool
+	// holdToTests fails a suite whose binary ran no test: a text run with no
+	// pattern and no -count=0 dispatches only functions gotest generated.
+	holdToTests bool
+	stdout      io.Writer
+	stderr      io.Writer
 	// starts writes the JSON stream, opening each package as go test does.
 	starts *startWriter
 	// gate is held by every write of the stream; the exit takes it whole.
@@ -160,6 +163,10 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 	} else if how != "" {
 		r.ExitCode = code
 		note = fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+	}
+	if c.holdToTests && r.ExitCode == 0 && r.Target.SuiteName != "" && !r.Target.Bench && warnsNoTests(r.Stderr) {
+		r.ExitCode = 2
+		r.Stderr = append(r.Stderr, fmt.Sprintf("gotest: %s ran no tests: the test binary holds no such function, so the generated harness was not part of the build; rerun with --debug to inspect it\n", r.Target.SuiteName)...)
 	}
 	if note != "" {
 		r.Stderr = append(r.Stderr, note...)
@@ -290,6 +297,17 @@ const noTestsToRun = "[no tests to run]"
 // noTestsWarning is what a test binary prints on stderr when it ran no
 // test; go test notes the package with noTestsToRun when it sees it.
 var noTestsWarning = []byte("testing: warning: no tests to run")
+
+// warnsNoTests reports whether a line of stderr is the testing package's
+// warning, whole: a test's own words that merely contain it do not count.
+func warnsNoTests(stderr []byte) bool {
+	for line := range bytes.SplitSeq(stderr, []byte("\n")) {
+		if bytes.Equal(bytes.TrimRight(line, "\r"), noTestsWarning) {
+			return true
+		}
+	}
+	return false
+}
 
 // ranNoTests reports whether every suite binary of a package ran no test.
 func ranNoTests(results []SuiteResult) bool {

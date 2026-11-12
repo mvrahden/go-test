@@ -7028,6 +7028,159 @@
                 {
                   "children": [
                     {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a guarded suite and one whose methods are all excluded",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 22,
+                          "name": "a_guarded_suite_and_one_whose_methods_are_all_excluded",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a run narrowed by focus",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 23,
+                          "name": "a_run_narrowed_by_focus",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a -run that matches nothing",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 24,
+                          "name": "a_-run_that_matches_nothing",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "passes each, the last noted as no tests to run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "notests_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "passes_each,_the_last_noted_as_no_tests_to_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run covers a guarded suite, a suite whose methods are all excluded, a run narrowed by focus and a -run that matches nothing",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "notests_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 19,
+                  "name": "a_text_run_covers_a_guarded_suite,_a_suite_whose_methods_are_all_excluded,_a_run_narrowed_by_focus_and_a_-run_that_matches_nothing",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SuitesThatLegitimatelyRunNothing",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "notests_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 18,
+              "name": "TestSuitesThatLegitimatelyRunNothing",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the package and exits 2, naming the suite as one that ran no tests",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "notests_unix_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "fails_the_package_and_exits_2,_naming_the_suite_as_one_that_ran_no_tests",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite's binary runs none of its tests in a text run without a pattern",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "notests_unix_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "a_suite's_binary_runs_none_of_its_tests_in_a_text_run_without_a_pattern",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASuiteWhoseBinaryRunsNoneOfItsTests",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "notests_unix_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 15,
+              "name": "TestASuiteWhoseBinaryRunsNoneOfItsTests",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLINoTests",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "notests_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestCLINoTestsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [],
                       "display": "passes every run",
                       "duration": 0,
@@ -29008,13 +29161,13 @@
     }
   ],
   "stats": {
-    "behaviors": 843,
+    "behaviors": 847,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 115,
+    "suites": 116,
     "tests": 0
   }
 }
