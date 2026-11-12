@@ -401,7 +401,7 @@ declaration order:
 | `[N]byte` | one `[]byte` leaf |
 | `[N]T` | `T` fanned N times |
 | slice of non-bytes, any other fuzzable shape | one packed `[]byte` leaf |
-| unexported fields, maps, interfaces, channels, funcs, recursive types | refused at generation time with the alternative named (the README's "Struct arguments" table), because generated code that cannot round-trip faithfully would lie |
+| unexported fields, maps, interfaces, channels, funcs, recursive types | refused at generation time with the alternative named (the "Struct arguments" table of `docs/fuzzing.md`), because generated code that cannot round-trip faithfully would lie |
 
 Numbers ride as bytes on purpose. Go's mutator gives a native integer only
 bounded ±100 arithmetic and a native float only bounded add/sub/mul/div,
@@ -427,7 +427,7 @@ format is positional, which has three consequences:
   `Explode` re-derives positions from the current type on every run.
 
 When seed harvesting is enabled (`gotestast.HarvestSeeds`, on by default —
-see the README's "Seed harvesting" section), the renderer additionally
+see "Seed harvesting" in `docs/fuzzing.md`), the renderer additionally
 emits one `f.Add(...)` line per harvested literal directly in the wrapper,
 after `BeforeAll` and before the user method call, so harvested seeds
 replay through the exact same `f.Add` path as hand-written ones.
@@ -1446,7 +1446,7 @@ Project-specific terms, one definition each; the section named elaborates.
 - **Fixture window** — the span during which a shared fixture is resident: from the first phase that needs it to the last, never speculatively. (Per-Suite Fixture Readiness; fixtures.md, Execution Model)
 - **Transfer field / local field / hydrate** — a shared fixture's exported, JSON-serialized fields cross the process boundary; fields assigned in `Hydrate` are local and rebuilt in each test process. (SharedFixture Lifecycle)
 - **Fan / leaf** — the generated decomposition of a fuzz argument into the native values Go's engine accepts, one per leaf field, reassembled before every execution. (Code Generation)
-- **Pass-through / shape-bound target** — a fuzz target whose arguments are all native passes them through unchanged; one with a fanned argument is shape-bound: its corpus positions mean whatever the type's current field order says. (Code Generation; README, Struct arguments)
-- **Seed / crasher / interesting input** — a seed is an `f.Add` value, replayed as an ordinary subtest on every run; a crasher is the corpus file the engine writes under `testdata/fuzz/<Func>/` for a failing input; interesting inputs reached new coverage and live in Go's build cache, never beside the code. (Fuzz mode; README, Fuzzing)
+- **Pass-through / shape-bound target** — a fuzz target whose arguments are all native passes them through unchanged; one with a fanned argument is shape-bound: its corpus positions mean whatever the type's current field order says. (Code Generation; docs/fuzzing.md, Struct arguments)
+- **Seed / crasher / interesting input** — a seed is an `f.Add` value, replayed as an ordinary subtest on every run; a crasher is the corpus file the engine writes under `testdata/fuzz/<Func>/` for a failing input; interesting inputs reached new coverage and live in Go's build cache, never beside the code. (Fuzz mode; docs/fuzzing.md)
 - **Capturing bench run** — a `gotest bench` run with `--spec`, `--json`, `--save` or `--against`, which captures the event stream and is therefore censused over the declared benchmarks. (Testing gotest)
 - **Subject / capability / behavior** — what a suite, a method and an `It` are in the rendered specification; the full vocabulary is `docs/design/spec.md`'s Conceptual Model.
