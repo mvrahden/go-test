@@ -1,6 +1,8 @@
 package lifecycle_test
 
 import (
+	"strings"
+
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -21,6 +23,24 @@ func (s *PanicAheadTestSuite) TestPanicAheadOfAFailingAfterEach(t *gotest.T) {
 			gotest.Equal(it, "fail", run.Verdict("TestPanicAheadTestSuite/TestOne"), "stdout: %s", run.Stdout)
 			gotest.Contains(it, run.Stdout+run.Stderr, "panic: TEST-BEFORE-EACH-PANIC")
 			gotest.Contains(it, run.Stdout, "MARK after the panic")
+		})
+	})
+}
+
+func (s *PanicAheadTestSuite) TestAMethodsPanicIsPrintedOnce(t *gotest.T) {
+	t.When("a test method panics", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"HOOKS_AT=body", "HOOKS_MODE=panic"}, "../testdata/hooks/")
+		gotest.NoError(w, err)
+		w.It("the report names the line it happened at, and its stack shows that line once", func(it *gotest.T) {
+			line := lineOf(it, "hooks_suite_test.go", `panic(hook + " panicked")`)
+			var out strings.Builder
+			for _, ev := range run.Events {
+				out.WriteString(ev.Output)
+			}
+			all := out.String() + run.Stderr
+			gotest.Equal(it, 1, run.Exit, all)
+			gotest.Contains(it, all, "[panicked at hooks_suite_test.go:"+line+"; recovered from the test method, ahead of its AfterEach]")
+			gotest.Equal(it, 1, strings.Count(all, "testdata/hooks/hooks_suite_test.go:"+line+" +0x"), all)
 		})
 	})
 }

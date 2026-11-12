@@ -18710,7 +18710,7 @@
                       "file": "panicahead_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 20,
+                      "line": 22,
                       "name": "the_test_fails_with_the_panic_reported,_and_its_AfterEach_still_runs",
                       "output": [],
                       "status": "none",
@@ -18724,7 +18724,7 @@
                   "file": "panicahead_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 19,
+                  "line": 21,
                   "name": "a_test_method's_BeforeEach_panics_and_its_AfterEach_fails_a_fatal_assertion",
                   "output": [],
                   "status": "none",
@@ -18738,8 +18738,54 @@
               "file": "panicahead_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 16,
+              "line": 18,
               "name": "TestPanicAheadOfAFailingAfterEach",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the report names the line it happened at, and its stack shows that line once",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "panicahead_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 34,
+                      "name": "the_report_names_the_line_it_happened_at,_and_its_stack_shows_that_line_once",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test method panics",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "panicahead_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 31,
+                  "name": "a_test_method_panics",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodsPanicIsPrintedOnce",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "panicahead_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 30,
+              "name": "TestAMethodsPanicIsPrintedOnce",
               "output": [],
               "status": "none"
             }
@@ -18751,7 +18797,7 @@
           "file": "panicahead_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 10,
+          "line": 12,
           "name": "TestPanicAheadTestSuite",
           "output": [],
           "status": "none"
@@ -27983,7 +28029,7 @@
     }
   ],
   "stats": {
-    "behaviors": 810,
+    "behaviors": 811,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

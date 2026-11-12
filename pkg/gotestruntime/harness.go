@@ -183,9 +183,11 @@ func drain(set *setupwaits.Set) {
 // AfterEach runs after, a test method's AfterEach, from the defer that pairs it
 // with BeforeEach. A panic in BeforeEach or the method is recovered first and
 // re-raised once after returns: a fatal assertion in after would otherwise
-// end the goroutine and discard the panic with it.
+// end the goroutine and discard the panic with it. The re-raised panic names
+// the user's line it happened at and carries no stack: the process's own
+// traceback still shows it.
 func AfterEach(after func()) {
-	if p := carry.From(recover(), "the test method, ahead of its AfterEach"); p != nil {
+	if p := carry.InPlace(recover(), "the test method, ahead of its AfterEach", panicSite); p != nil {
 		defer panic(p)
 	}
 	enterPhase("AfterEach ")

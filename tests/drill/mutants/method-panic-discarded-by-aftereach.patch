@@ -3,14 +3,14 @@ Judge: ./tests/canary CanaryTestSuite/TestAPanicAheadOfAFailingAfterEachIsReport
 Clause: when a test method's BeforeEach panics and its AfterEach fails a fatal assertion → the test fails with the panic reported, and its AfterEach still runs
 --- a/pkg/gotestruntime/harness.go
 +++ b/pkg/gotestruntime/harness.go
-@@ -132,9 +132,7 @@
- // re-raised once after returns: a fatal assertion in after would otherwise
- // end the goroutine and discard the panic with it.
+@@ -187,9 +187,7 @@
+ // the user's line it happened at and carries no stack: the process's own
+ // traceback still shows it.
  func AfterEach(after func()) {
--	if p := carry.From(recover(), "the test method, ahead of its AfterEach"); p != nil {
+-	if p := carry.InPlace(recover(), "the test method, ahead of its AfterEach", panicSite); p != nil {
 -		defer panic(p)
 -	}
-+	_ = carry.From
++	_ = carry.InPlace
  	enterPhase("AfterEach ")
  	after()
  }

@@ -2,8 +2,10 @@ package gotestruntime_test
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
@@ -72,5 +74,47 @@ example.com/pkg.deep(...)
 ...additional frames elided...
 example.com/pkg.ƒƒ_GOTEST_exec(0x1?, 0x0?)
 	/src/pkg/gotest_psuite_test.go:12 +0x19`)))
+	})
+}
+
+// runtimeSrc is the running toolchain's directory of package runtime.
+func runtimeSrc() string {
+	pc := reflect.ValueOf(runtime.Gosched).Pointer()
+	file, _ := runtime.FuncForPC(pc).FileLine(pc)
+	return filepath.ToSlash(filepath.Dir(file))
+}
+
+// atPanic is the traceback of a goroutine running AfterEach as a deferred
+// call of a panic, with frames between the panic and the user's line.
+func atPanic(between string) string {
+	return strings.ReplaceAll(`goroutine 7 [running]:
+github.com/mvrahden/go-test/pkg/gotestruntime.panicSite()
+	/mod/pkg/gotestruntime/phaseframe.go:120 +0x45
+github.com/mvrahden/go-test/pkg/gotestruntime.AfterEach(0xc0)
+	/mod/pkg/gotestruntime/harness.go:188 +0x2e
+panic({0x5a4f20?, 0x6b1c30?})
+	RT/panic.go:792 +0x132
+`+between+`example.com/pkg.(*CartTestSuite).TestTotal(0xc0, 0xc1)
+	/src/pkg/cart_test.go:42 +0x1d
+example.com/pkg.ƒƒ_GOTEST_exec(0x1?, 0x0?)
+	/src/pkg/gotest_psuite_test.go:12 +0x19`, "RT", runtimeSrc())
+}
+
+func (s *PhaseFrameTestSuite) TestUserFrameAtPanic(t *gotest.T) {
+	rt := runtimeSrc()
+
+	t.It("names the method's line for a nil-map write", func(it *gotest.T) {
+		gotest.Equal(it, "cart_test.go:42", gotestruntime.ExportUserFrameAtPanic([]byte(atPanic(
+			"runtime.mapassign_faststr(0x1, 0x0, {0x2, 0x3})\n\t"+rt+"/map_faststr.go:205 +0x3a\n"))))
+	})
+
+	t.It("names the method's line for a nil dereference, past the runtime's signal frames", func(it *gotest.T) {
+		gotest.Equal(it, "cart_test.go:42", gotestruntime.ExportUserFrameAtPanic([]byte(atPanic(
+			"runtime.panicmem(...)\n\t"+rt+"/panic.go:262\nruntime.sigpanic()\n\t"+rt+"/signal_unix.go:925 +0x359\n"))))
+	})
+
+	t.It("names the caller of gotest.Must, not gotest's frame", func(it *gotest.T) {
+		gotest.Equal(it, "cart_test.go:42", gotestruntime.ExportUserFrameAtPanic([]byte(atPanic(
+			"github.com/mvrahden/go-test/pkg/gotest.Must[...](...)\n\t/mod/pkg/gotest/must.go:14\n"))))
 	})
 }

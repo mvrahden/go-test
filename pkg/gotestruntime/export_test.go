@@ -82,3 +82,7 @@ func ExportSetTimeoutScale(f float64) (restore func()) {
 	timeoutScale = func() (float64, error) { return f, nil }
 	return func() { timeoutScale = prev }
 }
+
+// ExportUserFrameAtPanic reads a goroutine traceback as AfterEach does when
+// it carries a method's panic.
+var ExportUserFrameAtPanic = userFrameAtPanic

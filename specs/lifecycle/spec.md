@@ -142,6 +142,13 @@ A panic in a test method or its BeforeEach SHALL be reported and fail the test e
 - **WHEN** a test method's BeforeEach panics and its AfterEach fails a fatal assertion
 - **THEN** the test fails with the panic reported, and its AfterEach still runs
 
+### Requirement: A method's panic is printed once
+A panic in a test method SHALL be reported with the line of the user's it happened at ahead of one stack, the runtime's own.
+
+#### Scenario: A method panics
+- **WHEN** a test method panics
+- **THEN** the report names the line it happened at, and its stack shows that line once
+
 ### Requirement: A suite's AfterAll that leaves through runtime.Goexit
 A suite's AfterAll that leaves through runtime.Goexit without failing or skipping its own T SHALL fail the suite with a message that says so.
 
