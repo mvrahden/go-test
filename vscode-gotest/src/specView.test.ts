@@ -27,7 +27,9 @@ import {
   linkSources,
   SpecViewPanel,
   renderErrorHtml,
+  declaredTests,
 } from "./specView.js";
+import type { DiscoverPackage } from "./types.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -648,5 +650,109 @@ describe("renderErrorHtml", () => {
     expect(html).not.toContain("<stack>");
     expect(html).toContain('id="retry-render-btn"');
     expect(renderErrorHtml("a <b> c")).toContain("a &lt;b&gt; c");
+  });
+});
+
+describe("declaredTests", () => {
+  const method = (name: string, testName?: string) => ({
+    name,
+    ...(testName ? { testName } : {}),
+    parallel: false,
+    focused: false,
+    excluded: false,
+    file: "cart_test.go",
+    line: 1,
+    col: 1,
+  });
+  const suite = (
+    name: string,
+    methods: ReturnType<typeof method>[],
+    fuzzers: ReturnType<typeof method>[] = [],
+    external = false,
+  ) => ({
+    name,
+    ...(external ? { external: true } : {}),
+    parallel: false,
+    focused: false,
+    excluded: false,
+    guarded: false,
+    file: "cart_test.go",
+    line: 1,
+    col: 1,
+    lifecycle: [],
+    fixtures: [],
+    methods,
+    benchmarks: [],
+    fuzzers,
+  });
+  const pkg: DiscoverPackage = {
+    importPath: "example.com/cart",
+    dir: "/ws/cart",
+    suites: [
+      suite(
+        "CartTestSuite",
+        [method("TestAdd"), method("TestTotal")],
+        [method("FuzzParse")],
+      ),
+      suite("CartTestSuite", [method("TestAdd", "TestAdd#01")], [], true),
+      suite("Order_FuzzyTestSuite", [], [method("FuzzIds")]),
+    ],
+  };
+  const declared = declaredTests(pkg)!;
+
+  it.each([
+    ["a suite's own line", 1, "TestCartTestSuite", true],
+    ["a declared method", 1, "TestCartTestSuite/TestAdd", true],
+    [
+      "a behavior under a declared method",
+      1,
+      "TestCartTestSuite/TestAdd/when_empty/it_adds",
+      true,
+    ],
+    [
+      "an external twin's method by its reported name",
+      2,
+      "TestCartTestSuite/TestAdd#01",
+      true,
+    ],
+    [
+      "a repeat's method under -count",
+      2,
+      "TestCartTestSuite/TestTotal#01",
+      true,
+    ],
+    ["a method that is gone", 1, "TestCartTestSuite/TestRemoved", false],
+    [
+      "a repeat of a method that is gone",
+      2,
+      "TestCartTestSuite/TestRemoved#01",
+      false,
+    ],
+    [
+      "a behavior under a method that is gone",
+      1,
+      "TestCartTestSuite/TestRemoved/when_x",
+      false,
+    ],
+    ["a suite that is gone", 1, "TestOldTestSuite/TestX", false],
+    ["a plain test function", 1, "TestParseFlags", true],
+    ["a plain test function's subtest", 1, "TestParseFlags/empty", true],
+    ["a declared fuzz target", 1, "FuzzCartTestSuite_FuzzParse", true],
+    ["a fuzz target's seed row", 1, "FuzzCartTestSuite_FuzzParse/seed#0", true],
+    [
+      "a fuzz target of a suite whose name holds _Fuzz",
+      1,
+      "FuzzOrder_FuzzyTestSuite_FuzzIds",
+      true,
+    ],
+    ["a fuzz target that is gone", 1, "FuzzCartTestSuite_FuzzGone", false],
+    ["a plain fuzz function", 1, "FuzzDecode", true],
+    ["a benchmark", 1, "BenchmarkCartTestSuite/BenchmarkAdd", true],
+  ])("%s", (_name, instance, testPath, want) => {
+    expect(declared(instance as number, testPath as string)).toBe(want);
+  });
+
+  it("says nothing about a package that does not load", () => {
+    expect(declaredTests({ ...pkg, broken: true })).toBeUndefined();
   });
 });

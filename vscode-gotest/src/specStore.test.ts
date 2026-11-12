@@ -503,3 +503,45 @@ describe("a suite in both test packages", () => {
     ]);
   });
 });
+
+describe("SpecStore.pruneTests", () => {
+  const cart = "example.com/cart";
+  const whole = () =>
+    stream(
+      ...test(cart, "TestCartTestSuite/TestAdd", "pass"),
+      ...test(cart, "TestCartTestSuite/TestRemoved", "pass"),
+      verdict(cart, "pass"),
+    );
+
+  it("drops the kept tests the predicate refuses and keeps the rest", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole(), folder: "/ws" });
+    const dropped = store.pruneTests(
+      cart,
+      (_i, p) => !p.includes("TestRemoved"),
+    );
+    expect(dropped).toBe(1);
+    const composed = store.compose("/ws");
+    expect(composed).toContain("TestCartTestSuite/TestAdd");
+    expect(composed).not.toContain("TestRemoved");
+  });
+
+  it("hands the predicate each kept test's instance and path", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole(), folder: "/ws" });
+    const seen: string[] = [];
+    store.pruneTests(cart, (i, p) => {
+      seen.push(`${i} ${p}`);
+      return true;
+    });
+    expect(seen.sort()).toEqual([
+      "1 TestCartTestSuite/TestAdd",
+      "1 TestCartTestSuite/TestRemoved",
+    ]);
+  });
+
+  it("reports nothing for a package it does not hold", () => {
+    const store = new SpecStore();
+    expect(store.pruneTests("example.com/absent", () => false)).toBe(0);
+  });
+});

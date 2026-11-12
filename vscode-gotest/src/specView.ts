@@ -8,7 +8,7 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { EXTERNAL_ID, methodItemId } from "./types.js";
+import { EXTERNAL_ID, methodItemId, type DiscoverPackage } from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -83,6 +83,11 @@ export class SpecViewPanel implements vscode.Disposable {
         folder,
         new Set(known.map((p) => p.importPath)),
       ).length;
+      // Within a package, rows of a suite or method no longer declared.
+      for (const pkg of known) {
+        const declared = declaredTests(pkg);
+        if (declared) removed += this.runs.pruneTests(pkg.importPath, declared);
+      }
     }
     if (removed === 0) return;
     this.persist();
@@ -94,6 +99,7 @@ export class SpecViewPanel implements vscode.Disposable {
 
   // load restores the runs a previous session kept. A run merged before the
   // file was read wins: the store refuses to load over newer memory.
+  // Loaded after the snapshot restore: only a live discovery prunes kept rows.
   async load(): Promise<void> {
     const stored = await this.persisted.read();
     if (!stored) return;
@@ -1352,6 +1358,63 @@ export function renderErrorHtml(message: string | undefined): string {
   if (message === undefined) return "";
   const reason = escapeHtml(message.split("\n")[0]);
   return `<div class="render-error" role="alert">This view is out of date: the last render failed. <span class="render-error-reason">${reason}</span> <button class="tool-btn" id="retry-render-btn">Retry</button></div>`;
+}
+
+// declaredTests says whether a kept test path is still declared in pkg: a
+// suite's own line and its methods' rows by the suite and method names, a
+// fuzz target by its wrapper's name. Paths discovery does not list (plain
+// test functions, benchmarks) are kept. Either twin holding a method keeps
+// its row. Undefined for a package that does not load: its suites are unknown.
+export function declaredTests(
+  pkg: DiscoverPackage,
+): ((instance: number, testPath: string) => boolean) | undefined {
+  if (pkg.broken) return undefined;
+  const suites = pkg.suites ?? [];
+  const hasSuite = (name: string) => suites.some((s) => s.name === name);
+  const hasMethod = (name: string, method: string) =>
+    suites.some(
+      (s) =>
+        s.name === name &&
+        [...(s.methods ?? []), ...(s.fuzzers ?? [])].some(
+          (m) => (m.testName ?? m.name) === method,
+        ),
+    );
+  const hasFuzzer = (name: string, fuzzer: string) =>
+    suites.some(
+      (s) =>
+        s.name === name && (s.fuzzers ?? []).some((f) => f.name === fuzzer),
+    );
+  return (_instance, testPath) => {
+    const slash = testPath.indexOf("/");
+    const top = slash < 0 ? testPath : testPath.slice(0, slash);
+    if (top.startsWith("Test")) {
+      const name = top.slice(4);
+      if (!hasSuite(name)) return !name.endsWith("TestSuite");
+      if (slash < 0) return true;
+      const rest = testPath.slice(slash + 1);
+      const next = rest.indexOf("/");
+      const method = next < 0 ? rest : rest.slice(0, next);
+      // Under -count a repeat's method carries testing's #NN suffix.
+      return (
+        hasMethod(name, method) || hasMethod(name, method.replace(/#\d+$/, ""))
+      );
+    }
+    if (top.startsWith("Fuzz")) {
+      const body = top.slice(4);
+      let suiteLike = false;
+      for (
+        let idx = body.indexOf("_Fuzz");
+        idx >= 0;
+        idx = body.indexOf("_Fuzz", idx + 1)
+      ) {
+        const name = body.slice(0, idx);
+        if (hasFuzzer(name, body.slice(idx + 1))) return true;
+        if (name.endsWith("TestSuite")) suiteLike = true;
+      }
+      return !suiteLike;
+    }
+    return true;
+  };
 }
 
 function escapeHtml(s: string): string {

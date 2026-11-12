@@ -774,13 +774,22 @@ describe("failure output", () => {
 describe("packages discovery no longer reports", () => {
   it("leave the panel when their folder's discovery comes back without them", async () => {
     const cache = new DiscoveryCache();
-    const pkg = (importPath: string) =>
-      ({ importPath, dir: `/src/${importPath}`, suites: [] }) as never;
-    cache.update(
-      [pkg("example.com/cart"), pkg("example.com/checkout")],
-      true,
-      state.workspaceDir,
-    );
+    // Each package declares the suite and the methods its recorded stream
+    // reports, so only the package prune decides what leaves.
+    const pkg = (importPath: string, suite: string, methods: string[]) =>
+      ({
+        importPath,
+        dir: `/src/${importPath}`,
+        suites: [{ name: suite, methods: methods.map((name) => ({ name })) }],
+      }) as never;
+    const cart = pkg("example.com/cart", "CartTestSuite", [
+      "adds_an_item",
+      "totals_the_basket",
+    ]);
+    const checkout = pkg("example.com/checkout", "CheckoutTestSuite", [
+      "rejects_an_expired_card",
+    ]);
+    cache.update([cart, checkout], true, state.workspaceDir);
     const recorder = createRecordingChannel();
     const panel = new SpecViewPanel(recorder.channel as never, cache);
     await panel.show();
@@ -789,7 +798,7 @@ describe("packages discovery no longer reports", () => {
     expect(renderedHtml()).toContain("adds an item");
 
     // cart was renamed: the next discovery of the folder no longer has it.
-    cache.update([pkg("example.com/checkout")], true, state.workspaceDir);
+    cache.update([checkout], true, state.workspaceDir);
     await panel.show();
 
     const html = renderedHtml();

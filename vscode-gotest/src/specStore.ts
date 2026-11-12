@@ -253,6 +253,24 @@ export class SpecStore {
     }
     return removed;
   }
+
+  // pruneTests drops a package's kept tests that declared refuses: a suite
+  // or method that is gone. It returns how many it dropped.
+  pruneTests(
+    pkg: string,
+    declared: (instance: number, testPath: string) => boolean,
+  ): number {
+    const record = this.records.get(pkg);
+    if (!record) return 0;
+    let dropped = 0;
+    for (const key of Array.from(record.tests.keys())) {
+      const at = key.indexOf("\u0000");
+      if (declared(Number(key.slice(0, at)), key.slice(at + 1))) continue;
+      record.tests.delete(key);
+      dropped++;
+    }
+    return dropped;
+  }
 }
 
 const isStrings = (v: unknown): v is string[] =>

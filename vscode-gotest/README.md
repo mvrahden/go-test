@@ -106,6 +106,7 @@ After each test run, the **Spec View** panel renders BDD-formatted output with c
 Open it with **Go Test: Show Spec View**.
 
 - **The newest verdict of everything that ran** — every package the panel has seen stays, each test with the verdict of the newest run that reported it, whichever of a run, a coverage run or a watch cycle that was; rerunning one method leaves its siblings as they were
+- **Rows that are gone** — a suite or method that was deleted or renamed leaves the panel at the next discovery of its package; before, its last verdict stayed until the whole package ran again. Rows below a method (behaviors, table rows) follow their method's next run
 - **The specification under the runs** — the CLI lays a folder's runs over what the folder's source declares (`gotest spec --declared`), so a behavior no run reported is listed as *not run*, and every package and module row carries the CLI's counts
 - **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
 - **Go-to-source** — click any suite, method, fuzz target, When or It the source declares to navigate to the line the CLI names; `file:line` in failure output opens that line
