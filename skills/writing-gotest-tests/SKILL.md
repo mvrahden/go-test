@@ -306,6 +306,8 @@ func (s *CartTestSuite) TestTotalsItems(t *gotest.T) {
 
 ## References
 
+- `reference/api.md` — signatures and rules: assertions, polling, goroutines,
+  suites, lifecycle, config, fixtures, `T`/`B`/`F` methods
 - `reference/assertions.md` — full assertion surface, `Nil`/`NotNil` type
   guards, snapshot testing
 - `reference/setup.md` — declaring, checking and upgrading the CLI; drift

@@ -4,6 +4,7 @@ All package-level, first argument `t` (a `*gotest.T`, subtest `t`, the
 `poll *gotest.R` handle inside `Eventually`/`Consistently`, a `*gotest.B`
 or `*gotest.F`, or a plain `*testing.T`). Failures always
 report the user call site automatically — never call `t.T().Helper()`.
+Full signatures are in `api.md`.
 
 Assertions ARE the control flow: they halt the test on failure, so never
 wrap them (or manual fails) in guards — `if err != nil { gotest.Fail(t,
