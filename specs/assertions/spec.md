@@ -108,6 +108,13 @@ InDelta SHALL measure the distance between two integers exactly, neither roundin
 - **WHEN** InDelta compares the smallest and the largest int64
 - **THEN** measures their full distance, not one that wrapped around
 
+### Requirement: Ordering a NaN
+Greater, GreaterOrEqual, Less and LessOrEqual SHALL fail when either operand is NaN.
+
+#### Scenario: A NaN operand
+- **WHEN** an ordering assertion is given a NaN operand
+- **THEN** fails: NaN is neither below nor above any number
+
 ### Requirement: Failure messages
 A failure message SHALL format the extra arguments by the first when it is of any string kind and carry every extra argument when it is not, and ErrorAs SHALL name the type it expected when the error is of another type.
 

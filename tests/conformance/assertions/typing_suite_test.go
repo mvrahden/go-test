@@ -602,3 +602,22 @@ type measure struct {
 	P *int
 	F float64
 }
+
+func (s *AssertionTypingTestSuite) TestOrderingNaN(t *gotest.T) {
+	t.When("an ordering assertion is given a NaN operand", func(w *gotest.T) {
+		w.It("fails: NaN is neither below nor above any number", func(it *gotest.T) {
+			nan := math.NaN()
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.Less(r, nan, 5.0) }),
+				gotest.Record(func(r *gotest.R) { gotest.LessOrEqual(r, nan, 0.01) }),
+				gotest.Record(func(r *gotest.R) { gotest.Greater(r, 5.0, nan) }),
+				gotest.Record(func(r *gotest.R) { gotest.GreaterOrEqual(r, nan, nan) }),
+			} {
+				gotest.True(it, m.Failed())
+				gotest.Contains(it, m.Message(), "a NaN operand is neither less than, equal to nor greater than any number")
+			}
+			ok := gotest.Record(func(r *gotest.R) { gotest.Less(r, 1.0, 5.0) })
+			gotest.False(it, ok.Failed(), ok.Message())
+		})
+	})
+}

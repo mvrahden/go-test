@@ -1828,6 +1828,52 @@
               "name": "TestMismatchesWithoutADiff",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails: NaN is neither below nor above any number",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 608,
+                      "name": "fails:_NaN_is_neither_below_nor_above_any_number",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an ordering assertion is given a NaN operand",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 607,
+                  "name": "an_ordering_assertion_is_given_a_NaN_operand",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "OrderingNaN",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "typing_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 606,
+              "name": "TestOrderingNaN",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "AssertionTyping",
@@ -27214,7 +27260,7 @@
     }
   ],
   "stats": {
-    "behaviors": 790,
+    "behaviors": 791,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

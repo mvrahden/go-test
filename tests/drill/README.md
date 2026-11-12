@@ -416,6 +416,7 @@ shards of one run do not add up to every mutant exactly once.
 | `indelta-infinities-differ` | `InDelta` fails two equal infinities | canary: the passing fixture's typed-arguments method fails |
 | `indelta-integers-as-float64` | `InDelta` measures signed integers through float64 | ring-0 compare suite |
 | `indelta-nan-delta-passes` | `InDelta` with a NaN delta passes | canary: the failing fixture's NaN-delta method passes |
+| `ordering-nan-operand-passes` | `Less` passes when an operand is NaN | ring-0 compare suite |
 | `jsoneq-exponent-zeros-kept` | `JSONEq` keeps a number's trailing zeros in its digits, so `100` and `1e2` differ | ring-0 predicates suite |
 | `jsoneq-negative-zero-signed` | `JSONEq` keeps the sign of zero, so `-0` and `0` differ | ring-0 predicates suite |
 | `jsoneq-numbers-as-float64` | `JSONEq` decodes numbers into float64 | canary: the failing fixture's big-integer method passes |
