@@ -76,6 +76,7 @@ func (s *NightlyTestSuite) report(t *gotest.T, needs, open string) ([]string, st
 	bin := filepath.Join(dir, "bin")
 	gotest.NoError(t, os.MkdirAll(bin, 0o750))
 	gotest.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte(ghStandIn), 0o700)) //nolint:gosec // G306: an executable
+
 	cmd := exec.CommandContext(t.Context(), "bash", filepath.Join(scriptsDir, "nightly-report.sh"), file, "https://example.test/run/1") //nolint:gosec // G204: the repository's own script
 	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "GH_LOG="+log, "OPEN_ISSUE="+open)
 	out, err := cmd.Output()
