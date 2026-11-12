@@ -12377,6 +12377,52 @@
               "name": "TestAFixtureBeforeAllOrAfterAllGoesWrong",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its context ends at the Timeout and the method fails at that hook",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hooks_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 151,
+                      "name": "its_context_ends_at_the_Timeout_and_the_method_fails_at_that_hook",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a fixture's AfterEach waits on its context past the method's Timeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 149,
+                  "name": "a_fixture's_AfterEach_waits_on_its_context_past_the_method's_Timeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheContextAFixtureAfterEachGets",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hooks_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 148,
+              "name": "TestTheContextAFixtureAfterEachGets",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureHooks",
@@ -27706,7 +27752,7 @@
     }
   ],
   "stats": {
-    "behaviors": 803,
+    "behaviors": 804,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -283,6 +283,7 @@ shards of one run do not add up to every mutant exactly once.
 | `failfast-skip-located-in-runtime` | a FailFast skip is located in the runtime's `methods.go` | canary: the FailFast fixture's skips name a runtime file |
 | `failfast-trips-before-a-failure` | a FailFast suite trips before any method failed, so its first method is skipped | canary: the FailFast fixture's run exits 0 and its first method has no fail verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
+| `fixture-aftereach-context-unbounded` | a fixture's `AfterEach` gets `context.Background()`, so the method's Timeout does not end it | ring-0 lifetimes suite |
 | `fixture-aftereach-only-never-runs` | a fixture with only an `AfterEach` never runs it | canary: the fixtureorder `AfterEach` ahead of the failed `BeforeEach` does not run |
 | `fixture-aftereach-only-runs-out-of-turn` | a fixture with only an `AfterEach` runs it whether or not its turn came | canary: the fixtureorder `AfterEach` behind the failed `BeforeEach` runs |
 | `fixture-aftereach-reported-in-runtime` | an error a fixture's `AfterEach` returns is located in the runtime's `methods.go` | canary: the fixtureafterfail failure names a runtime file, not the hook's |

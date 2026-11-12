@@ -90,6 +90,13 @@ A suite's package fixtures SHALL take their per-method turns in dependency order
 - **WHEN** a fixture with only an AfterEach comes after a fixture whose BeforeEach fails
 - **THEN** does not run its AfterEach, as its turn never came
 
+### Requirement: The context a fixture's AfterEach gets
+A fixture's AfterEach SHALL get a context that ends at the method's Timeout, as its BeforeEach's does, and that a stop does not end.
+
+#### Scenario: An AfterEach that waits on its context
+- **WHEN** a fixture's AfterEach waits on its context past the method's Timeout
+- **THEN** its context ends at the Timeout and the method fails at that hook
+
 ### Requirement: A failed shared setup is released
 A shared fixture whose setup fails on its last attempt SHALL fail the run and SHALL run its AfterAll after every attempt, before the next one starts.
 

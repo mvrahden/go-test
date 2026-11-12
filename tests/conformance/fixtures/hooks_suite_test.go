@@ -144,3 +144,15 @@ func (s *FixtureHooksTestSuite) TestAFixtureBeforeAllOrAfterAllGoesWrong(t *gote
 		})
 	})
 }
+
+func (s *FixtureHooksTestSuite) TestTheContextAFixtureAfterEachGets(t *gotest.T) {
+	t.When("a fixture's AfterEach waits on its context past the method's Timeout", func(w *gotest.T) {
+		run, out := runHooks(w, "fixture.AfterEach", "wait")
+		w.It("its context ends at the Timeout and the method fails at that hook", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Contains(it, run.Markers, "fixture.AfterEach saw its context end")
+			gotest.Equal(it, "fail", run.Verdict(gridBody))
+			gotest.Regexp(it, `(?m)^\s+fixture\.go:\d+: GridFixture\.AfterEach exceeded its configured Timeout of 300ms`, out)
+		})
+	})
+}

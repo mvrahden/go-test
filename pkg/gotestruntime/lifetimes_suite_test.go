@@ -85,3 +85,22 @@ func (s *LifetimesTestSuite) TestBeforeAllContextEndsAtTheSetupTimeoutWhileItRun
 		t.Errorf("BeforeAll's context did not end at its SetupTimeout: %v", err)
 	}
 }
+
+func (s *LifetimesTestSuite) TestAFixtureAfterEachContextEndsAtTheTimeout(t *gotest.T) {
+	var bounded bool
+	var left time.Duration
+	t.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
+		cfg := gotest.SuiteConfig{Timeout: 5 * time.Second}
+		gotestruntime.RunMethods(tt, cfg, gotest.SuiteConfig{}, gotestruntime.Methods{
+			Fixtures: []gotestruntime.EachHooks{{Name: "Probe", After: func(ctx context.Context) error {
+				deadline, ok := ctx.Deadline()
+				bounded, left = ok, time.Until(deadline)
+				return nil
+			}}},
+			Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(_ *gotest.T, run func(func())) { run(func() {}) }}},
+		})
+	})
+	if !bounded || left <= 0 || left > 5*time.Second {
+		t.Errorf("a fixture AfterEach got a context without the method's deadline (deadline %v, %v left)", bounded, left)
+	}
+}
