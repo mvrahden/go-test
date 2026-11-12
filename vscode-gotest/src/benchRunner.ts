@@ -514,8 +514,11 @@ export class BenchRunner {
       const end: RunEnd = {
         exitCode: exit.code ?? 1,
         cancelled: false,
-        // A breached gate is shown by its diagnostics.
-        failed: benchmarkFailed || report.gate?.breached === true,
+        // A breached gate is shown by its diagnostics, and explains the exit
+        // only when every failure beside it names a benchmark.
+        failed:
+          benchmarkFailed ||
+          (report.gate?.breached === true && unplaced.length === 0),
         reason: [stripGoRunExitEcho(exit.stderr), ...unplaced]
           .filter(Boolean)
           .join("\n"),

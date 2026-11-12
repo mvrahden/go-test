@@ -368,6 +368,26 @@ describe("runProfile", () => {
     expect(run.errored).not.toHaveBeenCalled();
   });
 
+  it("errors the selection when a failure beside a breached gate names no benchmark", async () => {
+    h.script.always = {
+      stdout: [
+        doc({
+          gate: { thresholdPct: 10, worstPct: 12, breached: true },
+          failures: [
+            { package: "a/b", suite: "S", output: "AfterAll: teardown failed" },
+          ],
+        }),
+      ],
+      stderr: "bench gate: a/b/S/BenchmarkOk +12.0% exceeds 10% gate\n",
+      code: 1,
+    };
+    await runner.runProfile(request, token);
+    expect(run.errored).toHaveBeenCalledTimes(2);
+    expect(run.errored.mock.calls[0][1].message).toContain(
+      "a/b/S: AfterAll: teardown failed",
+    );
+  });
+
   it("leaves a clean run alone", async () => {
     h.script.always = { stdout: [doc({})], code: 0 };
     await runner.runProfile({ include: [ok] } as never, token);
