@@ -8,9 +8,10 @@
 #   release-preflight.sh --tagged <version> <sha>    the release workflow: the
 #                                                    tag exists and points at sha
 #
-# Both modes require: vX.Y.Z above every other release tag, a version the module
-# proxy has not recorded at another commit, a commit on origin/main, and green
-# gate runs for it.
+# Both modes require: vX.Y.Z above every other release tag, not below the
+# runtime and extension floors of the commit, a version the module proxy has
+# not recorded at another commit, a commit on origin/main, and green gate runs
+# for it.
 set -euo pipefail
 
 usage() { echo "usage: $0 [--tagged] <vX.Y.Z> [<sha>]" >&2; exit 2; }
@@ -87,7 +88,25 @@ else
 	ok "no tag $version yet"
 fi
 
-# 4. The proxy. Before tagging it must not list the version, and only @v/list
+# 4. Not below the floors the commit ships: its CLI refuses a runtime older
+# than MinRuntimeVersion, its extension a CLI older than MIN_CLI_VERSION.
+floor_of() { # path sed-expression name -> the floor declared at sha
+	local v
+	v=$(git show "$sha:$1" 2>/dev/null | sed -n "$2") || true
+	[ -n "$v" ] || fail "cannot read $3 from $1 at ${sha:0:12}"
+	printf '%s\n' "$v"
+}
+below() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" != "$1" ]; } # version floor
+runtime_floor=$(floor_of internal/gotestgen/runtimeversion.go 's/^const MinRuntimeVersion = "\(v[^"]*\)"$/\1/p' MinRuntimeVersion)
+below "$version" "$runtime_floor" &&
+	fail "$version is below MinRuntimeVersion $runtime_floor at ${sha:0:12}: the released CLI would refuse a module that requires $version; release $runtime_floor or later"
+ok "$version is not below MinRuntimeVersion $runtime_floor"
+cli_floor=$(floor_of vscode-gotest/src/cli.ts 's/^\(export \)\{0,1\}const MIN_CLI_VERSION = "\(v[^"]*\)";$/\2/p' MIN_CLI_VERSION)
+below "$version" "$cli_floor" &&
+	fail "$version is below MIN_CLI_VERSION $cli_floor at ${sha:0:12}: the extension would ask for a CLI no release provides; release $cli_floor or later"
+ok "$version is not below MIN_CLI_VERSION $cli_floor"
+
+# 5. The proxy. Before tagging it must not list the version, and only @v/list
 # is asked: asking for the version itself can make the proxy fetch it or
 # remember it as missing. Once the tag exists the proxy may record it any
 # moment, so a listed version must be recorded at sha.
@@ -105,11 +124,11 @@ else
 	fail "proxy.golang.org already lists $version; its checksum is fixed, so pick the next version"
 fi
 
-# 5. The commit is on main.
+# 6. The commit is on main.
 git merge-base --is-ancestor "$sha" origin/main || fail "$sha is not on origin/main"
 ok "$sha is on origin/main"
 
-# 6. Each required workflow ran green on main for sha, or, where its path
+# 7. Each required workflow ran green on main for sha, or, where its path
 # filter skipped sha, on the nearest ancestor with no gate change since.
 run_of() { # workflow commit -> "status conclusion url" of its latest push run, or nothing
 	gh api "repos/$repo/actions/workflows/$1/runs?head_sha=$2&event=push&branch=main&per_page=1" \
