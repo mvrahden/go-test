@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics / ProjectNolintAllow / when a nolint comment names a linter that lint\.nolint-allow of \.gotest\.yml lists / an entry that is no linter name is refused with exit 2, naming it \(
+Clause: when a nolint comment names a linter that lint.nolint-allow of .gotest.yml lists → an entry that is no linter name is refused with exit 2, naming it
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -615,7 +615,7 @@
+ 		}
+ 	}
+ 	for _, name := range cfg.Lint.NolintAllow {
+-		if !linterNameRe.MatchString(name) {
++		if false && !linterNameRe.MatchString(name) {
+ 			return nil, fmt.Errorf("invalid linter name in %s lint.nolint-allow: %q", config.FileName, name)
+ 		}
+ 	}

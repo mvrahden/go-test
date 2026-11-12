@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -613,7 +614,32 @@ func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { 
 			flags = append(flags, flag)
 		}
 	}
+	for _, name := range cfg.Lint.NolintAllow {
+		if !linterNameRe.MatchString(name) {
+			return nil, fmt.Errorf("invalid linter name in %s lint.nolint-allow: %q", config.FileName, name)
+		}
+	}
+	if len(cfg.Lint.NolintAllow) > 0 && !hasLintFlag(args, "nolint-allow") {
+		flags = append(flags, "-nolint-allow="+strings.Join(cfg.Lint.NolintAllow, ","))
+	}
 	return flags, nil
+}
+
+// linterNameRe is what a linter name a nolint comment may carry looks like.
+var linterNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
+
+// hasLintFlag reports whether args hold -name or --name, bare or with a value.
+func hasLintFlag(args []string, name string) bool {
+	for _, a := range args {
+		if a == "--" {
+			return false
+		}
+		a = strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
+		if a == name || strings.HasPrefix(a, name+"=") {
+			return true
+		}
+	}
+	return false
 }
 
 // lintTempBound is how long a lint's end waits for the compiles of a go

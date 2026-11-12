@@ -24530,6 +24530,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lint leaves the comment unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "ergonomics_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 116,
+                      "name": "lint_leaves_the_comment_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an entry that is no linter name is refused with exit 2, naming it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "ergonomics_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 120,
+                      "name": "an_entry_that_is_no_linter_name_is_refused_with_exit_2,_naming_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a nolint comment names a linter that lint.nolint-allow of .gotest.yml lists",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "ergonomics_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 115,
+                  "name": "a_nolint_comment_names_a_linter_that_lint.nolint-allow_of_.gotest.yml_lists",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ProjectNolintAllow",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "ergonomics_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 106,
+              "name": "TestProjectNolintAllow",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "the plain line ends with the rule in parentheses",
                       "duration": 0,
                       "excluded": false,
@@ -24537,7 +24598,7 @@
                       "file": "ergonomics_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 108,
+                      "line": 132,
                       "name": "the_plain_line_ends_with_the_rule_in_parentheses",
                       "output": [],
                       "status": "none",
@@ -24552,7 +24613,7 @@
                       "file": "ergonomics_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 115,
+                      "line": 139,
                       "name": "the_-json_finding_carries_the_rule_as_its_category_and_a_message_without_it",
                       "output": [],
                       "status": "none",
@@ -24566,7 +24627,7 @@
                   "file": "ergonomics_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 107,
+                  "line": 131,
                   "name": "lint_reports_a_finding",
                   "output": [],
                   "status": "none",
@@ -24580,7 +24641,7 @@
               "file": "ergonomics_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 106,
+              "line": 130,
               "name": "TestRuleNames",
               "output": [],
               "status": "none"
@@ -31361,7 +31422,7 @@
     }
   ],
   "stats": {
-    "behaviors": 912,
+    "behaviors": 914,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
