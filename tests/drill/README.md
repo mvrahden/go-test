@@ -475,6 +475,7 @@ shards of one run do not add up to every mutant exactly once.
 | `poll-final-skipped-consistently` | the deadline ends `Consistently` without a last poll | canary: the passing fixture's `Consistently` counts one poll, not two |
 | `snapshot-dir-from-file-only` | the snapshot dir is always beside the caller's file path | canary: under `-trimpath` the `snapshotting` baselines are not found |
 | `snapshot-ext-from-file-only` | the `_ext` suffix comes from opening the caller's file alone | canary: under `-trimpath` the `snapshotting` baselines are not found |
+| `snapshot-poll-recorder-unnamed` | a poll's recorder carries no test name, so a snapshot taken in a poll is filed under `unknown` | ring-0 snapshot internals suite |
 | `snapshot-keys-strip-twin-suffix` | a snapshot key drops testing's `#01` and `#0` | canary: twins and unnamed rows share one baseline and the second fails |
 | `snapshot-name-unchecked` | a snapshot name that spans lines is written as it is | canary: the failing fixture's bad name passes |
 | `snapshot-update-switch-any-value` | `GOTEST_UPDATE_SNAPSHOTS=0` rewrites baselines | canary: the stale baseline passes and the file changes |

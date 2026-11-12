@@ -28,6 +28,11 @@ func (s *SnapshotKeysTestSuite) TestKeys(t *gotest.T) {
 			}
 		})
 	})
+	t.When("MatchSnapshot is given the recorder of an Eventually or Consistently poll", func(w *gotest.T) {
+		w.It("reads the section of the test that polls", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestSnapKeysTestSuite/TestInAPoll"), "stdout: %s", run.Stdout)
+		})
+	})
 }
 
 func (s *SnapshotKeysTestSuite) TestLineEnds(t *gotest.T) {

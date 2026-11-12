@@ -1,0 +1,16 @@
+Expect: a poll's snapshot was not filed under its test
+Judge: ./pkg/gotest SnapshotInternalsTestSuite/TestMatchSnapshot_InAPollIsKeyedByItsTest
+Clause: when MatchSnapshot is given the recorder of an Eventually or Consistently poll → reads the section of the test that polls
+--- a/pkg/gotest/r.go
++++ b/pkg/gotest/r.go
+@@ -21,8 +21,8 @@
+ // nameOf is the test name t answers to: a recorder's polling test, else
+ // Name() when t has one, else "".
+ func nameOf(t testingT) string {
+-	if r, ok := t.(*R); ok {
+-		return r.name
++	if _, ok := t.(*R); ok {
++		return ""
+ 	}
+ 	if named, ok := t.(interface{ Name() string }); ok {
+ 		return named.Name()

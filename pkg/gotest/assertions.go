@@ -61,7 +61,7 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	polls := 0
 	for {
 		polls++
-		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
+		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, waitFor))
 		if !ok {
 			failf(t, "Consistently failed on poll %d:\n    %s", polls, abandonedPoll(waitFor))
 			return
@@ -114,9 +114,10 @@ const (
 // pollUntil runs fn on a goroutine of its own, as Record does, and gives it
 // until limit; ok is false when fn is still running then. A poll given up on
 // keeps running, since Go cannot stop it; a panic it raises later is written
-// to stderr with its stack, since the test has moved on.
-func pollUntil(fn func(*R), limit time.Time) (rec *R, ok bool) {
-	r := &R{}
+// to stderr with its stack, since the test has moved on. The recorder
+// carries name, the polling test's, which a snapshot through it is keyed by.
+func pollUntil(name string, fn func(*R), limit time.Time) (rec *R, ok bool) {
+	r := &R{name: name}
 	var state atomic.Int32
 	done := make(chan *capturedPanic, 1) // buffered: a poll given up on still exits
 	go func() {
@@ -260,7 +261,7 @@ func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	polls := 0
 	for {
 		polls++
-		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
+		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, waitFor))
 		if !ok {
 			failf(t, "Eventually failed after %v (%d polls):\n  %s", waitFor, polls, abandonedPoll(waitFor))
 			return

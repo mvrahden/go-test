@@ -2,7 +2,11 @@
 // rows and twins; its baselines are committed beside it.
 package snapkeys_test
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"time"
+
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type SnapKeysTestSuite struct{}
 
@@ -24,3 +28,10 @@ func (s *SnapKeysTestSuite) TestStale(t *gotest.T) { gotest.MatchSnapshot(t, "ne
 // TestCarriageReturns: CRs before a newline and at the end are line endings,
 // so the value matches a baseline written with plain newlines.
 func (s *SnapKeysTestSuite) TestCarriageReturns(t *gotest.T) { gotest.MatchSnapshot(t, "a\r\r\nb\r") }
+
+// TestInAPoll matches a snapshot through the recorder of a poll.
+func (s *SnapKeysTestSuite) TestInAPoll(t *gotest.T) {
+	gotest.Eventually(t, time.Second, 10*time.Millisecond, func(poll *gotest.R) {
+		gotest.MatchSnapshot(poll, "polled", "in a poll")
+	})
+}

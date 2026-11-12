@@ -294,3 +294,14 @@ func (s *SnapshotInternalsTestSuite) TestExternalBySymbol(t *gotest.T) {
 		}
 	}
 }
+
+func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_InAPollIsKeyedByItsTest(t *gotest.T) {
+	gotest.MatchSnapshot(gotest.ExportNamedR("TestOrdersTestSuite/TestTotal"), "polled", "in a poll")
+	data, err := os.ReadFile(s.snap("TestOrdersTestSuite_ext.snap"))
+	if err != nil || !strings.Contains(string(data), "=== SNAP TestTotal in a poll ===\npolled\n") {
+		t.Errorf("a poll's snapshot was not filed under its test: %v\n%s", err, data)
+	}
+	if _, err := os.Stat(s.snap("unknown_ext.snap")); !os.IsNotExist(err) {
+		t.Errorf("a poll's snapshot was filed under unknown: %v", err)
+	}
+}

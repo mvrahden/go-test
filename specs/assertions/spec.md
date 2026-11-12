@@ -377,6 +377,10 @@ MatchSnapshot SHALL key each section by the exact subtest name and SHALL find th
 - **WHEN** the package is built with -trimpath
 - **THEN** the baselines are still found beside the test, _ext suffix included
 
+#### Scenario: A snapshot taken in a poll
+- **WHEN** MatchSnapshot is given the recorder of an Eventually or Consistently poll
+- **THEN** reads the section of the test that polls
+
 ### Requirement: Baselines keyed by the release before exact names
 When a section's exact key is missing, MatchSnapshot SHALL compare against the section under the key the release before exact names derived (a trailing #<digits> stripped), unless another test's exact key or another migration claimed it this run. Under GOTEST_CI it SHALL leave the file as it was; otherwise it SHALL rename a matching section to the exact key. Benchmark and fuzz snapshots, which that release filed under unknown.snap as _, SHALL NOT be migrated.
 
