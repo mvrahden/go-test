@@ -473,6 +473,7 @@ shards of one run do not add up to every mutant exactly once.
 | `focus-narrows-in-silence` | a run narrowed by `F_` outside CI mode says nothing | CLI conformance: stderr holds no note |
 | `focus-note-fails-the-run` | the focus note outside CI mode ends the run with exit 1 | CLI conformance: the focused run exits 1 |
 | `suite-that-ran-nothing-passes` | a text run never holds a suite to the tests it runs | CLI conformance: the wrapped binary that ran nothing passes |
+| `nothing-to-run-unnoted` | a package whose suites a `-run` deselected passes without `[no tests to run]` | CLI conformance: the `-run` that matches nothing is not noted as no tests to run |
 | `ran-nothing-rule-matches-substrings` | the no-tests rule matches the testing package's warning inside a longer line | runner unit: a child's line that quotes the warning fails the suite |
 | `binary-count-zero-held-to-tests` | the no-tests rule ignores `-test.count=0` after `-args` | CLI conformance: the run exits 2 naming the suite |
 | `merged-coverage-keeps-the-maximum` | a merged count or atomic cover profile keeps each block's largest count | CLI conformance: the block two suites ran reads 1 |
