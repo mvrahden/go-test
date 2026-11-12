@@ -423,6 +423,14 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 - **WHEN** a cached test binary has no record beside it
 - **THEN** the next run links it again without a word and records it
 
+### Requirement: Clearing the test binary cache
+gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
+
+#### Scenario: Clearing the cache
+- **WHEN** gotest clean --cache runs
+- **THEN** removes every cached binary no run is using and says how many
+- **AND** refuses a package beside the flag with exit 2
+
 ### Requirement: Saving the event stream
 A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
 

@@ -136,3 +136,22 @@ func (s *BinaryCacheTestSuite) TestAnUntouchedCachedBinary(t *gotest.T) {
 	gotest.NotContains(t, out, "linked again")
 	gotest.Empty(t, linkStep.FindAllString(out, -1), out)
 }
+
+func (s *BinaryCacheTestSuite) TestCleanCache(t *gotest.T) {
+	dir := t.TempDir()
+	_, code := s.cli.runEnv(t, cacheEnv(dir), cachedPkg)
+	gotest.Equal(t, 0, code)
+	out, code := s.cli.runEnv(t, cacheEnv(dir), "clean", "--cache")
+	refused, refusedCode := s.cli.runEnv(t, cacheEnv(dir), "clean", "--cache", "./...")
+	t.When("gotest clean --cache runs", func(w *gotest.T) {
+		w.It("removes the cached binaries and says how many", func(it *gotest.T) {
+			gotest.Equal(it, 0, code, out)
+			gotest.Contains(it, out, "removed 1 cached test binaries from "+filepath.Join(dir, "bin"))
+			gotest.Empty(it, gotest.Must(filepath.Glob(filepath.Join(dir, "bin", "*", "*.test"))))
+		})
+		w.It("refuses a package beside the flag", func(it *gotest.T) {
+			gotest.Equal(it, 2, refusedCode, refused)
+			gotest.Contains(it, refused, "--cache clears the test binary cache and takes no packages; run gotest clean <packages> for generated files")
+		})
+	})
+}

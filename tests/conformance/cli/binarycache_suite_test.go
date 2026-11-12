@@ -119,3 +119,26 @@ func (s *CLIBinaryCacheTestSuite) TestACachedBinaryNoRunRecorded(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIBinaryCacheTestSuite) TestClearingTheCache(t *gotest.T) {
+	t.When("gotest clean --cache runs", func(w *gotest.T) {
+		cache := w.TempDir()
+		first := cachedRun(w, cache)
+		gotest.Equal(w, 0, first.Exit, "stderr: %s", first.Stderr)
+		env := []string{protocol.EnvCacheDir + "=" + cache}
+		clean, err := testkit.RunCLIWithEnv(w.Context(), ".", env, "clean", "--cache")
+		gotest.NoError(w, err)
+		left, err := filepath.Glob(filepath.Join(cache, "bin", "*", "*.test"))
+		gotest.NoError(w, err)
+		refused, err := testkit.RunCLIWithEnv(w.Context(), ".", env, "clean", "--cache", "../testdata/passing/")
+		gotest.NoError(w, err)
+		w.It("removes every cached binary no run is using and says how many", func(it *gotest.T) {
+			gotest.Equal(it, 0, clean.Exit, "stderr: %s", clean.Stderr)
+			gotest.Empty(it, left)
+			gotest.Contains(it, clean.Stderr, "removed 1 cached test binaries")
+		})
+		w.It("refuses a package beside the flag with exit 2", func(it *gotest.T) {
+			gotest.Equal(it, 2, refused.Exit, "stderr: %s", refused.Stderr)
+		})
+	})
+}

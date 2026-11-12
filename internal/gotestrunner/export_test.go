@@ -57,6 +57,8 @@ var (
 	ExportReadSum     = readSum
 	ExportWriteSum    = writeSum
 )
+
+var ExportClearBinaryCache = clearBinaryCache
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 var ExportComputeDispatchConcurrency = computeDispatchConcurrency

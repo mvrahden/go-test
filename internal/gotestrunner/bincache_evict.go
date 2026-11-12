@@ -200,3 +200,32 @@ func removeEmptyKey(dir string) {
 	keyEmptied(dir)
 	_ = os.Remove(dir)
 }
+
+// ClearBinaryCache removes every cached test binary no run is linking or
+// copying, with its lock and record, and the key dirs left empty. It returns
+// how many it removed, how many it left to a run using them, and the dir.
+func ClearBinaryCache() (removed, inUse int, dir string, err error) {
+	root, err := cacheRoot()
+	if err != nil {
+		return 0, 0, "", err
+	}
+	removed, inUse = clearBinaryCache(root)
+	return removed, inUse, filepath.Join(root, "bin"), nil
+}
+
+func clearBinaryCache(root string) (removed, inUse int) {
+	for _, k := range scanKeys(filepath.Join(root, "bin")) {
+		for _, b := range k.binaries {
+			if evictBinary(b) {
+				removed++
+			} else {
+				inUse++
+			}
+		}
+		for _, l := range k.locks {
+			evictLock(l)
+		}
+		removeEmptyKey(k.dir)
+	}
+	return removed, inUse
+}

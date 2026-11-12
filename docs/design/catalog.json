@@ -4084,6 +4084,67 @@
               "name": "TestACachedBinaryNoRunRecorded",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "removes every cached binary no run is using and says how many",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binarycache_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 135,
+                      "name": "removes_every_cached_binary_no_run_is_using_and_says_how_many",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "refuses a package beside the flag with exit 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "binarycache_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 140,
+                      "name": "refuses_a_package_beside_the_flag_with_exit_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest clean --cache runs",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "binarycache_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 124,
+                  "name": "gotest_clean_--cache_runs",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ClearingTheCache",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "binarycache_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 123,
+              "name": "TestClearingTheCache",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLIBinaryCache",
@@ -29513,7 +29574,7 @@
     }
   ],
   "stats": {
-    "behaviors": 855,
+    "behaviors": 857,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

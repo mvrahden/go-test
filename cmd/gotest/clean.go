@@ -7,16 +7,20 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 // runClean removes the generated files from the packages the patterns
 // match, expanded as generate expands them: only in a main module, where
-// generate writes them.
+// generate writes them. With --cache it clears the test binary cache instead.
 func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
-	_, args, err := SplitArgs(inv.TagArgs(), noOwnFlags)
+	own, args, err := SplitArgs(inv.TagArgs(), cleanAllowed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
+	}
+	if own.Bool("--cache") {
+		return clearCache(args)
 	}
 	patterns, err := ExtractPackagePatterns(args)
 	if err != nil {
@@ -66,6 +70,25 @@ func runClean(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	if removed > 0 {
 		fmt.Fprintf(os.Stderr, "removed %d generated file(s)\n", removed)
+	}
+	return 0
+}
+
+// clearCache removes every cached test binary no run is using; args may
+// hold go test flags, never a package.
+func clearCache(args []string) int {
+	if len(gotestrunner.PatternIndices(args, ownFlag)) > 0 {
+		fmt.Fprintln(os.Stderr, "FAIL: --cache clears the test binary cache and takes no packages; run gotest clean <packages> for generated files")
+		return 2
+	}
+	removed, inUse, dir, err := gotestrunner.ClearBinaryCache()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+	fmt.Fprintf(os.Stderr, "removed %d cached test binaries from %s\n", removed, dir)
+	if inUse > 0 {
+		fmt.Fprintf(os.Stderr, "note: %d left in place: a running gotest is using them\n", inUse)
 	}
 	return 0
 }

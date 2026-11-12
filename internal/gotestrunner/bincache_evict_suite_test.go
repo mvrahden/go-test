@@ -240,3 +240,30 @@ func (s *BinaryCacheEvictionTestSuite) TestARecordGoesWithItsBinary(t *gotest.T)
 		})
 	})
 }
+
+func (s *BinaryCacheEvictionTestSuite) TestClearingTheCache(t *gotest.T) {
+	t.When("the cache is cleared while a run holds one binary", func(w *gotest.T) {
+		w.It("removes every other binary with its lock and record, then the held one once it is free", func(it *gotest.T) {
+			root := it.TempDir()
+			dir := filepath.Join(root, "bin", "k1")
+			gotest.NoError(it, os.MkdirAll(dir, 0o755))
+			for _, name := range []string{".cwd", "a.test", "a.test.lock", "a.test.sum", "b.test", "b.test.lock"} {
+				gotest.NoError(it, os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o600))
+			}
+			unlock := gotest.Must(gotestrunner.ExportLockFile(filepath.Join(dir, "b.test.lock")))
+			removed, inUse := gotestrunner.ExportClearBinaryCache(root)
+			unlock()
+			gotest.Equal(it, 1, removed)
+			gotest.Equal(it, 1, inUse)
+			gotest.False(it, exists(filepath.Join(dir, "a.test")))
+			gotest.False(it, exists(filepath.Join(dir, "a.test.sum")))
+			gotest.True(it, exists(filepath.Join(dir, "b.test")))
+
+			removed, inUse = gotestrunner.ExportClearBinaryCache(root)
+			gotest.Equal(it, 1, removed)
+			gotest.Equal(it, 0, inUse)
+			_, statErr := os.Stat(dir)
+			gotest.True(it, os.IsNotExist(statErr))
+		})
+	})
+}

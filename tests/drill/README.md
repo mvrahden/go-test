@@ -481,6 +481,8 @@ shards of one run do not add up to every mutant exactly once.
 | `stop-ended-method-reads-passed` | a method the runtime says the stop ended keeps its passing verdict at an expired `--timeout` | runner unit: the deadline names no method and books nothing for it |
 | `damaged-cached-binary-reused` | a cached binary the go command left alone is reused without comparing it with its record | CLI conformance: the truncated binary's run exits 1 |
 | `unrecorded-cached-binary-trusted` | a cached binary without a record is reused as if it matched one | CLI conformance: the second run links nothing |
+| `clean-cache-removes-nothing` | `gotest clean --cache` exits 0 and leaves the cache as it was | CLI conformance: a cached binary is left |
+| `clean-cache-takes-packages` | `gotest clean --cache` with a package beside it clears the cache instead of refusing | CLI conformance: the run exits 0 |
 | `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |

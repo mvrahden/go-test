@@ -172,6 +172,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--fuzz` | Generate fuzz round-trip skeletons (`scaffold`) |
 | `--dry-run` | Print the unified diff of every edit instead of writing it (`migrate`) |
 | `--dir` | Skills directory to install into, default `.agents/skills` (`skill install`) |
+| `--cache` | Remove every cached test binary no run is using (`clean`) |
 
 ### Disambiguation
 

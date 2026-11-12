@@ -2,10 +2,12 @@ Judge: ./internal/gotestrunner BinaryCacheEvictionTestSuite/TestEvictionNeverTak
 Expect: ^FAIL .*internal/gotestrunner BinaryCacheEviction .* / keeps the key dir and the lock file \(
 --- a/internal/gotestrunner/bincache_evict.go
 +++ b/internal/gotestrunner/bincache_evict.go
-@@ -222,5 +222,5 @@ func removeEmptyKey(dir string) {
+@@ -198,7 +198,7 @@
  	}
  	_ = os.Remove(filepath.Join(dir, checkoutFile))
  	keyEmptied(dir)
 -	_ = os.Remove(dir)
 +	_ = os.RemoveAll(dir)
  }
+ 
+ // ClearBinaryCache removes every cached test binary no run is linking or

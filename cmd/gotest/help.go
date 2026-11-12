@@ -1009,6 +1009,7 @@ func printCleanHelp() {
 
 Usage:
   gotest clean [packages...]
+  gotest clean --cache
 
 Removes generated overlay files (gotest_p(x)suite_test.go) from the
 source tree. A run never writes them there; "gotest generate" does, for
@@ -1019,14 +1020,15 @@ package only, as generate does; before v1.33 it walked the directory
 tree. Above several modules, or for a module pulled in by a replace
 directive, use a go.work that lists them, or run clean inside each.
 
-The test binary cache (used for faster repeated runs) is managed
-separately: each run's start evicts the binaries of a checkout that no
-longer exists, those unused for 7 days, then the least recently used
-above 5 GiB. Set GOTEST_CACHE_DIR to
-control the cache location; use --no-cache to bypass it.
+gotest clean --cache removes every cached test binary no run is using.
+Otherwise the cache keeps itself: each run's start evicts the binaries of
+a checkout that no longer exists, those unused for 7 days, then the least
+recently used above 5 GiB. Set GOTEST_CACHE_DIR to control the cache
+location; use --no-cache to bypass it.
 
 Examples:
   gotest clean ./...                         Clean all packages
+  gotest clean --cache                       Clear the test binary cache
 `)
 }
 
