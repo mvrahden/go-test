@@ -214,7 +214,7 @@ gotest SHALL find a coverage profile in every spelling go test accepts, for the 
 - **THEN** finds the profile in every spelling go test accepts, for the --min gate and for summary
 
 ### Requirement: Merged coverage counts
-A -coverprofile under -covermode=count or atomic SHALL hold, for each block, the sum of the counts of the suite processes that ran it, as go test's one process counts it; under set a block any process ran SHALL read 1.
+A -coverprofile under -covermode=count or atomic SHALL hold, for each block, the sum of the counts of the package's suite processes that ran it: a block a test runs is counted as go test's one process counts it, but code that runs at package initialisation is counted once per suite process. Under set a block any process ran SHALL read 1.
 
 #### Scenario: A block two suites run
 - **WHEN** two suites of a package each run a block once under -covermode=count

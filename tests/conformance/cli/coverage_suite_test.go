@@ -55,6 +55,8 @@ func (s *CLICoverageProfileTestSuite) TestABlockTwoSuitesRun(t *gotest.T) {
 			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 			gotest.NoError(it, readErr)
 			gotest.Regexp(it, `(?m)clicovercount\.go:\d+\.\d+,\d+\.\d+ 1 2$`, string(data))
+			// Each suite process initialises the package: go test's one process would read 1.
+			gotest.Regexp(it, `(?m)clicovercount_init\.go:4\.\d+,\d+\.\d+ 1 2$`, string(data))
 		})
 	})
 }
