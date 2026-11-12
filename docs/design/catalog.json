@@ -19694,6 +19694,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the method is booked failed in -json, and spec shows it failed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_stopended_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 32,
+                      "name": "the_method_is_booked_failed_in_-json,_and_spec_shows_it_failed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run's --timeout ends a method that honours its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcb_stopended_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 21,
+                  "name": "a_run's_--timeout_ends_a_method_that_honours_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodThatHonoursItsContext",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcb_stopended_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestAMethodThatHonoursItsContext",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DeadlineStopEnded",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "lcb_stopended_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestDeadlineStopEndedTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "prints one line naming the method and the default deadline",
                       "duration": 0,
                       "excluded": false,
@@ -32228,13 +32289,13 @@
     }
   ],
   "stats": {
-    "behaviors": 939,
+    "behaviors": 940,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 132,
+    "suites": 133,
     "tests": 0
   }
 }
