@@ -31680,6 +31680,97 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "a run's spec shows each It whole under its When and the row whole under its method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelabel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "a_run's_spec_shows_each_It_whole_under_its_When_and_the_row_whole_under_its_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the summary names the failing It whole",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelabel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 32,
+                      "name": "the_summary_names_the_failing_It_whole",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "neither counts them as suites",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelabel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "neither_counts_them_as_suites",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It's label or a table row's name ends in TestSuite or Fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suitelabel_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 26,
+                  "name": "an_It's_label_or_a_table_row's_name_ends_in_TestSuite_or_Fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LabelsThatEndLikeASuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suitelabel_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestLabelsThatEndLikeASuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecSuiteLabel",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "suitelabel_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestSpecSuiteLabelTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -31787,13 +31878,13 @@
     }
   ],
   "stats": {
-    "behaviors": 925,
+    "behaviors": 928,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 128,
+    "suites": 129,
     "tests": 0
   }
 }

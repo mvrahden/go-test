@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecSuiteLabel .* / a run's spec shows each It whole under its When and the row whole under its method \(
+Clause: when an It's label or a table row's name ends in TestSuite or Fixture → a run's spec shows each It whole under its When and the row whole under its method
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -980,7 +980,7 @@
+ 		case strings.HasPrefix(name, "Test"):
+ 			n.Kind = KindMethod
+ 			n.Display = strings.TrimPrefix(strings.TrimPrefix(name, "Test"), "_")
+-		case parent == KindFixture && strings.HasSuffix(name, protocol.SuffixFixture) && !strings.HasSuffix(name, protocol.SuffixTestSuite):
++		case strings.HasSuffix(name, protocol.SuffixFixture) && !strings.HasSuffix(name, protocol.SuffixTestSuite):
+ 			n.Kind = KindFixture
+ 			n.Display = strings.TrimSuffix(name, protocol.SuffixFixture)
+ 		case parent == KindFixture && strings.HasSuffix(name, protocol.SuffixTestSuite):

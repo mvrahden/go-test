@@ -883,6 +883,8 @@ shards of one run do not add up to every mutant exactly once.
 | `discover-unrefused-warning-dropped` | discover drops every warning of a Benchmark or Fuzz method on a type that is no suite | conformance: the discovery It for discover on `orphanwarned` sees no warning |
 | `spec-focus-note-missing` | `gotest spec` outside CI mode never says that F_ narrows the run | conformance: the CLI It for spec on `focused` sees no note on stderr |
 | `summary-focus-note-missing` | `gotest summary` outside CI mode never says that F_ narrows the run | conformance: the CLI It for summary on `focused` sees no note on stderr |
+| `nested-suite-label-read-as-suite` | a nested subtest whose name ends in `TestSuite` becomes a suite node, its label cut at the suffix | conformance: the spec Its on `suitelabel` see the label cut short and three suites counted |
+| `nested-fixture-label-read-as-fixture` | a nested subtest whose name ends in `Fixture` becomes a fixture node, its label cut at the suffix | conformance: the spec It on `suitelabel` sees `is told to bind a DB` |
 | `spec-run-twin-unmarked` | a suite's second run in one process is not marked external | conformance: the spec It for a suite of both test packages sees neither suite marked |
 | `stamp-instance-on-runs-only` | the runner stamps `Gotest.Instance` on run events only, not on the other events of a later instance | cli conformance: the external twin suite's output and verdict events carry no Instance 2 |
 | `stamp-remarshals-the-event` | the runner re-marshals a stamped event instead of splicing the object in, reordering go test's fields | cli conformance: a stamped line minus its `Gotest` object is not the line go test wrote |

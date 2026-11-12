@@ -918,6 +918,13 @@ func noVerdict(n *Node) bool {
 }
 
 func classify(n *Node, topLevel bool) {
+	classifyUnder(n, topLevel, KindUnknown)
+}
+
+// classifyUnder is classify for a node whose parent has the given kind. A
+// nested name is a suite or a fixture only directly under a fixture: under a
+// suite, a method or a block it is a label, whatever it ends in.
+func classifyUnder(n *Node, topLevel bool, parent NodeKind) {
 	if n.Kind == KindFuzz {
 		return // shaped by attachFuzzWrappers, children included
 	}
@@ -970,10 +977,10 @@ func classify(n *Node, topLevel bool) {
 		case strings.HasPrefix(name, "Test"):
 			n.Kind = KindMethod
 			n.Display = strings.TrimPrefix(strings.TrimPrefix(name, "Test"), "_")
-		case strings.HasSuffix(name, protocol.SuffixFixture) && !strings.HasSuffix(name, protocol.SuffixTestSuite):
+		case parent == KindFixture && strings.HasSuffix(name, protocol.SuffixFixture) && !strings.HasSuffix(name, protocol.SuffixTestSuite):
 			n.Kind = KindFixture
 			n.Display = strings.TrimSuffix(name, protocol.SuffixFixture)
-		case strings.HasSuffix(name, protocol.SuffixTestSuite):
+		case parent == KindFixture && strings.HasSuffix(name, protocol.SuffixTestSuite):
 			n.Kind = KindSuite
 			n.Display = strings.TrimSuffix(name, protocol.SuffixTestSuite)
 		default:
@@ -997,7 +1004,7 @@ func classify(n *Node, topLevel bool) {
 		if n.Kind == KindBenchmark {
 			classifySubBenchmark(c)
 		} else {
-			classify(c, false)
+			classifyUnder(c, false, n.Kind)
 		}
 	}
 }

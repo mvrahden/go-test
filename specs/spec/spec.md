@@ -57,6 +57,15 @@ An It or a When whose label holds a slash, at its start, inside or at its end, S
 - **WHEN** an It's label extends a parallel sibling's label
 - **THEN** a run's spec shows both as Its under their When
 
+### Requirement: A label named like a suite
+An It, a When or a table row whose name ends in TestSuite or Fixture SHALL be one behavior under its parent, its label whole, in the spec of a run and in the summary, and SHALL NOT count as a suite or a fixture: only a top-level test of a suite's process, or one a fixture's test runs directly, SHALL be a suite or a fixture.
+
+#### Scenario: Labels that end in TestSuite or Fixture
+- **WHEN** an It's label or a table row's name ends in TestSuite or Fixture
+- **THEN** a run's spec shows each It whole under its When and the row whole under its method
+- **AND** the summary names the failing It whole
+- **AND** neither counts them as suites
+
 ### Requirement: Suites of both test packages
 A suite name declared in a package's test files and in its external test package SHALL read as two suites, the external one marked, each with its own behaviors, in a run's spec, in the spec replayed from its -json stream, a rerun of the external one's shared method included, in the declared spec and in discover, the internal one first, as go test runs it first.
 

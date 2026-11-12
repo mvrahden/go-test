@@ -1,0 +1,17 @@
+Expect: ^FAIL .*conformance/spec SpecSuiteLabel .* / a run's spec shows each It whole under its When and the row whole under its method \(
+Expect: ^FAIL .*conformance/spec SpecSuiteLabel .* / the summary names the failing It whole \(
+Expect: ^FAIL .*conformance/spec SpecSuiteLabel .* / neither counts them as suites \(
+Clause: when an It's label or a table row's name ends in TestSuite or Fixture → a run's spec shows each It whole under its When and the row whole under its method
+Clause: when an It's label or a table row's name ends in TestSuite or Fixture → the summary names the failing It whole
+Clause: when an It's label or a table row's name ends in TestSuite or Fixture → neither counts them as suites
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -983,7 +983,7 @@
+ 		case parent == KindFixture && strings.HasSuffix(name, protocol.SuffixFixture) && !strings.HasSuffix(name, protocol.SuffixTestSuite):
+ 			n.Kind = KindFixture
+ 			n.Display = strings.TrimSuffix(name, protocol.SuffixFixture)
+-		case parent == KindFixture && strings.HasSuffix(name, protocol.SuffixTestSuite):
++		case strings.HasSuffix(name, protocol.SuffixTestSuite):
+ 			n.Kind = KindSuite
+ 			n.Display = strings.TrimSuffix(name, protocol.SuffixTestSuite)
+ 		default:
