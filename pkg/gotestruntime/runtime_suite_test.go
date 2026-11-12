@@ -239,10 +239,10 @@ func (s *RuntimeTestSuite) TestRetry_CancelDuringTheReleaseReleasesOnce(t *gotes
 
 	_, err := gotestruntime.SetupFixtureDAG(ctx, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
-	gotest.ErrorIs(t, err, context.Canceled)
-	gotest.Equal(t, 1, attempts)
+	mustErrorIs(t, err, context.Canceled)
+	mustEqual(t, 1, attempts)
 	// The release between attempts already ran: the teardown does not repeat it.
-	gotest.Equal(t, 1, afterAlls)
+	mustEqual(t, 1, afterAlls)
 }
 
 func (s *RuntimeTestSuite) TestRetry_DelayObservedBetweenAttempts(t *gotest.T) {
@@ -560,8 +560,8 @@ func (s *RuntimeTestSuite) TestChildFailure_ReportsTheCause(t *gotest.T) {
 		BeforeAll: func(ctx context.Context) error { <-aFailed; <-ctx.Done(); return ctx.Err() }}
 	err := gotestruntime.ExportSetupDAG(context.Background(), []*gotestruntime.FixtureNode{a, b}, nil, gotestruntime.ExportNewNodeTracker())
 	// B saw its context end, but the error the run reports is why: A's failure.
-	gotest.ErrorContains(t, err, "A refused to start")
-	gotest.NotContains(t, err.Error(), "context canceled")
+	mustErrorContain(t, err, "A refused to start")
+	mustNotContain(t, err.Error(), "context canceled")
 }
 
 func (s *RuntimeTestSuite) TestChildFailure_SkippedChildIsNotTornDown(t *gotest.T) {
@@ -1420,8 +1420,8 @@ func (s *RuntimeTestSuite) TestDAG_FailedHydrateIsDehydrated(t *gotest.T) {
 				},
 			}
 			_, err := gotestruntime.SetupFixtureDAG(it.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
-			gotest.ErrorContains(it, err, "pool half open")
-			gotest.Equal(it, 1, dehydrated)
+			mustErrorContain(it, err, "pool half open")
+			mustEqual(it, 1, dehydrated)
 		})
 	}
 
@@ -1440,8 +1440,8 @@ func (s *RuntimeTestSuite) TestDAG_FailedHydrateIsDehydrated(t *gotest.T) {
 			},
 		}
 		_, err := gotestruntime.SetupFixtureDAG(it.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
-		gotest.ErrorContains(it, err, "unmarshal")
-		gotest.Zero(it, dehydrated)
+		mustErrorContain(it, err, "unmarshal")
+		mustEqual(it, 0, dehydrated)
 	})
 }
 

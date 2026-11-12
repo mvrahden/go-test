@@ -27,7 +27,10 @@ func (s *SnapshotInternalsTestSuite) BeforeEach(t *gotest.T) {
 	// The package directory, where go test runs the binary: the caller's file
 	// would do as well, until -trimpath makes it a path nothing can open.
 	dir, err := os.Getwd()
-	gotest.NoError(t, err)
+	if err != nil {
+		t.Errorf("os.Getwd: %v", err)
+		t.FailNow()
+	}
 	s.dir = dir
 	s.snapDir = t.TempDir()
 	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
