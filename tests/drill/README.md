@@ -644,6 +644,8 @@ shards of one run do not add up to every mutant exactly once.
 | `parallel-fixture-hooks-accepted` | a fixture hook that uses the fixture is accepted under a parallel suite | conformance: the discovery It for a racing fixture hook sees exit 0 instead of 2 |
 | `parallel-stub-hooks-refused` | every fixture hook is taken to use the fixture | conformance: the discovery It for fixture hooks that never use the fixture sees exit 2 |
 | `parallel-single-method-hooks-refused` | a parallel suite with one test method is refused for its fixture's hooks | conformance: the discovery It for a one-method suite sees exit 2 |
+| `parallel-setenv-accepted` | Setenv in a method of a parallel suite is accepted | conformance: the discovery It for Setenv under Parallel sees exit 1 instead of 2 |
+| `parallel-setenv-beforeall-refused` | Setenv in BeforeAll of a parallel suite is refused | conformance: the discovery It for Setenv in BeforeAll sees exit 2 |
 | `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
 | `harness-imports-collide-by-name` | two imported packages of the same name get the same alias | canary: the `shapes/genpgpg` package exits 2 instead of 0 |
 | `predeclared-clash-accepted` | a package redeclaring a name Go predeclares that the harness uses is generated for | conformance: the discovery It for `shapes/genpredeclared` sees a build failure instead of the located refusal |

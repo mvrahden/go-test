@@ -209,3 +209,11 @@ gotest SHALL refuse with exit 2 a suite with Parallel: true and two or more test
 - **THEN** a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel
 - **AND** a suite whose fixture hooks never use the fixture runs
 - **AND** a suite with one test method runs
+
+### Requirement: Setenv under a parallel suite
+gotest SHALL refuse with exit 2 a suite with Parallel: true whose test method, BeforeEach or AfterEach calls Setenv on a *gotest.T or a *testing.T, closures included: testing panics when a parallel test sets the environment. One error per suite, at the first call. It reads the method's own body, not the helpers it calls. A call in BeforeAll SHALL run.
+
+#### Scenario: A parallel suite sets the environment
+- **WHEN** a suite with Parallel: true calls Setenv on a T
+- **THEN** a call in a test method, in BeforeEach, in a nested It and through t.T() is refused at the call, told to set it in BeforeAll or drop Parallel
+- **AND** a call in BeforeAll runs and its value reaches every method

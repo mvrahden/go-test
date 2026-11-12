@@ -1026,6 +1026,10 @@ func ValidateContextConsistency(ts *TestSuiteSpec) error {
 		return err
 	}
 
+	if err := parallelSetenv(ts); err != nil {
+		return err
+	}
+
 	// Rule 1/7: Parallel requires returning BeforeEach (void BeforeEach forbidden)
 	if ts.th.ConfigParallel && be != nil && !be.HasReturn() {
 		return At(be.NamePos(), fmt.Errorf("%s: SuiteConfig has Parallel: true, but BeforeEach has no return value. Parallel methods require per-test isolation — move per-test fields to a context struct and return it from BeforeEach", suiteName))
