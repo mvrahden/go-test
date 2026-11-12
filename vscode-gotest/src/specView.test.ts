@@ -26,6 +26,7 @@ import {
   nearestItemId,
   linkSources,
   SpecViewPanel,
+  renderErrorHtml,
 } from "./specView.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -633,5 +634,19 @@ describe("the kept runs on disk", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("renderErrorHtml", () => {
+  it("is empty when the last render worked", () => {
+    expect(renderErrorHtml(undefined)).toBe("");
+  });
+  it("says the view is out of date, with the reason's first line escaped and a retry button", () => {
+    const html = renderErrorHtml("spec render timed out after 30s\n<stack>");
+    expect(html).toContain("This view is out of date: the last render failed.");
+    expect(html).toContain("spec render timed out after 30s");
+    expect(html).not.toContain("<stack>");
+    expect(html).toContain('id="retry-render-btn"');
+    expect(renderErrorHtml("a <b> c")).toContain("a &lt;b&gt; c");
   });
 });

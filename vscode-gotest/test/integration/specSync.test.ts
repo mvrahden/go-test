@@ -350,6 +350,31 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
       expect(renderedHtml()).not.toContain("totals the basket");
     },
   );
+
+  it.skipIf(process.platform === "win32")(
+    "keeps the last picture under a notice, and drops the notice when a render works again",
+    async () => {
+      const { panel } = newPanel();
+      await panel.show();
+      await panel.refresh(run("mixed"));
+      expect(renderedHtml()).toContain("totals the basket");
+      expect(renderedHtml()).not.toContain("This view is out of date");
+
+      state.cliPath = brokenBinary;
+      clearBinaryCache();
+      await panel.refresh(run("all-fail"));
+      expect(renderedHtml()).toContain(
+        "This view is out of date: the last render failed.",
+      );
+      expect(renderedHtml()).toContain("simulated toolchain failure");
+      expect(renderedHtml()).toContain("totals the basket");
+
+      state.cliPath = "";
+      clearBinaryCache();
+      await panel.refresh(run("mixed"));
+      expect(renderedHtml()).not.toContain("This view is out of date");
+    },
+  );
 });
 
 // Tier 2 — refresh() is stateful. The panel keeps the newest lines of every

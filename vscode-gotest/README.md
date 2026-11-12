@@ -14,7 +14,7 @@ This extension brings that into VS Code: run, debug, watch, and verify your suit
 Test Explorer shows your suites as **Package > Suite > Method > Subtest** — not a flat list of functions.
 Run or debug at any level. Coverage gutters track implementation progress. Watch mode streams results as you code.
 
-The **Spec View** renders your test structure as a behavioral specification — a readable tree with pass/fail indicators, go-to-source navigation, and clipboard export. Your tests become documentation that's always in sync.
+The **Spec View** renders your test structure as a behavioral specification — a readable tree with pass/fail indicators, go-to-source navigation, and clipboard export. Your tests become documentation regenerated from every run.
 
 **AI-assisted workflows** — Paste specs into AI conversations as context. The clean exports feed well into LLM toolchains. You define what the system should do — the tests verify.
 
@@ -113,6 +113,7 @@ Open it with **Go Test: Show Spec View**.
 - **Toolbar** — expand/collapse all, show or hide passed, failed, skipped and not run rows (the CLI's `--hide`; the counts stay the run's), search behaviors by name
 - **Copy / Clear** — copy what the panel shows as the CLI's Markdown, or clear results
 - **Persistence** — the panel survives editor reload and restores what it kept
+- **A render that failed** — when a render fails the panel keeps the last picture and says so at its top, with the reason and a Retry button; the next successful render removes the notice
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
 

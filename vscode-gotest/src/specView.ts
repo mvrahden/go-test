@@ -41,6 +41,8 @@ export class SpecViewPanel implements vscode.Disposable {
   private modulePaths: string[] = [];
   // Runs merged since the panel last rendered them.
   private stale = false;
+  // Why the last render failed; cleared by the next one that works.
+  private renderError: string | undefined;
   private rendering: Promise<void> = Promise.resolve();
   private actions: SpecViewActions | undefined;
   // The statuses the toolbar hides, as the CLI's --hide names them.
@@ -314,6 +316,7 @@ export class SpecViewPanel implements vscode.Disposable {
     this.imports.clear();
     this.selected = undefined;
     this.stale = false;
+    this.renderError = undefined;
     this.persist();
     if (this.panel) {
       this.panel.webview.html = this.buildHtml({ type: "empty" });
@@ -400,12 +403,20 @@ export class SpecViewPanel implements vscode.Disposable {
     try {
       const data = await this.renderRuns();
       this.lastSpecData = data;
+      this.renderError = undefined;
       await this.resolveModulePaths();
       if (!this.panel) return;
       this.panel.webview.html = this.buildHtml({ type: "specData", data });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
+      // The last picture stays, under a notice; the next reveal retries.
+      this.renderError = message;
+      this.stale = true;
+      if (!this.panel) return;
+      this.panel.webview.html = this.lastSpecData
+        ? this.buildHtml({ type: "specData", data: this.lastSpecData })
+        : this.buildHtml({ type: "empty" });
     }
   }
 
@@ -581,6 +592,7 @@ ${CSS}
 </style>
 </head>
 <body>
+${renderErrorHtml(this.renderError)}
 ${body}
 <script nonce="${nonce}">
 const SPEC_STATE = ${stateJson};
@@ -1334,6 +1346,14 @@ function fuzzTagHtml(node: SpecNode): string {
   return ` <span class="tag fuzz">FUZZ · ${n} seed${n === 1 ? "" : "s"}</span>`;
 }
 
+// renderErrorHtml is the notice over a picture the last render could not
+// replace: empty when that render worked.
+export function renderErrorHtml(message: string | undefined): string {
+  if (message === undefined) return "";
+  const reason = escapeHtml(message.split("\n")[0]);
+  return `<div class="render-error" role="alert">This view is out of date: the last render failed. <span class="render-error-reason">${reason}</span> <button class="tool-btn" id="retry-render-btn">Retry</button></div>`;
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -1593,6 +1613,7 @@ summary.node:hover > .node-actions,
 
 /* Error output */
 .error-details { margin: 2px 0 4px 20px; }
+.render-error { margin: 8px 12px; padding: 6px 10px; border: 1px solid var(--vscode-inputValidation-warningBorder); background: var(--vscode-inputValidation-warningBackground); }
 .error-summary {
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
@@ -1701,7 +1722,7 @@ document.addEventListener('click', (e) => {
     vscode.postMessage({ type: 'copySpec', search: box ? box.value.trim() : '' });
     return;
   }
-  if (t.id === 'refresh-btn') {
+  if (t.id === 'refresh-btn' || t.id === 'retry-render-btn') {
     vscode.postMessage({ type: 'refresh' });
     return;
   }
