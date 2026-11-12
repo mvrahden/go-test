@@ -370,6 +370,27 @@ gotest summary SHALL print one line per named ExclusiveGroup that ran, with its 
 - **AND** prints the same lines in the Markdown summary and the GitHub step summary
 - **AND** puts a groups entry with each group's suites and wall time in the JSON summary
 
+### Requirement: The summary's headline
+gotest summary's first line SHALL count as passed only the tests that passed and SHALL name beside them the tests that were skipped and those that were not run, in its terminal and Markdown summaries and the GitHub step summary. It SHALL say All only when every test passed, and SHALL claim no pass of a run in which none did. A run with failed tests SHALL open with their count, then the passed, skipped and not-run counts that are not zero.
+
+#### Scenario: A run in which every test passed
+- **WHEN** gotest summary runs a package whose tests all pass
+- **THEN** the Markdown headline says All and the count of tests
+
+#### Scenario: A run with skipped tests
+- **WHEN** gotest summary runs a package with passed and skipped tests
+- **THEN** the headline counts the passed tests and names the skipped ones
+- **AND** the Markdown headline does not say All
+- **AND** the GitHub step summary carries the Markdown headline
+
+#### Scenario: A run in which nothing passed
+- **WHEN** gotest summary runs a package whose tests are all skipped
+- **THEN** the headline says no tests passed, names the skipped ones and exits 0
+
+#### Scenario: A run with failed, passed and skipped tests
+- **WHEN** gotest summary runs a package with failed, passed and skipped tests
+- **THEN** the headline opens with the failed count, then the passed and the skipped
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 

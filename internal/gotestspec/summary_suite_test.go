@@ -88,7 +88,7 @@ func (s *SummaryRenderTestSuite) TestRenderSummary_WithFailures(t *gotest.T, _ *
 		}},
 	}})
 
-	gotest.Contains(t, out, "1 of 3 tests failed")
+	gotest.Contains(t, out, "1 test failed, 2 passed")
 	gotest.Contains(t, out, "FAIL")
 	gotest.Contains(t, out, "UserService / Create / rejects empty name")
 	gotest.Contains(t, out, "expected error, got nil")
@@ -154,7 +154,7 @@ func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_WithFailures(t *gotes
 		},
 	}})
 
-	gotest.Contains(t, out, "1 of 2 tests failed")
+	gotest.Contains(t, out, "### 1 test failed, 1 passed")
 	gotest.Contains(t, out, "<details>")
 	gotest.Contains(t, out, "pkg/foo")
 	gotest.Contains(t, out, "want 1, got 2")
@@ -373,4 +373,83 @@ func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_NamesInHTML(t *gotest
 			gotest.NotContains(it, out, `<b>&"`)
 		})
 	})
+}
+
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
+}
+
+// headlinePackages builds one package of stdlib leaves with the given verdicts.
+func headlinePackages(passed, failed, skipped, notRun int, pkgFailed bool) []*gotestspec.Package {
+	pkg := &gotestspec.Package{Path: "example.com/p"}
+	for range passed {
+		pkg.Nodes = append(pkg.Nodes, &gotestspec.Node{Kind: gotestspec.KindTest, Display: "Passes", Status: gotestspec.StatusPass})
+	}
+	for range failed {
+		pkg.Nodes = append(pkg.Nodes, failingTest("Fails", "    p_test.go:3: boom\n"))
+	}
+	for range skipped {
+		pkg.Nodes = append(pkg.Nodes, &gotestspec.Node{Kind: gotestspec.KindTest, Display: "Skips", Status: gotestspec.StatusSkip})
+	}
+	for range notRun {
+		pkg.Nodes = append(pkg.Nodes, &gotestspec.Node{Kind: gotestspec.KindTest, Display: "NeverRan", Status: gotestspec.StatusNone})
+	}
+	if pkgFailed {
+		pkg.Status = gotestspec.StatusFail
+		pkg.Output = []string{"exit status 1\n"}
+	}
+	return []*gotestspec.Package{pkg}
+}
+
+func (s *SummaryRenderTestSuite) TestHeadlines(t *gotest.T, _ *summaryRenderCtx) {
+	type row struct {
+		Desc                            string
+		passed, failed, skipped, notRun int
+		pkgFailed                       bool
+		terminal, markdown              string
+	}
+	rows := []row{
+		{"every test passed", 3, 0, 0, 0, false, "3 tests passed (448ms)", "### All 3 tests passed (448ms)"},
+		{"the one test passed", 1, 0, 0, 0, false, "1 test passed (448ms)", "### All 1 test passed (448ms)"},
+		{"passed and skipped", 1, 0, 2, 0, false, "1 test passed, 2 skipped (448ms)", "### 1 test passed, 2 skipped (448ms)"},
+		{"passed and not run", 1, 0, 0, 2, false, "1 test passed, 2 not run (448ms)", "### 1 test passed, 2 not run (448ms)"},
+		{"passed, skipped and not run", 1, 0, 2, 1, false, "1 test passed, 2 skipped, 1 not run (448ms)", "### 1 test passed, 2 skipped, 1 not run (448ms)"},
+		{"only skipped", 0, 0, 2, 0, false, "No tests passed: 2 skipped (448ms)", "### No tests passed: 2 skipped (448ms)"},
+		{"only not run", 0, 0, 0, 1, false, "No tests passed: 1 not run (448ms)", "### No tests passed: 1 not run (448ms)"},
+		{"skipped and not run", 0, 0, 2, 1, false, "No tests passed: 2 skipped, 1 not run (448ms)", "### No tests passed: 2 skipped, 1 not run (448ms)"},
+		{"nothing at all", 0, 0, 0, 0, false, "No tests ran (448ms)", "### No tests ran (448ms)"},
+		{"one failure", 0, 1, 0, 0, false, "1 test failed", "### 1 test failed"},
+		{"one failure, package failed", 0, 1, 0, 0, true, "1 test failed", "### 1 test failed"},
+		{"failures among passes", 144, 3, 0, 0, false, "3 tests failed, 144 passed", "### 3 tests failed, 144 passed"},
+		{"failures among passes, package failed", 144, 3, 0, 0, true, "3 tests failed, 144 passed", "### 3 tests failed, 144 passed"},
+		{"failed, passed and skipped", 1, 1, 1, 0, false, "1 test failed, 1 passed, 1 skipped", "### 1 test failed, 1 passed, 1 skipped"},
+		{"failed, passed and skipped, package failed", 1, 1, 1, 0, true, "1 test failed, 1 passed, 1 skipped", "### 1 test failed, 1 passed, 1 skipped"},
+		{"failed, skipped and not run", 0, 1, 2, 1, false, "1 test failed, 2 skipped, 1 not run", "### 1 test failed, 2 skipped, 1 not run"},
+		{"failed, skipped and not run, package failed", 0, 1, 2, 1, true, "1 test failed, 2 skipped, 1 not run", "### 1 test failed, 2 skipped, 1 not run"},
+		{"passed and skipped, package failed", 1, 0, 1, 0, true, "1 test passed, 1 skipped — package failure detected", "### 1 test passed, 1 skipped — package failure detected"},
+		{"only skipped, package failed", 0, 0, 2, 0, true, "No tests passed: 2 skipped — package failure detected", "### No tests passed: 2 skipped — package failure detected"},
+		{"nothing at all, package failed", 0, 0, 0, 0, true, "No tests ran — package failure detected", "### No tests ran — package failure detected"},
+	}
+	for it, r := range gotest.Each(t, rows) {
+		pkgs := headlinePackages(r.passed, r.failed, r.skipped, r.notRun, r.pkgFailed)
+		var terminal, markdown bytes.Buffer
+		gotestspec.RenderSummary(&terminal, pkgs, gotestspec.WithNoColor(), gotestspec.WithElapsed(448*time.Millisecond))
+		gotestspec.RenderMarkdownSummary(&markdown, pkgs, gotestspec.WithElapsed(448*time.Millisecond))
+		gotest.Equal(it, r.terminal, firstLine(terminal.String()))
+		gotest.Equal(it, r.markdown, firstLine(markdown.String()))
+	}
+
+	t.It("colors a headline without a pass yellow, never green", func(it *gotest.T) {
+		var buf bytes.Buffer
+		gotestspec.RenderSummary(&buf, headlinePackages(0, 0, 2, 0, false), gotestspec.WithElapsed(448*time.Millisecond))
+		gotest.Contains(it, buf.String(), "\033[33mNo tests passed: 2 skipped\033[0m")
+		gotest.NotContains(it, buf.String(), "\033[32m")
+	})
+}
+
+func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_TrailerNamesNotRun(t *gotest.T, _ *summaryRenderCtx) {
+	var buf bytes.Buffer
+	gotestspec.RenderMarkdownSummary(&buf, headlinePackages(0, 1, 2, 1, false))
+	gotest.Contains(t, buf.String(), ": 0 passed, 1 failed, 2 skipped, 1 not run\n")
 }

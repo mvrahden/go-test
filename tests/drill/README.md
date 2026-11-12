@@ -904,6 +904,7 @@ shards of one run do not add up to every mutant exactly once.
 | `signal-not-announced` | a stop a signal from outside began is neither told to the runner nor ends by the signal | canary: the outside run's stream names no stop from outside and the run passes |
 | `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |
 | `force-before-stop` | the runner's force line with no stop under way is ignored | ring-0 lifecycle: the process the force reached keeps running |
+| `summary-headline-counts-skips-as-passed` | the summary headline counts skipped tests as passed and leaves them unnamed | cli conformance: the headline of a run with passed and skipped tests names the skipped ones |
 
 ## Adding a mutant
 

@@ -78,6 +78,40 @@ func effectiveDuration(cfg *renderConfig, packages []*Package) time.Duration {
 	return totalDuration(packages)
 }
 
+// passedPhrase is a headline without failures: the tests that passed and,
+// beside them, those skipped and not run. clean is true when every test passed.
+func passedPhrase(s Stats) (phrase string, clean bool) { //nolint:gocritic // hugeParam: as renderSummary
+	rest := otherCounts(s, false)
+	switch {
+	case s.Passed > 0:
+		return strings.Join(append([]string{countNoun(s.Passed, "test passed", "tests passed")}, rest...), ", "), len(rest) == 0
+	case len(rest) > 0:
+		return "No tests passed: " + strings.Join(rest, ", "), false
+	default:
+		return "No tests ran", false
+	}
+}
+
+// failedPhrase is the headline of a run with failed tests: their count, then
+// the passed, skipped and not-run counts that are not zero.
+func failedPhrase(s Stats) string { //nolint:gocritic // hugeParam: as renderSummary
+	return strings.Join(append([]string{countNoun(s.Failed, "test failed", "tests failed")}, otherCounts(s, true)...), ", ")
+}
+
+func otherCounts(s Stats, withPassed bool) []string { //nolint:gocritic // hugeParam: as renderSummary
+	var parts []string
+	if withPassed && s.Passed > 0 {
+		parts = append(parts, fmt.Sprintf("%d passed", s.Passed))
+	}
+	if s.Skipped > 0 {
+		parts = append(parts, fmt.Sprintf("%d skipped", s.Skipped))
+	}
+	if s.NotRun > 0 {
+		parts = append(parts, fmt.Sprintf("%d not run", s.NotRun))
+	}
+	return parts
+}
+
 func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	cfg := renderConfig{color: true}
 	for _, o := range opts {
@@ -94,9 +128,14 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 
 	// A package-level failure without diagnostics still forbids the all-green
 	// summary: the verdict is the package status, not the presence of output.
+	passed, _ := passedPhrase(stats)
+	passedColor := c.green
+	if stats.Passed == 0 {
+		passedColor = c.yellow
+	}
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
-		fmt.Fprintf(w, "%s%d tests passed%s (%s)\n",
-			c.green, stats.Total(), c.reset,
+		fmt.Fprintf(w, "%s%s%s (%s)\n",
+			passedColor, passed, c.reset,
 			formatDuration(effectiveDuration(&cfg, packages)))
 		renderGroups(w, cfg.groups, c)
 		if cfg.coverage != nil {
@@ -107,8 +146,7 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	}
 
 	if len(failures) > 0 {
-		fmt.Fprintf(w, "%s%d of %d tests failed%s\n",
-			c.red, stats.Failed, stats.Total(), c.reset)
+		fmt.Fprintf(w, "%s%s%s\n", c.red, failedPhrase(stats), c.reset)
 
 		for _, f := range failures {
 			fmt.Fprintln(w)
@@ -128,8 +166,8 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 			}
 		}
 	} else {
-		fmt.Fprintf(w, "%s%d tests passed%s — %spackage failure detected%s\n",
-			c.green, stats.Total(), c.reset, c.red, c.reset)
+		fmt.Fprintf(w, "%s%s%s — %spackage failure detected%s\n",
+			passedColor, passed, c.reset, c.red, c.reset)
 	}
 
 	for _, d := range diags {
@@ -179,9 +217,14 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	failures := collectFailures(packages)
 	diags := collectPackageDiagnostics(packages)
 
+	passed, clean := passedPhrase(stats)
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
-		fmt.Fprintf(w, "### All %d tests passed (%s)\n",
-			stats.Total(), formatDuration(effectiveDuration(&cfg, packages)))
+		all := ""
+		if clean {
+			all = "All "
+		}
+		fmt.Fprintf(w, "### %s%s (%s)\n",
+			all, passed, formatDuration(effectiveDuration(&cfg, packages)))
 		renderMarkdownGroups(w, cfg.groups)
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
@@ -191,9 +234,9 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	}
 
 	if len(failures) > 0 {
-		fmt.Fprintf(w, "### %d of %d tests failed\n", stats.Failed, stats.Total())
+		fmt.Fprintf(w, "### %s\n", failedPhrase(stats))
 	} else {
-		fmt.Fprintf(w, "### %d tests passed — package failure detected\n", stats.Total())
+		fmt.Fprintf(w, "### %s — package failure detected\n", passed)
 	}
 
 	renderMarkdownFailures(w, failures)
@@ -233,6 +276,9 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 		parts = append(parts, "0 suites")
 	}
 	trailer := fmt.Sprintf("%d passed, %d failed, %d skipped", stats.Passed, stats.Failed, stats.Skipped)
+	if stats.NotRun > 0 {
+		trailer += fmt.Sprintf(", %d not run", stats.NotRun)
+	}
 	if stats.FailedPackages > 0 {
 		trailer += ", " + countNoun(stats.FailedPackages, "failed package", "failed packages")
 	}

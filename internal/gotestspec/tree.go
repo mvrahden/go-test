@@ -224,10 +224,6 @@ type Stats struct {
 	NotRun int
 }
 
-func (s Stats) Total() int { //nolint:gocritic // hugeParam: stable API
-	return s.Passed + s.Failed + s.Skipped
-}
-
 func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 	var cfg buildConfig
 	for _, o := range opts {

@@ -9770,6 +9770,190 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the Markdown headline says All and the count of tests",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "the_Markdown_headline_says_All_and_the_count_of_tests",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary runs a package whose tests all pass",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "gotest_summary_runs_a_package_whose_tests_all_pass",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the headline counts the passed tests and names the skipped ones",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 30,
+                      "name": "the_headline_counts_the_passed_tests_and_names_the_skipped_ones",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the Markdown headline does not say All",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "the_Markdown_headline_does_not_say_All",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the GitHub step summary carries the Markdown headline",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 41,
+                      "name": "the_GitHub_step_summary_carries_the_Markdown_headline",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary runs a package with passed and skipped tests",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 29,
+                  "name": "gotest_summary_runs_a_package_with_passed_and_skipped_tests",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the headline says no tests passed, names the skipped ones and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 52,
+                      "name": "the_headline_says_no_tests_passed,_names_the_skipped_ones_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary runs a package whose tests are all skipped",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 51,
+                  "name": "gotest_summary_runs_a_package_whose_tests_are_all_skipped",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the headline opens with the failed count, then the passed and the skipped",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 61,
+                      "name": "the_headline_opens_with_the_failed_count,_then_the_passed_and_the_skipped",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary runs a package with failed, passed and skipped tests",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 60,
+                  "name": "gotest_summary_runs_a_package_with_failed,_passed_and_skipped_tests",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheHeadline",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "summary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestTheHeadline",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLISummary",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "summary_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLISummaryTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0",
                       "duration": 0,
                       "excluded": false,
@@ -29711,13 +29895,13 @@
     }
   ],
   "stats": {
-    "behaviors": 863,
+    "behaviors": 869,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 118,
+    "suites": 119,
     "tests": 0
   }
 }
