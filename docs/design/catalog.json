@@ -12824,6 +12824,112 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "it reports the package broken with the refusal at the type's first such method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 45,
+                      "name": "it_reports_the_package_broken_with_the_refusal_at_the_type's_first_such_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "it warns of no other method of that type",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 55,
+                      "name": "it_warns_of_no_other_method_of_that_type",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "it reports a generic suite no alias instantiates broken with the refusal at its declaration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "it_reports_a_generic_suite_no_alias_instantiates_broken_with_the_refusal_at_its_declaration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a Benchmark or Fuzz method on a helper a suite calls, or on a type a non-test file declares, is still warned of as never running",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 66,
+                      "name": "a_Benchmark_or_Fuzz_method_on_a_helper_a_suite_calls,_or_on_a_type_a_non-test_file_declares,_is_still_warned_of_as_never_running",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when discover reads a package declaring cases no run reaches",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_discover_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 44,
+                  "name": "discover_reads_a_package_declaring_cases_no_run_reaches",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Discover",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_discover_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 43,
+              "name": "TestDiscover",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "NeverRunDiscover",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "neverrun_discover_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestNeverRunDiscoverTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a type nothing calls them on is refused at its first such method, told which suffix makes it a suite",
                       "duration": 0,
                       "excluded": false,
@@ -31605,13 +31711,13 @@
     }
   ],
   "stats": {
-    "behaviors": 919,
+    "behaviors": 923,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 126,
+    "suites": 127,
     "tests": 0
   }
 }

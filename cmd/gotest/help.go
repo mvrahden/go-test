@@ -695,9 +695,11 @@ without behaviors.
 
 "warnings" names, with its position, what a run would refuse (a package
 that does not load, an unsupported hook signature, a fuzz argument that
-cannot be fuzzed) and what it would pass over in silence: a lifecycle hook
-that is misspelled or carries X_, and a Benchmark or Fuzz method on a type
-that is no test suite.
+cannot be fuzzed, a case on a type that is no suite and that no test file
+calls, a generic suite no alias instantiates) and what it would pass over
+in silence: a lifecycle hook that is misspelled or carries X_, and a
+Benchmark or Fuzz method on a type that is no test suite and that the run
+does not refuse.
 
 Exit codes: 0 when the document was written, including for patterns that
 match no package ("packages": [], a warning on stderr: an editor's

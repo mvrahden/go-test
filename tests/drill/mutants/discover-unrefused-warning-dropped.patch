@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / a Benchmark or Fuzz method on a helper a suite calls, or on a type a non-test file declares, is still warned of as never running \(
+Clause: when discover reads a package declaring cases no run reaches → a Benchmark or Fuzz method on a helper a suite calls, or on a type a non-test file declares, is still warned of as never running
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -232,7 +232,7 @@
+ 				if w.Rule != "" && lint.Suppressed(pkg.Fset, pkg.Syntax, w.Pos, lint.Rule(w.Rule)) {
+ 					continue
+ 				}
+-				if w.Rule == "" && refusedTypes[receiverAt(pkg, w.Pos)] {
++				if w.Rule == "" {
+ 					continue
+ 				}
+ 				warn(pkg, w.Pos, w.Msg)

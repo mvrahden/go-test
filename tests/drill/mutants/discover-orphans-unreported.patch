@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / it reports the package broken with the refusal at the type's first such method \(
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / it reports a generic suite no alias instantiates broken with the refusal at its declaration \(
+Clause: when discover reads a package declaring cases no run reaches → it reports the package broken with the refusal at the type's first such method
+Clause: when discover reads a package declaring cases no run reaches → it reports a generic suite no alias instantiates broken with the refusal at its declaration
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -195,7 +195,7 @@
+ 		// what no run reaches is refused for the package as a whole; its
+ 		// types are not warned of again below
+ 		refusedTypes := map[types.Object]bool{}
+-		for _, ce := range lr.Orphans() {
++		for _, ce := range lr.Orphans()[:0] {
+ 			pkg := variantOf(pkgs, ce.Pos)
+ 			warn(pkg, ce.Pos, ce.Err.Error())
+ 			if recv := receiverAt(pkg, ce.Pos); recv != nil {

@@ -209,6 +209,16 @@ A test file of the package that the build constraints leave out of the run SHALL
 - **AND** a run with the build tag on runs the constrained suites too
 - **AND** a helper no file names is still refused
 
+### Requirement: Cases no run reaches, in discover
+discover SHALL report a package holding a case no run reaches, or a generic suite no alias instantiates, broken, with each refusal at its position, and SHALL NOT also warn of the methods that refusal covers. A Benchmark or Fuzz method on a type that is no suite and that the refusal leaves alone SHALL still be warned of as never running.
+
+#### Scenario: Discover reads cases no run reaches
+- **WHEN** discover reads a package declaring cases no run reaches
+- **THEN** it reports the package broken with the refusal at the type's first such method
+- **AND** it warns of no other method of that type
+- **AND** it reports a generic suite no alias instantiates broken with the refusal at its declaration
+- **AND** a Benchmark or Fuzz method on a helper a suite calls, or on a type a non-test file declares, is still warned of as never running
+
 ### Requirement: A case prefix alone
 A suite method named exactly Test, Benchmark or Fuzz, an X_ or F_ marker aside, that takes the T, B or F of that case SHALL be refused at the method, told to add a name; one that takes no such parameter SHALL stay a helper.
 
