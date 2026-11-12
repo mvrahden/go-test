@@ -3,8 +3,18 @@
 // the selection, and it never runs under plain Run — a search burns CPU on
 // request, not as a side effect of running tests.
 import * as vscode from "vscode";
-import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
-import { spawnTestProcess, isFuzzMethodLabel } from "./runnerUtils.js";
+import {
+  buildCliCommand,
+  formatCliCommand,
+  scopedConfig,
+  stripGoRunExitEcho,
+} from "./cli.js";
+import {
+  spawnTestProcess,
+  isFuzzMethodLabel,
+  markFailedRun,
+  type RunEnd,
+} from "./runnerUtils.js";
 import { withoutExternalId } from "./types.js";
 import {
   isValidGoDuration,
@@ -118,14 +128,25 @@ export interface SessionOutcome {
 }
 
 export interface FuzzVerdict {
-  status: "passed" | "failed" | "skipped" | "errored";
+  status: "passed" | "failed" | "skipped";
   message: string;
+}
+
+// sessionEnd reads one session's outcome for the failed-run rule: a crasher
+// or a failing seed is the session's failing verdict.
+export function sessionEnd(o: SessionOutcome): RunEnd {
+  return {
+    exitCode: o.exitCode,
+    cancelled: o.cancelled,
+    failed: o.crashers.size > 0 || o.failed.size > 0,
+    reason: stripGoRunExitEcho(o.stderr ?? ""),
+  };
 }
 
 // fuzzVerdicts maps one session's outcome onto its targets. A crasher file
 // is the finding signal; a FAIL without one is a seed or corpus entry that
 // reproduces on a normal run; a cancelled search found nothing and is not a
-// failure; exit 2 means the CLI could not run at all.
+// failure. Called for a session markFailedRun left alone.
 export function fuzzVerdicts(
   wrappers: string[],
   o: SessionOutcome,
@@ -133,12 +154,7 @@ export function fuzzVerdicts(
   const out = new Map<string, FuzzVerdict>();
   for (const w of wrappers) {
     const files = o.crashers.get(w);
-    if (o.exitCode === 2) {
-      out.set(w, {
-        status: "errored",
-        message: o.stderr?.trim() || "gotest fuzz failed (exit 2)",
-      });
-    } else if (files && files.length > 0) {
+    if (files && files.length > 0) {
       out.set(w, {
         status: "failed",
         message:
@@ -203,11 +219,16 @@ export async function runFuzzProfile(
   }[] = [];
   try {
     for (const session of sessions) {
-      if (token.isCancellationRequested) break;
       const sessionItems = session.wrappers
         .map((w) => byWrapper.get(`${session.importPath} ${w}`))
         .filter((i): i is vscode.TestItem => !!i);
+      // Targets a cancel never reached are skipped, not left running.
+      if (token.isCancellationRequested) {
+        for (const item of sessionItems) run.skipped(item);
+        continue;
+      }
       const outcome = await runSession(session, token, deps, run);
+      if (markFailedRun(run, sessionItems, sessionEnd(outcome))) continue;
       const verdicts = fuzzVerdicts(session.wrappers, outcome);
       for (const item of sessionItems) {
         const t = fuzzTargetFromItemId(item.id);
@@ -222,9 +243,6 @@ export async function runFuzzProfile(
             break;
           case "failed":
             run.failed(item, new vscode.TestMessage(v.message));
-            break;
-          case "errored":
-            run.errored(item, new vscode.TestMessage(v.message));
             break;
         }
         const files = outcome.crashers.get(t.wrapper);

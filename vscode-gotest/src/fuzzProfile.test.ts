@@ -16,7 +16,9 @@ import {
   planFuzzSessions,
   parseCrasherLine,
   fuzzVerdicts,
+  sessionEnd,
 } from "./fuzzProfile.js";
+import { markFailedRun } from "./runnerUtils.js";
 
 interface FakeItem {
   id: string;
@@ -215,7 +217,7 @@ describe("fuzzVerdicts", () => {
     expect(v.get("FuzzS_FuzzSummary")?.status).toBe("failed");
     expect(v.get("FuzzS_FuzzSummary")?.message).toContain("seed");
   });
-  it("marks a cancelled session skipped and a session that could not run errored", () => {
+  it("marks a cancelled session skipped and leaves a session that could not run to the failed-run rule", () => {
     const c = fuzzVerdicts(wrappers, {
       exitCode: 0,
       cancelled: true,
@@ -224,17 +226,71 @@ describe("fuzzVerdicts", () => {
       sessionLine: "",
     });
     expect(c.get("FuzzS_FuzzTrim")?.status).toBe("skipped");
-    const e = fuzzVerdicts(wrappers, {
+    const outcome = {
       exitCode: 2,
       cancelled: false,
       crashers: new Map(),
-      failed: new Set(),
+      failed: new Set<string>(),
       sessionLine: "",
       stderr: "FAIL: boom",
+    };
+    const run = { errored: vi.fn() };
+    expect(
+      markFailedRun(
+        run as never,
+        [{ id: "example.com/p/S/FuzzTrim" }] as never,
+        sessionEnd(outcome),
+      ),
+    ).toBe(true);
+    expect(run.errored.mock.calls[0][1].message).toBe(
+      "FAIL: boom\n\nexit code 2",
+    );
+  });
+});
+
+describe("sessionEnd", () => {
+  const base = {
+    cancelled: false,
+    crashers: new Map<string, string[]>(),
+    failed: new Set<string>(),
+    sessionLine: "",
+  };
+  it.each([1, 2, 3, 130, 137])(
+    "reads exit %i without a finding as a failed run",
+    (exitCode) => {
+      const end = sessionEnd({
+        ...base,
+        exitCode,
+        stderr: "go: module lookup failed\nexit status 1\n",
+      });
+      expect(end).toEqual({
+        exitCode,
+        cancelled: false,
+        failed: false,
+        reason: "go: module lookup failed",
+      });
+      const run = { errored: vi.fn() };
+      const item = { id: "example.com/p/S/FuzzTrim" };
+      expect(markFailedRun(run as never, [item] as never, end)).toBe(true);
+      expect(run.errored.mock.calls[0][1].message).toBe(
+        `go: module lookup failed\n\nexit code ${exitCode}`,
+      );
+    },
+  );
+  it("reads a crasher as the session's failing verdict", () => {
+    const end = sessionEnd({
+      ...base,
+      exitCode: 1,
+      crashers: new Map([["FuzzS_FuzzTrim", ["/w/ab12"]]]),
     });
-    expect(e.get("FuzzS_FuzzTrim")).toEqual({
-      status: "errored",
-      message: "FAIL: boom",
-    });
+    expect(end.failed).toBe(true);
+    expect(markFailedRun({ errored: vi.fn() } as never, [] as never, end)).toBe(
+      false,
+    );
+  });
+  it("reads a cancelled session as cancelled", () => {
+    expect(
+      sessionEnd({ ...base, exitCode: 130, cancelled: true }).cancelled,
+    ).toBe(true);
   });
 });
