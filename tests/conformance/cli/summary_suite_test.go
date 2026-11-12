@@ -98,3 +98,33 @@ func (s *CLISummaryTestSuite) TestTheStdlibNote(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLISummaryTestSuite) TestAnnotations(t *gotest.T) {
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+
+	t.When("gotest summary --github runs a package that fails to build", func(w *gotest.T) {
+		w.It("annotates the compiler's error at the file's path from the working directory", func(it *gotest.T) {
+			dir := it.TempDir()
+			_, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "annotbroken"), dir, "annotmod")
+			gotest.NoError(it, err)
+			run, err := testkit.RunCLI(it.Context(), dir, "summary", "--github", "--no-color", "./annotbroken/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `(?m)^::error file=annotbroken/annotbroken_suite_test\.go,line=\d+,`, run.Stdout)
+			gotest.NotContains(it, run.Stdout, "file=annotbroken/annotbroken/")
+		})
+	})
+
+	t.When("gotest summary --github runs a package with a failed test", func(w *gotest.T) {
+		w.It("annotates the failure at the test file in its package's directory", func(it *gotest.T) {
+			dir := it.TempDir()
+			_, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "failing"), dir, "annotmod")
+			gotest.NoError(it, err)
+			run, err := testkit.RunCLI(it.Context(), dir, "summary", "--github", "--no-color", "./failing/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `(?m)^::error file=failing/failing_suite_test\.go,line=9,`, run.Stdout)
+		})
+	})
+}

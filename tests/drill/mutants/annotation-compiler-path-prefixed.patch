@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / Annotations / when gotest summary --github runs a package that fails to build / annotates the compiler's error at the file's path from the working directory \(
+Clause: when gotest summary --github runs a package that fails to build → annotates the compiler's error at the file's path from the working directory
+--- a/internal/gotestspec/annotations.go
++++ b/internal/gotestspec/annotations.go
+@@ -76,7 +76,7 @@
+ 	if len(file) == 0 {
+ 		return file
+ 	}
+-	if strings.ContainsAny(file, `/\`) {
++	if false && strings.ContainsAny(file, `/\`) {
+ 		if _, err := os.Stat(filepath.Join(workDir, file)); err == nil {
+ 			return path.Clean(filepath.ToSlash(file))
+ 		}

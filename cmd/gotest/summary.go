@@ -280,7 +280,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 	// markdown document on stdout must stay the document alone.
 	if github && format == "terminal" {
 		modulePath := gotestspec.ReadModulePath(".")
-		annotations := gotestspec.CollectAnnotations(tree, modulePath)
+		annotations := gotestspec.CollectAnnotations(tree, modulePath, ".")
 		gotestspec.WriteGitHubAnnotations(os.Stdout, annotations)
 
 		if summaryPath := os.Getenv("GITHUB_STEP_SUMMARY"); summaryPath != "" {

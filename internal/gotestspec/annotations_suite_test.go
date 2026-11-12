@@ -2,6 +2,9 @@ package gotestspec_test
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -117,7 +120,7 @@ func (s *AnnotationsTestSuite) TestCollectAnnotations(t *gotest.T, _ *annotation
 		},
 	}}
 
-	annotations := gotestspec.CollectAnnotations(packages, "github.com/user/repo")
+	annotations := gotestspec.CollectAnnotations(packages, "github.com/user/repo", "")
 
 	gotest.Len(t, annotations, 1)
 	gotest.Equal(t, "pkg/foo/foo_test.go", annotations[0].File)
@@ -137,7 +140,7 @@ func (s *AnnotationsTestSuite) TestCollectAnnotations_NoFileReference(t *gotest.
 		}},
 	}}
 
-	gotest.Empty(t, gotestspec.CollectAnnotations(packages, ""), "no annotation for output without file:line")
+	gotest.Empty(t, gotestspec.CollectAnnotations(packages, "", ""), "no annotation for output without file:line")
 }
 
 func (s *AnnotationsTestSuite) TestCollectAnnotations_FiltersLogNoiseBeforeAssertion(t *gotest.T, _ *annotationsCtx) {
@@ -160,7 +163,7 @@ func (s *AnnotationsTestSuite) TestCollectAnnotations_FiltersLogNoiseBeforeAsser
 		}},
 	}}
 
-	annotations := gotestspec.CollectAnnotations(packages, "github.com/user/repo")
+	annotations := gotestspec.CollectAnnotations(packages, "github.com/user/repo", "")
 	gotest.Len(t, annotations, 1)
 
 	msg := annotations[0].Message
@@ -186,7 +189,7 @@ func (s *AnnotationsTestSuite) TestCollectAnnotations_PackageDiagnostic(t *gotes
 		},
 	}}
 
-	annotations := gotestspec.CollectAnnotations(packages, "github.com/user/repo")
+	annotations := gotestspec.CollectAnnotations(packages, "github.com/user/repo", "")
 
 	gotest.Len(t, annotations, 1)
 	gotest.Equal(t, "pkg/foo/foo_test.go", annotations[0].File)
@@ -416,5 +419,65 @@ func (s *AnnotationsTestSuite) TestIsStdlibFile(t *gotest.T, _ *annotationsCtx) 
 		{Desc: "/tmp/gotest/race_test.go", want: false},
 	}) {
 		gotest.Equal(sub, tc.want, gotestspec.ExportIsStdlibFile(tc.Desc))
+	}
+}
+
+func (s *AnnotationsTestSuite) TestCollectAnnotations_PathsTheCompilerPrinted(t *gotest.T, _ *annotationsCtx) {
+	dir := t.TempDir()
+	gotest.NoError(t, os.MkdirAll(filepath.Join(dir, "broken"), 0o755))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "broken", "broken_suite_test.go"), nil, 0o600))
+	gotest.NoError(t, os.WriteFile(filepath.Join(dir, "sum_suite_test.go"), nil, 0o600))
+
+	buildFailure := func(pkg string, output ...string) *gotestspec.Package {
+		return &gotestspec.Package{Path: pkg, Status: gotestspec.StatusFail, Output: output}
+	}
+	type row struct {
+		Desc    string
+		pkg     *gotestspec.Package
+		file    string
+		line    int
+		message string
+	}
+	rows := []row{
+		{
+			Desc: "a compiler path",
+			pkg: buildFailure("example.com/m/broken",
+				"# example.com/m/broken [example.com/m/broken.test]\n",
+				"broken/broken_suite_test.go:11:28: undefined: broken.Two\n"),
+			file: "broken/broken_suite_test.go", line: 11, message: "28: undefined: broken.Two",
+		},
+		{
+			Desc: "a compiler path in the working directory",
+			pkg:  buildFailure("example.com/m", "./sum_suite_test.go:4:2: undefined: x\n"),
+			file: "sum_suite_test.go", line: 4,
+		},
+		{
+			Desc: "a base name that also exists in the working directory",
+			pkg: &gotestspec.Package{Path: "example.com/m/failing", Nodes: []*gotestspec.Node{
+				failingTest("Fails", "    sum_suite_test.go:19: Equal failed\n"),
+			}},
+			file: "failing/sum_suite_test.go", line: 19,
+		},
+		{
+			Desc: "a path with a directory that does not exist here",
+			pkg:  buildFailure("example.com/m/pkg", "sub/helper.go:3: boom\n"),
+			file: "pkg/sub/helper.go", line: 3,
+		},
+	}
+	if runtime.GOOS == "windows" {
+		rows = append(rows, row{
+			Desc: "a compiler path with backslashes",
+			pkg:  buildFailure("example.com/m/broken", "broken\\broken_suite_test.go:11:28: undefined: broken.Two\n"),
+			file: "broken/broken_suite_test.go", line: 11,
+		})
+	}
+	for it, r := range gotest.Each(t, rows) {
+		annotations := gotestspec.CollectAnnotations([]*gotestspec.Package{r.pkg}, "example.com/m", dir)
+		gotest.Len(it, annotations, 1)
+		gotest.Equal(it, r.file, annotations[0].File)
+		gotest.Equal(it, r.line, annotations[0].Line)
+		if r.message != "" {
+			gotest.Equal(it, r.message, annotations[0].Message)
+		}
 	}
 }

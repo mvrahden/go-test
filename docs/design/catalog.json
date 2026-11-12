@@ -10008,6 +10008,83 @@
               "name": "TestTheStdlibNote",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "annotates the compiler's error at the file's path from the working directory",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 107,
+                      "name": "annotates_the_compiler's_error_at_the_file's_path_from_the_working_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary --github runs a package that fails to build",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 106,
+                  "name": "gotest_summary_--github_runs_a_package_that_fails_to_build",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "annotates the failure at the test file in its package's directory",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 120,
+                      "name": "annotates_the_failure_at_the_test_file_in_its_package's_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary --github runs a package with a failed test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 119,
+                  "name": "gotest_summary_--github_runs_a_package_with_a_failed_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Annotations",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "summary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 102,
+              "name": "TestAnnotations",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLISummary",
@@ -30047,7 +30124,7 @@
     }
   ],
   "stats": {
-    "behaviors": 874,
+    "behaviors": 876,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

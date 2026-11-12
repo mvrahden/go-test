@@ -397,6 +397,17 @@ gotest summary's first line SHALL count as passed only the tests that passed and
 - **WHEN** gotest summary runs a package with failed, passed and skipped tests
 - **THEN** the headline opens with the failed count, then the passed and the skipped
 
+### Requirement: Annotations of a summary
+gotest summary --github SHALL annotate a failed test at its file in its package's directory, and a package that failed to build at the path the compiler printed, which already names the file from the working directory.
+
+#### Scenario: A package that fails to build
+- **WHEN** gotest summary --github runs a package that fails to build
+- **THEN** annotates the compiler's error at the file's path from the working directory
+
+#### Scenario: A failed test
+- **WHEN** gotest summary --github runs a package with a failed test
+- **THEN** annotates the failure at the test file in its package's directory
+
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.
 
