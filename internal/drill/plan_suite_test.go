@@ -95,6 +95,25 @@ func selection(shard int, assignment [][]string, mutants []string) map[string]an
 	return map[string]any{"shard": shard, "shards": len(assignment), "assignment": assignment, "mutants": selected}
 }
 
+func (s *PlanningTestSuite) TestShardsOfANarrowedRunAgreeOnlyOnOneChangeList(t *gotest.T) {
+	dir := t.TempDir()
+	selection := func(shard int, assignment [][]string) string {
+		own := drill.SelectedMutants{Names: assignment[shard-1], ByName: map[string]drill.SelectedMutant{}}
+		for _, n := range own.Names {
+			own.ByName[n] = drill.SelectedMutant{Mode: "shared", Runs: []drill.Run{}}
+		}
+		path := filepath.Join(dir, fmt.Sprintf("%d-%d", shard, len(assignment[0])), fmt.Sprintf("selection-%d-of-2.json", shard))
+		gotest.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+		gotest.NoError(t, drill.WriteJSON(path, drill.Selection{Shard: shard, Shards: 2, Assignment: assignment, Mutants: own}))
+		return path
+	}
+	nothing := [][]string{{}, {}}
+	gotest.Empty(t, drill.CheckShards([]string{selection(1, nothing), selection(2, nothing)}), "a run that selects no mutant still splits exactly")
+	one := [][]string{{"gate"}, {}}
+	gotest.Equal(t, []string{"shards computed different assignments"},
+		drill.CheckShards([]string{selection(1, one), selection(2, nothing)}))
+}
+
 func (s *PlanningTestSuite) TestShardsThatDisagreeFailTheCheck(t *gotest.T) {
 	agreed := [][]string{{"a", "c"}, {"b"}}
 	entries := []struct {

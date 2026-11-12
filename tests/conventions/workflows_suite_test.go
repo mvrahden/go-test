@@ -183,6 +183,18 @@ func (s *WorkflowsTestSuite) TestSlowRunnersGetScaledBudgets(t *gotest.T) {
 	gotest.NotContains(t, string(data), "timeout-scale: 1\n", "a hosted Windows or macOS runner is slower than the machine the budgets were written on")
 }
 
+func (s *WorkflowsTestSuite) TestPullRequestsJudgeTheMutantsTheirChangeTouches(t *gotest.T) {
+	drill := readWorkflow(t, "quality.yml").Jobs["drill"]
+	at := slices.IndexFunc(drill.Steps, func(st workflowStep) bool { return strings.Contains(st.Run, "DRILL_CHANGED=") })
+	gotest.GreaterOrEqual(t, at, 0, "quality.yml's drill lists no changed files")
+	gotest.Contains(t, drill.Steps[at].Run, "--no-renames")
+	for _, name := range []string{"release.yml"} {
+		data, err := os.ReadFile(filepath.Join(workflowsDir, name))
+		gotest.NoError(t, err)
+		gotest.NotContains(t, string(data), "DRILL_CHANGED", "%s must judge every mutant", name)
+	}
+}
+
 func (s *WorkflowsTestSuite) TestTheContractRunsOnWhatTheExtensionReads(t *gotest.T) {
 	wf := readWorkflow(t, "contract.yml")
 	pr, push := eventPaths(t, wf, "pull_request"), eventPaths(t, wf, "push")

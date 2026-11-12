@@ -87,7 +87,18 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-go
+      - name: List the changed files
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if git diff --name-only --no-renames "$BASE"...HEAD > "$RUNNER_TEMP/drill-changed.txt" 2>/dev/null; then
+            echo "DRILL_CHANGED=$RUNNER_TEMP/drill-changed.txt" >> "$GITHUB_ENV"
+          else
+            echo "::notice title=drill::no base commit to compare with; every mutant is judged"
+          fi
       - name: Drill
         env:
           DRILL_SHARD: ${{ matrix.shard }}/4
