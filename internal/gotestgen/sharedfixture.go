@@ -37,6 +37,8 @@ type SharedFixtureInfo struct {
 	HasAfterAll      bool
 	HasHydrate       bool
 	HasDehydrate     bool
+	HydrateAt        string            // file:line of Hydrate, relative to the suite's directory; empty without one
+	DehydrateAt      string            // the same for Dehydrate
 	TransferFields   []string          // exported fields that are serialized (all exported minus local)
 	LocalFields      []string          // exported fields assigned in Hydrate
 	Dependencies     []string          // state keys of shared fixtures this one depends on

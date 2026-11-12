@@ -74,6 +74,8 @@ type SharedFixtureNodeVM struct {
 	HasConfig     bool
 	HasHydrate    bool
 	HasDehydrate  bool
+	HydrateAt     string
+	DehydrateAt   string
 	PkgPath       string
 	DependsOn     []string
 	ParentFields  map[string]string // parent shared fixture identifier → field name
@@ -384,6 +386,8 @@ func buildSharedFixtureNodeVMs(sharedFixtures []SharedFixtureInfo) []*SharedFixt
 			HasConfig:     sf.HasConfig,
 			HasHydrate:    sf.HasHydrate,
 			HasDehydrate:  sf.HasDehydrate,
+			HydrateAt:     sf.HydrateAt,
+			DehydrateAt:   sf.DehydrateAt,
 			PkgPath:       sf.PkgPath,
 			DependsOn:     dependsOn,
 			ParentFields:  parentFields,

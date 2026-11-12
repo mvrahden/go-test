@@ -26,6 +26,7 @@ func ƒ_node_DBFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DBFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 	}
 }
 
@@ -326,9 +327,11 @@ func ƒ_node_CFGFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_CFGFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_CFGFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "test.go:12",
 	}
 }
 
@@ -527,6 +530,7 @@ func ƒ_node_PlainFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_PlainFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 	}
 }
 
@@ -718,9 +722,11 @@ func ƒ_node_EachFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_EachFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_EachFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "test.go:12",
 	}
 }
 
@@ -807,9 +813,11 @@ func ƒ_node_DBFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DBFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:13",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DBFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "test.go:14",
 	}
 }
 
@@ -894,6 +902,7 @@ func ƒ_node_SimpleFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_SimpleFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 	}
 }
 
@@ -971,6 +980,7 @@ func ƒ_node_MinimalFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_MinimalFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 	}
 }
 
@@ -1048,6 +1058,7 @@ func ƒ_node_AppFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_AppFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 	}
 }
 
@@ -1156,6 +1167,7 @@ func ƒ_node_InfraFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_InfraFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:11",
 	}
 }
 
@@ -1171,6 +1183,7 @@ func ƒ_node_APIFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_APIFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:19",
 		DependsOn: []string{
 			"InfraFixture",
 		},
@@ -1270,6 +1283,7 @@ func ƒ_node_DBFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DBFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:10",
 	}
 }
 
@@ -1384,6 +1398,7 @@ func ƒ_node_InfraFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_InfraFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:10",
 	}
 }
 
@@ -1399,6 +1414,7 @@ func ƒ_node_APIFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_APIFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:14",
 		DependsOn: []string{
 			"InfraFixture",
 		},
@@ -1530,6 +1546,7 @@ func ƒ_node_AppFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_AppFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:15",
 		DependsOn: []string{
 			"PGSharedFixture",
 		},
@@ -1610,6 +1627,7 @@ func ƒ_node_DBFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DBFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:10",
 	}
 }
 
@@ -1795,6 +1813,7 @@ func ƒ_node_AppFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_AppFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:17",
 		DependsOn: []string{
 			"SetupSharedFixture",
 		},
@@ -1890,9 +1909,11 @@ func ƒ_node_E2EFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_E2EFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:20",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_E2EFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "test.go:21",
 		DependsOn: []string{
 			"PostgresSharedFixture",
 		},
@@ -1973,6 +1994,7 @@ func ƒ_node_DBFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DBFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "test.go:10",
 	}
 }
 

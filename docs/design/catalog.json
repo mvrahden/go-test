@@ -14556,6 +14556,98 @@
                       "duration": 0,
                       "excluded": false,
                       "external": false,
+                      "file": "hooks_declared_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "is_reported_at_the_hook's_declaration,_not_in_the_runtime's_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's BeforeAll returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_declared_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 18,
+                  "name": "a_package_fixture's_BeforeAll_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, not in the runtime's file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hooks_declared_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "is_reported_at_the_hook's_declaration,_not_in_the_runtime's_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's AfterAll returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_declared_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 25,
+                  "name": "a_package_fixture's_AfterAll_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatAFailedFixtureBeforeAllOrAfterAllSays",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hooks_declared_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestWhatAFailedFixtureBeforeAllOrAfterAllSays",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureHookDeclarations",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "hooks_declared_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestFixtureHookDeclarationsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, not in the runtime's file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
                       "file": "hooks_suite_test.go",
                       "focused": false,
                       "kind": "block",
@@ -32060,13 +32152,13 @@
     }
   ],
   "stats": {
-    "behaviors": 935,
+    "behaviors": 937,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 130,
+    "suites": 131,
     "tests": 0
   }
 }

@@ -28,9 +28,11 @@ func ƒ_node_AppFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_AppFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "fixture.go:15",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_AppFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "fixture.go:16",
 	}
 }
 
@@ -129,9 +131,11 @@ func ƒ_node_CacheFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_CacheFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "fixture.go:24",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_CacheFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "fixture.go:25",
 	}
 }
 
@@ -145,9 +149,11 @@ func ƒ_node_DatabaseFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DatabaseFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "fixture.go:12",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_DatabaseFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "fixture.go:17",
 	}
 }
 
@@ -164,9 +170,11 @@ func ƒ_node_ServiceFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_ServiceFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "fixture.go:32",
 		AfterAll: func(ctx ƒcontext.Context) error {
 			return ƒ_ServiceFixture.AfterAll(ctx)
 		},
+		AfterAllAt: "fixture.go:33",
 		DependsOn: []string{
 			"DatabaseFixture",
 			"CacheFixture",
@@ -425,6 +433,7 @@ func ƒ_node_GuardFixture() *ƒgotestruntime.FixtureNode {
 		BeforeAll: func(ctx ƒcontext.Context) error {
 			return ƒ_GuardFixture.BeforeAll(ctx)
 		},
+		BeforeAllAt: "ptest_test.go:27",
 	}
 }
 

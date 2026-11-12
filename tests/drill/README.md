@@ -297,6 +297,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
 | `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is left unlocated | canary: the fixtureelsewhere remote failure is unlocated |
+| `fixture-beforeall-unlocated` | the generator leaves a package fixture's `BeforeAll` unlocated | gotestgen: the hook locations test misses where `LocalFixture.BeforeAll` is declared |
+| `fixture-afterall-unlocated` | the generator leaves a package fixture's `AfterAll` unlocated | gotestgen: the hook locations test misses where `LocalFixture.AfterAll` is declared |
 | `fixture-report-in-runtime` | an error a fixture's `BeforeEach` returns is located in the runtime's `methods.go` | canary: the fixturehookfail failure names a runtime file, not the hook's |
 | `focus-ci-guard-tests-only` | `--ci` checks only test methods for the `F_` prefix, so a focused benchmark or fuzz method passes | cli conformance: `--ci` fails a run whose only focused method is a benchmark or a fuzz target |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |

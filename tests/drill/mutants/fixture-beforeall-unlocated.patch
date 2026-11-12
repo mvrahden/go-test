@@ -1,0 +1,14 @@
+Expect: where LocalFixture\.BeforeAll is declared
+Judge: ./internal/gotestgen BindingTestSuite/TestHookLocations
+Clause: when a package fixture's BeforeAll returns an error → is reported at the hook's declaration, not in the runtime's file
+--- a/internal/gotestgen/binding.go
++++ b/internal/gotestgen/binding.go
+@@ -486,7 +486,7 @@
+ 		AfterEach:    declaredMethod(named, "AfterEach") != nil,
+ 		BeforeEachAt: hookAt(r.targetPkg, declaredMethod(named, "BeforeEach")),
+ 		AfterEachAt:  hookAt(r.targetPkg, declaredMethod(named, "AfterEach")),
+-		BeforeAllAt:  hookAt(r.targetPkg, declaredMethod(named, "BeforeAll")),
++		BeforeAllAt:  hookAt(nil, declaredMethod(named, "BeforeAll")),
+ 		AfterAllAt:   hookAt(r.targetPkg, declaredMethod(named, "AfterAll")),
+ 		HasHydrate:   declaredMethod(named, "Hydrate") != nil,
+ 		HasDehydrate: declaredMethod(named, "Dehydrate") != nil,
