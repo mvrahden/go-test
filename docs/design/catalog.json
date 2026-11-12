@@ -26405,6 +26405,67 @@
               "name": "TestPollNames",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "bench-loop stays silent on it, through a second helper too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 330,
+                      "name": "bench-loop_stays_silent_on_it,_through_a_second_helper_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "bench-loop still reports a benchmark whose helper only asserts on b",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 335,
+                      "name": "bench-loop_still_reports_a_benchmark_whose_helper_only_asserts_on_b",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a benchmark hands its b to a helper of its package that holds the loop",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rules_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 329,
+                  "name": "a_benchmark_hands_its_b_to_a_helper_of_its_package_that_holds_the_loop",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BenchHelpers",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "rules_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 328,
+              "name": "TestBenchHelpers",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterRules",
@@ -31055,7 +31116,7 @@
     }
   ],
   "stats": {
-    "behaviors": 903,
+    "behaviors": 905,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -43,6 +43,7 @@ var diagnosticFixtures = []string{
 	"withsharedfixture",
 	"withalias",
 	"bench",
+	"benchhelper",
 	"fuzz",
 }
 

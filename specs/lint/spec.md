@@ -280,3 +280,11 @@ Inside a polling callback lint SHALL report a gotest assertion whose first argum
 #### Scenario: A call named like an assertion
 - **WHEN** a polling callback calls functions that only share an assertion's name
 - **THEN** lint reports the one handed the test's t and leaves those on plain values unreported
+
+### Requirement: A benchmark's loop in a helper
+bench-loop SHALL read a loop as the benchmark's own when the benchmark hands its b, the escape of it or an alias of that escape to a function or method of its package that names Loop or N on that parameter, itself or through at most five further such calls. It SHALL stay silent when the benchmark hands b to a function whose body it cannot read, gotest's own apart, and SHALL report a benchmark whose helpers never loop.
+
+#### Scenario: A loop held by a helper
+- **WHEN** a benchmark hands its b to a helper of its package that holds the loop
+- **THEN** bench-loop stays silent on it, through a second helper too
+- **AND** bench-loop still reports a benchmark whose helper only asserts on b

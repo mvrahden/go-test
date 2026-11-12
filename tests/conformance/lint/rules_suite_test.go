@@ -322,3 +322,19 @@ func (s *LinterRulesTestSuite) TestPollNames(t *gotest.T) {
 		})
 	})
 }
+
+const benchHelperPkg = "../testdata/lintbenchhelper/"
+
+func (s *LinterRulesTestSuite) TestBenchHelpers(t *gotest.T) {
+	t.When("a benchmark hands its b to a helper of its package that holds the loop", func(w *gotest.T) {
+		w.It("bench-loop stays silent on it, through a second helper too", func(it *gotest.T) {
+			got := findingsOf(ruleFindings(it, ".", benchHelperPkg), "bench-loop ")
+			gotest.Empty(it, findingsAt(got, "helper_suite_test.go:20:"))
+			gotest.Empty(it, findingsAt(got, "helper_suite_test.go:22:"))
+		})
+		w.It("bench-loop still reports a benchmark whose helper only asserts on b", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", benchHelperPkg),
+				"bench-loop helper_suite_test.go:24:1: benchmark HelperTestSuite.BenchmarkAsserted never calls b.Loop() — nothing is measured")
+		})
+	})
+}
