@@ -89,3 +89,19 @@ func (s *LinterGenerationTestSuite) TestGenerationRejects(t *gotest.T) {
 		})
 	})
 }
+
+func (s *LinterGenerationTestSuite) TestAnotherFindingOnTheLine(t *gotest.T) {
+	t.When("a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment", func(w *gotest.T) {
+		w.It("lint still reports the generator's rejection on that line", func(it *gotest.T) {
+			got := findingsOf(ruleFindings(it, ".", "../testdata/lintgenshown/skippable/"), "generation-rejects ")
+			gotest.ElementsMatch(it, []string{
+				"generation-rejects shown_suite_test.go:8:25: fuzz method StubTestSuite.FuzzShown never calls f.Fuzz",
+				"generation-rejects shown_suite_test.go:10:25: fuzz method StubTestSuite.FuzzQuiet never calls f.Fuzz",
+			}, got)
+		})
+		w.It("lint leaves the rejection to an integrity rule whose finding is shown on that line", func(it *gotest.T) {
+			gotest.Equal(it, []string{"receiver held_suite_test.go:9:1: suite method HeldTestSuite.TestByValue should use a pointer receiver"},
+				onLine(ruleFindings(it, ".", "../testdata/lintgenshown/integrity/"), "held_suite_test.go:9:"))
+		})
+	})
+}

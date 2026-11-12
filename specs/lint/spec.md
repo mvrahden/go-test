@@ -109,12 +109,17 @@ Lint SHALL report each compile error of a target package once, with its path rel
 - **THEN** a package that does not compile is reported once, with its path relative to the module
 
 ### Requirement: Shapes the generator rejects
-Lint SHALL report each shape the generator rejects at the position the generator rejects it, and discover SHALL mark such a package broken and name each rejection at its position.
+Lint SHALL report each shape the generator rejects at the position the generator rejects it, and discover SHALL mark such a package broken and name each rejection at its position. Lint SHALL leave a rejection to another rule only on a line where an integrity rule's finding is shown.
 
 #### Scenario: Rejected shapes
 - **WHEN** a package holds shapes the generator rejects
 - **THEN** lint reports each shape the generator rejects at the position it rejects it
 - **AND** discover marks the package broken and names each rejection at its position
+
+#### Scenario: Another finding on the rejected line
+- **WHEN** a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment
+- **THEN** lint still reports the generator's rejection on that line
+- **AND** lint leaves the rejection to an integrity rule whose finding is shown on that line
 
 ### Requirement: GitHub annotations
 Lint --github SHALL escape each annotation's message and properties as a workflow command needs, SHALL cut a long annotation on a rune boundary, and SHALL name each file relative to the workspace. --github=false SHALL print the plain report, inside GitHub Actions too, and a value that is no boolean SHALL be refused with exit 2.

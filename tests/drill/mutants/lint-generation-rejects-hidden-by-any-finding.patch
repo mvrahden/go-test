@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterGeneration / AnotherFindingOnTheLine / when a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment / lint still reports the generator's rejection on that line \(
+Clause: when a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment → lint still reports the generator's rejection on that line
+--- a/internal/lint/generation.go
++++ b/internal/lint/generation.go
+@@ -27,7 +27,7 @@
+ // a skippable rule's finding, shown or not, leaves the line to the
+ // generator's rejection.
+ func reportedLine(pass *analysis.Pass, rule Rule, pos token.Pos) {
+-	if rule == GenerationRejects || ruleMeta[rule].Tier != TierIntegrity {
++	if rule == GenerationRejects {
+ 		return
+ 	}
+ 	lines, _ := reportedLines.LoadOrStore(pass, map[token.Position]bool{})

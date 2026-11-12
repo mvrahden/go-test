@@ -790,6 +790,8 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-plain-line-without-rule` | a plain finding line ends without its rule | conformance: the lint It for rule names finds no `(stdlib-test)` at the line end |
 | `lint-json-message-carries-rule` | the rule is appended to the diagnostic's message, so `-json` carries it twice | conformance: the lint It for rule names finds the `-json` message changed |
 | `lint-poll-scope-names-untyped` | inside a poll callback, a call that only shares an assertion's name is reported whatever its first argument | conformance: the lint It for namesakes finds `strings.Contains` and three more reported |
+| `lint-generation-rejects-hidden-by-any-finding` | a skippable rule's finding, shown or suppressed, hides the generator's rejection of its line | conformance: the lint It for another finding on the rejected line finds the two fuzz rejections gone |
+| `lint-generation-rejects-never-stands-down` | the generator's rejection is reported beside an integrity finding shown on its line | conformance: the lint It for an integrity finding on the line finds two findings on line 9 |
 | `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
 | `lint-gh-paths-from-working-directory` | annotation paths are relative to the working directory, not `$GITHUB_WORKSPACE` | conformance: the lint `--github` It for a step in a subdirectory finds a `../` path |
 | `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |

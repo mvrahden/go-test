@@ -24997,6 +24997,67 @@
               "name": "TestGenerationRejects",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint still reports the generator's rejection on that line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "generation_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 95,
+                      "name": "lint_still_reports_the_generator's_rejection_on_that_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lint leaves the rejection to an integrity rule whose finding is shown on that line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "generation_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 102,
+                      "name": "lint_leaves_the_rejection_to_an_integrity_rule_whose_finding_is_shown_on_that_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "generation_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 94,
+                  "name": "a_skippable_rule_reports_on_a_line_the_generator_rejects,_shown_or_suppressed_by_a_nolint_comment",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AnotherFindingOnTheLine",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "generation_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 93,
+              "name": "TestAnotherFindingOnTheLine",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterGeneration",
@@ -30994,7 +31055,7 @@
     }
   ],
   "stats": {
-    "behaviors": 901,
+    "behaviors": 903,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

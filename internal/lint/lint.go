@@ -339,13 +339,13 @@ func report(pass *analysis.Pass, rule Rule, rng analysis.Range, format string, a
 }
 
 func reportWithFix(pass *analysis.Pass, rule Rule, rng analysis.Range, fixes []analysis.SuggestedFix, format string, args ...any) {
-	reportedLine(pass, rule, rng.Pos())
 	if skipped(rule) {
 		return
 	}
 	if !cfg.disableNolint && isSuppressed(pass, rng.Pos(), rule) {
 		return
 	}
+	reportedLine(pass, rule, rng.Pos())
 	pass.Report(analysis.Diagnostic{
 		Pos:            rng.Pos(),
 		End:            rng.End(),
