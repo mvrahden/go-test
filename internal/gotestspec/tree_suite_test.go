@@ -874,3 +874,42 @@ func (s *TreeTestSuite) TestStdlibTwins(t *gotest.T, _ *treeCtx) {
 		mustEq(t, fmt.Sprintf("node %d runs", i+1), twice[i].Runs, 2)
 	}
 }
+
+// A skip's message and a line logged before a skip without one read alike;
+// only the source's skip calls, or gotest's harness, tell them apart.
+func (s *TreeTestSuite) TestSkipReasons(t *gotest.T, _ *treeCtx) {
+	stream := `{"Action":"run","Package":"p","Test":"TestLogThenSkip"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkip","Output":"    skip_test.go:6: connecting to the database\n"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkip","Output":"    skip_test.go:7: no database here\n"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkip","Output":"--- SKIP: TestLogThenSkip (0.00s)\n"}
+{"Action":"skip","Package":"p","Test":"TestLogThenSkip","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestLogThenSkipNow"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkipNow","Output":"    skip_test.go:11: checked the flag\n"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkipNow","Output":"--- SKIP: TestLogThenSkipNow (0.00s)\n"}
+{"Action":"skip","Package":"p","Test":"TestLogThenSkipNow","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestGuardedTestSuite"}
+{"Action":"output","Package":"p","Test":"TestGuardedTestSuite","Output":"    gotest_psuite_test.go:25: suite guard: DATABASE_URL not set\n"}
+{"Action":"skip","Package":"p","Test":"TestGuardedTestSuite","Elapsed":0}
+`
+	events, err := gotestspec.ParseEvents(strings.NewReader(stream))
+	if err != nil {
+		fatalf(t, "ParseEvents: %v", err)
+	}
+	reasons := func(opts ...gotestspec.BuildOption) map[string]string {
+		out := map[string]string{}
+		for _, n := range gotestspec.BuildTree(events, opts...)[0].Nodes {
+			out[n.Name] = n.SkipReason
+		}
+		return out
+	}
+	calls := gotestspec.WithSkipCalls(gotestspec.SkipCalls{"p": {"skip_test.go:7": true, "skip_test.go:12": true}})
+
+	withSource := reasons(calls)
+	mustEq(t, "the skip's message, not the line logged before it", withSource["TestLogThenSkip"], "no database here")
+	mustEq(t, "no reason for a skip that gave none", withSource["TestLogThenSkipNow"], "")
+	mustEq(t, "the harness's own skip", withSource["TestGuardedTestSuite"], "suite guard: DATABASE_URL not set")
+
+	without := reasons()
+	mustEq(t, "no reason when the source cannot say", without["TestLogThenSkip"], "")
+	mustEq(t, "the harness's own skip without the source", without["TestGuardedTestSuite"], "suite guard: DATABASE_URL not set")
+}

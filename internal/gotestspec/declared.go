@@ -89,7 +89,7 @@ func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
 		d.Status, d.Duration, d.Start, d.End, d.Paused = o.Status, o.Duration, o.Start, o.End, o.Paused
 		d.Output = o.Output
 		d.External, d.Variant, d.Reported = d.External || o.External, o.Variant, o.Reported
-		d.Run, d.Runs = o.Run, o.Runs
+		d.Run, d.Runs, d.SkipReason = o.Run, o.Runs, o.SkipReason
 		d.Iterations, d.NsPerOp, d.BytesPerOp, d.AllocsPerOp = o.Iterations, o.NsPerOp, o.BytesPerOp, o.AllocsPerOp
 		d.Metrics, d.Procs = o.Metrics, o.Procs
 		d.Children = overlayNodes(d.Children, o.Children, skipped || d.Excluded || o.Status == StatusSkip)

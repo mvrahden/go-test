@@ -3,7 +3,7 @@ Clause: when a stream holds the skip of a suite its guard kept from running, ren
 --- a/internal/gotestspec/declared.go
 +++ b/internal/gotestspec/declared.go
 @@ -92,7 +92,7 @@
- 		d.Run, d.Runs = o.Run, o.Runs
+ 		d.Run, d.Runs, d.SkipReason = o.Run, o.Runs, o.SkipReason
  		d.Iterations, d.NsPerOp, d.BytesPerOp, d.AllocsPerOp = o.Iterations, o.NsPerOp, o.BytesPerOp, o.AllocsPerOp
  		d.Metrics, d.Procs = o.Metrics, o.Procs
 -		d.Children = overlayNodes(d.Children, o.Children, skipped || d.Excluded || o.Status == StatusSkip)

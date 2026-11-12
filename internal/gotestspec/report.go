@@ -218,23 +218,12 @@ func hiddenPhrase(hidden map[Status]bool) string {
 	return "hiding " + strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1] + " rows"
 }
 
-// skipReason is the reason a skipped node's skip gave, on one line: the
-// message of its first file:line output, else its first output line, else "".
+// skipReason is the reason a skipped node's skip gave, as BuildTree read it.
 func skipReason(n *Node) string {
 	if n.Status != StatusSkip {
 		return ""
 	}
-	lines := filterOutput(n.Output)
-	for _, l := range lines {
-		if f, _, msg := parseFileLine(l); f != "" && msg != "" {
-			first, _, _ := strings.Cut(msg, "\n")
-			return strings.TrimSpace(first)
-		}
-	}
-	if len(lines) > 0 {
-		return strings.TrimSpace(lines[0])
-	}
-	return ""
+	return n.SkipReason
 }
 
 // runMark names a repeated node's run ("RUN 2 OF 3"); "" for a single run.

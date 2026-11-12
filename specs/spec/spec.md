@@ -269,7 +269,7 @@ spec and summary SHALL read an event line of any length, from a run and from a s
 - **AND** summary renders it and exits by its verdict
 
 ### Requirement: Why a row was skipped
-A skipped row SHALL show the reason its skip gave, in the terminal and the Markdown spec; a row skipped without one SHALL show none.
+A skipped row SHALL show the reason its skip gave, in the terminal and the Markdown spec; a row skipped without one SHALL show none. The stream cannot tell a skip's message from a line logged before a skip without one, so the reason SHALL be the row's last logged line only when the source holds a skip call at that line, or when gotest's own harness wrote it; else no reason SHALL show.
 
 #### Scenario: A row skipped with a reason
 - **WHEN** a run skips a row with a reason
@@ -279,3 +279,8 @@ A skipped row SHALL show the reason its skip gave, in the terminal and the Markd
 #### Scenario: A suite its guard kept from running, in a run's spec
 - **WHEN** a run's suite is kept from running by its guard
 - **THEN** the terminal spec shows the guard's reason on the suite's line
+
+#### Scenario: A row that logs before it skips
+- **WHEN** a run's row logs a line and then skips
+- **THEN** the spec shows the skip's reason, not the logged line
+- **AND** shows no reason when the skip gave none

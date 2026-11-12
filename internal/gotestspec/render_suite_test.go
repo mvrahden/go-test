@@ -597,7 +597,7 @@ func (s *RenderTestSuite) TestSkipReasons(t *gotest.T, _ *renderCtx) {
 			Kind:    gotestspec.KindSuite,
 			Display: "Mail",
 			Children: []*gotestspec.Node{
-				{Kind: gotestspec.KindBlock, Display: "is emailed to the customer", Status: gotestspec.StatusSkip, Output: []string{"    mail_test.go:17: not implemented yet\n", "--- SKIP: TestX/is_emailed (0.00s)\n"}},
+				{Kind: gotestspec.KindBlock, Display: "is emailed to the customer", Status: gotestspec.StatusSkip, SkipReason: "not implemented yet", Output: []string{"    mail_test.go:17: not implemented yet\n", "--- SKIP: TestX/is_emailed (0.00s)\n"}},
 				{Kind: gotestspec.KindBlock, Display: "is parked", Status: gotestspec.StatusSkip, Excluded: true},
 				{Kind: gotestspec.KindBlock, Display: "passes", Status: gotestspec.StatusPass},
 			},
@@ -605,7 +605,7 @@ func (s *RenderTestSuite) TestSkipReasons(t *gotest.T, _ *renderCtx) {
 	}}
 	guarded := []*gotestspec.Package{{
 		Path:  "p",
-		Nodes: []*gotestspec.Node{{Kind: gotestspec.KindSuite, Display: "Guarded", Status: gotestspec.StatusSkip, Output: []string{"    harness.go:64: suite guard: DATABASE_URL not set\n"}}},
+		Nodes: []*gotestspec.Node{{Kind: gotestspec.KindSuite, Display: "Guarded", Status: gotestspec.StatusSkip, SkipReason: "suite guard: DATABASE_URL not set"}},
 	}}
 	markdown := func(pkgs []*gotestspec.Package) string {
 		var buf bytes.Buffer

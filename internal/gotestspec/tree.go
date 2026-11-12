@@ -2,6 +2,7 @@ package gotestspec
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -117,10 +119,21 @@ func (i DeclarationIndex) lookup(pkgPath, key string) Declaration {
 }
 
 type buildConfig struct {
-	decls DeclarationIndex
+	decls     DeclarationIndex
+	skipCalls SkipCalls
 }
 
 type BuildOption func(*buildConfig)
+
+// SkipCalls maps a package's path to the source lines of its test files
+// that call Skip or Skipf, each as "file.go:N".
+type SkipCalls map[string]map[string]bool
+
+// WithSkipCalls supplies where the source skips, so a skipped node's last
+// logged line can be told for the skip's message.
+func WithSkipCalls(calls SkipCalls) BuildOption {
+	return func(c *buildConfig) { c.skipCalls = calls }
+}
 
 // WithDeclarations supplies what the source declares, so the tree can show the
 // developer's own words. Without it the tree falls back to reconstructing a
@@ -185,6 +198,9 @@ type Node struct {
 	// under -count; both 0 when the stream holds one run.
 	Run  int
 	Runs int
+	// SkipReason is the message a skip gave (see readSkipReasons); empty
+	// when it gave none or the stream cannot say.
+	SkipReason string
 	// Reported is the own level go test reported when it is not Name: a
 	// twin's TestCreate#01, whose #01 is testing's, not the developer's.
 	Reported    string
@@ -321,6 +337,7 @@ func BuildTree(events []TestEvent, opts ...BuildOption) []*Package {
 
 	for path, pkg := range pkgs {
 		builds[path].prune()
+		readSkipReasons(pkg.Nodes, cfg.skipCalls[path])
 		splitRuns(pkg.Nodes, func(name string) bool {
 			return cfg.decls.lookup(path, DeclKey(name)).Twin
 		})
@@ -518,6 +535,40 @@ func pruneNodes(nodes []*Node, empty map[*Node]bool) []*Node {
 		n.Children = pruneNodes(n.Children, empty)
 		return empty[n] && len(n.Children) == 0
 	})
+}
+
+// readSkipReasons gives each skipped node the message its skip gave. The
+// stream cannot tell t.Skip("why") from t.Log("why") before t.SkipNow(): both
+// leave a last logged line. That line is the reason only when calls holds a
+// skip call at its file and line, or when gotest's harness wrote it.
+func readSkipReasons(nodes []*Node, calls map[string]bool) {
+	for _, n := range nodes {
+		if n.Status == StatusSkip {
+			n.SkipReason = lastSkipMessage(n.Output, calls)
+		}
+		readSkipReasons(n.Children, calls)
+	}
+}
+
+func lastSkipMessage(output []string, calls map[string]bool) string {
+	lines := filterOutput(output)
+	for i := len(lines) - 1; i >= 0; i-- {
+		file, line, msg := parseFileLine(lines[i])
+		if file == "" {
+			continue // a message's continuation line
+		}
+		first, _, _ := strings.Cut(msg, "\n")
+		first = strings.TrimSpace(first)
+		if first == "" {
+			return ""
+		}
+		base := filepath.Base(filepath.ToSlash(file))
+		if base == about.PSuite || base == about.PXSuite || calls[fmt.Sprintf("%s:%d", base, line)] {
+			return first
+		}
+		return ""
+	}
+	return ""
 }
 
 // splitRuns tells the instances of each top-level name apart. Under -count

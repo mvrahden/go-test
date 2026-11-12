@@ -179,7 +179,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	noteStdlibTests(overlay.StdlibTestsByPkg)
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
-	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)), gotestspec.WithSkipCalls(skipCallsOf(loaded)))
 	if view.declared {
 		// The packages the run loaded, read once; the run's verdicts lie over them.
 		declared, _ := buildStaticSpec(loaded, nil)
@@ -250,13 +250,18 @@ func (s *declaredSource) overlay(events []gotestspec.TestEvent) ([]*gotestspec.P
 	for _, lr := range pkgs.Loaded {
 		loaded[lr.PkgPath] = true
 	}
-	for pkg, paths := range declarationsForStream(events, loaded) {
+	calls := skipCallsOf(pkgs.Loaded)
+	outside, outsideCalls := streamSource(events, loaded)
+	for pkg, paths := range outside {
 		if idx == nil {
 			idx = gotestspec.DeclarationIndex{}
 		}
 		idx[pkg] = paths
 	}
-	return gotestspec.Overlay(declared, gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx))), nil
+	for pkg, lines := range outsideCalls {
+		calls[pkg] = lines
+	}
+	return gotestspec.Overlay(declared, gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx), gotestspec.WithSkipCalls(calls))), nil
 }
 
 // stampInput writes a saved stream back with the stamps gotest -json adds,
@@ -308,7 +313,8 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
 
 	var tree []*gotestspec.Package
 	if source == nil {
-		tree = gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
+		idx, calls := streamSource(events, nil)
+		tree = gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx), gotestspec.WithSkipCalls(calls))
 	} else if tree, err = source.overlay(events); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2

@@ -911,6 +911,8 @@ shards of one run do not add up to every mutant exactly once.
 | `output-file-colored` | a report --output writes takes its colour from stdout | cli conformance: a report written to a file while stdout is a character device holds no color codes |
 | `bench-numbered-name-read-as-procs` | the repetitions of a benchmark named with a trailing number are keyed without that number | bench conformance: a sub-benchmark named size-1024 under -cpu=1 -count=2 keeps both samples |
 | `spec-skip-reason-dropped` | a skipped row no longer shows the reason its skip gave | spec conformance: the terminal spec shows a skipped row's reason after SKIPPED |
+| `spec-skip-reason-first-logged-line` | a skipped row's reason is read from its first logged line | spec conformance: a row that logs and then skips shows the skip's reason |
+| `spec-skip-reason-from-a-log-line` | a skipped row's last logged line is taken for its reason without a skip call there | spec conformance: a row that logs and then skips without a reason shows none |
 | `spec-live-declared-not-overlaid` | `spec --declared` on a live run renders the run alone, without the declared specification under it | spec conformance: the rows of a table after its failing row show as not run |
 | `spec-repeated-run-read-as-twin` | every repeated top-level suite is read as a twin pair, its later runs as external suites | spec conformance: three runs of a suite show as runs 1, 2 and 3 of 3, none external |
 | `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |

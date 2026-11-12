@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/spec SpecSkipReason / ARowSkippedWithAReason / when 
 Clause: when a run skips a row with a reason → the terminal spec shows the reason after SKIPPED
 --- a/internal/gotestspec/report.go
 +++ b/internal/gotestspec/report.go
-@@ -221,7 +221,7 @@
- // skipReason is the reason a skipped node's skip gave, on one line: the
- // message of its first file:line output, else its first output line, else "".
+@@ -220,7 +220,7 @@
+ 
+ // skipReason is the reason a skipped node's skip gave, as BuildTree read it.
  func skipReason(n *Node) string {
 -	if n.Status != StatusSkip {
 +	if true || n.Status != StatusSkip {
  		return ""
  	}
- 	lines := filterOutput(n.Output)
+ 	return n.SkipReason

@@ -6,8 +6,8 @@ Clause: when a When and its Its hold underscores in their labels → a run's spe
  	noteStdlibTests(overlay.StdlibTestsByPkg)
  	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
  
--	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
-+	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(nil))
+-	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)), gotestspec.WithSkipCalls(skipCallsOf(loaded)))
++	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(nil), gotestspec.WithSkipCalls(skipCallsOf(loaded)))
  	if view.declared {
  		// The packages the run loaded, read once; the run's verdicts lie over them.
  		declared, _ := buildStaticSpec(loaded, nil)

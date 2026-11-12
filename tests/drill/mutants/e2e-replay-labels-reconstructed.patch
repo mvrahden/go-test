@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/spec .* / the spec replayed from the run's -json str
 Clause: when a When and its Its hold underscores in their labels → the spec replayed from the run's -json stream renders each behavior under that label
 --- a/cmd/gotest/spec.go
 +++ b/cmd/gotest/spec.go
-@@ -258,7 +258,7 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
+@@ -313,7 +313,7 @@
  
  	var tree []*gotestspec.Package
  	if source == nil {
--		tree = gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
-+		tree = gotestspec.BuildTree(events, gotestspec.WithDeclarations(nil))
+-		idx, calls := streamSource(events, nil)
++		idx, calls := gotestspec.DeclarationIndex(nil), skipCallsOf(nil)
+ 		tree = gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx), gotestspec.WithSkipCalls(calls))
  	} else if tree, err = source.overlay(events); err != nil {
  		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
- 		return 2

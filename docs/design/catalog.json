@@ -30073,6 +30073,67 @@
               "name": "TestAGuardedSuite",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the spec shows the skip's reason, not the logged line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "skipreason_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 40,
+                      "name": "the_spec_shows_the_skip's_reason,_not_the_logged_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "shows no reason when the skip gave none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "skipreason_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 47,
+                      "name": "shows_no_reason_when_the_skip_gave_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run's row logs a line and then skips",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "skipreason_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 39,
+                  "name": "a_run's_row_logs_a_line_and_then_skips",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARowThatLogsBeforeItSkips",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "skipreason_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 38,
+              "name": "TestARowThatLogsBeforeItSkips",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "SpecSkipReason",
@@ -30673,7 +30734,7 @@
     }
   ],
   "stats": {
-    "behaviors": 891,
+    "behaviors": 893,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
