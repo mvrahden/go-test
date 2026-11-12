@@ -11,6 +11,7 @@ import {
   type CliCommand,
 } from "./cli.js";
 import {
+  markFailedRun,
   resolveAncestorItems,
   skipUnresolved,
   OnceLog,
@@ -80,8 +81,11 @@ class WatchProcess implements vscode.Disposable {
       this.outputChannel.warn(`[watch] stderr: ${chunk.trimEnd()}`);
     });
 
-    this.child.on("close", () => {
+    this.child.on("close", (code: number | null) => {
       if (!this.disposed) {
+        // A process that dies during a cycle ends it as a failed one; with no
+        // cycle open this is a no-op.
+        this.onCycleEnd(typeof code === "number" && code !== 0 ? code : 1);
         this.maybeRestart();
       }
     });
@@ -248,7 +252,7 @@ export class WatchCycle {
     private readonly controller: GoTestController,
     cache: DiscoveryCache,
     cwd: string,
-    log?: (message: string) => void,
+    private readonly log?: (message: string) => void,
   ) {
     this.applier = new StreamApplier(
       controller,
@@ -270,6 +274,27 @@ export class WatchCycle {
     this.controller.testController.items.forEach((root) => {
       skipUnresolved(this.run, root, this.controller);
     });
+    if (exitCode !== undefined && exitCode !== 0) {
+      const items = [...this.applier.reported]
+        .map((p) => this.controller.findItem(p))
+        .filter((i): i is vscode.TestItem => i !== undefined);
+      const marked = markFailedRun(
+        this.run,
+        items,
+        {
+          exitCode,
+          cancelled: false,
+          failed: this.applier.failed,
+          reason: this.applier.runLevel.join("\n"),
+        },
+        this.controller,
+      );
+      if (!marked && !this.applier.failed) {
+        this.log?.(
+          `[watch] cycle failed with exit code ${exitCode} and reported no package`,
+        );
+      }
+    }
     resolveAncestorItems(this.run, this.controller);
     if (exitCode !== undefined && exitCode !== 0) {
       this.run.appendOutput(

@@ -28,8 +28,9 @@ import { DiscoveryCache, DiscoveryService } from "../../src/discovery.js";
 import { GoTestController } from "../../src/testController.js";
 import { TestResultStore } from "../../src/testResultStore.js";
 import { executeBatch } from "../../src/batchRunner.js";
+import { WatchManager } from "../../src/watch.js";
 import { createRecordingChannel } from "./vscodeStub.js";
-import { FakeTestRun } from "./vscodeTestApi.js";
+import { FakeTestRun, type FakeTestController } from "./vscodeTestApi.js";
 
 const extensionDir = path.resolve(__dirname, "..", "..");
 const repoRoot = path.resolve(extensionDir, "..");
@@ -174,3 +175,57 @@ describe("what a passing run says on stderr", () => {
     );
   }, 300_000);
 });
+
+describe("a watch cycle that fails after its last verdict", () => {
+  beforeAll(() => {
+    process.env.GOTEST_TEARDOWN_FAIL = "1";
+  });
+  afterAll(() => {
+    delete process.env.GOTEST_TEARDOWN_FAIL;
+  });
+
+  it("errors the package with the teardown's words, and leaves the passing test passing", async () => {
+    const registry = {
+      register: () => ({ id: "r" }),
+      cancel() {},
+      crash() {},
+    };
+    const manager = new WatchManager(
+      controller,
+      cache,
+      recorder.channel as never,
+      () => {},
+      registry as never,
+    );
+    const fake = state.controllers[0] as FakeTestController;
+    const runsBefore = fake.runs.length;
+    try {
+      await manager.start("./...", fixtureDir);
+      const run = await waitFor(
+        () =>
+          fake.runs
+            .slice(runsBefore)
+            .find((r) => r.ended && r.name === "Watch: ./..."),
+        120_000,
+      );
+      expect(run.verdicts.get(testId)).toBe("passed");
+      expect(run.verdicts.get(importPath)).toBe("errored");
+      expect((run.messages.get(importPath) ?? []).join("\n")).toContain(
+        "shared fixture teardown failed",
+      );
+    } finally {
+      manager.stopAll();
+      manager.dispose();
+    }
+  }, 300_000);
+});
+
+async function waitFor<T>(probe: () => T | undefined, ms: number): Promise<T> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const value = probe();
+    if (value !== undefined) return value;
+    if (Date.now() > deadline) throw new Error("timed out waiting for watch");
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}

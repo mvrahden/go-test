@@ -146,10 +146,12 @@ describe("opening a saved event stream", () => {
     // The missing package is said once, in the run.
     expect(run!.output.join("")).toContain("example.com/cart");
     // What the run booked for itself is no package to miss; its words
-    // reach the run.
-    expect(run!.output.join("")).toContain(
-      "[shared fixtures] FAIL: shared fixture teardown failed",
-    );
+    // reach the run, once.
+    expect(
+      run!.output
+        .join("")
+        .split("[shared fixtures] FAIL: shared fixture teardown failed"),
+    ).toHaveLength(2);
   }, 300_000);
 
   it("places the results of a stream without stamps on their items", async () => {

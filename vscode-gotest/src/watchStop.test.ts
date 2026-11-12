@@ -13,6 +13,9 @@ vi.mock("vscode", () => ({
   Uri: { file: (p: string) => ({ fsPath: p }) },
   StatusBarAlignment: { Left: 1 },
   TestRunRequest: class {},
+  TestMessage: class {
+    constructor(public readonly message: string) {}
+  },
   window: {
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
     showErrorMessage: vi.fn(),
@@ -103,6 +106,67 @@ describe("WatchManager", () => {
     for (const child of h.children) {
       expect(child.written).toEqual(["stop\n"]);
       expect(child.kill).not.toHaveBeenCalled();
+    }
+  });
+
+  it("ends a cycle the watch process died in, erroring the packages it reported", async () => {
+    const pkg = {
+      id: "example.com/pkg",
+      label: "example.com/pkg",
+      children: new Map(),
+      tags: [{ id: "package" }],
+    };
+    const results = new Map<string, { status: string }>();
+    const run = {
+      started: vi.fn(),
+      passed: vi.fn(),
+      failed: vi.fn(),
+      skipped: vi.fn(),
+      errored: vi.fn(),
+      appendOutput: vi.fn(),
+      end: vi.fn(),
+    };
+    const controller = {
+      createTestRun: () => run,
+      findItem: (id: string) => (id === pkg.id ? pkg : undefined),
+      recordResult: (id: string, status: string) => results.set(id, { status }),
+      getResult: (id: string) => results.get(id),
+      noteStart: () => {},
+      notePaused: () => {},
+      saveResults: () => {},
+      testController: {
+        items: { forEach: (cb: (i: unknown) => void) => cb(pkg) },
+      },
+    };
+    const line = (e: Record<string, unknown>) =>
+      JSON.stringify({ Package: "example.com/pkg", ...e }) + "\n";
+    h.script.once = [
+      {
+        stdout: [
+          JSON.stringify({ Action: "watch-start" }) +
+            "\n" +
+            line({ Action: "run", Test: "TestMySuite" }) +
+            line({ Action: "pass", Test: "TestMySuite", Elapsed: 0.01 }) +
+            line({ Action: "pass", Elapsed: 0.02 }),
+        ],
+        code: 1,
+      },
+    ];
+    const m = new WatchManager(
+      controller as never,
+      { resolveImportPath: () => "/ws/pkg" } as never,
+      log as never,
+      () => {},
+      registry as never,
+    );
+    await m.start("./...", "/ws");
+    try {
+      await vi.waitFor(() => expect(run.end).toHaveBeenCalled());
+      expect(run.errored).toHaveBeenCalledTimes(1);
+      expect(run.errored.mock.calls[0][0]).toBe(pkg);
+      expect(run.end).toHaveBeenCalledTimes(1);
+    } finally {
+      m.dispose();
     }
   });
 });

@@ -92,6 +92,7 @@ Copy a tabular coverage summary to the clipboard via the **Go Test: Copy Coverag
 Start continuous testing with **Go Test: Start Watch**.
 The extension spawns a `gotest watch` process that re-runs tests on file changes.
 Results stream into Test Explorer in real-time; each cycle's run ends, and the Spec View refreshes, when the CLI reports the cycle over.
+A watch cycle the CLI failed for a reason no test carries (a shared fixture that did not tear down) marks the packages the cycle reported as errored and says why in the run's output; a watch process that dies during a cycle ends that cycle the same way.
 A status bar item shows active watcher count and lets you stop all watchers with a click.
 
 ### Spec View

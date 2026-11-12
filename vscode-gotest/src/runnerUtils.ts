@@ -564,6 +564,12 @@ export class StreamApplier {
   private readonly routers = new Map<string, TestItemRouter>();
   // Packages the events named that have no directory here.
   readonly unknownPackages = new Set<string>();
+  // Packages whose own verdict the events carried.
+  readonly reported = new Set<string>();
+  // A fail event of a known package was applied.
+  failed = false;
+  // What the CLI said about the run itself (RunLevel output), line by line.
+  readonly runLevel: string[] = [];
 
   constructor(
     private readonly controller: GoTestController,
@@ -581,6 +587,16 @@ export class StreamApplier {
     for (const event of events) {
       if (this.builds.absorb(event)) continue;
       if (typeof event.Package !== "string") continue;
+      // The CLI books the run's own failure (shared fixtures, an interrupt,
+      // the global deadline) under a package of its own. No item holds it.
+      if (event.RunLevel === true) {
+        if (event.Action === "output" && event.Output) {
+          const line = event.Output.replace(/\n$/, "");
+          this.runLevel.push(line);
+          this.run.appendOutput(`[${event.Package}] ${line}\r\n`);
+        }
+        continue;
+      }
       const dir = this.packageDir(event.Package);
       if (!dir) {
         this.unknownPackages.add(event.Package);
@@ -610,6 +626,15 @@ export class StreamApplier {
         dir,
         { builds: this.builds, buildDir: this.buildDir, router },
       );
+      if (event.Action === "fail") this.failed = true;
+      if (
+        !event.Test &&
+        (event.Action === "pass" ||
+          event.Action === "fail" ||
+          event.Action === "skip")
+      ) {
+        this.reported.add(event.Package);
+      }
       if (result) applied.push(result);
     }
     return applied;
