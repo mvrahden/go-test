@@ -70,8 +70,9 @@ Every command is `go tool gotest <args>`; if Go reports the short name
 ambiguous, use `go tool github.com/mvrahden/go-test/cmd/gotest`. Never a
 global `go install` binary: it drifts from the pin and from the module's Go.
 From v1.29 the CLI refuses to run (`FAIL:`, exit 2; 1 from `lint`) when it
-was built with an older Go than the module's go line, or when the pin
-resolves below the oldest runtime it generates for; a binary drifted the
+was built with an older Go than the module's go line, and a run refuses
+(`FAIL:`, exit 2) when the pin resolves below the oldest runtime it
+generates for; `lint` does not check that floor. A binary drifted the
 other way still runs. That refusal is never a fault in the tests: switch to
 `go tool gotest`, which builds the CLI at the pinned version with a Go at
 least as new as the module's go line. From v1.33 a refusal about the

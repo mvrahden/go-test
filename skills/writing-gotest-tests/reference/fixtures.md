@@ -17,10 +17,11 @@ suites; setup that must happen once per run belongs in a shared fixture. A
 suite sets up only the fixtures it binds and their dependencies (v1.32+),
 so an unrelated fixture never fails it.
 
-Unlike a suite's, a fixture's `AfterAll` runs only after its `BeforeAll`
-succeeded (or overran): a `BeforeAll` that fails midway must release what
-it acquired before returning its error. When a fixture's setup fails, the
-suite's own `BeforeAll` and `AfterAll` never run.
+A fixture whose `BeforeAll` ran gets its `AfterAll` however it came out
+(v1.34+; below, only after a `BeforeAll` that succeeded or overran, so
+there a `BeforeAll` that fails midway releases what it acquired before
+returning its error). When a fixture's setup fails, the suite's own
+`BeforeAll` and `AfterAll` never run.
 
 Package fixtures may also define per-test hooks — `BeforeEach(ctx
 context.Context) error` / `AfterEach(ctx context.Context) error` — with the

@@ -170,7 +170,7 @@ gotest.Panics(t, f func()) any  // asserts f panics, returns recovered value
 ### Snapshots
 
 ```go
-gotest.MatchSnapshot(t, value any, name ...string)   // compare value against stored snapshot
+gotest.MatchSnapshot(t, value any, name ...string)   // value: string, []byte, encoding.TextMarshaler, fmt.Stringer, json.Marshaler, error or io.Reader
 ```
 
 Snapshots are stored in `testdata/__snapshots__/<TestName>.snap` (e.g. `TestMyTestSuite.snap`; suffix `_ext` for external `_test` packages) next to the test file.
@@ -344,7 +344,7 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite of its group; go test's `-p N` caps how many suite processes run at once — for suites whose verdicts measure wall-clock behavior or contend for resources), `ExclusiveGroup` (a named group run apart from every other suite).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite of its group, for suites whose verdicts measure wall-clock behavior or contend for resources; go test's `-p N` separately caps how many suite processes run at once), `ExclusiveGroup` (a named group run apart from every other suite).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 `ExclusiveGroup: "e2e"` is for suites that must not share the machine with the rest of the run but may share it with each other, such as E2E suites against one stack.
@@ -597,6 +597,8 @@ Use a returning `BeforeEach` to give each method its own isolated state.
 t.T() *testing.T                                    // access underlying testing.T (nil in every hook under a benchmark, in BeforeAll/AfterAll under a fuzz target)
 t.Context() context.Context                          // test context (respects deadline from SuiteConfig)
 t.Skipf(format, args...)                             // skip the test with a formatted reason
+t.Errorf(format, args...)                            // fail and go on, at the caller's line
+t.FailNow()                                          // stop the test now
 t.Setenv(key, value)                                 // set env var, restored after test
 t.TempDir() string                                   // create a temp dir, cleaned up after test
 t.Name() string                                      // the test's name (the wrapper's in a hook under a benchmark or fuzz target)

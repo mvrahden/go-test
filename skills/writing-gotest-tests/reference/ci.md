@@ -39,6 +39,9 @@ jobs:
   (`-single-dash` style), `badge` (+ `badge-branch`, default `ci/badges`).
   The action adds a failure-focused summary, GitHub annotations, and
   coverage reporting on top of the plain CLI run.
+- The action follows its `uses:` ref, not the pinned CLI:
+  `mvrahden/go-test@v1` is always the newest action. It splits `packages`,
+  `flags` and `go-test-flags` on every line and exits 2 on quotes.
 - **Coverage badge:** `badge: true` makes gotest render `coverage.svg` and
   the action commit it to the `badge-branch` of the consumer's own repo —
   from the default branch only, never from a PR — so the job needs
@@ -49,7 +52,8 @@ jobs:
   after the tests. The `flags` input is forwarded to it, which is where a
   `-benchtime=1x` smoke run goes. `gotest bench` accepts only its own
   flags (`--timeout`, `--setup-timeout`, `--no-cache`, `--debug`,
-  `--spec`, `--no-color`, `--save`, `--against`, `--gate`, `--json`), so
+  `--spec`, `--no-color`, `--save`, `--against`, `--gate`, `--json`,
+  `--control`), so
   any other gotest flag in `flags` — `--parallel`, `--ci`, `--min`,
   `--update-snapshots`, `--compile-parallel` — breaks this step (exit 2).
   Go test flags (`-benchtime`, `-count`) pass.

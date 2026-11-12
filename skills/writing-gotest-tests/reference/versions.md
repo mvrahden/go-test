@@ -580,10 +580,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     `Timeout` or `SetupTimeout`
     ([default deadline](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended));
     it fails nothing.
-41. **The GitHub action splits `packages`, `flags` and `go-test-flags` on
-    every line** and exits 2 on quotes; below v1.34 only the first line
-    counted.
-42. **`GOTEST_SLOW_BUILD_THRESHOLD`** sets when a build is reported as
+41. **`GOTEST_SLOW_BUILD_THRESHOLD`** sets when a build is reported as
     still running (a Go duration, default `15s`).
 
 ## v1.35
