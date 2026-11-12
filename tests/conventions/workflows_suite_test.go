@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -157,6 +158,29 @@ func (s *WorkflowsTestSuite) TestNpxToolsAreNotPinned(t *gotest.T) {
 		}
 	}
 	gotest.Empty(t, found, "npx tools carry a version; they run at their latest")
+}
+
+// A red cell without its event stream cannot be told from a slow one.
+func (s *WorkflowsTestSuite) TestEveryGateCellKeepsItsEventStream(t *gotest.T) {
+	wf := readWorkflow(t, "test.yml")
+	for _, name := range []string{"test", "platform-test"} {
+		steps := wf.Jobs[name].Steps
+		at := slices.IndexFunc(steps, func(st workflowStep) bool { return st.Uses == "./" })
+		gotest.GreaterOrEqual(t, at, 0, "%s has no step that runs the action", name)
+		gotest.Equal(t, "test", steps[at].ID, "%s", name)
+		gotest.NotEmpty(t, steps[at].With["events-file"], "%s saves no event stream", name)
+		gotest.Less(t, at+1, len(steps), "%s", name)
+		upload := steps[at+1]
+		gotest.Regexp(t, `^actions/upload-artifact@`, upload.Uses, "%s", name)
+		gotest.Contains(t, upload.If, "always()", "%s", name)
+		gotest.Equal(t, "${{ steps.test.outputs.events-file }}", upload.With["path"], "%s", name)
+	}
+}
+
+func (s *WorkflowsTestSuite) TestSlowRunnersGetScaledBudgets(t *gotest.T) {
+	data, err := os.ReadFile(filepath.Join(workflowsDir, "test.yml"))
+	gotest.NoError(t, err)
+	gotest.NotContains(t, string(data), "timeout-scale: 1\n", "a hosted Windows or macOS runner is slower than the machine the budgets were written on")
 }
 
 func (s *WorkflowsTestSuite) TestTheContractRunsOnWhatTheExtensionReads(t *gotest.T) {

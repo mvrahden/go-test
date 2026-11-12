@@ -41,7 +41,7 @@ jobs:
             timeout-scale: 2
           - os: macos-latest
             parallel: 6
-            timeout-scale: 1
+            timeout-scale: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-go
@@ -123,6 +123,7 @@ jobs:
       # the canary and the drill (quality.yml) replace the stdlib step; see
       # ARCHITECTURE.md, "Testing gotest".
       - name: Test (suites)
+        id: test
         uses: ./
         with:
           packages: "./... ./examples/..."
@@ -132,5 +133,13 @@ jobs:
           # it for the same number.
           badge: ${{ matrix.go == 'pinned' }}
           flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          events-file: ${{ runner.temp }}/test-events.json
+      - name: Upload the test event stream
+        if: ${{ always() && steps.test.outputs.events-file != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: test-events-${{ runner.os }}-go-${{ matrix.go }}
+          path: ${{ steps.test.outputs.events-file }}
+          retention-days: 14
       - if: ${{ !cancelled() }}
         uses: ./.github/actions/save-go-cache
