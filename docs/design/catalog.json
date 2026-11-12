@@ -10383,6 +10383,67 @@
               "name": "TestGenericSuites",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one taking the T, B or F of that case is refused at the method, told to add a name",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 69,
+                      "name": "one_taking_the_T,_B_or_F_of_that_case_is_refused_at_the_method,_told_to_add_a_name",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one taking no such parameter is a helper and the suite runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 77,
+                      "name": "one_taking_no_such_parameter_is_a_helper_and_the_suite_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares a method named exactly Test, Benchmark or Fuzz",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 68,
+                  "name": "a_suite_declares_a_method_named_exactly_Test,_Benchmark_or_Fuzz",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BareNames",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 63,
+              "name": "TestBareNames",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "NeverRun",
@@ -26285,7 +26346,7 @@
     }
   ],
   "stats": {
-    "behaviors": 759,
+    "behaviors": 761,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

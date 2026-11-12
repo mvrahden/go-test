@@ -59,3 +59,23 @@ func (s *NeverRunTestSuite) TestGenericSuites(t *gotest.T) {
 		})
 	})
 }
+
+func (s *NeverRunTestSuite) TestBareNames(t *gotest.T) {
+	refused, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/shapes/namebare/")
+	gotest.NoError(t, err)
+	out := refused.Stdout + refused.Stderr
+
+	t.When("a suite declares a method named exactly Test, Benchmark or Fuzz", func(w *gotest.T) {
+		w.It("one taking the T, B or F of that case is refused at the method, told to add a name", func(it *gotest.T) {
+			gotest.Equal(it, 2, refused.Exit, "output: %s", out)
+			for _, row := range []struct{ at, name string }{
+				{"10:25", "Test"}, {"12:25", "Benchmark"}, {"14:25", "Fuzz"},
+			} {
+				gotest.Contains(it, out, "namebare_suite_test.go:"+row.at+": "+row.name+" on BareTestSuite is no "+row.name+": go test runs no "+row.name+" without a name after the prefix; add one, or give the helper a name that is not "+row.name)
+			}
+		})
+		w.It("one taking no such parameter is a helper and the suite runs", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "namebarehelper", verdict: "TestHelperNamesTestSuite/TestRuns"})
+		})
+	})
+}

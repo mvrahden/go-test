@@ -192,3 +192,11 @@ A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a
 - **WHEN** a test file declares a generic suite
 - **THEN** one no alias instantiates is refused at its declaration, told to declare an alias
 - **AND** one an alias instantiates runs
+
+### Requirement: A case prefix alone
+A suite method named exactly Test, Benchmark or Fuzz, an X_ or F_ marker aside, that takes the T, B or F of that case SHALL be refused at the method, told to add a name; one that takes no such parameter SHALL stay a helper.
+
+#### Scenario: A method named by its prefix alone
+- **WHEN** a suite declares a method named exactly Test, Benchmark or Fuzz
+- **THEN** one taking the T, B or F of that case is refused at the method, told to add a name
+- **AND** one taking no such parameter is a helper and the suite runs

@@ -639,6 +639,8 @@ shards of one run do not add up to every mutant exactly once.
 | `orphan-case-non-test-file-refused` | a type a non-test file declares is read like one in a test file | conformance: the discovery It for a non-test file's type sees exit 2 |
 | `orphan-generic-accepted` | a generic suite no alias instantiates is never refused | conformance: the discovery It for an uninstantiated generic suite sees exit 0 instead of 2 |
 | `orphan-generic-instantiated-refused` | a generic suite is refused although an alias instantiates it | conformance: the discovery It for an instantiated generic suite sees exit 2 |
+| `bare-case-name-ignored` | a suite method named Test, Benchmark or Fuzz alone that takes its case's handle is read past | conformance: the discovery It for a bare case name sees exit 0 instead of 2 |
+| `bare-helper-name-refused` | a helper named Test, Benchmark or Fuzz alone is refused whatever it takes | conformance: the discovery It for a bare helper name sees exit 2 |
 | `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
 | `harness-imports-collide-by-name` | two imported packages of the same name get the same alias | canary: the `shapes/genpgpg` package exits 2 instead of 0 |
 | `predeclared-clash-accepted` | a package redeclaring a name Go predeclares that the harness uses is generated for | conformance: the discovery It for `shapes/genpredeclared` sees a build failure instead of the located refusal |

@@ -730,7 +730,9 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	// a case name go test would not run is no case, and one that takes the
 	// case's T is refused below, as go vet refuses such a test
 	misnamed := !IsGoTestName(m.Name())
-	if ok := IS_TEST_SUITE_METHOD.MatchString(m.Name()); !ok && !misnamed {
+	// a case prefix alone is no case either, and is refused the same way
+	bare := isBareCaseName(m.Name())
+	if ok := IS_TEST_SUITE_METHOD.MatchString(m.Name()); !ok && !misnamed && !bare {
 		return -1, nil
 	}
 
@@ -746,6 +748,11 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 		// usage of value type receivers for test-suites is discouraged.
 		namedRecvr, ok := types.Unalias(recv.Type()).(*types.Named)
 		if ok {
+			if bare {
+				if _, ok := caseParamOf(m.Name(), sig); !ok {
+					return -1, nil
+				}
+			}
 			if typeKey(namedRecvr) == s.recvKey && !misnamed {
 				return decl.Name.Pos(), fmt.Errorf("signature of %q has unsupported value type receiver", decl.Name)
 			}
@@ -765,8 +772,12 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 	if typeKey(recvType) != s.recvKey {
 		return decl.Name.Pos(), nil
 	}
-	if misnamed {
-		if prefix, ok := caseParamOf(m.Name(), sig); ok {
+	if misnamed || bare {
+		prefix, ok := caseParamOf(m.Name(), sig)
+		if ok && bare {
+			return m.Pos(), fmt.Errorf("%s on %s is no %s: go test runs no %s without a name after the prefix; add one, or give the helper a name that is not %s", m.Name(), s.ts.Name.Name, prefix, prefix, m.Name())
+		}
+		if ok {
 			return m.Pos(), fmt.Errorf("%s on %s is no %s: go test runs no %s whose next letter is lowercase; rename it %s, or give the helper a name that does not begin with %s", m.Name(), s.ts.Name.Name, prefix, prefix, goTestName(m.Name(), prefix), prefix)
 		}
 		return -1, nil
