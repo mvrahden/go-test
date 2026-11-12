@@ -1402,28 +1402,38 @@ export function renderErrorHtml(message: string | undefined): string {
 // declaredTests says whether a kept test path is still declared in pkg: a
 // suite's own line and its methods' rows by the suite and method names, a
 // fuzz target by its wrapper's name. Paths discovery does not list (plain
-// test functions, benchmarks) are kept. Either twin holding a method keeps
-// its row. Undefined for a package that does not load: its suites are unknown.
+// test functions, benchmarks) are kept. A twin's row is matched against
+// its own twin's methods. Undefined for a package that does not load: its
+// suites are unknown.
 export function declaredTests(
   pkg: DiscoverPackage,
 ): ((instance: number, testPath: string) => boolean) | undefined {
   if (pkg.broken) return undefined;
   const suites = pkg.suites ?? [];
   const hasSuite = (name: string) => suites.some((s) => s.name === name);
-  const hasMethod = (name: string, method: string) =>
-    suites.some(
-      (s) =>
-        s.name === name &&
-        [...(s.methods ?? []), ...(s.fuzzers ?? [])].some(
-          (m) => (m.testName ?? m.name) === method,
-        ),
+  // The suites a row of this instance belongs to: with both twins declared,
+  // go alternates their runs (internal, external, ...), as the router reads
+  // them; a lone suite takes every instance.
+  const suitesOf = (name: string, instance: number) => {
+    const named = suites.filter((s) => s.name === name);
+    const twins =
+      named.some((s) => s.external) && named.some((s) => !s.external);
+    return twins
+      ? named.filter((s) => !!s.external === (instance % 2 === 0))
+      : named;
+  };
+  const hasMethod = (name: string, instance: number, method: string) =>
+    suitesOf(name, instance).some((s) =>
+      [...(s.methods ?? []), ...(s.fuzzers ?? [])].some(
+        (m) => (m.testName ?? m.name) === method,
+      ),
     );
   const hasFuzzer = (name: string, fuzzer: string) =>
     suites.some(
       (s) =>
         s.name === name && (s.fuzzers ?? []).some((f) => f.name === fuzzer),
     );
-  return (_instance, testPath) => {
+  return (instance, testPath) => {
     const slash = testPath.indexOf("/");
     const top = slash < 0 ? testPath : testPath.slice(0, slash);
     if (top.startsWith("Test")) {
@@ -1435,7 +1445,8 @@ export function declaredTests(
       const method = next < 0 ? rest : rest.slice(0, next);
       // Under -count a repeat's method carries testing's #NN suffix.
       return (
-        hasMethod(name, method) || hasMethod(name, method.replace(/#\d+$/, ""))
+        hasMethod(name, instance, method) ||
+        hasMethod(name, instance, method.replace(/#\d+$/, ""))
       );
     }
     if (top.startsWith("Fuzz")) {

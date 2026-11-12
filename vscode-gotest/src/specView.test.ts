@@ -717,15 +717,15 @@ describe("declaredTests", () => {
       true,
     ],
     [
-      "a repeat's method under -count",
-      2,
+      "a repeat's method under -count (the internal twin's second run)",
+      3,
       "TestCartTestSuite/TestTotal#01",
       true,
     ],
     ["a method that is gone", 1, "TestCartTestSuite/TestRemoved", false],
     [
-      "a repeat of a method that is gone",
-      2,
+      "a repeat of a method that is gone (the internal twin's second run)",
+      3,
       "TestCartTestSuite/TestRemoved#01",
       false,
     ],
@@ -755,6 +755,20 @@ describe("declaredTests", () => {
 
   it("says nothing about a package that does not load", () => {
     expect(declaredTests({ ...pkg, broken: true })).toBeUndefined();
+  });
+
+  it("matches a twin's row against its own twin's methods", () => {
+    // The external twin's TestAdd is deleted; the internal twin keeps its own.
+    const gone = declaredTests({
+      ...pkg,
+      suites: [
+        suite("CartTestSuite", [method("TestAdd"), method("TestTotal")]),
+        suite("CartTestSuite", [method("TestTotal", "TestTotal#01")], [], true),
+      ],
+    })!;
+    expect(gone(2, "TestCartTestSuite/TestAdd#01")).toBe(false);
+    expect(gone(1, "TestCartTestSuite/TestAdd")).toBe(true);
+    expect(gone(2, "TestCartTestSuite/TestTotal#01")).toBe(true);
   });
 });
 
