@@ -53,6 +53,21 @@ func hasSelectionFlag(goTestArgs, flags []string) bool {
 	return false
 }
 
+// mayRunNothing reports whether the user's flags can make a suite's binary
+// run no test: a selection flag or -count=0, in gotest's spelling or in the
+// binary's own after -args.
+func mayRunNothing(goTestArgs, runFlags []string) bool {
+	if hasSelectionFlag(goTestArgs, testSelectionFlags) || extractFlag(runFlags, "-count") == "0" {
+		return true
+	}
+	at := slices.Index(goTestArgs, "-args")
+	if at < 0 {
+		return false
+	}
+	binary := goTestArgs[at+1:]
+	return hasSelectionFlag(binary, []string{"-test.bench"}) || extractFlag(binary, "-test.count") == "0"
+}
+
 // NoteBenchmarksNotRun says how many declared benchmarks a test run leaves
 // unexecuted, so silence never implies the packages were fully exercised.
 // -bench and -run make no such claim.

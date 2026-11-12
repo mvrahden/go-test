@@ -32,3 +32,24 @@ func (s *CLINoTestsTestSuite) TestSuitesThatLegitimatelyRunNothing(t *gotest.T) 
 		})
 	})
 }
+
+func (s *CLINoTestsTestSuite) TestTheBinarysOwnSelectionFlags(t *gotest.T) {
+	t.When("a text run gives the binary -test.count=0, -test.run, -test.skip, -test.list or -test.bench after -args", func(w *gotest.T) {
+		w.It("passes each, never naming a suite as one that ran no tests", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "-test.count=0", args: []string{"../testdata/passing/", "-args", "-test.count=0"}},
+				{Desc: "-test.count 0", args: []string{"../testdata/passing/", "-args", "-test.count", "0"}},
+				{Desc: "-test.run", args: []string{"../testdata/passing/", "-args", "-test.run=NothingMatches"}},
+				{Desc: "-test.skip", args: []string{"../testdata/passing/", "-args", "-test.skip=."}},
+				{Desc: "-test.list", args: []string{"../testdata/passing/", "-args", "-test.list=."}},
+				{Desc: "-test.bench", args: []string{"../testdata/passing/", "-args", "-test.bench=."}},
+			}) {
+				run, err := testkit.RunCLIWithEnv(sub.Context(), ".", []string{"GOTEST_CI=0"}, row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stdout, "ok")
+				gotest.NotContains(sub, run.Stderr, "ran no tests")
+			}
+		})
+	})
+}

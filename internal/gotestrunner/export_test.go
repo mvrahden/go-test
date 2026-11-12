@@ -427,3 +427,5 @@ func ExportBookDeadlineCut(stream string, cutShort bool) (running []CensusCase, 
 	running = c.bookDeadline(context.DeadlineExceeded)
 	return running, stdout.String()[before:]
 }
+
+var ExportMayRunNothing = mayRunNothing

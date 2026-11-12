@@ -321,3 +321,26 @@ func (s *CensusTestSuite) TestBenchmarksNotRunNote(t *gotest.T) {
 		gotest.Empty(it, note(nil, 0))
 	})
 }
+
+func (s *CensusTestSuite) TestFlagsThatMayRunNothing(t *gotest.T) {
+	for t, row := range gotest.Each(t, []struct {
+		Desc     string
+		args     []string
+		runFlags []string
+		want     bool
+	}{
+		{Desc: "no flags", want: false},
+		{Desc: "gotest's -run", args: []string{"-run", "X"}, want: true},
+		{Desc: "gotest's -count=0", runFlags: []string{"-count=0"}, want: true},
+		{Desc: "-count=1", runFlags: []string{"-count=1"}, want: false},
+		{Desc: "-test.count=0 after -args", args: []string{"-args", "-test.count=0"}, want: true},
+		{Desc: "-test.count 0 after -args", args: []string{"-args", "-test.count", "0"}, want: true},
+		{Desc: "-test.count=2 after -args", args: []string{"-args", "-test.count=2"}, want: false},
+		{Desc: "-test.run after -args", args: []string{"-args", "-test.run=X"}, want: true},
+		{Desc: "-test.skip after -args", args: []string{"-args", "-test.skip=X"}, want: true},
+		{Desc: "-test.list after -args", args: []string{"-args", "-test.list=."}, want: true},
+		{Desc: "-test.bench after -args", args: []string{"-args", "-test.bench=."}, want: true},
+		{Desc: "a custom flag after -args", args: []string{"-args", "-customflag=yes"}, want: false},	}) {
+		gotest.Equal(t, row.want, gotestrunner.ExportMayRunNothing(row.args, row.runFlags))
+	}
+}

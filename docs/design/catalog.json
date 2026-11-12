@@ -7350,6 +7350,143 @@
                 {
                   "children": [
                     {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "-test.count=0",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 40,
+                          "name": "-test.count=0",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-test.count 0",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 41,
+                          "name": "-test.count_0",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-test.run",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 42,
+                          "name": "-test.run",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-test.skip",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 43,
+                          "name": "-test.skip",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-test.list",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 44,
+                          "name": "-test.list",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "-test.bench",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "notests_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 45,
+                          "name": "-test.bench",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "passes each, never naming a suite as one that ran no tests",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "notests_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 38,
+                      "name": "passes_each,_never_naming_a_suite_as_one_that_ran_no_tests",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a text run gives the binary -test.count=0, -test.run, -test.skip, -test.list or -test.bench after -args",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "notests_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 37,
+                  "name": "a_text_run_gives_the_binary_-test.count=0,_-test.run,_-test.skip,_-test.list_or_-test.bench_after_-args",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheBinarysOwnSelectionFlags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "notests_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 36,
+              "name": "TestTheBinarysOwnSelectionFlags",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [],
                       "display": "fails the package and exits 2, naming the suite as one that ran no tests",
                       "duration": 0,
@@ -29574,7 +29711,7 @@
     }
   ],
   "stats": {
-    "behaviors": 857,
+    "behaviors": 863,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
