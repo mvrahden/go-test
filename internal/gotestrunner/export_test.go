@@ -403,3 +403,16 @@ func ExportHoldToTests(c *OutputCollector) { c.holdToTests = true }
 
 // compile.go
 var ExportCompileError = compileError
+
+// ExportBookDeadlineCut writes stream through a -json collector as the output
+// of one suite process, cut short by the run's context or not, books the
+// deadline over it and returns the named units and the booked events.
+func ExportBookDeadlineCut(stream string, cutShort bool) (running []CensusCase, booked string) {
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&stdout, &errw))
+	_, _ = io.WriteString(c.jsonWriter(), stream)
+	c.verdicts.endSuite(cutShort)
+	before := stdout.Len()
+	running = c.bookDeadline(context.DeadlineExceeded)
+	return running, stdout.String()[before:]
+}

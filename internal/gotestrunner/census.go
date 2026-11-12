@@ -103,7 +103,14 @@ type verdictIndex struct {
 	// ranNow and cutNow hold the units started and cut in the suite output
 	// being indexed.
 	ranNow, cutNow []CensusCase
+	// stopped holds, in stream order, the methods of cut-short suites that
+	// printed stopEndedLine; stoppedNow those of the suite output being read.
+	stopped, stoppedNow []CensusCase
 }
+
+// stopEndedLine is what the runtime prints on a method's output when the
+// method returned after the stop began: it did not finish.
+const stopEndedLine = "run stopping: the stop ended this method while it ran"
 
 func (x *verdictIndex) Write(p []byte) (int, error) {
 	x.partial = append(x.partial, p...)
@@ -124,6 +131,7 @@ var verdictMarkers = [][]byte{
 	[]byte(`"Action":"bench"`), []byte("/op"), []byte(`"Action":"run"`),
 	[]byte("--- PASS: "), []byte("--- FAIL: "), []byte("--- SKIP: "),
 	[]byte(`"Action":"pause"`), []byte(`"Action":"cont"`),
+	[]byte("run stopping: "),
 }
 
 var (
@@ -207,6 +215,9 @@ func (x *verdictIndex) observe(line []byte) {
 			}
 			x.resulted[key] = true
 		}
+		if depth == 1 && strings.TrimSpace(ev.Output) == stopEndedLine {
+			x.stoppedNow = append(x.stoppedNow, key)
+		}
 	case "pass", "fail", "skip":
 		if x.last == nil {
 			x.last = map[CensusCase]streamEvent{}
@@ -247,6 +258,10 @@ func isResultLine(output, test string) bool {
 // under counts as running or cut only when the run's context stopped it; a
 // binary that ended on its own was cut short by no deadline.
 func (x *verdictIndex) endSuite(cutShort bool) {
+	if cutShort {
+		x.stopped = append(x.stopped, x.stoppedNow...)
+	}
+	x.stoppedNow = nil
 	if !cutShort {
 		for _, k := range x.ranNow {
 			x.settle(k)
@@ -500,11 +515,19 @@ func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
 		return slices.Clone(c.cutShort)
 	}
 	running := c.verdicts.runningUnits()
+	// A method the stop ended returned, maybe passing, but did not finish.
+	stopped := map[CensusCase]bool{}
+	for _, k := range c.verdicts.stopped {
+		if !slices.Contains(running, k) {
+			running = append(running, k)
+			stopped[k] = true
+		}
+	}
 	booked := make([]streamEvent, 0, 2*len(running))
 	for _, r := range running {
 		booked = append(booked, streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n", Gotest: c.verdicts.stamp(r)})
 		// A unit the converter already failed keeps that verdict.
-		if c.verdicts.running[r] {
+		if c.verdicts.running[r] || (stopped[r] && c.verdicts.last[r].Action != "fail") {
 			booked = append(booked, streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path, Gotest: c.verdicts.stamp(r)})
 		}
 	}

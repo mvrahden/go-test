@@ -435,3 +435,51 @@ func (s *DeadlineAttributionTestSuite) TestASuiteTheDeadlineCut(t *gotest.T) {
 		})
 	})
 }
+
+// stopEndedStream is a suite the deadline stopped while TestWaits ran: the
+// method returned when its context ended and printed the runtime's stop line.
+const stopEndedStream = `{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- PASS: TestCartTestSuite/TestAdd (0.00s)\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop ended this method while it ran\n"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    --- PASS: TestCartTestSuite/TestWaits (2.80s)\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite","Output":"--- PASS: TestCartTestSuite (2.81s)\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+`
+
+func (s *DeadlineAttributionTestSuite) TestAMethodTheStopEnded(t *gotest.T) {
+	running, booked := gotestrunner.ExportBookDeadlineCut(stopEndedStream, true)
+	t.It("names the method the stop ended, and no method that ended before it", func(it *gotest.T) {
+		gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite/TestWaits"}}, running)
+	})
+	t.It("books it failed with the line that names the deadline, then its suite and package", func(it *gotest.T) {
+		gotest.Equal(it, `{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    gotest: --timeout expired while this test was running\n"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits"}
+{"Action":"fail","Package":"example.com/pkg","Test":"TestCartTestSuite"}
+{"Action":"fail","Package":"example.com/pkg"}
+`, booked)
+	})
+	t.It("books nothing for a suite that ended on its own", func(it *gotest.T) {
+		running, booked := gotestrunner.ExportBookDeadlineCut(stopEndedStream, false)
+		gotest.Empty(it, running)
+		gotest.Empty(it, booked)
+	})
+	t.It("names it when the suite's result is recorded as a cut-short process", func(it *gotest.T) {
+		var stdout, stderr bytes.Buffer
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+		c.Register(censusPkg, 1)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{
+			Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: censusPkg, SuiteName: "TestCartTestSuite"}},
+			Stdout: []byte(stopEndedStream), CutShort: true, DeadlineCut: true,
+		})
+		gotest.Equal(it, []unit{{Pkg: censusPkg, Path: "TestCartTestSuite/TestWaits"}}, gotestrunner.ExportBookDeadlineOn(c, context.DeadlineExceeded))
+	})
+	t.It("names nothing for a runtime that prints no stop line", func(it *gotest.T) {
+		silent := strings.Replace(stopEndedStream, `{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop ended this method while it ran\n"}`+"\n", "", 1)
+		running, _ := gotestrunner.ExportBookDeadlineCut(silent, true)
+		gotest.Empty(it, running)
+	})
+}
