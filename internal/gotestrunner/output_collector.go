@@ -585,6 +585,9 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 			w = io.MultiWriter(w, c.events)
 		}
 		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel}
+		if c.gate == &exitGate {
+			liveStream.Store(c.starts)
+		}
 	}
 	return c.starts
 }
@@ -616,6 +619,17 @@ func (s *startWriter) Write(p []byte) (int, error) {
 	}
 	s.buf = append([]byte(nil), s.buf...)
 	return len(p), nil
+}
+
+// bookExit books the run as interrupted unless the stream already holds
+// that booking; the caller holds the gate, so it writes line by line.
+func (s *startWriter) bookExit() {
+	if s.started[interruptedPkg] {
+		return
+	}
+	for line := range bytes.Lines(runFailureEvents(interruptedPkg, "run interrupted: ended by a further stop before its suites reported")) {
+		s.writeLine(line)
+	}
 }
 
 func (s *startWriter) writeLine(line []byte) {

@@ -475,6 +475,7 @@ shards of one run do not add up to every mutant exactly once.
 | `merged-coverage-keeps-the-maximum` | a merged count or atomic cover profile keeps each block's largest count | CLI conformance: the block two suites ran reads 1 |
 | `vendored-module-gets-no-advice` | a vendored module's build failure for the missing runtime names no fix | CLI conformance: stderr lacks the blank import |
 | `cover-profile-outlives-its-run` | the cover profile a `--min` run makes for itself is left behind | CLI conformance: a `gotest-work-*` dir stays in the temp directory |
+| `forced-exit-books-nothing` | an exit at a further stop leaves a stream that never books the run as interrupted | runner unit: the stream ends without the `interrupted` package |
 | `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |

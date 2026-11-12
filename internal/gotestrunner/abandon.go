@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -101,6 +102,10 @@ type writeGate struct{ mu sync.RWMutex }
 // once it holds the gate, false at bound or when hurry closes, for a stream
 // whose reader is gone.
 func (g *writeGate) end(bound time.Duration, hurry <-chan struct{}) bool {
+	// No write in flight: held at once, even in a hurry.
+	if g.mu.TryLock() {
+		return true
+	}
 	held := make(chan struct{})
 	go func() {
 		g.mu.Lock()
@@ -128,10 +133,19 @@ const writeBound = time.Second
 // Exit ends the process with code between two events of the stream: the
 // event on its way to stdout and the events file gets there first, within
 // writeBound or until hurry closes, and no other starts.
+// A -json stream that does not hold the run's interruption yet is given it
+// first.
 func Exit(code int, hurry <-chan struct{}) {
-	exitGate.end(writeBound, hurry)
+	if exitGate.end(writeBound, hurry) {
+		if s := liveStream.Load(); s != nil {
+			s.bookExit()
+		}
+	}
 	osExit(code)
 }
+
+// liveStream is the stream written through exitGate, once the run opens one.
+var liveStream atomic.Pointer[startWriter]
 
 // osExit ends the process; a test observes it instead.
 var osExit = os.Exit

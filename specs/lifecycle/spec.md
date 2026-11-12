@@ -438,7 +438,7 @@ A second SIGINT reaching gotest while its suites stop SHALL, on every OS, force 
 - **THEN** exits 130 once the shared fixture's AfterAll ran, leaving no shared fixture process behind
 
 ### Requirement: The run after a second Ctrl-C
-Its processes gone, the run SHALL end on its own path, its stream complete and the run booked as interrupted; gotest SHALL exit by itself only when the run has not ended two seconds after that, or at a further SIGINT, and then between two events of the stream.
+Its processes gone, the run SHALL end on its own path, its stream complete and the run booked as interrupted; gotest SHALL exit by itself only when the run has not ended two seconds after that, or at a further SIGINT, and then between two events of the stream. An exit gotest makes itself SHALL first book the run as interrupted on a stream that does not hold that booking yet.
 
 #### Scenario: A -json run whose method ignores the stop
 - **WHEN** a second SIGINT reaches a -json run while a stopped method body ignores its context
