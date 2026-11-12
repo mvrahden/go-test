@@ -443,7 +443,7 @@ const stopEndedStream = `{"Action":"run","Package":"example.com/pkg","Test":"Tes
 {"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd","Output":"--- PASS: TestCartTestSuite/TestAdd (0.00s)\n"}
 {"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite/TestAdd"}
 {"Action":"run","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits"}
-{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop ended this method while it ran\n"}
+{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop came while this method ran\n"}
 {"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    --- PASS: TestCartTestSuite/TestWaits (2.80s)\n"}
 {"Action":"pass","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits"}
 {"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite","Output":"--- PASS: TestCartTestSuite (2.81s)\n"}
@@ -483,11 +483,30 @@ func (s *DeadlineAttributionTestSuite) TestAMethodTheStopEnded(t *gotest.T) {
 		gotest.Contains(it, stdout.String(), `"Test":"TestCartTestSuite/TestWaits","Output":"    gotest: --timeout expired while this test was running\n"`)
 		gotest.Equal(it, 1, result.ExitCode)
 	})
-	t.It("books no method for a runtime that prints no stop line", func(it *gotest.T) {
-		silent := strings.Replace(stopEndedStream, `{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop ended this method while it ran\n"}`+"\n", "", 1)
-		gotest.NotEqual(it, stopEndedStream, silent)
-		running, booked := gotestrunner.ExportBookDeadlineCut(silent, true)
-		gotest.Empty(it, running)
-		gotest.NotContains(it, booked, "TestWaits")
-	})
+	// A runtime that prints no stop line, or another one, leaves the suite
+	// named alone.
+	const stopLine = `{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop came while this method ran\n"}` + "\n"
+	for t, entry := range gotest.Each(t, []struct {
+		Name, Line string
+	}{
+		{"a runtime that prints no stop line", ""},
+		{"a line that is not the runtime's", `{"Action":"output","Package":"example.com/pkg","Test":"TestCartTestSuite/TestWaits","Output":"    run stopping: the stop ended this method while it ran\n"}` + "\n"},
+	}) {
+		stream := strings.Replace(stopEndedStream, stopLine, entry.Line, 1)
+		gotest.NotEqual(t, stopEndedStream, stream)
+		var stdout, stderr bytes.Buffer
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &stderr))
+		c.Register(censusPkg, 1)
+		c.RecordResult(censusPkg, 0, gotestrunner.SuiteResult{
+			Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: censusPkg, SuiteName: "TestCartTestSuite"}},
+			Stdout: []byte(stream), CutShort: true, DeadlineCut: true,
+		})
+		before := stdout.Len()
+		var result gotestrunner.PipelineResult
+		gotestrunner.ExportApplyDeadlineFailure(c, &result, 3*time.Second, context.DeadlineExceeded, gotestrunner.ExportBookDeadlineOn(c, context.DeadlineExceeded))
+		t.It("books no method and names the suite in the run's FAIL line", func(it *gotest.T) {
+			gotest.NotContains(it, stdout.String()[before:], "TestWaits")
+			gotest.Contains(it, stderr.String(), "FAIL: global --timeout exceeded after 3s while running: example.com/pkg TestCartTestSuite\n")
+		})
+	}
 }

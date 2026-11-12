@@ -124,8 +124,9 @@ type verdictIndex struct {
 }
 
 // stopEndedLine is what the runtime prints on a method's output when the
-// method returned after the stop began: it did not finish.
-const stopEndedLine = "run stopping: the stop ended this method while it ran"
+// method returned after the stop began: it did not finish. No released
+// runtime printed an earlier wording, so none other is read.
+const stopEndedLine = "run stopping: the stop came while this method ran"
 
 func (x *verdictIndex) Write(p []byte) (int, error) {
 	x.partial = append(x.partial, p...)

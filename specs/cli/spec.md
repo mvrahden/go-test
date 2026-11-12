@@ -516,7 +516,7 @@ A run given --events-file SHALL write to that file byte for byte the go test -js
 - **THEN** keeps the events of the suites that ended before the kill, each line whole
 
 ### Requirement: A suite cut short by --timeout
-A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method the stop ended while it ran SHALL be booked failed in the stream with the line that names the deadline.
+A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method running when the stop came SHALL be booked failed in the stream with the line that names the deadline.
 
 #### Scenario: A method that returns when its context ends
 - **WHEN** --timeout expires while a method waits for its context to end, and the method then returns
