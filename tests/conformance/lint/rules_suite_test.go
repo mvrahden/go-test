@@ -205,7 +205,18 @@ func ruleFindings(t *gotest.T, dir, pkg string) []string {
 
 // lintFindings is ruleFindings, and of those the ones that carry a fix.
 func lintFindings(t *gotest.T, dir, pkg string) (got, fixable []string) {
-	run, err := testkit.RunCLI(t.Context(), dir, "lint", "-json", pkg)
+	return lintFindingsWith(t, dir, pkg)
+}
+
+// ruleFindingsWith is ruleFindings with args in place of the package.
+func ruleFindingsWith(t *gotest.T, dir string, args ...string) []string {
+	got, _ := lintFindingsWith(t, dir, args...)
+	return got
+}
+
+// lintFindingsWith is lintFindings with args in place of the package.
+func lintFindingsWith(t *gotest.T, dir string, args ...string) (got, fixable []string) {
+	run, err := testkit.RunCLI(t.Context(), dir, append([]string{"lint", "-json"}, args...)...)
 	gotest.NoError(t, err)
 	var byPkg map[string]map[string][]struct {
 		Posn     string            `json:"posn"`

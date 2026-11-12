@@ -260,3 +260,18 @@ func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {
 		})
 	})
 }
+
+// NolintAllowTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
+type NolintAllowTestSuite struct{}
+
+func (s *NolintAllowTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetNolintAllow("nilaway") }
+func (s *NolintAllowTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetNolintAllow("") }
+
+func (s *NolintAllowTestSuite) TestListedLinters(t *gotest.T) {
+	t.When("nolint-allow lists a linter", func(w *gotest.T) {
+		w.It("a nolint comment naming it is no finding, and one naming another still is", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withnolintallow")
+		})
+	})
+}

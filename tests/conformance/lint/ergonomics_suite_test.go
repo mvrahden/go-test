@@ -93,6 +93,16 @@ func (s *LinterErgonomicsTestSuite) TestSkipFlags(t *gotest.T) {
 	})
 }
 
+func (s *LinterErgonomicsTestSuite) TestNolintAllow(t *gotest.T) {
+	t.When("a nolint comment names a linter that -nolint-allow lists", func(w *gotest.T) {
+		w.It("lint leaves the comment unreported and suppresses none of its own rules", func(it *gotest.T) {
+			got := ruleFindingsWith(it, ".", "-nolint-allow=nilaway, not-a-rule", nolintPkg)
+			gotest.Empty(it, findingsOf(got, "nolint-unknown "))
+			gotest.Contains(it, got, "stdlib-test nolint_test.go:9:1: stdlib test TestUnknown — consider using a gotest suite")
+		})
+	})
+}
+
 func (s *LinterErgonomicsTestSuite) TestRuleNames(t *gotest.T) {
 	t.When("lint reports a finding", func(w *gotest.T) {
 		w.It("the plain line ends with the rule in parentheses", func(it *gotest.T) {

@@ -235,6 +235,7 @@ var SkippableRules = func() map[Rule]bool {
 var cfg struct {
 	skip          map[Rule]*bool
 	disableNolint bool
+	nolintAllow   string // linter names a nolint comment may name, comma-separated
 }
 
 var Analyzer = &analysis.Analyzer{
@@ -255,6 +256,7 @@ func init() {
 		cfg.skip[Rule(r)] = Analyzer.Flags.Bool("skip-"+r, false, "disable the "+r+" rule")
 	}
 	Analyzer.Flags.BoolVar(&cfg.disableNolint, "disable-nolint", false, "report all diagnostics and let the analysis driver handle suppression")
+	Analyzer.Flags.StringVar(&cfg.nolintAllow, "nolint-allow", "", "linter names a nolint comment may name beside golangci-lint's, comma-separated")
 }
 
 func skipped(rule Rule) bool {

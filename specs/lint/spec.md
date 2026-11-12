@@ -26,7 +26,7 @@ Lint SHALL report a suite declared inside a type block, a suite that embeds a fi
 - **THEN** lint leaves the call unreported, since the process that owns the fixture runs neither
 
 ### Requirement: Nolint comments
-A nolint comment with no rule or with all SHALL suppress every rule on its line; one naming a rule lint does not have SHALL be reported, and SHALL not suppress that report; one naming only another linter's rule SHALL suppress none of lint's own.
+A nolint comment with no rule or with all SHALL suppress every rule on its line; one naming a rule lint does not have SHALL be reported, and SHALL not suppress that report; one naming only another linter's rule SHALL suppress none of lint's own. A name -nolint-allow lists SHALL count as another linter's.
 
 #### Scenario: A bare nolint
 - **WHEN** a nolint comment names no rule
@@ -44,6 +44,10 @@ A nolint comment with no rule or with all SHALL suppress every rule on its line;
 #### Scenario: Another linter's rule
 - **WHEN** a nolint comment names another linter's rule
 - **THEN** lint leaves the rule to that linter and suppresses none of its own
+
+#### Scenario: A linter lint was told about
+- **WHEN** a nolint comment names a linter that -nolint-allow lists
+- **THEN** lint leaves the comment unreported and suppresses none of its own rules
 
 ### Requirement: Generated files
 Lint SHALL report a generated file only when git tracks it or when it lies outside a git repository, and SHALL say so where git cannot tell.

@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/lint LinterErgonomics .* / the comment naming the un
 Clause: when a nolint comment names a rule lint does not have → the comment naming the unknown rule cannot suppress that finding
 --- a/internal/lint/nolint.go
 +++ b/internal/lint/nolint.go
-@@ -24,11 +24,7 @@
- 					if id == "all" || Known(Rule(id)) || foreignLinters[id] {
+@@ -26,11 +26,7 @@
+ 					if id == "all" || Known(Rule(id)) || foreignLinters[id] || allowed[id] {
  						continue
  					}
 -					pass.Report(analysis.Diagnostic{

@@ -2,6 +2,7 @@ package lint
 
 import (
 	"go/ast"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -13,6 +14,7 @@ func checkNolintIDs(pass *analysis.Pass) {
 	if cfg.disableNolint {
 		return
 	}
+	allowed := nolintAllowed()
 	for _, file := range pass.Files {
 		if isGeneratedFile(pass, file.Pos()) || ast.IsGenerated(file) {
 			continue
@@ -21,7 +23,7 @@ func checkNolintIDs(pass *analysis.Pass) {
 			for _, c := range cg.List {
 				ids, _ := nolintIDs(c.Text)
 				for _, id := range ids {
-					if id == "all" || Known(Rule(id)) || foreignLinters[id] {
+					if id == "all" || Known(Rule(id)) || foreignLinters[id] || allowed[id] {
 						continue
 					}
 					pass.Report(analysis.Diagnostic{
@@ -33,6 +35,18 @@ func checkNolintIDs(pass *analysis.Pass) {
 			}
 		}
 	}
+}
+
+// nolintAllowed is the set -nolint-allow names: linters lint does not know
+// that a nolint comment may name, such as a module plugin.
+func nolintAllowed() map[string]bool {
+	m := map[string]bool{}
+	for name := range strings.SplitSeq(cfg.nolintAllow, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			m[name] = true
+		}
+	}
+	return m
 }
 
 // foreignLinters are golangci-lint's linter and formatter names, current and

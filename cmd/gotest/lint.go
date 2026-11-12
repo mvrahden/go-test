@@ -94,6 +94,7 @@ type lintArgs struct {
 // lintValueFlags take a value, as -name=value or as the next argument.
 var lintValueFlags = map[string]bool{
 	"c": true, "tags": true, "debug": true, "cpuprofile": true, "memprofile": true, "trace": true,
+	"nolint-allow": true,
 }
 
 func parseLintArgs(args []string) (lintArgs, error) {
@@ -542,7 +543,7 @@ func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, sou
 // lintAnalyzerFlag reports whether name (without dashes) is one of the
 // analyzer's own flags.
 func lintAnalyzerFlag(name string) bool {
-	if name == "disable-nolint" {
+	if name == "disable-nolint" || name == "nolint-allow" {
 		return true
 	}
 	rule, isSkip := strings.CutPrefix(name, "skip-")

@@ -787,6 +787,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
 | `lint-erg-generated-no-git-dropped` | `generated-file` reads a failed `git ls-files` as untracked | conformance: the lint It outside a git repository finds no finding |
 | `lint-erg-integrity-skip-usage` | `-skip-<integrity rule>` falls through to the driver's usage text | conformance: the lint It for `-skip-focus` finds the usage text instead of the refusal |
+| `lint-erg-nolint-allow-ignored` | a linter `-nolint-allow` lists is still an unknown rule in a nolint comment | conformance: the lint It for `-nolint-allow` finds two `nolint-unknown` findings |
 | `lint-plain-line-without-rule` | a plain finding line ends without its rule | conformance: the lint It for rule names finds no `(stdlib-test)` at the line end |
 | `lint-json-message-carries-rule` | the rule is appended to the diagnostic's message, so `-json` carries it twice | conformance: the lint It for rule names finds the `-json` message changed |
 | `lint-poll-scope-names-untyped` | inside a poll callback, a call that only shares an assertion's name is reported whatever its first argument | conformance: the lint It for namesakes finds `strings.Contains` and three more reported |
