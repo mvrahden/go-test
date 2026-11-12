@@ -10946,6 +10946,67 @@
               "name": "TestHydratedPromotedFields",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one Hydrate does not assign is refused at the field, told to assign it in Hydrate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 55,
+                      "name": "one_Hydrate_does_not_assign_is_refused_at_the_field,_told_to_assign_it_in_Hydrate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one Hydrate assigns, and an embedded struct with nothing to transfer, run with their state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 61,
+                      "name": "one_Hydrate_assigns,_and_an_embedded_struct_with_nothing_to_transfer,_run_with_their_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture embeds an interface or a named non-struct type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 54,
+                  "name": "a_shared_fixture_embeds_an_interface_or_a_named_non-struct_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EmbeddedNonStructs",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 53,
+              "name": "TestEmbeddedNonStructs",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "SharedFields",
@@ -26848,7 +26909,7 @@
     }
   ],
   "stats": {
-    "behaviors": 778,
+    "behaviors": 780,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -19,6 +19,14 @@ func EmbeddedFieldError(fixture string, f *types.Var, hydrated map[string]bool, 
 	if n := namedBehind(f.Type()); n != nil && strings.HasSuffix(n.Obj().Name(), protocol.SuffixFixture) {
 		return nil
 	}
+	// a non-struct embedded type is a value of its own, never transferred
+	if embedded := derefOnce(f.Type()); !isStruct(embedded) {
+		typ := types.TypeString(f.Type(), types.RelativeTo(in))
+		if types.IsInterface(embedded) {
+			return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, an interface the state cannot carry, so the suites read nil; assign it in Hydrate", fixture, typ))
+		}
+		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose value is not transferred to the suites; hold it in a named field (%s %s), or assign it in Hydrate", fixture, typ, f.Name(), typ))
+	}
 	fields := promotedExported(f.Type(), hydrated, map[types.Type]bool{})
 	var missing []string
 	for _, name := range fields {
@@ -34,6 +42,20 @@ func EmbeddedFieldError(fixture string, f *types.Var, hydrated map[string]bool, 
 		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields %s are neither transferred to the suites nor assigned in Hydrate; hold it in a named field (%s %s), or assign them in Hydrate", fixture, typ, joinAnd(missing), f.Name(), typ))
 	}
 	return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields are not transferred to the suites; hold it in a named field (%s %s), or assign it in Hydrate", fixture, typ, f.Name(), typ))
+}
+
+// derefOnce is t through an alias and one pointer.
+func derefOnce(t types.Type) types.Type {
+	t = types.Unalias(t)
+	if ptr, ok := t.(*types.Pointer); ok {
+		return types.Unalias(ptr.Elem())
+	}
+	return t
+}
+
+func isStruct(t types.Type) bool {
+	_, ok := t.Underlying().(*types.Struct)
+	return ok
 }
 
 // joinAnd lists names as "a", "a and b", "a, b and c".

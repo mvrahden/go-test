@@ -49,3 +49,17 @@ func (s *SharedFieldsTestSuite) TestHydratedPromotedFields(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SharedFieldsTestSuite) TestEmbeddedNonStructs(t *gotest.T) {
+	t.When("a shared fixture embeds an interface or a named non-struct type", func(w *gotest.T) {
+		w.It("one Hydrate does not assign is refused at the field, told to assign it in Hydrate", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharedembediface", exit: 2,
+				shows: `fixture\.go:10:2: shared fixture "ClockSharedFixture" embeds Clock, an interface the state cannot carry, so the suites read nil; assign it in Hydrate`})
+			checkShape(it, shape{pkg: "sharedembedvalue", exit: 2,
+				shows: `fixture\.go:10:2: shared fixture "EndpointSharedFixture" embeds Endpoint, whose value is not transferred to the suites; hold it in a named field \(Endpoint Endpoint\), or assign it in Hydrate`})
+		})
+		w.It("one Hydrate assigns, and an embedded struct with nothing to transfer, run with their state", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharedembedifaceok", verdict: "TestHandleTestSuite/TestHandle"})
+		})
+	})
+}
