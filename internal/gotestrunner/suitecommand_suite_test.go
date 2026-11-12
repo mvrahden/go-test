@@ -540,7 +540,7 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 		w.It("runs only the wrappers a -run selects", func(it *gotest.T) {
 			targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testless, nil, nil, "^TestFooSuite$|^FuzzFooSuite_A$", "")
 			gotest.Len(it, targets, 1)
-			gotest.Equal(it, "^TestFooSuite$|^FuzzFooSuite_A$", targets[0].RunFilter)
+			gotest.Equal(it, "^FuzzFooSuite_A$", targets[0].RunFilter)
 		})
 	})
 
@@ -553,6 +553,18 @@ func (s *SuiteCommandTestSuite) TestBuildSuiteTargets(t *gotest.T) {
 				names = append(names, targets[i].SuiteName)
 			}
 			gotest.ElementsMatch(it, []string{"TestFooSuite", "TestBarSuite"}, names)
+		})
+	})
+
+	t.When("-run has one alternative with a subtest level that matches two suites", func(w *gotest.T) {
+		suitesByPkg := map[string][]string{"example.com/pkg": {"FooSuite", "BarSuite"}}
+		targets := gotestrunner.BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, nil, nil, nil, nil, "Suite/TestOne", "")
+		w.It("gives each process its own suite's name as the first level", func(it *gotest.T) {
+			got := map[string]string{}
+			for i := range targets {
+				got[targets[i].SuiteName] = targets[i].RunFilter
+			}
+			gotest.Equal(it, map[string]string{"TestFooSuite": "^TestFooSuite$/TestOne", "TestBarSuite": "^TestBarSuite$/TestOne"}, got)
 		})
 	})
 }
@@ -650,11 +662,11 @@ func (s *SuiteCommandTestSuite) TestBuildBenchTargets(t *gotest.T) {
 			gotest.Equal(it, "^BenchmarkBar$/^BenchmarkB$", byName["Bar"])
 		})
 
-		w.It("leaves BenchFilter empty for a suite-only pattern", func(it *gotest.T) {
+		w.It("carries the wrapper's exact name for a suite-only pattern", func(it *gotest.T) {
 			benchesByPkg := map[string][]string{"example.com/pkg": {"CacheTestSuite"}}
 			targets := gotestrunner.BuildBenchTargets(compiled, benchesByPkg, dirsByPkg, nil, "", "^BenchmarkCacheTestSuite$", "")
 			gotest.Len(it, targets, 1)
-			gotest.Zero(it, targets[0].BenchFilter)
+			gotest.Equal(it, "^BenchmarkCacheTestSuite$", targets[0].BenchFilter)
 		})
 	})
 

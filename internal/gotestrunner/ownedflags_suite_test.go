@@ -29,7 +29,7 @@ func (s *OwnedGoTestFlagsTestSuite) TestRunFilterSelectsAFuzzWrapper(t *gotest.T
 			gotest.Equal(it, "TestFuzzyTestSuite", targets[0].SuiteName)
 		})
 		w.It("runs the binary with the user's filter", func(it *gotest.T) {
-			gotest.Equal(it, "FuzzFuzzyTestSuite_FuzzUpper", targets[0].RunFilter)
+			gotest.Equal(it, "^FuzzFuzzyTestSuite_FuzzUpper$", targets[0].RunFilter)
 		})
 		bulk, _ := gotestrunner.ExportPlanSuitePhases(suites, nil, fuzz, nil, "FuzzFuzzyTestSuite_FuzzUpper", "")
 		w.It("plans the suite's fixtures for the run", func(it *gotest.T) {

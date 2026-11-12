@@ -7153,6 +7153,159 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "runs each suite's hooks and the method once, each suite in its own process",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runfilter_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "runs_each_suite's_hooks_and_the_method_once,_each_suite_in_its_own_process",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -run names a method under a first level that matches two suites of a package",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runfilter_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "-run_names_a_method_under_a_first_level_that_matches_two_suites_of_a_package",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASubtestPatternOverTwoSuites",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runfilter_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestASubtestPatternOverTwoSuites",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "passes, the fixture's suite running only in the process given its state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runfilter_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 46,
+                      "name": "passes,_the_fixture's_suite_running_only_in_the_process_given_its_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -run /TestState runs a package holding a suite that binds a shared fixture beside one that binds none",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runfilter_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 45,
+                  "name": "-run_/TestState_runs_a_package_holding_a_suite_that_binds_a_shared_fixture_beside_one_that_binds_none",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASubtestPatternBesideASharedFixture",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runfilter_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 42,
+              "name": "TestASubtestPatternBesideASharedFixture",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "runs the test methods and replays no fuzz seed, as go test does",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "runfilter_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 58,
+                      "name": "runs_the_test_methods_and_replays_no_fuzz_seed,_as_go_test_does",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -run names only the Test function of a suite that also has a fuzz method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "runfilter_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 57,
+                  "name": "-run_names_only_the_Test_function_of_a_suite_that_also_has_a_fuzz_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "APatternNamingOnlyTheTestFunction",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "runfilter_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 54,
+              "name": "TestAPatternNamingOnlyTheTestFunction",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIRunFilter",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "runfilter_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLIRunFilterTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -28214,13 +28367,13 @@
     }
   ],
   "stats": {
-    "behaviors": 817,
+    "behaviors": 820,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 114,
+    "suites": 115,
     "tests": 0
   }
 }

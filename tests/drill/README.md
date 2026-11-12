@@ -457,6 +457,8 @@ shards of one run do not add up to every mutant exactly once.
 | `render-unexported-skipped` | the rendering leaves unexported fields out, so a change to one is not marked | ring-0 equal suite |
 | `run-cut-at-its-first-slash` | `-run` is matched by its text up to the first `/`, so a later alternative's suite is dropped | fixtures conformance: the suite the second alternative names does not run |
 | `run-of-a-missing-test-function-replays-seeds` | a `-run` naming the Test function of a suite without test methods replays its seeds | fuzz conformance: the seeds replay and the shared fixture starts |
+| `run-pattern-reaches-every-suite-process` | a `-run` pattern reaches every suite process whole, so a first level that matches two suites runs both in each | CLI conformance: the hooks and the method run twice, and the shared-fixture suite runs in a process without its state |
+| `run-pattern-keeps-unnamed-fuzz-seeds` | a `-run` without a subtest level reaches the suite process unnarrowed, so naming the Test function also replays the fuzz seeds | CLI conformance: the fuzz wrapper has a verdict |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | fixtures conformance: the fixture of a suite -skip names whole still starts |

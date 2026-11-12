@@ -112,6 +112,21 @@ A -run, -skip, -bench or -list pattern the testing package would reject SHALL be
 - **WHEN** a -list pattern does not compile
 - **THEN** is refused with exit 2 before anything runs, naming the pattern as go test does
 
+### Requirement: A -run pattern in each suite process
+Each suite process SHALL run only its own suite under a -run pattern: for every alternative whose first level matches the suite's Test function or one of its fuzz wrappers, the process SHALL get that alternative with its first level replaced by the function's exact name, the later levels as written. A suite SHALL so run once however many suites the first level matches, an Exclusive suite only in its own slot, a suite binding a shared fixture only where its state is.
+
+#### Scenario: A subtest pattern whose first level matches two suites
+- **WHEN** -run names a method under a first level that matches two suites of a package
+- **THEN** runs each suite's hooks and the method once, each suite in its own process
+
+#### Scenario: A subtest pattern beside a suite that binds a shared fixture
+- **WHEN** -run /TestState runs a package holding a suite that binds a shared fixture beside one that binds none
+- **THEN** passes, the fixture's suite running only in the process given its state
+
+#### Scenario: A pattern naming only a suite's Test function
+- **WHEN** -run names only the Test function of a suite that also has a fuzz method
+- **THEN** runs the test methods and replays no fuzz seed, as go test does
+
 ### Requirement: Go test flags gotest implements
 A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`.
 
