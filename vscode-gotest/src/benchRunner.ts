@@ -12,11 +12,13 @@ import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
 import { withoutExternalId } from "./types.js";
 import { ManagedChild } from "./managedChild.js";
+import { markFailedRun, type RunEnd } from "./runnerUtils.js";
 import {
   buildCliCommand,
   buildBenchArgs,
   formatCliCommand,
   offerCliUpgrade,
+  stripGoRunExitEcho,
   type CliCommand,
 } from "./cli.js";
 import {
@@ -138,6 +140,18 @@ export class BenchRunner {
       byKey.set(item.id, item);
     }
 
+    // The selected items a target covers.
+    const itemsOf = (target: BenchTarget): vscode.TestItem[] =>
+      items.filter((item) => {
+        const t = benchTargetFromItemId(item.id);
+        return (
+          t !== undefined &&
+          t.importPath === target.importPath &&
+          t.suiteName === target.suiteName &&
+          (!target.methodName || t.methodName === target.methodName)
+        );
+      });
+
     const run = this.controller.createTestRun(request, "Go Bench Run");
     for (const item of items) run.started(item);
     try {
@@ -152,17 +166,12 @@ export class BenchRunner {
           }
         },
         onError: (target, message) => {
-          for (const item of items) {
-            const t = benchTargetFromItemId(item.id);
-            if (
-              t &&
-              t.importPath === target.importPath &&
-              t.suiteName === target.suiteName &&
-              (!target.methodName || t.methodName === target.methodName)
-            ) {
-              run.errored(item, new vscode.TestMessage(message));
-            }
+          for (const item of itemsOf(target)) {
+            run.errored(item, new vscode.TestMessage(message));
           }
+        },
+        onEnd: (target, end) => {
+          markFailedRun(run, itemsOf(target), end);
         },
       });
     } finally {
@@ -421,6 +430,9 @@ export class BenchRunner {
         message?: string,
       ) => void;
       onError?: (target: BenchTarget, message: string) => void;
+      // How an invocation that produced a report ended, after its results
+      // and failures were handed on.
+      onEnd?: (target: BenchTarget, end: RunEnd) => void;
     },
   ): Promise<void> {
     for (const target of plan) {
@@ -457,6 +469,7 @@ export class BenchRunner {
       this.outputChannel.info(`[bench] ${formatCliCommand(cmd)}`);
 
       let report: BenchReport;
+      let exit: { code: number | null; stderr: string };
       try {
         const { stdout, stderr, code } = await this.spawnBench(
           cmd,
@@ -470,6 +483,7 @@ export class BenchRunner {
           throw new Error(`gotest bench exited with code ${code}`);
         }
         report = parseBenchReport(stdout);
+        exit = { code, stderr };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         this.outputChannel.error(`[bench] failed: ${message}`);
@@ -483,6 +497,35 @@ export class BenchRunner {
       this.recordAndLog(report);
       for (const result of report.baseline.results) {
         hooks.onResult?.(result.package, result.suite, result.name, true);
+      }
+      // A failure that names a benchmark lands on it; one of a suite or a
+      // package is part of the reason the run failed.
+      let benchmarkFailed = false;
+      const unplaced: string[] = [];
+      for (const f of report.failures ?? []) {
+        if (f.suite && f.name) {
+          benchmarkFailed = true;
+          hooks.onResult?.(f.package, f.suite, f.name, false, f.output);
+        } else {
+          const where = f.suite ? `${f.package}/${f.suite}` : f.package;
+          unplaced.push(`${where}: ${f.output.split("\n")[0]}`);
+        }
+      }
+      const end: RunEnd = {
+        exitCode: exit.code ?? 1,
+        cancelled: false,
+        // A breached gate is shown by its diagnostics.
+        failed: benchmarkFailed || report.gate?.breached === true,
+        reason: [stripGoRunExitEcho(exit.stderr), ...unplaced]
+          .filter(Boolean)
+          .join("\n"),
+      };
+      if (hooks.onEnd) {
+        hooks.onEnd(target, end);
+      } else if (end.exitCode !== 0 && !end.failed) {
+        vscode.window.showErrorMessage(
+          `gotest bench failed: ${end.reason.split("\n")[0] || `exit code ${end.exitCode}`}`,
+        );
       }
     }
   }

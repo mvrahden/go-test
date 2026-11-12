@@ -23,6 +23,9 @@ vi.mock("vscode", () => {
   return {
     EventEmitter: class {},
     CancellationTokenSource,
+    TestMessage: class {
+      constructor(public readonly message: string) {}
+    },
     Uri: { file: (p: string) => ({ fsPath: p }) },
     window: { showErrorMessage: vi.fn() },
     workspace: { getConfiguration: () => ({ get: () => undefined }) },
@@ -243,5 +246,132 @@ describe("profileTarget", () => {
     h.children[0].emit("close", 0, null);
     await run;
     expect(store.recordReport).not.toHaveBeenCalled();
+  });
+});
+
+describe("runProfile", () => {
+  const benchItem = (id: string) => ({
+    id,
+    tags: [{ id: "benchmark" }],
+  });
+  const ok = benchItem("a/b/S/BenchmarkOk");
+  const fails = benchItem("a/b/S/BenchmarkFails");
+  const request = { include: [ok, fails] } as never;
+  const token = {
+    isCancellationRequested: false,
+    onCancellationRequested: () => ({ dispose: () => {} }),
+  } as never;
+  const result = (name: string) => ({
+    package: "a/b",
+    suite: "S",
+    name,
+    samples: [{ iterations: 1, nsPerOp: 10, bytesPerOp: 0, allocsPerOp: 0 }],
+  });
+  const doc = (over: object) =>
+    JSON.stringify({
+      schemaVersion: 1,
+      baseline: {
+        schemaVersion: 1,
+        goos: "linux",
+        goarch: "amd64",
+        results: [result("BenchmarkOk")],
+      },
+      ...over,
+    });
+  let runner: BenchRunner;
+  let run: {
+    started: ReturnType<typeof vi.fn>;
+    passed: ReturnType<typeof vi.fn>;
+    failed: ReturnType<typeof vi.fn>;
+    errored: ReturnType<typeof vi.fn>;
+    end: ReturnType<typeof vi.fn>;
+  };
+
+  beforeEach(() => {
+    h.script.once = [];
+    h.script.calls = [];
+    h.children = [];
+    run = {
+      started: vi.fn(),
+      passed: vi.fn(),
+      failed: vi.fn(),
+      errored: vi.fn(),
+      end: vi.fn(),
+    };
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    runner = new BenchRunner(
+      { createTestRun: () => run } as never,
+      { getWorkspaceDir: () => "/ws" } as never,
+      { recordReport: vi.fn() } as never,
+      log as never,
+    );
+  });
+
+  it("fails the benchmark the report names and leaves its sibling passed", async () => {
+    h.script.always = {
+      stdout: [
+        doc({
+          failures: [
+            {
+              package: "a/b",
+              suite: "S",
+              name: "BenchmarkFails",
+              output: "bench_test.go:9: boom",
+            },
+          ],
+        }),
+      ],
+      code: 1,
+    };
+    await runner.runProfile(request, token);
+    expect(run.passed).toHaveBeenCalledWith(ok);
+    expect(run.failed.mock.calls[0][0]).toBe(fails);
+    expect(run.failed.mock.calls[0][1].message).toBe("bench_test.go:9: boom");
+    expect(run.errored).not.toHaveBeenCalled();
+  });
+
+  it("errors the selection when the run failed and no benchmark did", async () => {
+    h.script.always = {
+      stdout: [
+        doc({
+          failures: [
+            {
+              package: "a/b",
+              suite: "S",
+              output: "AfterAll: teardown failed\nmore",
+            },
+          ],
+        }),
+      ],
+      stderr:
+        "FAIL: bench gate: nothing to compare; no benchmark is in both the baseline and this run\n",
+      code: 1,
+    };
+    await runner.runProfile(request, token);
+    expect(run.errored).toHaveBeenCalledTimes(2);
+    expect(run.errored.mock.calls[0][1].message).toBe(
+      "FAIL: bench gate: nothing to compare; no benchmark is in both the baseline and this run\n" +
+        "a/b/S: AfterAll: teardown failed\n\nexit code 1",
+    );
+  });
+
+  it("leaves the benchmarks passed when only the gate was breached", async () => {
+    h.script.always = {
+      stdout: [
+        doc({ gate: { thresholdPct: 10, worstPct: 12, breached: true } }),
+      ],
+      stderr: "bench gate: a/b/S/BenchmarkOk +12.0% exceeds 10% gate\n",
+      code: 1,
+    };
+    await runner.runProfile(request, token);
+    expect(run.passed).toHaveBeenCalledWith(ok);
+    expect(run.errored).not.toHaveBeenCalled();
+  });
+
+  it("leaves a clean run alone", async () => {
+    h.script.always = { stdout: [doc({})], code: 0 };
+    await runner.runProfile({ include: [ok] } as never, token);
+    expect(run.errored).not.toHaveBeenCalled();
+    expect(run.failed).not.toHaveBeenCalled();
   });
 });

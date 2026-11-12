@@ -160,6 +160,11 @@ Benchmarks are deliberate acts: there is no bench-on-save and watch mode
 never benchmarks.
 Cancelling a bench run stops the CLI through its stdin, as a test run is
 stopped; a cancelled run records no numbers.
+A benchmark that fails is failed on its item with what it printed. A bench
+run that exits non-zero for another reason — a suite's teardown, a gate with
+nothing to compare — marks the selected benchmarks errored with the CLI's
+words; a breached gate is shown by its diagnostics and leaves the benchmarks
+passed.
 
 ### Fuzzing
 
