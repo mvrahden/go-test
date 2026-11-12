@@ -35,17 +35,6 @@ const snapshotSuite = "pkg/gotest/snapshot_internals_suite_test.go"
 // Directories whose every test file is ring 0.
 var ringZeroDirs = []string{"pkg/gotest/internal/assert", "pkg/gotest/internal/snapfile", "tests/canary"}
 
-// Calls that predate the check, "file gotest.Name" to their number. Delete an
-// entry when its calls are gone; never add one.
-var ringZeroPending = map[string]int{
-	"pkg/gotestruntime/runtime_suite_test.go gotest.ErrorIs":       1,
-	"pkg/gotestruntime/runtime_suite_test.go gotest.Equal":         3,
-	"pkg/gotestruntime/runtime_suite_test.go gotest.ErrorContains": 3,
-	"pkg/gotestruntime/runtime_suite_test.go gotest.NotContains":   1,
-	"pkg/gotestruntime/runtime_suite_test.go gotest.Zero":          1,
-	"pkg/gotest/snapshot_internals_suite_test.go gotest.NoError":   1,
-}
-
 // ringZeroCalls returns, per exported pkg/gotest function a ring-0 file may not
 // call, how often src uses it. funcs is the set of exported package-level
 // functions of pkg/gotest; rel is the file's slash path from the repository root.
@@ -148,7 +137,7 @@ func (s *RingZeroTestSuite) TestRingZeroFilesCheckWithPlainGo(t *gotest.T) {
 	root := filepath.Join("..", "..")
 	funcs := gotestFuncs(t, root)
 	gotest.NotEmpty(t, funcs)
-	found := map[string]int{}
+	var found []string
 	ringZeroFiles := 0
 	for _, dir := range scanRoots {
 		err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d fs.DirEntry, err error) error {
@@ -181,19 +170,15 @@ func (s *RingZeroTestSuite) TestRingZeroFilesCheckWithPlainGo(t *gotest.T) {
 				return err
 			}
 			for name, n := range calls {
-				found[rel+" "+name] = n
+				found = append(found, fmt.Sprintf("%s calls %s %d times: check with plain Go, if got != want { t.Errorf(...) }", rel, name, n))
 			}
 			return nil
 		})
 		gotest.NoError(t, err)
 	}
 	gotest.GreaterOrEqual(t, ringZeroFiles, 34)
-	for key, n := range found {
-		gotest.Equal(t, ringZeroPending[key], n, "ring-0 file calls %s: check with plain Go, if got != want { t.Errorf(...) }", key)
-	}
-	for key := range ringZeroPending {
-		gotest.Greater(t, found[key], 0, "%s is gone: delete it from ringZeroPending", key)
-	}
+	slices.Sort(found)
+	gotest.Empty(t, found)
 }
 
 func (s *RingZeroTestSuite) TestRingZeroDirectoriesHoldOnlyRingZeroFiles(t *gotest.T) {
