@@ -54,3 +54,24 @@ export function writeGitSettings(
   );
   ensureGitExclude(folder, log);
 }
+
+// moduleFileChanged follows a change to a folder's go.mod or go.work: the CLI
+// is resolved afresh, and the folder rediscovered, which empties the tree of
+// a folder that stopped using gotest.
+export async function moduleFileChanged(
+  folder: string,
+  deps: {
+    active: ActiveFolders;
+    discover: (folder: string) => Promise<void>;
+    resetCli: () => void;
+    setActiveContext: (anyActive: boolean) => void;
+    writeGitSettings: (folder: string) => void;
+  },
+): Promise<void> {
+  deps.resetCli();
+  if ((await deps.active.refresh(folder)) === "activated") {
+    deps.writeGitSettings(folder);
+  }
+  deps.setActiveContext(deps.active.size > 0);
+  await deps.discover(folder);
+}

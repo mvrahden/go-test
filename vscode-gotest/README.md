@@ -56,6 +56,7 @@ Also available on [Open VSX](https://open-vsx.org/extension/mvrahden/gotest) for
 4. Click the **Run** or **Debug** button next to any suite or method.
 
 The extension works in a workspace folder only when a go.mod there uses gotest: the module is gotest itself, or it declares the CLI as a tool, replaces the module, or requires it directly (a require marked `// indirect` alone does not count). With a go.work in the folder, its use modules are read instead of the folder's go.mod, and one such module is enough. Elsewhere the extension discovers nothing, runs no CLI, writes no git setting and shows no Spec View button.
+A change to go.mod or go.work is followed within a second: the CLI is resolved again and the folder rediscovered, so an upgrade, a new tool directive or a first require shows without a reload.
 
 ## Features
 

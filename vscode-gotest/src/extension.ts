@@ -43,7 +43,12 @@ import { ProcessRegistry } from "./processRegistry.js";
 import { setChildObserver } from "./managedChild.js";
 import { forceKillTimeoutSeconds } from "./config.js";
 import { setStoreErrorLogger } from "./jsonStore.js";
-import { validateGoBinary, scopedConfig, cliPackagePath } from "./cli.js";
+import {
+  validateGoBinary,
+  scopedConfig,
+  cliPackagePath,
+  clearBinaryCache,
+} from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
@@ -57,7 +62,11 @@ import {
 } from "./lint.js";
 import type { LintFinding } from "./lintFindings.js";
 import { openEventsFile } from "./importEvents.js";
-import { ActiveFolders, writeGitSettings } from "./activeFolders.js";
+import {
+  ActiveFolders,
+  moduleFileChanged,
+  writeGitSettings,
+} from "./activeFolders.js";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
@@ -292,6 +301,7 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
     coverOnSave,
     outputChannel,
+    active,
   );
 
   context.subscriptions.push(
@@ -886,6 +896,7 @@ function setupFileWatchers(
   coverageStore: CoverageStore,
   coverOnSave: CoverOnSave,
   outputChannel: vscode.LogOutputChannel,
+  active: ActiveFolders,
 ): vscode.Disposable[] {
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
@@ -954,7 +965,45 @@ function setupFileWatchers(
     triggerCoverOnSave(importPath, uri);
   };
 
+  // A go.mod or go.work change can add, upgrade or remove gotest: the CLI
+  // is resolved afresh and the folder rediscovered, once per burst.
+  const moduleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const moduleWatcher = vscode.workspace.createFileSystemWatcher(
+    "**/{go.mod,go.work}",
+  );
+  const onModuleFile = (uri: vscode.Uri) => {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (!folder) return;
+    const dir = folder.uri.fsPath;
+    const existing = moduleTimers.get(dir);
+    if (existing) clearTimeout(existing);
+    moduleTimers.set(
+      dir,
+      setTimeout(() => {
+        moduleTimers.delete(dir);
+        void moduleFileChanged(dir, {
+          active,
+          discover: (f) => discoveryService.discover(f),
+          resetCli: clearBinaryCache,
+          setActiveContext: (on) =>
+            void vscode.commands.executeCommand(
+              "setContext",
+              "gotest.active",
+              on,
+            ),
+          writeGitSettings: (f) => writeGitSettings(f, outputChannel),
+        }).catch((err) =>
+          outputChannel.error(`[activate] go.mod change in ${dir}: ${err}`),
+        );
+      }, 500),
+    );
+  };
+
   return [
+    moduleWatcher,
+    moduleWatcher.onDidChange(onModuleFile),
+    moduleWatcher.onDidCreate(onModuleFile),
+    moduleWatcher.onDidDelete(onModuleFile),
     testWatcher,
     testWatcher.onDidChange(onFileChange),
     testWatcher.onDidCreate(onFileChange),
@@ -966,6 +1015,7 @@ function setupFileWatchers(
     {
       dispose() {
         for (const t of coverOnSaveTimers.values()) clearTimeout(t);
+        for (const t of moduleTimers.values()) clearTimeout(t);
       },
     },
   ];

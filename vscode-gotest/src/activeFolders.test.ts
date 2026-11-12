@@ -21,7 +21,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
   execFile: execFileMock,
 }));
 
-import { ActiveFolders } from "./activeFolders.js";
+import { ActiveFolders, moduleFileChanged } from "./activeFolders.js";
 
 const PLAIN = "module example.com/app\n\ngo 1.26.0\n";
 const REQUIRING =
@@ -86,5 +86,36 @@ describe("ActiveFolders", () => {
     await active.refresh(dir);
     expect(execFileMock).not.toHaveBeenCalled();
     expect(existsSync(path.join(dir, ".git", "info", "exclude"))).toBe(false);
+  });
+
+  it("activates a folder whose go.mod starts to require gotest, then discovers it", async () => {
+    const calls: string[] = [];
+    const deps = {
+      active: new ActiveFolders(),
+      discover: async (f: string) =>
+        void calls.push(`discover ${path.basename(f)}`),
+      resetCli: () => void calls.push("reset"),
+      setActiveContext: (on: boolean) => void calls.push(`context ${on}`),
+      writeGitSettings: (f: string) =>
+        void calls.push(`git ${path.basename(f)}`),
+    };
+    const name = path.basename(dir);
+    writeFileSync(path.join(dir, "go.mod"), PLAIN);
+    await moduleFileChanged(dir, deps);
+    expect(calls).toEqual(["reset", "context false", `discover ${name}`]);
+
+    calls.length = 0;
+    writeFileSync(path.join(dir, "go.mod"), REQUIRING);
+    await moduleFileChanged(dir, deps);
+    expect(calls).toEqual([
+      "reset",
+      `git ${name}`,
+      "context true",
+      `discover ${name}`,
+    ]);
+
+    calls.length = 0;
+    await moduleFileChanged(dir, deps);
+    expect(calls).toEqual(["reset", "context true", `discover ${name}`]);
   });
 });
