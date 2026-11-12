@@ -101,3 +101,24 @@ func (s *NeverRunTestSuite) TestConstrainedCallers(t *gotest.T) {
 		})
 	})
 }
+
+func (s *NeverRunTestSuite) TestHarnessCallers(t *gotest.T) {
+	t.When("a test file hands a helper to an interface a non-test package declares and calls", func(w *gotest.T) {
+		w.It("a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion", func(it *gotest.T) {
+			run, err := testkit.RunPackage(it.Context(), it.TempDir(), "../testdata/shapes/orphanharness/")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			for _, m := range []string{"TestArgument", "TestAssignment", "TestReturn", "TestLiteral", "TestConversion"} {
+				gotest.Equal(it, "pass", run.Verdict("TestHarnessTestSuite/"+m), "stdout: %s", run.Stdout)
+			}
+		})
+		w.It("a helper converted only to any or to an interface without the method is still refused", func(it *gotest.T) {
+			run, err := testkit.RunPackage(it.Context(), it.TempDir(), "../testdata/shapes/orphanharnessnot/")
+			gotest.NoError(it, err)
+			out := run.Stdout + run.Stderr
+			gotest.Equal(it, 2, run.Exit, "output: %s", out)
+			gotest.Contains(it, out, "orphanharnessnot_suite_test.go:8:17: anyImpl.TestRoundTrip takes *gotest.T, but anyImpl is not a test suite")
+			gotest.Contains(it, out, "orphanharnessnot_suite_test.go:17:19: namedImpl.TestRoundTrip takes *gotest.T, but namedImpl is not a test suite")
+		})
+	})
+}

@@ -179,7 +179,7 @@ A generated file left on disk by an earlier generate SHALL neither break nor be 
 - **THEN** --tags= selects the files built with that tag
 
 ### Requirement: Cases no run reaches
-A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it, directly or through an interface: one error per type, at its first such method, naming the suite suffix. A generic suite in a _test.go file SHALL be refused at its declaration unless an alias named as a suite instantiates it. A type in a non-test file SHALL be left alone: another package may call it.
+A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it or converts a value of the type to an interface holding it: one error per type, at its first such method, naming the suite suffix. A generic suite in a _test.go file SHALL be refused at its declaration unless a suite alias instantiates it. A type in a non-test file SHALL be left alone.
 
 #### Scenario: Case-named methods on a type that is no suite
 - **WHEN** a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite
@@ -187,6 +187,11 @@ A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a
 - **AND** a helper whose method a suite calls, directly or through an interface, runs
 - **AND** a helper only the external test package calls runs
 - **AND** a type a non-test file declares is left alone
+
+#### Scenario: A helper a harness package calls
+- **WHEN** a test file hands a helper to an interface a non-test package declares and calls
+- **THEN** a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion
+- **AND** a helper converted only to any or to an interface without the method is still refused
 
 #### Scenario: A generic suite nothing instantiates
 - **WHEN** a test file declares a generic suite

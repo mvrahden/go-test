@@ -10535,6 +10535,67 @@
               "name": "TestConstrainedCallers",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 107,
+                      "name": "a_helper_converted_to_an_interface_that_holds_its_method_runs,_by_argument,_assignment,_return,_composite_literal_or_conversion",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper converted only to any or to an interface without the method is still refused",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 115,
+                      "name": "a_helper_converted_only_to_any_or_to_an_interface_without_the_method_is_still_refused",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file hands a helper to an interface a non-test package declares and calls",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 106,
+                  "name": "a_test_file_hands_a_helper_to_an_interface_a_non-test_package_declares_and_calls",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HarnessCallers",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 105,
+              "name": "TestHarnessCallers",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "NeverRun",
@@ -26726,7 +26787,7 @@
     }
   ],
   "stats": {
-    "behaviors": 774,
+    "behaviors": 776,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

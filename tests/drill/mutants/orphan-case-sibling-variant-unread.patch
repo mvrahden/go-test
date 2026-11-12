@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/discovery NeverRun .* / a helper only the external t
 Clause: when a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite → a helper only the external test package calls runs
 --- a/internal/gotestast/orphans.go
 +++ b/internal/gotestast/orphans.go
-@@ -51,7 +51,7 @@
- 				}
- 			}
+@@ -60,7 +60,7 @@
+ 		for _, file := range pkg.Syntax {
+ 			convertedToInterface(pkg.TypesInfo, file, called)
  		}
 -		for _, obj := range pkg.TypesInfo.Uses {
 +		for _, obj := range variants[0].TypesInfo.Uses {

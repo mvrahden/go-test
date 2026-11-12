@@ -643,6 +643,8 @@ shards of one run do not add up to every mutant exactly once.
 | `orphan-left-out-selector-unread` | a call in a file the build leaves out is not read as a call | conformance: the discovery It for a file of another platform sees exit 2 |
 | `orphan-loaded-call-unread` | a call the type checker records on the helper's own type is ignored | conformance: the discovery It for a tag-on run sees exit 2 |
 | `orphan-left-out-file-exempts-all` | any file the build leaves out exempts every helper | conformance: the discovery It for a helper no file names sees exit 0 |
+| `orphan-interface-conversion-unread` | a helper handed to an interface is not read as reached | conformance: the discovery It for a harness package's interface sees exit 2 |
+| `orphan-any-conversion-reaches-all` | any conversion to an interface reaches every method of the type | conformance: the discovery It for a helper converted to any sees exit 0 |
 | `bare-case-name-ignored` | a suite method named Test, Benchmark or Fuzz alone that takes its case's handle is read past | conformance: the discovery It for a bare case name sees exit 0 instead of 2 |
 | `bare-helper-name-refused` | a helper named Test, Benchmark or Fuzz alone is refused whatever it takes | conformance: the discovery It for a bare helper name sees exit 2 |
 | `parallel-fixture-hooks-accepted` | a fixture hook that uses the fixture is accepted under a parallel suite | conformance: the discovery It for a racing fixture hook sees exit 0 instead of 2 |

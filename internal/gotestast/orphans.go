@@ -55,6 +55,11 @@ func Orphans(variants ...*packages.Package) []Orphan {
 				}
 			}
 		}
+		// a value handed to an interface reaches the interface's methods,
+		// wherever the interface is declared and called
+		for _, file := range pkg.Syntax {
+			convertedToInterface(pkg.TypesInfo, file, called)
+		}
 		for _, obj := range pkg.TypesInfo.Uses {
 			fn, ok := obj.(*types.Func)
 			if !ok {
