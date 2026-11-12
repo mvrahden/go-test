@@ -38,7 +38,9 @@ type OutputCollector struct {
 	StdlibTestsByPkg map[string]int
 	// bench marks a bench run, whose packages that run nothing pass as go
 	// test -bench passes them: without a note.
-	bench  bool
+	bench bool
+	// list marks a -list run, whose passing output is the answer.
+	list   bool
 	stdout io.Writer
 	stderr io.Writer
 	// starts writes the JSON stream, opening each package as go test does.
@@ -492,7 +494,7 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 			failed = true
 		}
 	}
-	if c.verbose || failed {
+	if c.verbose || failed || c.list {
 		for i := range s.results {
 			r := &s.results[i]
 			_, _ = c.stdout.Write(StripTrailingStatus(r.Stdout))

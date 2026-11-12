@@ -148,6 +148,11 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **THEN** refuses it with exit 2, naming the flag and how many processes would write its file
 - **AND** a run of one suite writes the profile
 
+#### Scenario: Listing a package's tests
+- **WHEN** -list is given a pattern over a package with two suites, one binding a shared fixture
+- **THEN** prints each matching name once and exits 0
+- **AND** starts no suite and no shared fixture
+
 ### Requirement: Flags for the test binary
 A flag only the test binary declares SHALL reach the binary after -- or -args. Every word after -args SHALL reach the binary as written: gotest reads none of them as a flag of its own, as a go test flag or as a package. After a bare -- gotest SHALL read no flag of its own, while go test flags and packages still count. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
 

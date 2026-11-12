@@ -312,6 +312,9 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 
 	// A bench run compiles everything before it dispatches, so no build
 	// competes with a running benchmark. Every other run overlaps the two.
+	if !cfg.Bench && extractFlag(pf.RunFlags, "-list") != "" {
+		return runList(ctx, cfg, overlay, pf)
+	}
 	if cfg.Bench {
 		return runBench(ctx, cfg, overlay, pf)
 	}

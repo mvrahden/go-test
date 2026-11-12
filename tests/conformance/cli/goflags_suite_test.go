@@ -3,6 +3,7 @@ package cli_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -97,6 +98,22 @@ func (s *CLIGoTestFlagsTestSuite) TestAProfileFlagOverSeveralSuiteProcesses(t *g
 			gotest.Equal(it, 0, one.Exit, "stdout: %s\nstderr: %s", one.Stdout, one.Stderr)
 			_, statErr := os.Stat(filepath.Join(dir, "one.out"))
 			gotest.NoError(it, statErr)
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestListingAPackagesTests(t *gotest.T) {
+	run, err := testkit.RunCLI(t.Context(), ".", "-list", "TestSuite$", "../testdata/guardedshared/")
+	gotest.NoError(t, err)
+	t.When("-list is given a pattern over a package with two suites, one binding a shared fixture", func(w *gotest.T) {
+		w.It("prints each matching name once and exits 0", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, 1, strings.Count(run.Stdout, "TestGuardedTestSuite\n"))
+			gotest.Equal(it, 1, strings.Count(run.Stdout, "TestFreeTestSuite\n"))
+		})
+		w.It("starts no suite and no shared fixture", func(it *gotest.T) {
+			gotest.NotContains(it, run.Stdout+run.Stderr, "shared fixture")
+			gotest.NotContains(it, run.Stdout, "--- ")
 		})
 	})
 }

@@ -464,6 +464,7 @@ shards of one run do not add up to every mutant exactly once.
 | `goflags-overlay-refused` | an `-overlay` in `GOFLAGS` is refused as if given on the command line | CLI conformance: the run exits 2 instead of running the suite |
 | `profile-file-shared-by-suite-processes` | a profile flag reaches every suite process of a run, each writing the one file | CLI conformance: the two-package run exits 0 |
 | `profile-flag-refused-for-one-suite` | a profile flag is refused even when the run starts one suite process | CLI conformance: the one-suite run exits 2 |
+| `list-runs-the-suites` | `-list` dispatches the suites, their fixtures and the testing package's list per suite process | CLI conformance: the shared fixture is started and the run exits 1 |
 | `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
