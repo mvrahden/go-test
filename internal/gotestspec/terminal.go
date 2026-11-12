@@ -361,7 +361,11 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 
 		var tail []tailPart
 		if n.Excluded || n.Status == StatusSkip {
-			tail = append(tail, tailPart{" — SKIPPED", ""})
+			skipped := " — SKIPPED"
+			if reason := skipReason(n); reason != "" {
+				skipped += ": " + reason
+			}
+			tail = append(tail, tailPart{skipped, ""})
 		}
 		lead, lw := mark(n.Status)
 		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display, tail: append(tail, duration()...)}, c, cfg)

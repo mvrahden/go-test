@@ -240,3 +240,15 @@ spec and summary SHALL read an event line of any length, from a run and from a s
 - **WHEN** a saved stream holds an event line longer than a mebibyte
 - **THEN** spec renders the stream, the long line's test with its verdict
 - **AND** summary renders it and exits by its verdict
+
+### Requirement: Why a row was skipped
+A skipped row SHALL show the reason its skip gave, in the terminal and the Markdown spec; a row skipped without one SHALL show none.
+
+#### Scenario: A row skipped with a reason
+- **WHEN** a run skips a row with a reason
+- **THEN** the terminal spec shows the reason after SKIPPED
+- **AND** the Markdown spec shows the reason after the row
+
+#### Scenario: A suite its guard kept from running, in a run's spec
+- **WHEN** a run's suite is kept from running by its guard
+- **THEN** the terminal spec shows the guard's reason on the suite's line

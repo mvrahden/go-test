@@ -172,6 +172,9 @@ func renderMarkdownSuite(doc *mdDoc, n *Node, cfg *renderConfig) {
 			// Nothing ran, so nothing was skipped.
 		case n.Status == StatusSkip || n.Excluded:
 			heading += " — SKIPPED"
+			if reason := skipReason(n); reason != "" {
+				heading += ": " + EscapeLabel(reason)
+			}
 		case bare:
 		case n.Status == StatusFail:
 			heading += " — FAILED"
@@ -261,6 +264,11 @@ func markdownItem(list []string, n *Node, depth int, cfg *renderConfig) []string
 	}
 	if n.Incomplete {
 		line += " — " + incompleteMark
+	}
+	if word != "" && leaf {
+		if reason := skipReason(n); reason != "" {
+			line += " — " + EscapeLabel(reason)
+		}
 	}
 	if word != "" && (leaf || n.Kind == KindFuzz) && !n.NotRun && n.Status != StatusNone {
 		if d := EffectiveDuration(n); d >= time.Second {

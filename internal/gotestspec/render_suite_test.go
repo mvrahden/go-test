@@ -589,3 +589,43 @@ func (s *RenderTestSuite) TestMatchReadsTheRowsHideLeavesShown(t *gotest.T, _ *r
 	gotestspec.RenderJSON(&dropped, tree, hide, gotestspec.WithMatch("adds up"))
 	gotest.NotContains(t, dropped.String(), `"display":"totals"`)
 }
+
+func (s *RenderTestSuite) TestSkipReasons(t *gotest.T, _ *renderCtx) {
+	rows := []*gotestspec.Package{{
+		Path: "p",
+		Nodes: []*gotestspec.Node{{
+			Kind:    gotestspec.KindSuite,
+			Display: "Mail",
+			Children: []*gotestspec.Node{
+				{Kind: gotestspec.KindBlock, Display: "is emailed to the customer", Status: gotestspec.StatusSkip, Output: []string{"    mail_test.go:17: not implemented yet\n", "--- SKIP: TestX/is_emailed (0.00s)\n"}},
+				{Kind: gotestspec.KindBlock, Display: "is parked", Status: gotestspec.StatusSkip, Excluded: true},
+				{Kind: gotestspec.KindBlock, Display: "passes", Status: gotestspec.StatusPass},
+			},
+		}},
+	}}
+	guarded := []*gotestspec.Package{{
+		Path:  "p",
+		Nodes: []*gotestspec.Node{{Kind: gotestspec.KindSuite, Display: "Guarded", Status: gotestspec.StatusSkip, Output: []string{"    harness.go:64: suite guard: DATABASE_URL not set\n"}}},
+	}}
+	markdown := func(pkgs []*gotestspec.Package) string {
+		var buf bytes.Buffer
+		gotestspec.RenderMarkdown(&buf, pkgs)
+		return buf.String()
+	}
+
+	t.It("shows a row's reason after SKIPPED in the terminal spec, and none for a row without one", func(it *gotest.T) {
+		out := renderTerminal(rows)
+		gotest.Contains(it, out, "is emailed to the customer — SKIPPED: not implemented yet\n")
+		gotest.Contains(it, out, "is parked — SKIPPED\n")
+	})
+	t.It("shows a row's reason after the row in the Markdown spec", func(it *gotest.T) {
+		out := markdown(rows)
+		gotest.Contains(it, out, "- **SKIP** is emailed to the customer — not implemented yet\n")
+		gotest.Contains(it, out, "- **SKIP** is parked\n")
+	})
+	t.It("shows a guard's reason on the suite's line", func(it *gotest.T) {
+		gotest.Contains(it, renderTerminal(guarded), "Guarded — SKIPPED: suite guard: DATABASE_URL not set")
+		// Markdown escapes the reason as it escapes every label.
+		gotest.Contains(it, markdown(guarded), `#### Guarded — SKIPPED: suite guard: DATABASE\_URL not set`)
+	})
+}

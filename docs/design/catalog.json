@@ -29714,6 +29714,128 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the terminal spec shows the reason after SKIPPED",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "skipreason_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 18,
+                      "name": "the_terminal_spec_shows_the_reason_after_SKIPPED",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the Markdown spec shows the reason after the row",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "skipreason_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 22,
+                      "name": "the_Markdown_spec_shows_the_reason_after_the_row",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run skips a row with a reason",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "skipreason_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 17,
+                  "name": "a_run_skips_a_row_with_a_reason",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARowSkippedWithAReason",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "skipreason_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 16,
+              "name": "TestARowSkippedWithAReason",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the terminal spec shows the guard's reason on the suite's line",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "skipreason_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 31,
+                      "name": "the_terminal_spec_shows_the_guard's_reason_on_the_suite's_line",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run's suite is kept from running by its guard",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "skipreason_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 30,
+                  "name": "a_run's_suite_is_kept_from_running_by_its_guard",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AGuardedSuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "skipreason_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 29,
+              "name": "TestAGuardedSuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecSkipReason",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "skipreason_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 10,
+          "name": "TestSpecSkipReasonTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a run's spec shows it as one It under its When",
                       "duration": 0,
                       "excluded": false,
@@ -30292,13 +30414,13 @@
     }
   ],
   "stats": {
-    "behaviors": 880,
+    "behaviors": 883,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 122,
+    "suites": 123,
     "tests": 0
   }
 }
