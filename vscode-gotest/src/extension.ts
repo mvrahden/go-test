@@ -43,7 +43,7 @@ import { ProcessRegistry } from "./processRegistry.js";
 import { setChildObserver } from "./managedChild.js";
 import { forceKillTimeoutSeconds } from "./config.js";
 import { setStoreErrorLogger } from "./jsonStore.js";
-import { validateGoBinary, scopedConfig } from "./cli.js";
+import { validateGoBinary, scopedConfig, cliPackagePath } from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
@@ -57,8 +57,7 @@ import {
 } from "./lint.js";
 import type { LintFinding } from "./lintFindings.js";
 import { openEventsFile } from "./importEvents.js";
-import { execFile } from "node:child_process";
-import { ensureGitExclude } from "./gitExclude.js";
+import { ActiveFolders, writeGitSettings } from "./activeFolders.js";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
@@ -67,7 +66,6 @@ export function activate(context: vscode.ExtensionContext): void {
     log: true,
   });
   outputChannel.info("[activate] extension activated");
-  vscode.commands.executeCommand("setContext", "gotest.active", true);
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -77,6 +75,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   setStoreErrorLogger((message) => outputChannel.error(message));
 
+  const active = new ActiveFolders();
   const cache = new DiscoveryCache();
   const snapshotStore = new DiscoverySnapshotStore(context.storageUri);
   const discoveryService = new DiscoveryService(
@@ -281,6 +280,7 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     outputChannel,
     lint,
+    active,
   });
   const watcherDisposables = setupFileWatchers(
     cache,
@@ -343,6 +343,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context,
     snapshotStore,
     specView,
+    active,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
@@ -424,6 +425,7 @@ export function registerCommands(deps: {
   cache: DiscoveryCache;
   outputChannel: vscode.LogOutputChannel;
   lint: LintService;
+  active: ActiveFolders;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -439,6 +441,7 @@ export function registerCommands(deps: {
     cache,
     outputChannel,
     lint,
+    active,
   } = deps;
 
   // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
@@ -653,7 +656,25 @@ export function registerCommands(deps: {
     ),
 
     vscode.commands.registerCommand("gotest.refreshTests", async () => {
-      for (const folder of vscode.workspace.workspaceFolders ?? []) {
+      const folders = vscode.workspace.workspaceFolders ?? [];
+      for (const folder of folders) {
+        if ((await active.refresh(folder.uri.fsPath)) === "activated") {
+          writeGitSettings(folder.uri.fsPath, outputChannel);
+        }
+      }
+      void vscode.commands.executeCommand(
+        "setContext",
+        "gotest.active",
+        active.size > 0,
+      );
+      if (active.size === 0) {
+        const where = folders[0]?.uri.fsPath;
+        vscode.window.showInformationMessage(
+          `gotest: no go.mod in this workspace requires or declares gotest. Add it with: go get -tool ${cliPackagePath(where)}@latest`,
+        );
+        return;
+      }
+      for (const folder of folders) {
         await discoveryService.discover(folder.uri.fsPath);
       }
     }),
@@ -956,6 +977,7 @@ async function initializeAsync(deps: {
   context: vscode.ExtensionContext;
   snapshotStore: DiscoverySnapshotStore;
   specView: SpecViewPanel;
+  active: ActiveFolders;
 }): Promise<void> {
   const {
     workspaceFolders,
@@ -970,6 +992,7 @@ async function initializeAsync(deps: {
     context,
     snapshotStore,
     specView,
+    active,
   } = deps;
 
   const firstDir = workspaceFolders[0].uri.fsPath;
@@ -984,21 +1007,18 @@ async function initializeAsync(deps: {
     return;
   }
 
+  // Only a folder whose go.mod uses gotest gets the git settings and the
+  // Spec View button; the rest of the workspace is left alone.
   for (const folder of workspaceFolders) {
-    execFile(
-      "git",
-      ["config", "diff.snapshot.xfuncname", "^=== SNAP .+ ===$"],
-      { cwd: folder.uri.fsPath },
-      (err) => {
-        if (err) {
-          outputChannel.debug(
-            `[activate] git config diff.snapshot.xfuncname failed: ${err.message}`,
-          );
-        }
-      },
-    );
-    ensureGitExclude(folder.uri.fsPath, outputChannel);
+    if ((await active.refresh(folder.uri.fsPath)) === "activated") {
+      writeGitSettings(folder.uri.fsPath, outputChannel);
+    }
   }
+  void vscode.commands.executeCommand(
+    "setContext",
+    "gotest.active",
+    active.size > 0,
+  );
 
   // End what a previous session left running. A detached child survives the
   // extension host that started it, and until now nothing ever went back for

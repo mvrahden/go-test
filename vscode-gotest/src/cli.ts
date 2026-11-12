@@ -815,6 +815,14 @@ export function buildFuzzArgs(
   ];
 }
 
+// cliPackagePath is the configured package path of the CLI, without an
+// @version suffix.
+export function cliPackagePath(workspaceDir?: string): string {
+  return (
+    scopedConfig(workspaceDir).get<string>("modulePath") ?? DEFAULT_MODULE_PATH
+  ).replace(/@.*$/, "");
+}
+
 export function scopedConfig(
   workspaceDir?: string,
 ): vscode.WorkspaceConfiguration {
