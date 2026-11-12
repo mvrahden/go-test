@@ -564,8 +564,10 @@ func stdlibTests(f *ast.File) int {
 		if !ok || fd.Recv != nil || fd.Name.Name == "TestMain" || !strings.HasPrefix(fd.Name.Name, "Test") {
 			continue
 		}
-		if rest := strings.TrimPrefix(fd.Name.Name, "Test"); rest != "" && unicode.IsLower([]rune(rest)[0]) {
-			continue
+		if rest := strings.TrimPrefix(fd.Name.Name, "Test"); rest != "" {
+			if r, _ := utf8.DecodeRuneInString(rest); unicode.IsLower(r) {
+				continue
+			}
 		}
 		params := fd.Type.Params.List
 		if len(params) != 1 || len(params[0].Names) > 1 || fd.Type.Results != nil {
