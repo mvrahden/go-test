@@ -5701,6 +5701,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "spec notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "focusreport_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "spec_notes_on_stderr_that_F__narrows_the_run,_naming_the_method_where_it_is_declared,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "focusreport_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 29,
+                      "name": "summary_notes_on_stderr_that_F__narrows_the_run,_naming_the_method_where_it_is_declared,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when spec or summary runs, outside CI mode, a package holding a focused method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "focusreport_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "spec_or_summary_runs,_outside_CI_mode,_a_package_holding_a_focused_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFocusedMethodUnderSpecAndSummary",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "focusreport_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestAFocusedMethodUnderSpecAndSummary",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIFocusReport",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "focusreport_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLIFocusReportTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails with exit 1, naming the benchmark where it is declared",
                       "duration": 0,
                       "excluded": false,
@@ -31711,13 +31787,13 @@
     }
   ],
   "stats": {
-    "behaviors": 923,
+    "behaviors": 925,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 127,
+    "suites": 128,
     "tests": 0
   }
 }
