@@ -288,6 +288,10 @@ func (ts *TestSuiteSpec) TestCases() []*TestSuiteMethod {
 // FOR RENDERING
 func (ts *TestSuiteSpec) DeclaresTests() bool { return ts.th.DeclaresTests }
 
+// RunnableTests counts the Test methods the suite declares without X_; focus
+// does not change it.
+func (ts *TestSuiteSpec) RunnableTests() int { return ts.th.RunnableTests }
+
 // Benchmarks returns the benchmark methods slice.
 //
 // FOR RENDERING
@@ -405,7 +409,9 @@ type TestSuiteHarness struct {
 	AfterEach  *TestSuiteMethod
 	TestCases  []*TestSuiteMethod
 	// DeclaresTests survives the X_/F_ reduction of TestCases.
-	DeclaresTests  bool
+	DeclaresTests bool
+	// RunnableTests counts the Test methods without X_.
+	RunnableTests  int
 	Benchmarks     []*TestSuiteMethod
 	Fuzzers        []*TestSuiteMethod
 	Config         *types.Func // SuiteConfig() method, may be nil
@@ -929,6 +935,9 @@ func DetermineTestSuiteHarness(n ast.Node, pkg *packages.Package, s *TestSuiteSp
 
 	s.th.TestCases = append(s.th.TestCases, tm)
 	s.th.DeclaresTests = true
+	if !tm.IsExcluded() {
+		s.th.RunnableTests++
+	}
 
 	maxParams := 1
 

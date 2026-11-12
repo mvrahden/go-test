@@ -10466,6 +10466,97 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 19,
+                      "name": "a_suite_with_two_or_more_test_methods_whose_fixture_hook_uses_the_fixture_is_refused_at_the_suite,_told_to_move_the_work_into_its_returning_BeforeEach_or_drop_Parallel",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite whose fixture hooks never use the fixture runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "a_suite_whose_fixture_hooks_never_use_the_fixture_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite with one test method runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 26,
+                      "name": "a_suite_with_one_test_method_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite with Parallel: true binds a package fixture that declares BeforeEach or AfterEach",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "parallel_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 18,
+                  "name": "a_suite_with_Parallel:_true_binds_a_package_fixture_that_declares_BeforeEach_or_AfterEach",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FixtureHooks",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "parallel_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestFixtureHooks",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ParallelShapes",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "parallel_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestParallelShapesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a stale generated file on disk neither breaks the run nor is compiled",
                       "duration": 0,
                       "excluded": false,
@@ -26346,13 +26437,13 @@
     }
   ],
   "stats": {
-    "behaviors": 761,
+    "behaviors": 764,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 111,
+    "suites": 112,
     "tests": 0
   }
 }

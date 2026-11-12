@@ -200,3 +200,12 @@ A suite method named exactly Test, Benchmark or Fuzz, an X_ or F_ marker aside, 
 - **WHEN** a suite declares a method named exactly Test, Benchmark or Fuzz
 - **THEN** one taking the T, B or F of that case is refused at the method, told to add a name
 - **AND** one taking no such parameter is a helper and the suite runs
+
+### Requirement: Fixture per-method hooks under a parallel suite
+gotest SHALL refuse with exit 2 a suite with Parallel: true and two or more test methods that binds, directly or through another fixture, a package fixture whose BeforeEach or AfterEach uses the fixture: parallel methods share the one fixture, so the hook would run for all of them at once. The error is located at the suite and names the hook, the fixture and the way out. A hook whose body never names its receiver, and a suite with one test method, SHALL run.
+
+#### Scenario: A parallel suite binds a fixture with per-method hooks
+- **WHEN** a suite with Parallel: true binds a package fixture that declares BeforeEach or AfterEach
+- **THEN** a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel
+- **AND** a suite whose fixture hooks never use the fixture runs
+- **AND** a suite with one test method runs
