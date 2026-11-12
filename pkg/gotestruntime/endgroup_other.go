@@ -1,4 +1,4 @@
-//go:build !unix
+//go:build !(darwin || dragonfly || freebsd || linux || netbsd || openbsd)
 
 package gotestruntime
 
@@ -8,5 +8,5 @@ import "os"
 var runnerDeathSignal os.Signal
 
 // No process group to end here: on Windows the runner's job ends what the
-// tests started.
+// tests started, and syscall has no Getpgid on aix and solaris.
 func endGroup() {}

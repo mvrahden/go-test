@@ -3,10 +3,10 @@ Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteWhoseRunnerIsKilledStop
 Clause: when the runner of a suite process is killed while a method holds → ends a process the holding method started within 3s of the suite's exit, on Unix
 --- a/pkg/gotestruntime/endgroup_unix.go
 +++ b/pkg/gotestruntime/endgroup_unix.go
-@@ -22,7 +22,7 @@
+@@ -20,7 +20,7 @@
  // dropped. Group 1 is never signalled: kill(-1) reaches every process.
  func endGroup() {
- 	pgid, err := unix.Getpgid(0)
+ 	pgid, err := syscall.Getpgid(0)
 -	if err != nil || pgid <= 1 {
 +	if err != nil || pgid > 0 {
  		return

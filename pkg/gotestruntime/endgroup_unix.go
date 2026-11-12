@@ -1,4 +1,4 @@
-//go:build unix
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
 
 package gotestruntime
 
@@ -7,8 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 // groupGrace is how long the rest of the process group gets to exit on the
@@ -21,7 +19,7 @@ const groupGrace = 2 * time.Second
 // group, this process with it. This process's own SIGTERM is caught and
 // dropped. Group 1 is never signalled: kill(-1) reaches every process.
 func endGroup() {
-	pgid, err := unix.Getpgid(0)
+	pgid, err := syscall.Getpgid(0)
 	if err != nil || pgid <= 1 {
 		return
 	}
