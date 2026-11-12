@@ -22,7 +22,7 @@ func (s *AlphaTestSuite) TestDataPathSet(t *gotest.T) {
 }
 
 func (s *AlphaTestSuite) TestHandleHydrated(t *gotest.T) {
-	gotest.NotEmpty(t, s.Alpha.Handle)
+	gotest.NotZero(t, s.Alpha.Handle)
 	_, err := s.Alpha.Handle.Seek(0, 0)
 	gotest.NoError(t, err)
 	b, err := io.ReadAll(s.Alpha.Handle)
@@ -43,7 +43,7 @@ func (s *MultiTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *MultiTestSuite) TestAlphaAvailable(t *gotest.T) {
 	gotest.NotEmpty(t, s.Alpha.DataPath)
-	gotest.NotEmpty(t, s.Alpha.Handle)
+	gotest.NotZero(t, s.Alpha.Handle)
 }
 
 func (s *MultiTestSuite) TestBetaAvailable(t *gotest.T) {
