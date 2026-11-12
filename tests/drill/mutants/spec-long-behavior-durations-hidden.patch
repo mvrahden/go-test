@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s / a When and an It of 1\.2s carry theirs \(
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s / a When and an It of 1\.2s carry theirs \(
+Clause: when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s → a When and an It of 1.2s carry theirs
+Clause: when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s → a When and an It of 1.2s carry theirs
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -475,7 +475,7 @@
+ 	case KindSuite, KindMethod, KindTest, KindFuzz:
+ 		return true
+ 	}
+-	return EffectiveDuration(n) >= time.Second
++	return false
+ }
+
+ func formatDuration(d time.Duration) string {

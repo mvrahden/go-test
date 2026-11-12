@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s / a method with no verdict carries none \(
+Clause: when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s → a method with no verdict carries none
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -468,7 +468,7 @@
+ // suite, a method, a test or a fuzz target however short, any other row from
+ // one second up.
+ func showsDuration(n *Node) bool {
+-	if noVerdict(n) {
++	if false && noVerdict(n) {
+ 		return false
+ 	}
+ 	switch n.Kind {

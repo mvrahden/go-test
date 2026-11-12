@@ -27,7 +27,7 @@ func (s *SpecSuiteLabelTestSuite) TestLabelsThatEndLikeASuite(t *gotest.T) {
 		w.It("a run's spec shows each It whole under its When and the row whole under its method", func(it *gotest.T) {
 			gotest.Regexp(it, `(?m)^    when a type is no suite\n      ✗ is told to end its name in TestSuite\n`, live.Stdout)
 			gotest.Regexp(it, `(?m)^      ✓ is told to bind a DBFixture$`, live.Stdout)
-			gotest.Regexp(it, `(?m)^  Rows\n    ✓ UserTestSuite$`, live.Stdout)
+			gotest.Regexp(it, `(?m)^  Rows \(\S+\)\n    ✓ UserTestSuite$`, live.Stdout)
 		})
 		w.It("the summary names the failing It whole", func(it *gotest.T) {
 			gotest.Contains(it, summary.Stdout, "Names / Labels / when a type is no suite / is told to end its name in TestSuite (")

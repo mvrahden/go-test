@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s / each suite heading and each method item carries its duration \(
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s / each suite line and each method line carries its duration \(
+Clause: when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s → each suite heading and each method item carries its duration
+Clause: when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s → each suite line and each method line carries its duration
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -473,7 +473,7 @@
+ 	}
+ 	switch n.Kind {
+ 	case KindSuite, KindMethod, KindTest, KindFuzz:
+-		return true
++		return EffectiveDuration(n) >= time.Second
+ 	}
+ 	return EffectiveDuration(n) >= time.Second
+ }

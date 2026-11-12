@@ -55,7 +55,8 @@ func (s *RenderTestSuite) TestRenderTerminal_SuiteHierarchy(t *gotest.T, _ *rend
 	for _, want := range []string{"UserService", "Create", "✓ returns ok"} {
 		gotest.Contains(t, out, want)
 	}
-	gotest.NotContains(t, out, "8ms", "a duration shows from one second up")
+	gotest.Contains(t, out, "UserService — 1 passed (8ms)\n  Create (8ms)\n")
+	gotest.Contains(t, out, "✓ returns ok\n", "a behavior's duration shows from one second up")
 }
 
 func (s *RenderTestSuite) TestRenderTerminal_FailedLeaf(t *gotest.T, _ *renderCtx) {
@@ -111,8 +112,8 @@ func (s *RenderTestSuite) TestRenderMarkdown_SuiteHierarchy(t *gotest.T, _ *rend
 
 	for _, want := range []string{
 		"# Behavior Specification",
-		"#### UserService — 1 passed\n",
-		"\n- **Create**\n",
+		"#### UserService — 1 passed (8ms)\n",
+		"\n- **Create** (8ms)\n",
 		"\n  - PASS returns ok\n",
 	} {
 		gotest.Contains(t, out, want)
@@ -151,7 +152,7 @@ func (s *RenderTestSuite) TestRenderMarkdown_FailuresOutsideBehaviors(t *gotest.
 	out := buf.String()
 
 	t.It("marks a suite that failed without a behavior, with its reason", func(it *gotest.T) {
-		gotest.Contains(it, out, "#### Orders — FAILED\n\n```text\nTestOrdersTestSuite never ran: shared fixture DBSharedFixture did not come up\n```\n")
+		gotest.Contains(it, out, "#### Orders — FAILED (<1ms)\n\n```text\nTestOrdersTestSuite never ran: shared fixture DBSharedFixture did not come up\n```\n")
 	})
 	t.It("lists a package that failed on its own, with its output", func(it *gotest.T) {
 		gotest.Contains(it, out, "### shared fixtures — FAILED\n\n```text\nFAIL: shared fixture setup failed\nDBSharedFixture.BeforeAll failed after 1 attempt(s): refused\n```\n")
@@ -318,16 +319,16 @@ const outlineWant = "# Behavior Specification\n" +
 	"\n" +
 	"### examples/repository — 4 passed, 1 failed, 1 not run\n" +
 	"\n" +
-	"#### UserRepository — 2 passed\n" +
+	"#### UserRepository — 2 passed (20ms)\n" +
 	"\n" +
-	"- **CreateUser**\n" +
+	"- **CreateUser** (20ms)\n" +
 	"  - when a user is created\n" +
 	"    - PASS stores the email\n" +
 	"    - PASS has one entry\n" +
 	"\n" +
-	"#### UserRepository — EXTERNAL — 2 passed, 1 failed, 1 not run\n" +
+	"#### UserRepository — EXTERNAL — 2 passed, 1 failed, 1 not run (330.0s)\n" +
 	"\n" +
-	"- **CreateUser**\n" +
+	"- **CreateUser** (20ms)\n" +
 	"  - when a user is created\n" +
 	"    - PASS stores the email\n" +
 	"    - **FAIL** has one entry\n" +
@@ -372,14 +373,15 @@ func (s *RenderTestSuite) TestCountsAddUp(t *gotest.T, _ *renderCtx) {
 	})
 }
 
-func (s *RenderTestSuite) TestDurationsUnderASecondAreLeftOut(t *gotest.T, _ *renderCtx) {
+func (s *RenderTestSuite) TestSuitesAndMethodsCarryDurationsUnderASecond(t *gotest.T, _ *renderCtx) {
 	out := renderMarkdownOf(treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
 {"Action":"run","Package":"p","Test":"TestSTestSuite/TestQuick"}
 {"Action":"pass","Package":"p","Test":"TestSTestSuite/TestQuick","Elapsed":0.3}
 {"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0.3}
 {"Action":"pass","Package":"p","Elapsed":0.3}
 `))
-	gotest.Contains(t, out, "- PASS **Quick**\n")
+	gotest.Contains(t, out, "#### S — 1 passed (300ms)\n")
+	gotest.Contains(t, out, "- PASS **Quick** (300ms)\n")
 }
 
 func (s *RenderTestSuite) TestAMethodNamedWithAnUnderscoreReadsWithout(t *gotest.T, _ *renderCtx) {
@@ -505,7 +507,7 @@ func (s *RenderTestSuite) TestMatchKeepsTheLeavesHoldingTheTextAndTheirGroups(t 
 	out := renderMarkdownOf(treeOf(t, outlineStream),
 		gotestspec.WithModule("github.com/mvrahden/go-test"), gotestspec.WithMatch("EMAIL"))
 	gotest.Contains(t, out, "- PASS stores the email\n")
-	gotest.Contains(t, out, "- **CreateUser**\n  - when a user is created\n")
+	gotest.Contains(t, out, "- **CreateUser** (20ms)\n  - when a user is created\n")
 	gotest.NotContains(t, out, "has one entry")
 	gotest.NotContains(t, out, "Ping")
 	gotest.Contains(t, out, "2 suites, 2 behaviors: 2 passed.\n")

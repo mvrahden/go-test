@@ -260,8 +260,8 @@ gotest spec ./pkg/user
 ```
 === pkg/user — 2 passed ===
 
-UserService — 2 passed
-  Create
+UserService — 2 passed (1ms)
+  Create (<1ms)
     ✓ creates a user with valid input
     when email already exists
       ✓ returns ErrDuplicate

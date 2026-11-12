@@ -1,13 +1,15 @@
-Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / no duration under a second is shown \(
-Clause: when the Markdown spec of a run with failures and rows not run → no duration under a second is shown
---- a/internal/gotestspec/markdown.go
-+++ b/internal/gotestspec/markdown.go
-@@ -271,7 +271,7 @@
- 		}
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s / a When and an It of 128ms carry none \(
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s / a When and an It of 128ms carry none \(
+Clause: when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s → a When and an It of 128ms carry none
+Clause: when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s → a When and an It of 128ms carry none
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -475,7 +475,7 @@
+ 	case KindSuite, KindMethod, KindTest, KindFuzz:
+ 		return true
  	}
- 	if word != "" && (leaf || n.Kind == KindFuzz) && !n.NotRun && n.Status != StatusNone {
--		if d := EffectiveDuration(n); d >= time.Second {
-+		if d := EffectiveDuration(n); d >= 0*time.Second {
- 			line += " (" + formatDuration(d) + ")"
- 		}
- 	}
+-	return EffectiveDuration(n) >= time.Second
++	return EffectiveDuration(n) >= 0*time.Second
+ }
+
+ func formatDuration(d time.Duration) string {

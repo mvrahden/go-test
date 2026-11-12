@@ -43,7 +43,7 @@ func (s *SpecHidingTestSuite) TestHidingWhatPassed(t *gotest.T) {
 			gotest.Contains(it, terminal.Stdout, "could not release the database")
 			gotest.NotContains(it, terminal.Stdout, "✓")
 			markdown := spec(it, 1, "--format=md", "--hide=pass", hidingStream)
-			gotest.Contains(it, markdown.Stdout, "\n- **FAIL** **Open**\n")
+			gotest.Contains(it, markdown.Stdout, "\n- **FAIL** **Open** (4ms)\n")
 			gotest.Contains(it, markdown.Stdout, "#### Boot — FAILED")
 			gotest.NotContains(it, markdown.Stdout, "PASS")
 		})

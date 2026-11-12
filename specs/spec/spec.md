@@ -193,7 +193,7 @@ The specification read from source SHALL name an Each table row as the run does:
 - **AND** the declared spec under the run shows the row the run reported
 
 ### Requirement: A report a person reads
-The Markdown spec SHALL be an outline: a header with the counts, the runs' time range, the checkout it was made in, and what is hidden; then every failure with its path and message and every row not run with its path; then a heading per module, package and suite, each package and suite with its counts and an external suite marked EXTERNAL; then each behavior as one item that opens with its verdict. No duration under a second SHALL be shown.
+The Markdown spec SHALL be an outline: a header with the counts, the runs' time range, the checkout, and what is hidden; then every failure and every row not run with its path, a failure with its message; then a heading per module, package and suite, each package and suite with its counts and an external suite marked EXTERNAL; then each behavior as an item led by its verdict. Suite headings and method items SHALL carry their duration however short, other rows from a second up, rows not run none.
 
 #### Scenario: A run with failures and rows not run
 - **WHEN** the Markdown spec of a run with failures and rows not run
@@ -202,7 +202,13 @@ The Markdown spec SHALL be an outline: a header with the counts, the runs' time 
 - **AND** lists every row not run with its path
 - **AND** every package and suite heading carries its counts
 - **AND** an external suite's heading is marked EXTERNAL
-- **AND** no duration under a second is shown
+
+#### Scenario: Durations in the Markdown spec
+- **WHEN** the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s
+- **THEN** each suite heading and each method item carries its duration
+- **AND** a When and an It of 1.2s carry theirs
+- **AND** a When and an It of 128ms carry none
+- **AND** a method with no verdict carries none
 
 #### Scenario: A report that hides rows
 - **WHEN** the Markdown spec hides rows
@@ -217,7 +223,14 @@ The spec of a live run SHALL name the checkout's branch, its commit and whether 
 - **AND** a saved stream's header names no checkout
 
 ### Requirement: A terminal report a person reads
-The terminal spec SHALL carry the Markdown spec's content laid out for a terminal: a heading per package and a line per suite, each with its counts, each behavior as one line led by its mark, then every failure and row not run with its path and message after the packages, then the provenance line. A label SHALL wrap at the terminal's width, COLUMNS or 100, and SHALL stay on one line when the spec is redirected.
+The terminal spec SHALL carry the Markdown spec's content laid out for a terminal: a heading per package and a line per suite, each with its counts, each behavior as one line led by its mark, then every failure and row not run with its path and message after the packages, then the provenance line. A label SHALL wrap at the terminal's width, COLUMNS or 100, and SHALL stay on one line when the spec is redirected. Suite and method lines SHALL carry their duration as the Markdown spec does.
+
+#### Scenario: Durations in the terminal spec
+- **WHEN** the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s
+- **THEN** each suite line and each method line carries its duration
+- **AND** a When and an It of 1.2s carry theirs
+- **AND** a When and an It of 128ms carry none
+- **AND** a method with no verdict carries none
 
 #### Scenario: A run with failures
 - **WHEN** the terminal spec of a run with failures

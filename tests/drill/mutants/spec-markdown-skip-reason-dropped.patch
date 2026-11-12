@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/spec SpecSkipReason / ARowSkippedWithAReason / when 
 Clause: when a run skips a row with a reason → the Markdown spec shows the reason after the row
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -274,11 +274,6 @@
+@@ -276,11 +276,6 @@
  	if n.Incomplete {
  		line += " — " + incompleteMark
  	}
@@ -11,6 +11,6 @@ Clause: when a run skips a row with a reason → the Markdown spec shows the rea
 -			line += " — " + EscapeLabel(reason)
 -		}
 -	}
- 	if word != "" && (leaf || n.Kind == KindFuzz) && !n.NotRun && n.Status != StatusNone {
- 		if d := EffectiveDuration(n); d >= time.Second {
- 			line += " (" + formatDuration(d) + ")"
+ 	if !bare && showsDuration(n) {
+ 		line += " (" + formatDuration(EffectiveDuration(n)) + ")"
+ 	}

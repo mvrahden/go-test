@@ -663,7 +663,11 @@ shards of one run do not add up to every mutant exactly once.
 | `report-checkout-on-the-wrong-render` | the spec names the checkout when rendered from a saved stream and not for a live run | spec conformance: a live run in a fresh checkout names no commit, a saved stream rendered there names it |
 | `report-suite-counts-dropped` | the Markdown spec's suite headings lose their counts | spec conformance: `#### UserRepository` carries no counts |
 | `report-external-unmarked` | the Markdown spec heads an external suite like the internal one | spec conformance: no heading carries EXTERNAL |
-| `report-short-durations-shown` | the Markdown spec shows durations under a second | spec conformance: the 300ms method reads `(300ms)` |
+| `report-short-durations-shown` | a When or an It shows a duration under a second | spec conformance: the 128ms When and It read `(128ms)` in the Markdown and terminal spec |
+| `spec-method-durations-under-a-second-hidden` | suite and method rows show their duration only from one second up | spec conformance: the 128ms suite and method carry no duration |
+| `spec-long-behavior-durations-hidden` | a When or an It never shows its duration | spec conformance: the 1.2s When and It carry none |
+| `spec-unrun-method-duration-shown` | a Markdown method row without a verdict carries a duration | spec conformance: the method that never reported reads `(<1ms)` |
+| `spec-terminal-unrun-row-timed` | a terminal row without a verdict carries a duration | spec conformance: the method that never reported reads `NOT RUN (<1ms)` |
 | `shapes-grouped-suite-accepted` | a suite declared inside a type block is not refused | canary: the `shapes/grouped` package exits 0 instead of 2 |
 | `shapes-grouped-fixture-accepted` | a fixture declared inside a type block is not refused | canary: the `shapes/groupedfixture` package exits 0 instead of 2 |
 | `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |
