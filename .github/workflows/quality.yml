@@ -26,6 +26,8 @@ jobs:
       - uses: ./.github/actions/setup-go
       - name: Format check
         run: make fmt-check
+      - name: Workflow and shell lint
+        run: make workflow-lint
       - name: Vuln check
         run: make vuln
       - name: Resolve the golangci-lint pin

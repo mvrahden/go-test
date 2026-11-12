@@ -307,7 +307,7 @@ runs:
         for attempt in 1 2 3; do
           rm -rf "$work"
           mkdir -p "$work"
-          cd "$work"
+          cd "$work" || exit 1
           git init -q
           git remote add origin "$remote"
           git config user.name "github-actions[bot]"
@@ -474,6 +474,7 @@ runs:
         case "$INPUT_PACKAGES" in *\"*|*\'*)
           echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
         esac
+        pkgs=()
         read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
 
         set +e
