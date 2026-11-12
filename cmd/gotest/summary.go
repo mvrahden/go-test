@@ -36,7 +36,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	coverageProfile := own.Value("--coverage")
 	badgePath := own.Value("--badge")
-	noColor := colorDisabled(own.Bool("--no-color"))
+	noColor := reportColorDisabled(own.Bool("--no-color"), output)
 	github := own.Bool("--github") || os.Getenv("GITHUB_ACTIONS") == "true"
 	renderOnly := own.Bool("--render-only")
 

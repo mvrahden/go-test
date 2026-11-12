@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIOutputFile / AReportWrittenToAFile / when spec or summary writes its report to a file --output names while stdout is a character device / the file holds no color codes / spec \(
+Clause: when spec or summary writes its report to a file --output names while stdout is a character device → the file holds no color codes
+--- a/cmd/gotest/color.go
++++ b/cmd/gotest/color.go
+@@ -26,7 +26,7 @@
+ // reportColorDisabled is colorDisabled for a report: a file --output names
+ // never gets color codes, whatever stdout is.
+ func reportColorDisabled(noColorFlag bool, output string) bool {
+-	return output != "" || colorDisabled(noColorFlag)
++	return colorDisabled(noColorFlag)
+ }
+ 
+ // checkFormat validates a --format value before any work is done.

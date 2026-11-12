@@ -307,11 +307,15 @@ A JSON document gotest is asked for SHALL be one document on stdout, with no col
 - **THEN** prints one JSON document with no color codes or annotations, inside GitHub Actions too
 
 ### Requirement: Color follows the terminal
-gotest SHALL print no color codes to a stdout that is a pipe, whatever --no-color says. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
+gotest SHALL print no color codes to a stdout that is a pipe, whatever --no-color says, nor into a file --output names, whatever stdout is. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
 
 #### Scenario: Output into a pipe
 - **WHEN** stdout is a pipe
 - **THEN** prints no color codes, even with --no-color=false
+
+#### Scenario: A report written to a file
+- **WHEN** spec or summary writes its report to a file --output names while stdout is a character device
+- **THEN** the file holds no color codes
 
 ### Requirement: One output mode
 gotest SHALL refuse with exit 2 two output modes asked for at once, and an unknown --format. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.

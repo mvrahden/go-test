@@ -908,6 +908,7 @@ shards of one run do not add up to every mutant exactly once.
 | `summary-markdown-drops-stdlib-note` | a live summary passes no note of the stdlib tests it did not run to the Markdown summary | cli conformance: the Markdown summary of a suite package with a stdlib test carries the note |
 | `event-line-capped` | spec and summary refuse a stream with an event line over a mebibyte | spec conformance: a saved stream with a 2 MiB line renders its test with its verdict |
 | `annotation-compiler-path-prefixed` | a build failure is annotated with its package directory put in front of the path the compiler printed | cli conformance: the annotation of a compile error names the file from the working directory |
+| `output-file-colored` | a report --output writes takes its colour from stdout | cli conformance: a report written to a file while stdout is a character device holds no color codes |
 
 ## Adding a mutant
 

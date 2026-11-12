@@ -7548,6 +7548,98 @@
                 {
                   "children": [
                     {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "spec",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "outputfile_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 37,
+                          "name": "spec",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "summary",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "outputfile_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 37,
+                          "name": "summary",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "the file holds no color codes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "outputfile_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "the_file_holds_no_color_codes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when spec or summary writes its report to a file --output names while stdout is a character device",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "outputfile_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 35,
+                  "name": "spec_or_summary_writes_its_report_to_a_file_--output_names_while_stdout_is_a_character_device",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AReportWrittenToAFile",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "outputfile_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 34,
+              "name": "TestAReportWrittenToAFile",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIOutputFile",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "outputfile_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 16,
+          "name": "TestCLIOutputFileTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [],
                       "display": "passes every run",
                       "duration": 0,
@@ -30124,13 +30216,13 @@
     }
   ],
   "stats": {
-    "behaviors": 876,
+    "behaviors": 878,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 120,
+    "suites": 121,
     "tests": 0
   }
 }

@@ -35,7 +35,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if refuseControl(own, input) {
 		return 2
 	}
-	noColor := colorDisabled(own.Bool("--no-color"))
+	noColor := reportColorDisabled(own.Bool("--no-color"), output)
 	renderOnly := own.Bool("--render-only")
 
 	if own.Bool("--static") && input != "" {

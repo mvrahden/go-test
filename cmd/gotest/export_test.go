@@ -292,3 +292,6 @@ var ExportCommandHint = commandHint
 
 // focusguard.go
 var ExportFocusGate = focusGate
+
+// color.go
+var ExportReportColorDisabled = reportColorDisabled
