@@ -727,3 +727,19 @@ func (s *FlagParsingTestSuite) TestTheBinarysWordsAreNotRead(t *gotest.T) {
 		})
 	})
 }
+
+func (s *FlagParsingTestSuite) TestAUserOverlay(t *gotest.T) {
+	cfg := &config.ProjectConfig{}
+	t.When("-overlay is among the go test flags", func(w *gotest.T) {
+		for sub, args := range gotest.Each(w, [][]string{{"-overlay=o.json", "./..."}, {"-overlay", "o.json", "./..."}}) {
+			_, err := ExportParseExecFlags(nil, args, cfg)
+			gotest.ErrorContains(sub, err, "-overlay is not supported: gotest compiles its generated harness through an overlay of its own, and the go command reads only one")
+		}
+	})
+	t.When("-overlay follows -args", func(w *gotest.T) {
+		w.It("is the test binary's", func(it *gotest.T) {
+			_, err := ExportParseExecFlags(nil, []string{"./...", "-args", "-overlay=o.json"}, cfg)
+			gotest.NoError(it, err)
+		})
+	})
+}

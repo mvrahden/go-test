@@ -1,6 +1,8 @@
 package cli_test
 
 import (
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -40,6 +42,25 @@ func (s *CLIGoTestFlagsTestSuite) TestOwnedGoTestFlags(t *gotest.T) {
 					gotest.Contains(sub, run.Stderr, row.stderrHas)
 				}
 			}
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestAUserOverlay(t *gotest.T) {
+	empty := filepath.Join(t.TempDir(), "o.json")
+	gotest.NoError(t, os.WriteFile(empty, []byte(`{"Replace":{}}`), 0o600))
+	refused, err := testkit.RunCLI(t.Context(), ".", "-overlay", empty, "../testdata/failing/")
+	gotest.NoError(t, err)
+	viaEnv, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{"GOFLAGS=-overlay=" + empty}, "../testdata/failing/")
+	gotest.NoError(t, err)
+	t.When("-overlay is given to a run", func(w *gotest.T) {
+		w.It("refuses it with exit 2 before anything is built, saying gotest compiles its harness through an overlay of its own", func(it *gotest.T) {
+			gotest.Equal(it, 2, refused.Exit, "stdout: %s\nstderr: %s", refused.Stdout, refused.Stderr)
+			gotest.Contains(it, refused.Stderr, "FAIL: -overlay is not supported: gotest compiles its generated harness through an overlay of its own")
+			gotest.Empty(it, refused.Stdout)
+		})
+		w.It("still compiles its harness when GOFLAGS carries an -overlay", func(it *gotest.T) {
+			gotest.Equal(it, 1, viaEnv.Exit, "stdout: %s\nstderr: %s", viaEnv.Stdout, viaEnv.Stderr)
 		})
 	})
 }

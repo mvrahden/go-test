@@ -134,6 +134,11 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **WHEN** a go test flag gotest implements itself is given
 - **THEN** keeps the meaning go test gives the flag, or refuses it with a reason
 
+#### Scenario: A user overlay
+- **WHEN** -overlay is given to a run
+- **THEN** refuses it with exit 2 before anything is built, saying gotest compiles its harness through an overlay of its own
+- **AND** still compiles its harness when GOFLAGS carries an -overlay
+
 ### Requirement: Flags for the test binary
 A flag only the test binary declares SHALL reach the binary after -- or -args. Every word after -args SHALL reach the binary as written: gotest reads none of them as a flag of its own, as a go test flag or as a package. After a bare -- gotest SHALL read no flag of its own, while go test flags and packages still count. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
 

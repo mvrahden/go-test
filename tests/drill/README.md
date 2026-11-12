@@ -460,6 +460,8 @@ shards of one run do not add up to every mutant exactly once.
 | `run-pattern-reaches-every-suite-process` | a `-run` pattern reaches every suite process whole, so a first level that matches two suites runs both in each | CLI conformance: the hooks and the method run twice, and the shared-fixture suite runs in a process without its state |
 | `run-pattern-keeps-unnamed-fuzz-seeds` | a `-run` without a subtest level reaches the suite process unnarrowed, so naming the Test function also replays the fuzz seeds | CLI conformance: the fuzz wrapper has a verdict |
 | `args-words-read-by-gotest` | `-json` after `-args` is stripped and read as gotest's own | CLI conformance: the run streams JSON and the binary never sees `-json` |
+| `user-overlay-accepted` | a user `-overlay` reaches the build and replaces the generated harness | CLI conformance: the run exits 0 with no tests to run |
+| `goflags-overlay-refused` | an `-overlay` in `GOFLAGS` is refused as if given on the command line | CLI conformance: the run exits 2 instead of running the suite |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | fixtures conformance: the fixture of a suite -skip names whole still starts |

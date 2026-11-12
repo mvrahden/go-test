@@ -318,6 +318,9 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	if hasFlag(goTestArgs, "-o") {
 		return ExecConfig{}, fmt.Errorf("-o is not supported: gotest builds each suite's binary itself; use `gotest generate` to see the sources, or -exec to run the binaries under a command")
 	}
+	if hasFlag(goTestArgs, "-overlay") {
+		return ExecConfig{}, fmt.Errorf("-overlay is not supported: gotest compiles its generated harness through an overlay of its own, and the go command reads only one; put the replacement files in the tree, or run with --debug to inspect the overlay gotest writes")
+	}
 	patterns, err := ExtractPackagePatterns(goTestArgs)
 	if err != nil {
 		return ExecConfig{}, err
