@@ -183,9 +183,11 @@ func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any
 	}
 }
 
-// Empty asserts that object is empty: nil, zero-length, or a pointer to an empty value.
-// Applies to slices, maps, arrays, channels, strings, and pointers. Fails with a type
-// guard error for non-emptyable types (e.g. int, bool, func); use Nil or Zero instead.
+// Empty asserts that object is empty: nil, a nil pointer, or a zero-length slice,
+// map, array, channel or string. A non-nil pointer is followed to what it points
+// to, which must be one of those. Any other type fails with a type guard error,
+// a pointer to a struct or a number included (e.g. int, bool, func, *T); use Nil
+// or Zero instead.
 func Empty(t testingT, object any, msgAndArgs ...any) {
 	if !assert.IsEmptyable(object) {
 		guard := "Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero"
@@ -311,7 +313,10 @@ func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArg
 }
 
 // JSONEq asserts that expected and actual represent the same JSON structure, ignoring key order.
-// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
+// A string, []byte, json.RawMessage or io.Reader is read as JSON text, as is a
+// value of a named string type that implements neither json.Marshaler nor
+// encoding.TextMarshaler; text with invalid UTF-8 fails, naming the byte. Any
+// other value is marshaled first.
 func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
 	expNorm, err := assert.NormalizeJSON(expected)
 	if err != nil {
@@ -391,9 +396,11 @@ func Nil(t testingT, object any, msgAndArgs ...any) {
 	}
 }
 
-// NotEmpty asserts that object is NOT empty: not nil and non-zero length, or a pointer to a non-empty value.
-// Applies to slices, maps, arrays, channels, strings, and pointers. Fails with a type
-// guard error for non-emptyable types (e.g. int, bool, func); use NotNil or NotZero instead.
+// NotEmpty asserts that object is NOT empty: a slice, map, array, channel or string
+// of non-zero length. A non-nil pointer is followed to what it points to, which
+// must be one of those; a nil pointer is empty. Any other type fails with a type
+// guard error, a pointer to a struct or a number included (e.g. int, bool, func,
+// *T); use NotNil or NotZero instead.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 	if !assert.IsEmptyable(object) {
 		guard := "NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero"
