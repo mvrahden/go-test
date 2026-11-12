@@ -182,6 +182,41 @@ func (s *ReleasePreflightTestSuite) TestASkillDescribingAnotherVersionIsRefused(
 	gotest.ErrorIs(t, err, fs.ErrNotExist, "nothing may ask the proxy or gh; stdout: %s\nstderr: %s", stdout, stderr)
 }
 
+const pluginMod = "pkg/lint/golangci/go.mod"
+
+// pluginRequiring is the plugin's go.mod requiring the staged module at version.
+func pluginRequiring(version string) string {
+	return "module example.com/rel/pkg/lint/golangci\n\ngo 1.26.0\n\nrequire (\n\texample.com/rel " + version + "\n\tgolang.org/x/tools v0.51.0\n)\n\nreplace example.com/rel => ../../..\n"
+}
+
+func (s *ReleasePreflightTestSuite) TestAPluginRequiringTheReleaseMayBeReleased(t *gotest.T) {
+	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	r.write(t, pluginMod, pluginRequiring("v1.38.1"))
+	r.commitAndPush(t, "plugin")
+	exit, stdout, stderr := r.run(t, "v1.38.1")
+	gotest.Equal(t, 0, exit, "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stdout, "ok    "+pluginMod+" requires example.com/rel v1.38.1", "stdout: %s\nstderr: %s", stdout, stderr)
+}
+
+func (s *ReleasePreflightTestSuite) TestAPluginRequiringAnotherVersionIsRefused(t *gotest.T) {
+	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	r.write(t, pluginMod, pluginRequiring("v1.38.0"))
+	r.commitAndPush(t, "plugin")
+	exit, stdout, stderr := r.run(t, "v1.38.1")
+	gotest.Equal(t, 1, exit, "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stderr, "preflight: "+pluginMod+" requires example.com/rel v1.38.0, not v1.38.1: ", "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stderr, "set its require to v1.38.1", "stdout: %s\nstderr: %s", stdout, stderr)
+	_, err := os.Stat(r.log)
+	gotest.ErrorIs(t, err, fs.ErrNotExist, "nothing may ask the proxy or gh; stdout: %s\nstderr: %s", stdout, stderr)
+}
+
+func (s *ReleasePreflightTestSuite) TestACommitWithoutThePluginIsNotAsked(t *gotest.T) {
+	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	exit, stdout, stderr := r.run(t, "v1.38.1")
+	gotest.Equal(t, 0, exit, "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.NotContains(t, stdout+stderr, pluginMod)
+}
+
 func (s *ReleasePreflightTestSuite) TestASkillWithoutItsVersionLineIsRefused(t *gotest.T) {
 	r := stagePreflight(t, "v1.38.0", "v1.38.0")
 	r.write(t, skillFile, "# Writing gotest tests\n\nNo version here.\n")

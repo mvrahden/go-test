@@ -118,6 +118,17 @@ described=$(git show "$sha:$skill" 2>/dev/null | sed -n 's/.*describes \**\(v[0-
 	fail "$version is not the version $skill describes ($described) at ${sha:0:12}: update its \"This skill describes\" line to $minor"
 ok "$skill describes $minor"
 
+# The golangci plugin, where the commit has it, is tagged with this release
+# and must build against it.
+plugin=pkg/lint/golangci/go.mod
+if git cat-file -e "$sha:$plugin" 2>/dev/null; then
+	required=$(git show "$sha:$plugin" | awk -v m="$module" '$1 == m { print $2; exit } $1 == "require" && $2 == m { print $3; exit }')
+	[ -n "$required" ] || fail "$plugin at ${sha:0:12} does not require $module; require $module $version"
+	[ "$required" = "$version" ] ||
+		fail "$plugin requires $module $required, not $version: the plugin is tagged with this release and must build against it; set its require to $version"
+	ok "$plugin requires $module $version"
+fi
+
 # 6. The proxy. Before tagging it must not list the version, and only @v/list
 # is asked: asking for the version itself can make the proxy fetch it or
 # remember it as missing. Once the tag exists the proxy may record it any
