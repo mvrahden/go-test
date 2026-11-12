@@ -3937,6 +3937,52 @@
               "name": "TestASubBenchmarkNamedWithANumber",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the report keeps four samples of each, two at 8 processors and two at 1",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "numbered_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 52,
+                      "name": "the_report_keeps_four_samples_of_each,_two_at_8_processors_and_two_at_1",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest bench --json runs sub-benchmarks named plain and size-1024 with -cpu=8,1 and -count=2",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "numbered_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 51,
+                  "name": "gotest_bench_--json_runs_sub-benchmarks_named_plain_and_size-1024_with_-cpu=8,1_and_-count=2",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunOverTwoProcessorCounts",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "numbered_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 47,
+              "name": "TestARunOverTwoProcessorCounts",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "BenchNumbered",
@@ -30734,7 +30780,7 @@
     }
   ],
   "stats": {
-    "behaviors": 893,
+    "behaviors": 894,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

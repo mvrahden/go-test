@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/bench BenchNumbered / ASubBenchmarkNamedWithANumber 
 Clause: when gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2 → the report names it size-1024 with two samples
 --- a/internal/gotestbench/baseline.go
 +++ b/internal/gotestbench/baseline.go
-@@ -213,7 +213,7 @@
- 			continue
- 		}
- 		full := result.Name
--		if procs == 0 {
-+		if false && procs == 0 {
- 			full = result.Reported
- 		}
+@@ -242,7 +242,7 @@
  		suite, name := splitBenchFullName(full)
+ 		return pkgPath + "\x00" + suite + "\x00" + name
+ 	}
+-	if idx, ok := index[key(reported)]; ok {
++	if idx, ok := index[key(reported)]; ok && !strings.ContainsAny(reported[len(reported)-1:], "0123456789") {
+ 		return idx, 0, true
+ 	}
+ 	if i := strings.LastIndexByte(reported, '-'); i > 0 {

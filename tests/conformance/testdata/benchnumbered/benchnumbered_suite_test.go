@@ -11,6 +11,10 @@ import (
 type NumberedTestSuite struct{}
 
 func (s *NumberedTestSuite) BenchmarkCopy(b *gotest.B) {
+	b.B().Run("plain", func(sb *testing.B) {
+		for sb.Loop() {
+		}
+	})
 	b.B().Run("size-1024", func(sb *testing.B) {
 		for sb.Loop() {
 		}

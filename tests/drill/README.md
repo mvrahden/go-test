@@ -910,6 +910,7 @@ shards of one run do not add up to every mutant exactly once.
 | `annotation-compiler-path-prefixed` | a build failure is annotated with its package directory put in front of the path the compiler printed | cli conformance: the annotation of a compile error names the file from the working directory |
 | `output-file-colored` | a report --output writes takes its colour from stdout | cli conformance: a report written to a file while stdout is a character device holds no color codes |
 | `bench-numbered-name-read-as-procs` | the repetitions of a benchmark named with a trailing number are keyed without that number | bench conformance: a sub-benchmark named size-1024 under -cpu=1 -count=2 keeps both samples |
+| `bench-suffixed-repetitions-dropped` | a repetition whose line carries a GOMAXPROCS suffix is matched to no benchmark | bench conformance: under -cpu=8,1 -count=2 every benchmark keeps four samples |
 | `spec-skip-reason-dropped` | a skipped row no longer shows the reason its skip gave | spec conformance: the terminal spec shows a skipped row's reason after SKIPPED |
 | `spec-skip-reason-first-logged-line` | a skipped row's reason is read from its first logged line | spec conformance: a row that logs and then skips shows the skip's reason |
 | `spec-skip-reason-from-a-log-line` | a skipped row's last logged line is taken for its reason without a skip call there | spec conformance: a row that logs and then skips without a reason shows none |
