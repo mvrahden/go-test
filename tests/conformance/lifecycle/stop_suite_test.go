@@ -143,6 +143,25 @@ func (s *StopTestSuite) TestAnInterruptStopsTheRun(t *gotest.T) {
 	})
 }
 
+func (s *StopTestSuite) TestAMethodTheStopEnded(t *gotest.T) {
+	markerDir := t.TempDir()
+	cmd := exec.Command(s.cli, "-json", "../testdata/stopended/") //nolint:gosec // G204: binary built by this suite
+	cmd.Env = testkit.ChildEnv(markerDir)
+	tree := holding(t, cmd, markerDir)
+	signalled(t, cmd, tree, testkit.Interrupt(cmd, tree))
+	run := finished(cmd, tree, markerDir)
+	const line = "run stopping: the stop ended this method while it ran"
+
+	t.When("the run is interrupted while a method holds and the method returns once its context ends", func(w *gotest.T) {
+		w.It("writes run stopping: the stop ended this method while it ran in that method's output, and in none of a method that returned before the stop", func(it *gotest.T) {
+			gotest.Contains(it, run.Markers, "context ended")
+			gotest.Contains(it, outputOf(&run, "TestStopEndedTestSuite/TestHolds"), line, "stream:\n%s", run.Stdout)
+			gotest.Contains(it, run.Markers, "returned")
+			gotest.NotContains(it, outputOf(&run, "TestStopEndedTestSuite/TestAReturnsFirst"), line, "stream:\n%s", run.Stdout)
+		})
+	})
+}
+
 // outputOf is everything the stream printed for the test at path.
 func outputOf(run *testkit.Run, path string) string {
 	var out strings.Builder

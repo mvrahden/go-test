@@ -126,6 +126,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				}
 				mt.enter("")
 				defer runstate.EnterBody(it, "a method")()
+				defer sayStopEnded(it)()
 				method()
 			})
 		})
@@ -140,6 +141,24 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 func skipFailFast(t *testing.T, first string) {
 	fmt.Fprintln(t.Output(), "FailFast: "+first)
 	t.SkipNow()
+}
+
+// stopEndedLine is the line a method body the stop ended while it ran writes
+// to its output; the runner's stream reads this exact text.
+const stopEndedLine = "run stopping: the stop ended this method while it ran"
+
+// sayStopEnded returns what to run once a method body returned: when a stop
+// came while it ran, the body says so in t's output. A body that began after
+// the stop, or one cut short after the grace, never says it.
+func sayStopEnded(t *testing.T) func() {
+	if runstate.StopContext().Err() != nil {
+		return func() {}
+	}
+	return func() {
+		if runstate.StopContext().Err() != nil {
+			fmt.Fprintln(t.Output(), stopEndedLine)
+		}
+	}
 }
 
 // skipStopping skips t, a method a stopped run never started, with no
