@@ -126,7 +126,9 @@ import {
 import {
   ABOVE_FLOOR,
   BELOW_FLOOR,
-  PSEUDO_AT_FLOOR,
+  PSEUDO_ABOVE_FLOOR,
+  PSEUDO_BELOW_FLOOR,
+  RC_OF_FLOOR,
 } from "./floor.test-support.js";
 
 function setGoMod(dir: string, content: string) {
@@ -1289,13 +1291,13 @@ describe("checkProducerVersion", () => {
     mockConfigValues.clear();
   });
 
-  it("accepts the floor, anything above it, a pseudo-version at the floor and a dev build", async () => {
+  it("accepts the floor, anything above it, a commit after the floor and a dev build", async () => {
     const { checkProducerVersion } = await import("./cli.js");
     for (const v of [
       MIN_CLI_VERSION,
       ABOVE_FLOOR,
       "v2.0.0",
-      PSEUDO_AT_FLOOR,
+      PSEUDO_ABOVE_FLOOR,
       "dev (source checkout)",
       "dev (replace directive)",
       "dev",
@@ -1313,6 +1315,17 @@ describe("checkProducerVersion", () => {
     expect(() => checkProducerVersion("v1.29.0")).toThrow(
       `the CLI is v1.29.0, but >= ${MIN_CLI_VERSION} is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@${MIN_CLI_VERSION}`,
     );
+  });
+
+  it("refuses a release candidate of the floor and a commit before it", async () => {
+    const { checkProducerVersion, CliUnavailableError } =
+      await import("./cli.js");
+    for (const v of [RC_OF_FLOOR, PSEUDO_BELOW_FLOOR]) {
+      expect(() => checkProducerVersion(v)).toThrow(CliUnavailableError);
+      expect(() => checkProducerVersion(v)).toThrow(
+        `the CLI is ${v}, but >= ${MIN_CLI_VERSION} is required`,
+      );
+    }
   });
 
   it("refuses a document without a version as one that predates the floor", async () => {

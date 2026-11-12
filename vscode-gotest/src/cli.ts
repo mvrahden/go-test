@@ -733,22 +733,39 @@ async function queryBinaryVersion(
   return undefined;
 }
 
-// compareVersions orders by major.minor.patch; pre-release and build suffixes
-// are dropped so a pseudo-version sorts by its base version.
+// compareVersions orders versions as Go orders module versions: a pre-release
+// or pseudo-version sorts before the release it leads up to.
 export function compareVersions(a: string, b: string): number {
-  const parse = (v: string) =>
-    v
-      .replace(/^v/, "")
-      .replace(/[-+].*$/, "")
-      .split(".")
-      .map(Number);
+  const parse = (v: string) => {
+    const bare = v.replace(/^v/, "").replace(/\+.*$/, "");
+    const dash = bare.indexOf("-");
+    const core = dash < 0 ? bare : bare.slice(0, dash);
+    const pre = dash < 0 ? [] : bare.slice(dash + 1).split(".");
+    return { core: core.split(".").map(Number), pre };
+  };
+  // Numeric identifiers compare by value and before non-numeric ones.
+  const cmpId = (x: string, y: string): number => {
+    const nx = /^\d+$/.test(x),
+      ny = /^\d+$/.test(y);
+    if (nx && ny) return Number(x) - Number(y);
+    if (nx !== ny) return nx ? -1 : 1;
+    return x < y ? -1 : x > y ? 1 : 0;
+  };
   const pa = parse(a);
   const pb = parse(b);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+  for (let i = 0; i < Math.max(pa.core.length, pb.core.length); i++) {
+    const diff = (pa.core[i] ?? 0) - (pb.core[i] ?? 0);
     if (diff !== 0) return diff;
   }
-  return 0;
+  // A version without a pre-release is after every one with it.
+  if (pa.pre.length === 0 || pb.pre.length === 0) {
+    return pb.pre.length - pa.pre.length;
+  }
+  for (let i = 0; i < Math.min(pa.pre.length, pb.pre.length); i++) {
+    const diff = cmpId(pa.pre[i], pb.pre[i]);
+    if (diff !== 0) return diff;
+  }
+  return pa.pre.length - pb.pre.length;
 }
 
 export { escapeRegExp } from "./gomod.js";

@@ -71,7 +71,7 @@ vi.mock("./cli.js", async (importOriginal) => ({
 
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
 import { CliBelowFloorError, MIN_CLI_VERSION } from "./cli.js";
-import { BELOW_FLOOR, PSEUDO_AT_FLOOR } from "./floor.test-support.js";
+import { BELOW_FLOOR, PSEUDO_ABOVE_FLOOR } from "./floor.test-support.js";
 
 function makeOutputChannel() {
   return {
@@ -294,14 +294,14 @@ describe("DiscoveryService", () => {
       );
     });
 
-    it("accepts a dev build and a pseudo-version at the floor", async () => {
+    it("accepts a dev build and a commit after the floor", async () => {
       script.once.push({
         stdout: [discoverJson(pkgs, "dev (source checkout)")],
       });
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);
       script.once.push({
-        stdout: [discoverJson(pkgs, PSEUDO_AT_FLOOR)],
+        stdout: [discoverJson(pkgs, PSEUDO_ABOVE_FLOOR)],
       });
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);

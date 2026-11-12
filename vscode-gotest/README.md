@@ -36,7 +36,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 The extension invokes the gotest CLI automatically — no separate install needed.
 It runs the CLI your `go.mod` selects: `go tool` when the tool directive is declared, otherwise `go run` at the pinned version.
-The CLI must be **v1.38.0 or newer**. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
+The CLI must be **v1.38.0 or newer**. A release candidate or a commit before that release (`v1.38.0-rc.1`, `v1.37.1-0.<time>-<commit>`) is older than it; a commit after it (`v1.38.1-0.<time>-<commit>`) is newer. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
 
 ### Install
 
