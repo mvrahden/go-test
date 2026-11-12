@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/discovery NeverRun .* / a helper whose method a suit
 Clause: when a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite → a helper whose method a suite calls, directly or through an interface, runs
 --- a/internal/gotestast/orphans.go
 +++ b/internal/gotestast/orphans.go
-@@ -104,7 +104,7 @@
+@@ -114,7 +114,7 @@
  				}
  				method := decl.Name.Name
  				c, ok := caseOf(method, fn.Signature())
--				if !ok || called[key+"."+method] || calledByName[method] {
-+				if !ok {
+-				if !ok || called[key+"."+method] || calledByName[method] || selectedLeftOut[method] {
++				if !ok || selectedLeftOut[method] {
  					continue
  				}
  				if f := byType[key]; f != nil {

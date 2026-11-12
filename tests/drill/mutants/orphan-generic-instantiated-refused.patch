@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/discovery NeverRun .* / one an alias instantiates ru
 Clause: when a test file declares a generic suite → one an alias instantiates runs
 --- a/internal/gotestast/orphans.go
 +++ b/internal/gotestast/orphans.go
-@@ -154,7 +154,7 @@
- 		return Orphan{}, false
+@@ -158,7 +158,7 @@
+ 		return genericOrphan{}, false
  	}
  	named, ok := obj.Type().(*types.Named)
 -	if !ok || !declaresCase(named) || suiteKeys[typeKey(named)] {
 +	if !ok || !declaresCase(named) {
- 		return Orphan{}, false
+ 		return genericOrphan{}, false
  	}
  	if _, ok := named.Underlying().(*types.Struct); !ok {

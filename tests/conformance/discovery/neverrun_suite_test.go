@@ -79,3 +79,25 @@ func (s *NeverRunTestSuite) TestBareNames(t *gotest.T) {
 		})
 	})
 }
+
+func (s *NeverRunTestSuite) TestConstrainedCallers(t *gotest.T) {
+	t.When("the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out", func(w *gotest.T) {
+		w.It("a run with the build tag off runs the package", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "orphantags", verdict: "TestUnitTestSuite/TestA"})
+		})
+		w.It("a run on a platform the file is not for runs the package", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "orphangoos", verdict: "TestUnitTestSuite/TestA"})
+		})
+		w.It("a run with the build tag on runs the constrained suites too", func(it *gotest.T) {
+			run, err := testkit.RunPackage(it.Context(), it.TempDir(), "../testdata/shapes/orphantags/", "--tags=orphantagsint")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "pass", run.Verdict("TestIntegrationTestSuite/TestDB"), "stdout: %s", run.Stdout)
+			gotest.Equal(it, "pass", run.Verdict("TestPgStoreTestSuite/TestPut"), "stdout: %s", run.Stdout)
+		})
+		w.It("a helper no file names is still refused", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "orphantagsnone", exit: 2,
+				shows: `helper_test\.go:8:19: unnamed\.TestNobody takes \*gotest\.T, but unnamed is not a test suite`})
+		})
+	})
+}

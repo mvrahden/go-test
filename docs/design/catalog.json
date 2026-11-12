@@ -10444,6 +10444,97 @@
               "name": "TestBareNames",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a run with the build tag off runs the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 85,
+                      "name": "a_run_with_the_build_tag_off_runs_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run on a platform the file is not for runs the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 88,
+                      "name": "a_run_on_a_platform_the_file_is_not_for_runs_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run with the build tag on runs the constrained suites too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 91,
+                      "name": "a_run_with_the_build_tag_on_runs_the_constrained_suites_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper no file names is still refused",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 98,
+                      "name": "a_helper_no_file_names_is_still_refused",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 84,
+                  "name": "the_only_caller_of_a_helper,_or_the_only_alias_of_a_generic_suite,_is_in_a_test_file_a_build_constraint_leaves_out",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ConstrainedCallers",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 83,
+              "name": "TestConstrainedCallers",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "NeverRun",
@@ -26635,7 +26726,7 @@
     }
   ],
   "stats": {
-    "behaviors": 770,
+    "behaviors": 774,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

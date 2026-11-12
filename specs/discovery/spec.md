@@ -193,6 +193,16 @@ A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a
 - **THEN** one no alias instantiates is refused at its declaration, told to declare an alias
 - **AND** one an alias instantiates runs
 
+### Requirement: Callers the build leaves out
+A test file of the package that the build constraints leave out of the run SHALL count as a caller for the refusal of cases no run reaches: a case-named method whose name such a file selects, and a generic suite such a file names, SHALL NOT be refused, with the tag off or on. A helper that no file names, constrained or not, SHALL still be refused.
+
+#### Scenario: A caller behind a build constraint
+- **WHEN** the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out
+- **THEN** a run with the build tag off runs the package
+- **AND** a run on a platform the file is not for runs the package
+- **AND** a run with the build tag on runs the constrained suites too
+- **AND** a helper no file names is still refused
+
 ### Requirement: A case prefix alone
 A suite method named exactly Test, Benchmark or Fuzz, an X_ or F_ marker aside, that takes the T, B or F of that case SHALL be refused at the method, told to add a name; one that takes no such parameter SHALL stay a helper.
 

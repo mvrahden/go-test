@@ -3,6 +3,7 @@ package gotestast
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"sort"
@@ -40,6 +41,9 @@ func Orphans(variants ...*packages.Package) []Orphan {
 	suiteKeys := map[string]bool{}
 	called := map[string]bool{}
 	calledByName := map[string]bool{}
+	// test files the build constraints leave out may call what this build
+	// cannot see called
+	selectedLeftOut, namedLeftOut := leftOutNames(variants)
 	for _, pkg := range variants {
 		if pkg == nil || pkg.TypesInfo == nil {
 			continue
@@ -87,8 +91,8 @@ func Orphans(variants ...*packages.Package) []Orphan {
 			}
 			for _, d := range file.Decls {
 				if gd, ok := d.(*ast.GenDecl); ok {
-					if o, ok := uninstantiated(gd, pkg, suiteKeys); ok {
-						out = append(out, &found{orphan: o})
+					if o, ok := uninstantiated(gd, pkg, suiteKeys); ok && !namedLeftOut[o.name] {
+						out = append(out, &found{orphan: o.Orphan})
 					}
 					continue
 				}
@@ -110,7 +114,7 @@ func Orphans(variants ...*packages.Package) []Orphan {
 				}
 				method := decl.Name.Name
 				c, ok := caseOf(method, fn.Signature())
-				if !ok || called[key+"."+method] || calledByName[method] {
+				if !ok || called[key+"."+method] || calledByName[method] || selectedLeftOut[method] {
 					continue
 				}
 				if f := byType[key]; f != nil {
@@ -141,30 +145,70 @@ func Orphans(variants ...*packages.Package) []Orphan {
 
 // uninstantiated refuses a generic suite no alias named as a suite
 // instantiates.
-func uninstantiated(gd *ast.GenDecl, pkg *packages.Package, suiteKeys map[string]bool) (Orphan, bool) {
+func uninstantiated(gd *ast.GenDecl, pkg *packages.Package, suiteKeys map[string]bool) (genericOrphan, bool) {
 	if gd.Tok != token.TYPE || len(gd.Specs) != 1 {
-		return Orphan{}, false
+		return genericOrphan{}, false
 	}
 	ts, ok := gd.Specs[0].(*ast.TypeSpec)
 	if !ok || ts.TypeParams == nil || ts.TypeParams.NumFields() == 0 || !IS_TEST_SUITE.MatchString(ts.Name.Name) {
-		return Orphan{}, false
+		return genericOrphan{}, false
 	}
 	obj, ok := pkg.TypesInfo.Defs[ts.Name].(*types.TypeName)
 	if !ok {
-		return Orphan{}, false
+		return genericOrphan{}, false
 	}
 	named, ok := obj.Type().(*types.Named)
 	if !ok || !declaresCase(named) || suiteKeys[typeKey(named)] {
-		return Orphan{}, false
+		return genericOrphan{}, false
 	}
 	if _, ok := named.Underlying().(*types.Struct); !ok {
-		return Orphan{}, false
+		return genericOrphan{}, false
 	}
 	name := ts.Name.Name
-	return Orphan{
+	return genericOrphan{Orphan{
 		Pos: ts.Name.Pos(),
 		Msg: fmt.Sprintf("generic suite %s has no instantiation, so its cases never run; declare one as an alias whose name ends in TestSuite (type XTestSuite = %s[...])", name, name),
-	}, true
+	}, name}, true
+}
+
+// genericOrphan is an uninstantiated generic suite and its name.
+type genericOrphan struct {
+	Orphan
+	name string
+}
+
+// leftOutNames reads the test files the build constraints leave out of the
+// variants, syntax only: the names they select (x.Name) and every name they
+// spell. A file that does not parse names nothing.
+func leftOutNames(variants []*packages.Package) (selected, named map[string]bool) {
+	selected, named = map[string]bool{}, map[string]bool{}
+	seen := map[string]bool{}
+	fset := token.NewFileSet()
+	for _, pkg := range variants {
+		if pkg == nil {
+			continue
+		}
+		for _, path := range pkg.IgnoredFiles {
+			if !strings.HasSuffix(path, "_test.go") || seen[path] {
+				continue
+			}
+			seen[path] = true
+			file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+			if err != nil {
+				continue
+			}
+			ast.Inspect(file, func(n ast.Node) bool {
+				switch n := n.(type) {
+				case *ast.SelectorExpr:
+					selected[n.Sel.Name] = true
+				case *ast.Ident:
+					named[n.Name] = true
+				}
+				return true
+			})
+		}
+	}
+	return selected, named
 }
 
 // caseOf returns the case a method named as one is, when it takes that case's
