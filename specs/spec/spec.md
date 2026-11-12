@@ -232,3 +232,11 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 #### Scenario: A pick that finds nothing
 - **WHEN** --only names a package or position the stream does not hold, or --match or --only is given with --static
 - **THEN** refuses with exit 2 and says what it did not find
+
+### Requirement: An event line of any length
+spec and summary SHALL read an event line of any length, from a run and from a saved stream.
+
+#### Scenario: A line longer than a mebibyte
+- **WHEN** a saved stream holds an event line longer than a mebibyte
+- **THEN** spec renders the stream, the long line's test with its verdict
+- **AND** summary renders it and exits by its verdict

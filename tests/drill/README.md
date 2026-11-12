@@ -906,6 +906,7 @@ shards of one run do not add up to every mutant exactly once.
 | `force-before-stop` | the runner's force line with no stop under way is ignored | ring-0 lifecycle: the process the force reached keeps running |
 | `summary-headline-counts-skips-as-passed` | the summary headline counts skipped tests as passed and leaves them unnamed | cli conformance: the headline of a run with passed and skipped tests names the skipped ones |
 | `summary-markdown-drops-stdlib-note` | a live summary passes no note of the stdlib tests it did not run to the Markdown summary | cli conformance: the Markdown summary of a suite package with a stdlib test carries the note |
+| `event-line-capped` | spec and summary refuse a stream with an event line over a mebibyte | spec conformance: a saved stream with a 2 MiB line renders its test with its verdict |
 
 ## Adding a mutant
 

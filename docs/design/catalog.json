@@ -28614,6 +28614,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "spec renders the stream, the long line's test with its verdict",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "longline_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 32,
+                      "name": "spec_renders_the_stream,_the_long_line's_test_with_its_verdict",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary renders it and exits by its verdict",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "longline_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 37,
+                      "name": "summary_renders_it_and_exits_by_its_verdict",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a saved stream holds an event line longer than a mebibyte",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "longline_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "a_saved_stream_holds_an_event_line_longer_than_a_mebibyte",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ALineLongerThanAMebibyte",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "longline_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestALineLongerThanAMebibyte",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecLongLine",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "longline_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestSpecLongLineTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "keeps each behavior on one line of the outline",
                       "duration": 0,
                       "excluded": false,
@@ -29971,13 +30047,13 @@
     }
   ],
   "stats": {
-    "behaviors": 872,
+    "behaviors": 874,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 119,
+    "suites": 120,
     "tests": 0
   }
 }
