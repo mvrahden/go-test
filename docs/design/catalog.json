@@ -24132,6 +24132,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "go vet prints lint's findings for the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "drivers_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "go_vet_prints_lint's_findings_for_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when go vet runs a unitchecker main around the exported analyzer as its vettool",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "drivers_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "go_vet_runs_a_unitchecker_main_around_the_exported_analyzer_as_its_vettool",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GoVet",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "drivers_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestGoVet",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterDrivers",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "drivers_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestLinterDriversTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a bare nolint comment suppresses every rule on its line",
                       "duration": 0,
                       "excluded": false,
@@ -31300,13 +31361,13 @@
     }
   ],
   "stats": {
-    "behaviors": 911,
+    "behaviors": 912,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 124,
+    "suites": 125,
     "tests": 0
   }
 }

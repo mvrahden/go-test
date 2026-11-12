@@ -309,3 +309,10 @@ Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a
 - **WHEN** a test file declares a generic suite with a case
 - **THEN** lint reports the suite no alias instantiates at its declaration
 - **AND** lint leaves the suite an alias instantiates unreported
+
+### Requirement: Other drivers
+The analyzer pkg/lint exports SHALL report under go vet -vettool what gotest lint reports.
+
+#### Scenario: go vet with a vettool
+- **WHEN** go vet runs a unitchecker main around the exported analyzer as its vettool
+- **THEN** go vet prints lint's findings for the package
