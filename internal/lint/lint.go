@@ -1449,9 +1449,17 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			// Case 1: assertion with wrong first arg — gotest.Equal(t, ...) or a
 			// foreign library's Equal(t, ...): integrity coverage is deliberately
 			// package-agnostic for assertion-shaped names.
+			// A namesake of another package counts only when it is handed a
+			// test handle: strings.Contains(out, …) is no assertion.
 			name := assertionFuncName(pass, innerCall.Fun)
+			foreign := false
 			if name == "" && foreignAssertionNames[calleeName(innerCall.Fun)] {
-				name = calleeName(innerCall.Fun)
+				name, foreign = calleeName(innerCall.Fun), true
+			}
+			if foreign && len(innerCall.Args) > 0 {
+				if ident, ok := innerCall.Args[0].(*ast.Ident); !ok || !isTestHandle(pass, ident) {
+					name = ""
+				}
 			}
 			if name != "" && len(innerCall.Args) > 0 {
 				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
@@ -1497,6 +1505,21 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 func isTestT(pass *analysis.Pass, ident *ast.Ident) bool {
 	t := pass.TypesInfo.TypeOf(ident)
 	return namedPtrType(t, "testing", "T") || namedPtrType(t, gotestImportPath, "T")
+}
+
+// isTestHandle reports whether ident is a test handle: a *testing.T, B or
+// F, a testing.TB, or a *gotest.T, B, F or R.
+func isTestHandle(pass *analysis.Pass, ident *ast.Ident) bool {
+	t := pass.TypesInfo.TypeOf(ident)
+	if namedType(t, "testing", "TB") {
+		return true
+	}
+	for _, name := range []string{"T", "B", "F"} {
+		if namedPtrType(t, "testing", name) || namedPtrType(t, gotestImportPath, name) {
+			return true
+		}
+	}
+	return namedPtrType(t, gotestImportPath, "R")
 }
 
 func hasTypedRParam(pass *analysis.Pass, lit *ast.FuncLit) bool {

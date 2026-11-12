@@ -268,3 +268,10 @@ Lint's plain report SHALL end each finding's line with its rule in parentheses, 
 - **WHEN** lint reports a finding
 - **THEN** the plain line ends with the rule in parentheses
 - **AND** the -json finding carries the rule as its category and a message without it
+
+### Requirement: Assertions of another library inside a poll
+Inside a polling callback lint SHALL report a gotest assertion whose first argument is not the poll parameter, and a call that only bears an assertion's name where its first argument is a test handle: a testing.T, B, F or TB, or a gotest.T, B, F or R other than the poll parameter. A call that shares the name and takes anything else SHALL be left unreported.
+
+#### Scenario: A call named like an assertion
+- **WHEN** a polling callback calls functions that only share an assertion's name
+- **THEN** lint reports the one handed the test's t and leaves those on plain values unreported

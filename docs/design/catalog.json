@@ -26298,6 +26298,52 @@
               "name": "TestFixesKeepText",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "lint reports the one handed the test's t and leaves those on plain values unreported",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rules_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 319,
+                      "name": "lint_reports_the_one_handed_the_test's_t_and_leaves_those_on_plain_values_unreported",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a polling callback calls functions that only share an assertion's name",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rules_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 318,
+                  "name": "a_polling_callback_calls_functions_that_only_share_an_assertion's_name",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "PollNames",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "rules_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 317,
+              "name": "TestPollNames",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "LinterRules",
@@ -30948,7 +30994,7 @@
     }
   ],
   "stats": {
-    "behaviors": 900,
+    "behaviors": 901,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

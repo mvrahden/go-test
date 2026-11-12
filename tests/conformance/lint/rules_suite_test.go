@@ -311,3 +311,14 @@ func (s *LintRulesTestSuite) TestTheRules(t *gotest.T) {
 		})
 	})
 }
+
+const pollNamesPkg = "../testdata/lintpollnames/"
+
+func (s *LinterRulesTestSuite) TestPollNames(t *gotest.T) {
+	t.When("a polling callback calls functions that only share an assertion's name", func(w *gotest.T) {
+		w.It("lint reports the one handed the test's t and leaves those on plain values unreported", func(it *gotest.T) {
+			gotest.Equal(it, []string{"poll-scope pollnames_test.go:26:11: use poll instead of t in poll callback passed to Eventually"},
+				findingsOf(ruleFindings(it, ".", pollNamesPkg), "poll-scope "))
+		})
+	})
+}
