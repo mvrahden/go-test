@@ -19,6 +19,10 @@
 //	          skip: [testify]          # rules to skip, as lint.skip in .gotest.yml
 //	          nolint-allow: [nilaway]  # linters a nolint comment may name
 //
+// The plugin builds against the gotest version the module requires. A
+// setting that version's analyzer lacks is refused, naming the release that
+// added it.
+//
 // Each finding's message ends with its rule in parentheses: golangci-lint
 // names the linter, gotestlint, not the rule. The package documentation of
 // github.com/mvrahden/go-test/pkg/lint says which version to pin and how
@@ -44,41 +48,54 @@ type Settings struct {
 }
 
 // New builds the plugin; golangci-lint calls it with the linter's settings.
-func New(conf any) (register.LinterPlugin, error) {
+func New(conf any) (register.LinterPlugin, error) { return newPlugin(lint.Analyzer, conf) }
+
+// settingSince names the gotest release whose analyzer first has the flag a
+// setting sets: an older gotest the module pins lacks it.
+var settingSince = map[string]string{"nolint-allow": "v1.38.0"}
+
+// newPlugin is New for the analyzer a. It sets a flag only for a setting the
+// configuration gives, and refuses one a's gotest does not have.
+func newPlugin(a *analysis.Analyzer, conf any) (register.LinterPlugin, error) {
 	s, err := register.DecodeSettings[Settings](conf)
 	if err != nil {
 		return nil, err
 	}
 	for _, rule := range s.Skip {
-		if lint.Analyzer.Flags.Lookup("skip-"+rule) == nil {
+		if a.Flags.Lookup("skip-"+rule) == nil {
 			return nil, fmt.Errorf("gotestlint: cannot skip %q: no such rule, or an integrity rule, which only a //nolint on its line suppresses", rule)
 		}
 	}
+	if len(s.NolintAllow) > 0 && a.Flags.Lookup("nolint-allow") == nil {
+		return nil, fmt.Errorf("gotestlint: setting nolint-allow needs gotest %s or later; the module requires an older one", settingSince["nolint-allow"])
+	}
 	for _, rule := range s.Skip {
-		if err := lint.Analyzer.Flags.Set("skip-"+rule, "true"); err != nil {
+		if err := a.Flags.Set("skip-"+rule, "true"); err != nil {
 			return nil, err
 		}
 	}
-	if err := lint.Analyzer.Flags.Set("nolint-allow", strings.Join(s.NolintAllow, ",")); err != nil {
-		return nil, err
+	if len(s.NolintAllow) > 0 {
+		if err := a.Flags.Set("nolint-allow", strings.Join(s.NolintAllow, ",")); err != nil {
+			return nil, err
+		}
 	}
-	return plugin{}, nil
+	return plugin{a}, nil
 }
 
-type plugin struct{}
+type plugin struct{ a *analysis.Analyzer }
 
 // BuildAnalyzers returns the analyzer, its findings named by rule.
-func (plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
-	a := *lint.Analyzer
+func (p plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	a := *p.a
 	a.Run = func(pass *analysis.Pass) (any, error) {
-		p := *pass
-		p.Report = func(d analysis.Diagnostic) {
+		q := *pass
+		q.Report = func(d analysis.Diagnostic) {
 			if d.Category != "" {
 				d.Message += " (" + d.Category + ")"
 			}
 			pass.Report(d)
 		}
-		return lint.Analyzer.Run(&p)
+		return p.a.Run(&q)
 	}
 	return []*analysis.Analyzer{&a}, nil
 }
