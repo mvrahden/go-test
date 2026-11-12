@@ -413,7 +413,7 @@ func (s *DeadlineAttributionTestSuite) TestASuiteTheDeadlineCut(t *gotest.T) {
 		w.It("fails its package in the text run and says why", func(it *gotest.T) {
 			gotest.Equal(it, 1, c.WorstExitCode())
 			gotest.Contains(it, out.String(), "FAIL\texample.com/p\t")
-			gotest.Contains(it, errw.String(), "gotest: --timeout expired while this suite was running\n")
+			gotest.Contains(it, errw.String(), "gotest: --timeout expired while example.com/p TestWaitsTestSuite was running\n")
 		})
 	})
 	t.When("it was cut short by an interrupt", func(w *gotest.T) {

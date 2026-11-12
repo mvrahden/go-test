@@ -165,7 +165,7 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 		note = fmt.Sprintf("gotest: suite binary terminated %s\n", how)
 	} else if r.DeadlineCut {
 		r.ExitCode = max(r.ExitCode, 1)
-		note = "gotest: --timeout expired while this suite was running\n"
+		note = fmt.Sprintf("gotest: --timeout expired while %s %s was running\n", pkg, r.Target.SuiteName)
 	}
 	if c.holdToTests && r.ExitCode == 0 && r.Target.SuiteName != "" && !r.Target.Bench && warnsNoTests(r.Stderr) {
 		r.ExitCode = 2
