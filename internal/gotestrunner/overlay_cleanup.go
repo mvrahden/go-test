@@ -154,6 +154,20 @@ func ownerIdentity(dir string) (boot, ns string, stamped bool) {
 	return boot, ns, true
 }
 
+// NewStampedWorkDir makes a work dir stamped as this run's own, so a later
+// run's sweep removes it if this one is killed.
+func NewStampedWorkDir() (string, error) {
+	dir, err := os.MkdirTemp(workDirParent(), "gotest-work-*")
+	if err != nil {
+		return "", err
+	}
+	if err := writePIDFile(dir); err != nil {
+		_ = os.RemoveAll(dir)
+		return "", err
+	}
+	return dir, nil
+}
+
 // writePIDFile stamps dir with this run's identity, then its pid through a
 // renamed temp file, so a sweep that reads the pid finds both whole.
 func writePIDFile(dir string) error {

@@ -797,3 +797,20 @@ func (s *FlagParsingTestSuite) TestCommandHint(t *gotest.T) {
 		}
 	}
 }
+
+func (s *FlagParsingTestSuite) TestATemporaryCoverProfile(t *gotest.T) {
+	args, profile, cleanup, err := ExportEnsureCoverProfile([]string{"./p"}, true)
+	gotest.NoError(t, err)
+	t.It("lies in a stamped work dir, under the name cover.out", func(it *gotest.T) {
+		gotest.Regexp(it, `gotest-work-[^/\\]+[/\\]cover\.out$`, profile)
+		gotest.Equal(it, []string{"./p", "-coverprofile=" + profile}, args)
+		entries, readErr := os.ReadDir(filepath.Dir(profile))
+		gotest.NoError(it, readErr)
+		gotest.NotEmpty(it, entries)
+	})
+	t.It("is removed with its dir by the cleanup", func(it *gotest.T) {
+		cleanup()
+		_, statErr := os.Stat(filepath.Dir(profile))
+		gotest.True(it, os.IsNotExist(statErr))
+	})
+}

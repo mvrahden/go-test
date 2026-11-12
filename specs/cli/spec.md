@@ -386,7 +386,7 @@ gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper
 - **THEN** runs the suite
 
 ### Requirement: Generated files are the run's own
-The files a run generates for its packages SHALL be the run's own: runs that share a cache SHALL never share or remove each other's, and a --debug run SHALL keep its own for inspection.
+The files a run generates for its packages SHALL be the run's own: runs that share a cache SHALL never share or remove each other's, and a --debug run SHALL keep its own for inspection. A coverage profile the run needs and the user did not name SHALL lie in a work directory stamped as the run's own, so a later run removes it if this one is killed.
 
 #### Scenario: Runs sharing a cache
 - **WHEN** 16 runs of one package start at once and share one cache
@@ -399,6 +399,10 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 #### Scenario: A --debug run ends
 - **WHEN** a --debug run ends
 - **THEN** names its overlay on stderr and keeps it
+
+#### Scenario: A run with a coverage minimum ends
+- **WHEN** a run given --min and no -coverprofile ends
+- **THEN** leaves no coverage profile in the temp directory
 
 ### Requirement: The test binary cache
 A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most 5 GiB, and an eviction SHALL never fail a run or take a binary a run is linking or copying.

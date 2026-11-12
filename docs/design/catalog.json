@@ -7320,7 +7320,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "names its overlay on stderr and keeps it",
+                      "display": "leaves no coverage profile in the temp directory",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -7328,6 +7328,52 @@
                       "focused": false,
                       "kind": "block",
                       "line": 74,
+                      "name": "leaves_no_coverage_profile_in_the_temp_directory",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run given --min and no -coverprofile ends",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "overlay_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 73,
+                  "name": "a_run_given_--min_and_no_-coverprofile_ends",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ARunWithACoverageMinimumEnds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "overlay_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 67,
+              "name": "TestARunWithACoverageMinimumEnds",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "names its overlay on stderr and keeps it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "overlay_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 89,
                       "name": "names_its_overlay_on_stderr_and_keeps_it",
                       "output": [],
                       "status": "none",
@@ -7341,7 +7387,7 @@
                   "file": "overlay_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 73,
+                  "line": 88,
                   "name": "a_--debug_run_ends",
                   "output": [],
                   "status": "none",
@@ -7355,7 +7401,7 @@
               "file": "overlay_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 67,
+              "line": 82,
               "name": "TestADebugRunKeepsItsGeneratedFiles",
               "output": [],
               "status": "none"
@@ -29268,7 +29314,7 @@
     }
   ],
   "stats": {
-    "behaviors": 849,
+    "behaviors": 850,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

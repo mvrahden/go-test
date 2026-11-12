@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -369,13 +370,12 @@ func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, fun
 	if v := gotestrunner.ExtractCoverProfile(goTestArgs); v != "" {
 		return goTestArgs, v, noop, nil
 	}
-	f, err := os.CreateTemp("", "gotest-cover-*.out")
+	dir, err := gotestrunner.NewStampedWorkDir()
 	if err != nil {
 		return goTestArgs, "", noop, err
 	}
-	profile := f.Name()
-	f.Close()
-	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { os.Remove(profile) }, nil
+	profile := filepath.Join(dir, "cover.out")
+	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { _ = os.RemoveAll(dir) }, nil
 }
 
 func enforceCoverage(coverProfile string, minCoverage, code int) int {
