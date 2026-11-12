@@ -232,7 +232,8 @@ func (s *ConfigTestSuite) TestLoad_ValuesAFlagWouldRefuse(t *gotest.T, _ *config
 		{"a negative compile-parallel", "compile-parallel: -1\n", "compile-parallel: -1 is not a positive integer (omit the key for the default)"},
 		{"a negative min-coverage", "min-coverage: -5\n", "min-coverage: -5 is not a percentage from 0 to 100"},
 		{"a min-coverage above 100", "min-coverage: 150\n", "min-coverage: 150 is not a percentage from 0 to 100"},
-		{"a second document", "parallel: 4\n---\nparallel: 8\n", "holds more than one YAML document; gotest reads one"},
+		{"a second document", "parallel: 4\n---\nparallel: 8\n", "line 3: holds more than one YAML document; gotest reads one"},
+		{"a second document after an empty one", "parallel: 4\n---\n---\n# set\nparallel: 8\n", "line 5: holds more than one YAML document; gotest reads one"},
 	}) {
 		dir := sub.TempDir()
 		writeFile(sub, dir, "go.mod", "module test\n")
@@ -240,6 +241,21 @@ func (s *ConfigTestSuite) TestLoad_ValuesAFlagWouldRefuse(t *gotest.T, _ *config
 		_, err := config.Load(dir)
 		gotest.ErrorContains(sub, err, tc.want)
 		gotest.ErrorContains(sub, err, config.FileName)
+	}
+}
+
+func (s *ConfigTestSuite) TestLoad_AnEmptyTrailingDocument(t *gotest.T, _ *configCtx) {
+	for sub, content := range gotest.Each(t, []struct{ Desc, yaml string }{
+		{"a trailing ---", "parallel: 4\n---\n"},
+		{"a trailing --- with blank lines and comments", "parallel: 4\n---\n\n# nothing more\n\n"},
+		{"a trailing --- holding only null", "parallel: 4\n---\n~\n"},
+	}) {
+		dir := sub.TempDir()
+		writeFile(sub, dir, "go.mod", "module test\n")
+		writeFile(sub, dir, config.FileName, content.yaml)
+		cfg, err := config.Load(dir)
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, 4, cfg.Parallel)
 	}
 }
 

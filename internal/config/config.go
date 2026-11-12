@@ -168,8 +168,20 @@ func parse(path string) (ProjectConfig, error) {
 		}
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
-	if err := dec.Decode(new(yaml.Node)); !errors.Is(err, io.EOF) {
-		return ProjectConfig{}, fmt.Errorf("%s: holds more than one YAML document; gotest reads one", path)
+	// A later document that holds nothing, such as a trailing "---", is
+	// read past; one with content is refused at its line.
+	for {
+		var doc yaml.Node
+		err := dec.Decode(&doc)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if line, ok := documentContent(&doc); ok {
+			return ProjectConfig{}, fmt.Errorf("%s: line %d: holds more than one YAML document; gotest reads one", path, line)
+		}
 	}
 	if err := checkStringLists(data); err != nil {
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
@@ -178,6 +190,18 @@ func parse(path string) (ProjectConfig, error) {
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
 	return cfg, nil
+}
+
+// documentContent reports the line of a document's content; a document
+// that is empty or holds only null has none.
+func documentContent(doc *yaml.Node) (int, bool) {
+	for _, n := range doc.Content {
+		if n.Kind == yaml.ScalarNode && n.Tag == "!!null" {
+			continue
+		}
+		return n.Line, true
+	}
+	return 0, false
 }
 
 // validate refuses a value the key's flag would refuse. Zero stays legal for
