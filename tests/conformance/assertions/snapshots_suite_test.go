@@ -125,6 +125,35 @@ func (s *SnapshotKeysTestSuite) TestNames(t *gotest.T) {
 	})
 }
 
+func (s *SnapshotKeysTestSuite) TestSectionsNoTestRead(t *gotest.T) {
+	said := func(run *testkit.Run) string {
+		var out strings.Builder
+		for _, ev := range run.Events {
+			out.WriteString(ev.Output)
+		}
+		return out.String() + run.Stderr
+	}
+	baseline := filepath.Join("..", "testdata", "snapunread", "testdata", "__snapshots__", "TestUnreadTestSuite.snap")
+	before := readFile(t, baseline)
+	t.When("a suite that ran whole and passed under GOTEST_CI leaves a section of its snapshot file unread", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"GOTEST_CI=1"}, "../testdata/snapunread/")
+		gotest.NoError(w, err)
+		w.It("names the file and the section in one line, and leaves the file and the verdict as they are", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, said(&run), "TestUnreadTestSuite.snap holds 1 section no test of this run read: [TestGone]; delete them if their tests are gone")
+			gotest.Equal(it, before, readFile(it, baseline))
+		})
+	})
+	t.When("-run names one method of the suite", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"GOTEST_CI=1"}, "../testdata/snapunread/", "-run=^TestUnreadTestSuite$/^TestKept$")
+		gotest.NoError(w, err)
+		w.It("names no unread section", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.NotContains(it, said(&run), "no test of this run read")
+		})
+	})
+}
+
 // readFile reads a file of a staged fixture, failing t when it cannot.
 func readFile(t *gotest.T, path string) string {
 	data, err := os.ReadFile(path) //nolint:gosec // G304: the staged copy of the repo's own fixture

@@ -98,10 +98,13 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		if bench {
 			defer failOnPanic(b)
 		}
-		// The waits on goroutines BeforeAll started come after AfterAll, which
-		// is what stops them; as cleanups of tb they would run first.
-		defer drainSetupWaits(tb, budget.SetupTimeout)
-		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
+		func() {
+			// The waits on goroutines BeforeAll started come after AfterAll,
+			// which is what stops them; as cleanups of tb they would run first.
+			defer drainSetupWaits(tb, budget.SetupTimeout)
+			RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
+		}()
+		noteSuiteEnd(tb)
 	})
 	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)
 	return cfg, budget
@@ -393,6 +396,33 @@ func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what func()
 	}
 	reportAt(tb, at, fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", phase, budget, timeout, suffix))
 	return true
+}
+
+// noteSuiteEnd writes the notes other packages have on tb's suite, once it
+// ran whole and passed: a test, not failed, skipped or stopped, under flags
+// that select all of it.
+func noteSuiteEnd(tb testing.TB) {
+	t, ok := tb.(*testing.T)
+	if !ok || t.Failed() || t.Skipped() || runstate.StopContext().Err() != nil || !wholeRun() {
+		return
+	}
+	for _, note := range runstate.SuiteEnded(t.Name()) {
+		fmt.Fprintln(defaultDeadlineOut(tb), note)
+	}
+}
+
+// wholeRun reports whether the flags select every test of a suite they
+// select: -run names no subtest, -skip is empty, and no benchmark or fuzz
+// target is selected.
+func wholeRun() bool {
+	value := func(name string) string {
+		if f := flag.Lookup(name); f != nil {
+			return f.Value.String()
+		}
+		return ""
+	}
+	return !strings.Contains(value("test.run"), "/") && value("test.skip") == "" &&
+		value("test.bench") == "" && value("test.fuzz") == ""
 }
 
 // test2json reports whether the binary runs under -test.v=test2json.

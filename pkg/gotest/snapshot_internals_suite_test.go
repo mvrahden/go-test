@@ -305,3 +305,25 @@ func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_InAPollIsKeyedByItsTest(t
 		t.Errorf("a poll's snapshot was filed under unknown: %v", err)
 	}
 }
+
+func (s *SnapshotInternalsTestSuite) TestUnreadSectionsAreNamed(t *gotest.T) {
+	t.Setenv("GOTEST_CI", "1")
+	path := s.snap("TestSnapshotInternalsTestSuite_ext.snap")
+	baseline := "=== SNAP TestGone ===\nold\n=== SNAP TestUnreadSectionsAreNamed ===\nv\n"
+	if err := os.WriteFile(path, []byte(baseline), 0o600); err != nil {
+		t.Errorf("write the baseline: %v", err)
+		t.FailNow()
+	}
+	gotest.MatchSnapshot(t, "v")
+	notes := gotest.ExportUnreadSections("TestSnapshotInternalsTestSuite")
+	if len(notes) != 1 || !strings.Contains(notes[0], "TestSnapshotInternalsTestSuite_ext.snap holds 1 section no test of this run read: [TestGone]; delete them if their tests are gone") {
+		t.Errorf("no unread section was named: %q", notes)
+	}
+	if data, _ := os.ReadFile(path); string(data) != baseline {
+		t.Errorf("the baseline file was rewritten:\n%s", data)
+	}
+	t.Setenv("GOTEST_CI", "0")
+	if notes := gotest.ExportUnreadSections("TestSnapshotInternalsTestSuite"); len(notes) != 0 {
+		t.Errorf("unread sections were named outside GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS: %q", notes)
+	}
+}

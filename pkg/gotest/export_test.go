@@ -25,6 +25,9 @@ var (
 
 var ExportDefaultSnapshotDir = defaultSnapshotDir
 
+// ExportUnreadSections is what a suite's end notes on its snapshot files.
+var ExportUnreadSections = unreadSections
+
 // ExportRedirectSnapshots makes MatchSnapshot read and write its snapshots in
 // dir until the returned restore runs.
 func ExportRedirectSnapshots(dir string) (restore func()) {

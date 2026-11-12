@@ -12,10 +12,12 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/runstate"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/assert"
 	"github.com/mvrahden/go-test/pkg/gotest/internal/snapfile"
 )
@@ -290,6 +292,65 @@ var dedupSuffix = regexp.MustCompile(`#\d+$`)
 // read: an old-keyed section serves one key only, and never once its exact
 // key has claimed it.
 var claims sync.Map // snapPath → map[string]bool, guarded by fileMutex
+
+func init() { runstate.AtSuiteEnd(unreadSections) }
+
+// unreadSections names, for a suite that ran whole and passed, the sections
+// of its snapshot files no key of this process claimed: one note per file,
+// only under GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS, when baselines are
+// curated. It writes nothing.
+func unreadSections(suite string) []string {
+	if !snapshotReadonly() && !updateSnapshots() {
+		return nil
+	}
+	var notes []string
+	claims.Range(func(k, v any) bool {
+		path := k.(string)
+		if base := filepath.Base(path); base == suite+".snap" || base == suite+"_ext.snap" {
+			if note := unreadIn(path, v.(map[string]bool)); note != "" {
+				notes = append(notes, note)
+			}
+		}
+		return true
+	})
+	slices.Sort(notes)
+	return notes
+}
+
+// unreadIn is the note on path's unclaimed sections, "" for none or a file
+// that cannot be read.
+func unreadIn(path string, claimed map[string]bool) string {
+	mu := fileMutex(path)
+	mu.Lock()
+	defer mu.Unlock()
+	data, err := os.ReadFile(path) //nolint:gosec // G304: a snapshot file this process matched against
+	if err != nil {
+		return ""
+	}
+	var keys []string
+	for _, s := range snapfile.Parse(data) {
+		if !claimed[s.Key] {
+			keys = append(keys, "["+s.Key+"]")
+		}
+	}
+	if len(keys) == 0 {
+		return ""
+	}
+	noun := "sections"
+	if len(keys) == 1 {
+		noun = "section"
+	}
+	shown, more := keys, ""
+	if len(keys) > 10 {
+		shown, more = keys[:10], fmt.Sprintf(", and %d more", len(keys)-10)
+	}
+	if wd, err := os.Getwd(); err == nil {
+		if rel, err := filepath.Rel(wd, path); err == nil {
+			path = rel
+		}
+	}
+	return fmt.Sprintf("MatchSnapshot: %s holds %d %s no test of this run read: %s%s; delete them if their tests are gone", path, len(keys), noun, strings.Join(shown, ", "), more)
+}
 
 func claimsOf(snapPath string) map[string]bool {
 	m, _ := claims.LoadOrStore(snapPath, map[string]bool{})

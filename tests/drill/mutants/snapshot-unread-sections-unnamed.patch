@@ -1,0 +1,14 @@
+Expect: no unread section was named
+Judge: ./pkg/gotest SnapshotInternalsTestSuite/TestUnreadSectionsAreNamed
+Clause: when a suite that ran whole and passed under GOTEST_CI leaves a section of its snapshot file unread → names the file and the section in one line, and leaves the file and the verdict as they are
+--- a/pkg/gotest/snapshot.go
++++ b/pkg/gotest/snapshot.go
+@@ -329,7 +329,7 @@
+ 	}
+ 	var keys []string
+ 	for _, s := range snapfile.Parse(data) {
+-		if !claimed[s.Key] {
++		if false {
+ 			keys = append(keys, "["+s.Key+"]")
+ 		}
+ 	}
