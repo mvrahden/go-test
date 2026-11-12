@@ -28,6 +28,8 @@ jobs:
         run: make fmt-check
       - name: Workflow and shell lint
         run: make workflow-lint
+      - name: Drill patches apply
+        run: make drill-check
       - name: Vuln check
         run: make vuln
       - name: Resolve the golangci-lint pin

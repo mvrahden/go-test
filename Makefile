@@ -1,4 +1,4 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
@@ -23,6 +23,9 @@ lint: vet
 
 drill:
 	bash tests/drill/drill.sh
+
+drill-check:
+	bash tests/drill/drill.sh --check-patches
 
 catalog:
 	go run ./internal/speccatalog/render
