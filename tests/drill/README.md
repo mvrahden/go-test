@@ -380,6 +380,7 @@ shards of one run do not add up to every mutant exactly once.
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
 | `beforeall-goroutine-waited-before-afterall` | the waits of goroutines BeforeAll started run before AfterAll | canary: the server suite deadlocks until go test's alarm instead of passing |
+| `beforeall-resources-undone-before-afterall` | the AfterAll cleanup is registered before BeforeAll runs, so BeforeAll's temp dir and Setenv are undone first | ring-0 lifetimes suite |
 | `bench-skip-ignored` | a bench run plans and dispatches the benchmark suites `-skip` names | fixtures conformance: the fixture of the benchmark suite `-skip` names still starts |
 | `bytes-one-per-line` | a byte slice that is not text renders one byte per line | ring-0 equal suite |
 | `bytes-text-as-hex` | a byte slice of text renders as hex, so its lines are not diffed as text | ring-0 equal suite |

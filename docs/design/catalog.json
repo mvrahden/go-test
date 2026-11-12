@@ -20896,6 +20896,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "AfterAll still finds both",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelifetime_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "AfterAll_still_finds_both",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll takes a temporary directory and sets an environment variable through its T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suitelifetime_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "BeforeAll_takes_a_temporary_directory_and_sets_an_environment_variable_through_its_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatBeforeAllTakes",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suitelifetime_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestWhatBeforeAllTakes",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SuiteLifetime",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "suitelifetime_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestSuiteLifetimeTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "passes a method that runs for 1.5s",
                       "duration": 0,
                       "excluded": false,
@@ -27568,13 +27629,13 @@
     }
   ],
   "stats": {
-    "behaviors": 799,
+    "behaviors": 800,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 113,
+    "suites": 114,
     "tests": 0
   }
 }

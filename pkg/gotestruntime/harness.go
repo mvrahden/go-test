@@ -39,8 +39,10 @@ type Suite struct {
 
 // OpenSuite runs the frame every generated Test, Benchmark and Fuzz wrapper
 // shares: the guard, the fixtures, the config, BeforeAll, and AfterAll as
-// tb's cleanup. A suite its guard skips sets up no fixtures; the fixtures are
-// held before AfterAll is registered, so they are torn down after it. It
+// tb's cleanup, registered once BeforeAll returned so that what BeforeAll
+// took from its T lasts through AfterAll. A suite its guard skips sets up no
+// fixtures; the fixtures are held before AfterAll is registered, so they are
+// torn down after it. It
 // returns the config the suite runs under and the budget it declared, which
 // is zero without a SuiteConfig.
 func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
@@ -87,7 +89,10 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 	}
 	// Never wait on the suite's subtests here: on panic, testing runs ancestor
 	// cleanups from the panicking goroutine, and the wait would deadlock.
-	tb.Cleanup(func() {
+	// Registered once BeforeAll has returned, however it returned, so it runs
+	// ahead of the cleanups BeforeAll registered on tb: its temp dirs, its
+	// Setenv restores.
+	defer tb.Cleanup(func() {
 		if bench {
 			defer failOnPanic(b)
 		}

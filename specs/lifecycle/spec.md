@@ -115,6 +115,13 @@ A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived fr
 - **WHEN** a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll
 - **THEN** fails the suite with a verdict naming the wait and its SetupTimeout
 
+### Requirement: What BeforeAll takes from its T
+A temporary directory and an environment variable a suite's BeforeAll takes from its T SHALL last until AfterAll has returned.
+
+#### Scenario: A temporary directory and an environment variable from BeforeAll
+- **WHEN** BeforeAll takes a temporary directory and sets an environment variable through its T
+- **THEN** AfterAll still finds both
+
 ### Requirement: A panic ahead of a failing AfterEach
 A panic in a test method or its BeforeEach SHALL be reported and fail the test even when AfterEach then fails a fatal assertion, and AfterEach SHALL still run.
 
