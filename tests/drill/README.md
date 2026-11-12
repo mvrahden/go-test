@@ -484,7 +484,8 @@ shards of one run do not add up to every mutant exactly once.
 | `forced-exit-books-nothing` | an exit at a further stop leaves a stream that never books the run as interrupted | runner unit: the stream ends without the `interrupted` package |
 | `deadline-cut-suite-passes` | a suite whose method returned when `--timeout` stopped it keeps its passing verdict | CLI conformance: the package verdict is `pass` |
 | `deadline-names-no-suite` | an expired `--timeout` with no method left running fails the run without naming the suite it stopped | CLI conformance: the FAIL line names nothing |
-| `stop-ended-method-reads-passed` | a method the runtime says the stop ended keeps its passing verdict at an expired `--timeout` | runner unit: the deadline names no method and books nothing for it |
+| `stop-ended-method-reads-passed` | a method the runtime says the stop ended keeps its passing verdict at an expired `--timeout` | runner unit: the deadline books nothing for the method |
+| `stop-ended-method-named-running` | a method the runtime says the stop ended counts as still running at an expired `--timeout`, so the run's FAIL line names it, on stderr only, not its suite | runner unit: the FAIL line names the method and the stream lacks it |
 | `damaged-cached-binary-reused` | a cached binary the go command left alone is reused without comparing it with its record | CLI conformance: the truncated binary's run exits 1 |
 | `unrecorded-cached-binary-trusted` | a cached binary without a record is reused as if it matched one | CLI conformance: the second run links nothing |
 | `clean-cache-removes-nothing` | `gotest clean --cache` exits 0 and leaves the cache as it was | CLI conformance: a cached binary is left |

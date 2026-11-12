@@ -1,0 +1,13 @@
+Expect: ^FAIL .*internal/gotestrunner .*DeadlineAttribution
+Judge: ./internal/gotestrunner DeadlineAttributionTestSuite/TestAMethodTheStopEnded
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -552,7 +552,7 @@
+ 	booked = append(booked, c.verdicts.suiteFailures(cut)...)
+ 	booked = append(booked, c.verdicts.packageFailures(booked)...)
+ 	writeBooked(c.jsonTarget(), booked)
+-	return running
++	return cut
+ }
+
+ // maxNamedUnits caps the units a one-line message names.

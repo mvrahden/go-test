@@ -516,10 +516,12 @@ func (c *OutputCollector) cutShortUnits() []CensusCase {
 	return slices.Clone(c.cutShort)
 }
 
-// bookDeadline returns the units an expired deadline cut short and books each
-// into the JSON stream as failed, with its suite and package. A suite cut short
-// is failed whether or not it reported a verdict: it never finished. The text
-// run has no stream and names the suites whose process the deadline signalled.
+// bookDeadline books the units an expired deadline cut short into the JSON
+// stream as failed, with its suite and package, and returns those still
+// running. A suite cut short is failed whether or not it reported a verdict:
+// it never finished. A method the stop ended is booked but not returned: it
+// returned, so the run's FAIL line names its suite. The text run has no stream
+// and names the suites whose process the deadline signalled.
 func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
 	if !errors.Is(dispatchErr, context.DeadlineExceeded) {
 		return nil
@@ -530,23 +532,24 @@ func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
 		return slices.Clone(c.cutShort)
 	}
 	running := c.verdicts.runningUnits()
+	cut := slices.Clone(running)
 	// A method the stop ended returned, maybe passing, but did not finish.
 	stopped := map[CensusCase]bool{}
 	for _, k := range c.verdicts.stopped {
-		if !slices.Contains(running, k) {
-			running = append(running, k)
+		if !slices.Contains(cut, k) {
+			cut = append(cut, k)
 			stopped[k] = true
 		}
 	}
-	booked := make([]streamEvent, 0, 2*len(running))
-	for _, r := range running {
+	booked := make([]streamEvent, 0, 2*len(cut))
+	for _, r := range cut {
 		booked = append(booked, streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n", Gotest: c.verdicts.stamp(r)})
 		// A unit the converter already failed keeps that verdict.
 		if c.verdicts.running[r] || (stopped[r] && c.verdicts.last[r].Action != "fail") {
 			booked = append(booked, streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path, Gotest: c.verdicts.stamp(r)})
 		}
 	}
-	booked = append(booked, c.verdicts.suiteFailures(running)...)
+	booked = append(booked, c.verdicts.suiteFailures(cut)...)
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
 	writeBooked(c.jsonTarget(), booked)
 	return running
