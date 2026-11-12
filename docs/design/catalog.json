@@ -10322,6 +10322,67 @@
               "name": "TestCaseNamedMethods",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one no alias instantiates is refused at its declaration, told to declare an alias",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 53,
+                      "name": "one_no_alias_instantiates_is_refused_at_its_declaration,_told_to_declare_an_alias",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one an alias instantiates runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 57,
+                      "name": "one_an_alias_instantiates_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file declares a generic suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 52,
+                  "name": "a_test_file_declares_a_generic_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GenericSuites",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 51,
+              "name": "TestGenericSuites",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "NeverRun",
@@ -26224,7 +26285,7 @@
     }
   ],
   "stats": {
-    "behaviors": 757,
+    "behaviors": 759,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -47,3 +47,15 @@ func (s *NeverRunTestSuite) TestCaseNamedMethods(t *gotest.T) {
 		})
 	})
 }
+
+func (s *NeverRunTestSuite) TestGenericSuites(t *gotest.T) {
+	t.When("a test file declares a generic suite", func(w *gotest.T) {
+		w.It("one no alias instantiates is refused at its declaration, told to declare an alias", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "orphangeneric", exit: 2,
+				shows: `orphangeneric_suite_test\.go:6:6: generic suite OrphanContractTestSuite has no instantiation, so its cases never run; declare one as an alias whose name ends in TestSuite \(type XTestSuite = OrphanContractTestSuite\[\.\.\.\]\)`})
+		})
+		w.It("one an alias instantiates runs", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "aliasalias", verdict: "TestIntTestSuite/TestZero"})
+		})
+	})
+}

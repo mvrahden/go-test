@@ -86,6 +86,12 @@ func Orphans(variants ...*packages.Package) []Orphan {
 				continue
 			}
 			for _, d := range file.Decls {
+				if gd, ok := d.(*ast.GenDecl); ok {
+					if o, ok := uninstantiated(gd, pkg, suiteKeys); ok {
+						out = append(out, &found{orphan: o})
+					}
+					continue
+				}
 				decl, ok := d.(*ast.FuncDecl)
 				if !ok || decl.Recv == nil || !decl.Name.IsExported() {
 					continue
@@ -131,6 +137,34 @@ func Orphans(variants ...*packages.Package) []Orphan {
 	}
 	sort.SliceStable(orphans, func(i, j int) bool { return orphans[i].Pos < orphans[j].Pos })
 	return orphans
+}
+
+// uninstantiated refuses a generic suite no alias named as a suite
+// instantiates.
+func uninstantiated(gd *ast.GenDecl, pkg *packages.Package, suiteKeys map[string]bool) (Orphan, bool) {
+	if gd.Tok != token.TYPE || len(gd.Specs) != 1 {
+		return Orphan{}, false
+	}
+	ts, ok := gd.Specs[0].(*ast.TypeSpec)
+	if !ok || ts.TypeParams == nil || ts.TypeParams.NumFields() == 0 || !IS_TEST_SUITE.MatchString(ts.Name.Name) {
+		return Orphan{}, false
+	}
+	obj, ok := pkg.TypesInfo.Defs[ts.Name].(*types.TypeName)
+	if !ok {
+		return Orphan{}, false
+	}
+	named, ok := obj.Type().(*types.Named)
+	if !ok || !declaresCase(named) || suiteKeys[typeKey(named)] {
+		return Orphan{}, false
+	}
+	if _, ok := named.Underlying().(*types.Struct); !ok {
+		return Orphan{}, false
+	}
+	name := ts.Name.Name
+	return Orphan{
+		Pos: ts.Name.Pos(),
+		Msg: fmt.Sprintf("generic suite %s has no instantiation, so its cases never run; declare one as an alias whose name ends in TestSuite (type XTestSuite = %s[...])", name, name),
+	}, true
 }
 
 // caseOf returns the case a method named as one is, when it takes that case's
