@@ -340,7 +340,7 @@ func (s *CensusTestSuite) TestFlagsThatMayRunNothing(t *gotest.T) {
 		{Desc: "-test.skip after -args", args: []string{"-args", "-test.skip=X"}, want: true},
 		{Desc: "-test.list after -args", args: []string{"-args", "-test.list=."}, want: true},
 		{Desc: "-test.bench after -args", args: []string{"-args", "-test.bench=."}, want: true},
-		{Desc: "a custom flag after -args", args: []string{"-args", "-customflag=yes"}, want: false},	}) {
+		{Desc: "a custom flag after -args", args: []string{"-args", "-customflag=yes"}, want: false}}) {
 		gotest.Equal(t, row.want, gotestrunner.ExportMayRunNothing(row.args, row.runFlags))
 	}
 }
