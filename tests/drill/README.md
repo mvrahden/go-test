@@ -290,6 +290,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-aftereach-only-runs-out-of-turn` | a fixture with only an `AfterEach` runs it whether or not its turn came | canary: the fixtureorder `AfterEach` behind the failed `BeforeEach` runs |
 | `fixture-aftereach-reported-in-runtime` | an error a fixture's `AfterEach` returns is located in the runtime's `methods.go` | canary: the fixtureafterfail failure names a runtime file, not the hook's |
 | `fixture-aftereach-without-before` | a fixture's `AfterEach` runs for a method whose fixture `BeforeEach` failed | canary: the fixturehookfail markers show an `AfterEach` after the failed `BeforeEach` |
+| `fixture-setup-located-in-runtime` | a failed fixture `BeforeAll` is reported with `tb.Fatalf`, located in the runtime's `hold.go` | lifecycle: the edges setup failure names `hold.go:` |
+| `fixture-teardown-error-left-on-stderr` | a failed fixture `AfterAll` is reported as a bare `fixture teardown failed`, its error only on stderr | lifecycle: the edges teardown line names no fixture, hook or error |
 | `fixture-beforeeach-after-a-fixture-overran` | a fixture's `BeforeEach` starts after an earlier fixture's overran the `Timeout` | canary: the hookoverrun later fixture's `BeforeEach` runs |
 | `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |

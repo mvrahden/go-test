@@ -1,0 +1,15 @@
+Expect: the setup failure is located in the runtime's file
+Judge: ./tests/lifecycle HoldsTestSuite/TestAFixtureSetupFailureIsNotLocatedInTheRuntime
+Clause: when a package fixture's BeforeAll returns an error → the suite's output names the fixture, the hook and the error, and no file of the runtime
+--- a/pkg/gotestruntime/hold.go
++++ b/pkg/gotestruntime/hold.go
+@@ -43,8 +43,7 @@
+ 			tb.FailNow()
+ 			return
+ 		}
+-		reportAt(tb, failureAt(err), "fixture setup: "+err.Error())
+-		tb.FailNow()
++		tb.Fatalf("fixture setup: %v", err)
+ 		return
+ 	}
+ 	tb.Cleanup(func() {

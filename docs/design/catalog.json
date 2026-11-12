@@ -12500,6 +12500,83 @@
               "name": "TestAFixtureHookLeavesThroughGoexit",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite's output names the fixture, the hook and the error, and no file of the runtime",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hooks_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 182,
+                      "name": "the_suite's_output_names_the_fixture,_the_hook_and_the_error,_and_no_file_of_the_runtime",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's BeforeAll returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 180,
+                  "name": "a_package_fixture's_BeforeAll_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the suite's output names the fixture, the hook and the error, and no file of the runtime",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hooks_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 190,
+                      "name": "the_suite's_output_names_the_fixture,_the_hook_and_the_error,_and_no_file_of_the_runtime",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's AfterAll returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 188,
+                  "name": "a_package_fixture's_AfterAll_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatAFailedFixtureBeforeAllOrAfterAllSays",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hooks_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 179,
+              "name": "TestWhatAFailedFixtureBeforeAllOrAfterAllSays",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FixtureHooks",
@@ -27906,7 +27983,7 @@
     }
   ],
   "stats": {
-    "behaviors": 808,
+    "behaviors": 810,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

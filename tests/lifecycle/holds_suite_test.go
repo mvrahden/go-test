@@ -96,7 +96,7 @@ func (s *HoldsTestSuite) TestARunThatSelectsNoBoundSuiteSetsNothingUp(t *gotest.
 func (s *HoldsTestSuite) TestATeardownFailureFailsTheHoldingTest(t *gotest.T) {
 	code, out, _ := s.holds(t, []string{"HOLDS_FAIL_TEARDOWN=1"}, "-run", "TestPanickingTestSuite")
 	gotest.Equal(t, 1, code, out)
-	gotest.Regexp(t, `fixture teardown failed\n--- FAIL: TestPanickingTestSuite `, out)
+	gotest.Regexp(t, `fixture teardown failed: \S+\.AfterAll: .+\n--- FAIL: TestPanickingTestSuite `, out)
 }
 
 func (s *HoldsTestSuite) TestAPanickingTestReleasesTheFixture(t *gotest.T) {
@@ -182,4 +182,18 @@ func (s *HoldsTestSuite) TestAnAfterAllLeavingThroughGoexitFailsTheSuite(t *gote
 	code, out := s.edges(t, nil, "-run", "TestGoexitAfterAllTestSuite")
 	gotest.Equal(t, 1, code, "an AfterAll that left through runtime.Goexit passed:\n%s", out)
 	gotest.Contains(t, out, "AfterAll left through runtime.Goexit without a verdict")
+}
+
+func (s *HoldsTestSuite) TestAFixtureSetupFailureIsNotLocatedInTheRuntime(t *gotest.T) {
+	code, out := s.edges(t, []string{"EDGES_FAIL=setup"}, "-run", "TestBoundTestSuite")
+	gotest.Contains(t, out, "fixture setup: EdgeFixture.BeforeAll: the edge fixture would not come up")
+	gotest.NotContains(t, out, "hold.go:", "the setup failure is located in the runtime's file")
+	gotest.Equal(t, 1, code, out)
+}
+
+func (s *HoldsTestSuite) TestAFixtureTeardownFailureSaysWhatFailed(t *gotest.T) {
+	code, out := s.edges(t, []string{"EDGES_FAIL=teardown"}, "-run", "TestBoundTestSuite")
+	gotest.Regexp(t, `(?m)^\s+fixture teardown failed: EdgeFixture\.AfterAll: the edge fixture would not let go$`, out, "the teardown's error is not in the holding test's output")
+	gotest.NotContains(t, out, "hold.go:")
+	gotest.Equal(t, 1, code, out)
 }

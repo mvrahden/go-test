@@ -175,3 +175,22 @@ func (s *FixtureHooksTestSuite) TestAFixtureHookLeavesThroughGoexit(t *gotest.T)
 		})
 	})
 }
+
+func (s *FixtureHooksTestSuite) TestWhatAFailedFixtureBeforeAllOrAfterAllSays(t *gotest.T) {
+	t.When("a package fixture's BeforeAll returns an error", func(w *gotest.T) {
+		run, _ := runHooks(w, "fixture.BeforeAll", "error")
+		w.It("the suite's output names the fixture, the hook and the error, and no file of the runtime", func(it *gotest.T) {
+			out := outputOf(&run, gridSuite)
+			gotest.Contains(it, out, "fixture setup: GridFixture.BeforeAll: fixture.BeforeAll failed")
+			gotest.NotContains(it, out, "hold.go")
+		})
+	})
+	t.When("a package fixture's AfterAll returns an error", func(w *gotest.T) {
+		run, _ := runHooks(w, "fixture.AfterAll", "error")
+		w.It("the suite's output names the fixture, the hook and the error, and no file of the runtime", func(it *gotest.T) {
+			out := outputOf(&run, gridSuite)
+			gotest.Contains(it, out, "fixture teardown failed: GridFixture.AfterAll: fixture.AfterAll failed")
+			gotest.NotContains(it, out, "hold.go")
+		})
+	})
+}

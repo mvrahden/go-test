@@ -58,6 +58,7 @@ func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[stri
 				if r != nil {
 					err = fmt.Errorf("%s: panic: %v", node.Name, r)
 				}
+				err = setupFailure(node, err)
 				mu.Lock()
 				errs[node.Name] = err
 				mu.Unlock()
@@ -146,7 +147,7 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 				cancel()
 			}
 			if err != nil {
-				return fmt.Errorf("hydrate shared fixture %q: %w", node.SharedState.StateKey, err)
+				return setupFailure(node, fmt.Errorf("hydrate shared fixture %q: %w", node.SharedState.StateKey, err))
 			}
 		}
 		tracker.setAttempted(node, true)
@@ -162,12 +163,37 @@ func setupNodeDAG(ctx context.Context, node *FixtureNode, sharedState map[string
 	// teardown pass. A setup cancelled before then has nothing to release,
 	// and neither has an attempt already released between retries.
 	if err := runBeforeAllWithRetry(ctx, node, func(held bool) { tracker.setAttempted(node, held) }); err != nil {
-		return err
+		if ctx.Err() != nil && errors.Is(err, context.Canceled) {
+			return err // a victim of another node's failure, or of a stop
+		}
+		return setupFailure(node, err)
 	}
 	return nil
 }
 
-func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
+// setupFailure is err as the failure of node's BeforeAll, or of its Hydrate
+// for a shared node, located where the hook is declared.
+func setupFailure(node *FixtureNode, err error) error {
+	f := &hookFailure{fixture: node.Name, hook: "BeforeAll", at: node.BeforeAllAt, err: err}
+	if node.SharedState != nil {
+		f.hook, f.at = "Hydrate", node.SharedState.HydrateAt
+	}
+	return f
+}
+
+// teardownFailure is err as the failure of node's AfterAll, or of its
+// Dehydrate for a shared node.
+func teardownFailure(node *FixtureNode, err error) *hookFailure {
+	f := &hookFailure{fixture: node.Name, hook: "AfterAll", at: node.AfterAllAt, err: err}
+	if node.SharedState != nil {
+		f.hook, f.at = "Dehydrate", node.SharedState.DehydrateAt
+	}
+	return f
+}
+
+// teardownDAG releases the fixtures and returns whether any release failed,
+// with the hooks that failed in the fixtures' order.
+func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) (bool, []*hookFailure) {
 	dependents := make(map[string][]string, len(fixtures))
 	for _, f := range fixtures {
 		for _, dep := range f.DependsOn {
@@ -180,7 +206,7 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 		done[f.Name] = make(chan struct{})
 	}
 
-	failed := make(map[string]bool)
+	failed := make(map[string]*hookFailure)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -194,45 +220,51 @@ func teardownDAG(fixtures []*FixtureNode, tracker *nodeTracker) bool {
 				<-done[dep]
 			}
 
+			fail := func(err error) {
+				mu.Lock()
+				failed[node.Name] = teardownFailure(node, err)
+				mu.Unlock()
+			}
 			// As in setupDAG: unset only when the hook left through
 			// runtime.Goexit, which counts as a failed teardown.
 			finished := false
 			defer func() {
 				if !finished {
 					fmt.Fprintln(os.Stderr, goexited(node, "AfterAll", "Dehydrate"))
-					mu.Lock()
-					failed[node.Name] = true
-					mu.Unlock()
+					fail(errors.New(goexitHint))
 				}
 			}()
 			if node.SharedState != nil {
-				if tracker.isAttempted(node) && runDehydrate(node) {
-					mu.Lock()
-					failed[node.Name] = true
-					mu.Unlock()
+				if tracker.isAttempted(node) {
+					if err := runDehydrate(node); err != nil {
+						fail(err)
+					}
 				}
 				finished = true
 				return // shared state nodes don't have AfterAll in test process
 			}
 			// A fixture whose BeforeAll ran is released whether it succeeded
 			// or not; one that never started has nothing to release.
-			if tracker.isAttempted(node) && runAfterAll(node) {
-				mu.Lock()
-				failed[node.Name] = true
-				mu.Unlock()
+			if tracker.isAttempted(node) {
+				if err := runAfterAll(node); err != nil {
+					fail(err)
+				}
 			}
 			finished = true
 		}(f)
 	}
 	wg.Wait()
 
-	for _, f := range failed {
-		if f {
-			return true
+	var failures []*hookFailure
+	for _, f := range fixtures {
+		if hf := failed[f.Name]; hf != nil {
+			failures = append(failures, hf)
 		}
 	}
-	return false
+	return len(failures) > 0, failures
 }
+
+const goexitHint = "left through runtime.Goexit, as a FailNow or SkipNow on a testing.TB does; return an error from the hook instead"
 
 // goexited is the error of node's hook that left through runtime.Goexit:
 // hook for a package fixture, shared for a shared one's.
@@ -240,7 +272,7 @@ func goexited(node *FixtureNode, hook, shared string) error {
 	if node.SharedState != nil {
 		hook = shared
 	}
-	return fmt.Errorf("%s.%s left through runtime.Goexit, as a FailNow or SkipNow on a testing.TB does; return an error from the hook instead", node.Name, hook)
+	return fmt.Errorf("%s.%s %s", node.Name, hook, goexitHint)
 }
 
 // runBeforeAllWithRetry adapts a DAG node onto RunFixtureSetup, the single
@@ -267,9 +299,10 @@ func runBeforeAllWithRetry(ctx context.Context, node *FixtureNode, held func(boo
 }
 
 // runAfterAll adapts a DAG node onto RunFixtureTeardown, the single policy the
-// generated shared-fixture subprocess runs AfterAll under too.
-func runAfterAll(node *FixtureNode) bool {
-	return RunFixtureTeardown(context.Background(), FixtureTeardown{
+// generated shared-fixture subprocess runs AfterAll under too, and returns
+// what failed.
+func runAfterAll(node *FixtureNode) error {
+	return runFixtureTeardown(context.Background(), FixtureTeardown{
 		Name:     node.Name,
 		Timeout:  node.Config.Timeout,
 		Budget:   node.Budget,
@@ -278,21 +311,20 @@ func runAfterAll(node *FixtureNode) bool {
 }
 
 // runDehydrate mirrors runAfterAll for shared-state nodes.
-func runDehydrate(node *FixtureNode) (failed bool) {
+func runDehydrate(node *FixtureNode) (err error) {
 	if node.SharedState == nil || node.SharedState.Dehydrate == nil {
-		return false
+		return nil
 	}
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "%s: dehydrate panicked: %v\n\n%s\n", node.Name, r, debug.Stack())
-			failed = true
+			err = fmt.Errorf("panicked: %v", r)
 		}
 	}()
-	if err := node.SharedState.Dehydrate(context.Background()); err != nil {
+	if err = node.SharedState.Dehydrate(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "%s: dehydrate failed: %v\n", node.Name, err)
-		return true
 	}
-	return false
+	return err
 }
 
 // reportBudget tells the runner, on its channel, how long this process may
@@ -450,7 +482,7 @@ func setupFixtureDAG(ctx context.Context, cfg MainConfig, up func(*FixtureDAG)) 
 
 	if len(cfg.Fixtures) > 0 {
 		if err := setupDAG(ctx, cfg.Fixtures, sharedState, tracker); err != nil {
-			_ = teardownDAG(cfg.Fixtures, tracker)
+			_, _ = teardownDAG(cfg.Fixtures, tracker)
 			return nil, err
 		}
 	}
@@ -466,7 +498,7 @@ func setupFixtureDAG(ctx context.Context, cfg MainConfig, up func(*FixtureDAG)) 
 
 func (d *FixtureDAG) Teardown() bool {
 	d.torn.Do(func() {
-		d.failed = teardownDAG(d.cfg.Fixtures, d.tracker)
+		d.failed, d.failures = teardownDAG(d.cfg.Fixtures, d.tracker)
 	})
 	return d.failed
 }

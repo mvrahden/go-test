@@ -77,7 +77,8 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		stopWatch()
 	})
 	if _, err := timeoutScale(); err != nil {
-		tb.Fatal(err)
+		reportAt(tb, "", err.Error()) // tb.Fatal would locate it in this file
+		tb.FailNow()
 	}
 	if s.Fixtures != nil {
 		s.Fixtures(tb)

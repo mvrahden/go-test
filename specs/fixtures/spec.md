@@ -86,6 +86,17 @@ An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook
 - **WHEN** a hook another package declares returns an error under -fullpath
 - **THEN** names the hook's file by its full path, as go test -fullpath does
 
+### Requirement: What a failed fixture BeforeAll or AfterAll says
+A package fixture's BeforeAll or AfterAll that fails SHALL be reported in the output of the suite's test, naming the fixture, the hook and the error, and never located in a file of the runtime.
+
+#### Scenario: A fixture BeforeAll error
+- **WHEN** a package fixture's BeforeAll returns an error
+- **THEN** the suite's output names the fixture, the hook and the error, and no file of the runtime
+
+#### Scenario: A fixture AfterAll error
+- **WHEN** a package fixture's AfterAll returns an error
+- **THEN** the suite's output names the fixture, the hook and the error, and no file of the runtime
+
 ### Requirement: Fixture per-method hooks in dependency order
 A suite's package fixtures SHALL take their per-method turns in dependency order, a fixture's turn coming only once every BeforeEach before it returned without an error inside the Timeout. In its turn a fixture runs its BeforeEach, if it has one; its AfterEach SHALL run, in reverse, exactly when its turn came and that BeforeEach returned without an error.
 

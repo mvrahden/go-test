@@ -29,3 +29,8 @@ func (s *GoexitAfterAllTestSuite) BeforeAll(t *gotest.T) {}
 func (s *GoexitAfterAllTestSuite) AfterAll(t *gotest.T) { runtime.Goexit() }
 
 func (s *GoexitAfterAllTestSuite) TestRuns(t *gotest.T) {}
+
+// BoundTestSuite binds EdgeFixture, whose failures EDGES_FAIL picks.
+type BoundTestSuite struct{ Edge *EdgeFixture }
+
+func (s *BoundTestSuite) TestRuns(t *gotest.T) {}

@@ -34,6 +34,9 @@ func ExportRun(runTests func() int, cfg MainConfig) int {
 	return code
 }
 
+// ExportFailureAt is where the hook that failed in err is declared.
+var ExportFailureAt = failureAt
+
 // ExportBuildConfig runs a hold's build the way HoldFixtures does.
 var ExportBuildConfig = buildConfig
 
