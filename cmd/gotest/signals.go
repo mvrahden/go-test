@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"time"
 
@@ -110,19 +109,37 @@ const (
 	inputEnd                  // the control input ended: a stop when none is under way
 )
 
+// controlLineMax bounds the control reader's buffer; a longer line is read
+// through and ignored.
+const controlLineMax = 4096
+
 // readControl sends the stop and force lines of control to events, and its
-// end; any other line is ignored. A trailing \r is tolerated.
+// end; any other line, of any length, is ignored. A trailing \r is tolerated.
 func readControl(control io.Reader, events chan<- stopEvent) {
-	lines := bufio.NewScanner(control)
-	for lines.Scan() {
-		switch strings.TrimSuffix(lines.Text(), "\r") {
+	r := bufio.NewReaderSize(control, controlLineMax)
+	for {
+		line, isPrefix, err := r.ReadLine()
+		if err != nil {
+			events <- inputEnd
+			return
+		}
+		if isPrefix {
+			for isPrefix && err == nil {
+				_, isPrefix, err = r.ReadLine()
+			}
+			if err != nil {
+				events <- inputEnd
+				return
+			}
+			continue
+		}
+		switch string(line) {
 		case "stop":
 			events <- aStop
 		case "force":
 			events <- aForce
 		}
 	}
-	events <- inputEnd
 }
 
 // firstStop waits for the first stop, forced when it is a force line: false

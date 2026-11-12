@@ -445,7 +445,7 @@ Its processes gone, the run SHALL end on its own path, its stream complete and t
 - **THEN** books the run as interrupted on its stream
 
 ### Requirement: Stopping gotest through its standard input
-With --control=stdin, gotest SHALL read its standard input by line: a stop line SHALL stop the run as a first SIGINT does; a force line SHALL act as a second SIGINT, never a repeat of the first, starting the stop when none is under way; the input's end SHALL stop a run no stop is under way in. Lines and signals SHALL count as one source: a SIGINT within 300ms of a stop line is that stop, a later one the second. Without --control, gotest SHALL NOT read its standard input.
+With --control=stdin, gotest SHALL read its standard input by line: a stop line SHALL stop the run as a first SIGINT does; a force line SHALL act as a second SIGINT, never a repeat of the first, starting the stop if none is; the input's end SHALL stop a run not yet stopping. Lines and signals SHALL be one source: a SIGINT within 300ms of a stop line is that stop, a later one the second. Any other line SHALL be ignored, however long. Without --control, gotest SHALL NOT read its standard input.
 
 #### Scenario: A stop line
 - **WHEN** a stop line reaches gotest's standard input while a method holds

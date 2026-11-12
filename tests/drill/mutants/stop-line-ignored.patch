@@ -4,9 +4,9 @@ Clause: when a stop line reaches gotest's standard input while a method holds â†
 Clause: when a stop line reaches gotest's standard input while a method holds â†’ books the run as interrupted on its stream
 --- a/cmd/gotest/signals.go
 +++ b/cmd/gotest/signals.go
-@@ -117,7 +117,6 @@
- 	for lines.Scan() {
- 		switch strings.TrimSuffix(lines.Text(), "\r") {
+@@ -135,7 +135,6 @@
+ 		}
+ 		switch string(line) {
  		case "stop":
 -			events <- aStop
  		case "force":
