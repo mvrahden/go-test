@@ -74,6 +74,8 @@ func (s *PredicatesTestSuite) TestIsNilable(t *gotest.T, _ *predicatesCtx) {
 func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 	empty := []int{}
 	full := []int{1}
+	zero := 0
+	ptrToEmpty := &empty
 	for _, c := range []struct {
 		what string
 		in   any
@@ -109,6 +111,10 @@ func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 		{"chan", make(chan int), true},
 		{"int", 0, false},
 		{"struct", struct{}{}, false},
+		{"pointer to an int", &zero, false},
+		{"pointer to a struct", &struct{}{}, false},
+		{"nil pointer to an int", (*int)(nil), true},
+		{"pointer to a pointer to a slice", &ptrToEmpty, true},
 	} {
 		if got := assert.IsEmptyable(c.in); got != c.want {
 			t.Errorf("IsEmptyable(%s): got %v, want %v", c.what, got, c.want)

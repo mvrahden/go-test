@@ -170,7 +170,8 @@ func IsNilable(object any) bool {
 	return false
 }
 
-// IsEmptyable reports whether object is of a kind that can be empty.
+// IsEmptyable reports whether object is of a kind that can be empty. A nil
+// pointer is empty; any other pointer is followed to what it points to.
 func IsEmptyable(object any) bool {
 	if object == nil {
 		return true
@@ -178,8 +179,10 @@ func IsEmptyable(object any) bool {
 	rv := reflect.ValueOf(object)
 	switch rv.Kind() {
 	case reflect.Slice, reflect.Map, reflect.Array,
-		reflect.Chan, reflect.String, reflect.Ptr:
+		reflect.Chan, reflect.String:
 		return true
+	case reflect.Ptr:
+		return rv.IsNil() || IsEmptyable(rv.Elem().Interface())
 	}
 	return false
 }

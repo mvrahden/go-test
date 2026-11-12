@@ -108,6 +108,11 @@ func (s *CollectionAssertionsTestSuite) TestEmpty(t *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &[]int{1, 2, 3}) })
 			gotest.True(it, m.Failed())
 		})
+		w.It("fails the type guard for a pointer to a struct", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &struct{ N int }{}) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "points to a value that cannot be empty; for nil checks, use Nil")
+		})
 		w.It("fails for double indirection to non-empty", func(it *gotest.T) {
 			inner := &[]int{1, 2, 3}
 			m := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &inner) })
@@ -234,6 +239,12 @@ func (s *CollectionAssertionsTestSuite) TestNotEmpty(t *gotest.T) {
 		w.It("fails for nil pointer", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, (*[]int)(nil)) })
 			gotest.True(it, m.Failed())
+		})
+		w.It("fails the type guard for a pointer to a number", func(it *gotest.T) {
+			n := 1
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &n) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "NotEmpty: *int points to a value that cannot be empty; for nil checks, use NotNil")
 		})
 		w.It("fails for single indirection to empty", func(it *gotest.T) {
 			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &[]int{}) })

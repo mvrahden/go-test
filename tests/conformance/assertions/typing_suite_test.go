@@ -621,3 +621,36 @@ func (s *AssertionTypingTestSuite) TestOrderingNaN(t *gotest.T) {
 		})
 	})
 }
+
+func (s *AssertionTypingTestSuite) TestEmptyOnPointers(t *gotest.T) {
+	type user struct{ Name string }
+	n := 0
+	t.When("NotEmpty is given a pointer that is not nil to a number or a struct", func(w *gotest.T) {
+		w.It("fails the type guard, naming NotNil and NotZero", func(it *gotest.T) {
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &n) }),
+				gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &user{}) }),
+			} {
+				gotest.True(it, m.Failed())
+				gotest.Contains(it, m.Message(), "points to a value that cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero")
+			}
+			e := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &n) })
+			gotest.Contains(it, e.Message(), "Empty: *int points to a value that cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero")
+		})
+	})
+	t.When("Empty and NotEmpty are given a pointer to a slice, or a nil pointer", func(w *gotest.T) {
+		w.It("the pointer is followed and the length decides, and the nil pointer is empty", func(it *gotest.T) {
+			full, none := []int{1}, []int{}
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &full) }),
+				gotest.Record(func(r *gotest.R) { gotest.Empty(r, &none) }),
+				gotest.Record(func(r *gotest.R) { gotest.Empty(r, (*user)(nil)) }),
+				gotest.Record(func(r *gotest.R) { gotest.Empty(r, (*int)(nil)) }),
+			} {
+				gotest.False(it, m.Failed(), m.Message())
+			}
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, (*user)(nil)) })
+			gotest.Contains(it, m.Message(), "NotEmpty failed:\n  object is empty")
+		})
+	})
+}

@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / IsEmpty
+Judge: ./pkg/gotest/internal/assert
+Clause: when NotEmpty is given a pointer that is not nil to a number or a struct → fails the type guard, naming NotNil and NotZero
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -182,7 +182,7 @@
+ 		reflect.Chan, reflect.String:
+ 		return true
+ 	case reflect.Ptr:
+-		return rv.IsNil() || IsEmptyable(rv.Elem().Interface())
++		return true
+ 	}
+ 	return false
+ }

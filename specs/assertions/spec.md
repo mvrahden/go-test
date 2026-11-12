@@ -86,6 +86,17 @@ Contains SHALL take a nil needle as the nil element or key of a slice, array or 
 - **WHEN** Contains is asked for a nil substring of a string
 - **THEN** fails naming the string's type
 
+### Requirement: Empty and NotEmpty on pointers
+Empty and NotEmpty SHALL follow a pointer that is not nil to what it points to and SHALL fail the type guard when that has no length; a nil pointer SHALL be empty.
+
+#### Scenario: A pointer to a value with no length
+- **WHEN** NotEmpty is given a pointer that is not nil to a number or a struct
+- **THEN** fails the type guard, naming NotNil and NotZero
+
+#### Scenario: A pointer to a value with a length
+- **WHEN** Empty and NotEmpty are given a pointer to a slice, or a nil pointer
+- **THEN** the pointer is followed and the length decides, and the nil pointer is empty
+
 ### Requirement: InDelta at the edges of float64
 InDelta SHALL fail when the delta is NaN, and SHALL hold two equal infinities within any delta.
 

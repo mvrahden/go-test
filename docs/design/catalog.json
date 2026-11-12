@@ -1874,6 +1874,83 @@
               "name": "TestOrderingNaN",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "fails the type guard, naming NotNil and NotZero",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 629,
+                      "name": "fails_the_type_guard,_naming_NotNil_and_NotZero",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when NotEmpty is given a pointer that is not nil to a number or a struct",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 628,
+                  "name": "NotEmpty_is_given_a_pointer_that_is_not_nil_to_a_number_or_a_struct",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the pointer is followed and the length decides, and the nil pointer is empty",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "typing_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 642,
+                      "name": "the_pointer_is_followed_and_the_length_decides,_and_the_nil_pointer_is_empty",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Empty and NotEmpty are given a pointer to a slice, or a nil pointer",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "typing_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 641,
+                  "name": "Empty_and_NotEmpty_are_given_a_pointer_to_a_slice,_or_a_nil_pointer",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EmptyOnPointers",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "typing_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 625,
+              "name": "TestEmptyOnPointers",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "AssertionTyping",
@@ -27260,7 +27337,7 @@
     }
   ],
   "stats": {
-    "behaviors": 791,
+    "behaviors": 793,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

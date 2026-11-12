@@ -199,7 +199,11 @@ func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any
 // guard error for non-emptyable types (e.g. int, bool, func); use Nil or Zero instead.
 func Empty(t testingT, object any, msgAndArgs ...any) {
 	if !assert.IsEmptyable(object) {
-		fail(t, fmt.Sprintf("Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero", object), msgAndArgs)
+		guard := "Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero"
+		if reflect.ValueOf(object).Kind() == reflect.Ptr {
+			guard = "Empty: %T points to a value that cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero"
+		}
+		fail(t, fmt.Sprintf(guard, object), msgAndArgs)
 		return
 	}
 	if !assert.IsEmpty(object) {
@@ -403,7 +407,11 @@ func Nil(t testingT, object any, msgAndArgs ...any) {
 // guard error for non-emptyable types (e.g. int, bool, func); use NotNil or NotZero instead.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 	if !assert.IsEmptyable(object) {
-		fail(t, fmt.Sprintf("NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero", object), msgAndArgs)
+		guard := "NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero"
+		if reflect.ValueOf(object).Kind() == reflect.Ptr {
+			guard = "NotEmpty: %T points to a value that cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero"
+		}
+		fail(t, fmt.Sprintf(guard, object), msgAndArgs)
 		return
 	}
 	if assert.IsEmpty(object) {
