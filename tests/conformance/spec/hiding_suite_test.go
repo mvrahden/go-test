@@ -112,7 +112,7 @@ func (s *SpecHidingTestSuite) TestHidingAPackagesOwnFailure(t *gotest.T) {
 }
 
 func (s *SpecHidingTestSuite) TestAViewThatCannotApply(t *gotest.T) {
-	t.When("--hide is given with --static or with a status it does not know, or --declared without --input or with --static", func(w *gotest.T) {
+	t.When("--hide is given with --static or with a status it does not know, or --declared with --static", func(w *gotest.T) {
 		w.It("refuses with exit 2, naming what it needs or the statuses it accepts", func(it *gotest.T) {
 			for sub, r := range gotest.Each(it, []struct {
 				Desc   string
@@ -121,7 +121,6 @@ func (s *SpecHidingTestSuite) TestAViewThatCannotApply(t *gotest.T) {
 			}{
 				{Desc: "--hide under --static", args: []string{"--static", "--hide=pass", "../testdata/declared/"}, stderr: "--static has none"},
 				{Desc: "an unknown status", args: []string{"--hide=green", hidingStream}, stderr: "use pass, fail, skip or none"},
-				{Desc: "--declared without --input", args: []string{"--declared", "../testdata/declared/"}, stderr: "--declared requires --input"},
 				{Desc: "--declared with --static", args: []string{"--static", "--declared", "../testdata/declared/"}, stderr: "--static and --declared are mutually exclusive"},
 			}) {
 				run := spec(sub, 2, r.args...)

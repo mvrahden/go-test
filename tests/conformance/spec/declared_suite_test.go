@@ -270,3 +270,37 @@ func (s *SpecDeclaredTestSuite) TestWhereTheSourceDeclaresANode(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SpecDeclaredTestSuite) TestALiveRunUnderItsDeclaredSpecification(t *gotest.T) {
+	const pkg = "../testdata/specnotrun/"
+	t.When("a run of a package is rendered with --declared", func(w *gotest.T) {
+		w.It("shows the rows of a table after its failing row as not run", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--declared", pkg)
+			gotest.Len(it, doc.Packages, 1)
+			nodes := doc.Packages[0].Nodes
+			gotest.Equal(it, "pass", node(it, nodes, "TestNotRunTestSuite", "TestRowsAfterAFailure", "first").Status)
+			gotest.Equal(it, "fail", node(it, nodes, "TestNotRunTestSuite", "TestRowsAfterAFailure", "second").Status)
+			gotest.Equal(it, "none", node(it, nodes, "TestNotRunTestSuite", "TestRowsAfterAFailure", "third").Status)
+			terminal := spec(it, 1, "--declared", pkg)
+			gotest.Regexp(it, `○ third — NOT RUN\n`, terminal.Stdout)
+		})
+		w.It("reads a method the X_ prefix excludes as skipped", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--declared", pkg)
+			gotest.Len(it, doc.Packages, 1)
+			gotest.Equal(it, "skip", node(it, doc.Packages[0].Nodes, "TestNotRunTestSuite", "X_TestParked").Status)
+		})
+		w.It("counts what did not run as not run and exits as without --declared", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--declared", pkg)
+			gotest.Equal(it, 1, doc.Stats.NotRun)
+			gotest.Equal(it, 1, doc.Stats.Passed)
+			gotest.Equal(it, 1, doc.Stats.Failed)
+			gotest.Equal(it, 1, doc.Stats.Skipped)
+			gotest.Equal(it, 4, doc.Stats.Behaviors)
+			without := specJSON(it, 1, pkg)
+			gotest.Zero(it, without.Stats.NotRun)
+			gotest.Equal(it, 2, without.Stats.Behaviors)
+			terminal := spec(it, 1, "--declared", pkg)
+			gotest.Regexp(it, `: 1 passed, 1 failed, 1 skipped, 1 not run\n$`, terminal.Stdout)
+		})
+	})
+}

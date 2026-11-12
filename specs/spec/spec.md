@@ -113,7 +113,7 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **AND** counts one failure and exits 1, or 0 with --render-only
 
 ### Requirement: The declared specification under a run's verdicts
-`spec --input=<file> --declared [packages]` SHALL render the specification the source declares, as --static reads it: a node the stream reported carries its verdict, duration and output, one it did not report neither, or skipped under a node the run skipped; what only the stream holds stays under its declared parent. A behavior with no verdict, unreported or only started, SHALL count as not run, with no duration, sparing the exit code, so the counts add up to the behaviors.
+`spec --declared [packages]` SHALL render the specification the source declares under the run's verdicts, or a saved stream's with --input, as --static reads it: a reported node carries its verdict, duration and output, an unreported one neither, or skipped under a skipped node; what only the stream holds stays under its declared parent. A behavior with no verdict, unreported or only started, SHALL count as not run, with no duration, sparing the exit code, so the counts add up to the behaviors.
 
 #### Scenario: A run of some of a package's methods
 - **WHEN** a stream of some of a package's methods is rendered with --declared
@@ -134,6 +134,12 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **THEN** counts as not run
 - **AND** shows no duration
 - **AND** the counts add up to the behaviors
+
+#### Scenario: A live run under its declared specification
+- **WHEN** a run of a package is rendered with --declared
+- **THEN** shows the rows of a table after its failing row as not run
+- **AND** reads a method the X_ prefix excludes as skipped
+- **AND** counts what did not run as not run and exits as without --declared
 
 ### Requirement: Where the source declares a node
 With --static or --declared each JSON package SHALL carry its dir and each node the source declares its file and line.
@@ -196,7 +202,7 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 - **THEN** every behavior stays on one line
 
 ### Requirement: Hiding rows by status
-`--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared without --input or beside --static, SHALL exit 2.
+`--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared beside --static, SHALL exit 2.
 
 #### Scenario: Hiding what passed
 - **WHEN** a failing stream is rendered with --hide=pass
@@ -213,7 +219,7 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 - **THEN** leaves the package's failure and its output out of every format, its stats still counting it
 
 #### Scenario: A view that cannot apply
-- **WHEN** --hide is given with --static or with a status it does not know, or --declared without --input or with --static
+- **WHEN** --hide is given with --static or with a status it does not know, or --declared with --static
 - **THEN** refuses with exit 2, naming what it needs or the statuses it accepts
 
 ### Requirement: Searching and picking rows

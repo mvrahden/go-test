@@ -180,6 +180,11 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
+	if view.declared {
+		// The packages the run loaded, read once; the run's verdicts lie over them.
+		declared, _ := buildStaticSpec(loaded, nil)
+		tree = gotestspec.Overlay(declared, tree)
+	}
 
 	if err := gotestspec.CheckView(tree, view.options...); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -457,9 +462,6 @@ func parseSpecView(own OwnFlags, input string) (specView, error) {
 	view.declared = own.Bool("--declared")
 	if view.declared && static {
 		return view, fmt.Errorf("--static and --declared are mutually exclusive")
-	}
-	if view.declared && input == "" {
-		return view, fmt.Errorf("--declared requires --input: it lays a stream's verdicts over the source")
 	}
 	if own.Given("--hide") {
 		if static {
