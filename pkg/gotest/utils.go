@@ -14,7 +14,11 @@ import (
 )
 
 // Each iterates over entries as sub-tests, yielding a fresh *T and the entry for each.
+// It panics on a T with no *testing.T, as It and When do.
 func Each[E any](t *T, entries []E) iter.Seq2[*T, E] {
+	if t.t == nil {
+		panic("gotest: Each is unavailable in benchmark/fuzz lifecycle hooks")
+	}
 	return func(yield func(*T, E) bool) {
 		for i, entry := range entries {
 			name := eachEntryName(reflect.ValueOf(entry), i)

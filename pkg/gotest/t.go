@@ -17,8 +17,8 @@ func NewT(t *testing.T) *T {
 
 // NewTFromTB adapts a non-*testing.T testing type (*testing.B, *testing.F)
 // so suite lifecycle hooks written against *gotest.T can run under
-// benchmarks and fuzz targets. T() returns nil and It/When panic on a
-// TB-backed T; the generator rejects a hook that calls T() in a suite with
+// benchmarks and fuzz targets. T() returns nil and It, When and Each panic
+// on a TB-backed T; the generator rejects a hook that calls T() in a suite with
 // benchmark or fuzz methods.
 func NewTFromTB(tb testing.TB) *T { return &T{tb: tb} }
 
