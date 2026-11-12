@@ -274,7 +274,7 @@ No generated code leaks into your workflow.
 
 ### Step 3: Share Setup With a Fixture
 
-Setup that several suites need goes into a fixture: a struct ending in `Fixture` for one suite at a time, `SharedFixture` for one instance across packages. [Fixtures](#fixtures) describes both.
+Setup that several suites need goes into a fixture: a struct ending in `Fixture` for one suite at a time, `SharedFixture` for one instance across packages. [Fixtures](#fixtures) describes both, and [`examples/sharedfixture`](examples/sharedfixture) is a shared fixture two packages bind, runnable as it stands.
 
 ## Specification
 

@@ -97,7 +97,7 @@ func parseVersion(s string) (version, bool) {
 
 // releaseTags lists the release tags, newest first.
 func releaseTags(t *gotest.T) []string {
-	out, err := exec.CommandContext(t.Context(), "git", "-C", repoRoot(t), "tag", "--list", "v[0-9]*", "--sort=-v:refname").Output()
+	out, err := exec.CommandContext(t.Context(), "git", "-C", repoRoot(t), "tag", "--list", "v[0-9]*", "--sort=-v:refname").Output() //nolint:gosec // G204: git on the repository root
 	gotest.NoError(t, err)
 	var tags []string
 	for _, tag := range strings.Fields(string(out)) {
@@ -135,7 +135,7 @@ func firstTagOf(tags []string, release string) string {
 
 // atTag reads path at tag; a path the tag does not have is "", false.
 func atTag(t *gotest.T, tag, path string) (string, bool) {
-	out, err := exec.CommandContext(t.Context(), "git", "-C", repoRoot(t), "show", tag+":"+path).Output()
+	out, err := exec.CommandContext(t.Context(), "git", "-C", repoRoot(t), "show", tag+":"+path).Output() //nolint:gosec // G204: tags and paths of this repository
 	if err != nil {
 		return "", false
 	}
