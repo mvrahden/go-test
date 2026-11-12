@@ -1,4 +1,4 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check coverage-total
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check coverage-total lint-plugin
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
@@ -26,6 +26,14 @@ drill:
 
 drill-check:
 	bash tests/drill/drill.sh --check-patches
+
+# The golangci plugin is a module of its own, built against this one
+# without the workspace.
+PLUGIN_DIR := pkg/lint/golangci
+
+lint-plugin:
+	@if [ ! -f "$(PLUGIN_DIR)/go.mod" ]; then echo "lint-plugin: no module at $(PLUGIN_DIR), nothing to check"; else \
+		cd "$(PLUGIN_DIR)" && GOWORK=off go vet ./... && GOWORK=off go test ./...; fi
 
 COVER_DIR ?= $(or $(TMPDIR),/tmp)/gotest-coverage-total
 
@@ -95,4 +103,4 @@ release-check:
 	@test -n "$(VERSION)" || { echo "usage: make release-check VERSION=vX.Y.Z [SHA=<commit>]"; exit 2; }
 	bash .github/scripts/release-preflight.sh $(VERSION) $(SHA)
 
-checks: fmt-check workflow-lint vuln golangci-lint runtime-compat
+checks: fmt-check workflow-lint vuln golangci-lint runtime-compat lint-plugin
