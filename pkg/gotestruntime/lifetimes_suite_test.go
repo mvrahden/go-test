@@ -91,7 +91,7 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextEndsAtTheTimeout(t *got
 	var left time.Duration
 	t.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
 		cfg := gotest.SuiteConfig{Timeout: 5 * time.Second}
-		gotestruntime.RunMethods(tt, cfg, gotest.SuiteConfig{}, gotestruntime.Methods{
+		gotestruntime.RunMethods(tt, cfg, cfg, gotestruntime.Methods{
 			Fixtures: []gotestruntime.EachHooks{{Name: "Probe", After: func(ctx context.Context) error {
 				deadline, ok := ctx.Deadline()
 				bounded, left = ok, time.Until(deadline)
@@ -102,5 +102,30 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextEndsAtTheTimeout(t *got
 	})
 	if !bounded || left <= 0 || left > 5*time.Second {
 		t.Errorf("a fixture AfterEach got a context without the method's deadline (deadline %v, %v left)", bounded, left)
+	}
+}
+
+func (s *LifetimesTestSuite) TestAFixtureAfterEachContextOutlivesTheDefaultDeadline(t *gotest.T) {
+	var bounded bool
+	var err error
+	passed := t.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
+		// The effective Timeout, with none declared: the default deadline.
+		cfg := gotest.SuiteConfig{Timeout: 50 * time.Millisecond}
+		gotestruntime.RunMethods(tt, cfg, gotest.SuiteConfig{}, gotestruntime.Methods{
+			Fixtures: []gotestruntime.EachHooks{{Name: "Probe", After: func(ctx context.Context) error {
+				_, bounded = ctx.Deadline()
+				err = ctx.Err()
+				return err
+			}}},
+			Cases: []gotestruntime.Method{{Name: "TestSlow", Run: func(_ *gotest.T, run func(func())) {
+				run(func() { time.Sleep(150 * time.Millisecond) })
+			}}},
+		})
+	})
+	if bounded || err != nil {
+		t.Errorf("a fixture AfterEach got a context the default deadline ends (deadline %v, err %v)", bounded, err)
+	}
+	if !passed {
+		t.Errorf("a method past the default deadline failed at its fixture's AfterEach")
 	}
 }

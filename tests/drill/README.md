@@ -285,7 +285,8 @@ shards of one run do not add up to every mutant exactly once.
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
 | `fixture-afterall-goexit-passes` | a fixture `AfterAll` that left through `runtime.Goexit` counts as a clean teardown | ring-0 runtime suite |
 | `fixture-beforeall-goexit-passes` | a fixture `BeforeAll` that left through `runtime.Goexit` comes up without an error | ring-0 runtime suite |
-| `fixture-aftereach-context-unbounded` | a fixture's `AfterEach` gets `context.Background()`, so the method's Timeout does not end it | ring-0 lifetimes suite |
+| `fixture-aftereach-context-unbounded` | a fixture's `AfterEach` gets `context.Background()`, so the method's declared Timeout does not end it | ring-0 lifetimes suite |
+| `fixture-aftereach-ended-by-the-default-deadline` | a fixture's `AfterEach` gets a context the default deadline ends, so a release that honours it fails a suite that declares no Timeout | ring-0 lifetimes suite |
 | `fixture-aftereach-only-never-runs` | a fixture with only an `AfterEach` never runs it | canary: the fixtureorder `AfterEach` ahead of the failed `BeforeEach` does not run |
 | `fixture-aftereach-only-runs-out-of-turn` | a fixture with only an `AfterEach` runs it whether or not its turn came | canary: the fixtureorder `AfterEach` behind the failed `BeforeEach` runs |
 | `fixture-aftereach-reported-in-runtime` | an error a fixture's `AfterEach` returns is located in the runtime's `methods.go` | canary: the fixtureafterfail failure names a runtime file, not the hook's |

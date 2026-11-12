@@ -155,6 +155,16 @@ func (s *FixtureHooksTestSuite) TestTheContextAFixtureAfterEachGets(t *gotest.T)
 			gotest.Regexp(it, `(?m)^\s+fixture\.go:\d+: GridFixture\.AfterEach exceeded its configured Timeout of 300ms`, out)
 		})
 	})
+	t.When("a method of a suite that declares no Timeout runs past the default deadline and its fixture's AfterEach returns its context's error", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"GOTEST_TIMEOUT_SCALE=0.01"}, "../testdata/aftereachdefault/")
+		gotest.NoError(w, err)
+		w.It("that context has not ended and the method passes", func(it *gotest.T) {
+			out := outputOf(&run, "")
+			gotest.Equal(it, "pass", run.Verdict("TestSlowTestSuite/TestSlow"), "stdout: %s", run.Stdout)
+			gotest.NotContains(it, out, "ReleaseFixture.AfterEach failed")
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+		})
+	})
 }
 
 func (s *FixtureHooksTestSuite) TestAFixtureHookLeavesThroughGoexit(t *gotest.T) {

@@ -109,8 +109,13 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 					defer func() {
 						mt.enter(f.Name + ".AfterEach ")
 						// Releases what BeforeEach acquired, so a stop does
-						// not end its context; the method's deadline does.
-						if err := f.After(AfterEachT(mt.t).Context()); err != nil { //nolint:fail-guard // the method has run; report and go on
+						// not end its context; a declared Timeout does, the
+						// default deadline does not.
+						ctx := context.WithoutCancel(mt.t.Context())
+						if budget.Timeout > 0 {
+							ctx = AfterEachT(mt.t).Context()
+						}
+						if err := f.After(ctx); err != nil { //nolint:fail-guard // the method has run; report and go on
 							reportAt(it, callsite.Declared(f.AfterAt), fmt.Sprintf("%s.AfterEach failed: %v", f.Name, err))
 						}
 					}()
