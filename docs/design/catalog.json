@@ -3874,6 +3874,82 @@
           "name": "TestBenchGateTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the report names it size-1024 with two samples",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "numbered_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "the_report_names_it_size-1024_with_two_samples",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "records no GOMAXPROCS of 1024",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "numbered_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 40,
+                      "name": "records_no_GOMAXPROCS_of_1024",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "numbered_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "gotest_bench_--json_runs_a_sub-benchmark_named_size-1024_with_-cpu=1_and_-count=2",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASubBenchmarkNamedWithANumber",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "numbered_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestASubBenchmarkNamedWithANumber",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "BenchNumbered",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "numbered_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestBenchNumberedTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -30216,13 +30292,13 @@
     }
   ],
   "stats": {
-    "behaviors": 878,
+    "behaviors": 880,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 121,
+    "suites": 122,
     "tests": 0
   }
 }

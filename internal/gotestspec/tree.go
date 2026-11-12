@@ -581,8 +581,11 @@ func isBenchmarkName(name string) bool {
 // the benchmark reported, then B/op and allocs/op when memory is reported.
 // The three the renderers know have fields of their own; the rest are Metrics.
 type BenchLine struct {
-	Name        string // the benchmark's full name without the GOMAXPROCS suffix
-	Procs       int    // the GOMAXPROCS suffix, 0 when the line carries none
+	Name  string // the benchmark's full name without the GOMAXPROCS suffix
+	Procs int    // the GOMAXPROCS suffix, 0 when the line carries none
+	// Reported is the name as the line gives it, a suffix included. Alone a
+	// line cannot say whether a trailing "-1024" is a suffix or the name's.
+	Reported    string
 	Iterations  int
 	NsPerOp     float64
 	BytesPerOp  int64
@@ -607,7 +610,7 @@ func ParseBenchLine(line string) (BenchLine, bool) {
 	if err != nil {
 		return BenchLine{}, false
 	}
-	out := BenchLine{Name: m[1], Iterations: iters}
+	out := BenchLine{Name: m[1], Reported: fields[0], Iterations: iters}
 	if m[2] != "" {
 		out.Procs, _ = strconv.Atoi(m[2])
 	}
@@ -682,6 +685,10 @@ func (b *benchScan) parse(node *Node, line string) {
 	node.AllocsPerOp = result.AllocsPerOp
 	node.Metrics = result.Metrics
 	node.Procs = result.Procs
+	if result.Reported == node.Name || strings.HasSuffix(result.Reported, "/"+node.Name) {
+		// The line gives the node's own name: it carries no suffix.
+		node.Procs = 0
+	}
 	// go test's own -json encoder never emits a "pass" event for a
 	// benchmark (see ActionBench doc comment); reaching a parsed ns/op line
 	// is the only success signal a real benchmark run ever produces.

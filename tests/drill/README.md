@@ -909,6 +909,7 @@ shards of one run do not add up to every mutant exactly once.
 | `event-line-capped` | spec and summary refuse a stream with an event line over a mebibyte | spec conformance: a saved stream with a 2 MiB line renders its test with its verdict |
 | `annotation-compiler-path-prefixed` | a build failure is annotated with its package directory put in front of the path the compiler printed | cli conformance: the annotation of a compile error names the file from the working directory |
 | `output-file-colored` | a report --output writes takes its colour from stdout | cli conformance: a report written to a file while stdout is a character device holds no color codes |
+| `bench-numbered-name-read-as-procs` | the repetitions of a benchmark named with a trailing number are keyed without that number | bench conformance: a sub-benchmark named size-1024 under -cpu=1 -count=2 keeps both samples |
 
 ## Adding a mutant
 

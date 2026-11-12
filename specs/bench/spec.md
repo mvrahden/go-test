@@ -73,3 +73,11 @@ A --json bench run SHALL print one schemaVersion 1 report whose baseline holds t
 #### Scenario: Comparing with --json under a gate
 - **WHEN** a --json bench run is compared against its saved baseline with --gate=1000 and -count=4
 - **THEN** carries one delta for the benchmark and the gate's 1000% threshold, not breached
+
+### Requirement: A benchmark whose name ends in a number
+A benchmark whose name ends in a dash and a number SHALL keep that name when the run's result lines carry no GOMAXPROCS suffix, and every repetition of it SHALL be one of its samples.
+
+#### Scenario: A sub-benchmark named size-1024 on one processor
+- **WHEN** gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2
+- **THEN** the report names it size-1024 with two samples
+- **AND** records no GOMAXPROCS of 1024

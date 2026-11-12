@@ -39,6 +39,12 @@ func (s *BenchLineTestSuite) TestResultLine(t *gotest.T) {
 		mustInDelta(it, "misses", 7, line.Metrics["misses"], 0.001)
 	})
 
+	t.It("keeps the name as the line gives it", func(it *gotest.T) {
+		line, ok := gotestspec.ParseBenchLine("BenchmarkCopy/size-1024 \t 100 \t 10.0 ns/op")
+		mustEq(it, "ok", ok, true)
+		mustEq(it, "reported", line.Reported, "BenchmarkCopy/size-1024")
+	})
+
 	t.It("rejects a line without ns/op or without an iteration count", func(it *gotest.T) {
 		_, ok := gotestspec.ParseBenchLine("BenchmarkFoo-8 \t 1201 \t 24 B/op")
 		mustEq(it, "no ns/op", ok, false)

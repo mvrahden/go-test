@@ -94,9 +94,9 @@ func FromPackages(pkgs []*gotestspec.Package) Baseline {
 
 	for _, pkg := range pkgs {
 		for _, top := range pkg.Nodes {
-			harvestBranchSamples(pkg.Path, top, &results, index)
+			harvestBranchSamples(pkg.Path, top, &results, index, procs)
 		}
-		harvestPackageOutputSamples(pkg.Path, pkg.Output, &results, index)
+		harvestPackageOutputSamples(pkg.Path, pkg.Output, &results, index, procs)
 		if cpu == "" {
 			cpu = cpuLine(pkg.Output)
 		}
@@ -193,15 +193,15 @@ func collectBenchLeaves(pkgPath string, top, n *gotestspec.Node, below string, r
 // harvestBranchSamples gathers the result lines the stream filed under a
 // benchmark that has sub-benchmarks: such a node is never a leaf, so a line
 // there belongs to the leaf it names.
-func harvestBranchSamples(pkgPath string, n *gotestspec.Node, results *[]Result, index map[string]int) {
+func harvestBranchSamples(pkgPath string, n *gotestspec.Node, results *[]Result, index map[string]int, procs int) {
 	if len(n.Children) == 0 {
 		return
 	}
 	if n.Kind == gotestspec.KindBenchmark {
-		harvestPackageOutputSamples(pkgPath, n.Output, results, index)
+		harvestPackageOutputSamples(pkgPath, n.Output, results, index, procs)
 	}
 	for _, c := range n.Children {
-		harvestBranchSamples(pkgPath, c, results, index)
+		harvestBranchSamples(pkgPath, c, results, index, procs)
 	}
 }
 
@@ -216,14 +216,21 @@ func harvestBranchSamples(pkgPath string, n *gotestspec.Node, results *[]Result,
 // benchmark result line can arrive split across two consecutive events.
 // Joining them back into one stream and re-splitting on "\n" reconstructs
 // complete lines before matching, regardless of how test2json chunked them.
-func harvestPackageOutputSamples(pkgPath string, output []string, results *[]Result, index map[string]int) {
+//
+// procs is 0 when no leaf of the run carried a GOMAXPROCS suffix: a line is
+// then keyed by its name as given, so a name ending in "-1024" keeps it.
+func harvestPackageOutputSamples(pkgPath string, output []string, results *[]Result, index map[string]int, procs int) {
 	lines := strings.Split(strings.Join(output, ""), "\n")
 	for _, line := range lines {
 		result, ok := gotestspec.ParseBenchLine(line)
 		if !ok {
 			continue
 		}
-		suite, name := splitBenchFullName(result.Name)
+		full := result.Name
+		if procs == 0 {
+			full = result.Reported
+		}
+		suite, name := splitBenchFullName(full)
 		key := pkgPath + "\x00" + suite + "\x00" + name
 		idx, ok := index[key]
 		if !ok {

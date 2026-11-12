@@ -722,3 +722,28 @@ func (s *TreeTestSuite) TestAnUnstampedEventOfAStampedPackageFallsBack(t *gotest
 	mustEq(t, "split leaf", m.Children[0].Children[0].Name, "b")
 	mustEq(t, "leaf status", m.Children[0].Children[0].Status, gotestspec.StatusPass)
 }
+
+// A sub-benchmark whose own name ends in a number: a result line that gives
+// the name exactly carries no GOMAXPROCS suffix.
+func (s *TreeTestSuite) TestBuildTree_SubBenchmarkNamedWithANumber(t *gotest.T, _ *treeCtx) {
+	stream := func(reported string) string {
+		return `{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkCopy"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024"}
+{"Action":"output","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024","Output":"` + reported + `   \t 100 \t 10.0 ns/op\n"}`
+	}
+	leafOf := func(tree []*gotestspec.Package) *gotestspec.Node {
+		mustLen(t, "root nodes", tree[0].Nodes, 1)
+		mustLen(t, "methods", tree[0].Nodes[0].Children, 1)
+		mustLen(t, "sub-benchmarks", tree[0].Nodes[0].Children[0].Children, 1)
+		return tree[0].Nodes[0].Children[0].Children[0]
+	}
+
+	bare := leafOf(treeOf(t, stream("BenchmarkFooTestSuite/BenchmarkCopy/size-1024")))
+	mustEq(t, "display", bare.Display, "size-1024")
+	mustEq(t, "iterations", bare.Iterations, 100)
+	mustEq(t, "procs without a suffix", bare.Procs, 0)
+
+	suffixed := leafOf(treeOf(t, stream("BenchmarkFooTestSuite/BenchmarkCopy/size-1024-8")))
+	mustEq(t, "procs with a suffix", suffixed.Procs, 8)
+}

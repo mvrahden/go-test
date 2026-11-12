@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/bench BenchNumbered / ASubBenchmarkNamedWithANumber / when gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2 / the report names it size-1024 with two samples \(
+Clause: when gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2 → the report names it size-1024 with two samples
+--- a/internal/gotestbench/baseline.go
++++ b/internal/gotestbench/baseline.go
+@@ -213,7 +213,7 @@
+ 			continue
+ 		}
+ 		full := result.Name
+-		if procs == 0 {
++		if false && procs == 0 {
+ 			full = result.Reported
+ 		}
+ 		suite, name := splitBenchFullName(full)

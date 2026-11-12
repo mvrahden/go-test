@@ -31,6 +31,33 @@ func buildTree(it *gotest.T, ndjson string) []*gotestspec.Package {
 
 func (s *BaselineTestSuite) TestFromPackages(t *gotest.T) {
 	it0 := t
+	t.When("a sub-benchmark's name ends in a number", func(w *gotest.T) {
+		stream := func(suffix string) string {
+			return `
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024","Output":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024` + suffix + `   \t 100 \t 10.0 ns/op\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024` + suffix + `   \t 200 \t 12.0 ns/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite","Elapsed":0.01}
+`
+		}
+		w.It("keeps the name and every repetition when no line carries a suffix", func(it *gotest.T) {
+			b := gotestbench.FromPackages(buildTree(it, stream("")))
+			gotest.Len(it, b.Results, 1)
+			gotest.Equal(it, "BenchmarkCopy/size-1024", b.Results[0].Name)
+			gotest.Len(it, b.Results[0].Samples, 2)
+			gotest.Zero(it, b.GOMAXPROCS)
+		})
+		w.It("reads the suffix as GOMAXPROCS when the lines carry one", func(it *gotest.T) {
+			b := gotestbench.FromPackages(buildTree(it, stream("-8")))
+			gotest.Len(it, b.Results, 1)
+			gotest.Equal(it, "BenchmarkCopy/size-1024", b.Results[0].Name)
+			gotest.Len(it, b.Results[0].Samples, 2)
+			gotest.Equal(it, 8, b.GOMAXPROCS)
+		})
+	})
+
 	t.When("a benchmark suite wrapper contains a leaf benchmark", func(w *gotest.T) {
 		w.It("derives Package/Suite/Name and one Sample from the leaf's fields", func(it *gotest.T) {
 			pkgs := buildTree(it, `
