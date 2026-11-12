@@ -94,13 +94,14 @@ func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 10*time.Second, "the teardown waited for the test")
 	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
-	// The method the stop ended says so; the one done before the stop does not.
+	// The method running when the stop came says so; the one done before the
+	// stop does not.
 	out := cmd.Stdout.(*strings.Builder).String()
-	gotest.Contains(t, methodOutput(out, "TestHoldingTestSuite/TestHolds"), stopEndedLine, "the method the stop ended did not say so:\n%s", out)
-	gotest.NotContains(t, methodOutput(out, "TestHoldingTestSuite/TestAReturnsFirst"), stopEndedLine, "a method that returned before the stop said the stop ended it:\n%s", out)
+	gotest.Contains(t, methodOutput(out, "TestHoldingTestSuite/TestHolds"), stopEndedLine, "the method running when the stop came did not say so:\n%s", out)
+	gotest.NotContains(t, methodOutput(out, "TestHoldingTestSuite/TestAReturnsFirst"), stopEndedLine, "a method that returned before the stop said the stop came while it ran:\n%s", out)
 }
 
-const stopEndedLine = "run stopping: the stop ended this method while it ran"
+const stopEndedLine = "run stopping: the stop came while this method ran"
 
 // methodOutput is what a -test.v run printed between test's RUN line and the
 // next line of the testing package.
@@ -148,7 +149,7 @@ func (s *StoppingTestSuite) TestAMethodIgnoringItsContextIsCutShort(t *gotest.T)
 	err := waitWithin(t, tree, cmd, 20*time.Second)
 	c.close()
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
-	gotest.NotContains(t, cmd.Stdout.(*strings.Builder).String(), stopEndedLine, "a method cut short said the stop ended it")
+	gotest.NotContains(t, cmd.Stdout.(*strings.Builder).String(), stopEndedLine, "a method cut short said the stop came while it ran")
 	gotest.Less(t, time.Since(began), 15*time.Second, "the stop waited for the method")
 	gotest.False(t, endedOnItsOwn(err), "the process ends by the signal, its method cut short: %v", err)
 }

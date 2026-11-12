@@ -148,9 +148,10 @@ func skipFailFast(t *testing.T, first string) {
 	t.SkipNow()
 }
 
-// stopEndedLine is the line a method body the stop ended while it ran writes
-// to its output; the runner's stream reads this exact text.
-const stopEndedLine = "run stopping: the stop ended this method while it ran"
+// stopEndedLine is the line a method body that was running when the stop
+// came writes to its output, whether the stop ended it or not; the runner's
+// stream reads this exact text.
+const stopEndedLine = "run stopping: the stop came while this method ran"
 
 // sayStopEnded returns what to run once a method body returned: when a stop
 // came while it ran, the body says so in t's output. A body that began after

@@ -20720,7 +20720,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "writes run stopping: the stop ended this method while it ran in that method's output, and in none of a method that returned before the stop",
+                      "display": "writes run stopping: the stop came while this method ran in that method's output, and in none of a method that returned before the stop",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -20728,7 +20728,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 156,
-                      "name": "writes_run_stopping:_the_stop_ended_this_method_while_it_ran_in_that_method's_output,_and_in_none_of_a_method_that_returned_before_the_stop",
+                      "name": "writes_run_stopping:_the_stop_came_while_this_method_ran_in_that_method's_output,_and_in_none_of_a_method_that_returned_before_the_stop",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -20748,7 +20748,7 @@
                   "vocab": "when"
                 }
               ],
-              "display": "AMethodTheStopEnded",
+              "display": "AMethodRunningWhenTheStopCame",
               "duration": 0,
               "excluded": false,
               "external": false,
@@ -20756,7 +20756,7 @@
               "focused": false,
               "kind": "method",
               "line": 146,
-              "name": "TestAMethodTheStopEnded",
+              "name": "TestAMethodRunningWhenTheStopCame",
               "output": [],
               "status": "none"
             },

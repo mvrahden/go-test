@@ -284,7 +284,7 @@ A run stopped while a group runs SHALL skip every suite not started, the later g
 - **AND** starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
 
 ### Requirement: Stopping a run
-A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released; a method the stop ended while it ran SHALL say so. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the Ctrl-C that stopped it.
+A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released; a method running when the stop came SHALL say so. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the Ctrl-C that stopped it.
 
 #### Scenario: Interrupted while a method holds
 - **WHEN** the run is interrupted while a method holds
@@ -294,9 +294,9 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** runs AfterAll before the fixture is released
 - **AND** ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
 
-#### Scenario: A method the stop ended while it ran
+#### Scenario: A method running when the stop came
 - **WHEN** the run is interrupted while a method holds and the method returns once its context ends
-- **THEN** writes run stopping: the stop ended this method while it ran in that method's output, and in none of a method that returned before the stop
+- **THEN** writes run stopping: the stop came while this method ran in that method's output, and in none of a method that returned before the stop
 
 ### Requirement: A signal from outside the runner
 Under the runner, a SIGINT or SIGTERM the runner did not send SHALL start a first stop, the holding method's context ended and AfterAll run before the fixture is released; the stream SHALL name it a stop from outside the runner and the package SHALL fail. A signal during a stop SHALL change nothing and SHALL never force it, and one landing after the runner's stop settled the run SHALL NOT end the process: it ends with its tests' own status, every verdict in the stream.

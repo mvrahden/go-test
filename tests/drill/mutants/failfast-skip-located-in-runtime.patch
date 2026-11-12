@@ -13,4 +13,4 @@ Clause: when the first method of a FailFast suite fails → skips every method t
 +	t.Skipf("FailFast: %s", first)
  }
  
- // stopEndedLine is the line a method body the stop ended while it ran writes
+ // stopEndedLine is the line a method body that was running when the stop

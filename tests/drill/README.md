@@ -517,8 +517,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
 | `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the runner is gone |
-| `stop-ended-method-unsaid` | a method body the stop ended while it ran returns without saying so | lifecycle: the held method's output under plain go test lacks `run stopping: the stop ended this method while it ran` |
-| `stop-ended-said-of-every-method` | every method body says the stop ended it, the one that returned before the stop too | lifecycle: the method done before the stop says the stop ended it |
+| `stop-ended-method-unsaid` | a method body running when the stop came returns without saying so | lifecycle: the held method's output under plain go test lacks `run stopping: the stop came while this method ran` |
+| `stop-ended-said-of-every-method` | every method body says the stop came while it ran, the one that returned before the stop too | lifecycle: the method done before the stop says the stop came while it ran |
 | `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
 | `stop-releases-before-afterall` | a stop releases the fixtures before the suite's AfterAll runs | canary: the stopped fixture's markers show the release ahead of AfterAll |
 | `stop-grace-past-5s` | a stopped method body that ignores its context gets 15s instead of 5s | canary: the stopgrace run does not say the body was cut short after 5s |
