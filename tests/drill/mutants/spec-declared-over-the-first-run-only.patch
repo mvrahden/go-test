@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecDeclared / ALiveRunUnderItsDeclaredSpecification / when a run of a package is rendered with --declared / under -count lays the declared specification over every run \(
+Clause: when a run of a package is rendered with --declared → under -count lays the declared specification over every run
+--- a/internal/gotestspec/declared.go
++++ b/internal/gotestspec/declared.go
+@@ -57,7 +57,7 @@
+ 	for _, o := range observed {
+ 		runs = max(runs, o.Runs)
+ 	}
+-	if runs < 2 {
++	if true || runs < 2 {
+ 		return overlayNodes(declared, observed, false)
+ 	}
+ 	byRun := make([][]*Node, runs+1)

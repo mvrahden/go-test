@@ -161,6 +161,7 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **THEN** shows the rows of a table after its failing row as not run
 - **AND** reads a method the X_ prefix excludes as skipped
 - **AND** counts what did not run as not run and exits as without --declared
+- **AND** under -count lays the declared specification over every run
 
 ### Requirement: Where the source declares a node
 With --static or --declared each JSON package SHALL carry its dir and each node the source declares its file and line.

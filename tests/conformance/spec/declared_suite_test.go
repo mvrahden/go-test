@@ -302,5 +302,22 @@ func (s *SpecDeclaredTestSuite) TestALiveRunUnderItsDeclaredSpecification(t *got
 			terminal := spec(it, 1, "--declared", pkg)
 			gotest.Regexp(it, `: 1 passed, 1 failed, 1 skipped, 1 not run\n$`, terminal.Stdout)
 		})
+		w.It("under -count lays the declared specification over every run", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--declared", pkg, "-count=2")
+			gotest.Len(it, doc.Packages, 1)
+			var runs []specNode
+			for _, n := range doc.Packages[0].Nodes {
+				if n.Name == "TestNotRunTestSuite" {
+					runs = append(runs, n)
+				}
+			}
+			gotest.Len(it, runs, 2)
+			for i, r := range runs {
+				gotest.Equal(it, i+1, r.Run)
+				gotest.Equal(it, "none", node(it, r.Children, "TestRowsAfterAFailure", "third").Status, "run %d", i+1)
+				gotest.Equal(it, "skip", node(it, r.Children, "X_TestParked").Status, "run %d", i+1)
+			}
+			gotest.Equal(it, 2, doc.Stats.NotRun)
+		})
 	})
 }

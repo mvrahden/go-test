@@ -28261,6 +28261,21 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "under -count lays the declared specification over every run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "declared_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 305,
+                      "name": "under_-count_lays_the_declared_specification_over_every_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
                     }
                   ],
                   "display": "when a run of a package is rendered with --declared",
@@ -30780,7 +30795,7 @@
     }
   ],
   "stats": {
-    "behaviors": 894,
+    "behaviors": 895,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

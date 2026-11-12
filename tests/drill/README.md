@@ -915,6 +915,7 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-skip-reason-first-logged-line` | a skipped row's reason is read from its first logged line | spec conformance: a row that logs and then skips shows the skip's reason |
 | `spec-skip-reason-from-a-log-line` | a skipped row's last logged line is taken for its reason without a skip call there | spec conformance: a row that logs and then skips without a reason shows none |
 | `spec-live-declared-not-overlaid` | `spec --declared` on a live run renders the run alone, without the declared specification under it | spec conformance: the rows of a table after its failing row show as not run |
+| `spec-declared-over-the-first-run-only` | under -count `--declared` lays the declared specification over the first run only | spec conformance: every run of a repeated suite shows its rows not run and its X_ method skipped |
 | `spec-repeated-run-read-as-twin` | every repeated top-level suite is read as a twin pair, its later runs as external suites | spec conformance: three runs of a suite show as runs 1, 2 and 3 of 3, none external |
 | `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |
 
