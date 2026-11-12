@@ -35,6 +35,7 @@ type renderConfig struct {
 	benchEnvWarning string
 	benchGate       *BenchGate
 	groups          []GroupRun
+	notes           []string
 	hidden          map[Status]bool
 	match           string
 	only            *onlyView

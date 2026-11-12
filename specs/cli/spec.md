@@ -60,11 +60,17 @@ gotest SHALL suggest the command meant when the first word is almost a subcomman
 - **THEN** suggests the command meant, and runs any other word as a package pattern
 
 ### Requirement: Packages with only stdlib tests
-gotest SHALL note on stderr, in every mode, that a package has only stdlib tests. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+gotest SHALL note on stderr, in every mode, that a package has only stdlib tests. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`. The Markdown summary and the GitHub step summary SHALL carry the note under their headline, and a summary with the note SHALL not say All.
 
 #### Scenario: A package without suites
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
+
+#### Scenario: A suite package that also holds stdlib tests
+- **WHEN** gotest summary writes Markdown for a package that holds a suite and a stdlib test
+- **THEN** the note of the stdlib tests not run follows the headline
+- **AND** the headline does not say All
+- **AND** the GitHub step summary carries the note
 
 ### Requirement: A suite that ran no tests
 In a text run given no -run, -skip, -list or -count=0, nor -test.run, -test.skip, -test.list, -test.bench or -test.count=0 after -args, a suite process whose binary reports that it ran no tests SHALL fail its package and the run with exit 2, naming the suite: the function gotest generated for it was not in the binary. A suite that is guarded, whose methods are all excluded, that focus leaves out or that the user's pattern does not match SHALL NOT fail this way.

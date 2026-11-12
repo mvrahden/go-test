@@ -159,7 +159,11 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	elapsed := time.Since(pipelineStart)
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups)); err != nil {
+	var notes []string
+	if note := stdlibNote(overlay.StdlibTestsByPkg); note != "" {
+		notes = []string{note}
+	}
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -189,7 +193,7 @@ func runSummaryFromInput(input, format, output, coverageProfile string, noColor,
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(declarationsForStream(events, nil)))
 
-	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil); err != nil {
+	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, 0, badgePath, nil, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
 	}
@@ -208,7 +212,19 @@ func groupRuns(groups []gotestrunner.GroupRun) []gotestspec.GroupRun {
 	return out
 }
 
-func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun) error {
+// stdlibNote is the stderr note of the stdlib tests not run, without its
+// "note: ", for the Markdown summary; "" when there are none.
+func stdlibNote(byPkg map[string]int) string {
+	total, names := sumStdlibTests(byPkg)
+	if total == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d stdlib test(s) in %s not run — gotest runs suites; use 'go test' for stdlib tests", total, names)
+}
+
+// notes go under the Markdown headline only: the terminal summary and the
+// JSON document leave them on stderr.
+func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProfile string, noColor, github bool, elapsed time.Duration, badgePath string, groups []gotestspec.GroupRun, notes []string) error {
 	var w io.Writer = os.Stdout
 	var closeFunc func()
 	if output != "" {
@@ -246,9 +262,14 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 		}
 	}
 
+	mdOpts := renderOpts
+	if len(notes) > 0 {
+		mdOpts = append(append([]gotestspec.RenderOption(nil), renderOpts...), gotestspec.WithNotes(notes...))
+	}
+
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdownSummary(w, tree, renderOpts...)
+		gotestspec.RenderMarkdownSummary(w, tree, mdOpts...)
 	case "json":
 		gotestspec.RenderJSON(w, tree, renderOpts...)
 	default:
@@ -265,7 +286,7 @@ func writeSummaryOutput(tree []*gotestspec.Package, format, output, coverageProf
 		if summaryPath := os.Getenv("GITHUB_STEP_SUMMARY"); summaryPath != "" {
 			sf, err := os.OpenFile(summaryPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err == nil {
-				gotestspec.RenderMarkdownSummary(sf, tree, renderOpts...)
+				gotestspec.RenderMarkdownSummary(sf, tree, mdOpts...)
 				sf.Close()
 			}
 		}

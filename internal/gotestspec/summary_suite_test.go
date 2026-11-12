@@ -453,3 +453,28 @@ func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_TrailerNamesNotRun(t 
 	gotestspec.RenderMarkdownSummary(&buf, headlinePackages(0, 1, 2, 1, false))
 	gotest.Contains(t, buf.String(), ": 0 passed, 1 failed, 2 skipped, 1 not run\n")
 }
+
+func (s *SummaryRenderTestSuite) TestRenderMarkdownSummary_Notes(t *gotest.T, _ *summaryRenderCtx) {
+	const note = "1 stdlib test(s) in example.com/p not run — gotest runs suites; use 'go test' for stdlib tests"
+	render := func(pkgs []*gotestspec.Package, opts ...gotestspec.RenderOption) string {
+		var buf bytes.Buffer
+		gotestspec.RenderMarkdownSummary(&buf, pkgs, opts...)
+		return buf.String()
+	}
+
+	t.It("puts the note under a headline that does not say All", func(it *gotest.T) {
+		out := render(headlinePackages(2, 0, 0, 0, false), gotestspec.WithNotes(note))
+		gotest.Regexp(it, `^### 2 tests passed \(`, out)
+		gotest.Contains(it, out, "\n\n> **Note:** 1 stdlib test")
+		gotest.Contains(it, out, "example.com/p not run")
+	})
+	t.It("says All and carries no note without one", func(it *gotest.T) {
+		out := render(headlinePackages(2, 0, 0, 0, false))
+		gotest.Regexp(it, `^### All 2 tests passed`, out)
+		gotest.NotContains(it, out, "**Note:**")
+	})
+	t.It("puts the note under the headline of a failed run", func(it *gotest.T) {
+		out := render(headlinePackages(1, 1, 0, 0, false), gotestspec.WithNotes(note))
+		gotest.Regexp(it, "^### 1 test failed, 1 passed\n\n> \\*\\*Note:\\*\\* 1 stdlib test", out)
+	})
+}

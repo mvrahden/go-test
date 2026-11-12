@@ -188,6 +188,18 @@ func RenderSummary(w io.Writer, packages []*Package, opts ...RenderOption) {
 	renderSummary(w, stats, c)
 }
 
+// WithNotes puts each note under the Markdown summary's headline, which then
+// does not say All.
+func WithNotes(notes ...string) RenderOption {
+	return func(c *renderConfig) { c.notes = append(c.notes, notes...) }
+}
+
+func renderMarkdownNotes(w io.Writer, notes []string) {
+	for _, n := range notes {
+		fmt.Fprintf(w, "\n> **Note:** %s\n", EscapeLabel(n))
+	}
+}
+
 // renderMarkdownGroups lists one line per named group.
 func renderMarkdownGroups(w io.Writer, groups []GroupRun) {
 	if len(groups) == 0 {
@@ -220,11 +232,12 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	passed, clean := passedPhrase(stats)
 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
 		all := ""
-		if clean {
+		if clean && len(cfg.notes) == 0 {
 			all = "All "
 		}
 		fmt.Fprintf(w, "### %s%s (%s)\n",
 			all, passed, formatDuration(effectiveDuration(&cfg, packages)))
+		renderMarkdownNotes(w, cfg.notes)
 		renderMarkdownGroups(w, cfg.groups)
 		if cfg.coverage != nil {
 			renderMarkdownCoverage(w, cfg.coverage)
@@ -238,6 +251,7 @@ func RenderMarkdownSummary(w io.Writer, packages []*Package, opts ...RenderOptio
 	} else {
 		fmt.Fprintf(w, "### %s — package failure detected\n", passed)
 	}
+	renderMarkdownNotes(w, cfg.notes)
 
 	renderMarkdownFailures(w, failures)
 

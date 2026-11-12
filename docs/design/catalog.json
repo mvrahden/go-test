@@ -9932,6 +9932,82 @@
               "name": "TestTheHeadline",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the note of the stdlib tests not run follows the headline",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 79,
+                      "name": "the_note_of_the_stdlib_tests_not_run_follows_the_headline",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the headline does not say All",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 88,
+                      "name": "the_headline_does_not_say_All",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the GitHub step summary carries the note",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "summary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 91,
+                      "name": "the_GitHub_step_summary_carries_the_note",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest summary writes Markdown for a package that holds a suite and a stdlib test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "summary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "gotest_summary_writes_Markdown_for_a_package_that_holds_a_suite_and_a_stdlib_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "TheStdlibNote",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "summary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 70,
+              "name": "TestTheStdlibNote",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLISummary",
@@ -29895,7 +29971,7 @@
     }
   ],
   "stats": {
-    "behaviors": 869,
+    "behaviors": 872,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

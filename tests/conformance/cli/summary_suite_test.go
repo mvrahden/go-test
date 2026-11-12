@@ -66,3 +66,35 @@ func (s *CLISummaryTestSuite) TestTheHeadline(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLISummaryTestSuite) TestTheStdlibNote(t *gotest.T) {
+	t.When("gotest summary writes Markdown for a package that holds a suite and a stdlib test", func(w *gotest.T) {
+		root, err := testkit.RepoRoot()
+		gotest.NoError(w, err)
+		dir := w.TempDir()
+		gotest.NoError(w, testkit.StageModule(root, filepath.Join("..", "testdata", "climixedtestify"), dir))
+		md, err := testkit.RunCLI(w.Context(), dir, "summary", "--format=md", "./mixed/")
+		gotest.NoError(w, err)
+
+		w.It("the note of the stdlib tests not run follows the headline", func(it *gotest.T) {
+			gotest.Equal(it, 0, md.Exit, "stdout: %s\nstderr: %s", md.Stdout, md.Stderr)
+			gotest.Contains(it, md.Stdout, "> **Note:** 1 stdlib test")
+			gotest.Contains(it, md.Stdout, "climixedtestifymod/mixed not run")
+			// A package without stdlib tests gets no note.
+			plain, err := testkit.RunCLI(it.Context(), ".", "summary", "--format=md", "../testdata/passing/")
+			gotest.NoError(it, err)
+			gotest.NotContains(it, plain.Stdout, "**Note:**")
+		})
+		w.It("the headline does not say All", func(it *gotest.T) {
+			gotest.NotContains(it, md.Stdout, "### All")
+		})
+		w.It("the GitHub step summary carries the note", func(it *gotest.T) {
+			step := filepath.Join(it.TempDir(), "step.md")
+			run, err := testkit.RunCLIWithEnv(it.Context(), dir, []string{"GITHUB_STEP_SUMMARY=" + step}, "summary", "--github", "--no-color", "./mixed/")
+			gotest.NoError(it, err)
+			file, err := os.ReadFile(step)
+			gotest.NoError(it, err, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Contains(it, string(file), "> **Note:** 1 stdlib test")
+		})
+	})
+}

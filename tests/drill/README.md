@@ -905,6 +905,7 @@ shards of one run do not add up to every mutant exactly once.
 | `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |
 | `force-before-stop` | the runner's force line with no stop under way is ignored | ring-0 lifecycle: the process the force reached keeps running |
 | `summary-headline-counts-skips-as-passed` | the summary headline counts skipped tests as passed and leaves them unnamed | cli conformance: the headline of a run with passed and skipped tests names the skipped ones |
+| `summary-markdown-drops-stdlib-note` | a live summary passes no note of the stdlib tests it did not run to the Markdown summary | cli conformance: the Markdown summary of a suite package with a stdlib test carries the note |
 
 ## Adding a mutant
 
