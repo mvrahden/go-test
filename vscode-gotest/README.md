@@ -64,6 +64,7 @@ Run or debug at any level — a single method, an entire suite, or all tests in 
 Multi-select is fully supported.
 Test results persist across sessions, so you see pass/fail state immediately after reopening the editor.
 The tree itself is restored from disk on startup, so suites are browsable straight away instead of waiting for the Go toolchain to finish discovery.
+A run the CLI failed is never green: when it exits non-zero and no test or package carries a failing verdict, the packages (for a fuzz or bench run, the selected targets) are marked errored with what the CLI said and its exit code.
 
 ### CodeLens
 

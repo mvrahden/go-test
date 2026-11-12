@@ -61,6 +61,8 @@ import {
   restoreStoredResults,
   TestItemRouter,
   OnceLog,
+  markFailedRun,
+  type RunEnd,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -2768,5 +2770,45 @@ describe("TestItemRouter", () => {
     expect(
       router.route(ev("run", "FuzzySuite", { Subtest: "FuzzySuite" })),
     ).toBe(suite);
+  });
+});
+
+describe("markFailedRun", () => {
+  const pkg = createItem("example.com/a", "a", undefined, [{ id: "package" }]);
+  const run = () => ({ errored: vi.fn() });
+  const end = (over: Partial<RunEnd> = {}): RunEnd => ({
+    exitCode: 1,
+    cancelled: false,
+    failed: false,
+    reason: "FAIL: shared fixture teardown failed\n",
+    ...over,
+  });
+
+  it("errors each item once, with the reason and the exit code, and records it", () => {
+    const r = run();
+    const store = { recordResult: vi.fn() };
+    expect(
+      markFailedRun(r as any, [pkg, pkg] as any, end(), store as any),
+    ).toBe(true);
+    expect(r.errored).toHaveBeenCalledTimes(1);
+    expect(r.errored.mock.calls[0][0]).toBe(pkg);
+    expect(r.errored.mock.calls[0][1].message).toBe(
+      "FAIL: shared fixture teardown failed\n\nexit code 1",
+    );
+    expect(store.recordResult).toHaveBeenCalledWith("example.com/a", "errored");
+  });
+  it("says only the exit code when the CLI gave no reason", () => {
+    const r = run();
+    markFailedRun(r as any, [pkg] as any, end({ reason: "", exitCode: 137 }));
+    expect(r.errored.mock.calls[0][1].message).toBe("exit code 137");
+  });
+  it.each([
+    ["the run succeeded", { exitCode: 0 }],
+    ["the run was cancelled", { cancelled: true, exitCode: 130 }],
+    ["a failing verdict is already shown", { failed: true }],
+  ])("marks nothing when %s", (_name, over) => {
+    const r = run();
+    expect(markFailedRun(r as any, [pkg] as any, end(over))).toBe(false);
+    expect(r.errored).not.toHaveBeenCalled();
   });
 });

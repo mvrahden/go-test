@@ -20,6 +20,7 @@ import {
   BuildOutputs,
   erroredItem,
   itemTestPath,
+  markFailedRun,
 } from "./runnerUtils.js";
 import { coverOf, type RunPiece } from "./specStore.js";
 import {
@@ -287,20 +288,17 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
       // alone: the tree already shows red, and overwriting that verdict would
       // lose which test it was. The -json stream is not part of the message
       // here — it is the whole run's output, not something to read on an item.
-      if (!attributed && !streamedFailure) {
-        const diagnostic = [stderrFiltered, `exit code ${result.exitCode}`]
-          .filter(Boolean)
-          .join("\n\n");
-        const seen = new Set<string>();
-        for (const info of pkgInfos) {
-          for (const item of info.items) {
-            const pkgItem = getPackageItem(item);
-            if (seen.has(pkgItem.id)) continue;
-            seen.add(pkgItem.id);
-            erroredItem(run, controller, pkgItem, diagnostic);
-          }
-        }
-      }
+      markFailedRun(
+        run,
+        pkgInfos.flatMap((info) => info.items.map(getPackageItem)),
+        {
+          exitCode: result.exitCode,
+          cancelled: false,
+          failed: attributed || streamedFailure,
+          reason: stderrFiltered,
+        },
+        controller,
+      );
     }
 
     if (coverFile && coverage) {

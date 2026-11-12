@@ -307,6 +307,41 @@ export function erroredItem(
   controller.recordResult(item.id, "errored");
 }
 
+// How one CLI invocation ended.
+export interface RunEnd {
+  exitCode: number;
+  cancelled: boolean;
+  // A failing verdict of this invocation is on an item.
+  failed: boolean;
+  // What the CLI said the run failed for: its stderr or run-level output,
+  // without go run's "exit status N" echo.
+  reason: string;
+}
+
+// markFailedRun holds the one rule for a run the CLI failed: a non-zero exit
+// that was not a cancel, with no failing verdict to show for it, marks items
+// errored with the reason and the exit code. It reports whether it marked
+// any. store records the verdict, for surfaces that keep verdicts.
+export function markFailedRun(
+  run: vscode.TestRun,
+  items: readonly vscode.TestItem[],
+  end: RunEnd,
+  store?: Pick<GoTestController, "recordResult">,
+): boolean {
+  if (end.exitCode === 0 || end.cancelled || end.failed) return false;
+  const message = [end.reason.trim(), `exit code ${end.exitCode}`]
+    .filter(Boolean)
+    .join("\n\n");
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    run.errored(item, new vscode.TestMessage(message));
+    store?.recordResult(item.id, "errored");
+  }
+  return seen.size > 0;
+}
+
 export interface AppliedResult {
   itemId: string;
   status: "pass" | "fail" | "skip";
