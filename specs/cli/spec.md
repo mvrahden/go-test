@@ -19,6 +19,13 @@ gotest SHALL name the go get -tool command to run when a suite imports gotest in
 - **WHEN** a suite imports gotest in a module that does not require it
 - **THEN** names the go get -tool command to run
 
+### Requirement: A module that only requires gotest
+gotest SHALL run the suites of a module that requires gotest and declares no tool directive, with the go.mod and go.sum go mod tidy leaves it.
+
+#### Scenario: A tidied module without the tool directive
+- **WHEN** a tidied module requires gotest and declares no tool directive
+- **THEN** runs its suites and exits 0
+
 ### Requirement: A broken config
 When .gotest.yml does not parse, version and help SHALL still print, and a run SHALL report the config error with exit 2. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
 

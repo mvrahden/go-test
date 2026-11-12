@@ -806,6 +806,7 @@ shards of one run do not add up to every mutant exactly once.
 | `budget-line-leaves-out-the-fixtures` | the teardown budget a suite process sends is its setup timeout alone | canary: the stopbudget suite whose budget outlasts its linger is killed first |
 | `channel-cloexec-dropped` | the channel is moved without close-on-exec, so a process a test starts inherits it | canary: the channel fixture's child finds a socket among its descriptors |
 | `channel-type-unchecked` | the channel's variable is taken for a descriptor of any type, so a regular file it names is closed | canary: the channel fixture's child cannot write to its descriptor 3 |
+| `runtime-imports-a-third-party-module` | the control channel calls golang.org/x/sys again, a module tidy cannot keep | conformance: the tidied module's run fails to build for a missing go.sum entry |
 | `signal-forces-under-the-runner` | under the runner a second signal during a stop forces it | canary: the outside run's second SIGTERM releases the fixture without AfterAll |
 | `signal-not-announced` | a stop a signal from outside began is neither told to the runner nor ends by the signal | canary: the outside run's stream names no stop from outside and the run passes |
 | `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |

@@ -7994,6 +7994,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "runs its suites and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "tidymodule_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 31,
+                      "name": "runs_its_suites_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a tidied module requires gotest and declares no tool directive",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "tidymodule_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "a_tidied_module_requires_gotest_and_declares_no_tool_directive",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WithoutTheToolDirective",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "tidymodule_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestWithoutTheToolDirective",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLITidyModule",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "tidymodule_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestCLITidyModuleTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 0 and prints the version on stdout",
                       "duration": 0,
                       "excluded": false,
@@ -25965,13 +26026,13 @@
     }
   ],
   "stats": {
-    "behaviors": 750,
+    "behaviors": 751,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 108,
+    "suites": 109,
     "tests": 0
   }
 }
