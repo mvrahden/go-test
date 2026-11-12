@@ -7,10 +7,10 @@
         <p class="tagline">Specification-driven test suites for Go.</p>
         <p class="bridge">A <code>go test</code> code generator &mdash; you write structs with naming conventions, it handles the wiring.</p>
         <div class="pills">
-          <span class="pill"><code>go test</code> under the hood</span>
-          <span class="pill">No runtime deps</span>
-          <span class="pill">No reflection</span>
-          <span class="pill">Pure code generation</span>
+          <span class="pill">Built on <code>go test</code></span>
+          <span class="pill">Stdlib-only runtime</span>
+          <span class="pill">No reflection in discovery</span>
+          <span class="pill">Generated wiring</span>
         </div>
         <img src="{{ "gopher.png" | absURL }}" alt="gotest gopher" class="hero-gopher" width="360">
         <div class="install-cmd">
@@ -52,7 +52,7 @@
     <span class="t-skip">~</span><span class="t-skip"> hard-deletes after 30 days &#8212; SKIPPED</span>
 <span class="t-summary">1 suite, 5 behaviors: <span class="t-pass">4 passed</span>, 0 failed, <span class="t-skip">1 skipped</span></span></pre>
         </div>
-        <p class="caption">Under the hood it's <code>go test</code>. On the surface, your suites read as specifications.</p>
+        <p class="caption">It compiles with <code>go test</code> and prints <code>go test</code> output. On the surface, your suites read as specifications.</p>
       </div>
     </section>
 
@@ -130,12 +130,12 @@
           <span class="step-arrow">&#8594;</span>
           <div class="code-step">
             <strong>gotest generates</strong>
-            The boilerplate you'd write by hand
+            The test functions that hand your suite to the runtime
           </div>
           <span class="step-arrow">&#8594;</span>
           <div class="code-step">
-            <strong>go test runs</strong>
-            Standard output, standard tooling. Your source tree stays clean.
+            <strong>gotest runs</strong>
+            One process per suite, standard <code>go test</code> output. Your source tree stays clean.
           </div>
         </div>
       </div>
@@ -156,12 +156,12 @@
           </thead>
           <tbody>
             <tr>
-              <td>Runtime dependencies</td>
+              <td>Third-party runtime dependencies</td>
               <td class="yes">Yes</td>
               <td class="no">None</td>
             </tr>
             <tr>
-              <td>Reflection</td>
+              <td>Reflection to find and call tests</td>
               <td class="yes">Yes</td>
               <td class="no">None</td>
             </tr>
@@ -171,9 +171,9 @@
               <td class="no">None</td>
             </tr>
             <tr>
-              <td>Lock-in</td>
-              <td class="yes">High</td>
-              <td class="no">Low &mdash; standard Go structs</td>
+              <td>Runs under plain <code>go test</code></td>
+              <td>Yes</td>
+              <td>No &mdash; suites run under <code>go tool gotest</code></td>
             </tr>
             <tr>
               <td>BDD vocabulary</td>
@@ -222,7 +222,7 @@
           <div class="eco-item">
             <strong>Agent skill</strong>
             <code>gotest skill install</code>
-            <p>Teaches coding agents gotest's rules (v1.34+)</p>
+            <p>Teaches coding agents gotest's rules (v1.35.0+)</p>
           </div>
         </div>
       </div>

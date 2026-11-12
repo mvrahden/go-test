@@ -230,20 +230,26 @@ gotest spec ./...
 Output:
 
 {{< spec title="gotest spec ./..." >}}
-Counter <span class="t-time">(<1ms)</span>
-  Inc <span class="t-time">(<1ms)</span>
-    incrementing once <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
-    incrementing twice more <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> has value 3 <span class="t-time">(<1ms)</span>
-  Dec <span class="t-time">(<1ms)</span>
-    decrementing from 2 <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
-    decrementing past zero <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> goes negative <span class="t-time">(<1ms)</span>
-  Reset <span class="t-time">(<1ms)</span>
-    resetting after increments <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns to zero <span class="t-time">(<1ms)</span>
+=== . — 5 passed ===
+
+Counter — 5 passed
+  Inc
+    when incrementing once
+      <span class="t-pass">✓</span> has value 1
+    when incrementing twice more
+      <span class="t-pass">✓</span> has value 3
+  Dec
+    when decrementing from 2
+      <span class="t-pass">✓</span> has value 1
+    when decrementing past zero
+      <span class="t-pass">✓</span> goes negative
+  Reset
+    when resetting after increments
+      <span class="t-pass">✓</span> returns to zero
+
+Runs from 2026-11-12 14:16 to 14:16 UTC
+
+1 suite, 5 behaviors: 5 passed
 {{< /spec >}}
 
 This is generated from the test names and `When`/`It` labels. The suite name is stripped of its `TestSuite` suffix, method names lose their `Test` prefix, and the hierarchy is indented. The result is a behavioral specification that non-developers can read.
@@ -287,27 +293,32 @@ func (s *BoundaryTestSuite) TestResetIdempotent(t *gotest.T) {
 Run `gotest spec ./...` again and both suites appear in the output:
 
 {{< spec title="gotest spec ./..." >}}
-Boundary <span class="t-time">(<1ms)</span>
-  NewCounter <span class="t-time">(<1ms)</span>
-    <span class="t-pass">✓</span> starts at zero <span class="t-time">(<1ms)</span>
-  ResetIdempotent <span class="t-time">(<1ms)</span>
-    resetting a counter that is already zero <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> stays at zero <span class="t-time">(<1ms)</span>
+=== . — 7 passed ===
 
-Counter <span class="t-time">(<1ms)</span>
-  Inc <span class="t-time">(<1ms)</span>
-    incrementing once <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
-    incrementing twice more <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> has value 3 <span class="t-time">(<1ms)</span>
-  Dec <span class="t-time">(<1ms)</span>
-    decrementing from 2 <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> has value 1 <span class="t-time">(<1ms)</span>
-    decrementing past zero <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> goes negative <span class="t-time">(<1ms)</span>
-  Reset <span class="t-time">(<1ms)</span>
-    resetting after increments <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns to zero <span class="t-time">(<1ms)</span>
+Boundary — 2 passed
+  NewCounter
+    <span class="t-pass">✓</span> starts at zero
+  ResetIdempotent
+    when resetting a counter that is already zero
+      <span class="t-pass">✓</span> stays at zero
+Counter — 5 passed
+  Inc
+    when incrementing once
+      <span class="t-pass">✓</span> has value 1
+    when incrementing twice more
+      <span class="t-pass">✓</span> has value 3
+  Dec
+    when decrementing from 2
+      <span class="t-pass">✓</span> has value 1
+    when decrementing past zero
+      <span class="t-pass">✓</span> goes negative
+  Reset
+    when resetting after increments
+      <span class="t-pass">✓</span> returns to zero
+
+Runs from 2026-11-12 14:16 to 14:16 UTC
+
+2 suites, 7 behaviors: 7 passed
 {{< /spec >}}
 
 Both suites ran in separate processes, concurrently. Neither can affect the other, even if one panics or leaks goroutines.
@@ -332,7 +343,7 @@ func (s *CounterTestSuite) X_TestReset(t *gotest.T) {
 }
 ```
 
-Both prefixes work on suites too: `F_CounterTestSuite` runs only that suite.
+Both prefixes work on suites too: `F_CounterTestSuite` runs only that suite. Focus is run-wide: while any `F_` is present, every unfocused suite in every package of the run is skipped.
 
 ## Use watch mode
 

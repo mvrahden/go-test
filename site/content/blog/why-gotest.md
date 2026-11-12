@@ -47,11 +47,11 @@ That premise shaped five design principles. They are not aspirations; they are c
 
 ## Principle 1: Standard Go output, always
 
-Every generated test is a `func Test*(t *testing.T)`. Every line of output is standard `go test` output. Every CI system, IDE, coverage tool, and profiler works unchanged.
+Every generated test is a `func Test*(t *testing.T)`. Every line of output is standard `go test` output. Coverage tools, profilers and anything that reads `go test -json` work unchanged; CI calls `gotest` where it called `go test`, and an editor needs the gotest extension to show suites as tests.
 
-This is the highest-priority principle, and the others are subordinate to it. gotest does not replace `go test`. It generates the bridge code that connects your suite structs to `go test`'s entry point convention. What actually runs is `go test`, with standard `func Test*(t *testing.T)` functions that the generator produced.
+This is the highest-priority principle, and the others are subordinate to it. gotest does not replace the `testing` package. It generates the bridge code that connects your suite structs to `go test`'s entry point convention, compiles the package with `go test -c`, and runs each suite from that binary in a process of its own. The test functions are standard `func Test*(t *testing.T)` functions that the generator produced.
 
-This means there is no lock-in at the output level. CI pipelines that parse `go test -json` output do not need to know gotest exists. Coverage tools see standard Go test functions. Race detector, profiler, debugger: all unchanged. The generated code is the same code a careful developer would write by hand; gotest automates the wiring, not the execution.
+This means there is no lock-in at the output level. CI pipelines that parse `go test -json` output do not need to know gotest exists. Coverage tools see standard Go test functions. The race detector and the profiler are unchanged; a debugger needs the generated file on disk first (`gotest generate`, then `dlv test`). The generated code is a table of your hooks and methods handed to gotest's runtime package, which runs them in the order the lifecycle promises.
 
 ## Principle 2: The naming IS the API
 
@@ -97,9 +97,9 @@ There is no registration call, no embedded base type, no interface to implement.
 
 The code generator reads these source files with `go/parser`, walks the AST looking for the naming patterns, and produces the lifecycle wiring. Discovery is purely static: no code runs during the generation step.
 
-## Principle 3: Zero runtime cost
+## Principle 3: No runtime discovery
 
-At test execution time, there is no discovery or dispatch machinery in your call stack. The runtime surface is thin: the `gotest.T` wrapper that provides `When`/`It` methods and standalone assertion functions like `gotest.Equal`, plus a small runtime package the generated code calls for timeouts and panic containment. The orchestration itself is generated: struct initialization, `t.Run` calls, `t.Cleanup` calls, direct method invocations. No reflection, no interface dispatch, no type assertions in the wiring.
+At test execution time, there is no discovery machinery in your call stack. Two packages are: the `gotest.T` wrapper with `When`/`It` and the assertion functions, and `pkg/gotestruntime`, which the generated code calls to run the suite: hook order, one subtest per method, timeouts, panic containment and the stop path. The generated code itself is struct initialization and a table of direct method values. No reflection finds or calls a test.
 
 This has practical consequences. Stack traces point to your code, not to framework internals. Refactoring tools can follow the call chain because every call is a direct call. The `gotest` package that your tests import is a thin layer of helper types and functions; it has no transitive dependencies beyond the standard library.
 
@@ -115,7 +115,7 @@ A developer who has never heard of gotest can read a test suite struct and under
 
 A developer who runs `go test` directly (without the CLI) loses nothing that was already there: existing flat `func Test*` tests run exactly as before. The suites simply stay inert — their `func Test*` entry points exist only in gotest's overlay, so `go test` never sees them. The two runners split the work: `go test` runs the flat tests, `gotest` runs the suites.
 
-And a developer who decides to stop using gotest can look at the generated code to see exactly what to write by hand. The generated file is a complete, readable Go test file. It is not a binary artifact or a compressed intermediate representation. It is the code you would have written yourself if you had the patience.
+And a developer who decides to stop using gotest keeps the assertions and `When`/`It`, which are an ordinary library, and writes one `func Test*` per suite that calls its hooks and methods in order. The generated file (`gotest generate ./...`) is readable Go and lists them, though it hands them to gotest's runtime instead of spelling the calls out.
 
 ## Principle 5: Adopt incrementally, eject freely
 

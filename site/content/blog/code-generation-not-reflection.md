@@ -79,22 +79,24 @@ func (s *UserServiceTestSuite) TestDelete(t *gotest.T) { /* ... */ }
 ```go {title="generated bridge (simplified)"}
 func TestUserServiceTestSuite(t *testing.T) {
     s := &UserServiceTestSuite{}
+    cfg, budget := gotestruntime.OpenSuite(t, gotestruntime.Suite{})
 
-    t.Run("TestCreate", func(t *testing.T) {
-        it := gotest.NewT(t)
-        s.BeforeEach(it)
-        s.TestCreate(it)
-    })
-
-    t.Run("TestDelete", func(t *testing.T) {
-        it := gotest.NewT(t)
-        s.BeforeEach(it)
-        s.TestDelete(it)
+    gotestruntime.RunMethods(t, cfg, budget, gotestruntime.Methods{
+        Cases: []gotestruntime.Method{
+            {Name: "TestCreate", Run: func(it *gotest.T, run func(func())) {
+                s.BeforeEach(it)
+                run(func() { s.TestCreate(it) })
+            }},
+            {Name: "TestDelete", Run: func(it *gotest.T, run func(func())) {
+                s.BeforeEach(it)
+                run(func() { s.TestDelete(it) })
+            }},
+        },
     })
 }
 ```
 
-The generated code is what you'd write by hand if you were wiring up the suite yourself: a top-level `func Test*` that creates the struct, then runs each test method as a subtest with the lifecycle hooks in the right places.
+The generated code is a top-level `func Test*` that creates the struct and lists each test method with its hooks as plain function values. The `gotestruntime` package it calls runs each one as a subtest, in the order the lifecycle promises, and holds the timeouts.
 
 For suites with fixtures, the generated test function also sets the fixtures up in dependency (DAG) order before the suite starts, and registers their teardown with `t.Cleanup`, so it runs after the suite's `AfterAll`.
 
@@ -133,7 +135,7 @@ With reflection, this would either panic at runtime or, worse, silently skip the
 
 ### Inspectable output
 
-You can run `gotest generate ./...` to write the generated files to disk and read them. The generated code is standard Go; you can set breakpoints in it, step through the lifecycle logic, and see exactly what gets called in what order. There's no framework magic at runtime, just direct method calls.
+You can run `gotest generate ./...` to write the generated files to disk and read them. The generated code is standard Go; you can set breakpoints in it, step through the lifecycle logic, and see exactly what gets called in what order. The runtime it calls is ordinary Go in `pkg/gotestruntime`, which you can step into as well.
 
 ### No registration ceremony
 
@@ -184,7 +186,7 @@ cat pkg/user/gotest_psuite_test.go
 gotest clean ./...
 ```
 
-The generated files are standard Go test files. They import your package, reference your types, and call your methods. Reading them is the most direct way to understand what the framework does, because the framework *is* the generated code. If you'd rather start from the other end — write a small suite and then inspect what gets generated for it — [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) walks through exactly that.
+The generated files are standard Go test files. They import your package, reference your types, and call your methods. Reading them shows which of your methods the framework calls and in what order; the calls themselves are made by `pkg/gotestruntime`. If you'd rather start from the other end — write a small suite and then inspect what gets generated for it — [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) walks through exactly that.
 
 ## The trade-off
 
@@ -194,4 +196,4 @@ If part of your workflow has to invoke `go test` directly, run `gotest generate 
 
 Day to day, the build step mostly disappears: generation operates on parse trees, Go's build cache recompiles only the packages whose files changed, and an unchanged test binary is not linked again, so the edit-test loop stays close to plain `go test`. [Go Test Watch Mode and Focused Tests]({{< ref "/blog/the-inner-loop" >}}) covers what that loop looks like in practice.
 
-The code generation approach aligns with Go's broader philosophy: explicit over implicit, compile-time over runtime, readable code over framework magic. The generated code is what a careful developer would write by hand. gotest just writes it for you.
+The code generation approach aligns with Go's broader philosophy: explicit over implicit, compile-time over runtime, readable code over framework magic. The generated code lists your hooks and methods as plain function values, and an ordinary Go package runs them. gotest just writes the list for you.

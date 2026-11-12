@@ -1,4 +1,4 @@
 ---
 title: "gotest"
-description: "A go test code generator: struct-based suites with lifecycle hooks, BDD structure, and spec output for AI workflows. Zero reflection, zero runtime deps."
+description: "A go test code generator: struct-based suites, lifecycle hooks, BDD structure, spec output for AI workflows. No reflection in discovery, a stdlib-only runtime."
 ---

@@ -206,7 +206,7 @@ Here's the observation that changes the equation: **the suite pattern is an orga
 
 What suites need at runtime is ordinary Go code: `t.Run` calls, `t.Cleanup` calls, struct initialization. Everything the stdlib already provides. The reason frameworks like testify/suite use reflection is to *discover* test methods and *wire up* lifecycle hooks. But discovery and wiring are compile-time activities. They can happen before `go test` runs.
 
-That's the approach [gotest](https://github.com/mvrahden/go-test) takes. You write test suites as plain Go structs with naming conventions. A code generator reads your source, discovers the structure, and generates the lifecycle wiring that you'd write by hand. What runs is standard `go test`. No reflection. No framework orchestration at runtime. (If you want to try this hands-on, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the walkthrough.)
+That's the approach [gotest](https://github.com/mvrahden/go-test) takes. You write test suites as plain Go structs with naming conventions. A code generator reads your source, discovers the structure, and generates the test functions that hand each suite to gotest's runtime, which runs it in a process of its own with `go test`'s output. No reflection finds or calls a test. (If you want to try this hands-on, [Your First Go Test Suite in 10 Minutes]({{< ref "/blog/zero-to-suite" >}}) is the walkthrough.)
 
 ```go {title="gotest approach"}
 type UserServiceTestSuite struct {

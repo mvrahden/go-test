@@ -483,7 +483,7 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
           <tr><td><code>parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--parallel</code></td><td>Total concurrent test method budget. 0 means 2×GOMAXPROCS, auto-halved under <code>-race</code>/<code>-msan</code>/<code>-asan</code>.</td></tr>
           <tr><td><code>compile-parallel</code></td><td>int</td><td>0 (auto)</td><td><code>--compile-parallel</code></td><td>Concurrent compilation processes. 0 means NumCPU, auto-halved under <code>-race</code>/<code>-msan</code>/<code>-asan</code>.</td></tr>
           <tr><td><code>debounce</code></td><td>duration</td><td>200ms</td><td><code>--debounce</code></td><td>Watch mode re-run delay.</td></tr>
-          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Non-integrity lint rules to disable: <code>assertion-simplify</code>, <code>assertion-redundant</code>, <code>fail-guard</code>, <code>t-escape</code>, <code>stdlib-test</code>, <code>testify</code>.</td></tr>
+          <tr><td><code>lint.skip</code></td><td>[string]</td><td><em>none</em></td><td>—</td><td>Non-integrity lint rules to disable: <code>assertion-redundant</code>, <code>assertion-simplify</code>, <code>behavior-wording</code>, <code>bench-fixture-io</code>, <code>bench-wait</code>, <code>config-no-deadline</code>, <code>fail-guard</code>, <code>fuzz-hook-io</code>, <code>fuzz-no-oracle</code>, <code>fuzz-raw-seed</code>, <code>fuzz-seed</code>, <code>stdlib-test</code>, <code>t-escape</code>, <code>testify</code>.</td></tr>
         </tbody>
       </table>
       <div class="code-block">
@@ -678,7 +678,7 @@ percentage = covered / total</div>
           <tr><td><code>gotest generate ./...</code></td><td>Generate suite files without running tests.</td></tr>
           <tr><td><code>gotest clean ./...</code></td><td>Remove orphaned generated files.</td></tr>
           <tr><td><code>gotest refactor toggle-focus &lt;file&gt; &lt;id&gt;</code></td><td>Toggle <code>F_</code>/<code>X_</code> prefixes programmatically.</td></tr>
-          <tr><td><code>gotest skill install</code></td><td>Install the coding-agent skill shipped with this version (v1.34+); <code>--dir</code> picks the skills directory.</td></tr>
+          <tr><td><code>gotest skill install</code></td><td>Install the coding-agent skill shipped with this version (v1.35.0+); <code>--dir</code> picks the skills directory.</td></tr>
           <tr><td><code>gotest prepare ./...</code></td><td>Start shared fixtures for debugging; blocks until SIGTERM.</td></tr>
           <tr><td><code>gotest version</code></td><td>Print version information.</td></tr>
           <tr><td><code>gotest help [subcommand]</code></td><td>General or subcommand-specific help.</td></tr>
