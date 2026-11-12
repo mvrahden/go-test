@@ -759,6 +759,7 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-guard-fixed` | `ErrorIs` with a nil target is rewritten into `NoError` | conformance: the lint It for guards finds the row's verdict changed |
 | `lint-redundant-notnil-unguarded` | a `NotNil` that fails its type guard is removed as redundant | conformance: the lint It for redundant assertions finds the string row's verdict changed |
 | `lint-redundant-impure-operand` | an assertion before one on the same call or receive is removed as redundant | conformance: the lint It for impure operands finds the call rows' verdicts changed |
+| `lint-redundant-impure-argument` | only the checked operand must be pure; a call among the other arguments may write it | conformance: the lint It for impure operands finds the target-call row's verdict changed |
 | `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |
 | `lint-error-contains-any-receiver` | `Contains(t, v.Error(), s)` becomes `ErrorContains` on a receiver that does not implement error | conformance: the lint It for Error searches sees the fix fail to compile |
 | `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |

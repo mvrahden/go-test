@@ -151,7 +151,7 @@ Lint --github SHALL escape each annotation's message and properties as a workflo
 - **THEN** lint refuses it with exit 2, naming the value
 
 ### Requirement: Assertion rewrites keep the verdict
-An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. Lint SHALL report an assertion as redundant only where both operands are the same name, field, element or literal, which reading twice cannot change.
+An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. Lint SHALL report an assertion as redundant only where both check the same operand and every argument of both is a name, field, element or literal, which evaluating cannot change.
 
 #### Scenario: Nil checks
 - **WHEN** an assertion checks an operand against nil

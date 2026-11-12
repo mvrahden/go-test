@@ -220,6 +220,12 @@ var rewriteRows = []rewriteRow{
 		body: "ch := make(chan []int, 2)\n\tch <- []int{1}\n\tch <- nil\n\tgotest.NotEmpty(t, <-ch)\n\tgotest.Len(t, <-ch, 1)", verdict: "fail"},
 	{Desc: "NotNil of an element at a called index before Contains", group: groupImpure,
 		body: "xs := [][]int{{1}, nil}\n\ti := -1\n\tnext := func() int {\n\t\ti++\n\t\treturn i\n\t}\n\tgotest.NotNil(t, xs[next()])\n\tgotest.Contains(t, xs[next()], 1)", verdict: "fail"},
+	// A call among the second assertion's other arguments runs before it
+	// reads the operand, and may write it.
+	{Desc: "Error before ErrorIs whose target call sets the error", group: groupImpure, imports: []string{"errors"}, decls: "var errBoom = errors.New(\"boom\")\n",
+		body: "var err error\n\ttarget := func() error {\n\t\terr = errBoom\n\t\treturn errBoom\n\t}\n\tgotest.Error(t, err)\n\tgotest.ErrorIs(t, err, target())", verdict: "fail"},
+	{Desc: "NotEmpty before Contains whose needle call appends", group: groupImpure,
+		body: "var xs []int\n\tadd := func() int {\n\t\txs = append(xs, 1)\n\t\treturn 1\n\t}\n\tgotest.NotEmpty(t, xs)\n\tgotest.Contains(t, xs, add())", verdict: "fail"},
 }
 
 // rowPkg names the package row i is staged in.

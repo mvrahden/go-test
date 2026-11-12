@@ -21,7 +21,7 @@ func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl 
 			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {
 				continue
 			}
-			if !isPureOperand(first.guardedArg) || !sameExprText(pass, first.guardedArg, second.guardedArg) {
+			if !allPure(first.call.Args[1:]) || !allPure(second.call.Args[1:]) || !sameExprText(pass, first.guardedArg, second.guardedArg) {
 				continue
 			}
 			reason := isRedundantBefore(pass, first, second)
@@ -165,4 +165,15 @@ func isPureOperand(e ast.Expr) bool {
 		return isPureOperand(e.X)
 	}
 	return false
+}
+
+// allPure reports whether every argument is a pure operand: removing the
+// first assertion then moves no evaluation that could write the operand.
+func allPure(args []ast.Expr) bool {
+	for _, a := range args {
+		if !isPureOperand(a) {
+			return false
+		}
+	}
+	return true
 }
