@@ -472,6 +472,7 @@ shards of one run do not add up to every mutant exactly once.
 | `focus-note-fails-the-run` | the focus note outside CI mode ends the run with exit 1 | CLI conformance: the focused run exits 1 |
 | `suite-that-ran-nothing-passes` | a text run never holds a suite to the tests it runs | CLI conformance: the wrapped binary that ran nothing passes |
 | `ran-nothing-rule-matches-substrings` | the no-tests rule matches the testing package's warning inside a longer line | runner unit: a child's line that quotes the warning fails the suite |
+| `merged-coverage-keeps-the-maximum` | a merged count or atomic cover profile keeps each block's largest count | CLI conformance: the block two suites ran reads 1 |
 | `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |

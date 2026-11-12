@@ -202,6 +202,13 @@ gotest SHALL find a coverage profile in every spelling go test accepts, for the 
 - **WHEN** a fully covered package runs with a minimum and a profile
 - **THEN** finds the profile in every spelling go test accepts, for the --min gate and for summary
 
+### Requirement: Merged coverage counts
+A -coverprofile under -covermode=count or atomic SHALL hold, for each block, the sum of the counts of the suite processes that ran it, as go test's one process counts it; under set a block any process ran SHALL read 1.
+
+#### Scenario: A block two suites run
+- **WHEN** two suites of a package each run a block once under -covermode=count
+- **THEN** the profile counts the block twice
+
 ### Requirement: Scaffold paths
 The scaffold subcommand SHALL write the scaffold beside the source file it is given, or into the directory of the package a type or function target names, by a relative or an absolute path, even when the path runs through a symlinked directory and when the working directory is outside the module. The relative and absolute cases are the tables in `tests/conformance/cli/scaffold_suite_test.go`.
 

@@ -180,6 +180,27 @@ func (s *ArgsTestSuite) TestCoverProfile(t *gotest.T) {
 	})
 
 	t.When("merging profiles", func(w *gotest.T) {
+		w.When("the profiles count", func(w2 *gotest.T) {
+			for sub, tc := range gotest.Each(w2, []struct{ Desc, mode, want string }{
+				{"count sums", "count", "foo/bar.go:1.2,3.4 1 4"},
+				{"atomic sums", "atomic", "foo/bar.go:1.2,3.4 1 4"},
+				{"set keeps 1", "set", "foo/bar.go:1.2,3.4 1 1"},
+			}) {
+				a, b := "3", "1"
+				if tc.mode == "set" {
+					a = "1"
+				}
+				dir := sub.TempDir()
+				p1, p2 := filepath.Join(dir, "a.out"), filepath.Join(dir, "b.out")
+				gotest.NoError(sub, os.WriteFile(p1, []byte("mode: "+tc.mode+"\nfoo/bar.go:1.2,3.4 1 "+a+"\n"), 0o600))
+				gotest.NoError(sub, os.WriteFile(p2, []byte("mode: "+tc.mode+"\nfoo/bar.go:1.2,3.4 1 "+b+"\n"), 0o600))
+				out := filepath.Join(dir, "m.out")
+				gotest.NoError(sub, gotestrunner.MergeCoverProfiles([]string{p1, p2}, out))
+				data, err := os.ReadFile(out)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, "mode: "+tc.mode+"\n"+tc.want+"\n", string(data))
+			}
+		})
 		w.When("two profiles with overlapping blocks", func(w2 *gotest.T) {
 			w2.It("merges and sorts with max-count aggregation", func(it *gotest.T) {
 				dir := it.TempDir()
