@@ -177,3 +177,13 @@ A generated file left on disk by an earlier generate SHALL neither break nor be 
 #### Scenario: A build-constrained suite file
 - **WHEN** a suite file carries a build constraint
 - **THEN** --tags= selects the files built with that tag
+
+### Requirement: Cases no run reaches
+A method named as a case that takes *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it, directly or through an interface: one error per type, at its first such method, naming the suffix that makes the type a suite. A type a non-test file declares SHALL be left alone: another package may call it.
+
+#### Scenario: Case-named methods on a type that is no suite
+- **WHEN** a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite
+- **THEN** a type nothing calls them on is refused at its first such method, told which suffix makes it a suite
+- **AND** a helper whose method a suite calls, directly or through an interface, runs
+- **AND** a helper only the external test package calls runs
+- **AND** a type a non-test file declares is left alone

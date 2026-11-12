@@ -10238,6 +10238,112 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a type nothing calls them on is refused at its first such method, told which suffix makes it a suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 29,
+                      "name": "a_type_nothing_calls_them_on_is_refused_at_its_first_such_method,_told_which_suffix_makes_it_a_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper whose method a suite calls, directly or through an interface, runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "a_helper_whose_method_a_suite_calls,_directly_or_through_an_interface,_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper only the external test package calls runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 40,
+                      "name": "a_helper_only_the_external_test_package_calls_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a type a non-test file declares is left alone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 44,
+                      "name": "a_type_a_non-test_file_declares_is_left_alone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 28,
+                  "name": "a_test_file_declares_methods_named_as_cases,_taking_a_gotest_T,_B_or_F,_on_a_type_that_is_no_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CaseNamedMethods",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestCaseNamedMethods",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "NeverRun",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "neverrun_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestNeverRunTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a stale generated file on disk neither breaks the run nor is compiled",
                       "duration": 0,
                       "excluded": false,
@@ -26118,13 +26224,13 @@
     }
   ],
   "stats": {
-    "behaviors": 753,
+    "behaviors": 757,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 110,
+    "suites": 111,
     "tests": 0
   }
 }

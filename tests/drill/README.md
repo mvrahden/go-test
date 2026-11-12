@@ -633,6 +633,10 @@ shards of one run do not add up to every mutant exactly once.
 | `caseless-excluded-case-uncounted` | an excluded case does not count as a declared one | canary: the `shapes/excludedonly` package exits 2 instead of 0 |
 | `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package is refused at its helper field as a nested suite, not at the helper's declaration |
 | `caseless-testify-base-collected` | a testify suite embedding testify's suite through a base is read as a gotest suite | conformance: the discovery It for a testify base suite sees exit 2 |
+| `orphan-case-type-accepted` | case-named methods on a type that is no suite are never collected | conformance: the discovery It for a type nothing calls sees exit 0 instead of 2 |
+| `orphan-case-called-helper-refused` | a helper a suite calls is refused as if nothing called it | conformance: the discovery It for a helper a suite calls sees exit 2 |
+| `orphan-case-sibling-variant-unread` | calls are read from the declaring test variant alone | conformance: the discovery It for a helper only the external test package calls sees exit 2 |
+| `orphan-case-non-test-file-refused` | a type a non-test file declares is read like one in a test file | conformance: the discovery It for a non-test file's type sees exit 2 |
 | `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
 | `harness-imports-collide-by-name` | two imported packages of the same name get the same alias | canary: the `shapes/genpgpg` package exits 2 instead of 0 |
 | `predeclared-clash-accepted` | a package redeclaring a name Go predeclares that the harness uses is generated for | conformance: the discovery It for `shapes/genpredeclared` sees a build failure instead of the located refusal |
