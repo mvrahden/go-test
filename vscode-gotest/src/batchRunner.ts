@@ -66,8 +66,9 @@ export interface BatchResult {
 export function runPiece(
   stdout: string,
   config: Pick<BatchConfig, "pkgInfos" | "filter" | "workspaceDir">,
+  at = Date.now(),
 ): RunPiece {
-  const piece: RunPiece = { stream: stdout, folder: config.workspaceDir };
+  const piece: RunPiece = { stream: stdout, folder: config.workspaceDir, at };
   if (!config.filter) return piece;
   piece.partial = new Map();
   for (const info of config.pkgInfos) {

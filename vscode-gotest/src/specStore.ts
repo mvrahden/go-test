@@ -14,6 +14,8 @@ export interface RunPiece {
   // for. A package the stream names that is absent here ran whole, and its
   // newest stream replaces what was kept for it.
   partial?: Map<string, (testPath: string) => boolean>;
+  // When the run finished, in epoch ms; absent on an imported stream.
+  at?: number;
 }
 
 export interface PackageRecord {
@@ -28,6 +30,8 @@ export interface PackageRecord {
   // events carry RunLevel. It belongs to the folder's newest run, not to a
   // package.
   runLevel: boolean;
+  // When the newest run that reported the package finished.
+  ranAt?: number;
 }
 
 // A kept line and its place in the order lines were merged, across runs.
@@ -42,6 +46,7 @@ export interface StoredRecord {
   pkgLines: string[];
   tests: [string, KeptLine[]][];
   runLevel: boolean;
+  ranAt?: number;
 }
 
 // testKey names a test path within one instance of its top-level name: a
@@ -164,12 +169,14 @@ export class SpecStore {
       const pkgLines = [...buildLines, ...group.pkgLines];
       const covered = piece.partial?.get(path);
       const kept = this.records.get(path);
+      const ranAt = piece.at ?? kept?.ranAt;
       if (!kept || !covered) {
         this.records.set(path, {
           folder: piece.folder,
           pkgLines,
           tests: group.tests,
           runLevel: group.runLevel,
+          ranAt,
         });
         continue;
       }
@@ -178,9 +185,15 @@ export class SpecStore {
         pkgLines,
         tests: mergeTests(kept.tests, group, covered),
         runLevel: group.runLevel,
+        ranAt,
       });
     }
     return Array.from(groups.keys());
+  }
+
+  // ranAtOf is when the newest run that reported pkg finished.
+  ranAtOf(pkg: string): number | undefined {
+    return this.records.get(pkg)?.ranAt;
   }
 
   // folderOf is the folder whose CLI renders a package.
@@ -219,6 +232,7 @@ export class SpecStore {
       pkgLines: r.pkgLines,
       tests: Array.from(r.tests),
       runLevel: r.runLevel,
+      ...(r.ranAt === undefined ? {} : { ranAt: r.ranAt }),
     }));
   }
 
@@ -237,6 +251,7 @@ export class SpecStore {
         pkgLines: r.pkgLines,
         tests: new Map(r.tests),
         runLevel: r.runLevel,
+        ranAt: r.ranAt,
       });
     }
   }
@@ -293,6 +308,7 @@ function isStoredRecord(v: unknown): v is StoredRecord {
     typeof r.path === "string" &&
     typeof r.folder === "string" &&
     typeof r.runLevel === "boolean" &&
+    (r.ranAt === undefined || typeof r.ranAt === "number") &&
     isStrings(r.pkgLines) &&
     Array.isArray(r.tests) &&
     r.tests.every(

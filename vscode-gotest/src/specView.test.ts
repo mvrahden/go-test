@@ -28,6 +28,7 @@ import {
   SpecViewPanel,
   renderErrorHtml,
   declaredTests,
+  formatRanAt,
 } from "./specView.js";
 import type { DiscoverPackage } from "./types.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -754,5 +755,60 @@ describe("declaredTests", () => {
 
   it("says nothing about a package that does not load", () => {
     expect(declaredTests({ ...pkg, broken: true })).toBeUndefined();
+  });
+});
+
+describe("formatRanAt", () => {
+  const now = new Date(2026, 10, 11, 16, 5).getTime();
+  it("gives the time of a run of today", () => {
+    expect(formatRanAt(new Date(2026, 10, 11, 9, 7).getTime(), now)).toBe(
+      "09:07",
+    );
+  });
+  it("adds the date to a run of another day", () => {
+    expect(formatRanAt(new Date(2026, 10, 10, 23, 59).getTime(), now)).toBe(
+      "2026-11-10 23:59",
+    );
+  });
+});
+
+describe("when each package last ran", () => {
+  const pkgOf = (p: string): SpecPackage => ({
+    path: p,
+    status: "pass",
+    duration: 0.1,
+    nodes: [node("TestCartTestSuite", "pass", [node("adds", "pass")])],
+  });
+  const twoPackages = {
+    packages: [pkgOf("example.com/cart"), pkgOf("example.com/order")],
+    stats: stats(),
+  };
+  const onePackage = { packages: [pkgOf("example.com/cart")], stats: stats() };
+
+  it("shows on each package when it last ran, and nothing where it is not known", () => {
+    const now = new Date(2026, 10, 11, 16, 5).getTime();
+    const at = new Date(2026, 10, 11, 14, 32).getTime();
+    const html = buildSpecBody(twoPackages, [], {
+      dirOf: () => undefined,
+      ranAtOf: (p) => (p === "example.com/cart" ? at : undefined),
+      now,
+    });
+    expect(html.match(/class="ran-at"/g)).toHaveLength(1);
+    expect(html).toContain(">last run 14:32</span>");
+  });
+
+  it("shows it above the rows when one package is all there is", () => {
+    const at = new Date(2026, 10, 11, 14, 32).getTime();
+    const html = buildSpecBody(onePackage, [], {
+      dirOf: () => undefined,
+      ranAtOf: () => at,
+      now: new Date(2026, 10, 11, 16, 5).getTime(),
+    });
+    expect(html).toContain('<div class="ran-at-line">last run 14:32</div>');
+  });
+
+  it("shows no time when none is known", () => {
+    const html = buildSpecBody(twoPackages, [], { dirOf: () => undefined });
+    expect(html).not.toContain("last run");
   });
 });

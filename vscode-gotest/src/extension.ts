@@ -254,7 +254,11 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     outputChannel,
     (jsonOutput, _scope, cwd) => {
-      void specView.refresh({ stream: jsonOutput, folder: cwd });
+      void specView.refresh({
+        stream: jsonOutput,
+        folder: cwd,
+        at: Date.now(),
+      });
     },
     runRegistry,
   );

@@ -581,7 +581,11 @@ export class SpecViewPanel implements vscode.Disposable {
         : buildSpecBody(
             msg.data,
             this.modulePaths,
-            { dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir },
+            {
+              dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir,
+              ranAtOf: (pkgPath) => this.currentRuns().ranAtOf(pkgPath),
+              now: Date.now(),
+            },
             this.sourcesForToolbar(),
             this.hidden,
           );
@@ -828,6 +832,39 @@ function buildEmptyBody(gopherUri: string): string {
 // for the file:line tokens of output a stream without positions holds.
 interface RenderEnv {
   dirOf: (pkgPath: string) => string | undefined;
+  // When a package last ran, and the clock that is read against.
+  ranAtOf?: (pkgPath: string) => number | undefined;
+  now?: number;
+}
+
+// formatRanAt is a run's local time: HH:MM on the day of now, with the date
+// on any other day.
+export function formatRanAt(at: number, now: number): string {
+  const d = new Date(at);
+  const n = new Date(now);
+  const two = (v: number) => String(v).padStart(2, "0");
+  const time = `${two(d.getHours())}:${two(d.getMinutes())}`;
+  const sameDay =
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate();
+  return sameDay
+    ? time
+    : `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${time}`;
+}
+
+// ranAtText is a package's "last run" text, when the time is known.
+function ranAtText(pkgPath: string, env: RenderEnv): string | undefined {
+  const at = env.ranAtOf?.(pkgPath);
+  if (at === undefined) return undefined;
+  return `last run ${formatRanAt(at, env.now ?? Date.now())}`;
+}
+
+function ranAtHtml(pkgPath: string, env: RenderEnv): string {
+  const at = env.ranAtOf?.(pkgPath);
+  if (at === undefined) return "";
+  const text = `last run ${formatRanAt(at, env.now ?? Date.now())}`;
+  return ` <span class="ran-at" title="${escapeAttr(new Date(at).toISOString())}">${escapeHtml(text)}</span>`;
 }
 
 interface SourceOption {
@@ -852,7 +889,9 @@ export function buildSpecBody(
   let tree: string;
   if (groups.length === 1 && groups[0].entries.length === 1) {
     const pkg = groups[0].entries[0].pkg;
+    const ranAt = ranAtText(pkg.path, env);
     tree =
+      (ranAt ? `<div class="ran-at-line">${escapeHtml(ranAt)}</div>` : "") +
       buildPackageFailureHtml(pkg, env) +
       pkg.nodes
         .map((n, i) =>
@@ -1012,7 +1051,7 @@ function buildPackageSectionHtml(
     .map((n, i) => buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]))
     .join("");
   return `<details class="pkg-section" open>
-  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
+  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}${ranAtHtml(pkg.path, env)}</summary>
   ${failure}${nodes}
 </details>`;
 }
@@ -1676,6 +1715,8 @@ summary.node:hover > .node-actions,
 
 /* Error output */
 .error-details { margin: 2px 0 4px 20px; }
+.ran-at, .ran-at-line { opacity: 0.7; font-size: 0.9em; }
+.ran-at-line { margin: 0 0 4px 4px; }
 .render-error { margin: 8px 12px; padding: 6px 10px; border: 1px solid var(--vscode-inputValidation-warningBorder); background: var(--vscode-inputValidation-warningBackground); }
 .error-summary {
   color: var(--vscode-descriptionForeground);

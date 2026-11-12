@@ -545,3 +545,52 @@ describe("SpecStore.pruneTests", () => {
     expect(store.pruneTests("example.com/absent", () => false)).toBe(0);
   });
 });
+
+describe("when a package last ran", () => {
+  const cart = "example.com/cart";
+  const whole = stream(
+    ...test(cart, "TestCartTestSuite/TestAdd", "pass"),
+    ...test(cart, "TestCartTestSuite/TestTotal", "pass"),
+    verdict(cart, "pass"),
+  );
+  const oneMethod = stream(
+    ...test(cart, "TestCartTestSuite/TestAdd", "fail"),
+    verdict(cart, "fail"),
+  );
+
+  it("keeps when a package's newest run finished, across a partial rerun and a reload", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws", at: 1000 });
+    expect(store.ranAtOf(cart)).toBe(1000);
+    store.merge({
+      stream: oneMethod,
+      folder: "/ws",
+      at: 2000,
+      partial: new Map([[cart, coverOf(["TestCartTestSuite/TestAdd"])]]),
+    });
+    expect(store.ranAtOf(cart)).toBe(2000);
+    const again = new SpecStore();
+    again.restore(JSON.parse(JSON.stringify(store.serialize())));
+    expect(again.ranAtOf(cart)).toBe(2000);
+  });
+
+  it("keeps no time for a stream that carries none", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws" });
+    expect(store.ranAtOf(cart)).toBeUndefined();
+  });
+
+  it("restores a file written before the time was kept, and refuses a time that is not a number", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws", at: 1000 });
+    const stored = JSON.parse(JSON.stringify(store.serialize()));
+    for (const r of stored) delete r.ranAt;
+    const old = new SpecStore();
+    old.restore(stored);
+    expect(old.size).toBe(store.size);
+    stored[0].ranAt = "yesterday";
+    const bad = new SpecStore();
+    bad.restore(stored);
+    expect(bad.size).toBe(0);
+  });
+});
