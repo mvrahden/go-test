@@ -1,0 +1,12 @@
+{"Time":"2026-11-12T17:12:38.647208303+01:00","Action":"run","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo"}
+{"Time":"2026-11-12T17:12:38.647236165+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Output":"=== RUN   TestFoo\n","OutputType":"frame"}
+{"Time":"2026-11-12T17:12:38.647265872+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Output":"--- PASS: TestFoo (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-12T17:12:38.647272905+01:00","Action":"pass","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Elapsed":0}
+{"Time":"2026-11-12T17:12:38.647278996+01:00","Action":"run","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo"}
+{"Time":"2026-11-12T17:12:38.64728106+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Output":"=== RUN   TestFoo\n","OutputType":"frame"}
+{"Time":"2026-11-12T17:12:38.647284056+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Output":"    b_test.go:5: external fails\n","OutputType":"error"}
+{"Time":"2026-11-12T17:12:38.647287904+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Output":"--- FAIL: TestFoo (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-12T17:12:38.647290088+01:00","Action":"fail","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Test":"TestFoo","Elapsed":0}
+{"Time":"2026-11-12T17:12:38.647292592+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-11-12T17:12:38.647347627+01:00","Action":"output","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Output":"FAIL\tgithub.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin\t0.003s\n","OutputType":"frame"}
+{"Time":"2026-11-12T17:12:38.647357076+01:00","Action":"fail","Package":"github.com/mvrahden/go-test/tests/conformance/testdata/specstdtwin","Elapsed":0.003}

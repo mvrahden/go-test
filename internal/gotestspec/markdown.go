@@ -262,6 +262,9 @@ func markdownItem(list []string, n *Node, depth int, cfg *renderConfig) []string
 	if n.Kind == KindFuzz {
 		line += " (fuzz)"
 	}
+	if n.External {
+		line += " — EXTERNAL"
+	}
 	if mark := runMark(n); mark != "" {
 		line += " — " + mark
 	}

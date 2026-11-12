@@ -74,3 +74,48 @@ func (s *SpecRepeatTestSuite) TestASuiteOfBothTestPackagesRunTwice(t *gotest.T) 
 		})
 	})
 }
+
+// stdTwins are the TestFoo nodes of a replayed specstdtwin stream, in order.
+func stdTwins(doc specDoc) []specNode {
+	var out []specNode
+	for _, n := range doc.Packages[0].Nodes {
+		if n.Name == "TestFoo" {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (s *SpecRepeatTestSuite) TestAStdlibTestOfBothTestPackages(t *gotest.T) {
+	const once, twice = "../testdata/specstdtwin/once.jsonl", "../testdata/specstdtwin/twice.jsonl"
+	t.When("a saved stream holds one run of a stdlib test both test packages declare", func(w *gotest.T) {
+		w.It("the spec shows two tests, the external one marked, neither marked as a run", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--input="+once)
+			nodes := stdTwins(doc)
+			gotest.Len(it, nodes, 2)
+			gotest.False(it, nodes[0].External)
+			gotest.True(it, nodes[1].External)
+			gotest.Zero(it, nodes[0].Runs)
+			gotest.Zero(it, nodes[1].Runs)
+			terminal := spec(it, 1, "--input="+once)
+			gotest.Contains(it, terminal.Stdout, "Foo — EXTERNAL")
+			gotest.NotContains(it, terminal.Stdout, "RUN 2 OF 2")
+		})
+		w.It("under -count=2 each run shows the internal test and the external one, marked", func(it *gotest.T) {
+			doc := specJSON(it, 1, "--input="+twice)
+			nodes := stdTwins(doc)
+			gotest.Len(it, nodes, 4)
+			var external []bool
+			var runs []int
+			for _, n := range nodes {
+				external = append(external, n.External)
+				runs = append(runs, n.Run)
+				gotest.Equal(it, 2, n.Runs)
+			}
+			gotest.Equal(it, []bool{false, true, false, true}, external)
+			gotest.Equal(it, []int{1, 1, 2, 2}, runs)
+			terminal := spec(it, 1, "--input="+twice)
+			gotest.Contains(it, terminal.Stdout, "Foo — EXTERNAL — RUN 2 OF 2")
+		})
+	})
+}

@@ -89,6 +89,14 @@ A suite a run holds more than once, as under -count, SHALL read as one suite per
 - **WHEN** a suite of both test packages is run twice
 - **THEN** each run shows the internal suite and the external one, marked
 
+### Requirement: Stdlib tests of both test packages
+A stdlib test function a package's test files and its external test package both declare SHALL read, in the spec of a saved go test stream, as two tests per run, the external one marked, and not as two runs of one test.
+
+#### Scenario: A stdlib test of both test packages
+- **WHEN** a saved stream holds one run of a stdlib test both test packages declare
+- **THEN** the spec shows two tests, the external one marked, neither marked as a run
+- **AND** under -count=2 each run shows the internal test and the external one, marked
+
 ### Requirement: A group's own failure
 A When or an It that fails while every behavior under it passes SHALL show, on its own row of a run's spec, that it failed and what it wrote.
 

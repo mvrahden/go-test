@@ -841,3 +841,36 @@ func (s *TreeTestSuite) TestRepeatedSubtestNamesAreNotATwin(t *gotest.T, _ *tree
 	mustEq(t, "first run", nodes[0].Run, 1)
 	mustEq(t, "second run", nodes[1].Run, 2)
 }
+
+// A stdlib test both test packages declare has no children for the stream
+// rules to read: only the source says it is a twin pair.
+func (s *TreeTestSuite) TestStdlibTwins(t *gotest.T, _ *treeCtx) {
+	one := `{"Action":"run","Package":"p","Test":"TestFoo"}
+{"Action":"pass","Package":"p","Test":"TestFoo","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestFoo"}
+{"Action":"fail","Package":"p","Test":"TestFoo","Elapsed":0}
+`
+	decls := gotestspec.WithDeclarations(gotestspec.DeclarationIndex{"p": {gotestspec.DeclKey("TestFoo"): {Twin: true}}})
+	build := func(stream string) []*gotestspec.Package {
+		events, err := gotestspec.ParseEvents(strings.NewReader(stream))
+		if err != nil {
+			fatalf(t, "ParseEvents: %v", err)
+		}
+		return gotestspec.BuildTree(events, decls)
+	}
+
+	once := runsOf(t, build(one), 2)
+	mustEq(t, "internal", once[0].External, false)
+	mustEq(t, "external", once[1].External, true)
+	mustEq(t, "runs of a single run", once[1].Runs, 0)
+
+	twice := runsOf(t, build(one+one), 4)
+	for i, want := range []struct {
+		external bool
+		run      int
+	}{{false, 1}, {true, 1}, {false, 2}, {true, 2}} {
+		mustEq(t, fmt.Sprintf("node %d external", i+1), twice[i].External, want.external)
+		mustEq(t, fmt.Sprintf("node %d run", i+1), twice[i].Run, want.run)
+		mustEq(t, fmt.Sprintf("node %d runs", i+1), twice[i].Runs, 2)
+	}
+}

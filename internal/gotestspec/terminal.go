@@ -360,6 +360,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 		}
 
 		var tail []tailPart
+		if n.External {
+			tail = append(tail, tailPart{" — EXTERNAL", c.dim})
+		}
 		if mark := runMark(n); mark != "" {
 			tail = append(tail, tailPart{" — " + mark, ""})
 		}

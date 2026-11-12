@@ -1,6 +1,11 @@
 package main
 
 import (
+	"go/ast"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
 	"golang.org/x/tools/go/packages"
 
 	"github.com/mvrahden/go-test/internal/gotestast"
@@ -76,20 +81,30 @@ func buildDeclarationIndex(loadResults []*gotestgen.LoadResult) gotestspec.Decla
 	collector := gotestgen.NewCollector()
 
 	for _, lr := range loadResults {
-		// A suite both test packages declare is a twin pair: its second
-		// instance in a run is the external suite, not a repeat.
+		// A suite or a stdlib test both test packages declare is a twin
+		// pair: its second instance in a run is the external one, not a
+		// repeat.
 		declaredIn := map[string]int{}
 		for _, pkg := range []*packages.Package{lr.Ptest, lr.Pxtest} {
 			if pkg == nil {
 				continue
 			}
+			names := testFuncNames(pkg)
 			result := collector.CollectSuiteSpecs(pkg)
 			if len(result.Errs) > 0 {
+				for name := range names {
+					declaredIn[name]++
+				}
 				continue
 			}
 			for _, suite := range result.Suites {
+				names["Test"+suite.Identifier()] = true
+			}
+			for name := range names {
+				declaredIn[name]++
+			}
+			for _, suite := range result.Suites {
 				suitePath := "Test" + suite.Identifier()
-				declaredIn[suitePath]++
 				for _, method := range suite.TestCases() {
 					indexBehaviors(idx, lr.PkgPath, []string{suitePath, method.Identifier()}, suite.BehaviorsOf(method).Behaviors)
 				}
@@ -110,6 +125,38 @@ func buildDeclarationIndex(loadResults []*gotestgen.LoadResult) gotestspec.Decla
 		return nil
 	}
 	return idx
+}
+
+// testFuncNames are the top-level Test functions pkg's test files declare.
+func testFuncNames(pkg *packages.Package) map[string]bool {
+	names := map[string]bool{}
+	for _, f := range pkg.Syntax {
+		if !strings.HasSuffix(pkg.Fset.Position(f.Pos()).Filename, "_test.go") {
+			continue
+		}
+		for _, d := range f.Decls {
+			fn, ok := d.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil || fn.Name.Name == "TestMain" || !isTestName(fn.Name.Name) {
+				continue
+			}
+			names[fn.Name.Name] = true
+		}
+	}
+	return names
+}
+
+// isTestName is go test's rule: Test, then nothing or a character that is
+// not a lower-case letter.
+func isTestName(name string) bool {
+	rest, ok := strings.CutPrefix(name, "Test")
+	if !ok {
+		return false
+	}
+	if rest == "" {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(rest)
+	return !unicode.IsLower(r)
 }
 
 func indexBehaviors(idx gotestspec.DeclarationIndex, pkgPath string, parent []string, behaviors []*gotestast.Behavior) {

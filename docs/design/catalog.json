@@ -29463,6 +29463,67 @@
               "name": "TestASuiteOfBothTestPackagesRunTwice",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the spec shows two tests, the external one marked, neither marked as a run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "repeat_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 92,
+                      "name": "the_spec_shows_two_tests,_the_external_one_marked,_neither_marked_as_a_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "under -count=2 each run shows the internal test and the external one, marked",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "repeat_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 104,
+                      "name": "under_-count=2_each_run_shows_the_internal_test_and_the_external_one,_marked",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a saved stream holds one run of a stdlib test both test packages declare",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "repeat_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 91,
+                  "name": "a_saved_stream_holds_one_run_of_a_stdlib_test_both_test_packages_declare",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AStdlibTestOfBothTestPackages",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "repeat_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 89,
+              "name": "TestAStdlibTestOfBothTestPackages",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "SpecRepeat",
@@ -30612,7 +30673,7 @@
     }
   ],
   "stats": {
-    "behaviors": 889,
+    "behaviors": 891,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
