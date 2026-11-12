@@ -197,11 +197,10 @@ Projects using `go.work` are also supported.
 
 ## Commands
 
+The palette offers these. Commands that act on one test, benchmark or fuzz target (Run, Debug, Run File, Fuzz Target, …) need that target and are reached through CodeLens, the Test Explorer and code actions.
+
 | Command | Description |
 |---------|-------------|
-| Go Test: Run | Run a specific test by ID |
-| Go Test: Run File | Run all suites in the current file |
-| Go Test: Debug | Debug a specific test by ID |
 | Go Test: Refresh | Re-run test discovery for all workspace folders |
 | Go Test: Show Focused Tests | List all focused tests and navigate to them |
 | Go Test: Show Spec View | Open the BDD spec output panel |
@@ -210,17 +209,10 @@ Projects using `go.work` are also supported.
 | Go Test: Lint Workspace | Run `gotest lint` on every workspace folder |
 | Go Test: Start Watch | Start continuous testing for a package scope |
 | Go Test: Stop Watch | Stop all active watch processes |
-| Go Test: Run Benchmark | Run a suite's or method's benchmarks via `gotest bench` |
-| Go Test: Bench (stable, 5×) | Run a benchmark with `-count=5` for mean ± spread |
 | Go Test: Save Bench Baseline | Save the workspace's benchmark results as a baseline |
 | Go Test: Compare vs Baseline | Compare current numbers against a saved baseline |
 | Go Test: Profile Benchmark (CPU/Mem) | Profile one benchmark and open `go tool pprof` |
-| Go Test: Fuzz Target | Start a budgeted fuzz session for one target |
-| Go Test: Debug Fuzz Seeds | Replay a fuzz target's seeds under the debugger |
-| Go Test: Triage Fuzz Crashers | Show decoded inputs for a package's crashers |
-| Go Test: Promote Fuzz Crashers | Turn crashers into typed `f.Add` seeds |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
-| Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Update Snapshots | Re-run tests with `--update-snapshots` to rewrite `MatchSnapshot` baselines (also a run profile and a CodeLens on snapshot tests) |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |
 | Go Test: Copy Test Results | Copy test results to clipboard (also available as context menu on test items) |
