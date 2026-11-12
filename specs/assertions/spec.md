@@ -25,6 +25,10 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **WHEN** a behavior another module declares fails in its helper, the module's path having no dot, required through a replace and built with -trimpath
 - **THEN** the failure names the helper's line and the caller's
 
+#### Scenario: A helper in a directory named like gotest's
+- **WHEN** a helper fails in a file under a pkg/gotest directory of the user's module
+- **THEN** the failure names the helper's line and the caller's
+
 ### Requirement: Named string types
 Regexp, Contains and JSONEq SHALL treat a value of a named string type as the string it holds; JSONEq marshals one that implements json.Marshaler or encoding.TextMarshaler.
 

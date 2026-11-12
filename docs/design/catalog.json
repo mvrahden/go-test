@@ -2319,6 +2319,52 @@
               "name": "TestHelperInARequiredModuleUnderTrimpath",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the failure names the helper's line and the caller's",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "locations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 102,
+                      "name": "the_failure_names_the_helper's_line_and_the_caller's",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a helper fails in a file under a pkg/gotest directory of the user's module",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "locations_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 101,
+                  "name": "a_helper_fails_in_a_file_under_a_pkg/gotest_directory_of_the_user's_module",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AHelperInADirectoryNamedLikeGotests",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "locations_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 98,
+              "name": "TestAHelperInADirectoryNamedLikeGotests",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "FailureLocations",
@@ -27491,7 +27537,7 @@
     }
   ],
   "stats": {
-    "behaviors": 797,
+    "behaviors": 798,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

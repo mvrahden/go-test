@@ -820,6 +820,7 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-bench-sample-iterations-lost` | a saved sample records 1 iteration, not the ones it ran | conformance: the bench It for saving with --json sees iterations other than 10 |
 | `e2e-bench-report-drops-gate` | the --json report leaves out the gate verdict | conformance: the bench It for comparing under a gate sees no gate |
 | `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |
+| `user-directory-read-as-gotest` | a frame under any directory named `pkg/gotest` counts as gotest's own, so a user's helper there loses its line | ring-0 helper suite |
 | `e2e-assertion-line-left-to-testing` | testing's location for a failure points into gotest | canary: the trimpath helper check sees the failure not naming both lines |
 | `fixs-external-overlay-dropped` | the overlay leaves out the external test package's harness | fixtures conformance: the external test package's suite never runs |
 | `fixture-program-built-without-the-run-flags` | the shared fixture program is built without the run's build flags | conformance: a fixture behind a build tag does not come up |

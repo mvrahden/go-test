@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Helper / .*IsGotestSource_OnlyThisModule
+Judge: ./pkg/gotest/internal/assert
+Clause: when a helper fails in a file under a pkg/gotest directory of the user's module → the failure names the helper's line and the caller's
+--- a/pkg/gotest/internal/assert/trace.go
++++ b/pkg/gotest/internal/assert/trace.go
+@@ -22,7 +22,7 @@
+ 	if !cut || root == "" {
+ 		return nil
+ 	}
+-	return []string{root + "pkg/gotest/", root + "pkg/gotestruntime/"}
++	return nil
+ })
+ 
+ // gotestDirMarkers name the same directories by their last elements, for
