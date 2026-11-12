@@ -289,3 +289,6 @@ var (
 
 // cli.go
 var ExportCommandHint = commandHint
+
+// focusguard.go
+var ExportFocusGate = focusGate

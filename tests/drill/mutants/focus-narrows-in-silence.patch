@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / notes on stderr that F_ narrows the run, naming the method where it is declared, in the plain and -json modes \(
+Clause: when a run outside CI mode holds a focused method → notes on stderr that F_ narrows the run, naming the method where it is declared, in the plain and -json modes
+--- a/cmd/gotest/focusguard.go
++++ b/cmd/gotest/focusguard.go
+@@ -80,6 +80,9 @@
+ 	if ci {
+ 		return enforceFocusGuard(loaded)
+ 	}
++	if !ci {
++		return 0, nil
++	}
+ 	suites, err := gotestgen.CollectFromLoaded(loaded)
+ 	if err != nil {
+ 		return 0, nil

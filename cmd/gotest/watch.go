@@ -375,17 +375,15 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		return 2, benchNs
 	}
 
-	if cfg.CI {
-		if code, err := enforceFocusGuard(loaded); err != nil {
-			if jsonMode {
-				fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
-			} else {
-				fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			}
-			return 2, benchNs
-		} else if code != 0 {
-			return code, benchNs
+	if code, err := focusGate(loaded, cfg.CI); err != nil {
+		if jsonMode {
+			fmt.Printf("{\"Action\":\"watch-error\",\"Output\":%q}\n", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		}
+		return 2, benchNs
+	} else if code != 0 {
+		return code, benchNs
 	}
 
 	// Only the spec view renders a tree, and reading the declarations costs a

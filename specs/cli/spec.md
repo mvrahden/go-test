@@ -91,6 +91,14 @@ With --ci, a run SHALL fail with exit 1 before anything runs when a suite or any
 - **WHEN** --ci runs a package whose only focused method is a fuzz target
 - **THEN** fails with exit 1, naming the fuzz target where it is declared
 
+### Requirement: A focused run outside CI mode
+Outside CI mode, a run that holds a focused suite or method SHALL say on stderr, before anything runs, that F_ narrows it, how many items carry the prefix and where the first is declared, and SHALL exit by what ran.
+
+#### Scenario: A focused method outside CI mode
+- **WHEN** a run outside CI mode holds a focused method
+- **THEN** notes on stderr that F_ narrows the run, naming the method where it is declared, in the plain and -json modes
+- **AND** exits 0 when what ran passed
+
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
 

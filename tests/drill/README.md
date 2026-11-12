@@ -468,6 +468,8 @@ shards of one run do not add up to every mutant exactly once.
 | `config-timeout-reaches-fuzz` | `gotest fuzz` takes the config's timeout and setup-timeout as flags it refuses | CLI conformance: the session exits 2 naming `--timeout` |
 | `fuzz-timeout-flag-accepted` | `gotest fuzz` no longer refuses `--timeout` given as a flag | CLI conformance: the flagged session does not exit 2 |
 | `config-values-unchecked` | `.gotest.yml` values out of their flag's range load without a word | CLI conformance: the run does not exit 2 naming the key |
+| `focus-narrows-in-silence` | a run narrowed by `F_` outside CI mode says nothing | CLI conformance: stderr holds no note |
+| `focus-note-fails-the-run` | the focus note outside CI mode ends the run with exit 1 | CLI conformance: the focused run exits 1 |
 | `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |

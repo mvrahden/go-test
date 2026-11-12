@@ -72,6 +72,24 @@ func enforceFocusGuard(loaded []*gotestgen.LoadResult) (int, error) {
 	return 0, nil
 }
 
+// focusGate is the focus guard of a run: in CI mode enforceFocusGuard;
+// outside it a note on stderr that F_ narrows the run, which never fails it.
+// A collection error outside CI mode is left to generation, which reports it
+// with its location.
+func focusGate(loaded []*gotestgen.LoadResult, ci bool) (int, error) {
+	if ci {
+		return enforceFocusGuard(loaded)
+	}
+	suites, err := gotestgen.CollectFromLoaded(loaded)
+	if err != nil {
+		return 0, nil
+	}
+	if violations := CheckFocusViolations(suites); len(violations) > 0 {
+		fmt.Fprintf(os.Stderr, "note: F_ narrows this run to the focused suites and methods (%d, first %s) — the rest is skipped; remove F_ to run everything, --ci refuses it\n", len(violations), strings.Join(strings.Fields(violations[0].String()), " "))
+	}
+	return 0, nil
+}
+
 func CheckFocusViolations(suites gotestast.TestSuiteSpecSet) []FocusViolation {
 	var violations []FocusViolation
 	for _, s := range suites {

@@ -21,13 +21,11 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		return 2
 	}
 
-	if cfg.CI {
-		if code, err := enforceFocusGuard(loaded); err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
-			return 2
-		} else if code != 0 {
-			return code
-		}
+	if code, err := focusGate(loaded, cfg.CI); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	} else if code != 0 {
+		return code
 	}
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
