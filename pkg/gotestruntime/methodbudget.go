@@ -34,10 +34,11 @@ type method struct {
 type phaseWatch struct{ done, stopped chan struct{} }
 
 // openMethod builds the T of the method it runs and, with a positive budget,
-// starts its watch; end stops the watch. The T's context ends at timeout, or
-// at the budget when there is one: then only after the watch has judged an
-// overrun, so a hook waiting on that context is still waiting, and located,
-// when the verdict is written.
+// starts its watch, which ends after the method's cleanups; end names the
+// phase that follows the hooks and the body. The T's context ends at
+// timeout, or at the budget when there is one: then only after the watch has
+// judged an overrun, so a hook waiting on that context is still waiting, and
+// located, when the verdict is written.
 func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end func()) {
 	if budget <= 0 {
 		m = &method{it: it, t: TestT(it, timeout)}
@@ -63,15 +64,17 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 	// watch that judges it.
 	m.watchOn()
 	timer := time.AfterFunc(budget, m.deadlinePassed)
+	// The watch ends here, not in end: registered ahead of the method's own
+	// cleanups, this runs after them, so the waits on its gotest.Go
+	// goroutines are held to the budget too.
 	it.Cleanup(func() {
+		afterTs.Delete(m.t)
+		m.watchOff()
 		timer.Stop()
 		stop()
 		cancel()
 	})
-	return m, func() {
-		afterTs.Delete(m.t)
-		m.watchOff()
-	}
+	return m, func() { m.enter("cleanup (the wait on a goroutine started with gotest.Go) ") }
 }
 
 // watchOn starts the method's watch unless one runs or the deadline has

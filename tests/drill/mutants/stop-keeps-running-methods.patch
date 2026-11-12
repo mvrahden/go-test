@@ -5,7 +5,7 @@ Clause: when the run is interrupted while a method holds → skips the methods t
 Clause: when the runner of a suite process is killed while a method holds → the methods that have not started never run
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -89,7 +89,7 @@
+@@ -86,7 +86,7 @@
  					skipFailFast(it, first)
  				}
  			}
@@ -13,4 +13,4 @@ Clause: when the runner of a suite process is killed while a method holds → th
 +			if false && runstate.StopContext().Err() != nil {
  				skipStopping(it)
  			}
- 			// The budget covers the fixture hooks, the suite hooks and the body:
+ 			// The budget covers the fixture hooks, the suite hooks, the body and

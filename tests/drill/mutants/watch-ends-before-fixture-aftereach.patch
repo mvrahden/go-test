@@ -3,15 +3,15 @@ Judge: ./tests/canary CanaryTestSuite/TestAHookOverrunFailsTheMethod
 Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or overruns the Timeout → fails the run with exit 1 and the method, naming the hook and located at it, running the later hooks the row lists and, after a panic, no further method
 --- a/pkg/gotestruntime/methods.go
 +++ b/pkg/gotestruntime/methods.go
-@@ -95,7 +95,6 @@
- 			// The budget covers the fixture hooks, the suite hooks and the body:
- 			// ended last, after every AfterEach registered below.
+@@ -92,7 +92,6 @@
+ 			// The budget covers the fixture hooks, the suite hooks, the body and
+ 			// the method's cleanups, where a gotest.Go goroutine is waited for.
  			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
 -			defer end()
  			for _, f := range m.Fixtures {
  				// After a BeforeEach that overran no later fixture's turn comes.
  				if mt.overran() {
-@@ -119,6 +118,7 @@
+@@ -116,6 +115,7 @@
  					}()
  				}
  			}
@@ -19,3 +19,17 @@ Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or ove
  			if mt.overran() {
  				return
  			}
+--- a/pkg/gotestruntime/methodbudget.go
++++ b/pkg/gotestruntime/methodbudget.go
+@@ -74,7 +74,10 @@
+ 		stop()
+ 		cancel()
+ 	})
+-	return m, func() { m.enter("cleanup (the wait on a goroutine started with gotest.Go) ") }
++	return m, func() {
++		m.watchOff()
++		m.enter("cleanup (the wait on a goroutine started with gotest.Go) ")
++	}
+ }
+ 
+ // watchOn starts the method's watch unless one runs or the deadline has

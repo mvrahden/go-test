@@ -20,7 +20,7 @@ func (s *HoldsTestSuite) SuiteConfig() gotest.SuiteConfig {
 	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 45 * time.Second}
 }
 
-var plainPackages = []string{"./testdata/holds/", "./testdata/panics/"}
+var plainPackages = []string{"./testdata/holds/", "./testdata/panics/", "./testdata/edges/"}
 
 func (s *HoldsTestSuite) BeforeAll(t *gotest.T) {
 	root, err := filepath.Abs("../..")
@@ -165,4 +165,15 @@ func (s *HoldsTestSuite) TestEveryPanicReleasesTheFixture(t *gotest.T) {
 		gotest.Contains(t, out, tc.value)
 		gotest.Equal(t, []string{"setup", "teardown"}, events, out)
 	}
+}
+
+func (s *HoldsTestSuite) edges(t *gotest.T, env []string, args ...string) (code int, out string) {
+	code, out, _ = goTest(t, s.root, "./testdata/edges/", "EDGES_LOG", env, args...)
+	return code, out
+}
+
+func (s *HoldsTestSuite) TestAGoWaitIsHeldToTheMethodsTimeout(t *gotest.T) {
+	code, out := s.edges(t, nil, "-run", "TestLingerTestSuite")
+	gotest.Contains(t, out, "cleanup (the wait on a goroutine started with gotest.Go) exceeded its configured Timeout of 200ms", "the wait on the goroutine was not held to the Timeout")
+	gotest.Equal(t, 1, code, out)
 }

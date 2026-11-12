@@ -42,6 +42,12 @@ func (s *GoroutinesTestSuite) TestWaits(t *gotest.T) {
 			gotest.Regexp(it, `goroutines_suite_test\.go:\d+: goroutine started by gotest\.Go exited via runtime\.Goexit`, run.Stdout)
 		})
 	})
+	t.When("a goroutine a method started with gotest.Go is still running when the method's declared Timeout passes", func(w *gotest.T) {
+		w.It("fails the method with a verdict naming the wait and its Timeout", func(it *gotest.T) {
+			gotest.Equal(it, "fail", run.Verdict("TestLingerTestSuite/TestLingers"), "stdout: %s", run.Stdout)
+			gotest.Contains(it, run.Stdout, "cleanup (the wait on a goroutine started with gotest.Go) exceeded its configured Timeout of 200ms")
+		})
+	})
 }
 
 type lastGoroutineRow struct {
