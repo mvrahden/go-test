@@ -85,8 +85,6 @@ func (b *BaseSuite) TestShared(t *gotest.T) {
 	fmt.Println("RAN base TestShared")
 }
 
-func (b *BaseSuite) TestOverridden(t *gotest.T) { fmt.Println("RAN base TestOverridden") }
-
 type ChildTestSuite struct{ base BaseSuite }
 
 func (s *ChildTestSuite) TestOverridden(t *gotest.T) {

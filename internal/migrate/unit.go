@@ -104,6 +104,9 @@ type suiteDecl struct {
 	forwards []forward
 	// runner is the name of the suite.Run function the migration drops.
 	runner string
+	// unran are the tests of a helper base testify never ran, which the
+	// migration removes, each at its line in the source as it was.
+	unran []unranTest
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
@@ -606,6 +609,7 @@ func (u *unit) migrate() error {
 		u.collectHooks()
 		u.collectNeedsT()
 		u.collectForwards()
+		u.collectUnran()
 		for _, s := range u.suites {
 			s.setupStops = s.migrated() && u.setupMayStop(s)
 		}

@@ -48,7 +48,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		verb = "Would migrate"
 	}
 	markers, suites, soft, stdlib := 0, 0, 0, 0
-	var lines, refused, leftover, uncompiled, unplaced, generated, ids []string
+	var lines, refused, leftover, uncompiled, unplaced, generated, ids, removed []string
 	for i := range results {
 		r := &results[i]
 		markers += r.Markers
@@ -56,6 +56,9 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		stdlib += r.StdlibTests
 		if r.OldID != "" {
 			ids = append(ids, "    "+r.OldID+" → "+r.NewID)
+		}
+		for _, m := range r.Removed {
+			removed = append(removed, "    "+m)
 		}
 		switch {
 		case len(r.Uncompiled) > 0:
@@ -117,7 +120,7 @@ func runMigrate(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	if markers > 0 {
 		fmt.Printf("%d TODO(gotest-migrate) marker%s left; resolve them by hand\n", markers, plural(markers))
 	}
-	printNotKept(soft, stdlib, ids)
+	printNotKept(soft, stdlib, ids, removed)
 	switch {
 	case len(uncompiled) > 0:
 		return 2
@@ -146,8 +149,8 @@ func holdSignals(write func() error) error {
 
 // printNotKept prints what a migration did not keep, each line only where
 // it has something to say.
-func printNotKept(soft, stdlib int, ids []string) {
-	if soft == 0 && stdlib == 0 && len(ids) == 0 {
+func printNotKept(soft, stdlib int, ids, removed []string) {
+	if soft == 0 && stdlib == 0 && len(ids) == 0 && len(removed) == 0 {
 		return
 	}
 	fmt.Println("Not kept, check by hand:")
@@ -160,5 +163,9 @@ func printNotKept(soft, stdlib int, ids []string) {
 	if len(ids) > 0 {
 		fmt.Println("  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:")
 		printLines(ids)
+	}
+	if len(removed) > 0 {
+		fmt.Println("  tests a base declared that testify never ran, as every suite embedding it declares its own, removed:")
+		printLines(removed)
 	}
 }

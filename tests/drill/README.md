@@ -787,6 +787,8 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-positive-float-translated` | `Positive` on a float is translated into `Greater` against 0 | conformance: the migrate It for the forms left unconverted finds no marker on `s.Positive(f)` |
 | `migrate-summary-silent` | migrate prints no closing summary of what it did not keep | conformance: the migrate It for the closing summary finds no `Not kept` section |
 | `migrate-summary-always` | the `Not kept` header is printed with nothing under it | conformance: the migrate It for a migration with nothing to say finds the header |
+| `migrate-unran-base-test-kept` | a base test every child overrides is carried over, a case on a helper | conformance: the migrate It for such a test finds it in the output and the run refused |
+| `migrate-called-base-test-removed` | a base test something calls is removed with the ones no suite ran | conformance: the migrate It for the kept tests finds `TestCalled` gone |
 | `e2e-bench-note-dropped` | a test run drops the note on the benchmarks it left out | conformance: the CLI It for a package that declares a benchmark sees no note on stderr |
 | `e2e-excluded-suite-passes` | an X_ suite is booked as passed, not skipped | conformance: the discovery It for an X_ suite sees it not reported skipped |
 | `e2e-discover-when-kind-misnamed` | discover reports a When's kind as it | conformance: the discovery It for a When with Its sees the wrong kind |

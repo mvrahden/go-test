@@ -163,6 +163,9 @@ type MigrateResult struct {
 	// OldID and NewID are the go test id of the suite before and after,
 	// set where they differ.
 	OldID, NewID string
+	// Removed names the tests of a base testify never ran that the
+	// migration removed from the file: file:line, type and method.
+	Removed []string
 }
 
 // DeriveNewName computes the new suite name from an old one, exported:
@@ -527,14 +530,15 @@ func (u *unit) fileResults(uf *unitFile, shown string, changed bool, markers int
 	if u.anyMigrated() {
 		stdlib = stdlibTests(uf.f)
 	}
+	removed := u.unranIn(uf, shown)
 	switch {
 	case len(results) > 0:
-		results[0].Soft, results[0].StdlibTests = uf.soft, stdlib
+		results[0].Soft, results[0].StdlibTests, results[0].Removed = uf.soft, stdlib, removed
 		return results
 	case stdlib > 0 && !changed && markers == 0:
 		return []MigrateResult{{File: shown, StdlibTests: stdlib}}
 	case changed:
-		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true, Soft: uf.soft, StdlibTests: stdlib}}
+		return []MigrateResult{{File: shown, Markers: markers, RefsOnly: true, Soft: uf.soft, StdlibTests: stdlib, Removed: removed}}
 	case markers > 0:
 		return []MigrateResult{{File: shown, Markers: markers, StdlibTests: stdlib}}
 	}

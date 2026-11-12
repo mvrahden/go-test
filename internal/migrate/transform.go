@@ -34,6 +34,7 @@ func (u *unit) transformFile(f *ast.File) bool {
 		}
 	}
 	changed := u.derefPtrEmbeds(f)
+	changed = u.dropUnran(f) || changed
 	changed = u.rewriteEmbedded(f) || changed
 
 	// A base kept as a helper under a name gotest would run is renamed

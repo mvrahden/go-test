@@ -2,11 +2,11 @@ Expect: ^FAIL .*conformance/migrate MigrateVerdicts / WhatMigrateDidNotKeep / wh
 Clause: when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test → the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed
 --- a/cmd/gotest/migrate.go
 +++ b/cmd/gotest/migrate.go
-@@ -117,7 +117,6 @@
+@@ -120,7 +120,6 @@
  	if markers > 0 {
  		fmt.Printf("%d TODO(gotest-migrate) marker%s left; resolve them by hand\n", markers, plural(markers))
  	}
--	printNotKept(soft, stdlib, ids)
+-	printNotKept(soft, stdlib, ids, removed)
  	switch {
  	case len(uncompiled) > 0:
  		return 2

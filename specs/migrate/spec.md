@@ -6,7 +6,7 @@ What `gotest migrate` makes of testify suites: the code it writes, what it leave
 ## Requirements
 
 ### Requirement: Base suites
-Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets to a fresh base: the child SHALL hold the base in a named field and declare the hooks and tests testify ran on it through the base, the base SHALL become a helper type gotest does not run, a TestSuite suffix renamed SuiteHelper, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
+Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets afresh: the child SHALL hold the base in a named field and carry over only the hooks and tests testify ran on it, the base SHALL become a helper type gotest does not run, a TestSuite suffix renamed SuiteHelper, less the tests no suite ran, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
 
 #### Scenario: A child of a base suite
 - **WHEN** a testify suite embeds a base suite of the migrated test files
@@ -26,6 +26,11 @@ Migrate SHALL convert a testify suite embedding a base suite of the migrated tes
 #### Scenario: A child's method calling the base
 - **WHEN** a method of the child without t calls a base method that gains t
 - **THEN** the method gains t, its callers pass it, and the migrated child runs without a marker
+
+#### Scenario: A base test every child overrides
+- **WHEN** a base no runner runs declares a test that every suite embedding it overrides and nothing calls
+- **THEN** migrate removes it and names it in the closing summary, since testify never ran it
+- **AND** a base test only some children override, one something calls, and the tests of a base a runner runs are kept
 
 ### Requirement: Base suites left as they are
 Migrate SHALL leave a suite's file unconverted under a marker giving the reason when its base cannot carry over: an embedding by any other pointer, which gotest's new leaves nil; a local or anonymous struct embedding a base, as gotest runs only package-level suites; a base in a non-test file of the suite's directory, as migrate changes only test files; a helper name already taken. A base of a package in another directory SHALL make migrate exit 2, naming its package, with nothing written.
@@ -157,7 +162,7 @@ Migrate SHALL keep a comment that trails a statement at the end of that statemen
 - **THEN** each comment stays at the end of its own statement
 
 ### Requirement: The closing summary
-After it migrates a suite, migrate SHALL say on stdout what it did not keep: the number of assertions that let a test go on after failing and now stop it, the number of stdlib tests it left in the migrated files, which gotest does not run, and each go test id that changed beside its new id. It SHALL print none of this where there is none.
+After it migrates a suite, migrate SHALL say on stdout what it did not keep: the number of assertions that let a test go on after failing and now stop it, the number of stdlib tests it left in the migrated files, which gotest does not run, each go test id that changed beside its new id, and each base test it removed, at its file and line. It SHALL print none of this where there is none.
 
 #### Scenario: What migrate did not keep
 - **WHEN** migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test

@@ -23487,6 +23487,67 @@
               "name": "TestAHelperNameTaken",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate removes it and names it in the closing summary, since testify never ran it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "base_suites_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 511,
+                      "name": "migrate_removes_it_and_names_it_in_the_closing_summary,_since_testify_never_ran_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a base test only some children override, one something calls, and the tests of a base a runner runs are kept",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "base_suites_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 518,
+                      "name": "a_base_test_only_some_children_override,_one_something_calls,_and_the_tests_of_a_base_a_runner_runs_are_kept",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a base no runner runs declares a test that every suite embedding it overrides and nothing calls",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "base_suites_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 508,
+                  "name": "a_base_no_runner_runs_declares_a_test_that_every_suite_embedding_it_overrides_and_nothing_calls",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABaseTestEveryChildOverrides",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "base_suites_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 507,
+              "name": "TestABaseTestEveryChildOverrides",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "MigrateBaseSuites",
@@ -27107,7 +27168,7 @@
     }
   ],
   "stats": {
-    "behaviors": 787,
+    "behaviors": 789,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
