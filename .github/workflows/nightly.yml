@@ -48,6 +48,31 @@ jobs:
           path: ${{ steps.test.outputs.events-file }}
           retention-days: 14
 
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-key: test
+      - name: Prepare the CLI's coverage directory
+        run: mkdir -p "$RUNNER_TEMP/cli-cover"
+      - name: Test (suites, with the CLI instrumented)
+        uses: ./
+        env:
+          GOCOVERDIR: ${{ runner.temp }}/cli-cover
+        with:
+          packages: "./... ./examples/..."
+          race: true
+          flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          coverage: true
+          go-test-flags: -coverprofile=${{ runner.temp }}/suites.out
+      - name: Coverage with the CLI's subprocess runs
+        run: |
+          bash .github/scripts/coverage-total.sh "$RUNNER_TEMP/suites.out" "$RUNNER_TEMP/cli-cover" "$GATE_MIN_TOTAL_COVERAGE" \
+            github.com/mvrahden/go-test/cmd/... github.com/mvrahden/go-test/internal/... github.com/mvrahden/go-test/pkg/...
+
   gate-min:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -273,7 +298,7 @@ jobs:
           echo "Go tip ($(go version 2>/dev/null || echo unavailable)): $outcome" >> "$GITHUB_STEP_SUMMARY"
 
   report:
-    needs: [gate, gate-min, platform, checks, drill, drill-shards, mixed-verdicts, fuzz, go-tip]
+    needs: [gate, coverage, gate-min, platform, checks, drill, drill-shards, mixed-verdicts, fuzz, go-tip]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -312,6 +312,10 @@ func copyExecutable(from, dir string) (string, error) {
 func cliKey(ctx context.Context, root string) (string, error) {
 	h := sha256.New()
 	h.Write([]byte(root + "\n"))
+	// An instrumented build must never serve a plain run.
+	if os.Getenv("GOCOVERDIR") != "" {
+		h.Write([]byte("cover\n"))
+	}
 	for _, args := range [][]string{
 		{"list", "-export", "-f", "{{.BuildID}}", "./cmd/gotest"},
 		{"env", "GOFLAGS", "CGO_ENABLED", "CGO_LDFLAGS", "GOVERSION"},

@@ -28,7 +28,14 @@ func BuildCLI(ctx context.Context, repoRoot, dir string) (string, error) {
 
 func buildCLI(ctx context.Context, repoRoot, dir string) (string, error) {
 	binary := filepath.Join(dir, cliName())
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/gotest") //nolint:gosec // G204: go tool with controlled arguments
+	args := []string{"build"}
+	// Under GOCOVERDIR the CLI writes its counters there, so a run can
+	// measure what its CLI subprocesses execute.
+	if os.Getenv("GOCOVERDIR") != "" {
+		args = append(args, "-cover", "-covermode=atomic")
+	}
+	args = append(args, "-o", binary, "./cmd/gotest")
+	cmd := exec.CommandContext(ctx, "go", args...) //nolint:gosec // G204: go tool with controlled arguments
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("build gotest: %w\n%s", err, out)

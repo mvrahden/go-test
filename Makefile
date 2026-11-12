@@ -1,4 +1,4 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check coverage-total
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
@@ -26,6 +26,13 @@ drill:
 
 drill-check:
 	bash tests/drill/drill.sh --check-patches
+
+COVER_DIR ?= $(or $(TMPDIR),/tmp)/gotest-coverage-total
+
+coverage-total:
+	rm -rf "$(COVER_DIR)" && mkdir -p "$(COVER_DIR)/data"
+	GOCOVERDIR="$(COVER_DIR)/data" go run ./cmd/gotest spec --parallel=$(GATE_PARALLEL) --timeout=$(GATE_TIMEOUT) ./... ./examples/... -race -coverprofile="$(COVER_DIR)/suites.out"
+	bash .github/scripts/coverage-total.sh "$(COVER_DIR)/suites.out" "$(COVER_DIR)/data" $(GATE_MIN_TOTAL_COVERAGE) github.com/mvrahden/go-test/cmd/... github.com/mvrahden/go-test/internal/... github.com/mvrahden/go-test/pkg/...
 
 catalog:
 	go run ./internal/speccatalog/render
