@@ -24,7 +24,7 @@ func (s *LinterGitHubTestSuite) TestAnnotationEscaping(t *gotest.T) {
 
 		w.It("lint --github escapes the annotation's message and properties", func(it *gotest.T) {
 			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
-			gotest.Regexp(it, `^::error file=[^,:]*[/\\]lintgh[/\\]fixture%2Cshared\.go,line=8,col=6,title=generation-rejects::`, run.Stdout)
+			gotest.Regexp(it, `^::error file=[^,:]*[/\\]lintgh[/\\]fixture%2Cshared\.go,line=9,col=2,title=generation-rejects::`, run.Stdout)
 			gotest.Contains(it, run.Stdout, `::shared fixture "TagSharedFixture": transfer field "Ch" has non-JSON-serializable type struct{C chan int "x:\"100%25, gh:éé`)
 			gotest.NotContains(it, run.Stdout, "100%,")
 		})
@@ -44,7 +44,7 @@ func (s *LinterGitHubTestSuite) TestWorkspacePaths(t *gotest.T) {
 			run, err := testkit.RunCLIWithEnv(it.Context(), ".", []string{"GITHUB_WORKSPACE=" + root}, "lint", "--github", "../testdata/lintgh/")
 			gotest.NoError(it, err)
 			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
-			gotest.Regexp(it, `^::error file=tests/conformance/testdata/lintgh/fixture%2Cshared\.go,line=8,col=6,`, run.Stdout)
+			gotest.Regexp(it, `^::error file=tests/conformance/testdata/lintgh/fixture%2Cshared\.go,line=9,col=2,`, run.Stdout)
 		})
 	})
 }
