@@ -2,8 +2,11 @@
 package gotestruntime_test //nolint:fail-guard
 
 import (
+	"context"
+	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestruntime"
@@ -35,5 +38,50 @@ func (s *LifetimesTestSuite) TestBeforeAllResourcesLastThroughAfterAll(t *gotest
 	}
 	if got := os.Getenv(key); got != "" {
 		t.Errorf("BeforeAll's environment variable outlived the suite: %q", got)
+	}
+}
+
+func (s *LifetimesTestSuite) TestBeforeAllContextOutlivesItsSetupTimeout(t *gotest.T) {
+	var ctx context.Context
+	var during, after bool
+	var inMethods, inAfterAll error
+	t.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // OpenSuite takes the raw testing.TB
+		gotestruntime.OpenSuite(tt, gotestruntime.Suite{
+			Config:    func() gotest.SuiteConfig { return gotest.SuiteConfig{SetupTimeout: 50 * time.Millisecond} },
+			BeforeAll: func(bt *gotest.T) { ctx = bt.Context(); _, during = ctx.Deadline() },
+			AfterAll:  func(*gotest.T) { inAfterAll = ctx.Err() },
+		})
+		time.Sleep(150 * time.Millisecond) // the methods' time: three SetupTimeouts
+		inMethods = ctx.Err()
+		_, after = ctx.Deadline()
+	})
+	if !during {
+		t.Errorf("BeforeAll's context carried no deadline while BeforeAll ran")
+	}
+	if inMethods != nil {
+		t.Errorf("BeforeAll's context ended while the suite still ran: %v", inMethods)
+	}
+	if after {
+		t.Errorf("BeforeAll's context still reports a deadline after BeforeAll returned")
+	}
+	if inAfterAll == nil {
+		t.Errorf("BeforeAll's context was still live in AfterAll")
+	}
+}
+
+func (s *LifetimesTestSuite) TestBeforeAllContextEndsAtTheSetupTimeoutWhileItRuns(t *gotest.T) {
+	var err error
+	t.T().Run("inner", func(tt *testing.T) { //nolint:t-escape // RunSetup takes the raw testing.TB
+		// No declared budget: the context ends, nothing is failed.
+		gotestruntime.RunSetup(tt, 50*time.Millisecond, 0, func(bt *gotest.T) {
+			select {
+			case <-bt.Context().Done():
+				err = bt.Context().Err()
+			case <-time.After(2 * time.Second):
+			}
+		})
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("BeforeAll's context did not end at its SetupTimeout: %v", err)
 	}
 }

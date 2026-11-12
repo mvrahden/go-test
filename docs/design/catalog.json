@@ -20922,6 +20922,83 @@
                   "output": [],
                   "status": "none",
                   "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the context BeforeAll got is still live in them",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelifetime_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 28,
+                      "name": "the_context_BeforeAll_got_is_still_live_in_them",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "that context has ended by the time AfterAll runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelifetime_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 32,
+                      "name": "that_context_has_ended_by_the_time_AfterAll_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite's methods run past its SetupTimeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suitelifetime_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 27,
+                  "name": "a_suite's_methods_run_past_its_SetupTimeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its context ends at the SetupTimeout",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelifetime_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 37,
+                      "name": "its_context_ends_at_the_SetupTimeout",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when BeforeAll waits on its context past the SetupTimeout",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suitelifetime_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 36,
+                  "name": "BeforeAll_waits_on_its_context_past_the_SetupTimeout",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
                 }
               ],
               "display": "WhatBeforeAllTakes",
@@ -27629,7 +27706,7 @@
     }
   ],
   "stats": {
-    "behaviors": 800,
+    "behaviors": 803,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

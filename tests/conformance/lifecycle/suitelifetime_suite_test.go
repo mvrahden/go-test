@@ -24,4 +24,20 @@ func (s *SuiteLifetimeTestSuite) TestWhatBeforeAllTakes(t *gotest.T) {
 			gotest.Contains(it, run.Markers, "afterall: env kept")
 		})
 	})
+	t.When("a suite's methods run past its SetupTimeout", func(w *gotest.T) {
+		w.It("the context BeforeAll got is still live in them", func(it *gotest.T) {
+			gotest.Equal(it, "pass", run.Verdict("TestLongTestSuite/TestOutlastsSetup"), "stdout: %s", run.Stdout)
+			gotest.Contains(it, run.Markers, "method: context live")
+		})
+		w.It("that context has ended by the time AfterAll runs", func(it *gotest.T) {
+			gotest.Contains(it, run.Markers, "afterall: context ended")
+		})
+	})
+	t.When("BeforeAll waits on its context past the SetupTimeout", func(w *gotest.T) {
+		w.It("its context ends at the SetupTimeout", func(it *gotest.T) {
+			gotest.Contains(it, run.Markers, "beforeall: context ended")
+			gotest.Equal(it, "fail", run.Verdict("TestWaitingTestSuite"), "a declared SetupTimeout is held by verdict")
+			gotest.Contains(it, run.Stdout, "BeforeAll exceeded its configured SetupTimeout of 300ms")
+		})
+	})
 }

@@ -178,6 +178,7 @@ type budgetContext struct {
 	cancel   context.CancelCauseFunc
 	values   context.Context
 	deadline time.Time
+	dropped  atomic.Bool
 	done     chan struct{}
 	once     sync.Once
 	err      atomic.Pointer[error]
@@ -192,13 +193,30 @@ func newBudgetContext(parent context.Context, deadline time.Time) *budgetContext
 	return c
 }
 
-func (c *budgetContext) Deadline() (time.Time, bool) { return c.deadline, true }
-func (c *budgetContext) Done() <-chan struct{}       { return c.done }
-func (c *budgetContext) Value(key any) any           { return c.values.Value(key) }
+func (c *budgetContext) Done() <-chan struct{} { return c.done }
+func (c *budgetContext) Value(key any) any     { return c.values.Value(key) }
+
+func (c *budgetContext) Deadline() (time.Time, bool) {
+	if c.dropped.Load() {
+		return time.Time{}, false
+	}
+	return c.deadline, true
+}
+
+// dropDeadline withdraws the deadline: Deadline reports none from then on.
+// It bends context.Context's "successive calls return the same results", on
+// purpose: a deadline left in the past would time out every later use.
+func (c *budgetContext) dropDeadline() { c.dropped.Store(true) }
 
 func (c *budgetContext) Err() error {
 	if err := c.err.Load(); err != nil {
 		return *err
+	}
+	// The parent's end reaches end on an AfterFunc goroutine; a read right
+	// after it must already see it.
+	if err := c.values.Err(); err != nil {
+		c.end(err)
+		return *c.err.Load()
 	}
 	return nil
 }

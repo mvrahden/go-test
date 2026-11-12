@@ -116,7 +116,16 @@ A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived fr
 - **THEN** fails the suite with a verdict naming the wait and its SetupTimeout
 
 ### Requirement: What BeforeAll takes from its T
-A temporary directory and an environment variable a suite's BeforeAll takes from its T SHALL last until AfterAll has returned.
+The context of the T a suite's BeforeAll gets SHALL carry the SetupTimeout as its deadline and end at it only while BeforeAll is still running; once BeforeAll has returned it SHALL carry no deadline and SHALL end when the suite's methods are done, before AfterAll runs, or at a stop. A temporary directory and an environment variable BeforeAll takes from its T SHALL last until AfterAll has returned.
+
+#### Scenario: Methods that run past the SetupTimeout
+- **WHEN** a suite's methods run past its SetupTimeout
+- **THEN** the context BeforeAll got is still live in them
+- **AND** that context has ended by the time AfterAll runs
+
+#### Scenario: BeforeAll waits past the SetupTimeout
+- **WHEN** BeforeAll waits on its context past the SetupTimeout
+- **THEN** its context ends at the SetupTimeout
 
 #### Scenario: A temporary directory and an environment variable from BeforeAll
 - **WHEN** BeforeAll takes a temporary directory and sets an environment variable through its T

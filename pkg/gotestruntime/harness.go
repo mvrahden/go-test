@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -109,8 +110,47 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 // goroutines it, or any T derived from it, starts with gotest.Go are kept for
 // [drainSetupWaits].
 func SetupT(t testing.TB, timeout time.Duration) *gotest.T {
-	scoped := testScopedT(t, timeout)
+	scoped, _ := setupScopedT(t, timeout, nil)
 	return gotest.NewTWithContext(t, setupwaits.Open(scoped.Context(), t))
+}
+
+// setupScopedT builds BeforeAll's T: a positive timeout is its deadline and
+// ends it until returned is called. From then on Deadline reports none, and
+// the context ends with t's (just before t's cleanups, so before AfterAll) or
+// at a stop. Like [testScopedT] otherwise.
+//
+// With judged, the watch of a declared budget, the deadline ends the context
+// only once the watch has judged, so a BeforeAll waiting on it is still
+// running, and located, when the verdict is written.
+func setupScopedT(t testing.TB, timeout time.Duration, judged <-chan struct{}) (tt *gotest.T, returned func()) {
+	if timeout <= 0 {
+		return testScopedT(t, timeout), func() {}
+	}
+	parent, cancel := context.WithCancel(t.Context())
+	if runstate.StopContext().Err() != nil {
+		cancel()
+	}
+	stop := context.AfterFunc(runstate.StopContext(), cancel)
+	ctx := newBudgetContext(parent, time.Now().Add(timeout))
+	var over atomic.Bool
+	timer := time.AfterFunc(timeout, func() {
+		if judged != nil {
+			<-judged
+		}
+		if !over.Load() {
+			ctx.end(context.DeadlineExceeded)
+		}
+	})
+	t.Cleanup(func() {
+		timer.Stop()
+		stop()
+		cancel()
+	})
+	return gotest.NewTWithContext(t, ctx), func() {
+		over.Store(true)
+		timer.Stop()
+		ctx.dropDeadline()
+	}
 }
 
 // drainSetupWaits waits for the goroutines tb's BeforeAll started, held to
@@ -196,20 +236,26 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
-// budget is the deadline it is held to by verdict, or zero for a suite that
-// declared no config of its own.
+// RunSetup runs a suite's BeforeAll. timeout bounds the context it receives
+// while BeforeAll runs; once it returned, the context has no deadline and ends
+// when t's methods are done, before AfterAll, or at a stop. budget is the
+// deadline it is held to by verdict, or zero for a suite that declared no
+// config of its own.
 func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
-	tt := SetupT(t, timeout)
+	// Watching before the context's timer starts, as a method's watch does.
+	// Deferred: the watch also ends when BeforeAll exits via Goexit.
+	end, judged := watchPhaseJudged(t, budget, "BeforeAll ", "SetupTimeout")
+	defer end()
+	scoped, returned := setupScopedT(t, timeout, judged)
+	tt := gotest.NewTWithContext(t, setupwaits.Open(scoped.Context(), t))
 	if defaultApplies(timeout, budget) {
 		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" BeforeAll", "SetupTimeout", timeout)()
 	}
-	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() {
-		// A stop gives BeforeAll the grace a method body gets: AfterAll
-		// cannot run before it returns.
-		defer runstate.EnterBody(t, "BeforeAll")()
-		beforeAll(tt)
-	})
+	// A stop gives BeforeAll the grace a method body gets: AfterAll cannot
+	// run before it returns.
+	defer runstate.EnterBody(t, "BeforeAll")()
+	defer returned()
+	beforeAll(tt)
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
@@ -253,8 +299,15 @@ func watchWhile(tb testing.TB, timeout time.Duration, what, budget string, run f
 // legal: the testing package panics on a log from a test that has already
 // completed, and the test cannot complete before the watch has ended.
 func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end func()) {
+	end, _ = watchPhaseJudged(tb, timeout, what, budget)
+	return end
+}
+
+// watchPhaseJudged is [watchPhase] that also returns judged, which closes
+// once the watch has judged the deadline or ended; nil without a watch.
+func watchPhaseJudged(tb testing.TB, timeout time.Duration, what, budget string) (end func(), judged <-chan struct{}) {
 	if timeout <= 0 {
-		return func() {}
+		return func() {}, nil
 	}
 	due, done, stopped := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	timer := time.AfterFunc(timeout, func() { close(due) })
@@ -267,7 +320,7 @@ func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end 
 		timer.Stop()
 		close(done)
 		<-stopped
-	})
+	}), stopped
 }
 
 // watchDeadline fails tb if the phase, running on goroutine gid, has not
