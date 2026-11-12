@@ -2,6 +2,7 @@ package conventions_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -30,14 +31,24 @@ var (
 	packageHeading = regexp.MustCompile(`(?m)^=== \S+ — `)
 )
 
-// readmeExample returns the fenced blocks of the README's first example, in
-// order: the suite, the run command, its output, the spec command, its output.
+// readmeExample returns the fenced blocks of the README's suite example, in
+// order: the suite, its production code, the run command, its output, the
+// spec command, its output.
 func readmeExample(t *gotest.T) []string {
+	out := readmeBlocks(t, "\n### Step 2: Write a Suite\n", "README has no Step 2: Write a Suite section")
+	gotest.Len(t, out, 6, "the example shows the suite, its production code, a run, its output, a spec run and its output")
+	return out
+}
+
+// readmeBlocks returns the bodies of the fenced blocks of the README section
+// that opens with heading and ends at the next heading of level two or three.
+func readmeBlocks(t *gotest.T, heading, missing string) []string {
 	data, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
 	gotest.NoError(t, err)
-	_, section, found := strings.Cut(string(data), "\n## 30-Second Example\n")
-	gotest.True(t, found, "README has no 30-Second Example section")
+	_, section, found := strings.Cut(string(data), heading)
+	gotest.True(t, found, missing)
 	section, _, _ = strings.Cut(section, "\n## ")
+	section, _, _ = strings.Cut(section, "\n### ")
 	var blocks []string
 	for _, part := range strings.Split(section, "\n```")[1:] {
 		_, body, _ := strings.Cut(part, "\n")
@@ -49,20 +60,36 @@ func readmeExample(t *gotest.T) []string {
 	for i := 0; i < len(blocks); i += 2 {
 		out = append(out, strings.TrimRight(blocks[i], "\n"))
 	}
-	gotest.Len(t, out, 5, "the example shows the suite, a run, its output, a spec run and its output")
 	return out
+}
+
+// asShown is a fixture file as the README prints it, from its package line
+// on: the README indents with four spaces where gofmt writes a tab.
+func asShown(t *gotest.T, path string) string {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the suite's own fixture
+	gotest.NoError(t, err)
+	text := string(data)
+	if i := strings.Index(text, "\npackage "); i >= 0 && !strings.HasPrefix(text, "package ") {
+		text = text[i+1:]
+	}
+	return strings.TrimSpace(strings.ReplaceAll(text, "\t", "    "))
+}
+
+// dropNameLine drops a block's first line, the file-name comment.
+func dropNameLine(block string) string {
+	return strings.Join(strings.Split(block, "\n")[1:], "\n")
 }
 
 func (s *ReadmeExampleTestSuite) TestTheFirstExampleIsTheFixture(t *gotest.T) {
 	blocks := readmeExample(t)
-	fixture, err := os.ReadFile(filepath.Join("testdata", "readme", "user_service_suite_test.go"))
-	gotest.NoError(t, err)
-	shown := strings.Join(strings.Split(blocks[0], "\n")[1:], "\n") // drop the file-name comment
-	shown = strings.Replace(shown, "package user\n", "package readme\n", 1)
+	suite := strings.Replace(dropNameLine(blocks[0]), "package user\n", "package readme\n", 1)
+	code := strings.Replace(dropNameLine(blocks[1]), "package user\n", "package readme\n", 1)
 	t.When("the README shows its first suite", func(w *gotest.T) {
 		w.It("is the suite the fixture package holds, to the line", func(it *gotest.T) {
-			// The README indents with four spaces where gofmt writes a tab.
-			gotest.Equal(it, strings.TrimSpace(shown), strings.TrimSpace(strings.ReplaceAll(string(fixture), "\t", "    ")))
+			gotest.Equal(it, strings.TrimSpace(suite), asShown(it, filepath.Join("testdata", "readme", "user_service_suite_test.go")))
+		})
+		w.It("shows the production code the fixture package holds", func(it *gotest.T) {
+			gotest.Equal(it, strings.TrimSpace(code), asShown(it, filepath.Join("testdata", "readme", "user.go")))
 		})
 	})
 }
@@ -76,8 +103,9 @@ func (s *ReadmeExampleTestSuite) TestTheFirstExampleRunsAsWritten(t *gotest.T) {
 			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
 		})
 		w.It("prints every line the README shows for it", func(it *gotest.T) {
-			got := durations.ReplaceAllString(run.Stdout, "(…)")
-			for _, line := range strings.Split(durations.ReplaceAllString(blocks[2], "(…)"), "\n") {
+			// Whole lines: a shortened name must not pass as a prefix of the real one.
+			got := strings.Split(durations.ReplaceAllString(run.Stdout, "(…)"), "\n")
+			for _, line := range strings.Split(durations.ReplaceAllString(blocks[3], "(…)"), "\n") {
 				gotest.Contains(it, got, line)
 			}
 		})
@@ -91,7 +119,7 @@ func (s *ReadmeExampleTestSuite) TestTheFirstExampleRendersTheSpecShown(t *gotes
 	t.When("the README's first example renders as a spec", func(w *gotest.T) {
 		w.It("prints the tree the README shows, durations aside", func(it *gotest.T) {
 			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
-			want := durations.ReplaceAllString(strings.TrimSpace(blocks[4]), "(…)")
+			want := durations.ReplaceAllString(strings.TrimSpace(blocks[5]), "(…)")
 			got := durations.ReplaceAllString(strings.TrimSpace(run.Stdout), "(…)")
 			// The README names a package of its own and no checkout or run times.
 			got = provenanceLine.ReplaceAllString(got, "")
@@ -128,6 +156,33 @@ func (s *ReadmeExampleTestSuite) TestTheContentsListEverySection(t *gotest.T) {
 	t.When("the README's contents are compared with its sections", func(w *gotest.T) {
 		w.It("list every section once, in order, by the anchor GitHub gives it", func(it *gotest.T) {
 			gotest.Equal(it, want, got)
+		})
+	})
+}
+
+func (s *ReadmeExampleTestSuite) TestTheLibraryExampleRunsUnderGoTest(t *gotest.T) {
+	blocks := readmeBlocks(t, "\n### Step 1: Use the Library in the Tests You Have\n", "README has no Step 1: Use the Library in the Tests You Have section")
+	gotest.NotEmpty(t, blocks)
+	root, err := testkit.RepoRoot()
+	gotest.NoError(t, err)
+	dir := t.TempDir()
+	_, err = testkit.StagePackage(root, filepath.Join("testdata", "library"), dir, "librarymod")
+	gotest.NoError(t, err)
+	cmd := exec.CommandContext(t.Context(), "go", "test", "-count=1", "-v", "./library/")
+	cmd.Dir = dir
+	cmd.Env = testkit.ChildEnv(dir, "GOFLAGS=")
+	out, err := cmd.CombinedOutput()
+	t.When("the README's library example runs under plain go test", func(w *gotest.T) {
+		w.It("is the test the fixture package holds, to the line", func(it *gotest.T) {
+			gotest.Equal(it, strings.TrimSpace(dropNameLine(blocks[0])), asShown(it, filepath.Join("testdata", "library", "price_test.go")))
+		})
+		w.It("passes", func(it *gotest.T) {
+			gotest.NoError(it, err, "output: %s", out)
+		})
+		w.It("runs the nested behavior and each row as subtests", func(it *gotest.T) {
+			gotest.Contains(it, string(out), "--- PASS: TestTotal/the_cart_is_empty/totals_zero")
+			gotest.Contains(it, string(out), "--- PASS: TestTotal/one_item")
+			gotest.Contains(it, string(out), "--- PASS: TestTotal/two_items")
 		})
 	})
 }

@@ -26,7 +26,7 @@ The code your tests link imports only the standard library. Suites are found and
 - [How It Works](#how-it-works)
 - [What It Costs](#what-it-costs)
 - [Install](#install)
-- [30-Second Example](#30-second-example)
+- [Getting Started](#getting-started)
 - [Specification](#specification)
 - [Isolation](#isolation)
 - [Parallelism](#parallelism)
@@ -119,9 +119,58 @@ import (
 
 **Two runners.** `go tool gotest` runs suites and nothing else; `go test` runs plain `func Test*` functions and nothing else. Under plain `go test` a package of suites prints `ok … [no tests to run]` and exits 0, and `gotest` passes over the `func Test*` functions beside a suite with one note on stderr (`note: N stdlib test(s) in … not run`). A complete run is both commands, so every place that calls `go test ./...` today — CI, a Makefile, a pre-commit hook, an editor task — needs `go tool gotest ./...` beside it for as long as the module holds both kinds of test.
 
-## 30-Second Example
+## Getting Started
 
-Write a test suite:
+Three steps. Each is useful alone, and the first needs no new command.
+
+### Step 1: Use the Library in the Tests You Have
+
+`pkg/gotest` is an ordinary library. In a plain `func Test*`, under plain `go test`, it gives you the assertions, `When`/`It` nesting, table rows, polling and snapshots:
+
+```go
+// price_test.go
+package price
+
+import (
+    "testing"
+
+    "github.com/mvrahden/go-test/pkg/gotest"
+)
+
+func TestTotal(t *testing.T) {
+    gt := gotest.NewT(t)
+
+    gt.When("the cart is empty", func(w *gotest.T) {
+        w.It("totals zero", func(it *gotest.T) {
+            gotest.Equal(it, 0, Total(nil))
+        })
+    })
+
+    for it, tc := range gotest.Each(gt, []struct {
+        Desc  string
+        Items []int
+        Want  int
+    }{
+        {Desc: "one item", Items: []int{5}, Want: 5},
+        {Desc: "two items", Items: []int{5, 7}, Want: 12},
+    }) {
+        gotest.Equal(it, tc.Want, Total(tc.Items))
+    }
+}
+```
+
+```bash
+go get github.com/mvrahden/go-test
+go test ./...
+```
+
+Assertions take the `*testing.T` directly as well (`gotest.Equal(t, want, got)`), and a failure inside a helper names the helper's line and the test's without `t.Helper()`. The same tests render as a specification from their event stream: `go test -json ./... | go tool gotest spec --input=-`.
+
+This step changes nothing about how your tests run. Take the next one when you want lifecycle hooks, fixtures or a process per suite.
+
+### Step 2: Write a Suite
+
+A suite is a struct whose name ends in `TestSuite`. It runs under `go tool gotest` ([Install](#install)), not under `go test`.
 
 ```go
 // user_service_suite_test.go
@@ -152,6 +201,31 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
             gotest.ErrorIs(it, err, ErrDuplicate)
         })
     })
+}
+```
+
+```go
+// user.go
+package user
+
+import "errors"
+
+// ErrDuplicate reports an email that is already registered.
+var ErrDuplicate = errors.New("duplicate user")
+
+// UserService registers users by email.
+type UserService struct{ users map[string]bool }
+
+// NewUserService returns an empty service.
+func NewUserService() *UserService { return &UserService{users: map[string]bool{}} }
+
+// Create registers an email once.
+func (u *UserService) Create(email string) error {
+    if u.users[email] {
+        return ErrDuplicate
+    }
+    u.users[email] = true
+    return nil
 }
 ```
 
@@ -197,6 +271,10 @@ UserService — 2 passed
 
 No generated code leaks into your workflow.
 `gotest` creates it before tests run - invisible to the project's filetree.
+
+### Step 3: Share Setup With a Fixture
+
+Setup that several suites need goes into a fixture: a struct ending in `Fixture` for one suite at a time, `SharedFixture` for one instance across packages. [Fixtures](#fixtures) describes both.
 
 ## Specification
 
