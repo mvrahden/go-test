@@ -113,6 +113,7 @@ import {
   clearBinaryCache,
   CliBelowFloorError,
   CliUnavailableError,
+  GotestNotRequiredError,
   offerCliUpgrade,
   planUpgrade,
   compareGoVersions,
@@ -277,6 +278,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when version is below minimum", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
@@ -291,6 +294,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when cliPath file does not exist", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/nonexistent/gotest");
       mockFileExists.mockResolvedValue(false);
 
@@ -301,6 +306,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when version output is unparseable", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
@@ -315,6 +322,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when version check throws", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockRejectedValue(new Error("EACCES"));
@@ -577,31 +586,33 @@ describe("buildCliCommand", () => {
     });
   });
 
-  describe("step 5: fallback", () => {
-    it("uses go run module@latest when no go.mod exists", async () => {
-      const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
-
-      expect(cmd).toEqual({
-        bin: "/usr/local/go/bin/go",
-        args: ["run", `${GOTEST_MODULE}@latest`, "spec", "./..."],
-      });
+  describe("step 7: no pin", () => {
+    it("refuses to run when no go.mod exists, naming the fix", async () => {
+      await expect(
+        buildCliCommand(["spec", "./..."], "/workspace"),
+      ).rejects.toThrow(
+        `no go.mod here requires gotest. Add it with: go get -tool ${GOTEST_MODULE}@latest`,
+      );
+      await expect(
+        buildCliCommand(["spec", "./..."], "/workspace"),
+      ).rejects.toBeInstanceOf(GotestNotRequiredError);
     });
 
-    it("does not include -- separator", async () => {
-      const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
-
-      expect(cmd.args).not.toContain("--");
-    });
-
-    it("uses go run module@latest when version not found in go.mod", async () => {
+    it("refuses to run when go.mod does not require gotest", async () => {
       setGoMod(
         "/workspace",
         ["module github.com/myapp", "go 1.24.0"].join("\n"),
       );
 
-      const cmd = await buildCliCommand(["spec"], "/workspace");
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        GotestNotRequiredError,
+      );
+    });
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@latest`);
+    it("still runs a module path that carries its own version", async () => {
+      mockConfigValues.set("modulePath", `${GOTEST_MODULE}@v1.99.0`);
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.99.0`]);
     });
 
     it("respects modulePath containing @ as-is", async () => {
@@ -927,6 +938,7 @@ describe("buildCliCommand", () => {
 
   describe("buildTags", () => {
     it("appends -tags flag to subcommand args", async () => {
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("buildTags", "integration,e2e");
 
       const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
@@ -1130,16 +1142,16 @@ describe("buildCliCommand", () => {
       );
     });
 
-    it("keeps the bootstrap fallback when no use module requires gotest", async () => {
+    it("refuses to run when no use module requires gotest", async () => {
       setFiles({
         "/workspace/go.work": work,
         "/workspace/a/go.mod": "module github.com/a\n\ngo 1.25.0\n",
         "/workspace/b/go.mod": "module github.com/b\n\ngo 1.25.0\n",
       });
 
-      const cmd = await buildCliCommand(["spec"], "/workspace");
-
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@latest`);
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        GotestNotRequiredError,
+      );
     });
 
     it("Upgrade runs in every use module that pins gotest", async () => {

@@ -39,6 +39,27 @@ export async function readModuleRoots(dir: string): Promise<ModuleRoot[]> {
   return roots;
 }
 
+// moduleRootFor is the root whose directory is dir or its nearest ancestor;
+// the deepest wins. Undefined when no root contains dir.
+export function moduleRootFor(
+  dir: string,
+  roots: ModuleRoot[],
+): ModuleRoot | undefined {
+  let best: ModuleRoot | undefined;
+  for (const root of roots) {
+    const rel = path.relative(root.dir, dir);
+    if (
+      rel === ".." ||
+      rel.startsWith(".." + path.sep) ||
+      path.isAbsolute(rel)
+    ) {
+      continue;
+    }
+    if (!best || root.dir.length > best.dir.length) best = root;
+  }
+  return best;
+}
+
 // parseUseDirectives lists a go.work's `use` entries as written.
 export function parseUseDirectives(content: string): string[] {
   return parseDirective(content, "use");

@@ -265,7 +265,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   debugLauncher.registerCleanupOnSessionEnd(context);
 
-  const providerDisposables = registerProviders(cache, benchResultStore);
+  const providerDisposables = registerProviders(
+    cache,
+    active,
+    benchResultStore,
+  );
   const commandDisposables = registerCommands({
     controller,
     runner,
@@ -364,6 +368,7 @@ function resolveActiveWorkspaceDir(): string | undefined {
 
 function registerProviders(
   cache: DiscoveryCache,
+  active: ActiveFolders,
   benchResultStore?: BenchResultStore,
 ): vscode.Disposable[] {
   const codeLensProvider = new GoTestCodeLensProvider(cache, benchResultStore);
@@ -389,7 +394,9 @@ function registerProviders(
     { providedCodeActionKinds: FocusExcludeProvider.providedCodeActionKinds },
   );
 
-  const scaffoldProvider = new ScaffoldCodeActionProvider();
+  const scaffoldProvider = new ScaffoldCodeActionProvider((folder) =>
+    active.has(folder),
+  );
   const scaffoldCodeActionsDisposable =
     vscode.languages.registerCodeActionsProvider(
       { language: "go", pattern: "**/*.go" },

@@ -190,14 +190,14 @@ export async function buildCliCommand(
     throw err;
   }
 
-  // 7. Fallback: go run @latest, only when no module requires gotest yet
-  // (scaffold runs before a pin exists) or modulePath carries its own @version.
-  const goBin = await resolveGoBinary(log, workspaceDir);
-  const qualified = modulePath.includes("@")
-    ? modulePath
-    : `${modulePath}@latest`;
-  log?.debug(`[cli] using fallback: ${goBin} run ${qualified}`);
-  return { bin: goBin, args: ["run", qualified, ...subcommandArgs] };
+  // 7. No pin: a module path with its own @version runs as written;
+  // otherwise there is no version to run.
+  if (modulePath.includes("@")) {
+    const goBin = await resolveGoBinary(log, workspaceDir);
+    log?.debug(`[cli] using modulePath as written: ${goBin} run ${modulePath}`);
+    return { bin: goBin, args: ["run", modulePath, ...subcommandArgs] };
+  }
+  throw new GotestNotRequiredError(modulePath);
 }
 
 // CliUnavailableError carries the user-facing fix when no CLI can run.
@@ -205,6 +205,17 @@ export class CliUnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "CliUnavailableError";
+  }
+}
+
+// GotestNotRequiredError: no module here requires gotest, so there is no
+// version of the CLI to run.
+export class GotestNotRequiredError extends CliUnavailableError {
+  constructor(readonly modulePath: string) {
+    super(
+      `no go.mod here requires gotest. Add it with: go get -tool ${modulePath}@latest`,
+    );
+    this.name = "GotestNotRequiredError";
   }
 }
 
@@ -694,7 +705,7 @@ async function isVendored(dir: string): Promise<boolean> {
 }
 
 // runGoInModule runs a go command in a module, re-vendoring when it vendors.
-async function runGoInModule(
+export async function runGoInModule(
   dir: string,
   args: string[],
   log?: vscode.LogOutputChannel,

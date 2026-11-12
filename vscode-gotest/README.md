@@ -193,6 +193,7 @@ Generate test suite skeletons from existing code:
 - **Command palette** — "Go Test: Scaffold Suite" for manual target entry
 
 The generated file opens automatically and discovery refreshes.
+The "Generate test suite for …" code actions are offered only in a folder that uses gotest; the palette command works everywhere.
 
 ### Copilot Chat skill
 
@@ -297,7 +298,7 @@ The extension runs whatever `go.mod` selects, in this order:
 4. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
 5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.38.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
 6. **Pinned below v1.38.0** — Refused with an **Upgrade** action; a newer CLI generates code the pinned runtime cannot compile. **Upgrade** moves each pinning module to the newest release whose `go` line does not exceed the module's, so the module's Go version stays put. A `go 1.N` line takes a release that needs `go 1.N.0`: the same language version, which `go get` only spells out. When even v1.38.0 needs a newer Go, it changes nothing and names the `go` line required; raising it is your call. The release lookup runs in a private temporary module, so your `go.mod`, a `go.work` and `-mod`/`-modfile` in `GOFLAGS` do not affect it, while proxy settings do; it shows progress and can be cancelled, and releases the proxy cannot serve are skipped. A floor hit while an upgrade runs does not start a second one.
-7. **`go run @latest`** — Only when no module requires gotest yet, so `scaffold` can run before a pin exists.
+7. **No pin** — When no module requires gotest the extension runs no CLI: there is no version to run, and it never substitutes `@latest`. **Scaffold Suite** then offers to add gotest first (`go get -tool <module>@latest` in the module of the target) and scaffolds once go.mod pins it. A `gotest.modulePath` that carries its own `@version` is run as written.
 
 In a `go.work` root every `use` module is read: a tool declared by any of them counts, and the pin is the highest across modules, which is what the workspace builds.
 
