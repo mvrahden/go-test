@@ -115,10 +115,29 @@ func Narrow(names, changed []string, facts map[string]MutantFacts, spec func(pat
 	return selected, fmt.Sprintf("drill  the changed files select %d of %d mutants", len(selected), len(names))
 }
 
+// sharedFixtures are fixture trees judge packages read from outside their
+// own directory, and the judge packages that read them. The conformance
+// suites name their fixtures through variables as often as literals, so a
+// change to one counts for every conformance package.
+var sharedFixtures = []struct{ tree, judges string }{
+	{"tests/conformance/testdata/", "tests/conformance/"},
+	{"tests/canary/testdata/broken/", "tests/conformance/cli/"},
+}
+
 func touches(name string, changed []string, f MutantFacts, specs map[string]string) bool {
 	for _, path := range changed {
 		if path == "tests/drill/mutants/"+name+".patch" || slices.Contains(f.Targets, path) {
 			return true
+		}
+		for _, shared := range sharedFixtures {
+			if !strings.HasPrefix(path, shared.tree) {
+				continue
+			}
+			for _, pkg := range f.Packages {
+				if strings.HasPrefix(pkg+"/", shared.judges) {
+					return true
+				}
+			}
 		}
 		for _, pkg := range f.Packages {
 			// A run over the whole module judges with every file.
