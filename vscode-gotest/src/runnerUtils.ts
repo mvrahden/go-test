@@ -1121,9 +1121,12 @@ function resolveItemRecursive(
     if (r.anyFailed) anyFailed = true;
   });
 
-  // A package the run errored keeps that verdict: its passing children do
-  // not make the run that failed it green.
-  if (isPackage && directResult?.status === "errored") {
+  // A package the run failed or errored keeps that verdict: its passing
+  // children do not make it green.
+  if (
+    isPackage &&
+    (directResult?.status === "errored" || directResult?.status === "fail")
+  ) {
     return { anyFailed: true, anyResolved: true };
   }
 

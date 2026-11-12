@@ -1651,6 +1651,28 @@ describe("resolveAncestorItems", () => {
     expect(run.failed).toHaveBeenCalledWith(dir, []);
   });
 
+  it("leaves a package the run failed as it is, and fails its folder", () => {
+    const { dir, pkg, run, controller } = makeAncestorFixture();
+    controller.getResult.mockImplementation((id: string) => {
+      if (id === "example.com/internal/auth")
+        return { status: "fail" as const };
+      if (id === "example.com/internal/auth/AuthSuite")
+        return { status: "pass" as const };
+      return undefined;
+    });
+
+    resolveAncestorItems(run as any, controller as any);
+
+    expect(run.passed).not.toHaveBeenCalledWith(pkg);
+    expect(run.failed).not.toHaveBeenCalledWith(pkg, []);
+    expect(run.failed).toHaveBeenCalledWith(dir, []);
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "dir:internal",
+      "fail",
+      undefined,
+    );
+  });
+
   it("leaves a package the run errored errored, and its folder failed", () => {
     const { dir, pkg, run, controller } = makeAncestorFixture();
     controller.getResult.mockImplementation((id: string) => {
