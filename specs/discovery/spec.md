@@ -177,3 +177,83 @@ A generated file left on disk by an earlier generate SHALL neither break nor be 
 #### Scenario: A build-constrained suite file
 - **WHEN** a suite file carries a build constraint
 - **THEN** --tags= selects the files built with that tag
+
+### Requirement: Cases no run reaches
+A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it or converts a value of the type to an interface holding it: one error per type, at its first such method, naming the suite suffix. A generic suite in a _test.go file, X_ aside, SHALL be refused at its declaration unless a suite alias instantiates it. A type in a non-test file SHALL be left alone.
+
+#### Scenario: Case-named methods on a type that is no suite
+- **WHEN** a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite
+- **THEN** a type nothing calls them on is refused at its first such method, told which suffix makes it a suite
+- **AND** a helper whose method a suite calls, directly or through an interface, runs
+- **AND** a helper only the external test package calls runs
+- **AND** a type a non-test file declares is left alone
+
+#### Scenario: A helper a harness package calls
+- **WHEN** a test file hands a helper to an interface a non-test package declares and calls
+- **THEN** a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion
+- **AND** a helper converted only to any or to an interface without the method is still refused
+
+#### Scenario: A generic suite nothing instantiates
+- **WHEN** a test file declares a generic suite
+- **THEN** one no alias instantiates is refused at its declaration, told to declare an alias
+- **AND** one an alias instantiates runs
+- **AND** one marked X_ is not refused
+
+### Requirement: Callers the build leaves out
+A test file of the package that the build constraints leave out of the run SHALL count as a caller for the refusal of cases no run reaches: a case-named method whose name such a file selects, and a generic suite such a file names, SHALL NOT be refused, with the tag off or on. A helper that no file names, constrained or not, SHALL still be refused.
+
+#### Scenario: A caller behind a build constraint
+- **WHEN** the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out
+- **THEN** a run with the build tag off runs the package
+- **AND** a run on a platform the file is not for runs the package
+- **AND** a run with the build tag on runs the constrained suites too
+- **AND** a helper no file names is still refused
+
+### Requirement: A case prefix alone
+A suite method named exactly Test, Benchmark or Fuzz, an X_ or F_ marker aside, that takes the T, B or F of that case SHALL be refused at the method, told to add a name; one that takes no such parameter SHALL stay a helper.
+
+#### Scenario: A method named by its prefix alone
+- **WHEN** a suite declares a method named exactly Test, Benchmark or Fuzz
+- **THEN** one taking the T, B or F of that case is refused at the method, told to add a name
+- **AND** one taking no such parameter is a helper and the suite runs
+
+### Requirement: Fixture per-method hooks under a parallel suite
+gotest SHALL refuse with exit 2 a suite with Parallel: true and two or more test methods that binds, directly or through another fixture, a package fixture whose BeforeEach or AfterEach uses the fixture: parallel methods share the one fixture, so the hook would run for all of them at once. The error is located at the suite and names the hook, the fixture and the way out. A hook whose body never names its receiver, and a suite with one test method, SHALL run.
+
+#### Scenario: A parallel suite binds a fixture with per-method hooks
+- **WHEN** a suite with Parallel: true binds a package fixture that declares BeforeEach or AfterEach
+- **THEN** a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel
+- **AND** a suite whose fixture hooks never use the fixture runs
+- **AND** a suite with one test method runs
+
+### Requirement: Setenv under a parallel suite
+gotest SHALL refuse with exit 2 a suite with Parallel: true whose test method, BeforeEach or AfterEach calls Setenv on a *gotest.T or a *testing.T, closures included: testing panics when a parallel test sets the environment. One error per suite, at the first call. It reads the method's own body, not the helpers it calls. A call in BeforeAll SHALL run.
+
+#### Scenario: A parallel suite sets the environment
+- **WHEN** a suite with Parallel: true calls Setenv on a T
+- **THEN** a call in a test method, in BeforeEach, in a nested It and through t.T() is refused at the call, told to set it in BeforeAll or drop Parallel
+- **AND** a call in BeforeAll runs and its value reaches every method
+
+### Requirement: Shared fixture fields the state cannot carry
+gotest SHALL refuse with exit 2, at the field and naming the way out, a shared fixture embedding a non-struct type, or a struct with exported fields, unless Hydrate assigns it or every field it promotes (only named fields are transferred), and a transfer field whose type holds an interface with methods (JSON cannot rebuild it). An embedded struct without exported fields, a field Hydrate assigns, and a field of a type that refers to itself SHALL be accepted.
+
+#### Scenario: A shared fixture embeds a type
+- **WHEN** a shared fixture embeds a type
+- **THEN** one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate
+- **AND** one of an unexported type is refused, told to hold it in an exported field of an exported type or assign it in Hydrate
+- **AND** one without exported fields and one Hydrate assigns are left out, and the suite runs with its state
+
+#### Scenario: Hydrate assigns an embedded struct's fields
+- **WHEN** Hydrate assigns the fields a shared fixture's embedded struct promotes
+- **THEN** a fixture whose Hydrate assigns every one of them runs with its state
+- **AND** one whose Hydrate assigns only some is refused at the field, naming the fields it does not
+
+#### Scenario: A shared fixture embeds a non-struct type
+- **WHEN** a shared fixture embeds an interface or a named non-struct type
+- **THEN** one Hydrate does not assign is refused at the field, told to assign it in Hydrate
+- **AND** one Hydrate assigns, and an embedded struct with nothing to transfer, run with their state
+
+#### Scenario: A field JSON cannot rebuild
+- **WHEN** a shared fixture transfers a field whose type holds an interface with methods
+- **THEN** the field is refused at the field, told to assign it in Hydrate or unexport it
+- **AND** an interface field Hydrate assigns and a field of a type that refers to itself reach the suite

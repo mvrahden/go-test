@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion \(
+Clause: when a test file hands a helper to an interface a non-test package declares and calls → a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -58,7 +58,7 @@
+ 		// a value handed to an interface reaches the interface's methods,
+ 		// wherever the interface is declared and called
+ 		for _, file := range pkg.Syntax {
+-			convertedToInterface(pkg.TypesInfo, file, called)
++			_ = file
+ 		}
+ 		for _, obj := range pkg.TypesInfo.Uses {
+ 			fn, ok := obj.(*types.Func)

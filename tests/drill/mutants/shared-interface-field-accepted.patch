@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / the field is refused at the field, told to assign it in Hydrate or unexport it \(
+Clause: when a shared fixture transfers a field whose type holds an interface with methods → the field is refused at the field, told to assign it in Hydrate or unexport it
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -82,7 +82,7 @@
+ 		return "function"
+ 	case *types.Interface:
+ 		if !u.Empty() {
+-			return "interface with methods"
++			return ""
+ 		}
+ 	case *types.Array:
+ 		return nonSerializable(u.Elem(), seen)

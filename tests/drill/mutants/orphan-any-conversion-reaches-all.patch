@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / a helper converted only to any or to an interface without the method is still refused \(
+Clause: when a test file hands a helper to an interface a non-test package declares and calls → a helper converted only to any or to an interface without the method is still refused
+--- a/internal/gotestast/conversions.go
++++ b/internal/gotestast/conversions.go
+@@ -21,8 +21,9 @@
+ 		if n == nil || !ok {
+ 			return
+ 		}
+-		for i := range iface.NumMethods() {
+-			reached[typeKey(n)+"."+iface.Method(i).Name()] = true
++		_ = iface
++		for i := range n.NumMethods() {
++			reached[typeKey(n)+"."+n.Method(i).Name()] = true
+ 		}
+ 	})
+ }

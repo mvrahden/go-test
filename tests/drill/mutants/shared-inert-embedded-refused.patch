@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / one without exported fields and one Hydrate assigns are left out, and the suite runs with its state \(
+Clause: when a shared fixture embeds a type → one without exported fields and one Hydrate assigns are left out, and the suite runs with its state
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -26,7 +26,7 @@
+ 			missing = append(missing, name)
+ 		}
+ 	}
+-	if len(missing) == 0 {
++	if len(missing) == 0 && len(fields) > 0 {
+ 		return nil
+ 	}
+ 	typ := types.TypeString(f.Type(), types.RelativeTo(in))

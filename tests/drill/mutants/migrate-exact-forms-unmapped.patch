@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AssertionsWithAnExactGotestForm / when a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer / migrate writes gotest\.Fail, gotest\.TimeWithin, and gotest\.Greater and gotest\.Less against 0, and the result compiles \(
+Clause: when a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer → migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles
+--- a/internal/migrate/migrate.go
++++ b/internal/migrate/migrate.go
+@@ -60,7 +60,6 @@
+ 	"Panics":         "Panics",
+ 	"Fail":           "Fail",
+ 	"FailNow":        "Fail",
+-	"WithinDuration": "TimeWithin",
+ 	"Positive":       "Greater",
+ 	"Negative":       "Less",
+ }

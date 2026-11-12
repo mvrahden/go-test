@@ -52,6 +52,28 @@ func collectorError(pkg *packages.Package, errs []CollectorError) error {
 	return errors.Join(located...)
 }
 
+// Orphans are the declarations of lr no run reaches, as refusals.
+func (lr *LoadResult) Orphans() []CollectorError {
+	orphans := gotestast.Orphans(lr.Ptest, lr.Pxtest)
+	errs := make([]CollectorError, 0, len(orphans))
+	for _, o := range orphans {
+		errs = append(errs, CollectorError{Err: errors.New(o.Msg), Pos: o.Pos})
+	}
+	return errs
+}
+
+// orphanError joins the refusals of Orphans, each behind its position.
+func orphanError(lr *LoadResult) error {
+	pkg := lr.Ptest
+	if pkg == nil {
+		pkg = lr.Pxtest
+	}
+	if pkg == nil {
+		return nil
+	}
+	return collectorError(pkg, lr.Orphans())
+}
+
 func relativeToWorkDir(path string) string {
 	wd, err := os.Getwd()
 	if err != nil {

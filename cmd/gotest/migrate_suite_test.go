@@ -184,7 +184,8 @@ func (s *MigrateCLITestSuite) TestSiblingFiles(t *gotest.T, ctx *migrateCtx) {
 
 	t.It("converts the suite wherever its parts are declared and exits 0", func(it *gotest.T) {
 		gotest.Equal(it, 0, code, stdout+stderr)
-		gotest.Equal(it, "Migrated 1 suites:\n  methods_test.go: updated for suites other files declare\n  runner_test.go: updated for suites other files declare\n  suite_test.go: SplitSuite → SplitTestSuite\n", stdout)
+		gotest.Equal(it, "Migrated 1 suites:\n  methods_test.go: updated for suites other files declare\n  runner_test.go: updated for suites other files declare\n  suite_test.go: SplitSuite → SplitTestSuite\n"+
+			"Not kept, check by hand:\n  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:\n    TestSplitSuite → TestSplitTestSuite\n", stdout)
 		gotest.Empty(it, stderr)
 	})
 
@@ -314,7 +315,8 @@ func (s *MigrateCLITestSuite) TestTestdataSkipped(t *gotest.T, ctx *migrateCtx) 
 
 	t.It("migrates the packages ./... names", func(it *gotest.T) {
 		gotest.Equal(it, 0, code, stdout+stderr)
-		gotest.Equal(it, "Migrated 1 suites:\n  "+filepath.FromSlash("pkg/sample_test.go")+": CleanSuite → CleanTestSuite\n", stdout)
+		gotest.Equal(it, "Migrated 1 suites:\n  "+filepath.FromSlash("pkg/sample_test.go")+": CleanSuite → CleanTestSuite\n"+
+			"Not kept, check by hand:\n  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:\n    TestCleanSuite → TestCleanTestSuite\n", stdout)
 		gotest.Empty(it, stderr)
 	})
 

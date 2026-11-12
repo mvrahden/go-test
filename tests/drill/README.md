@@ -633,6 +633,35 @@ shards of one run do not add up to every mutant exactly once.
 | `caseless-excluded-case-uncounted` | an excluded case does not count as a declared one | canary: the `shapes/excludedonly` package exits 2 instead of 0 |
 | `caseless-helper-is-a-suite` | a type named like a suite is a suite even without a case | canary: the `shapes/caseless` package is refused at its helper field as a nested suite, not at the helper's declaration |
 | `caseless-testify-base-collected` | a testify suite embedding testify's suite through a base is read as a gotest suite | conformance: the discovery It for a testify base suite sees exit 2 |
+| `orphan-case-type-accepted` | case-named methods on a type that is no suite are never collected | conformance: the discovery It for a type nothing calls sees exit 0 instead of 2 |
+| `orphan-case-called-helper-refused` | a helper a suite calls is refused as if nothing called it | conformance: the discovery It for a helper a suite calls sees exit 2 |
+| `orphan-case-sibling-variant-unread` | calls are read from the declaring test variant alone | conformance: the discovery It for a helper only the external test package calls sees exit 2 |
+| `orphan-case-non-test-file-refused` | a type a non-test file declares is read like one in a test file | conformance: the discovery It for a non-test file's type sees exit 2 |
+| `orphan-generic-accepted` | a generic suite no alias instantiates is never refused | conformance: the discovery It for an uninstantiated generic suite sees exit 0 instead of 2 |
+| `orphan-generic-instantiated-refused` | a generic suite is refused although an alias instantiates it | conformance: the discovery It for an instantiated generic suite sees exit 2 |
+| `orphan-left-out-alias-unread` | an alias in a file a build tag leaves out is not read as an instantiation | conformance: the discovery It for a tag-off run sees exit 2 |
+| `orphan-left-out-selector-unread` | a call in a file the build leaves out is not read as a call | conformance: the discovery It for a file of another platform sees exit 2 |
+| `orphan-loaded-call-unread` | a call the type checker records on the helper's own type is ignored | conformance: the discovery It for a tag-on run sees exit 2 |
+| `orphan-left-out-file-exempts-all` | any file the build leaves out exempts every helper | conformance: the discovery It for a helper no file names sees exit 0 |
+| `orphan-interface-conversion-unread` | a helper handed to an interface is not read as reached | conformance: the discovery It for a harness package's interface sees exit 2 |
+| `orphan-any-conversion-reaches-all` | any conversion to an interface reaches every method of the type | conformance: the discovery It for a helper converted to any sees exit 0 |
+| `orphan-generic-excluded-refused` | an excluded generic suite without an alias is refused | conformance: the discovery It for an X_ generic suite sees exit 2 |
+| `shared-unexported-advice-named` | the refusal of an unexported embedded type suggests a named field of it | conformance: the discovery It for an unexported embedded type misses the advice |
+| `bare-case-name-ignored` | a suite method named Test, Benchmark or Fuzz alone that takes its case's handle is read past | conformance: the discovery It for a bare case name sees exit 0 instead of 2 |
+| `bare-helper-name-refused` | a helper named Test, Benchmark or Fuzz alone is refused whatever it takes | conformance: the discovery It for a bare helper name sees exit 2 |
+| `parallel-fixture-hooks-accepted` | a fixture hook that uses the fixture is accepted under a parallel suite | conformance: the discovery It for a racing fixture hook sees exit 0 instead of 2 |
+| `parallel-stub-hooks-refused` | every fixture hook is taken to use the fixture | conformance: the discovery It for fixture hooks that never use the fixture sees exit 2 |
+| `parallel-single-method-hooks-refused` | a parallel suite with one test method is refused for its fixture's hooks | conformance: the discovery It for a one-method suite sees exit 2 |
+| `parallel-setenv-accepted` | Setenv in a method of a parallel suite is accepted | conformance: the discovery It for Setenv under Parallel sees exit 1 instead of 2 |
+| `parallel-setenv-beforeall-refused` | Setenv in BeforeAll of a parallel suite is refused | conformance: the discovery It for Setenv in BeforeAll sees exit 2 |
+| `shared-embedded-field-accepted` | a shared fixture's embedded type with exported fields is left out of the transfer in silence | conformance: the discovery It for an embedded shared fixture field sees exit 1 instead of 2 |
+| `shared-inert-embedded-refused` | an embedded type without exported fields is refused like one with them | conformance: the discovery It for inert embedded fields sees exit 2 |
+| `shared-promoted-hydrate-unread` | Hydrate's assignments of promoted fields are not read | conformance: the discovery It for a fully hydrated embedded struct sees exit 2 |
+| `shared-partial-hydrate-accepted` | an embedded struct Hydrate assigns in part is accepted | conformance: the discovery It for a partly hydrated embedded struct sees exit 0 |
+| `shared-embedded-nonstruct-accepted` | an embedded interface or non-struct type is left out of the transfer in silence | conformance: the discovery It for an embedded non-struct type sees exit 1 instead of 2 |
+| `shared-hydrated-embedded-refused` | an embedded field Hydrate assigns is refused | conformance: the discovery It for a hydrated embedded handle sees exit 2 |
+| `shared-interface-field-accepted` | a shared fixture's transfer field of an interface type with methods is accepted | conformance: the discovery It for an interface transfer field sees exit 0 instead of 2 |
+| `shared-self-referential-type-unguarded` | the transfer check reads a type that refers to itself without end | conformance: the discovery It for a self-referential transfer field sees the generator's stack overflow, exit 2 |
 | `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
 | `harness-imports-collide-by-name` | two imported packages of the same name get the same alias | canary: the `shapes/genpgpg` package exits 2 instead of 0 |
 | `predeclared-clash-accepted` | a package redeclaring a name Go predeclares that the harness uses is generated for | conformance: the discovery It for `shapes/genpredeclared` sees a build failure instead of the located refusal |
@@ -753,6 +782,13 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-nan-indelta-translated` | `InDelta` is translated whatever may be NaN | conformance: the migrate It for InDelta where a NaN decides finds no marker |
 | `migrate-workspace-vendor-ignored` | the vendor directory is looked for beside go.mod even where a workspace governs | conformance: the migrate It for a vendored workspace finds the load failing offline |
 | `migrate-goenv-gowork-ignored` | the workspace is resolved without the `go env -w` settings | conformance: the migrate It for a workspace turned off by go env finds the load failing offline |
+| `migrate-comment-drifts-to-next-call` | the converted assertion's callee keeps the positions of the source it was parsed from | conformance: the migrate It for trailing comments finds `// one` inside the next call |
+| `migrate-exact-forms-unmapped` | `WithinDuration` is left unmapped | conformance: the migrate It for exact gotest forms sees exit 1 and a marker |
+| `migrate-positive-float-translated` | `Positive` on a float is translated into `Greater` against 0 | conformance: the migrate It for the forms left unconverted finds no marker on `s.Positive(f)` |
+| `migrate-summary-silent` | migrate prints no closing summary of what it did not keep | conformance: the migrate It for the closing summary finds no `Not kept` section |
+| `migrate-summary-always` | the `Not kept` header is printed with nothing under it | conformance: the migrate It for a migration with nothing to say finds the header |
+| `migrate-unran-base-test-kept` | a base test every child overrides is carried over, a case on a helper | conformance: the migrate It for such a test finds it in the output and the run refused |
+| `migrate-called-base-test-removed` | a base test something calls is removed with the ones no suite ran | conformance: the migrate It for the kept tests finds `TestCalled` gone |
 | `e2e-bench-note-dropped` | a test run drops the note on the benchmarks it left out | conformance: the CLI It for a package that declares a benchmark sees no note on stderr |
 | `e2e-excluded-suite-passes` | an X_ suite is booked as passed, not skipped | conformance: the discovery It for an X_ suite sees it not reported skipped |
 | `e2e-discover-when-kind-misnamed` | discover reports a When's kind as it | conformance: the discovery It for a When with Its sees the wrong kind |

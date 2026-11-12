@@ -840,3 +840,116 @@ func valueBase(x ast.Expr) ast.Expr {
 	}
 	return x
 }
+
+// collectUnran lists, for each helper base, the tests testify never ran: no
+// runner runs the base, every suite embedding it, all of them migrated,
+// declares its own, and nothing calls it. Carried over, such a test would
+// be a case on a type gotest does not run.
+func (u *unit) collectUnran() {
+	called := map[string]bool{}
+	for _, obj := range u.info.Uses {
+		if fn, ok := obj.(*types.Func); ok {
+			called[methodKey(fn)] = true
+		}
+	}
+	for _, b := range u.suites {
+		if !b.helper || !b.migrated() {
+			continue
+		}
+		ran, children, all := map[string]bool{}, 0, true
+		for _, s := range u.suites {
+			for _, e := range s.embeds {
+				if e.base != b {
+					continue
+				}
+				children++
+				all = all && s.migrated()
+				mset := types.NewMethodSet(types.NewPointer(s.obj.Type()))
+				for i := range mset.Len() {
+					if fn, ok := mset.At(i).Obj().(*types.Func); ok {
+						ran[methodKey(fn)] = true
+					}
+				}
+			}
+		}
+		if children == 0 || !all {
+			continue
+		}
+		prefix := objKey(b.obj) + "."
+		for _, uf := range u.files {
+			for _, decl := range uf.f.Decls {
+				fd, ok := decl.(*ast.FuncDecl)
+				if !ok || fd.Recv == nil || !gotestast.IS_TEST_CASE.MatchString(fd.Name.Name) {
+					continue
+				}
+				fn, ok := u.info.Defs[fd.Name].(*types.Func)
+				if !ok {
+					continue
+				}
+				if k := methodKey(fn); strings.HasPrefix(k, prefix) && !ran[k] && !called[k] {
+					// Read now: removing an import later merges lines of the file.
+					b.unran = append(b.unran, unranTest{fd, u.fset.Position(fd.Pos()).Line})
+				}
+			}
+		}
+	}
+}
+
+// unranTest is a base test testify never ran, at its original line.
+type unranTest struct {
+	decl *ast.FuncDecl
+	line int
+}
+
+// dropUnran removes from f the base tests testify never ran, with their
+// comments, and reports whether it removed any.
+func (u *unit) dropUnran(f *ast.File) bool {
+	drop := map[ast.Decl]bool{}
+	for _, s := range u.suites {
+		for _, t := range s.unran {
+			drop[t.decl] = true
+		}
+	}
+	decls := f.Decls[:0]
+	var spans [][2]token.Pos
+	for _, d := range f.Decls {
+		if !drop[d] {
+			decls = append(decls, d)
+			continue
+		}
+		start := d.Pos()
+		if fd := d.(*ast.FuncDecl); fd.Doc != nil {
+			start = fd.Doc.Pos()
+		}
+		spans = append(spans, [2]token.Pos{start, d.End()})
+	}
+	if len(spans) == 0 {
+		return false
+	}
+	f.Decls = decls
+	comments := f.Comments[:0]
+	for _, cg := range f.Comments {
+		inside := false
+		for _, sp := range spans {
+			inside = inside || (cg.Pos() >= sp[0] && cg.End() <= sp[1])
+		}
+		if !inside {
+			comments = append(comments, cg)
+		}
+	}
+	f.Comments = comments
+	return true
+}
+
+// unranIn names the base tests removed from uf: file:line, type and method.
+func (u *unit) unranIn(uf *unitFile, shown string) []string {
+	var out []string
+	for _, s := range u.suites {
+		for _, t := range s.unran {
+			if u.fileAt(t.decl.Pos()) == uf {
+				out = append(out, fmt.Sprintf("%s:%d: %s.%s", shown, t.line, s.obj.Name(), t.decl.Name.Name))
+			}
+		}
+	}
+	return out
+}

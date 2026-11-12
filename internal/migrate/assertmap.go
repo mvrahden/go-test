@@ -20,6 +20,25 @@ func (u *unit) mapAssertion(f *ast.File, name string, args []ast.Expr) (gotestNa
 	if len(args) == 0 {
 		return g, args, ""
 	}
+	switch name {
+	case "Fail", "FailNow":
+		if len(args) > 1 {
+			return "", nil, "testify " + name + " printed its failure message and then a second, formatted one; gotest.Fail takes one message and its args — merge them by hand"
+		}
+		return g, args, ""
+	case "Positive", "Negative":
+		// testify fails both on NaN; an integer, never NaN, keeps the verdict.
+		t := u.info.TypeOf(args[0])
+		if b, ok := underOrNil(t).(*types.Basic); !ok || b.Info()&types.IsInteger == 0 {
+			ts := "an operand of unknown type"
+			if t != nil {
+				ts = types.TypeString(t, types.RelativeTo(u.pkgOf(f)))
+			}
+			return "", nil, name + " on " + ts + ": only an integer, which is never NaN, keeps testify's verdict under gotest." + g + " — compare with 0 by hand"
+		}
+		zero := &ast.BasicLit{Kind: token.INT, Value: "0", ValuePos: args[0].End()}
+		return g, append([]ast.Expr{args[0], zero}, args[1:]...), ""
+	}
 	if (name == "Equal" || name == "NotEqual") && len(args) >= 2 {
 		if why := u.constMismatch(f, name, g, args); why != "" {
 			return "", nil, why
@@ -407,4 +426,12 @@ func (u *unit) lookup(f *ast.File, name string, pos token.Pos) types.Object {
 	}
 	_, obj := scope.LookupParent(name, pos)
 	return obj
+}
+
+// underOrNil is t's underlying type, nil for nil.
+func underOrNil(t types.Type) types.Type {
+	if t == nil {
+		return nil
+	}
+	return t.Underlying()
 }

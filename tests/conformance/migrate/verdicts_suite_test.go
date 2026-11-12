@@ -568,3 +568,118 @@ func TestB(t *testing.T) { suite.Run(t, new(BSuite)) }
 		})
 	})
 }
+
+func (s *MigrateVerdictsTestSuite) TestCommentsTrailingConvertedCalls(t *gotest.T) {
+	t.When("line comments trail assertions migrate converts and an s.Run call it turns into t.It", func(w *gotest.T) {
+		w.It("each comment stays at the end of its own statement", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	s.Require().Equal(1, 1) // one
+	s.Equal(1, 1)           // two
+	s.Run("nested", func() { // three
+		s.Equal(1, 1) // four
+	})
+}
+`)})
+			gotest.Equal(it, 0, exit, out)
+			gotest.Contains(it, out, "func (s *VTestSuite) TestA(t *gotest.T) {\n\tgotest.Equal(t, 1, 1)              // one\n\tgotest.Equal(t, 1, 1)              // two\n\tt.It(\"nested\", func(t *gotest.T) { // three\n\t\tgotest.Equal(t, 1, 1) // four\n\t})\n}\n")
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestAssertionsWithAnExactGotestForm(t *gotest.T) {
+	t.When("a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer", func(w *gotest.T) {
+		w.It("migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("\t\"time\"\n", "", `func (s *VSuite) TestA() {
+	now := time.Now()
+	s.WithinDuration(now, now, time.Second)
+	s.Positive(1)
+	s.Negative(-1)
+	if now.IsZero() {
+		s.Fail("zero time")
+		s.Require().FailNow("zero time")
+	}
+}
+`)})
+			gotest.Equal(it, 0, exit, out)
+			for _, want := range []string{
+				"\tgotest.TimeWithin(t, now, now, time.Second)\n",
+				"\tgotest.Greater(t, 1, 0)\n",
+				"\tgotest.Less(t, -1, 0)\n",
+				"\t\tgotest.Fail(t, \"zero time\")\n\t\tgotest.Fail(t, \"zero time\")\n",
+			} {
+				gotest.Contains(it, out, want)
+			}
+		})
+		w.It("Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	f := 1.5
+	s.Positive(f)
+	s.Fail("first", "second %d", 1)
+	s.NotPanics(func() {})
+}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): Positive on float64: only an integer[^\n]*\n\ts\.Positive\(f\)\n`, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify Fail printed its failure message[^\n]*\n\ts\.Fail\("first", "second %d", 1\)\n`, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): NotPanics has no gotest form[^\n]*\n\ts\.NotPanics\(func\(\) \{\}\)\n`, out)
+		})
+	})
+}
+
+func (s *MigrateVerdictsTestSuite) TestWhatMigrateDidNotKeep(t *gotest.T) {
+	t.When("migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test", func(w *gotest.T) {
+		w.It("the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed", func(it *gotest.T) {
+			dir := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(dir, map[string]string{"p/a_test.go": `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type HooksSuite struct{ suite.Suite }
+
+func (s *HooksSuite) TestA() {
+	s.Equal(1, 1)
+	s.Assert().True(true)
+	s.Require().True(true)
+}
+
+func TestHooks(t *testing.T) { suite.Run(t, new(HooksSuite)) }
+
+func TestPlain(t *testing.T) { require.True(t, true) }
+`}))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.Contains(it, mig.Stdout, "Not kept, check by hand:\n"+
+				"  assertions that let a test go on after failing and now stop it (s.X, s.Assert().X, assert.X): 2\n"+
+				"  stdlib tests left as they are, which gotest does not run (go test still does): 1\n"+
+				"  go test ids that changed, so a -run filter or a CI step naming the old one matches nothing:\n"+
+				"    TestHooks → TestHooksTestSuite\n")
+		})
+		w.It("a migration with none of these prints no such section", func(it *gotest.T) {
+			dir := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(dir, map[string]string{"p/a_test.go": `package p
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type VSuite struct{ suite.Suite }
+
+func (s *VSuite) TestA() { s.Require().True(true) }
+
+func TestVTestSuite(t *testing.T) { suite.Run(t, new(VSuite)) }
+`}))
+			mig, err := testkit.RunCLIWithEnv(it.Context(), dir, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s", mig.Stdout, mig.Stderr)
+			gotest.NotContains(it, mig.Stdout, "Not kept")
+		})
+	})
+}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / one Hydrate does not assign is refused at the field, told to assign it in Hydrate \(
+Clause: when a shared fixture embeds an interface or a named non-struct type → one Hydrate does not assign is refused at the field, told to assign it in Hydrate
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -20,7 +20,7 @@
+ 		return nil
+ 	}
+ 	// a non-struct embedded type is a value of its own, never transferred
+-	if embedded := derefOnce(f.Type()); !isStruct(embedded) {
++	if embedded := derefOnce(f.Type()); false && !isStruct(embedded) {
+ 		typ := types.TypeString(f.Type(), types.RelativeTo(in))
+ 		if types.IsInterface(embedded) {
+ 			return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, an interface the state cannot carry, so the suites read nil; assign it in Hydrate", fixture, typ))

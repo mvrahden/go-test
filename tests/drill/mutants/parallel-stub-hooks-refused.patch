@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery ParallelShapes .* / a suite whose fixture hooks never use the fixture runs \(
+Clause: when a suite with Parallel: true binds a package fixture that declares BeforeEach or AfterEach → a suite whose fixture hooks never use the fixture runs
+--- a/internal/gotestast/parallel.go
++++ b/internal/gotestast/parallel.go
+@@ -10,7 +10,7 @@
+ // HookUsesReceiver reports whether a hook's body names its receiver. A hook
+ // whose source is not at hand (decl nil) is taken to.
+ func HookUsesReceiver(decl *ast.FuncDecl, info *types.Info) bool {
+-	if decl == nil || decl.Body == nil || info == nil {
++	if true || decl == nil || decl.Body == nil || info == nil {
+ 		return true
+ 	}
+ 	if decl.Recv == nil || len(decl.Recv.List) == 0 || len(decl.Recv.List[0].Names) == 0 {

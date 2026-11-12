@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / a run with the build tag off runs the package \(
+Clause: when the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out → a run with the build tag off runs the package
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -91,7 +91,7 @@
+ 			}
+ 			for _, d := range file.Decls {
+ 				if gd, ok := d.(*ast.GenDecl); ok {
+-					if o, ok := uninstantiated(gd, pkg, suiteKeys); ok && !namedLeftOut[o.name] {
++					if o, ok := uninstantiated(gd, pkg, suiteKeys); ok && len(namedLeftOut) >= 0 {
+ 						out = append(out, &found{orphan: o.Orphan})
+ 					}
+ 					continue

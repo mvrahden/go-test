@@ -10238,6 +10238,827 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "a type nothing calls them on is refused at its first such method, told which suffix makes it a suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 29,
+                      "name": "a_type_nothing_calls_them_on_is_refused_at_its_first_such_method,_told_which_suffix_makes_it_a_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper whose method a suite calls, directly or through an interface, runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "a_helper_whose_method_a_suite_calls,_directly_or_through_an_interface,_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper only the external test package calls runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 40,
+                      "name": "a_helper_only_the_external_test_package_calls_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a type a non-test file declares is left alone",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 44,
+                      "name": "a_type_a_non-test_file_declares_is_left_alone",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 28,
+                  "name": "a_test_file_declares_methods_named_as_cases,_taking_a_gotest_T,_B_or_F,_on_a_type_that_is_no_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CaseNamedMethods",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestCaseNamedMethods",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one no alias instantiates is refused at its declaration, told to declare an alias",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 53,
+                      "name": "one_no_alias_instantiates_is_refused_at_its_declaration,_told_to_declare_an_alias",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one an alias instantiates runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 57,
+                      "name": "one_an_alias_instantiates_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one marked X_ is not refused",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 60,
+                      "name": "one_marked_X__is_not_refused",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file declares a generic suite",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 52,
+                  "name": "a_test_file_declares_a_generic_suite",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "GenericSuites",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 51,
+              "name": "TestGenericSuites",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one taking the T, B or F of that case is refused at the method, told to add a name",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 72,
+                      "name": "one_taking_the_T,_B_or_F_of_that_case_is_refused_at_the_method,_told_to_add_a_name",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one taking no such parameter is a helper and the suite runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 80,
+                      "name": "one_taking_no_such_parameter_is_a_helper_and_the_suite_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite declares a method named exactly Test, Benchmark or Fuzz",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "a_suite_declares_a_method_named_exactly_Test,_Benchmark_or_Fuzz",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BareNames",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 66,
+              "name": "TestBareNames",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a run with the build tag off runs the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 88,
+                      "name": "a_run_with_the_build_tag_off_runs_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run on a platform the file is not for runs the package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 91,
+                      "name": "a_run_on_a_platform_the_file_is_not_for_runs_the_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a run with the build tag on runs the constrained suites too",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 94,
+                      "name": "a_run_with_the_build_tag_on_runs_the_constrained_suites_too",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper no file names is still refused",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 101,
+                      "name": "a_helper_no_file_names_is_still_refused",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 87,
+                  "name": "the_only_caller_of_a_helper,_or_the_only_alias_of_a_generic_suite,_is_in_a_test_file_a_build_constraint_leaves_out",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ConstrainedCallers",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 86,
+              "name": "TestConstrainedCallers",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a helper converted to an interface that holds its method runs, by argument, assignment, return, composite literal or conversion",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 110,
+                      "name": "a_helper_converted_to_an_interface_that_holds_its_method_runs,_by_argument,_assignment,_return,_composite_literal_or_conversion",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a helper converted only to any or to an interface without the method is still refused",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 118,
+                      "name": "a_helper_converted_only_to_any_or_to_an_interface_without_the_method_is_still_refused",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file hands a helper to an interface a non-test package declares and calls",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 109,
+                  "name": "a_test_file_hands_a_helper_to_an_interface_a_non-test_package_declares_and_calls",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HarnessCallers",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 108,
+              "name": "TestHarnessCallers",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "NeverRun",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "neverrun_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestNeverRunTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "a_suite_with_two_or_more_test_methods_whose_fixture_hook_uses_the_fixture_is_refused_at_the_suite,_told_to_move_the_work_into_its_returning_BeforeEach_or_drop_Parallel",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite whose fixture hooks never use the fixture runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 24,
+                      "name": "a_suite_whose_fixture_hooks_never_use_the_fixture_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a suite with one test method runs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "a_suite_with_one_test_method_runs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite with Parallel: true binds a package fixture that declares BeforeEach or AfterEach",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "parallel_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 19,
+                  "name": "a_suite_with_Parallel:_true_binds_a_package_fixture_that_declares_BeforeEach_or_AfterEach",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FixtureHooks",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "parallel_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 18,
+              "name": "TestFixtureHooks",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a call in a test method, in BeforeEach, in a nested It and through t.T() is refused at the call, told to set it in BeforeAll or drop Parallel",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 41,
+                      "name": "a_call_in_a_test_method,_in_BeforeEach,_in_a_nested_It_and_through_t.T()_is_refused_at_the_call,_told_to_set_it_in_BeforeAll_or_drop_Parallel",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a call in BeforeAll runs and its value reaches every method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "parallel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 52,
+                      "name": "a_call_in_BeforeAll_runs_and_its_value_reaches_every_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite with Parallel: true calls Setenv on a T",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "parallel_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 40,
+                  "name": "a_suite_with_Parallel:_true_calls_Setenv_on_a_T",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Setenv",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "parallel_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 33,
+              "name": "TestSetenv",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "ParallelShapes",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "parallel_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestParallelShapesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 19,
+                      "name": "one_with_exported_fields_is_refused_at_the_field,_told_to_hold_it_in_a_named_field_or_assign_it_in_Hydrate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one of an unexported type is refused, told to hold it in an exported field of an exported type or assign it in Hydrate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "one_of_an_unexported_type_is_refused,_told_to_hold_it_in_an_exported_field_of_an_exported_type_or_assign_it_in_Hydrate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one without exported fields and one Hydrate assigns are left out, and the suite runs with its state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "one_without_exported_fields_and_one_Hydrate_assigns_are_left_out,_and_the_suite_runs_with_its_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture embeds a type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 18,
+                  "name": "a_shared_fixture_embeds_a_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EmbeddedFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestEmbeddedFields",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the field is refused at the field, told to assign it in Hydrate or unexport it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "the_field_is_refused_at_the_field,_told_to_assign_it_in_Hydrate_or_unexport_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "an interface field Hydrate assigns and a field of a type that refers to itself reach the suite",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 39,
+                      "name": "an_interface_field_Hydrate_assigns_and_a_field_of_a_type_that_refers_to_itself_reach_the_suite",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture transfers a field whose type holds an interface with methods",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 34,
+                  "name": "a_shared_fixture_transfers_a_field_whose_type_holds_an_interface_with_methods",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "InterfaceFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 33,
+              "name": "TestInterfaceFields",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a fixture whose Hydrate assigns every one of them runs with its state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 47,
+                      "name": "a_fixture_whose_Hydrate_assigns_every_one_of_them_runs_with_its_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one whose Hydrate assigns only some is refused at the field, naming the fields it does not",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 50,
+                      "name": "one_whose_Hydrate_assigns_only_some_is_refused_at_the_field,_naming_the_fields_it_does_not",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Hydrate assigns the fields a shared fixture's embedded struct promotes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 46,
+                  "name": "Hydrate_assigns_the_fields_a_shared_fixture's_embedded_struct_promotes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HydratedPromotedFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 45,
+              "name": "TestHydratedPromotedFields",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "one Hydrate does not assign is refused at the field, told to assign it in Hydrate",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "one_Hydrate_does_not_assign_is_refused_at_the_field,_told_to_assign_it_in_Hydrate",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one Hydrate assigns, and an embedded struct with nothing to transfer, run with their state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 65,
+                      "name": "one_Hydrate_assigns,_and_an_embedded_struct_with_nothing_to_transfer,_run_with_their_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture embeds an interface or a named non-struct type",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 58,
+                  "name": "a_shared_fixture_embeds_an_interface_or_a_named_non-struct_type",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EmbeddedNonStructs",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 57,
+              "name": "TestEmbeddedNonStructs",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SharedFields",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "sharedfields_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestSharedFieldsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a stale generated file on disk neither breaks the run nor is compiled",
                       "duration": 0,
                       "excluded": false,
@@ -22666,6 +23487,67 @@
               "name": "TestAHelperNameTaken",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate removes it and names it in the closing summary, since testify never ran it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "base_suites_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 511,
+                      "name": "migrate_removes_it_and_names_it_in_the_closing_summary,_since_testify_never_ran_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a base test only some children override, one something calls, and the tests of a base a runner runs are kept",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "base_suites_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 518,
+                      "name": "a_base_test_only_some_children_override,_one_something_calls,_and_the_tests_of_a_base_a_runner_runs_are_kept",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a base no runner runs declares a test that every suite embedding it overrides and nothing calls",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "base_suites_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 508,
+                  "name": "a_base_no_runner_runs_declares_a_test_that_every_suite_embedding_it_overrides_and_nothing_calls",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ABaseTestEveryChildOverrides",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "base_suites_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 507,
+              "name": "TestABaseTestEveryChildOverrides",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "MigrateBaseSuites",
@@ -23691,6 +24573,174 @@
               "kind": "method",
               "line": 521,
               "name": "TestACommentOnARemovedImport",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each comment stays at the end of its own statement",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 574,
+                      "name": "each_comment_stays_at_the_end_of_its_own_statement",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when line comments trail assertions migrate converts and an s.Run call it turns into t.It",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 573,
+                  "name": "line_comments_trail_assertions_migrate_converts_and_an_s.Run_call_it_turns_into_t.It",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CommentsTrailingConvertedCalls",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 572,
+              "name": "TestCommentsTrailingConvertedCalls",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 591,
+                      "name": "migrate_writes_gotest.Fail,_gotest.TimeWithin,_and_gotest.Greater_and_gotest.Less_against_0,_and_the_result_compiles",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 613,
+                      "name": "Fail_with_a_second_message,_Positive_on_a_float_and_NotPanics_stay_unconverted_under_markers_giving_the_reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 590,
+                  "name": "a_suite_calls_FailNow_or_Fail_with_one_message,_WithinDuration,_and_Positive_or_Negative_on_an_integer",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AssertionsWithAnExactGotestForm",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 589,
+              "name": "TestAssertionsWithAnExactGotestForm",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 631,
+                      "name": "the_summary_counts_the_assertions_that_now_stop_the_test_and_the_stdlib_tests_left,_and_lists_the_id_that_changed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a migration with none of these prints no such section",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 663,
+                      "name": "a_migration_with_none_of_these_prints_no_such_section",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 630,
+                  "name": "migrate_converts_a_suite_with_soft_assertions,_under_a_runner_of_another_name,_beside_a_plain_testify_test",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatMigrateDidNotKeep",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 629,
+              "name": "TestWhatMigrateDidNotKeep",
               "output": [],
               "status": "none"
             }
@@ -26118,13 +27168,13 @@
     }
   ],
   "stats": {
-    "behaviors": 753,
+    "behaviors": 789,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 110,
+    "suites": 113,
     "tests": 0
   }
 }

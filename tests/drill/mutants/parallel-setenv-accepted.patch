@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery ParallelShapes .* / a call in a test method, in BeforeEach, in a nested It and through t\.T\(\) is refused at the call, told to set it in BeforeAll or drop Parallel \(
+Clause: when a suite with Parallel: true calls Setenv on a T → a call in a test method, in BeforeEach, in a nested It and through t.T() is refused at the call, told to set it in BeforeAll or drop Parallel
+--- a/internal/gotestast/parallel.go
++++ b/internal/gotestast/parallel.go
+@@ -54,7 +54,7 @@
+ // AfterEach calls Setenv on a T: testing panics there. It reads each
+ // method's own body, closures included, not the helpers it calls.
+ func parallelSetenv(ts *TestSuiteSpec) error {
+-	if !ts.th.ConfigParallel {
++	if true || !ts.th.ConfigParallel {
+ 		return nil
+ 	}
+ 	methods := []*TestSuiteMethod{ts.th.BeforeEach, ts.th.AfterEach}
