@@ -27,11 +27,15 @@ gotest SHALL run the suites of a module that requires gotest and declares no too
 - **THEN** runs its suites and exits 0
 
 ### Requirement: A broken config
-When .gotest.yml does not parse, version and help SHALL still print, and a run SHALL report the config error with exit 2. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+When .gotest.yml does not parse, version and help SHALL still print, and a run SHALL report the config error with exit 2. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`. A value its flag would refuse, or a second YAML document, SHALL be reported the same way, naming the key and the value.
 
 #### Scenario: A config that does not parse
 - **WHEN** .gotest.yml does not parse
 - **THEN** still prints version and help, and a run reports the config error with exit 2
+
+#### Scenario: A value its flag would refuse
+- **WHEN** .gotest.yml sets parallel, compile-parallel or min-coverage to a value its flag refuses, or holds a second document
+- **THEN** a run reports the key and the value with exit 2
 
 ### Requirement: Config defaults a command cannot take
 A timeout or setup-timeout in .gotest.yml SHALL apply only to the commands that take --timeout or --setup-timeout. gotest fuzz, whose clock is --for, SHALL ignore both and SHALL still refuse --timeout given as a flag.

@@ -6809,6 +6809,113 @@
               "name": "TestAConfigTimeoutUnderFuzz",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "a negative parallel",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "newcomer_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 156,
+                          "name": "a_negative_parallel",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a negative compile-parallel",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "newcomer_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 157,
+                          "name": "a_negative_compile-parallel",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a min-coverage above 100",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "newcomer_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 158,
+                          "name": "a_min-coverage_above_100",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "a second document",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "newcomer_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 159,
+                          "name": "a_second_document",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "a run reports the key and the value with exit 2",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "newcomer_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 154,
+                      "name": "a_run_reports_the_key_and_the_value_with_exit_2",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when .gotest.yml sets parallel, compile-parallel or min-coverage to a value its flag refuses, or holds a second document",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "newcomer_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 153,
+                  "name": ".gotest.yml_sets_parallel,_compile-parallel_or_min-coverage_to_a_value_its_flag_refuses,_or_holds_a_second_document",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AConfigValueItsFlagWouldRefuse",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "newcomer_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 152,
+              "name": "TestAConfigValueItsFlagWouldRefuse",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "CLINewcomer",
@@ -28810,7 +28917,7 @@
     }
   ],
   "stats": {
-    "behaviors": 835,
+    "behaviors": 839,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

@@ -148,3 +148,23 @@ func (s *CfgFuzzTestSuite) TestOne(t *gotest.T) { gotest.True(t, true) }
 		})
 	})
 }
+
+func (s *CLINewcomerTestSuite) TestAConfigValueItsFlagWouldRefuse(t *gotest.T) {
+	t.When(".gotest.yml sets parallel, compile-parallel or min-coverage to a value its flag refuses, or holds a second document", func(w *gotest.T) {
+		w.It("a run reports the key and the value with exit 2", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []struct{ Desc, yaml, stderrHas string }{
+				{"a negative parallel", "parallel: -3\n", "parallel: -3"},
+				{"a negative compile-parallel", "compile-parallel: -1\n", "compile-parallel: -1"},
+				{"a min-coverage above 100", "min-coverage: 150\n", "min-coverage: 150"},
+				{"a second document", "parallel: 4\n---\nparallel: 8\n", "more than one YAML document"},
+			}) {
+				dir := sub.TempDir()
+				gotest.NoError(sub, os.WriteFile(filepath.Join(dir, ".gotest.yml"), []byte(row.yaml), 0o600))
+				run, err := testkit.RunCLI(sub.Context(), dir, "./...")
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, 2, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, row.stderrHas)
+			}
+		})
+	})
+}

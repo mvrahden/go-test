@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / a run reports the key and the value with exit 2 / a negative parallel \(
+Clause: when .gotest.yml sets parallel, compile-parallel or min-coverage to a value its flag refuses, or holds a second document → a run reports the key and the value with exit 2
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -174,9 +174,6 @@
+ 	if err := checkStringLists(data); err != nil {
+ 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+ 	}
+-	if err := cfg.validate(); err != nil {
+-		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+-	}
+ 	return cfg, nil
+ }
+ 

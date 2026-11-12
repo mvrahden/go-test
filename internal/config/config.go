@@ -168,10 +168,33 @@ func parse(path string) (ProjectConfig, error) {
 		}
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
+	if err := dec.Decode(new(yaml.Node)); !errors.Is(err, io.EOF) {
+		return ProjectConfig{}, fmt.Errorf("%s: holds more than one YAML document; gotest reads one", path)
+	}
 	if err := checkStringLists(data); err != nil {
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
+	if err := cfg.validate(); err != nil {
+		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+	}
 	return cfg, nil
+}
+
+// validate refuses a value the key's flag would refuse. Zero stays legal for
+// the counts, as an int cannot tell it from an omitted key.
+func (c *ProjectConfig) validate() error {
+	for _, kv := range []struct {
+		key string
+		n   int
+	}{{"parallel", c.Parallel}, {"compile-parallel", c.CompileParallel}} {
+		if kv.n < 0 {
+			return fmt.Errorf("%s: %d is not a positive integer (omit the key for the default)", kv.key, kv.n)
+		}
+	}
+	if c.MinCoverage < 0 || c.MinCoverage > 100 {
+		return fmt.Errorf("min-coverage: %d is not a percentage from 0 to 100", c.MinCoverage)
+	}
+	return nil
 }
 
 // checkStringLists refuses a list element that is not a string: YAML
