@@ -143,3 +143,10 @@ Migrate SHALL remove the testify imports nothing uses any more, with the comment
 #### Scenario: A comment on a removed import
 - **WHEN** an import migrate removes carries a comment on its line or above it
 - **THEN** the comment goes with the import and the file stays as gofmt formats it
+
+### Requirement: Comments
+Migrate SHALL keep a comment that trails a statement at the end of that statement, whether it converts the statement or the one after it.
+
+#### Scenario: Comments trailing converted calls
+- **WHEN** line comments trail assertions migrate converts and an s.Run call it turns into t.It
+- **THEN** each comment stays at the end of its own statement

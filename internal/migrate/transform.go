@@ -443,6 +443,47 @@ func freeName(fd *ast.FuncDecl) string {
 	}
 }
 
+// anchor puts every position inside e, an expression parsed or built apart
+// from the file, at pos, the position of the code it replaces, and returns e.
+func anchor(e ast.Expr, pos token.Pos) ast.Expr {
+	ast.Inspect(e, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.Ident:
+			n.NamePos = pos
+		case *ast.BasicLit:
+			n.ValuePos = pos
+		case *ast.StarExpr:
+			n.Star = pos
+		case *ast.IndexExpr:
+			n.Lbrack, n.Rbrack = pos, pos
+		case *ast.IndexListExpr:
+			n.Lbrack, n.Rbrack = pos, pos
+		case *ast.ArrayType:
+			n.Lbrack = pos
+		case *ast.MapType:
+			n.Map = pos
+		case *ast.ChanType:
+			n.Begin = pos
+		case *ast.FuncType:
+			n.Func = pos
+		case *ast.InterfaceType:
+			n.Interface = pos
+		case *ast.StructType:
+			n.Struct = pos
+		case *ast.FieldList:
+			n.Opening, n.Closing = pos, pos
+		case *ast.ParenExpr:
+			n.Lparen, n.Rparen = pos, pos
+		case *ast.CallExpr:
+			n.Lparen, n.Rparen = pos, pos
+		case *ast.Ellipsis:
+			n.Ellipsis = pos
+		}
+		return true
+	})
+	return e
+}
+
 // gotestTType is the *gotest.T type expression.
 func gotestTType() ast.Expr {
 	return &ast.StarExpr{X: &ast.SelectorExpr{X: ast.NewIdent("gotest"), Sel: ast.NewIdent("T")}}
@@ -499,7 +540,11 @@ func (r *rewriter) reaches(pos token.Pos) bool {
 	return r.tObj == nil || r.u.lookup(r.f, r.tName, pos) == r.tObj
 }
 
-func (r *rewriter) tIdent() *ast.Ident { return ast.NewIdent(r.tName) }
+// tIdent is t, at pos: a node without a position in the file lets the
+// printer place a pending comment inside the code it is printed with.
+func (r *rewriter) tIdent(pos token.Pos) *ast.Ident {
+	return &ast.Ident{Name: r.tName, NamePos: pos}
+}
 
 // subtests turns `s.Run(name, func() {...})` statements into
 // `t.It(name, func(t *gotest.T) {...})`: the closure's own t, under the same
@@ -526,8 +571,9 @@ func (r *rewriter) subtests(body *ast.BlockStmt, vars []*ast.Ident) bool {
 		if !ok || lit.Type.Params.NumFields() != 0 || lit.Type.Results.NumFields() != 0 {
 			return true
 		}
-		sel.X, sel.Sel = r.tIdent(), ast.NewIdent("It")
-		lit.Type.Params.List = []*ast.Field{{Names: []*ast.Ident{r.tIdent()}, Type: gotestTType()}}
+		sel.X, sel.Sel = r.tIdent(sel.X.Pos()), &ast.Ident{Name: "It", NamePos: sel.Sel.Pos()}
+		at := lit.Type.Params.Opening
+		lit.Type.Params.List = []*ast.Field{{Names: []*ast.Ident{r.tIdent(at)}, Type: anchor(gotestTType(), at)}}
 		changed = true
 		return true
 	})
@@ -617,7 +663,13 @@ func (r *rewriter) assertionCall(call *ast.CallExpr, recv *ast.Ident) ast.Expr {
 	if err != nil {
 		return nil
 	}
-	return &ast.CallExpr{Fun: fun, Args: append([]ast.Expr{r.tIdent()}, newArgs...), Ellipsis: call.Ellipsis}
+	return &ast.CallExpr{
+		Fun:      anchor(fun, call.Pos()),
+		Lparen:   call.Lparen,
+		Args:     append([]ast.Expr{r.tIdent(call.Lparen)}, newArgs...),
+		Ellipsis: call.Ellipsis,
+		Rparen:   call.Rparen,
+	}
 }
 
 // stCalls rewrites every s.T() in body to t.T() and reports whether it
@@ -668,7 +720,7 @@ func (r *rewriter) methodCalls(body *ast.BlockStmt) bool {
 			return true
 		}
 		if _, ok := r.hookOf(sel); ok && r.gotestT && r.reaches(call.Pos()) {
-			call.Args = append([]ast.Expr{r.tIdent()}, call.Args...)
+			call.Args = append([]ast.Expr{r.tIdent(call.Lparen)}, call.Args...)
 			changed = true
 		}
 		return true

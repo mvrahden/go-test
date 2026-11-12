@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / CommentsTrailingConvertedCalls / when line comments trail assertions migrate converts and an s.Run call it turns into t.It / each comment stays at the end of its own statement \(
+Clause: when line comments trail assertions migrate converts and an s.Run call it turns into t.It → each comment stays at the end of its own statement
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -664,7 +664,7 @@
+ 		return nil
+ 	}
+ 	return &ast.CallExpr{
+-		Fun:      anchor(fun, call.Pos()),
++		Fun:      fun,
+ 		Lparen:   call.Lparen,
+ 		Args:     append([]ast.Expr{r.tIdent(call.Lparen)}, newArgs...),
+ 		Ellipsis: call.Ellipsis,

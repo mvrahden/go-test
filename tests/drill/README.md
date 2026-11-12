@@ -782,6 +782,7 @@ shards of one run do not add up to every mutant exactly once.
 | `migrate-nan-indelta-translated` | `InDelta` is translated whatever may be NaN | conformance: the migrate It for InDelta where a NaN decides finds no marker |
 | `migrate-workspace-vendor-ignored` | the vendor directory is looked for beside go.mod even where a workspace governs | conformance: the migrate It for a vendored workspace finds the load failing offline |
 | `migrate-goenv-gowork-ignored` | the workspace is resolved without the `go env -w` settings | conformance: the migrate It for a workspace turned off by go env finds the load failing offline |
+| `migrate-comment-drifts-to-next-call` | the converted assertion's callee keeps the positions of the source it was parsed from | conformance: the migrate It for trailing comments finds `// one` inside the next call |
 | `e2e-bench-note-dropped` | a test run drops the note on the benchmarks it left out | conformance: the CLI It for a package that declares a benchmark sees no note on stderr |
 | `e2e-excluded-suite-passes` | an X_ suite is booked as passed, not skipped | conformance: the discovery It for an X_ suite sees it not reported skipped |
 | `e2e-discover-when-kind-misnamed` | discover reports a When's kind as it | conformance: the discovery It for a When with Its sees the wrong kind |

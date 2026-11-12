@@ -24514,6 +24514,52 @@
               "name": "TestACommentOnARemovedImport",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each comment stays at the end of its own statement",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 574,
+                      "name": "each_comment_stays_at_the_end_of_its_own_statement",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when line comments trail assertions migrate converts and an s.Run call it turns into t.It",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 573,
+                  "name": "line_comments_trail_assertions_migrate_converts_and_an_s.Run_call_it_turns_into_t.It",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CommentsTrailingConvertedCalls",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 572,
+              "name": "TestCommentsTrailingConvertedCalls",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "MigrateVerdicts",
@@ -26939,7 +26985,7 @@
     }
   ],
   "stats": {
-    "behaviors": 782,
+    "behaviors": 783,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

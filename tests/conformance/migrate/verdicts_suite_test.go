@@ -568,3 +568,20 @@ func TestB(t *testing.T) { suite.Run(t, new(BSuite)) }
 		})
 	})
 }
+
+func (s *MigrateVerdictsTestSuite) TestCommentsTrailingConvertedCalls(t *gotest.T) {
+	t.When("line comments trail assertions migrate converts and an s.Run call it turns into t.It", func(w *gotest.T) {
+		w.It("each comment stays at the end of its own statement", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	s.Require().Equal(1, 1) // one
+	s.Equal(1, 1)           // two
+	s.Run("nested", func() { // three
+		s.Equal(1, 1) // four
+	})
+}
+`)})
+			gotest.Equal(it, 0, exit, out)
+			gotest.Contains(it, out, "func (s *VTestSuite) TestA(t *gotest.T) {\n\tgotest.Equal(t, 1, 1)              // one\n\tgotest.Equal(t, 1, 1)              // two\n\tt.It(\"nested\", func(t *gotest.T) { // three\n\t\tgotest.Equal(t, 1, 1) // four\n\t})\n}\n")
+		})
+	})
+}
