@@ -37,3 +37,15 @@ func (s *SharedFieldsTestSuite) TestInterfaceFields(t *gotest.T) {
 		})
 	})
 }
+
+func (s *SharedFieldsTestSuite) TestHydratedPromotedFields(t *gotest.T) {
+	t.When("Hydrate assigns the fields a shared fixture's embedded struct promotes", func(w *gotest.T) {
+		w.It("a fixture whose Hydrate assigns every one of them runs with its state", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharedembedhyd", verdict: "TestStateTestSuite/TestState"})
+		})
+		w.It("one whose Hydrate assigns only some is refused at the field, naming the fields it does not", func(it *gotest.T) {
+			checkShape(it, shape{pkg: "sharedembedpart", exit: 2,
+				shows: `fixture\.go:14:2: shared fixture "StateSharedFixture" embeds Info, whose exported fields Host and Port are neither transferred to the suites nor assigned in Hydrate; hold it in a named field \(Info Info\), or assign them in Hydrate`})
+		})
+	})
+}

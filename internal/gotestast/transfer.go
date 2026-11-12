@@ -19,42 +19,60 @@ func EmbeddedFieldError(fixture string, f *types.Var, hydrated map[string]bool, 
 	if n := namedBehind(f.Type()); n != nil && strings.HasSuffix(n.Obj().Name(), protocol.SuffixFixture) {
 		return nil
 	}
-	if !promotesExported(f.Type(), map[types.Type]bool{}) {
+	fields := promotedExported(f.Type(), hydrated, map[types.Type]bool{})
+	var missing []string
+	for _, name := range fields {
+		if !hydrated[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
 		return nil
 	}
 	typ := types.TypeString(f.Type(), types.RelativeTo(in))
+	if len(missing) < len(fields) {
+		return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields %s are neither transferred to the suites nor assigned in Hydrate; hold it in a named field (%s %s), or assign them in Hydrate", fixture, typ, joinAnd(missing), f.Name(), typ))
+	}
 	return At(f.Pos(), fmt.Errorf("shared fixture %q embeds %s, whose exported fields are not transferred to the suites; hold it in a named field (%s %s), or assign it in Hydrate", fixture, typ, f.Name(), typ))
 }
 
-// promotesExported reports whether embedding t promotes an exported field:
-// a struct, through one pointer, with an exported named field or an embedded
-// field that promotes one. A non-struct type promotes none.
-func promotesExported(t types.Type, seen map[types.Type]bool) bool {
+// joinAnd lists names as "a", "a and b", "a, b and c".
+func joinAnd(names []string) string {
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// promotedExported names the exported fields embedding t promotes: those of
+// a struct, through one pointer, and of the structs it embeds, except the
+// ones under an embedded field hydrated names. A non-struct promotes none.
+func promotedExported(t types.Type, hydrated map[string]bool, seen map[types.Type]bool) []string {
 	t = types.Unalias(t)
 	if ptr, ok := t.(*types.Pointer); ok {
 		t = types.Unalias(ptr.Elem())
 	}
 	if seen[t] {
-		return false
+		return nil
 	}
 	seen[t] = true
 	st, ok := t.Underlying().(*types.Struct)
 	if !ok {
-		return false
+		return nil
 	}
+	var names []string
 	for i := range st.NumFields() {
 		f := st.Field(i)
-		if f.Anonymous() {
-			if promotesExported(f.Type(), seen) {
-				return true
+		switch {
+		case f.Anonymous():
+			if !hydrated[f.Name()] {
+				names = append(names, promotedExported(f.Type(), hydrated, seen)...)
 			}
-			continue
-		}
-		if f.Exported() {
-			return true
+		case f.Exported():
+			names = append(names, f.Name())
 		}
 	}
-	return false
+	return names
 }
 
 // TransferFieldError refuses a transfer field of the shared fixture named

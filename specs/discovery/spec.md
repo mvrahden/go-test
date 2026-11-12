@@ -234,12 +234,17 @@ gotest SHALL refuse with exit 2 a suite with Parallel: true whose test method, B
 - **AND** a call in BeforeAll runs and its value reaches every method
 
 ### Requirement: Shared fixture fields the state cannot carry
-gotest SHALL refuse with exit 2, at the field and naming the way out, a shared fixture that embeds a type with exported fields unless Hydrate assigns it (only named fields are transferred, so the suites would read zero values), and a transfer field whose type holds an interface with methods (JSON cannot rebuild its value). An embedded type without exported fields, a field Hydrate assigns, and a field of a type that refers to itself SHALL be accepted.
+gotest SHALL refuse with exit 2, at the field and naming the way out, a shared fixture that embeds a type with exported fields unless Hydrate assigns it or every exported field it promotes (only named fields are transferred, so the suites would read zero values), and a transfer field whose type holds an interface with methods (JSON cannot rebuild its value). An embedded type without exported fields, a field Hydrate assigns, and a field of a type that refers to itself SHALL be accepted.
 
 #### Scenario: A shared fixture embeds a type
 - **WHEN** a shared fixture embeds a type
 - **THEN** one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate
 - **AND** one without exported fields and one Hydrate assigns are left out, and the suite runs with its state
+
+#### Scenario: Hydrate assigns an embedded struct's fields
+- **WHEN** Hydrate assigns the fields a shared fixture's embedded struct promotes
+- **THEN** a fixture whose Hydrate assigns every one of them runs with its state
+- **AND** one whose Hydrate assigns only some is refused at the field, naming the fields it does not
 
 #### Scenario: A field JSON cannot rebuild
 - **WHEN** a shared fixture transfers a field whose type holds an interface with methods

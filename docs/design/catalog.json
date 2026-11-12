@@ -10885,6 +10885,67 @@
               "name": "TestInterfaceFields",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "a fixture whose Hydrate assigns every one of them runs with its state",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 43,
+                      "name": "a_fixture_whose_Hydrate_assigns_every_one_of_them_runs_with_its_state",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "one whose Hydrate assigns only some is refused at the field, naming the fields it does not",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "sharedfields_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 46,
+                      "name": "one_whose_Hydrate_assigns_only_some_is_refused_at_the_field,_naming_the_fields_it_does_not",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when Hydrate assigns the fields a shared fixture's embedded struct promotes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "sharedfields_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 42,
+                  "name": "Hydrate_assigns_the_fields_a_shared_fixture's_embedded_struct_promotes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HydratedPromotedFields",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "sharedfields_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 41,
+              "name": "TestHydratedPromotedFields",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "SharedFields",
@@ -26787,7 +26848,7 @@
     }
   ],
   "stats": {
-    "behaviors": 776,
+    "behaviors": 778,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

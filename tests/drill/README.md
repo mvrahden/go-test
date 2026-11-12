@@ -654,6 +654,8 @@ shards of one run do not add up to every mutant exactly once.
 | `parallel-setenv-beforeall-refused` | Setenv in BeforeAll of a parallel suite is refused | conformance: the discovery It for Setenv in BeforeAll sees exit 2 |
 | `shared-embedded-field-accepted` | a shared fixture's embedded type with exported fields is left out of the transfer in silence | conformance: the discovery It for an embedded shared fixture field sees exit 1 instead of 2 |
 | `shared-inert-embedded-refused` | an embedded type without exported fields is refused like one with them | conformance: the discovery It for inert embedded fields sees exit 2 |
+| `shared-promoted-hydrate-unread` | Hydrate's assignments of promoted fields are not read | conformance: the discovery It for a fully hydrated embedded struct sees exit 2 |
+| `shared-partial-hydrate-accepted` | an embedded struct Hydrate assigns in part is accepted | conformance: the discovery It for a partly hydrated embedded struct sees exit 0 |
 | `shared-interface-field-accepted` | a shared fixture's transfer field of an interface type with methods is accepted | conformance: the discovery It for an interface transfer field sees exit 0 instead of 2 |
 | `shared-self-referential-type-unguarded` | the transfer check reads a type that refers to itself without end | conformance: the discovery It for a self-referential transfer field sees the generator's stack overflow, exit 2 |
 | `harness-imports-unaliased` | the generated harness imports `strconv` under its own name | canary: the `shapes/gencontext` package, which declares `strconv`, exits 2 instead of 0 |
