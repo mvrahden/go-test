@@ -60,9 +60,11 @@ go tool gotest version
 ## Vendored modules
 
 In a vendored module (`vendor/modules.txt`) any go.mod edit breaks every
-build until `go mod vendor` reruns, and gotest cannot run vendored at all
-(the overlay's `pkg/gotestruntime` import is never vendored) — report, do
-not work around.
+build until `go mod vendor` reruns. gotest runs vendored only when a file
+of the module imports `github.com/mvrahden/go-test/pkg/gotestruntime` (and
+`pkg/gotestfuzz` for struct fuzz targets), because only generated code
+imports them; where that file is missing, report it and do not add it
+unasked.
 
 ## Running the CLI
 

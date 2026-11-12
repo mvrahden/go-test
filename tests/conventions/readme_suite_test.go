@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/speccatalog"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -95,6 +96,37 @@ func (s *ReadmeExampleTestSuite) TestTheFirstExampleRendersTheSpecShown(t *gotes
 			// The README names a package of its own and no checkout or run times.
 			got = provenanceLine.ReplaceAllString(got, "")
 			got = packageHeading.ReplaceAllString(got, "=== pkg/user — ")
+			gotest.Equal(it, want, got)
+		})
+	})
+}
+
+func (s *ReadmeExampleTestSuite) TestTheContentsListEverySection(t *gotest.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	gotest.NoError(t, err)
+	var want, got []string
+	inFence, inContents := false, false
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		if heading, ok := strings.CutPrefix(line, "## "); ok {
+			inContents = heading == "Contents"
+			if !inContents {
+				want = append(want, "- ["+heading+"](#"+speccatalog.Slug(heading)+")")
+			}
+			continue
+		}
+		if inContents && strings.HasPrefix(line, "- [") {
+			got = append(got, line)
+		}
+	}
+	t.When("the README's contents are compared with its sections", func(w *gotest.T) {
+		w.It("list every section once, in order, by the anchor GitHub gives it", func(it *gotest.T) {
 			gotest.Equal(it, want, got)
 		})
 	})

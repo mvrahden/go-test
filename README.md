@@ -20,6 +20,76 @@ What you read back is a behavioral specification.
 
 The code your tests link imports only the standard library. Suites are found and registered by code generation, never by reflection.
 
+## Contents
+
+- [Why gotest?](#why-gotest)
+- [How It Works](#how-it-works)
+- [What It Costs](#what-it-costs)
+- [Install](#install)
+- [30-Second Example](#30-second-example)
+- [Specification](#specification)
+- [Isolation](#isolation)
+- [Parallelism](#parallelism)
+- [Testing Toolkit](#testing-toolkit)
+- [Benchmarking](#benchmarking)
+- [Fuzzing](#fuzzing)
+- [Configuration](#configuration)
+- [Test Selection](#test-selection)
+- [Tooling](#tooling)
+- [GitHub Actions](#github-actions)
+- [Commands](#commands)
+- [Naming Conventions](#naming-conventions)
+- [Coding Agents](#coding-agents)
+- [VS Code Extension](#vs-code-extension)
+- [License](#license)
+
+## Why gotest?
+
+Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more.
+Setup/teardown logic is copy-pasted or buried in `TestMain`.
+As test suites grow, organization becomes a discipline problem rather than a tooling one.
+
+**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file.
+Test output is standard — but the mechanism behind it isn't.
+
+**gotest** takes a different approach:
+
+- **Specification-driven.** BDD vocabulary (`When`/`It`) structures tests as readable behavioral contracts. `gotest spec` renders them as documentation — in the terminal, as markdown, or as structured JSON. Always in sync, never stale.
+- **Isolated by default.** Each suite runs in its own process, so suites share no memory, no package-level state and no `init` side effects. Within a suite the methods share one struct value: `BeforeEach` gives each method fresh state, and a field one method writes is there for the next unless a hook resets it.
+- **Parallel on two levels.** Suites run in parallel automatically, as separate processes. Methods run in parallel when the suite opts in, and each then gets its own state from a `BeforeEach` that returns it. The generator refuses a parallel suite whose `BeforeEach` returns nothing; it cannot see a method that writes a suite field, so run parallel suites under `-race`.
+
+Under the hood, `gotest` generates one `func Test<Suite>(t *testing.T)` per suite: a table of the suite's hooks and methods, handed to the `pkg/gotestruntime` library, which runs each method as a subtest, keeps setup and teardown in order and holds the timeouts.
+Generated files never touch your source tree: they reach the compiler through a build overlay and are removed after the run.
+
+gotest's own behavioral promises are stated once in [`specs/`](specs/README.md), each scenario bound to a test; this README explains them and links there.
+
+## How It Works
+
+```
+you write:          gotest generates:              gotest runs:
+                    (in a build overlay)
+
+MySuite struct      gotest_psuite_test.go          one process per suite:
+  BeforeAll()   →     func TestMySuite(t)      →     BeforeAll()
+  TestFoo()             OpenSuite(hooks)             t.Run("TestFoo", ...)
+  AfterAll()            RunMethods(methods)          AfterAll()
+```
+
+The generated file is short: a wrapper type and one call each to `gotestruntime.OpenSuite` and `gotestruntime.RunMethods`, with your hooks and methods passed as plain function values. `gotest generate ./...` writes it to disk when you want to read it.
+Suites are found by reading the source, and the generated code calls your methods directly: no reflection finds or dispatches a test. Assertions such as `Equal` use `reflect` to compare values.
+
+## What It Costs
+
+gotest puts a generator and a runner in front of `go test`. That buys the lifecycle, the fixtures and the specification view, and it has a price:
+
+- **Two commands for a complete run.** Plain `go test` does not see suites, and `gotest` does not run plain `func Test*` functions. A module with both kinds needs both commands, each with its own coverage profile. [Install](#install) says what each prints.
+- **`TestMain` runs once per suite.** Each suite is a process of its own, so a package's `TestMain`, its `init` functions and its package-level variables are set up once per suite, not once per package. Move resource setup from `TestMain` into a fixture.
+- **Editors see suites through the extension only.** The [VS Code extension](#vs-code-extension) lists, runs and debugs suites. gopls and other editors show suite methods as plain methods. To debug elsewhere, write the generated code to disk first: `gotest generate ./...`, then `dlv test`, then `gotest clean ./...`.
+- **Go 1.26 or newer.** The Go version follows gotest's own `go.mod`, so upgrading gotest can raise your module's `go` line; Install shows how to keep it.
+- **The tool directive adds indirect requirements.** `go get -tool` records the CLI's dependencies in your `go.mod` as `// indirect`. Your test binaries link none of them: the runtime imports only the standard library.
+- **A vendored module needs one extra file**, shown under [Install](#install).
+- **Leaving means rewriting the entry points.** Assertions, `When`/`It` and `Each` are a library and keep working under plain `go test`. Suites need one hand-written `func Test*` each, and shared fixtures have no standard-library equivalent.
+
 ## Install
 
 Add gotest to your module as a Go tool. Its version and its Go toolchain then follow your `go.mod`:
@@ -32,6 +102,22 @@ go tool gotest ./...
 `go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes. A CLI built with an older Go than the module's go line, or pinned below the oldest runtime it generates for, refuses to run and names the version your module selects; one drifted the other way still runs, unless it predates v1.38 and the runtime does not: then each suite fails as it starts, naming both versions and the fix.
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
+
+**Vendored modules.** `go mod vendor` copies the packages your module imports. Nothing in your tree imports gotest's runtime: the generated code does, and it never reaches the disk. Give the module one file that imports it, then vendor again; without it `gotest` refuses to run in a vendored module and names the import:
+
+```go
+// internal/gotestdeps/deps.go
+
+// Package gotestdeps keeps the packages gotest's generated code imports in vendor/.
+package gotestdeps
+
+import (
+    _ "github.com/mvrahden/go-test/pkg/gotestfuzz"    // fuzz targets that take a struct
+    _ "github.com/mvrahden/go-test/pkg/gotestruntime" // every suite
+)
+```
+
+**Two runners.** `go tool gotest` runs suites and nothing else; `go test` runs plain `func Test*` functions and nothing else. Under plain `go test` a package of suites prints `ok … [no tests to run]` and exits 0, and `gotest` passes over the `func Test*` functions beside a suite with one note on stderr (`note: N stdlib test(s) in … not run`). A complete run is both commands, so every place that calls `go test ./...` today — CI, a Makefile, a pre-commit hook, an editor task — needs `go tool gotest ./...` beside it for as long as the module holds both kinds of test.
 
 ## 30-Second Example
 
@@ -111,41 +197,6 @@ UserService — 2 passed
 
 No generated code leaks into your workflow.
 `gotest` creates it before tests run - invisible to the project's filetree.
-
-## Why gotest?
-
-Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more.
-Setup/teardown logic is copy-pasted or buried in `TestMain`.
-As test suites grow, organization becomes a discipline problem rather than a tooling one.
-
-**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file.
-Test output is standard — but the mechanism behind it isn't.
-
-**gotest** takes a different approach:
-
-- **Specification-driven.** BDD vocabulary (`When`/`It`) structures tests as readable behavioral contracts. `gotest spec` renders them as documentation — in the terminal, as markdown, or as structured JSON. Always in sync, never stale.
-- **Isolated by default.** Each suite runs in its own process, so suites share no memory, no package-level state and no `init` side effects. Within a suite the methods share one struct value: `BeforeEach` gives each method fresh state, and a field one method writes is there for the next unless a hook resets it.
-- **Parallel on two levels.** Suites run in parallel automatically, as separate processes. Methods run in parallel when the suite opts in, and each then gets its own state from a `BeforeEach` that returns it. The generator refuses a parallel suite whose `BeforeEach` returns nothing; it cannot see a method that writes a suite field, so run parallel suites under `-race`.
-
-Under the hood, `gotest` generates one `func Test<Suite>(t *testing.T)` per suite: a table of the suite's hooks and methods, handed to the `pkg/gotestruntime` library, which runs each method as a subtest, keeps setup and teardown in order and holds the timeouts.
-Generated files never touch your source tree: they reach the compiler through a build overlay and are removed after the run.
-
-gotest's own behavioral promises are stated once in [`specs/`](specs/README.md), each scenario bound to a test; this README explains them and links there.
-
-## How It Works
-
-```
-you write:          gotest generates:              gotest runs:
-                    (in a build overlay)
-
-MySuite struct      gotest_psuite_test.go          one process per suite:
-  BeforeAll()   →     func TestMySuite(t)      →     BeforeAll()
-  TestFoo()             OpenSuite(hooks)             t.Run("TestFoo", ...)
-  AfterAll()            RunMethods(methods)          AfterAll()
-```
-
-The generated file is short: a wrapper type and one call each to `gotestruntime.OpenSuite` and `gotestruntime.RunMethods`, with your hooks and methods passed as plain function values. `gotest generate ./...` writes it to disk when you want to read it.
-Suites are found by reading the source, and the generated code calls your methods directly: no reflection finds or dispatches a test. Assertions such as `Equal` use `reflect` to compare values.
 
 ## Specification
 
@@ -328,7 +379,6 @@ Fixture hooks receive `context.Context` and return `error` — the generated wra
 
 `BeforeAll`/`AfterAll` receive `context.Background()` bounded by the fixture's configured timeout.
 `BeforeEach` receives the test's `t.Context()`; `AfterEach` receives `context.Background()` — cleanup must proceed even after the test context is cancelled.
-Requires Go 1.26+.
 
 Test suites reference fixtures via named pointer fields — one or more:
 
