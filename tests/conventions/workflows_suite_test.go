@@ -177,6 +177,14 @@ func (s *WorkflowsTestSuite) TestEveryGateCellKeepsItsEventStream(t *gotest.T) {
 	}
 }
 
+// Suites that read version labels against local tags skip without them.
+func (s *WorkflowsTestSuite) TestTheGateChecksOutTheTags(t *gotest.T) {
+	steps := readWorkflow(t, "test.yml").Jobs["test"].Steps
+	at := slices.IndexFunc(steps, func(st workflowStep) bool { return strings.HasPrefix(st.Uses, "actions/checkout@") })
+	gotest.GreaterOrEqual(t, at, 0, "test.yml's test job has no checkout")
+	gotest.Equal(t, "0", steps[at].With["fetch-depth"], "test.yml's test job checks out without its tags")
+}
+
 func (s *WorkflowsTestSuite) TestSlowRunnersGetScaledBudgets(t *gotest.T) {
 	data, err := os.ReadFile(filepath.Join(workflowsDir, "test.yml"))
 	gotest.NoError(t, err)
