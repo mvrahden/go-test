@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestEventsSayWhereTheirTestSits/gotest_-json_runs_a_subtest/its_run_event_carries_its_own_level_in_Gotest.Subtest
+Expect: ^FAIL .*conformance/cli .* / when gotest -json runs a subtest / its run event carries its own level in Gotest.Subtest \(
+Clause: when gotest -json runs a subtest → its run event carries its own level in Gotest.Subtest
+--- a/internal/protocol/placement.go
++++ b/internal/protocol/placement.go
+@@ -199,7 +199,7 @@
+ 		s.Instance = pl.Instance
+ 	}
+ 	if action == "run" {
+-		s.Subtest, s.Repeat = pl.Own, pl.Repeat
++		s.Subtest, s.Repeat = pl.Written, pl.Repeat
+ 	}
+ 	return s
+ }

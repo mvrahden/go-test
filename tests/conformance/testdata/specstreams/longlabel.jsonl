@@ -1,0 +1,8 @@
+{"Time":"2026-11-09T18:02:00.000Z","Action":"start","Package":"example.com/wide"}
+{"Time":"2026-11-09T18:02:00.001Z","Action":"run","Package":"example.com/wide","Test":"TestWideTestSuite"}
+{"Time":"2026-11-09T18:02:00.002Z","Action":"run","Package":"example.com/wide","Test":"TestWideTestSuite/TestWide"}
+{"Time":"2026-11-09T18:02:00.003Z","Action":"run","Package":"example.com/wide","Test":"TestWideTestSuite/TestWide/lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy"}
+{"Time":"2026-11-09T18:02:00.004Z","Action":"pass","Package":"example.com/wide","Test":"TestWideTestSuite/TestWide/lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy_lengthy","Elapsed":0.001}
+{"Time":"2026-11-09T18:02:00.005Z","Action":"pass","Package":"example.com/wide","Test":"TestWideTestSuite/TestWide","Elapsed":0.001}
+{"Time":"2026-11-09T18:02:00.006Z","Action":"pass","Package":"example.com/wide","Test":"TestWideTestSuite","Elapsed":0.001}
+{"Time":"2026-11-09T18:02:00.007Z","Action":"pass","Package":"example.com/wide","Elapsed":0.01}

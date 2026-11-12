@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / shows that node and what is under it
+Clause: when the spec is rendered with --only and a node's position → shows that node and what is under it
+--- a/internal/gotestspec/view.go
++++ b/internal/gotestspec/view.go
+@@ -77,7 +77,7 @@
+ 				return nil, fmt.Errorf("--only: no node at %s in %s", joinPosition(c.only.position[:i+1]), pkg.Path)
+ 			}
+ 			if i == len(c.only.position)-1 {
+-				cp.Nodes = []*Node{shown[at]}
++				_ = shown
+ 			}
+ 			nodes = shown[at].Children
+ 		}

@@ -1,0 +1,23 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestEventsSayWhereTheirTestSits/gotest_-json_runs_a_subtest/every_field_go_test_wrote_is_kept_as_go_test_wrote_it
+Expect: ^FAIL .*conformance/cli .* / when gotest -json runs a subtest / every field go test wrote is kept as go test wrote it \(
+Clause: when gotest -json runs a subtest → every field go test wrote is kept as go test wrote it
+--- a/internal/gotestrunner/stamp.go
++++ b/internal/gotestrunner/stamp.go
+@@ -51,10 +51,11 @@
+ 	if err != nil {
+ 		return line
+ 	}
+-	end := len(body) - 1
+-	stamped := make([]byte, 0, len(line)+len(obj)+10)
+-	stamped = append(stamped, line[:end]...)
+-	stamped = append(stamped, `,"Gotest":`...)
+-	stamped = append(stamped, obj...)
+-	return append(stamped, line[end:]...)
++	var fields map[string]json.RawMessage
++	if json.Unmarshal(body, &fields) != nil {
++		return line
++	}
++	fields["Gotest"] = obj
++	stamped, _ := json.Marshal(fields)
++	return append(stamped, line[len(body):]...)
+ }

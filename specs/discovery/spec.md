@@ -63,11 +63,20 @@ A suite the X_ prefix excludes SHALL be reported skipped as excluded by the user
 - **THEN** reports the X_ suite skipped as excluded by the user, runs none of its methods and passes the suite beside it
 
 ### Requirement: Behaviors in discover
-discover SHALL report, for each behavior a method declares, the call that declared it.
+discover SHALL report, for each behavior a method declares, the call that declared it, a label that holds a slash as one behavior under the call around it, and each suite of the external test package marked external.
 
 #### Scenario: A When with Its under it
 - **WHEN** a method declares a When with Its under it
 - **THEN** discover reports the When's kind as when and each It's as it
+
+#### Scenario: Labels with slashes
+- **WHEN** a method declares Its and a When whose labels start or end with a slash
+- **THEN** discover reports each label as one behavior under the call around it
+
+#### Scenario: Suites of the external test package
+- **WHEN** a package's external test package declares suites
+- **THEN** discover marks each of them external
+- **AND** discover leaves the internal suite of the same name unmarked
 
 ### Requirement: Discover lists what the source declares
 `gotest discover` SHALL list every Test, Benchmark and Fuzz method a suite declares, an excluded or unfocused one included and marked as such, whatever a run of the package would select.

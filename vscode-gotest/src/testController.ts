@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
-import type { DiscoverBehavior } from "./types.js";
+import {
+  EXTERNAL_ID,
+  methodItemId,
+  suiteItemId,
+  type DiscoverBehavior,
+} from "./types.js";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
 import { TestResultStore, type TestResult } from "./testResultStore.js";
@@ -411,7 +416,8 @@ export class GoTestController implements vscode.Disposable {
     const seenSuiteIds = new Set<string>();
 
     for (const suite of pkg.suites) {
-      const suiteId = `${importPath}/${suite.name}`;
+      const suiteId = suiteItemId(importPath, suite, pkg.suites);
+      const isTwin = suiteId.endsWith(EXTERNAL_ID);
       seenSuiteIds.add(suiteId);
 
       const suiteUri = vscode.Uri.file(path.join(pkg.dir, suite.file));
@@ -432,6 +438,7 @@ export class GoTestController implements vscode.Disposable {
         suite.excluded,
         suite.parallel,
         suite.guarded,
+        isTwin,
       );
       suiteItem.description = suite.guarded ? "guarded" : undefined;
       pkgItem.children.add(suiteItem);
@@ -439,7 +446,7 @@ export class GoTestController implements vscode.Disposable {
       const seenMethodIds = new Set<string>();
 
       for (const method of suite.methods) {
-        const methodId = `${suiteId}/${method.name}`;
+        const methodId = methodItemId(suiteId, method);
         seenMethodIds.add(methodId);
 
         const methodUri = vscode.Uri.file(path.join(pkg.dir, method.file));
@@ -764,6 +771,7 @@ export class GoTestController implements vscode.Disposable {
     excluded: boolean,
     parallel: boolean,
     guarded?: boolean,
+    external?: boolean,
   ): readonly vscode.TestTag[] {
     const tags: vscode.TestTag[] = [];
     if (focused) {
@@ -777,6 +785,9 @@ export class GoTestController implements vscode.Disposable {
     }
     if (guarded) {
       tags.push(new vscode.TestTag("guarded"));
+    }
+    if (external) {
+      tags.push(new vscode.TestTag("external"));
     }
     return tags;
   }

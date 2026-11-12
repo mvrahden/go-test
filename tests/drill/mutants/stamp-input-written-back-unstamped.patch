@@ -1,0 +1,14 @@
+Judge: ./tests/conformance/cli CLIStreamsTestSuite/TestASavedStreamIsStamped/a_stream_saved_without_its_stamps_is_passed_through_spec_--stamp/comes_back_as_gotest_-json_wrote_it
+Expect: ^FAIL .*conformance/cli .* / when a stream saved without its stamps is passed through spec --stamp / comes back as gotest -json wrote it \(
+Clause: when a stream saved without its stamps is passed through spec --stamp → comes back as gotest -json wrote it
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -267,7 +267,7 @@
+ 		fmt.Fprintf(os.Stderr, "FAIL: reading input: %s\n", err)
+ 		return 2
+ 	}
+-	stamped := gotestrunner.StampStream(data)
++	stamped := data
+ 	if output == "" {
+ 		_, err = os.Stdout.Write(stamped)
+ 	} else {

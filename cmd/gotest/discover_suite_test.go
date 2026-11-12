@@ -271,3 +271,47 @@ func (s *DiscoverTestSuite) TestRunDiscover_Benchmarks(t *gotest.T) {
 		gotest.NotContains(it, payload, `"fuzzers":[{"name":"TestOne"`)
 	})
 }
+
+func (s *DiscoverTestSuite) TestATwinMethodCarriesItsRunName(t *gotest.T) {
+	out, err := ExportDiscover([]string{filepath.Join(s.repoRoot, "cmd", "gotest", "testdata", "static", "twins")}, nil)
+	gotest.NoError(t, err)
+	gotest.Len(t, out.Packages, 1)
+	gotest.Len(t, out.Packages[0].Suites, 2)
+	internal, external := out.Packages[0].Suites[0], out.Packages[0].Suites[1]
+
+	t.When("a suite is declared in both test packages", func(w *gotest.T) {
+		w.It("marks the external twin and not the internal one", func(it *gotest.T) {
+			gotest.False(it, internal.External)
+			gotest.True(it, external.External)
+		})
+		w.It("names a shared method as go test reports it, and a lone one plainly", func(it *gotest.T) {
+			gotest.Len(it, external.Methods, 2)
+			gotest.Equal(it, "TestCreate", external.Methods[0].Name)
+			gotest.Equal(it, "TestCreate#01", external.Methods[0].TestName)
+			gotest.Equal(it, "TestRemove", external.Methods[1].Name)
+			gotest.Zero(it, external.Methods[1].TestName)
+			gotest.Zero(it, internal.Methods[0].TestName)
+		})
+	})
+}
+
+func (s *DiscoverTestSuite) TestTwinTestNamesMarksOnlySharedMethods(t *gotest.T) {
+	gotest.Equal(t, map[string]string{"TestCreate": "TestCreate#01"},
+		ExportTwinTestNames([]string{"TestCreate", "TestList"}, []string{"TestCreate", "TestRemove"}))
+}
+
+func (s *DiscoverTestSuite) TestALoneExternalSuiteIsMarkedExternal(t *gotest.T) {
+	out, err := ExportDiscover([]string{filepath.Join(s.repoRoot, "cmd", "gotest", "testdata", "static", "loneext")}, nil)
+	gotest.NoError(t, err)
+	gotest.Len(t, out.Packages, 1)
+	gotest.Len(t, out.Packages[0].Suites, 1)
+	suite := out.Packages[0].Suites[0]
+
+	t.When("a suite is declared only in the external test package", func(w *gotest.T) {
+		w.It("marks it external and gives no method a run name", func(it *gotest.T) {
+			gotest.True(it, suite.External)
+			gotest.Len(it, suite.Methods, 1)
+			gotest.Zero(it, suite.Methods[0].TestName)
+		})
+	})
+}

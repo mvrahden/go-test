@@ -32,6 +32,7 @@ var ExportSplitTopLevelOr = splitTopLevelOr
 var ExportSuiteRunFilter = suiteRunFilter
 var ExportAssignCoverProfiles = assignCoverProfiles
 var ExportResolveSetupTimeout = resolveSetupTimeout
+var ExportStampBlock = stampBlock
 
 // ExportSetSharedFixtureDrainDelay sets the shared fixture process's drain
 // delay and returns the call that restores it.

@@ -55,6 +55,8 @@ type jsonNode struct {
 	// statically read tree can set it, so it is absent from a rendered run.
 	Incomplete bool `json:"incomplete,omitempty"`
 	Variant    int  `json:"variant,omitempty"`
+	// Reported is the own level go test reported when it differs from Name.
+	Reported string `json:"reported,omitempty"`
 	// File (relative to the package's dir) and Line say where the source
 	// declares the node; absent for a node only a run revealed.
 	File        string     `json:"file,omitempty"`
@@ -90,7 +92,8 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 	for _, o := range opts {
 		o(&cfg)
 	}
-	stats := CollectStats(packages)
+	packages, _ = cfg.narrow(packages)
+	stats := cfg.stats(packages)
 
 	root := jsonRoot{
 		Version:  about.ResolvedVersion(),
@@ -117,7 +120,7 @@ func RenderJSON(w io.Writer, packages []*Package, opts ...RenderOption) {
 			Output:   output,
 		}
 		if cfg.packageStats {
-			own := jsonStats(CollectStats([]*Package{pkg}))
+			own := jsonStats(cfg.stats([]*Package{pkg}))
 			jp.Stats = &own
 		}
 		root.Packages = append(root.Packages, jp)
@@ -150,6 +153,7 @@ func (c *renderConfig) convertNodes(all []*Node) []jsonNode {
 			External:    n.External,
 			Incomplete:  n.Incomplete,
 			Variant:     n.Variant,
+			Reported:    n.Reported,
 			File:        n.File,
 			Line:        n.Line,
 			Output:      n.Output,
@@ -162,6 +166,9 @@ func (c *renderConfig) convertNodes(all []*Node) []jsonNode {
 		}
 		if result[i].Output == nil {
 			result[i].Output = []string{}
+		}
+		if noVerdict(n) {
+			result[i].Duration = 0 // a row without a verdict took no time it can show
 		}
 	}
 	return result

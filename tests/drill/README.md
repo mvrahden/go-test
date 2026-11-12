@@ -321,13 +321,19 @@ shards of one run do not add up to every mutant exactly once.
 | `branch-keeps-a-pass-over-a-failure` | a suite whose own line says pass stays passed above a failed method | spec conformance: the composed stream's suite renders unlike the one go test failed |
 | `failed-branch-counted-as-its-own` | a branch failed by a failure beneath it counts as a failure of its own | spec conformance: the composed stream counts two failures |
 | `declared-node-shown-as-passed` | `--declared` gives a declared node the stream did not report a pass | spec conformance: the left-out method's rows carry a verdict |
-| `not-run-uncounted` | the behaviors the stream did not report are not counted as not run | spec conformance: the declared package counts 0 not run |
+| `not-run-uncounted` | the behaviors without a verdict are not counted as not run | spec conformance: the declared package counts 0 not run, and a behavior that started without a verdict counts nowhere |
+| `no-verdict-row-timed` | the terminal spec times a behavior that started and reported no verdict | spec conformance: the row reads `○ DeleteUser` instead of NOT RUN |
 | `excluded-read-as-not-run` | a method the X_ prefix excludes reads as not run under `--declared` | spec conformance: the parked method has no skip verdict |
 | `observed-rows-dropped` | `--declared` drops the rows only the stream names | spec conformance: the method over a table that is no literal has no rows |
 | `hidden-hook-failure` | `--hide` keeps a branch only for a row shown beneath it | spec conformance: the suite whose AfterAll failed vanishes under `--hide=pass` |
 | `hidden-package-kept` | `--hide` keeps a package none of whose rows is shown | spec conformance: the green run's package stays in the document |
 | `hide-under-static-accepted` | `--hide` is accepted beside `--static` | spec conformance: the static run exits 0 instead of 2 |
 | `hiding-recounts` | the trailer and each package's stats count only the rows `--hide` shows | spec conformance: the hidden passes are missing from the counts |
+| `match-case-sensitive` | `--match` compares the label in the case it was typed | spec conformance: the uppercase search finds no behavior |
+| `only-position-unchecked` | `--only` renders nothing instead of refusing a position the stream does not hold | spec conformance: the pick exits 0 instead of 2 |
+| `match-header-unnamed` | the header leaves out the search it was made with | spec conformance: the Markdown header lacks `search "…"` |
+| `only-keeps-the-whole-package` | `--only` names a node and renders the whole package | spec conformance: the picked package shows the rows of the node's neighbours |
+| `only-position-ignores-hide` | `--only` counts positions among all children, hidden rows included | spec conformance: the position under `--hide` picks another node |
 | `finding-without-extent` | a lint finding ends where it starts | lint conformance: the call's and the signature's findings end at their posn |
 | `runlevel-start-unmarked` | the start line of a package the run books for itself carries no RunLevel | cli conformance: the shared fixtures package's start line is unmarked |
 | `runlevel-package-unread` | the spec tree drops the RunLevel its events carry | cli conformance: the spec document does not mark the shared fixtures package |
@@ -582,15 +588,27 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-seed-error-at-flush` | a seed of the wrong type is reported where gotest flushes the seeds, not at its `f.Add` call | canary: the `fuzzseedtype` failure does not name the fixture's `f.Add` line |
 | `promote-splices-the-echo-whole` | a decoding target's echo of several arguments is spliced as one value | conformance: the fuzz promote It for a decoding target of several arguments finds no seed added |
 | `fuzz-session-drops-other-targets` | a fuzz session's record drops the crashers of targets it did not fuzz | conformance: the fuzz session It for another checkout finds its crasher not promoted |
-| `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: a label with a pipe breaks its table row; canary: the `specmarkdown` rows have the wrong number of cells |
+| `spec-label-pipe-unescaped` | the Markdown spec leaves a pipe in a label unescaped | spec conformance: the When's line lacks its escaped pipe |
+| `spec-label-line-break-kept` | the Markdown spec keeps a line break in a label | spec conformance: a label's second half is a line of its own; canary: the `specmarkdown` spec has a line that is no item |
+| `spec-label-item-start-unescaped` | the Markdown spec leaves a label that opens a list, a heading, a quote or a code block as it is | spec conformance: the rows of `TestOpenings` open blocks inside their items |
 | `spec-label-html-unescaped` | the Markdown spec leaves angle brackets in a label unescaped | spec conformance: a label's tags reach the reader as HTML; canary: the `specmarkdown` spec carries `<b>` |
-| `spec-slash-splits-run` | the tree of a run reads a slash in an It's name as a level | spec conformance: the run's spec shows "reads a" as a level; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
-| `spec-slash-splits-source` | the spec read from source keeps the level a slash implies | spec conformance: the static spec shows "reads a" as a level |
-| `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `### Parked — EXCLUDED` |
+| `spec-slash-splits-run` | the tree of a run splits every name at its slashes instead of placing it by the stream's order | spec conformance: the run's and the replay's spec show "reads a" as a level and labels that start or end with a slash, a When that ends with one and a parallel sibling cut into levels; canary: the `specmarkdown` live spec has no "reads a/b paths" row |
+| `spec-slash-splits-source` | the spec read from source reads the text after a label's last slash as a level of its own | spec conformance: the static spec has no "reads a/b paths" row, splits labels that start or end with a slash into levels, and --declared sees rows the run never reported |
+| `spec-excluded-method-unmarked` | the Markdown spec read from source leaves an X_ method's heading unmarked | spec conformance: the parked method's heading lacks EXCLUDED; canary: the `specmarkdown` static spec misses `- **Parked** — EXCLUDED` |
 | `spec-label-link-unescaped` | the Markdown spec leaves brackets, asterisks, underscores and ampersands in a label as they are | spec conformance: a label's link, emphasis and entity reach the reader |
 | `spec-slash-nests-under-a-finished-it` | the tree of a run nests an It under an earlier, finished It its label begins with | spec conformance: the run's spec shows "reads a/b" under "reads a" |
 | `spec-slash-nests-under-a-declared-it` | the spec read from source nests an It under an earlier It its label begins with | spec conformance: the static spec shows "reads a/b" under "reads a" |
-| `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own with an empty status | spec conformance: the failed When's row carries no FAIL and no message |
+| `spec-group-failure-unshown` | the Markdown spec shows a group that failed on its own without a verdict | spec conformance: the failed When's item carries no FAIL and no message |
+| `report-attention-dropped` | the spec lists nothing under Needs attention | spec conformance: the failure and the row not run are missing from the Markdown and the terminal spec |
+| `terminal-suite-counts-dropped` | the terminal spec's suite lines lose their counts | spec conformance: `UserRepository — 2 passed` reads `UserRepository` |
+| `terminal-label-never-wrapped` | the terminal spec's labels stay whole at any width | spec conformance: a label wider than the width stays on one line |
+| `terminal-wrapped-when-redirected` | the terminal spec wraps at 100 columns even when stdout is not a terminal | spec conformance: a 143-column behavior is broken over lines in a redirected spec |
+| `terminal-failures-not-listed` | the terminal spec leaves out its Needs attention block | spec conformance: no failure is listed after the packages |
+| `report-provenance-dropped` | the Markdown spec's header leaves out where its numbers come from | spec conformance: no time range and no hiding part |
+| `report-checkout-on-the-wrong-render` | the spec names the checkout when rendered from a saved stream and not for a live run | spec conformance: a live run in a fresh checkout names no commit, a saved stream rendered there names it |
+| `report-suite-counts-dropped` | the Markdown spec's suite headings lose their counts | spec conformance: `#### UserRepository` carries no counts |
+| `report-external-unmarked` | the Markdown spec heads an external suite like the internal one | spec conformance: no heading carries EXTERNAL |
+| `report-short-durations-shown` | the Markdown spec shows durations under a second | spec conformance: the 300ms method reads `(300ms)` |
 | `shapes-grouped-suite-accepted` | a suite declared inside a type block is not refused | canary: the `shapes/grouped` package exits 0 instead of 2 |
 | `shapes-grouped-fixture-accepted` | a fixture declared inside a type block is not refused | canary: the `shapes/groupedfixture` package exits 0 instead of 2 |
 | `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |
@@ -741,8 +759,20 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-when-connective-dropped` | a When's label loses its when on every surface | conformance: the spec It for labels with underscores sees discover's When label without when |
 | `e2e-run-spec-labels-reconstructed` | a run's spec ignores the labels source declares | conformance: the spec It for a run's spec sees underscores turned into spaces |
 | `e2e-static-spec-labels-reconstructed` | the spec read from source ignores the labels as written | conformance: the spec It for --static sees underscores turned into spaces |
+| `each-row-constant-named-by-index` | the spec read from source names a table row a constant names by its index | conformance: the spec Its for a row named by a constant see `#0` rows |
+| `each-row-runtime-name-guessed` | the spec read from source names a table row only a run can name by its index | conformance: the spec Its for a row named at run time see a listed `#1` row |
 | `e2e-replay-labels-reconstructed` | a replayed stream's spec ignores the labels source declares | conformance: the spec It for a replay sees underscores turned into spaces |
 | `e2e-connective-doubled` | a label that opens with a connective gets a second when | conformance: the spec It for a connective of its own sees "when with …" |
+| `discover-splits-slash-labels` | discover keeps only the text after a label's last slash | conformance: the spec and discovery Its for discover see the label cut short |
+| `discover-external-flag-inverted` | discover marks the internal test package's suites external and the external one's not | conformance: the spec and discovery Its for discover see the external flag on the wrong suites |
+| `spec-run-twin-unmarked` | a suite's second run in one process is not marked external | conformance: the spec It for a suite of both test packages sees neither suite marked |
+| `stamp-instance-on-runs-only` | the runner stamps `Gotest.Instance` on run events only, not on the other events of a later instance | cli conformance: the external twin suite's output and verdict events carry no Instance 2 |
+| `stamp-remarshals-the-event` | the runner re-marshals a stamped event instead of splicing the object in, reordering go test's fields | cli conformance: a stamped line minus its `Gotest` object is not the line go test wrote |
+| `stamp-input-written-back-unstamped` | `spec --input --stamp` writes the saved stream back without stamping it | cli conformance: a stream stripped of its stamps does not come back as gotest -json wrote it |
+| `stamp-subtest-drops-the-repeat` | the runner stamps the written name as `Gotest.Subtest`, without testing's `#NN` | cli conformance: the twin's `TestShared#01` and the repeated `example.com/m/pkg#01` run events carry no suffix |
+| `spec-run-twins-merged` | a suite's second run lands on the first one's nodes | conformance: the spec Its for a suite of both test packages see one suite holding both suites' methods |
+| `placement-twin-method-repeat-unread` | a suite method's `#NN` is read as testing's only when its earlier name was seen, so a rerun of the external twin's shared method keeps `#01` | spec conformance: the declared spec under that rerun shows `TestShared#01` beside a not-run `TestShared` |
+| `spec-run-twin-order-reversed` | the first of a suite's two runs is marked external | conformance: the spec It for go test's order sees the external suite holding the internal suite's method |
 | `e2e-bench-sample-iterations-lost` | a saved sample records 1 iteration, not the ones it ran | conformance: the bench It for saving with --json sees iterations other than 10 |
 | `e2e-bench-report-drops-gate` | the --json report leaves out the gate verdict | conformance: the bench It for comparing under a gate sees no gate |
 | `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |

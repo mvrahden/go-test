@@ -180,6 +180,25 @@ The go test -json stream SHALL hold JSON lines only, inside GitHub Actions too. 
 - **THEN** marks every event of the shared fixtures package RunLevel, its start line included, and no event of another package
 - **AND** spec's JSON document of that stream marks the shared fixtures package runLevel, and no other
 
+### Requirement: Where a test event's test sits
+A test event of a suite process in the go test -json stream SHALL carry an object `"Gotest"` before its final `}` when one of its fields applies: `Subtest`, the own level as reported, on every `run`; `Repeat`, the NN of testing's `#NN`, on a run that has it; `Instance` on every event of the second or later run of a top-level name, the 1-based run. A field that does not apply is left out, and an event none applies to carries no object. Every other byte SHALL be go test's.
+
+#### Scenario: Where a subtest sits
+- **WHEN** gotest -json runs a subtest
+- **THEN** its run event carries its own level in Gotest.Subtest
+- **AND** every field go test wrote is kept as go test wrote it
+
+#### Scenario: A suite of both test packages in the stream
+- **WHEN** gotest -json runs a suite of both test packages
+- **THEN** every event of the external suite carries Gotest.Instance 2
+
+### Requirement: Stamping a saved stream
+`gotest spec --input=<file> --stamp` SHALL write the stream back with the object `"Gotest"` added to each test event that carries none, as gotest -json adds it, placed by the stream's own order, every other byte kept. It SHALL exit 0, and 2 when the input cannot be read or --input is missing.
+
+#### Scenario: A stream saved without its stamps
+- **WHEN** a stream saved without its stamps is passed through spec --stamp
+- **THEN** comes back as gotest -json wrote it
+
 ### Requirement: JSON documents
 A JSON document gotest is asked for SHALL be one document on stdout, with no color codes and no annotations, inside GitHub Actions too. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
 

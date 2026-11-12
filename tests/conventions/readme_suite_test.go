@@ -24,6 +24,11 @@ func (s *ReadmeExampleTestSuite) SuiteConfig() gotest.SuiteConfig {
 // durations replaces every "(12ms)", "(<1ms)" or "(0.01s)" so two runs compare.
 var durations = regexp.MustCompile(`\((<1ms|\d+(\.\d+)?(ms|s))\)`)
 
+var (
+	provenanceLine = regexp.MustCompile(`(?m)^Runs from [^\n]*\n\n`)
+	packageHeading = regexp.MustCompile(`(?m)^=== \S+ — `)
+)
+
 // readmeExample returns the fenced blocks of the README's first example, in
 // order: the suite, the run command, its output, the spec command, its output.
 func readmeExample(t *gotest.T) []string {
@@ -87,6 +92,9 @@ func (s *ReadmeExampleTestSuite) TestTheFirstExampleRendersTheSpecShown(t *gotes
 			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
 			want := durations.ReplaceAllString(strings.TrimSpace(blocks[4]), "(…)")
 			got := durations.ReplaceAllString(strings.TrimSpace(run.Stdout), "(…)")
+			// The README names a package of its own and no checkout or run times.
+			got = provenanceLine.ReplaceAllString(got, "")
+			got = packageHeading.ReplaceAllString(got, "=== pkg/user — ")
 			gotest.Equal(it, want, got)
 		})
 	})

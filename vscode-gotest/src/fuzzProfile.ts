@@ -5,6 +5,7 @@
 import * as vscode from "vscode";
 import { buildCliCommand, formatCliCommand, scopedConfig } from "./cli.js";
 import { spawnTestProcess, isFuzzMethodLabel } from "./runnerUtils.js";
+import { withoutExternalId } from "./types.js";
 import {
   isValidGoDuration,
   offerCrasherActions,
@@ -52,9 +53,10 @@ export interface FuzzItemTarget {
 }
 
 // fuzzTargetFromItemId reads "<importPath>/<Suite>/<FuzzMethod>" from the
-// right, since the import path carries slashes of its own.
+// right, since the import path carries slashes of its own; an external
+// twin's marker is dropped, as go test knows both by one name.
 export function fuzzTargetFromItemId(id: string): FuzzItemTarget | undefined {
-  const parts = id.split("/");
+  const parts = withoutExternalId(id).split("/");
   if (parts.length < 3) return undefined;
   const methodName = parts[parts.length - 1];
   const suiteName = parts[parts.length - 2];

@@ -58,7 +58,7 @@ func (s *SpecDeclaredTestSuite) TestARunOfSomeMethods(t *gotest.T) {
 				gotest.Zero(it, row.Duration)
 			}
 			terminal := spec(it, 0, "--input="+s.input, "--declared", declaredPkg)
-			gotest.Regexp(it, `\n      \? has no verdict — NOT RUN\n`, terminal.Stdout)
+			gotest.Regexp(it, `\n      ○ has no verdict — NOT RUN\n`, terminal.Stdout)
 			gotest.Regexp(it, `\n  LeftOut\n`, terminal.Stdout)
 		})
 		w.It("counts the behaviors the stream did not report as not run, and exits as without --declared", func(it *gotest.T) {
@@ -70,7 +70,7 @@ func (s *SpecDeclaredTestSuite) TestARunOfSomeMethods(t *gotest.T) {
 			terminal := spec(it, 0, "--input="+s.input, "--declared", declaredPkg)
 			gotest.Regexp(it, `: 3 passed, 1 skipped, 2 not run\n$`, terminal.Stdout)
 			markdown := spec(it, 0, "--format=md", "--input="+s.input, "--declared", declaredPkg)
-			gotest.Contains(it, markdown.Stdout, ": 3 passed, 0 failed, 1 skipped, 2 not run.")
+			gotest.Contains(it, markdown.Stdout, ": 3 passed, 1 skipped, 2 not run.\n")
 			without := specJSON(it, 0, "--input="+s.input)
 			gotest.Zero(it, without.Stats.NotRun)
 			spec(it, 0, "--render-only", "--input="+s.input, "--declared", declaredPkg)
@@ -97,6 +97,58 @@ func (s *SpecDeclaredTestSuite) TestRowsOnlyARunCanName(t *gotest.T) {
 				rows = append(rows, row.Name)
 			}
 			gotest.Equal(it, []string{"first", "second"}, rows)
+		})
+	})
+}
+
+func (s *SpecDeclaredTestSuite) TestTableRowsNamedBeforeTheRun(t *gotest.T) {
+	const pkg = "../testdata/specrows/"
+	run, err := testkit.RunPackage(t.Context(), t.TempDir(), pkg)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, run.Exit, "stderr: %s", run.Stderr)
+	input := filepath.Join(t.TempDir(), "events.jsonl")
+	gotest.NoError(t, os.WriteFile(input, []byte(run.Stdout), 0o600))
+	t.When("a table row is named by a constant", func(w *gotest.T) {
+		w.It("the spec read from source names the row by the constant's value", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--static", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowsNamedByConstants")
+			gotest.False(it, method.Incomplete)
+			var rows []string
+			for _, row := range method.Children {
+				gotest.Equal(it, "none", row.Status)
+				rows = append(rows, row.Name)
+			}
+			gotest.Equal(it, []string{"p_suite", "local_name"}, rows)
+		})
+		w.It("the declared spec under the run shows the row with its verdict", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--input="+input, "--declared", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowsNamedByConstants")
+			gotest.False(it, method.Incomplete)
+			gotest.Len(it, method.Children, 2)
+			for _, row := range method.Children {
+				gotest.Equal(it, "pass", row.Status)
+			}
+			gotest.Equal(it, "p_suite", method.Children[0].Name)
+		})
+	})
+	t.When("a table row's name is known only at run time", func(w *gotest.T) {
+		w.It("the spec read from source lists no row for it and marks its method incomplete", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--static", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowNamedAtRunTime")
+			gotest.True(it, method.Incomplete)
+			gotest.Len(it, method.Children, 1)
+			gotest.Equal(it, "literal", method.Children[0].Name)
+		})
+		w.It("the declared spec under the run shows the row the run reported", func(it *gotest.T) {
+			doc := specJSON(it, 0, "--input="+input, "--declared", pkg)
+			method := node(it, doc.Packages[0].Nodes, "TestSpecRowsTestSuite", "TestRowNamedAtRunTime")
+			gotest.True(it, method.Incomplete)
+			var rows []string
+			for _, row := range method.Children {
+				gotest.Equal(it, "pass", row.Status)
+				rows = append(rows, row.Name)
+			}
+			gotest.Equal(it, []string{"literal", "known_late"}, rows)
 		})
 	})
 }

@@ -1,11 +1,15 @@
 Expect: ^FAIL .*conformance/spec .* / counts the behaviors the stream did not report as not run, and exits as without --declared
+Expect: ^FAIL .*conformance/spec .* / when a behavior started and reported no verdict / counts as not run \(
+Expect: ^FAIL .*conformance/spec .* / when a behavior started and reported no verdict / the counts add up to the behaviors \(
 Clause: when a stream of some of a package's methods is rendered with --declared → counts the behaviors the stream did not report as not run, and exits as without --declared
+Clause: when a behavior started and reported no verdict → counts as not run
+Clause: when a behavior started and reported no verdict → the counts add up to the behaviors
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -698,7 +698,6 @@ func collectStats(n *Node, s *Stats, inStdlib bool) {
+@@ -756,7 +756,6 @@
  func countVerdict(n *Node, s *Stats) {
  	switch {
- 	case n.NotRun:
+ 	case n.NotRun || n.Status == StatusNone:
 -		s.NotRun++
  	case n.Status == StatusPass:
  		s.Passed++

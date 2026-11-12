@@ -2,6 +2,7 @@ package gotestspec_test
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 )
 
 // MarkdownSafetyTestSuite covers what a label can do to the Markdown spec: a
-// label is text, so no character in it may end a cell, start a row, open a
+// label is text, so no character in it may break its line, open a block or a
 // code span or reach a reader as HTML.
 type MarkdownSafetyTestSuite struct{}
 
@@ -40,6 +41,7 @@ func (s *MarkdownSafetyTestSuite) TestEscapeMarkdown(t *gotest.T) {
 			{Desc: "ampersand", in: "a&#124;b", want: "a&amp;#124;b"},
 			{Desc: "asterisk", in: "a*b", want: `a\*b`},
 			{Desc: "underscore", in: "a_b", want: `a\_b`},
+			{Desc: "tilde", in: "~~a~~", want: `\~\~a\~\~`},
 			{Desc: "brackets", in: "[l](http://x)", want: `\[l\](http://x)`},
 			{Desc: "plain text", in: "returns ok", want: "returns ok"},
 		}) {
@@ -88,22 +90,6 @@ func hostileTree() []*gotestspec.Package {
 	}}
 }
 
-// cellCount counts the cells of a table row: the pipes no backslash escapes,
-// less the closing one.
-func cellCount(row string) int {
-	n := 0
-	for i := 0; i < len(row); i++ {
-		if row[i] == '\\' {
-			i++
-			continue
-		}
-		if row[i] == '|' {
-			n++
-		}
-	}
-	return n - 1
-}
-
 func renderMarkdownOf(packages []*gotestspec.Package, opts ...gotestspec.RenderOption) string {
 	var buf bytes.Buffer
 	gotestspec.RenderMarkdown(&buf, packages, opts...)
@@ -112,29 +98,23 @@ func renderMarkdownOf(packages []*gotestspec.Package, opts ...gotestspec.RenderO
 
 func (s *MarkdownSafetyTestSuite) TestRenderMarkdown_HostileLabels(t *gotest.T) {
 	for _, mode := range []struct {
-		name  string
-		opts  []gotestspec.RenderOption
-		cells int
+		name string
+		opts []gotestspec.RenderOption
 	}{
-		{"a run", nil, 3},
-		{"the source", []gotestspec.RenderOption{gotestspec.WithoutVerdicts()}, 1},
+		{"a run", nil},
+		{"the source", []gotestspec.RenderOption{gotestspec.WithoutVerdicts()}},
 	} {
 		out := renderMarkdownOf(hostileTree(), mode.opts...)
 		t.When("the markdown spec of "+mode.name+" renders labels that hold Markdown syntax", func(w *gotest.T) {
-			w.It("keeps every behavior row on one line with its own cells", func(it *gotest.T) {
-				rows := 0
+			w.It("keeps every behavior on one line of the outline", func(it *gotest.T) {
+				items := 0
 				for _, line := range strings.Split(out, "\n") {
-					if !strings.HasPrefix(line, "| ") || strings.HasPrefix(line, "| Benchmark |") {
-						continue
+					if strings.HasPrefix(strings.TrimLeft(line, " "), "- ") {
+						items++
 					}
-					rows++
-					if strings.Contains(line, "ns/op") || strings.Contains(line, "bench") {
-						gotest.Equal(it, 4, cellCount(line), "row %q", line)
-						continue
-					}
-					gotest.Equal(it, mode.cells, cellCount(line), "row %q", line)
 				}
-				gotest.Equal(it, 8, rows, "rows:\n%s", out)
+				gotest.Equal(it, 7, items, "items:\n%s", out)
+				gotest.Contains(it, out, "| bench\\|&lt;y&gt; | 0 | 0 | 0 |\n", "the benchmark row keeps its four cells")
 				gotest.NotContains(it, out, "\nline")
 				gotest.NotContains(it, out, "\nnext")
 			})
@@ -152,15 +132,15 @@ func (s *MarkdownSafetyTestSuite) TestRenderMarkdown_HostileLabels(t *gotest.T) 
 
 			w.It("shows each label as written", func(it *gotest.T) {
 				for _, want := range []string{
-					"## S&lt;i&gt;\\|",
-					"### M\\`x",
-					"**when a \\| b\\***",
-					"links \\[l\\](http://x) &amp;#124; \\_x\\_",
-					"keeps &lt;b&gt;bold&lt;/b&gt;",
-					"row line \\| \\`c\\`",
-					"leaf\\|&lt;x&gt;",
-					"bench\\|&lt;y&gt;",
-					"item &lt;z&gt; next",
+					"#### S&lt;i&gt;\\|",
+					"- **M\\`x**\n",
+					"  - when a \\| b\\*\n",
+					"links \\[l\\](http://x) &amp;#124; \\_x\\_\n",
+					"keeps &lt;b&gt;bold&lt;/b&gt;\n",
+					"row line \\| \\`c\\`\n",
+					"**leaf\\|&lt;x&gt;**\n",
+					"| bench\\|&lt;y&gt; |",
+					"item &lt;z&gt; next\n",
 				} {
 					gotest.Contains(it, out, want)
 				}
@@ -177,7 +157,7 @@ func (s *MarkdownSafetyTestSuite) TestRenderMarkdown_OutputHoldsAFence(t *gotest
 	}})
 	t.When("a failure's output holds a code fence", func(w *gotest.T) {
 		w.It("opens the block with a longer fence, so the output stays inside it", func(it *gotest.T) {
-			gotest.Contains(it, out, "````\npanic: boom\n```\n## injected\n````\n")
+			gotest.Contains(it, out, "\n````text\npanic: boom\n```\n## injected\n````\n")
 		})
 	})
 }
@@ -209,8 +189,8 @@ func slashTree(t *gotest.T, opts ...gotestspec.BuildOption) []*gotestspec.Packag
 
 func (s *MarkdownSafetyTestSuite) TestBuildTree_ASlashInAnIt(t *gotest.T) {
 	decls := gotestspec.DeclarationIndex{"example.com/pkg": {
-		"TestPathsTestSuite/TestRead/a_path_is_read":                 {Label: "a path is read", Vocab: gotestspec.VocabWhen},
-		"TestPathsTestSuite/TestRead/a_path_is_read/reads_a/b_paths": {Label: "reads a/b paths", Vocab: gotestspec.VocabIt},
+		gotestspec.DeclKey("TestPathsTestSuite", "TestRead", "a_path_is_read"):                    {Label: "a path is read", Vocab: gotestspec.VocabWhen},
+		gotestspec.DeclKey("TestPathsTestSuite", "TestRead", "a_path_is_read", "reads_a/b_paths"): {Label: "reads a/b paths", Vocab: gotestspec.VocabIt},
 	}}
 	for _, c := range []struct {
 		name string
@@ -249,9 +229,9 @@ func (s *MarkdownSafetyTestSuite) TestBuildTree_ASlashInAnIt(t *gotest.T) {
 
 			w.It("renders no level for the text before the slash", func(it *gotest.T) {
 				out := renderMarkdownOf(pkgs)
-				gotest.Contains(it, out, "| &nbsp;&nbsp;reads a/b paths | PASS |")
-				gotest.NotContains(it, out, "reads a**")
-				gotest.NotContains(it, out, "&nbsp;&nbsp;&nbsp;&nbsp;b paths")
+				gotest.Contains(it, out, "a path is read\n    - PASS reads a/b paths\n")
+				gotest.NotContains(it, out, "- reads a\n")
+				gotest.NotContains(it, out, "b paths\n      ")
 			})
 		})
 	}
@@ -327,12 +307,11 @@ func (s *MarkdownSafetyTestSuite) TestRenderMarkdown_AGroupFailsOnItsOwn(t *gote
 	bare := renderMarkdownOf(groupFailurePackages())
 	t.When("a group fails with every behavior under it passing", func(w *gotest.T) {
 		w.It("shows the failure and what it wrote on the group's row", func(it *gotest.T) {
-			gotest.Contains(it, out, "| **when the disk \\| is full** — boot\\_test.go:9: no space &lt;left&gt; boot\\_test.go:10: retry later | FAIL | 2ms |\n")
-			gotest.Contains(it, out, "| &nbsp;&nbsp;starts | PASS | ")
+			gotest.Contains(it, out, "  - **FAIL** when the disk \\| is full\n    ```text\n    boot_test.go:9: no space <left>\n    boot_test.go:10: retry later\n    ```\n    - PASS starts\n")
 		})
 
 		w.It("still shows the failure when the group wrote nothing", func(it *gotest.T) {
-			gotest.Contains(it, bare, "| **when the disk \\| is full** — test failed without diagnostic output (bare Fail?) | FAIL | 2ms |\n")
+			gotest.Contains(it, bare, "  - **FAIL** when the disk \\| is full\n    ```text\n    test failed without diagnostic output (bare Fail?)\n    ```\n")
 		})
 	})
 }
@@ -372,21 +351,69 @@ func (s *MarkdownSafetyTestSuite) TestRenderMarkdown_ExcludedFromSource(t *gotes
 	t.When("the markdown spec read from source holds X_ suites and methods", func(w *gotest.T) {
 		w.It("marks each excluded suite, method and behavior EXCLUDED", func(it *gotest.T) {
 			for _, want := range []string{
-				"## Parked — EXCLUDED\n",
-				"### Anything — EXCLUDED\n",
-				"### Parked — EXCLUDED\n",
-				"| never runs — EXCLUDED |",
-				"| ParkedLeaf — EXCLUDED |",
-				"## Empty — EXCLUDED\n",
+				"#### Parked — EXCLUDED\n\n- **Anything** — EXCLUDED\n  - never runs — EXCLUDED\n",
+				"- **Parked** — EXCLUDED\n  - never runs — EXCLUDED\n",
+				"- **ParkedLeaf** — EXCLUDED\n",
+				"#### Empty — EXCLUDED\n",
 			} {
 				gotest.Contains(it, out, want)
 			}
 		})
 
 		w.It("leaves what is not excluded unmarked", func(it *gotest.T) {
-			gotest.Contains(it, out, "## Labels\n")
-			gotest.Contains(it, out, "### Live\n")
-			gotest.Contains(it, out, "| runs |")
+			gotest.Contains(it, out, "#### Labels\n")
+			gotest.Contains(it, out, "- **Live**\n  - runs\n")
 		})
 	})
+}
+
+// openingTree holds Whens whose labels open a Markdown block at the start of
+// a line.
+func openingTree(labels ...string) []*gotestspec.Package {
+	method := &gotestspec.Node{Kind: gotestspec.KindMethod, Display: "M"}
+	for _, l := range labels {
+		method.Children = append(method.Children, &gotestspec.Node{
+			Kind: gotestspec.KindBlock, Display: l,
+			Children: []*gotestspec.Node{{Kind: gotestspec.KindBlock, Display: "holds", Status: gotestspec.StatusPass}},
+		})
+	}
+	return []*gotestspec.Package{{
+		Path:  "example.com/pkg",
+		Nodes: []*gotestspec.Node{{Kind: gotestspec.KindSuite, Display: "S", Children: []*gotestspec.Node{method}}},
+	}}
+}
+
+// opensABlock matches item text that Markdown reads as a block of its own.
+var opensABlock = regexp.MustCompile("^([#>+-] |[0-9]+[.)]( |$)|```|~~~| )")
+
+func (s *MarkdownSafetyTestSuite) TestLabelsAtTheStartOfAnItemStayText(t *gotest.T) {
+	labels := []string{"1. x", "2) x", "3.", "# x", "> x", "- x", "+ x", "```", "~~~ x", "    four", "1.5x faster"}
+	want := []string{`1\. x`, `2\) x`, `3\.`, `\# x`, `\> x`, `\- x`, `\+ x`, "\\`\\`\\`", `\~\~\~ x`, "four", "1.5x faster"}
+	for _, mode := range []struct {
+		name string
+		opts []gotestspec.RenderOption
+	}{
+		{"a run", nil},
+		{"the source", []gotestspec.RenderOption{gotestspec.WithoutVerdicts()}},
+	} {
+		out := renderMarkdownOf(openingTree(labels...), mode.opts...)
+		t.When("the markdown spec of "+mode.name+" holds a label that opens a list, a heading, a quote or a code block", func(w *gotest.T) {
+			w.It("escapes the opening, so the label is the item's text", func(it *gotest.T) {
+				for _, e := range want {
+					gotest.Contains(it, out, "\n  - "+e+"\n")
+				}
+			})
+			w.It("opens no list, heading, quote or code block inside an item", func(it *gotest.T) {
+				for _, line := range strings.Split(out, "\n") {
+					text := strings.TrimLeft(line, " ")
+					if len(text) == len(line) {
+						continue // a heading or paragraph of the document itself
+					}
+					item, ok := strings.CutPrefix(text, "- ")
+					gotest.True(it, ok, "an indented line that is no item: %q", line)
+					gotest.False(it, opensABlock.MatchString(item), "line %q", line)
+				}
+			})
+		})
+	}
 }

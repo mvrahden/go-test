@@ -43,6 +43,7 @@ let store: TestResultStore;
 let savedGoWork: string | undefined;
 let tmp = "";
 let eventsFile = "";
+let ciStdout = "";
 
 beforeAll(async () => {
   tmp = mkdtempSync(path.join(tmpdir(), "gotest-import-"));
@@ -88,6 +89,7 @@ beforeAll(async () => {
   );
   expect(ci.error).toBeUndefined();
   expect(ci.stdout).toContain(failing);
+  ciStdout = ci.stdout;
   eventsFile = path.join(tmp, "events.jsonl");
   // Framed as a gotest watch capture would be: its markers are no packages.
   writeFileSync(
@@ -148,6 +150,39 @@ describe("opening a saved event stream", () => {
     expect(run!.output.join("")).toContain(
       "[shared fixtures] FAIL: shared fixture teardown failed",
     );
+  }, 300_000);
+
+  it("places the results of a stream without stamps on their items", async () => {
+    // What an older gotest or plain go test -json saved: no Gotest objects.
+    const bare = ciStdout.replace(/,"Gotest":\{[^{}]*\}\}$/gm, "}");
+    expect(bare).not.toContain('"Gotest"');
+    const file = path.join(tmp, "unstamped.jsonl");
+    writeFileSync(file, bare, "utf-8");
+    const recorder = createRecordingChannel();
+    const specView = new SpecViewPanel(recorder.channel as never, cache);
+    const fake = state.controllers[0] as FakeTestController;
+    const before = fake.runs.length;
+
+    await openEventsFile(
+      { controller, cache, specView, outputChannel: recorder.channel as never },
+      file,
+    );
+
+    const run = fake.runs
+      .slice(before)
+      .find((r) => r.name === "Imported: unstamped.jsonl");
+    expect(run, "a run named after the file").toBeDefined();
+    const failed = run!.verdictsMatching("failed");
+    expect(failed.some((id) => id.endsWith("reports_the_expected_total"))).toBe(
+      true,
+    );
+    const passed = run!.verdictsMatching("passed");
+    expect(
+      passed.some((id) => id.endsWith("still_runs_the_sibling_behavior")),
+    ).toBe(true);
+    expect(passed.some((id) => /\/Test[A-Z]\w*$/.test(id))).toBe(true);
+    expect(recorder.warnings.join("\n")).not.toContain("below the floor");
+    expect(recorder.warnings.join("\n")).not.toContain("[import]");
   }, 300_000);
 
   it("keeps the replayed verdicts out of the result store", async () => {

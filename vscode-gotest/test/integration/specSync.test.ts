@@ -594,7 +594,7 @@ function discovered(patterns: string[]): Map<string, string> {
 function linked(html: string): Map<string, string> {
   const at = new Map<string, string>();
   const row =
-    /data-id="([^"]+)">\s*<span class="icon [a-z]+" data-loc-file="([^"]+)" data-loc-line="(\d+)"/g;
+    /data-id="([^"]+)"[^>]*>\s*<span class="icon [a-z]+" data-loc-file="([^"]+)" data-loc-line="(\d+)"/g;
   for (const m of html.matchAll(row)) {
     at.set(m[1].replace(/&quot;/g, '"'), `${m[2]}:${m[3]}`);
   }

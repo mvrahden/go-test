@@ -57,7 +57,10 @@ import {
   resolveAncestorsOf,
   skipUnresolved,
   itemTestPath,
+  methodSegmentOf,
   restoreStoredResults,
+  TestItemRouter,
+  OnceLog,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -291,6 +294,67 @@ function makeTreeWithDirs() {
   );
   return { dir, pkg, suite, method, dynamic };
 }
+
+function makeTwinTree() {
+  const pkg = createItem("example.com/pkg", "pkg", undefined, [
+    { id: "package" },
+  ]);
+  const internal = createItem(
+    "example.com/pkg/UserRepositoryTestSuite",
+    "UserRepositoryTestSuite",
+    pkg,
+  );
+  const external = createItem(
+    "example.com/pkg/UserRepositoryTestSuite~external",
+    "UserRepositoryTestSuite",
+    pkg,
+    [{ id: "external" }],
+  );
+  const create = createItem(
+    "example.com/pkg/UserRepositoryTestSuite/TestCreate",
+    "TestCreate",
+    internal,
+  );
+  const externalCreate = createItem(
+    "example.com/pkg/UserRepositoryTestSuite~external/TestCreate#01",
+    "TestCreate",
+    external,
+  );
+  return { internal, external, create, externalCreate };
+}
+
+describe("external twins", () => {
+  it("filters the external copy of a shared method by testing's #01 name", () => {
+    const { externalCreate, create } = makeTwinTree();
+    expect(buildRunFilter([externalCreate as any])).toBe(
+      "^TestUserRepositoryTestSuite$/^TestCreate#01$",
+    );
+    expect(buildRunFilter([create as any])).toBe(
+      "^TestUserRepositoryTestSuite$/^TestCreate$",
+    );
+  });
+
+  it("filters a whole external suite by the shared top-level name", () => {
+    const { external } = makeTwinTree();
+    expect(buildRunFilter([external as any])).toBe(
+      "^TestUserRepositoryTestSuite$|^FuzzUserRepositoryTestSuite_.*$",
+    );
+  });
+
+  it("names the go test path of an external copy without the id marker", () => {
+    const { external, externalCreate } = makeTwinTree();
+    expect(itemTestPath(externalCreate as any)).toBe(
+      "TestUserRepositoryTestSuite/TestCreate#01",
+    );
+    expect(itemTestPath(external as any)).toBe("TestUserRepositoryTestSuite");
+  });
+
+  it("reads a method's id segment, not its label", () => {
+    const { externalCreate, create } = makeTwinTree();
+    expect(methodSegmentOf(externalCreate as any)).toBe("TestCreate#01");
+    expect(methodSegmentOf(create as any)).toBe("TestCreate");
+  });
+});
 
 describe("itemTestPath", () => {
   it("names the go test path a filter built from the item asks for", () => {
@@ -557,25 +621,47 @@ describe("applyResults", () => {
     return { controller, run, passItem, failItem, skipItem };
   }
 
+  // How a stream starts the suite and its failing method: stamped with where
+  // each sits.
+  const suiteRun = {
+    Action: "run" as const,
+    Test: "MySuite",
+    Package: "example.com/pkg",
+    Gotest: { Subtest: "MySuite" },
+  };
+  const failRun = [
+    suiteRun,
+    {
+      Action: "run" as const,
+      Test: "MySuite/TestFail",
+      Package: "example.com/pkg",
+      Gotest: { Subtest: "TestFail" },
+    },
+  ];
+
   it("returns AppliedResult[] and records results to controller", () => {
     const { controller, run, passItem, failItem, skipItem } =
       makeApplyResultsFixture();
 
     const events = [
+      suiteRun,
       {
         Action: "run" as const,
         Test: "MySuite/TestPass",
         Package: "example.com/pkg",
+        Gotest: { Subtest: "TestPass" },
       },
       {
         Action: "run" as const,
         Test: "MySuite/TestFail",
         Package: "example.com/pkg",
+        Gotest: { Subtest: "TestFail" },
       },
       {
         Action: "run" as const,
         Test: "MySuite/TestSkip",
         Package: "example.com/pkg",
+        Gotest: { Subtest: "TestSkip" },
       },
       {
         Action: "pass" as const,
@@ -716,6 +802,7 @@ describe("applyResults", () => {
     const { controller, run, failItem } = makeApplyResultsFixture();
 
     const events = [
+      ...failRun,
       {
         Action: "output" as const,
         Test: "MySuite/TestFail",
@@ -777,6 +864,7 @@ describe("applyResults", () => {
     const test = "MySuite/TestFail";
     const pkg = "example.com/pkg";
     return [
+      ...failRun,
       {
         Action: "output" as const,
         Test: test,
@@ -924,9 +1012,27 @@ describe("applyEvent", () => {
       appendOutput: vi.fn(),
     };
 
+    // The router has seen the suite and its methods start, as a stream says
+    // before anything else about them.
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    router.route({
+      Action: "run",
+      Test: "TestMySuite",
+      Gotest: { Subtest: "TestMySuite" },
+    } as any);
+    for (const m of ["TestPass", "TestFail", "TestSkip"]) {
+      router.route({
+        Action: "run",
+        Test: `TestMySuite/${m}`,
+        Gotest: { Subtest: m },
+      } as any);
+    }
+    const opts = { router };
+
     return {
       controller,
       run,
+      opts,
       pkgItem,
       suiteItem,
       passItem,
@@ -941,7 +1047,7 @@ describe("applyEvent", () => {
   const STAMP_MS = Date.parse(STAMP);
 
   it("processes 'run' event — calls run.started, notes the bracket start", () => {
-    const { controller, run, passItem } = makeApplyEventFixture();
+    const { controller, run, passItem, opts } = makeApplyEventFixture();
 
     applyEvent(
       controller as any,
@@ -950,18 +1056,20 @@ describe("applyEvent", () => {
         Action: "run",
         Test: "TestMySuite/TestPass",
         Package: "example.com/pkg",
+        Gotest: { Subtest: "TestPass" },
         Time: STAMP,
       } as any,
       new Map<string, string>(),
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(controller.noteStart).toHaveBeenCalledWith(passItem.id, STAMP_MS);
   });
 
   it("processes 'run' event — calls run.started, returns undefined", () => {
-    const { controller, run, passItem } = makeApplyEventFixture();
+    const { controller, run, passItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const result = applyEvent(
@@ -971,10 +1079,12 @@ describe("applyEvent", () => {
         Action: "run",
         Test: "TestMySuite/TestPass",
         Package: "example.com/pkg",
+        Gotest: { Subtest: "TestPass" },
       } as any,
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toBeUndefined();
@@ -982,7 +1092,7 @@ describe("applyEvent", () => {
   });
 
   it("processes 'pass' event — calls run.passed, records result, returns AppliedResult", () => {
-    const { controller, run, passItem } = makeApplyEventFixture();
+    const { controller, run, passItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const result = applyEvent(
@@ -998,6 +1108,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toEqual({
@@ -1015,7 +1126,7 @@ describe("applyEvent", () => {
   });
 
   it("processes 'skip' event — calls run.skipped, records result, returns AppliedResult", () => {
-    const { controller, run, skipItem } = makeApplyEventFixture();
+    const { controller, run, skipItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const result = applyEvent(
@@ -1030,6 +1141,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toEqual({
@@ -1047,7 +1159,7 @@ describe("applyEvent", () => {
   });
 
   it("processes 'output' event — accumulates in outputMap, appends to run", () => {
-    const { controller, run } = makeApplyEventFixture();
+    const { controller, run, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const result = applyEvent(
@@ -1062,6 +1174,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toBeUndefined();
@@ -1072,7 +1185,7 @@ describe("applyEvent", () => {
   });
 
   it("processes 'fail' event — uses accumulated output for diagnostics", () => {
-    const { controller, run, failItem } = makeApplyEventFixture();
+    const { controller, run, failItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
     outputMap.set(
       "TestMySuite/TestFail",
@@ -1092,6 +1205,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toEqual({
@@ -1109,7 +1223,7 @@ describe("applyEvent", () => {
   });
 
   it("uses diagnostic location as fallback for panic stack traces", () => {
-    const { controller, run, failItem } = makeApplyEventFixture();
+    const { controller, run, failItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
     outputMap.set(
       "TestMySuite/TestFail",
@@ -1136,6 +1250,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(run.failed).toHaveBeenCalledTimes(1);
@@ -1148,7 +1263,7 @@ describe("applyEvent", () => {
   });
 
   it("processes package terminal event — resolves package and ancestors", () => {
-    const { controller, run, pkgItem } = makeApplyEventFixture();
+    const { controller, run, pkgItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const result = applyEvent(
@@ -1158,6 +1273,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toEqual({
@@ -1174,7 +1290,7 @@ describe("applyEvent", () => {
   });
 
   it("returns undefined for unknown test path", () => {
-    const { controller, run } = makeApplyEventFixture();
+    const { controller, run, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const result = applyEvent(
@@ -1189,6 +1305,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toBeUndefined();
@@ -1196,7 +1313,7 @@ describe("applyEvent", () => {
   });
 
   it("filters 'exit status' output lines", () => {
-    const { controller, run } = makeApplyEventFixture();
+    const { controller, run, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     applyEvent(
@@ -1210,13 +1327,14 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(run.appendOutput).not.toHaveBeenCalled();
   });
 
   it("accumulates package-level output and attaches as message on fail", () => {
-    const { controller, run, pkgItem } = makeApplyEventFixture();
+    const { controller, run, pkgItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     const outputLines = [
@@ -1237,6 +1355,7 @@ describe("applyEvent", () => {
         outputMap,
         "example.com/pkg",
         "/some/dir",
+        opts,
       );
     }
 
@@ -1247,6 +1366,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(result).toEqual({
@@ -1265,7 +1385,7 @@ describe("applyEvent", () => {
   });
 
   it("shows fallback message on package fail with no output", () => {
-    const { controller, run, pkgItem } = makeApplyEventFixture();
+    const { controller, run, pkgItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
 
     applyEvent(
@@ -1275,6 +1395,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/some/dir",
+      opts,
     );
 
     expect(run.failed).toHaveBeenCalledTimes(1);
@@ -1288,7 +1409,7 @@ describe("applyEvent", () => {
   // The compiler's file names are relative to the directory the CLI ran in,
   // which is not the package's.
   it("takes a failed build's diagnostics from the build events, located against the CLI's directory", () => {
-    const { controller, run, pkgItem } = makeApplyEventFixture();
+    const { controller, run, pkgItem, opts } = makeApplyEventFixture();
     const outputMap = new Map<string, string>();
     const builds = new BuildOutputs();
     const build = "example.com/pkg_test [example.com/pkg.test]";
@@ -1322,7 +1443,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/ws/pkg",
-      { builds, buildDir: "/ws" },
+      { ...opts, builds, buildDir: "/ws" },
     );
     const result = applyEvent(
       controller as any,
@@ -1336,7 +1457,7 @@ describe("applyEvent", () => {
       outputMap,
       "example.com/pkg",
       "/ws/pkg",
-      { builds, buildDir: "/ws" },
+      { ...opts, builds, buildDir: "/ws" },
     );
 
     expect(result).toEqual({
@@ -1357,7 +1478,7 @@ describe("applyEvent", () => {
   });
 
   it("leaves a package that failed on its own tests without a build's diagnostics", () => {
-    const { controller, run } = makeApplyEventFixture();
+    const { controller, run, opts } = makeApplyEventFixture();
     const builds = new BuildOutputs();
     builds.absorb({
       Action: "build-output",
@@ -1372,7 +1493,7 @@ describe("applyEvent", () => {
       new Map(),
       "example.com/pkg",
       "/ws/pkg",
-      { builds, buildDir: "/ws" },
+      { ...opts, builds, buildDir: "/ws" },
     );
 
     const messages = run.failed.mock.calls[0][1];
@@ -2318,5 +2439,312 @@ describe("restoreStoredResults", () => {
     expect(run.errored).toHaveBeenCalledWith(method, expect.anything());
     expect(run.passed).not.toHaveBeenCalledWith(method, undefined);
     expect(run.end).toHaveBeenCalled();
+  });
+});
+
+describe("TestItemRouter", () => {
+  // A controller whose createDynamicSubtest keeps the real id rule: the
+  // parent's id plus the own level, the declared child when there is one.
+  function makeRouterFixture() {
+    const pkg = createItem("example.com/pkg", "example.com/pkg");
+    const suite = createItem("example.com/pkg/S", "S", pkg);
+    const method = createItem("example.com/pkg/S/TestM", "TestM", suite);
+    const create = createItem(
+      "example.com/pkg/S/TestCreate",
+      "TestCreate",
+      suite,
+    );
+    const twin = createItem("example.com/pkg/S~external", "S", pkg);
+    const twinCreate = createItem(
+      "example.com/pkg/S~external/TestCreate#01",
+      "TestCreate",
+      twin,
+    );
+    const items = new Map<string, MockTestItem>();
+    const index = (item: MockTestItem) => {
+      items.set(item.id, item);
+      item.children.forEach(index);
+    };
+    index(pkg);
+    const created: { id: string; label: string }[] = [];
+    const controller = {
+      findItem: (id: string) => items.get(id),
+      createDynamicSubtest: (
+        parent: MockTestItem,
+        subtestPath: string,
+        label: string,
+      ) => {
+        const id = `${parent.id}/${subtestPath}`;
+        const existing = parent.children.get(id);
+        if (existing) return existing;
+        created.push({ id, label });
+        const child = createItem(id, label, parent);
+        items.set(id, child);
+        return child;
+      },
+    };
+    return { controller, suite, method, create, twin, twinCreate, created };
+  }
+
+  const ev = (
+    Action: string,
+    Test: string,
+    Gotest?: { Subtest?: string; Repeat?: number; Instance?: number },
+  ) => ({ Action, Test, Package: "example.com/pkg", Time: "", Gotest }) as any;
+
+  it("places a slash label as one level under its parent", () => {
+    const { controller, method } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    router.route(ev("run", "TestS", { Subtest: "TestS" }));
+    router.route(ev("run", "TestS/TestM", { Subtest: "TestM" }));
+
+    for (const own of ["gets_./", "/abs/pkg", "./pkg"]) {
+      const item = router.route(
+        ev("run", `TestS/TestM/${own}`, { Subtest: own }),
+      );
+      expect(item?.id).toBe(`example.com/pkg/S/TestM/${own}`);
+      expect((item as any)?.parent).toBe(method);
+    }
+  });
+
+  it("routes later events of a test to the item its run placed", () => {
+    const { controller } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    router.route(ev("run", "TestS", { Subtest: "TestS" }));
+    router.route(ev("run", "TestS/TestM", { Subtest: "TestM" }));
+    const placed = router.route(
+      ev("run", "TestS/TestM//abs/pkg", { Subtest: "/abs/pkg" }),
+    );
+
+    expect(router.route(ev("output", "TestS/TestM//abs/pkg"))).toBe(placed);
+    expect(router.route(ev("pass", "TestS/TestM//abs/pkg"))).toBe(placed);
+  });
+
+  it("labels a created level without testing's repeat suffix", () => {
+    const { controller, created } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    router.route(ev("run", "TestS", { Subtest: "TestS" }));
+    router.route(ev("run", "TestS/TestM", { Subtest: "TestM" }));
+    router.route(ev("run", "TestS/TestM/row", { Subtest: "row" }));
+    router.route(
+      ev("run", "TestS/TestM/row#01", { Subtest: "row#01", Repeat: 1 }),
+    );
+
+    expect(created).toEqual([
+      { id: "example.com/pkg/S/TestM/row", label: "row" },
+      { id: "example.com/pkg/S/TestM/row#01", label: "row" },
+    ]);
+  });
+
+  it("lands a twin's second instance on the external suite's items", () => {
+    const { controller, suite, create, twin, twinCreate } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+
+    expect(router.route(ev("run", "TestS", { Subtest: "TestS" }))).toBe(suite);
+    expect(
+      router.route(ev("run", "TestS/TestCreate", { Subtest: "TestCreate" })),
+    ).toBe(create);
+    expect(router.route(ev("pass", "TestS"))).toBe(suite);
+    expect(
+      router.route(ev("run", "TestS", { Subtest: "TestS", Instance: 2 })),
+    ).toBe(twin);
+    expect(
+      router.route(
+        ev("run", "TestS/TestCreate#01", {
+          Subtest: "TestCreate#01",
+          Repeat: 1,
+          Instance: 2,
+        }),
+      ),
+    ).toBe(twinCreate);
+    expect(
+      router.route(ev("fail", "TestS/TestCreate#01", { Instance: 2 })),
+    ).toBe(twinCreate);
+    expect(router.route(ev("fail", "TestS", { Instance: 2 }))).toBe(twin);
+  });
+
+  it("keeps a twin's output to its own instance", () => {
+    const { controller, twin } = makeRouterFixture();
+    const run = {
+      started: vi.fn(),
+      failed: vi.fn(),
+      appendOutput: vi.fn(),
+    };
+    const ctl = {
+      ...controller,
+      recordResult: vi.fn(),
+      noteStart: vi.fn(),
+    };
+    applyResults(
+      ctl as any,
+      run as any,
+      [
+        ev("run", "TestS", { Subtest: "TestS" }),
+        { ...ev("output", "TestS"), Output: "internal says\n" },
+        ev("run", "TestS", { Subtest: "TestS", Instance: 2 }),
+        {
+          ...ev("output", "TestS", { Instance: 2 }),
+          Output: "external says\n",
+        },
+        ev("fail", "TestS", { Instance: 2 }),
+      ],
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    expect(run.failed).toHaveBeenCalledTimes(1);
+    expect(run.failed.mock.calls[0][0]).toBe(twin);
+    const message = run.failed.mock.calls[0][1][0].message;
+    expect(message).toContain("external says");
+    expect(message).not.toContain("internal says");
+  });
+
+  it("lands a repeated run of a suite without a twin on its items, the last verdict last", () => {
+    const { controller, suite, method } = makeRouterFixture();
+    controller.findItem = ((find) => (id: string) =>
+      id.endsWith("~external") ? undefined : find(id))(controller.findItem);
+    const run = { started: vi.fn(), passed: vi.fn(), failed: vi.fn() };
+    const ctl = { ...controller, recordResult: vi.fn(), noteStart: vi.fn() };
+    applyResults(
+      ctl as any,
+      run as any,
+      [
+        ev("run", "TestS", { Subtest: "TestS" }),
+        ev("run", "TestS/TestM", { Subtest: "TestM" }),
+        ev("run", "TestS/TestM/x", { Subtest: "x" }),
+        ev("pass", "TestS/TestM/x"),
+        ev("pass", "TestS/TestM"),
+        ev("run", "TestS", { Subtest: "TestS", Instance: 2 }),
+        ev("run", "TestS/TestM#01", {
+          Subtest: "TestM#01",
+          Repeat: 1,
+          Instance: 2,
+        }),
+        ev("run", "TestS/TestM#01/x", { Subtest: "x", Instance: 2 }),
+        ev("fail", "TestS/TestM#01/x", { Instance: 2 }),
+        ev("fail", "TestS/TestM#01", { Instance: 2 }),
+      ],
+      "example.com/pkg",
+      "/some/dir",
+    );
+
+    const x = method.children.get("example.com/pkg/S/TestM/x");
+    expect(run.passed.mock.calls.map((c) => c[0])).toEqual([x, method]);
+    expect(run.failed.mock.calls.map((c) => c[0])).toEqual([x, method]);
+    expect(method.children.size).toBe(1);
+    expect(suite.children.size).toBe(2);
+  });
+
+  it("lands a rerun of the external twin's shared method on its item", () => {
+    const { controller, twin, twinCreate } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    // -run ^TestS$/^TestCreate#01$: the internal instance runs no method.
+    router.route(ev("run", "TestS", { Subtest: "TestS" }));
+    router.route(ev("pass", "TestS"));
+    expect(
+      router.route(ev("run", "TestS", { Subtest: "TestS", Instance: 2 })),
+    ).toBe(twin);
+    expect(
+      router.route(
+        ev("run", "TestS/TestCreate#01", {
+          Subtest: "TestCreate#01",
+          Repeat: 1,
+          Instance: 2,
+        }),
+      ),
+    ).toBe(twinCreate);
+  });
+
+  it("alternates a twin's repeated runs: odd internal, even external", () => {
+    const { controller, suite, create, twin, twinCreate } = makeRouterFixture();
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+    const got = [1, 2, 3, 4].map((n) => {
+      const Instance = n > 1 ? n : undefined;
+      const own = n === 1 ? "TestCreate" : `TestCreate#0${n - 1}`;
+      return [
+        router.route(ev("run", "TestS", { Subtest: "TestS", Instance })),
+        router.route(
+          ev("run", `TestS/${own}`, {
+            Subtest: own,
+            Repeat: n > 1 ? n - 1 : undefined,
+            Instance,
+          }),
+        ),
+      ];
+    });
+
+    expect(got).toEqual([
+      [suite, create],
+      [twin, twinCreate],
+      [suite, create],
+      [twin, twinCreate],
+    ]);
+  });
+
+  it("routes an unstamped subtest to nothing and says so once", () => {
+    const { controller } = makeRouterFixture();
+    const log = vi.fn();
+    const router = new TestItemRouter(
+      controller as any,
+      "example.com/pkg",
+      new OnceLog(log),
+    );
+
+    expect(router.route(ev("run", "TestS/TestM/x"))).toBeUndefined();
+    expect(router.route(ev("run", "TestS/TestM/y"))).toBeUndefined();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      "[runner] unstamped subtest events; CLI below the floor?",
+    );
+  });
+
+  it("says what its caller gives for an unstamped subtest, not the floor", () => {
+    const { controller } = makeRouterFixture();
+    const log = vi.fn();
+    const router = new TestItemRouter(
+      controller as any,
+      "example.com/pkg",
+      new OnceLog(log),
+      "[import] not placed",
+    );
+
+    expect(router.route(ev("run", "TestS/TestM/x"))).toBeUndefined();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith("[import] not placed");
+  });
+
+  it("finds a fuzz wrapper by its top-level name and places its seeds", () => {
+    const { controller, created } = makeRouterFixture();
+    const fuzz = createItem("example.com/pkg/My_Suite/FuzzParse", "FuzzParse");
+    const find = controller.findItem;
+    controller.findItem = (id: string) => (id === fuzz.id ? fuzz : find(id));
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+
+    expect(
+      router.route(
+        ev("run", "FuzzMy_Suite_FuzzParse", {
+          Subtest: "FuzzMy_Suite_FuzzParse",
+        }),
+      ),
+    ).toBe(fuzz);
+    const seed = router.route(
+      ev("run", "FuzzMy_Suite_FuzzParse/seed#0", { Subtest: "seed#0" }),
+    );
+    expect(seed?.id).toBe("example.com/pkg/My_Suite/FuzzParse/seed#0");
+    expect(created).toEqual([
+      { id: "example.com/pkg/My_Suite/FuzzParse/seed#0", label: "seed#0" },
+    ]);
+  });
+
+  it("takes a Fuzz-named top level no wrapper matches for a suite", () => {
+    const { controller } = makeRouterFixture();
+    const suite = createItem("example.com/pkg/FuzzySuite", "FuzzySuite");
+    const find = controller.findItem;
+    controller.findItem = (id: string) => (id === suite.id ? suite : find(id));
+    const router = new TestItemRouter(controller as any, "example.com/pkg");
+
+    expect(
+      router.route(ev("run", "FuzzySuite", { Subtest: "FuzzySuite" })),
+    ).toBe(suite);
   });
 });

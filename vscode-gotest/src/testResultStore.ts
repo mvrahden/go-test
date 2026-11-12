@@ -47,7 +47,9 @@ interface StoredTestResult extends TestResult {
 // (3 and 4 were used mid-development and never released, so this reuses 3.)
 // 5: a result can be errored, which a build reading 3 would restore as
 // nothing at all.
-const STORE_VERSION = 5;
+// 6: an external twin suite has an item id of its own; a result kept under
+// the shared id may belong to either twin.
+const STORE_VERSION = 6;
 
 type StoredData = Record<string, StoredTestResult>;
 

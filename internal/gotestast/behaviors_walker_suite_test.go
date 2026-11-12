@@ -101,12 +101,11 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 			},
 		},
 		{
-			// A single slash is a level separator, so "a/b" and "a/c" share one
-			// parent; a run of slashes is not, so "https://" stays one level.
-			Desc:   "a slash in a description is a level, a run of them is not",
+			// go test reports one subtest for a label with a slash, so the
+			// slash is part of the name and makes no level.
+			Desc:   "a slash in a description is part of its name",
 			method: "TestSlashes",
 			want: []string{
-				"a",
 				"a/b_grouping",
 				"a/b_grouping/works",
 				"a/c_grouping",
@@ -114,6 +113,54 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 				"https://_URI",
 				"https://_URI/stays_one_level",
 			},
+		},
+		{
+			Desc:   "a label that begins or ends with a slash is one name",
+			method: "TestWholeNames",
+			want: []string{
+				"gets_./",
+				"/abs/pkg",
+				"reads_specs/",
+				"reads_specs//holds",
+				"b#01",
+				"a",
+				"a#01",
+			},
+		},
+		{
+			Desc:   "a sibling spelled like a nested path repeats its full name",
+			method: "TestFullNameRepeat",
+			want:   []string{"a", "a/b", "a/b#01"},
+		},
+		{
+			Desc:   "a repeated leaf is numbered",
+			method: "TestRepeatedLeaf",
+			want:   []string{"x", "x#01"},
+		},
+		{
+			Desc:   "an empty label is numbered from zero",
+			method: "TestEmptyLabel",
+			want:   []string{"#00"},
+		},
+		{
+			Desc:   "a written number alone stays as written",
+			method: "TestExplicitNumber",
+			want:   []string{"a#01"},
+		},
+		{
+			Desc:   "a repeat skips the number a label already took",
+			method: "TestExplicitNumberFirst",
+			want:   []string{"a#01", "a", "a#02"},
+		},
+		{
+			Desc:   "a written number a repeat already took is numbered again",
+			method: "TestExplicitNumberLast",
+			want:   []string{"a", "a#01", "a#01#01"},
+		},
+		{
+			Desc:   "repeated rows are numbered and their children are not",
+			method: "TestRepeatedRows",
+			want:   []string{"r", "r/y", "r#01", "r#01/y"},
 		},
 		{
 			Desc:   "a keyed table names its rows from Desc",
@@ -138,6 +185,57 @@ func (s *BehaviorWalkerTestSuite) TestTreeShape(t *gotest.T) {
 				"#0", "#0/still_runs",
 				"#1", "#1/still_runs",
 			},
+		},
+		{
+			Desc:   "rows named by constants take the constant's value",
+			method: "TestConstantRows",
+			want: []string{
+				"p_suite", "p_suite/runs",
+				"local_name", "local_name/runs",
+				"pre_x", "pre_x/runs",
+				"n", "n/runs",
+				"d", "d/runs",
+			},
+		},
+		{
+			Desc:   "a typed string constant names its row",
+			method: "TestTypedConstantRows",
+			want:   []string{"typed_name", "typed_name/runs"},
+		},
+		{
+			Desc:   "a row named by a variable is not listed",
+			method: "TestVariableRow",
+			want:   []string{"first", "first/runs", "third", "third/runs"},
+		},
+		{
+			Desc:   "a Name that is not a string leaves the index",
+			method: "TestIntNameRow",
+			want:   []string{"#0", "#0/runs"},
+		},
+		{
+			Desc:   "a Desc only a run knows hides the row though Name is a constant",
+			method: "TestVariableDescBeatsName",
+			want:   nil,
+		},
+		{
+			Desc:   "a Name promoted from an embedded struct hides the row",
+			method: "TestPromotedNameSet",
+			want:   nil,
+		},
+		{
+			Desc:   "a promoted Name left unset hides the row too",
+			method: "TestPromotedNameUnset",
+			want:   nil,
+		},
+		{
+			Desc:   "a Name on the row itself hides the promoted one",
+			method: "TestShadowedName",
+			want:   []string{"direct", "direct/runs"},
+		},
+		{
+			Desc:   "rows that are not structs are named by index",
+			method: "TestNonStructRows",
+			want:   []string{"#0", "#0/runs", "#1", "#1/runs"},
 		},
 		{
 			Desc:   "only the unconditional behavior is declared",
@@ -183,6 +281,17 @@ func (s *BehaviorWalkerTestSuite) TestCompleteness(t *gotest.T) {
 		{
 			Desc: "a computed description is not", method: "TestComputedDescription",
 			complete: false, note: "not a string literal",
+		},
+		{
+			Desc: "a row named by constants is exhaustive", method: "TestConstantRows", complete: true,
+		},
+		{
+			Desc: "a row named by a variable is not", method: "TestVariableRow",
+			complete: false, note: "Each row name is not a constant",
+		},
+		{
+			Desc: "a promoted row name is not", method: "TestPromotedNameSet",
+			complete: false, note: "Each row name is not a constant",
 		},
 		{
 			Desc: "a table that is not a literal is not", method: "TestNonLiteralTable",
@@ -256,12 +365,47 @@ func (s *BehaviorWalkerTestSuite) TestDisplayKeepsTheProse(t *gotest.T) {
 		})
 	})
 
-	t.When("a description is split across levels by a slash", func(w *gotest.T) {
+	t.When("a description holds a slash", func(w *gotest.T) {
 		spec := s.specs["TestSlashes"]
 
-		w.It("gives each level the piece of prose it came from", func(it *gotest.T) {
-			gotest.Equal(it, "a", spec.Behaviors[0].Display)
-			gotest.Equal(it, "b grouping", spec.Behaviors[0].Children[0].Display)
+		w.It("keeps the whole prose in one Display", func(it *gotest.T) {
+			gotest.Equal(it, "a/b grouping", spec.Behaviors[0].Display)
+			gotest.Equal(it, "works", spec.Behaviors[0].Children[0].Display)
+		})
+	})
+
+	t.When("a sibling repeats a name", func(w *gotest.T) {
+		spec := s.specs["TestWholeNames"]
+
+		w.It("writes the repeat without the suffix this reader added", func(it *gotest.T) {
+			var written []string
+			for _, b := range spec.Behaviors[3:] {
+				written = append(written, b.Written())
+			}
+			gotest.Equal(it, []string{"b#01", "a", "a"}, written)
+		})
+	})
+
+	t.When("a sibling repeats a full name", func(w *gotest.T) {
+		w.It("writes the label without the suffix this reader added", func(it *gotest.T) {
+			spec := s.specs["TestFullNameRepeat"]
+			gotest.Equal(it, "a/b#01", spec.Behaviors[1].Name)
+			gotest.Equal(it, "a/b", spec.Behaviors[1].Written())
+		})
+
+		w.It("keeps a written number as written", func(it *gotest.T) {
+			spec := s.specs["TestExplicitNumber"]
+			gotest.Equal(it, "a#01", spec.Behaviors[0].Written())
+		})
+
+		w.It("shows an empty label by its number", func(it *gotest.T) {
+			spec := s.specs["TestEmptyLabel"]
+			gotest.Equal(it, "#00", spec.Behaviors[0].Written())
+		})
+
+		w.It("adds a suffix after a written number", func(it *gotest.T) {
+			spec := s.specs["TestExplicitNumberLast"]
+			gotest.Equal(it, "a#01", spec.Behaviors[2].Written())
 		})
 	})
 }

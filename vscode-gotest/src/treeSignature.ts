@@ -32,8 +32,10 @@ export function treeSignature(packages: DiscoverPackage[]): string {
     feed(pkg.importPath);
     for (const suite of pkg.suites ?? []) {
       feed(suite.name);
+      feed(suite.external ? "x" : "");
       for (const method of suite.methods ?? []) {
         feed(method.name);
+        feed(method.testName ?? "");
         feedBehaviors(method.behaviors);
       }
     }

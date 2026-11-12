@@ -2,8 +2,8 @@ Expect: ^FAIL .*conformance/spec .* / reads the suite's declared methods and row
 Clause: when a stream holds the skip of a suite its guard kept from running, rendered with --declared → reads the suite's declared methods and rows as skipped, not as not run, and counts them so
 --- a/internal/gotestspec/declared.go
 +++ b/internal/gotestspec/declared.go
-@@ -89,7 +89,7 @@ func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
- 		d.External, d.Variant = o.External, o.Variant
+@@ -91,7 +91,7 @@ func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
+ 		d.External, d.Variant, d.Reported = d.External || o.External, o.Variant, o.Reported
  		d.Iterations, d.NsPerOp, d.BytesPerOp, d.AllocsPerOp = o.Iterations, o.NsPerOp, o.BytesPerOp, o.AllocsPerOp
  		d.Metrics, d.Procs = o.Metrics, o.Procs
 -		d.Children = overlayNodes(d.Children, o.Children, skipped || d.Excluded || o.Status == StatusSkip)

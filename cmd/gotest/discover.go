@@ -47,11 +47,15 @@ type discoverPackage struct {
 }
 
 type discoverSuite struct {
-	Name       string           `json:"name"`
-	Parallel   bool             `json:"parallel"`
-	Focused    bool             `json:"focused"`
-	Excluded   bool             `json:"excluded"`
-	Guarded    bool             `json:"guarded"`
+	Name     string `json:"name"`
+	Parallel bool   `json:"parallel"`
+	Focused  bool   `json:"focused"`
+	Excluded bool   `json:"excluded"`
+	Guarded  bool   `json:"guarded"`
+	// External marks a suite of the package's external test files; go test
+	// runs it as a suite of its own, a second one when the internal files
+	// declare the same name.
+	External   bool             `json:"external,omitempty"`
 	File       string           `json:"file"`
 	Line       int              `json:"line"`
 	Col        int              `json:"col"`
@@ -63,7 +67,10 @@ type discoverSuite struct {
 }
 
 type discoverMethod struct {
-	Name     string `json:"name"`
+	Name string `json:"name"`
+	// TestName is the name go test reports when it differs from Name: a
+	// method both twins declare runs a second time as Name#01.
+	TestName string `json:"testName,omitempty"`
 	Parallel bool   `json:"parallel"`
 	Focused  bool   `json:"focused"`
 	Excluded bool   `json:"excluded"`
@@ -192,9 +199,14 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 			// Listed before the rejection check, which reduces each suite to the
 			// methods a run would select, in place: discover lists what the
 			// source declares, excluded and unfocused methods marked as such.
+			internalSuites := pkgEntry.Suites
 			for _, suite := range result.Suites {
 				ds := buildDiscoverSuite(suite)
 				ds.Fixtures = discoverFixtureNames(suite)
+				if pkg == lr.Pxtest {
+					ds.External = true
+					nameTwinMethods(&ds, internalSuites)
+				}
 				pkgEntry.Suites = append(pkgEntry.Suites, ds)
 			}
 			if rejected := c.Rejections(pkg, result); len(rejected) > 0 {
@@ -223,6 +235,45 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 		}
 	}
 	return out, nil
+}
+
+// nameTwinMethods gives the methods of an external suite that an internal
+// suite of the same name also declares the names go test reports.
+func nameTwinMethods(ds *discoverSuite, internalSuites []discoverSuite) {
+	for i := range internalSuites {
+		in := &internalSuites[i]
+		if in.Name != ds.Name {
+			continue
+		}
+		var internal, external []string
+		for _, m := range in.Methods {
+			internal = append(internal, m.Name)
+		}
+		for _, m := range ds.Methods {
+			external = append(external, m.Name)
+		}
+		names := twinTestNames(internal, external)
+		for i := range ds.Methods {
+			ds.Methods[i].TestName = names[ds.Methods[i].Name]
+		}
+		return
+	}
+}
+
+// twinTestNames is the name go test gives each method of the external
+// twin: one the internal twin also runs gains #01.
+func twinTestNames(internal, external []string) map[string]string {
+	ran := map[string]bool{}
+	for _, n := range internal {
+		ran[n] = true
+	}
+	out := map[string]string{}
+	for _, n := range external {
+		if ran[n] {
+			out[n] = n + "#01"
+		}
+	}
+	return out
 }
 
 func buildDiscoverSuite(suite *gotestast.TestSuiteSpec) discoverSuite {

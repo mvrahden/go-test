@@ -1,5 +1,6 @@
-// Package specmarkdown declares labels that Markdown would read as syntax, Its
-// whose labels hold a slash, and suites and methods X_ excludes.
+// Package specmarkdown declares labels that Markdown would read as syntax,
+// rows whose labels open a block, Its whose labels hold a slash, and suites
+// and methods X_ excludes.
 package specmarkdown
 
 import "github.com/mvrahden/go-test/pkg/gotest"
@@ -19,6 +20,12 @@ line break in one row`, func(it *gotest.T) {})
 	})
 	for it, r := range gotest.Each(t, []row{{"row | <i>x</i>"}}) {
 		gotest.NotEmpty(it, r.Desc)
+	}
+}
+
+func (s *LabelsTestSuite) TestOpenings(t *gotest.T) {
+	for it, r := range gotest.Each(t, []row{{"1. a numbered row"}, {"# a heading row"}, {"> a quoted row"}, {"- a listed row"}, {"+ a plussed row"}, {"``` a fenced row"}, {"~~~ a tilde-fenced row"}, {"    an indented row"}}) {
+		it.It("holds", func(h *gotest.T) { gotest.NotEmpty(h, r.Desc) })
 	}
 }
 

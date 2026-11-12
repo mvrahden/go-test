@@ -13,6 +13,7 @@ import {
   parseExpectedActual,
   type TestEvent,
 } from "./outputParser.js";
+import { EXTERNAL_ID, withoutExternalId } from "./types.js";
 
 export { killProcessTree };
 
@@ -108,6 +109,8 @@ export function getItemDepth(item: vscode.TestItem): number {
 
 const PACKAGE_TAG = "package";
 
+export { EXTERNAL_ID } from "./types.js";
+
 export function getPackageItem(item: vscode.TestItem): vscode.TestItem {
   let current: vscode.TestItem = item;
   if (current.tags.some((t) => t.id === PACKAGE_TAG)) {
@@ -150,112 +153,146 @@ export function expandToPackages(items: vscode.TestItem[]): vscode.TestItem[] {
   return result.length > 0 ? result : items;
 }
 
-// splitTestPath cuts a go test name into its subtest levels. A single slash
-// separates levels, but a run of them does not: `t.When("https:// URI")` is one
-// subtest whose name happens to contain slashes, and go test reports it that
-// way. Splitting on every slash invented two levels that no run ever produced,
-// so an observed result landed beside its declared behavior instead of on it.
-// The CLI applies the identical rule on both sides of the boundary.
-function splitTestPath(path: string): string[] {
-  const segments: string[] = [];
-  let cur = "";
-  for (let i = 0; i < path.length; i++) {
-    const isSeparator =
-      path[i] === "/" &&
-      (i + 1 >= path.length || path[i + 1] !== "/") &&
-      (i === 0 || path[i - 1] !== "/");
-    if (isSeparator) {
-      segments.push(cur);
-      cur = "";
-    } else {
-      cur += path[i];
-    }
+// OnceLog says each message once: a run's routers share one.
+export class OnceLog {
+  private readonly said = new Set<string>();
+
+  constructor(private readonly sink?: (message: string) => void) {}
+
+  note(message: string): void {
+    if (this.said.has(message)) return;
+    this.said.add(message);
+    this.sink?.(message);
   }
-  if (cur.length > 0) {
-    segments.push(cur);
-  }
-  return segments;
 }
 
-export function resolveTestItem(
-  controller: GoTestController,
-  testPath: string,
-  importPath: string,
-): vscode.TestItem | undefined {
-  const segments = splitTestPath(testPath);
-  if (segments.length === 0) {
-    return undefined;
-  }
+export const UNSTAMPED_LIVE =
+  "[runner] unstamped subtest events; CLI below the floor?";
 
-  const firstSegment = segments[0];
+// TestItemRouter finds the Test Explorer item a package's events belong to,
+// by where the CLI says each test sits: a name's slashes cannot say it, since
+// a label may hold slashes. One router per package per run: later events of
+// a test are looked up by the item its run placed.
+export class TestItemRouter {
+  private readonly placed = new Map<string, vscode.TestItem | undefined>();
+  // Per parent item and written level: the run that first reached it, the
+  // own levels it reported in order, and how many each run has placed.
+  private readonly occurrences = new Map<
+    string,
+    { first: number; owns: string[]; counts: Map<number, number> }
+  >();
 
-  // Generated fuzz wrappers are top-level Fuzz<Suite>_<Method> functions,
-  // where <Method> itself starts with "Fuzz". Suite names may contain
-  // underscores, so instead of guessing the split point, try each "_Fuzz"
-  // boundary against the tree — the item that exists is the answer. Falls
-  // through to plain suite resolution when nothing matches (e.g. a suite
-  // whose own name starts with Fuzz).
-  if (firstSegment.startsWith("Fuzz")) {
-    const body = firstSegment.slice(4);
-    for (
-      let idx = body.indexOf("_Fuzz");
-      idx >= 0;
-      idx = body.indexOf("_Fuzz", idx + 1)
-    ) {
-      const fuzzItem = controller.findItem(
-        `${importPath}/${body.slice(0, idx)}/${body.slice(idx + 1)}`,
-      );
-      if (!fuzzItem) continue;
-      if (segments.length === 1) {
-        return fuzzItem;
-      }
-      let parentItem = fuzzItem;
-      for (let i = 1; i < segments.length; i++) {
-        parentItem = controller.createDynamicSubtest(
-          parentItem,
-          segments.slice(1, i + 1).join("/"),
-          segments[i],
-        );
-      }
-      return parentItem;
+  constructor(
+    private readonly controller: GoTestController,
+    private readonly importPath: string,
+    private readonly log: OnceLog = new OnceLog(),
+    // What is said of subtest events without stamps: a live run's CLI is
+    // below the floor, an imported stream is one the CLI could not place.
+    private readonly unstamped = UNSTAMPED_LIVE,
+  ) {}
+
+  // The item an event's results belong to, by its stamps.
+  route(event: TestEvent): vscode.TestItem | undefined {
+    const test = event.Test;
+    if (!test) return undefined;
+    const instance = event.Gotest?.Instance ?? 1;
+    const key = `${instance}\u0000${test}`;
+    if (event.Action !== "run") {
+      if (this.placed.has(key)) return this.placed.get(key);
+      // A top-level name holds no slash; its item needs no run to find.
+      return test.includes("/") ? undefined : this.topLevel(test, instance);
     }
+    const item = this.place(test, event.Gotest, instance);
+    this.placed.set(key, item);
+    return item;
   }
 
-  const suiteName = firstSegment.startsWith("Test")
-    ? firstSegment.slice(4)
-    : firstSegment;
-
-  const suiteId = `${importPath}/${suiteName}`;
-  const suiteItem = controller.findItem(suiteId);
-  if (!suiteItem) {
-    return undefined;
+  private place(
+    test: string,
+    stamp: TestEvent["Gotest"],
+    instance: number,
+  ): vscode.TestItem | undefined {
+    const own = stamp?.Subtest;
+    if (own === undefined || own === "") {
+      if (!test.includes("/")) return this.topLevel(test, instance);
+      this.log.note(this.unstamped);
+      return undefined;
+    }
+    if (own === test) return this.topLevel(test, instance);
+    if (!test.endsWith("/" + own)) return undefined;
+    const parentName = test.slice(0, test.length - own.length - 1);
+    const parent = this.placed.get(`${instance}\u0000${parentName}`);
+    if (!parent) return undefined;
+    // The repeat suffix testing appended is part of the id, not the label.
+    const suffix = stamp?.Repeat
+      ? `#${String(stamp.Repeat).padStart(2, "0")}`
+      : "";
+    const written =
+      suffix && own.endsWith(suffix) ? own.slice(0, -suffix.length) : own;
+    const level = this.levelOf(parent.id, written, own, instance);
+    const declared = parent.children.get(`${parent.id}/${level}`);
+    if (declared) return declared;
+    return this.controller.createDynamicSubtest(parent, level, written);
   }
 
-  if (segments.length === 1) {
-    return suiteItem;
+  // levelOf is the own level a repeated run's test takes under parent: the
+  // one its occurrence had in the first run that reached parent. testing
+  // numbers a repeat's names on from the earlier runs' (TestX#01 in the
+  // second), so the nth "TestX" of every run is one item.
+  private levelOf(
+    parentId: string,
+    written: string,
+    own: string,
+    instance: number,
+  ): string {
+    const key = `${parentId}\u0000${written}`;
+    let seen = this.occurrences.get(key);
+    if (!seen) {
+      seen = { first: instance, owns: [], counts: new Map() };
+      this.occurrences.set(key, seen);
+    }
+    const n = seen.counts.get(instance) ?? 0;
+    seen.counts.set(instance, n + 1);
+    if (instance === seen.first) {
+      seen.owns.push(own);
+      return own;
+    }
+    return seen.owns[n] ?? own;
   }
 
-  const methodName = segments[1];
-  const methodId = `${suiteId}/${methodName}`;
-  const methodItem = controller.findItem(methodId);
-  if (!methodItem) {
-    return undefined;
+  // topLevel is a suite's item, or a generated fuzz wrapper's. Instance 2 is
+  // an external twin's run; a lone external suite runs once, as instance 1.
+  private topLevel(
+    name: string,
+    instance: number,
+  ): vscode.TestItem | undefined {
+    // Fuzz wrappers are Fuzz<Suite>_<Method> with <Method> starting with
+    // Fuzz. Suite names may hold underscores, so each "_Fuzz" boundary is
+    // tried against the tree; none matching falls through to a suite named
+    // Fuzz*.
+    if (name.startsWith("Fuzz")) {
+      const body = name.slice(4);
+      for (
+        let idx = body.indexOf("_Fuzz");
+        idx >= 0;
+        idx = body.indexOf("_Fuzz", idx + 1)
+      ) {
+        const fuzzItem = this.controller.findItem(
+          `${this.importPath}/${body.slice(0, idx)}/${body.slice(idx + 1)}`,
+        );
+        if (fuzzItem) return fuzzItem;
+      }
+    }
+    const suite = name.startsWith("Test") ? name.slice(4) : name;
+    const plain = `${this.importPath}/${suite}`;
+    if (instance % 2 === 0) {
+      // Under -count go alternates a twin's runs: internal, external, ...
+      // Without a twin every run is the plain suite's.
+      const twin = this.controller.findItem(`${plain}${EXTERNAL_ID}`);
+      if (twin) return twin;
+    }
+    return this.controller.findItem(plain);
   }
-
-  if (segments.length === 2) {
-    return methodItem;
-  }
-
-  let parentItem = methodItem;
-  for (let i = 2; i < segments.length; i++) {
-    const segment = segments[i];
-    // One segment per level: the id is the go test path, which is also what a
-    // statically declared behavior uses. createDynamicSubtest returns the
-    // declared item when there is one and only fabricates when there is not.
-    parentItem = controller.createDynamicSubtest(parentItem, segment, segment);
-  }
-
-  return parentItem;
 }
 
 // erroredItem marks an item whose run could not produce a verdict, in the
@@ -306,6 +343,8 @@ export interface ApplyOptions {
   // directory, not the package's.
   builds?: BuildOutputs;
   buildDir?: string;
+  // The package's router for this run: it remembers where each test sat.
+  router: TestItemRouter;
 }
 
 export function applyEvent(
@@ -315,10 +354,15 @@ export function applyEvent(
   outputMap: Map<string, string>,
   importPath: string,
   pkgDir: string,
-  options: ApplyOptions = {},
+  options: ApplyOptions,
 ): AppliedResult | undefined {
+  // A twin's second run reuses the top-level name: its output is its own.
+  const outputKey =
+    event.Test && (event.Gotest?.Instance ?? 1) > 1
+      ? `${event.Gotest?.Instance}\u0000${event.Test}`
+      : (event.Test ?? "");
   if (event.Action === "output") {
-    const key = event.Test ?? "";
+    const key = outputKey;
     const output = event.Output ?? "";
     if (!(key === "" && isPackageSummaryLine(output))) {
       const existing = outputMap.get(key) ?? "";
@@ -331,9 +375,7 @@ export function applyEvent(
       return undefined;
     }
     const line = event.Output.replace(/\n$/, "\r\n");
-    const testItem = event.Test
-      ? resolveTestItem(controller, event.Test, importPath)
-      : undefined;
+    const testItem = event.Test ? options.router.route(event) : undefined;
     run.appendOutput(line, undefined, testItem);
     return undefined;
   }
@@ -378,7 +420,7 @@ export function applyEvent(
     return undefined;
   }
 
-  const item = resolveTestItem(controller, event.Test, importPath);
+  const item = options.router.route(event);
   if (!item) {
     return undefined;
   }
@@ -396,7 +438,7 @@ export function applyEvent(
       controller.recordResult(item.id, "pass", duration, at);
       return { itemId: item.id, status: "pass", duration };
     case "fail": {
-      const output = outputMap.get(event.Test) ?? "";
+      const output = outputMap.get(outputKey) ?? "";
       const testMessages = extractTestMessages(output, pkgDir);
       const vscodeMessages = testMessages.map((msg) => {
         const parsed = parseExpectedActual(msg.message);
@@ -457,9 +499,10 @@ export function applyResults(
   events: TestEvent[],
   importPath: string,
   pkgDir: string,
-  options: ApplyOptions = {},
+  options: Partial<ApplyOptions> = {},
 ): AppliedResult[] {
   const outputMap = new Map<string, string>();
+  const router = options.router ?? new TestItemRouter(controller, importPath);
   const applied: AppliedResult[] = [];
   for (const event of events) {
     const result = applyEvent(
@@ -469,7 +512,7 @@ export function applyResults(
       outputMap,
       importPath,
       pkgDir,
-      options,
+      { ...options, router },
     );
     if (result) applied.push(result);
   }
@@ -483,6 +526,7 @@ export function applyResults(
 export class StreamApplier {
   private readonly outputMaps = new Map<string, Map<string, string>>();
   private readonly builds = new BuildOutputs();
+  private readonly routers = new Map<string, TestItemRouter>();
   // Packages the events named that have no directory here.
   readonly unknownPackages = new Set<string>();
 
@@ -492,6 +536,9 @@ export class StreamApplier {
     private readonly packageDir: (importPath: string) => string | undefined,
     // Where the compiler's relative file names resolve: the CLI's cwd.
     private readonly buildDir: string,
+    // Says once per run what could not be routed.
+    private readonly log: OnceLog = new OnceLog(),
+    private readonly unstamped = UNSTAMPED_LIVE,
   ) {}
 
   apply(events: TestEvent[]): AppliedResult[] {
@@ -509,6 +556,16 @@ export class StreamApplier {
         outputMap = new Map();
         this.outputMaps.set(event.Package, outputMap);
       }
+      let router = this.routers.get(event.Package);
+      if (!router) {
+        router = new TestItemRouter(
+          this.controller,
+          event.Package,
+          this.log,
+          this.unstamped,
+        );
+        this.routers.set(event.Package, router);
+      }
       const result = applyEvent(
         this.controller,
         this.run,
@@ -516,7 +573,7 @@ export class StreamApplier {
         outputMap,
         event.Package,
         dir,
-        { builds: this.builds, buildDir: this.buildDir },
+        { builds: this.builds, buildDir: this.buildDir, router },
       );
       if (result) applied.push(result);
     }
@@ -657,7 +714,9 @@ export function itemTestPath(item: vscode.TestItem): string | undefined {
     return `Fuzz${method.parent.label}_${method.label}${rest}`;
   }
   const pkg = getPackageItem(item);
-  return `Test${item.id.slice(pkg.id.length + 1)}`;
+  // The twin marker is an id detail; go test knows both twins by one name.
+  const rest = item.id.slice(pkg.id.length + 1);
+  return `Test${withoutExternalId(rest)}`;
 }
 
 export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
@@ -693,7 +752,7 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
       if (isFuzzMethodLabel(item.label)) {
         group.fuzzers.push(item.label);
       } else {
-        group.methods.push(item.label);
+        group.methods.push(methodSegmentOf(item));
       }
     } else if (depth >= 3) {
       let current = item;
@@ -703,13 +762,14 @@ export function buildRunFilter(items: vscode.TestItem[]): string | undefined {
         // the developer wrote ("classifying a number") while go test knows it
         // by its rewritten name ("classifying_a_number"). Filtering on the
         // label would never match.
-        subtestParts.unshift(subtestSegmentOf(current));
+        subtestParts.unshift(methodSegmentOf(current));
         current = current.parent!;
       }
-      const methodName = current.label;
+      const methodName = methodSegmentOf(current);
+      const methodLabel = current.label;
       const suiteName = current.parent!.label;
       const group = groupFor(suiteName);
-      if (isFuzzMethodLabel(methodName)) {
+      if (isFuzzMethodLabel(methodLabel)) {
         // Seed subtests of a fuzz target live under its top-level wrapper.
         group.subtests.push(
           `^Fuzz${suiteName}_${methodName}$/^${subtestParts
@@ -1082,9 +1142,9 @@ function resolveItemRecursive(
   return { anyFailed, anyResolved };
 }
 
-// subtestSegmentOf returns the single go test path segment an item adds to its
+// methodSegmentOf returns the single go test path segment an item adds to its
 // parent. Ids are the test path, so the segment is what follows the parent's id.
-function subtestSegmentOf(item: vscode.TestItem): string {
+export function methodSegmentOf(item: vscode.TestItem): string {
   const parentId = item.parent?.id;
   if (parentId && item.id.startsWith(parentId + "/")) {
     return item.id.slice(parentId.length + 1);

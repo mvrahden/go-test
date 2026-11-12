@@ -60,30 +60,33 @@ The terminal format is designed for quick visual scanning during development. It
 
 ### Markdown
 
-Headings and behavior tables. This is for documentation:
+An outline of headings and list items. This is for documentation:
 
 ```sh
 gotest spec ./... --format=md --output=docs/behavior-spec.md
 ```
 
-The markdown output is a self-contained document with a summary header and per-suite behavior tables:
+The markdown output is a self-contained document: a header with the counts and where they come from, the rows that need attention, then a heading per module, package and suite over the behaviors:
 
 ```md {title="docs/behavior-spec.md"}
 # Behavior Specification
 
-4 suites, 28 behaviors: 28 passed, 0 failed, 0 skipped.
+4 suites, 28 behaviors: 28 passed.
 
-## Cart
+Runs from 2026-11-09 18:02 to 18:03 UTC · main @ c94f5cd5
 
-### AddItem
+## example.com/shop
 
-| Behavior | Status | Duration |
-|----------|--------|----------|
-| **the cart is empty** | | |
-| &nbsp;&nbsp;adds the item | PASS | <1ms |
-| &nbsp;&nbsp;sets quantity to 1 | PASS | <1ms |
-| **the item already exists** | | |
-| &nbsp;&nbsp;increments the quantity | PASS | <1ms |
+### cart — 28 passed
+
+#### Cart — 3 passed
+
+- **AddItem**
+  - when the cart is empty
+    - PASS adds the item
+    - PASS sets quantity to 1
+  - when the item already exists
+    - PASS increments the quantity
 ```
 
 This is a file you can commit to your repository, link from your README, or publish to a documentation site. It stays accurate because it is generated from tests that the CI pipeline enforces.

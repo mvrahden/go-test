@@ -190,7 +190,7 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 		c.flushReadyText()
 	case RunStreamJSON, RunCaptureJSON:
 		w := c.jsonWriter()
-		filterPackageLevelEvents(w, r.Stdout)
+		filterPackageLevelEvents(w, stampBlock(r.Stdout))
 		c.verdicts.endSuite(r.CutShort)
 		if len(r.Stderr) > 0 {
 			_, _ = c.stderr.Write(r.Stderr)
@@ -351,11 +351,12 @@ func (c *OutputCollector) RecordGivenUp(pkg string, idx int, suite, reason strin
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.mode != RunBatchText {
-		w := c.jsonWriter()
+		var w bytes.Buffer
 		now := time.Now()
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    " + reason + "\n"})
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "fail", "Package": pkg, "Test": suite, "Elapsed": 0})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    " + reason + "\n"})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "fail", "Package": pkg, "Test": suite, "Elapsed": 0})
+		_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
 	}
 	c.recordResultLocked(pkg, idx, SuiteResult{Stderr: []byte(reason + "\n"), ExitCode: 1})
 }
@@ -370,12 +371,13 @@ func (c *OutputCollector) RecordStopped(pkg string, idx int, suite string) {
 	if c.mode == RunBatchText {
 		r.Stdout = []byte(skip + "    run stopping\n")
 	} else {
-		w := c.jsonWriter()
+		var w bytes.Buffer
 		now := time.Now()
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": skip})
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    run stopping\n"})
-		writeJSONLine(w, map[string]any{"Time": now, "Action": "skip", "Package": pkg, "Test": suite, "Elapsed": 0})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "run", "Package": pkg, "Test": suite})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": skip})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "output", "Package": pkg, "Test": suite, "Output": "    run stopping\n"})
+		writeJSONLine(&w, map[string]any{"Time": now, "Action": "skip", "Package": pkg, "Test": suite, "Elapsed": 0})
+		_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
 	}
 	c.recordResultLocked(pkg, idx, r)
 }
@@ -430,28 +432,29 @@ func (c *OutputCollector) EmitSkippedSuites(skippedByPkg map[string][]string) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	w := c.jsonWriter()
+	var w bytes.Buffer
 	now := time.Now()
 	for _, pkg := range slices.Sorted(maps.Keys(skippedByPkg)) {
 		names := skippedByPkg[pkg]
 		for _, name := range names {
 			testFunc := "Test" + name
-			writeJSONLine(w, map[string]any{
+			writeJSONLine(&w, map[string]any{
 				"Time": now, "Action": "run", "Package": pkg, "Test": testFunc,
 			})
-			writeJSONLine(w, map[string]any{
+			writeJSONLine(&w, map[string]any{
 				"Time": now, "Action": "output", "Package": pkg, "Test": testFunc,
 				"Output": fmt.Sprintf("--- SKIP: %s (0.00s)\n", testFunc),
 			})
-			writeJSONLine(w, map[string]any{
+			writeJSONLine(&w, map[string]any{
 				"Time": now, "Action": "output", "Package": pkg, "Test": testFunc,
 				"Output": "    test suite was excluded by user\n",
 			})
-			writeJSONLine(w, map[string]any{
+			writeJSONLine(&w, map[string]any{
 				"Time": now, "Action": "skip", "Package": pkg, "Test": testFunc, "Elapsed": 0,
 			})
 		}
 	}
+	_, _ = c.jsonWriter().Write(stampBlock(w.Bytes()))
 }
 
 func (c *OutputCollector) anyFailedLocked() bool {

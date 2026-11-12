@@ -55,6 +55,16 @@ function tree(behaviors: DiscoverBehavior[]): DiscoverPackage[] {
 }
 
 describe("treeSignature", () => {
+  it("changes when a method's go test name or a suite's twin side changes", () => {
+    const plain = tree([]);
+    const named = tree([]);
+    named[0].suites[0].methods[0].testName = "TestIt#01";
+    const external = tree([]);
+    external[0].suites[0].external = true;
+    const sigs = [plain, named, external].map(treeSignature);
+    expect(new Set(sigs).size).toBe(3);
+  });
+
   it("is stable for an unchanged tree", () => {
     expect(treeSignature(tree([behavior("when_a")]))).toBe(
       treeSignature(tree([behavior("when_a")])),

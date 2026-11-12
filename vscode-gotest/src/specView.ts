@@ -8,13 +8,17 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
+import { EXTERNAL_ID, methodItemId } from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
 const RUNS_FILE = "specRuns.json";
-const RUNS_VERSION = 1;
+// 2: lines are kept per suite instance and in the order they were merged.
+const RUNS_VERSION = 2;
 
 // What the panel's node buttons do, given Test Explorer item ids.
+const GITHUB_COMMENT_LIMIT = 65536;
+
 export interface SpecViewActions {
   run(ids: string[]): Promise<void>;
   debug(id: string): Promise<void>;
@@ -225,12 +229,32 @@ export class SpecViewPanel implements vscode.Disposable {
     );
   }
 
+  // The item ids above each row a button acted on, as the rows list them: a
+  // behavior's name may hold slashes, so its ancestors are never found by
+  // cutting its id.
+  private readonly ancestry = new Map<string, string[]>();
+
+  private noteAncestors(raw: unknown): void {
+    if (!raw || typeof raw !== "object") return;
+    for (const [id, list] of Object.entries(raw)) {
+      if (Array.isArray(list) && list.every((a) => typeof a === "string"))
+        this.ancestry.set(id, list);
+    }
+  }
+
+  // ancestorsOf lists the item ids above a row the panel last acted on.
+  ancestorsOf(id: string): string[] | undefined {
+    return this.ancestry.get(id);
+  }
+
   // The webview posts plain objects; each branch checks what it reads.
   private handleMessage(msg: any): void {
     if (msg.type === "run" && this.actions) {
       const ids: string[] = Array.isArray(msg.ids) ? msg.ids : [msg.id];
+      this.noteAncestors(msg.ancestors);
       void this.actions.run(ids.filter((id) => typeof id === "string"));
     } else if (msg.type === "debug" && this.actions) {
+      this.noteAncestors(msg.ancestors);
       if (typeof msg.id === "string") void this.actions.debug(msg.id);
     } else if (msg.type === "selectSource") {
       this.select(typeof msg.id === "string" ? msg.id : undefined);
@@ -240,7 +264,15 @@ export class SpecViewPanel implements vscode.Disposable {
       this.stale = true;
       void this.render();
     } else if (msg.type === "copySpec") {
-      void this.copy();
+      void this.copy(typeof msg.search === "string" ? msg.search : "");
+    } else if (msg.type === "copyNode") {
+      const ok =
+        typeof msg.pkg === "string" &&
+        Array.isArray(msg.position) &&
+        msg.position.every(
+          (i: unknown) => Number.isInteger(i) && (i as number) >= 0,
+        );
+      if (ok) void this.copy("", { pkg: msg.pkg, position: msg.position });
     } else if (msg.type === "toggleHide") {
       if (typeof msg.status !== "string") return;
       if (!this.hidden.delete(msg.status)) this.hidden.add(msg.status);
@@ -389,28 +421,64 @@ export class SpecViewPanel implements vscode.Disposable {
   }
 
   // copy puts on the clipboard what the panel shows, as the CLI writes it in
-  // Markdown: the same streams, rendered with the same flags.
-  private async copy(): Promise<void> {
+  // Markdown: the same streams, rendered with the same flags. A search keeps
+  // the rows the panel's search keeps; a node is rendered alone, by the CLI of
+  // the folder its package belongs to.
+  private async copy(
+    search = "",
+    node?: { pkg: string; position: number[] },
+  ): Promise<void> {
     const runs = this.currentRuns();
     const parts: string[] = [];
     try {
-      for (const folder of runs.folders()) {
-        parts.push(await this.runSpec(runs.compose(folder), folder, "md"));
+      if (node) {
+        const folder = runs.folderOf(node.pkg);
+        if (folder === undefined) return;
+        const only = [node.pkg, node.position.join(".")]
+          .filter((_, i) => i === 0 || node.position.length > 0)
+          .join(":");
+        parts.push(
+          await this.runSpec(runs.compose(folder), folder, "md", [
+            `--only=${only}`,
+          ]),
+        );
+      } else {
+        const match = search.trim();
+        const extra = match ? [`--match=${match}`] : [];
+        for (const folder of runs.folders()) {
+          parts.push(
+            await this.runSpec(runs.compose(folder), folder, "md", extra),
+          );
+        }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] copy: ${message}`);
       return;
     }
-    if (parts.length > 0)
-      await vscode.env.clipboard.writeText(parts.join("\n"));
+    if (parts.length === 0) return;
+    const text = parts.join("\n");
+    await vscode.env.clipboard.writeText(text);
+    const tokens = Math.round(text.length / 4);
+    void vscode.window.showInformationMessage(
+      `Copied ${text.length} characters (about ${tokens} tokens).`,
+    );
+    if (text.length > GITHUB_COMMENT_LIMIT) {
+      void vscode.window.showWarningMessage(
+        `The copy is above GitHub's 65,536-character comment limit.`,
+      );
+    }
   }
 
   // specArgs are the CLI's flags for a folder's render: the declared
   // specification under the workspace's runs, never under an imported
   // stream, and the statuses the toolbar hides. --hide is always given, so
   // every package carries the CLI's counts.
-  private async specArgs(folder: string, format: string): Promise<string[]> {
+  private async specArgs(
+    folder: string,
+    format: string,
+    extra: string[] = [],
+  ): Promise<string[]> {
     const args = [
       "spec",
       "--input=-",
@@ -423,6 +491,8 @@ export class SpecViewPanel implements vscode.Disposable {
     const patterns = this.selected
       ? undefined
       : await this.patternsFor?.(folder);
+    // --declared takes the rest of the line, so the flags come before it.
+    args.push(...extra);
     if (patterns && patterns.length > 0) args.push("--declared", ...patterns);
     return args;
   }
@@ -525,13 +595,14 @@ ${SCRIPT}
     jsonInput: string,
     folder: string | undefined,
     format: string,
+    extra: string[] = [],
   ): Promise<string> {
     const workspaceDir =
       folder ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     let cmd;
     try {
       cmd = await buildCliCommand(
-        await this.specArgs(workspaceDir ?? "", format),
+        await this.specArgs(workspaceDir ?? "", format, extra),
         workspaceDir,
         this.outputChannel,
       );
@@ -685,6 +756,11 @@ export interface SpecNode {
   focused: boolean;
   excluded: boolean;
   external: boolean;
+  // The run of its top-level name; 2 or more on an external twin's suite.
+  variant?: number;
+  // The own level go test reported, when it is not name: a twin's
+  // TestCreate#01.
+  reported?: string;
   incomplete?: boolean;
   // Where the source declares the node, relative to its package's dir.
   file?: string;
@@ -760,7 +836,11 @@ export function buildSpecBody(
     const pkg = groups[0].entries[0].pkg;
     tree =
       buildPackageFailureHtml(pkg, env) +
-      pkg.nodes.map((n) => buildNodeHtml(n, "", nodeCtx(env, pkg))).join("");
+      pkg.nodes
+        .map((n, i) =>
+          buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]),
+        )
+        .join("");
   } else if (groups.length === 1) {
     tree = groups[0].entries
       .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
@@ -911,7 +991,7 @@ function buildPackageSectionHtml(
   const failure = buildPackageFailureHtml(pkg, env);
   if (pkg.nodes.length === 0 && !failure) return "";
   const nodes = pkg.nodes
-    .map((n) => buildNodeHtml(n, "", nodeCtx(env, pkg)))
+    .map((n, i) => buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]))
     .join("");
   return `<details class="pkg-section" open>
   <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
@@ -971,7 +1051,11 @@ function buildModuleSectionHtml(group: ModuleGroup, env: RenderEnv): string {
   const inner =
     group.entries.length === 1
       ? buildPackageFailureHtml(only, env) +
-        only.nodes.map((n) => buildNodeHtml(n, "", nodeCtx(env, only))).join("")
+        only.nodes
+          .map((n, i) =>
+            buildNodeHtml(n, null, nodeCtx(env, only), [i], [only.path]),
+          )
+          .join("")
       : group.entries
           .map((e) => buildPackageSectionHtml(e.displayPath, e.pkg, env))
           .join("");
@@ -1004,26 +1088,43 @@ function nodeCtx(env: RenderEnv, pkg: SpecPackage): NodeCtx {
   };
 }
 
-// itemIdOf is the Test Explorer id of a node: the package, then the go test
-// path with the top-level test's Test prefix dropped, as discovery names
-// suites. A fuzz target sits under its suite in both trees.
+// itemIdOf is the Test Explorer id of a node under its parent's (null at the
+// top, undefined when the parent has none): a suite as discovery names it,
+// its Test prefix dropped and an external twin's run marked; below it the
+// level go test reported, as the router names a subtest's item. A fuzz
+// target sits under its suite in both trees.
 export function itemIdOf(
   pkgPath: string,
-  nodePath: string,
+  parentId: string | null | undefined,
+  node: Pick<SpecNode, "name" | "reported" | "external" | "variant">,
 ): string | undefined {
-  if (!nodePath.startsWith("Test") || nodePath.startsWith("Test_")) {
+  if (parentId === undefined) return undefined;
+  if (parentId !== null) {
+    return methodItemId(parentId, { name: node.name, testName: node.reported });
+  }
+  if (!node.name.startsWith("Test") || node.name.startsWith("Test_")) {
     return undefined;
   }
-  return `${pkgPath}/${nodePath.slice(4)}`;
+  const twin = node.external && (node.variant ?? 0) >= 2;
+  return `${pkgPath}/${node.name.slice(4)}${twin ? EXTERNAL_ID : ""}`;
 }
 
 // nearestItemId is id itself when the tree has it, else its closest
-// ancestor that it has: behaviors past the tree's per-method cap are not
+// ancestor that it has (the row's own list of them when it has one, else cut
+// at slashes, which a behavior's name may hold): behaviors past the tree's per-method cap are not
 // items, and running one runs its method.
 export function nearestItemId(
   id: string,
   has: (id: string) => boolean,
+  ancestors?: string[],
 ): string | undefined {
+  if (ancestors) {
+    if (has(id)) return id;
+    for (let i = ancestors.length - 1; i >= 0; i--) {
+      if (has(ancestors[i])) return ancestors[i];
+    }
+    return undefined;
+  }
   let current = id;
   for (;;) {
     if (has(current)) return current;
@@ -1038,22 +1139,34 @@ function actionsHtml(id: string | undefined): string {
   return `<span class="node-actions"><button class="act" data-act="run" title="Run">Run</button><button class="act" data-act="debug" title="Debug">Debug</button></span>`;
 }
 
-function idAttr(id: string | undefined): string {
-  return id ? ` data-id="${escapeAttr(id)}"` : "";
+function copyNodeHtml(): string {
+  return `<span class="node-actions"><button class="act" data-act="copyNode" title="Copy this node as Markdown">Copy</button></span>`;
 }
 
-// Nodes are rendered with their go test path, the parent's path and their
-// own name, which names their Test Explorer item.
+function idAttr(id: string | undefined, ancestors: string[] = []): string {
+  if (!id) return "";
+  const above =
+    ancestors.length > 0
+      ? ` data-ancestors="${escapeAttr(JSON.stringify(ancestors))}"`
+      : "";
+  return ` data-id="${escapeAttr(id)}"${above}`;
+}
+
+// Nodes are rendered under the item id their parent's path names (null at
+// the top), which with their own reported level names their Test Explorer
+// item. A fixture row has no item, though the rows beneath it may.
 function buildNodeHtml(
   node: SpecNode,
-  parentPath: string,
+  parentBase: string | null | undefined,
   ctx: NodeCtx,
+  position: number[],
+  ancestors: string[],
 ): string {
-  const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+  const base = itemIdOf(ctx.pkgPath, parentBase, node);
   if (node.children.length === 0) {
-    return buildLeafHtml(node, nodePath, ctx);
+    return buildLeafHtml(node, base, ctx, ancestors);
   }
-  return buildBranchHtml(node, nodePath, ctx);
+  return buildBranchHtml(node, base, ctx, position, ancestors);
 }
 
 // sourceOf is where the CLI says the source declares a node; a node only a
@@ -1078,10 +1191,14 @@ function buildIconHtml(node: SpecNode, ctx: NodeCtx): string {
   return `<span class="icon ${node.status}"${locAttrs}><span class="status-text">${icon}</span>${gotoSpan}</span>`;
 }
 
-function buildLeafHtml(node: SpecNode, nodePath: string, ctx: NodeCtx): string {
+function buildLeafHtml(
+  node: SpecNode,
+  base: string | undefined,
+  ctx: NodeCtx,
+  ancestors: string[],
+): string {
   const iconHtml = buildIconHtml(node, ctx);
-  const id =
-    node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
+  const id = node.kind === "fixture" ? undefined : base;
   let suffix = fuzzTagHtml(node);
   if (node.external) suffix += ` <span class="tag external">EXT.</span>`;
   if (node.focused) suffix += ` <span class="tag focused">FOCUSED</span>`;
@@ -1095,7 +1212,7 @@ function buildLeafHtml(node: SpecNode, nodePath: string, ctx: NodeCtx): string {
   const errorBlock =
     node.status === "fail" ? errorBlockHtml(node, ctx.outputDir) : "";
 
-  return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}"${idAttr(id)}>
+  return `<div class="leaf ${node.kind} ${node.status}" data-display="${escapeAttr(node.display)}"${idAttr(id, ancestors)}>
   ${iconHtml} ${escapeHtml(node.display)}${suffix}${dur}${actionsHtml(id)}
   ${errorBlock}
 </div>`;
@@ -1103,15 +1220,17 @@ function buildLeafHtml(node: SpecNode, nodePath: string, ctx: NodeCtx): string {
 
 function buildBranchHtml(
   node: SpecNode,
-  nodePath: string,
+  base: string | undefined,
   ctx: NodeCtx,
+  position: number[],
+  ancestors: string[],
 ): string {
   const openAttr = node.status === "fail" ? " open" : "";
   const iconHtml = buildIconHtml(node, ctx);
-  const id =
-    node.kind === "fixture" ? undefined : itemIdOf(ctx.pkgPath, nodePath);
+  const id = node.kind === "fixture" ? undefined : base;
+  const below = id ? [...ancestors, id] : ancestors;
   const children = node.children
-    .map((c) => buildNodeHtml(c, nodePath, ctx))
+    .map((c, i) => buildNodeHtml(c, base, ctx, [...position, i], below))
     .join("");
 
   let label = escapeHtml(node.display);
@@ -1136,7 +1255,7 @@ function buildBranchHtml(
     node.status === "fail" ? errorBlockHtml(node, ctx.outputDir) : "";
 
   return `<details class="branch ${node.status}" data-display="${escapeAttr(node.display)}"${openAttr}>
-  <summary class="node ${node.kind}"${idAttr(id)}>${iconHtml} ${label}${suffix}${actionsHtml(id)}</summary>
+  <summary class="node ${node.kind}"${idAttr(id, ancestors)} data-pkg="${escapeAttr(ctx.pkgPath)}" data-position="${position.join(".")}">${iconHtml} ${label}${suffix}${actionsHtml(id)}${copyNodeHtml()}</summary>
   ${errorBlock}${children}
 </details>`;
 }
@@ -1512,6 +1631,16 @@ const SCRIPT = `
 const vscode = acquireVsCodeApi();
 if (SPEC_STATE) vscode.setState(SPEC_STATE);
 
+// The item ids above each row, as the rows list them.
+function ancestorsOf(rows) {
+  const out = {};
+  for (const el of rows) {
+    if (!el.dataset.ancestors) continue;
+    try { out[el.dataset.id] = JSON.parse(el.dataset.ancestors); } catch (_) {}
+  }
+  return out;
+}
+
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (!t || !(t instanceof HTMLElement)) return;
@@ -1522,8 +1651,22 @@ document.addEventListener('click', (e) => {
   }
   const act = t.closest('.act');
   if (act) {
+    if (act.dataset.act === 'copyNode') {
+      const row = act.closest('[data-position]');
+      if (row) {
+        const raw = row.dataset.position;
+        vscode.postMessage({
+          type: 'copyNode',
+          pkg: row.dataset.pkg,
+          position: raw === '' ? [] : raw.split('.').map(Number),
+        });
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const owner = act.closest('[data-id]');
-    if (owner) vscode.postMessage({ type: act.dataset.act, id: owner.dataset.id });
+    if (owner) vscode.postMessage({ type: act.dataset.act, id: owner.dataset.id, ancestors: ancestorsOf([owner]) });
     e.preventDefault();
     e.stopPropagation();
     return;
@@ -1536,7 +1679,10 @@ document.addEventListener('click', (e) => {
       .map(el => el.matches('details') ? el.querySelector(':scope > summary') : el)
       .map(el => el && el.dataset.id)
       .filter(id => id);
-    if (ids.length > 0) vscode.postMessage({ type: 'run', ids: ids });
+    if (ids.length > 0) {
+      const owners = Array.from(document.querySelectorAll('[data-id]')).filter(el => ids.includes(el.dataset.id));
+      vscode.postMessage({ type: 'run', ids: ids, ancestors: ancestorsOf(owners) });
+    }
     return;
   }
   const iconEl = t.closest('.icon[data-loc-file], .src-link');
@@ -1551,7 +1697,8 @@ document.addEventListener('click', (e) => {
     }
   }
   if (t.id === 'copy-spec-btn') {
-    vscode.postMessage({ type: 'copySpec' });
+    const box = document.getElementById('search-input');
+    vscode.postMessage({ type: 'copySpec', search: box ? box.value.trim() : '' });
     return;
   }
   if (t.id === 'refresh-btn') {

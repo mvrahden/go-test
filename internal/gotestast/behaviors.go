@@ -3,13 +3,12 @@ package gotestast
 import (
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"strconv"
 	"strings"
 	"unicode"
-
-	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 // Behaviors are the `When`/`It` blocks a test method declares. They are the
@@ -36,21 +35,23 @@ const (
 )
 
 type Behavior struct {
-	// Name is the subtest segment go test will produce: the same sanitisation
-	// the testing package applies, plus the "#01" it appends to a name that
-	// repeats among its siblings. A description containing a slash is split
-	// into one Behavior per level, the levels a -run pattern matches it by.
-	// All of this has to match byte for byte, because it is how a
-	// statically-known behavior is reconciled with the one observed at run time.
+	// Name is the subtest level go test will produce: the same sanitisation
+	// the testing package applies, plus the "#01" it appends to a name whose
+	// full path repeats within the method. A slash in it stays in it. All of
+	// this has to match byte for byte, because it is how a statically-known
+	// behavior is reconciled with the one observed at run time.
 	Name     string
 	Display  string
 	Kind     BehaviorKind
 	Line     int
 	Children []*Behavior
-	// Implied marks a level no call declares: the text before a slash in the
-	// descriptions beneath it. go test reports no subtest for it.
-	Implied bool
+	// added is the length of the repeat suffix this reader appended to Name.
+	added int
 }
+
+// Written is Name without the repeat suffix this reader added for a repeated
+// full name. A suffix the label itself holds is part of what was written.
+func (b *Behavior) Written() string { return b.Name[:len(b.Name)-b.added] }
 
 // MethodSpec is the behavior tree of a single test method. Complete reports
 // whether the tree is exhaustive: when false, the method declares behaviors
@@ -73,8 +74,10 @@ func (ts *TestSuiteSpec) BehaviorsOf(m *TestSuiteMethod) MethodSpec {
 		info:     ts.pkg.TypesInfo,
 		fset:     ts.pkg.Fset,
 		complete: true,
+		used:     map[string]int{},
 	}
 	behaviors := w.walkBlock(fd.Body)
+	w.name(nil, behaviors)
 	return MethodSpec{Behaviors: behaviors, Complete: w.complete, Notes: w.notes}
 }
 
@@ -83,6 +86,8 @@ type behaviorWalker struct {
 	fset     *token.FileSet
 	complete bool
 	notes    []string
+	// used counts each full name inside the method, as testing's subNames does.
+	used map[string]int
 }
 
 func (w *behaviorWalker) incomplete(pos token.Pos, format string, args ...any) {
@@ -118,94 +123,72 @@ func (w *behaviorWalker) walkBlock(block *ast.BlockStmt) []*Behavior {
 			w.flagHidden(stmt)
 		}
 	}
-	return resolveSiblings(out)
-}
-
-// resolveSiblings turns the behaviors written in one block into the subtests go
-// test will actually produce for them. Two rules of the testing package apply
-// here and neither is visible in the source: a name that repeats among its
-// siblings gains a "#01" suffix, and a name containing a slash becomes one
-// subtest level per segment. Skipping either would put a behavior in the tree
-// under a name no run will ever report.
-func resolveSiblings(in []*Behavior) []*Behavior {
-	if len(in) == 0 {
-		return nil
-	}
-	seen := make(map[string]int, len(in))
-	var out []*Behavior
-	for _, b := range in {
-		// The testing package uniquifies against the name as written, before
-		// any slash in it is read as a separator, so uniquing comes first.
-		name := b.Name
-		if n := seen[name]; n > 0 {
-			b.Name = fmt.Sprintf("%s#%02d", name, n)
-		}
-		seen[name]++
-		out = insertPath(out, splitSegments(b.Name), splitSegments(b.Display), b)
-	}
 	return out
 }
 
-// insertPath places a behavior at the end of its segment path, reusing a
-// grouping node a sibling already created. Two behaviors written as "a/b" and
-// "a/c" are one node with two children at run time, not two nodes that happen
-// to share a prefix. A behavior a call declares is never such a node: "a/b"
-// written after an It "a" is its sibling, as go test reports it.
-func insertPath(out []*Behavior, segments, displays []string, leaf *Behavior) []*Behavior {
-	if len(segments) <= 1 {
-		return append(out, leaf)
-	}
-	head := segments[0]
-	var node *Behavior
-	for _, existing := range out {
-		if existing.Name == head && existing.Implied {
-			node = existing
-			break
+// name gives each behavior the name go test reports, in the order the calls
+// run: a call is named before its children, its children before the next
+// sibling. Pre-order over the tree is that order, table rows included.
+func (w *behaviorWalker) name(parent []string, behaviors []*Behavior) {
+	for _, b := range behaviors {
+		written := b.Name
+		b.Name = w.unique(parent, written)
+		// An empty label has only its number to show, as a run shows it.
+		if written != "" {
+			b.added = len(b.Name) - len(written)
 		}
+		w.name(append(parent[:len(parent):len(parent)], b.Name), b.Children)
 	}
-	if node == nil {
-		node = &Behavior{
-			Name:    head,
-			Display: displayAt(displays, 0, head),
-			Kind:    BehaviorWhen,
-			Line:    leaf.Line,
-			Implied: true,
+}
+
+// unique ports testing's matcher.unique: it counts each full name, so a
+// repeat gains "#01", an empty name "#00", and a written "#NN" that an
+// earlier repeat already took is numbered again. The own level is returned.
+func (w *behaviorWalker) unique(parent []string, sub string) string {
+	// The method itself is the root, so every key starts with "/".
+	prefix := "/"
+	for _, level := range parent {
+		prefix += level + "/"
+	}
+	base := prefix + sub
+	for {
+		n := w.used[base]
+		w.used[base] = n + 1
+		if n == 0 && sub != "" {
+			stem, nn := parseSubtestNumber(base)
+			if len(stem) < len(base) && nn < w.used[stem] {
+				continue
+			}
+			return sub
 		}
-		out = append(out, node)
+		name := fmt.Sprintf("%s#%02d", base, n)
+		if w.used[name] != 0 {
+			continue
+		}
+		return name[len(prefix):]
 	}
-	rest := segments[1:]
-	if len(rest) == 1 {
-		leaf.Name = rest[0]
-		leaf.Display = displayAt(displays, 1, rest[0])
-	}
-	node.Children = insertPath(node.Children, rest, tailFrom(displays, 1), leaf)
-	return out
 }
 
-// splitSegments cuts a name at the separator go test uses between subtest
-// levels, by the same rule the stream parser applies. Sanitisation never adds
-// or removes a slash, so the description and the subtest name split into the
-// same number of pieces.
-func splitSegments(s string) []string {
-	segments := protocol.SplitTestPath(s)
-	if len(segments) == 0 {
-		return []string{s}
+// parseSubtestNumber ports testing's: it splits a "#NN" suffix that "%02d"
+// could have produced from the name before it. "#00" counts only after an
+// empty name.
+func parseSubtestNumber(s string) (prefix string, nn int) {
+	i := strings.LastIndex(s, "#")
+	if i < 0 {
+		return s, 0
 	}
-	return segments
-}
-
-func displayAt(displays []string, i int, fallback string) string {
-	if i < len(displays) {
-		return displays[i]
+	prefix, suffix := s[:i], s[i+1:]
+	if len(suffix) < 2 || (len(suffix) > 2 && suffix[0] == '0') {
+		return s, 0
 	}
-	return fallback
-}
-
-func tailFrom(displays []string, i int) []string {
-	if i < len(displays) {
-		return displays[i:]
+	if suffix == "00" && !strings.HasSuffix(prefix, "/") {
+		return s, 0
 	}
-	return nil
+	n, err := strconv.ParseInt(suffix, 10, 32)
+	if err != nil || n < 0 {
+		return s, 0
+	}
+	return prefix, int(n)
 }
 
 // flagHidden marks the tree incomplete if a construct we do not model
@@ -316,7 +299,11 @@ func (w *behaviorWalker) eachRows(s *ast.RangeStmt) []*Behavior {
 
 	rows := make([]*Behavior, 0, len(composite.Elts))
 	for i, elt := range composite.Elts {
-		name := w.eachEntryName(elt, i)
+		name, known := w.eachEntryName(elt, i)
+		if !known {
+			w.incomplete(elt.Pos(), "Each row name is not a constant")
+			continue
+		}
 		rows = append(rows, &Behavior{
 			Name:     SubtestName(name),
 			Display:  name,
@@ -328,49 +315,93 @@ func (w *behaviorWalker) eachRows(s *ast.RangeStmt) []*Behavior {
 	return rows
 }
 
-// eachEntryName mirrors the runtime's eachEntryName: the Desc field wins, then
-// Name, then the index. Both the keyed and the positional literal forms are
-// resolved, because a table written as `{"too short", ...}` names its rows just
-// as surely as one written as `{Desc: "too short"}`.
-func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) string {
-	composite, ok := elt.(*ast.CompositeLit)
-	if !ok {
-		return fmt.Sprintf("#%d", index)
+// eachEntryName mirrors the runtime's eachEntryName: a Desc field of a string
+// kind and not empty wins, then Name, then the index. Keyed and positional
+// literals both resolve, and a value is known when it is a string literal or
+// any constant the type checker evaluated. known is false when a field the
+// runtime would read holds a value only a run has, and the row can not be
+// named.
+func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) (name string, known bool) {
+	byIndex := fmt.Sprintf("#%d", index)
+	composite, isLit := elt.(*ast.CompositeLit)
+	st := w.structOf(elt)
+	if st == nil {
+		if w.info != nil && w.info.TypeOf(elt) != nil {
+			return byIndex, true // rows that are not structs are named by index
+		}
+		if !isLit {
+			return "", false
+		}
+	}
+	if !isLit {
+		return "", false // a struct value the source does not spell out
 	}
 
 	for _, field := range []string{"Desc", "Name"} {
-		for _, e := range composite.Elts {
-			kv, ok := e.(*ast.KeyValueExpr)
-			if !ok {
+		// A field promoted from an embedded struct names the row too; its
+		// value is not spelled at this level, so the row's name is unknown.
+		if st != nil {
+			obj, index, _ := types.LookupFieldOrMethod(w.info.TypeOf(elt), true, nil, field)
+			if v, ok := obj.(*types.Var); ok && len(index) > 1 {
+				if basic, ok := v.Type().Underlying().(*types.Basic); ok && basic.Info()&types.IsString != 0 {
+					return "", false
+				}
 				continue
 			}
-			key, ok := kv.Key.(*ast.Ident)
-			if !ok || key.Name != field {
-				continue
-			}
-			if value, ok := stringLiteral(kv.Value); ok && value != "" {
-				return value
-			}
+		}
+		expr, ok := eachField(composite, st, field)
+		if !ok {
+			continue
+		}
+		if st != nil && !isStringField(st, field) {
+			continue
+		}
+		value, ok := w.stringConstant(expr)
+		if !ok {
+			return "", false
+		}
+		if value != "" {
+			return value, true
 		}
 	}
+	return byIndex, true
+}
 
-	if st := w.structOf(composite); st != nil {
-		for _, field := range []string{"Desc", "Name"} {
-			for i := 0; i < st.NumFields() && i < len(composite.Elts); i++ {
-				if st.Field(i).Name() != field {
-					continue
-				}
-				if _, keyed := composite.Elts[i].(*ast.KeyValueExpr); keyed {
-					continue
-				}
-				if value, ok := stringLiteral(composite.Elts[i]); ok && value != "" {
-					return value
-				}
+// eachField is the expression a literal sets a field to, keyed or positional.
+func eachField(composite *ast.CompositeLit, st *types.Struct, field string) (ast.Expr, bool) {
+	for i, e := range composite.Elts {
+		if kv, keyed := e.(*ast.KeyValueExpr); keyed {
+			if key, ok := kv.Key.(*ast.Ident); ok && key.Name == field {
+				return kv.Value, true
 			}
+			continue
+		}
+		if st != nil && i < st.NumFields() && st.Field(i).Name() == field {
+			return e, true
 		}
 	}
+	return nil, false
+}
 
-	return fmt.Sprintf("#%d", index)
+func isStringField(st *types.Struct, field string) bool {
+	for i := 0; i < st.NumFields(); i++ {
+		if st.Field(i).Name() == field {
+			basic, ok := st.Field(i).Type().Underlying().(*types.Basic)
+			return ok && basic.Info()&types.IsString != 0
+		}
+	}
+	return false
+}
+
+// stringConstant is the value of a string literal or of any string constant
+// the type checker evaluated.
+func (w *behaviorWalker) stringConstant(expr ast.Expr) (string, bool) {
+	if w.info != nil {
+		if tv, ok := w.info.Types[expr]; ok && tv.Value != nil && tv.Value.Kind() == constant.String {
+			return constant.StringVal(tv.Value), true
+		}
+	}
+	return stringLiteral(expr)
 }
 
 func (w *behaviorWalker) structOf(expr ast.Expr) *types.Struct {

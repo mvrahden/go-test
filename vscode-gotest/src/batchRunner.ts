@@ -9,6 +9,8 @@ import { buildCliCommand, clearBinaryCache, formatCliCommand } from "./cli.js";
 import { readModulePath } from "./gomod.js";
 import {
   applyEvent,
+  OnceLog,
+  TestItemRouter,
   getPackageItem,
   skipUnresolved,
   spawnTestProcess,
@@ -145,6 +147,9 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
     const pkgOutputMaps = new Map<string, Map<string, string>>();
     const pkgDirMap = new Map(pkgInfos.map((p) => [p.importPath, p.dir]));
     const builds = new BuildOutputs();
+    // One router per package, sharing one log for the run.
+    const routers = new Map<string, TestItemRouter>();
+    const unrouted = new OnceLog((m) => outputChannel.warn(m));
 
     const handleStdoutLine = (line: string) => {
       let event: TestEvent;
@@ -178,6 +183,11 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         outputMap = new Map();
         pkgOutputMaps.set(event.Package, outputMap);
       }
+      let router = routers.get(event.Package);
+      if (!router) {
+        router = new TestItemRouter(controller, event.Package, unrouted);
+        routers.set(event.Package, router);
+      }
 
       const result = applyEvent(
         controller,
@@ -186,7 +196,7 @@ export async function executeBatch(config: BatchConfig): Promise<BatchResult> {
         outputMap,
         event.Package,
         dir,
-        { builds, buildDir: workspaceDir },
+        { builds, buildDir: workspaceDir, router },
       );
       if (result) onResults?.([result]);
 

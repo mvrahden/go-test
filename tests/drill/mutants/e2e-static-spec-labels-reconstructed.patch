@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/spec .* / the spec read from source renders each beh
 Clause: when a When and its Its hold underscores in their labels → the spec read from source renders each behavior under that label
 --- a/cmd/gotest/staticspec.go
 +++ b/cmd/gotest/staticspec.go
-@@ -154,7 +154,7 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior, file string) []*gotest
+@@ -168,7 +168,7 @@ func staticBehaviorNodes(behaviors []*gotestast.Behavior, file string) []*gotest
  		node := &gotestspec.Node{
- 			Name:        gotestspec.StripDuplicateSuffix(b.Name),
+ 			Name:        b.Written(),
  			Vocab:       vocabOf(b.Kind),
 -			SourceLabel: b.Display,
 +			SourceLabel: "",

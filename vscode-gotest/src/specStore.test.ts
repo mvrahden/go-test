@@ -174,10 +174,11 @@ describe("SpecStore", () => {
       partial: new Map([[cart, coverOf(["TestCartTestSuite/TestRows"])]]),
     });
 
+    // The kept TestAdd was written before the rerun's lines.
     expect(pathsOf(store.compose("/ws"), cart)).toEqual([
+      "TestCartTestSuite/TestAdd",
       "TestCartTestSuite/TestRows/#00",
       "TestCartTestSuite/TestRows",
-      "TestCartTestSuite/TestAdd",
       "TestCartTestSuite",
     ]);
   });
@@ -250,38 +251,26 @@ describe("SpecStore", () => {
     expect(store.packages).toEqual([cart]);
   });
 
-  it("treats a suite that ran twice in a package as one unit", () => {
-    const twice = stream(
-      ...test(cart, "TestCartTestSuite/TestAdd", "pass"),
-      ...test(cart, "TestCartTestSuite", "pass"),
-      ...test(cart, "TestCartTestSuite/TestAdd#01", "fail"),
-      ...test(cart, "TestCartTestSuite", "fail"),
-      verdict(cart, "fail"),
-    );
-    const store = new SpecStore();
-    store.merge({ stream: twice, folder: "/ws" });
-    store.merge({
-      stream: twice.replace(/"fail"/g, '"pass"'),
-      folder: "/ws",
-      partial: new Map([[cart, coverOf(["TestCartTestSuite/TestAdd"])]]),
-    });
-
-    const composed = store.compose("/ws");
-    expect(composed).not.toContain('"fail"');
-    expect(pathsOf(composed, cart)).toEqual([
-      "TestCartTestSuite/TestAdd",
-      "TestCartTestSuite",
-      "TestCartTestSuite",
-      "TestCartTestSuite/TestAdd#01",
-    ]);
-  });
-
   it("restores what it serialized", () => {
     const store = new SpecStore();
     store.merge({ stream: fullCart, folder: "/ws" });
     const copy = new SpecStore();
     copy.restore(JSON.parse(JSON.stringify(store.serialize())));
     expect(copy.compose("/ws")).toBe(store.compose("/ws"));
+  });
+
+  it("restores nothing from records whose lines carry no order", () => {
+    const store = new SpecStore();
+    store.restore([
+      {
+        path: cart,
+        folder: "/ws",
+        pkgLines: [line(verdict(cart, "pass"))],
+        tests: [["TestCartTestSuite", [line(verdict(cart, "pass"))]]],
+        runLevel: false,
+      },
+    ]);
+    expect(store.size).toBe(0);
   });
 });
 
@@ -362,37 +351,155 @@ describe("SpecStore.prune", () => {
   });
 });
 
+// The lines gotest writes for a test, stamped: a run names its own level,
+// and every event of a later instance of a top-level name carries it.
+function begin(pkg: string, test: string, subtest: string, instance = 1): Ev {
+  const stamp: Ev = { Subtest: subtest };
+  if (instance >= 2) stamp.Instance = instance;
+  return { Action: "run", Package: pkg, Test: test, Gotest: stamp };
+}
+
+function end(
+  pkg: string,
+  test: string,
+  action: string,
+  instance = 1,
+  elapsed = 0.01,
+): Ev {
+  const ev: Ev = { Action: action, Package: pkg, Test: test, Elapsed: elapsed };
+  if (instance >= 2) ev.Gotest = { Instance: instance };
+  return ev;
+}
+
+const lines = (s: string) => s.split("\n").filter(Boolean);
+
 describe("compose", () => {
-  it("starts every test before any verdict, so a slash in a name stays one subtest", () => {
-    const store = new SpecStore();
+  it("compose replays lines in the order they were written", () => {
     const suite = "TestPathsTestSuite";
     const method = suite + "/TestRead";
-    const leaf = method + "/reads a/b paths";
+    const written = stream(
+      begin(cart, suite, suite),
+      begin(cart, method, "TestRead"),
+      begin(cart, method + "/.", "."),
+      end(cart, method + "/.", "pass"),
+      begin(cart, method + "/./pkg", "./pkg"),
+      end(cart, method + "/./pkg", "pass"),
+      end(cart, method, "pass"),
+      end(cart, suite, "pass"),
+      verdict(cart, "pass"),
+    );
+    const store = new SpecStore();
+    store.merge({ stream: written, folder: "/ws" });
+
+    expect(store.compose("/ws")).toBe(written);
+  });
+
+  it("restores the order it composed", () => {
+    const store = new SpecStore();
+    store.merge({ stream: fullCart, folder: "/ws" });
     store.merge({
       stream: stream(
-        { Action: "run", Package: cart, Test: suite },
-        { Action: "run", Package: cart, Test: method },
-        ...test(cart, leaf, "pass"),
-        { Action: "pass", Package: cart, Test: method, Elapsed: 0.01 },
-        { Action: "pass", Package: cart, Test: suite, Elapsed: 0.01 },
+        ...test(cart, "TestCartTestSuite/TestTotal", "pass"),
+        ...test(cart, "TestCartTestSuite", "pass"),
         verdict(cart, "pass"),
       ),
       folder: "/ws",
+      partial: new Map([[cart, coverOf(["TestCartTestSuite/TestTotal"])]]),
+    });
+    const copy = new SpecStore();
+    copy.restore(JSON.parse(JSON.stringify(store.serialize())));
+
+    // A run merged after a restore is written after what was restored.
+    const later = stream(
+      ...test(cart, "TestCartTestSuite/TestAdd", "fail"),
+      ...test(cart, "TestCartTestSuite", "fail"),
+      verdict(cart, "fail"),
+    );
+    const partial = new Map([[cart, coverOf(["TestCartTestSuite/TestAdd"])]]);
+    store.merge({ stream: later, folder: "/ws", partial });
+    copy.merge({ stream: later, folder: "/ws", partial });
+    expect(pathsOf(copy.compose("/ws"), cart)).toEqual([
+      "TestCartTestSuite/TestTotal",
+      "TestCartTestSuite/TestAdd",
+      "TestCartTestSuite",
+    ]);
+    expect(copy.compose("/ws")).toBe(store.compose("/ws"));
+  });
+});
+
+describe("a suite in both test packages", () => {
+  const S = "TestTwinsTestSuite";
+  // Both instances whole: the internal one with TestCreate and TestRead,
+  // the external one with its TestCreate (named #01) and TestList.
+  const whole = stream(
+    begin(cart, S, S),
+    begin(cart, `${S}/TestCreate`, "TestCreate"),
+    end(cart, `${S}/TestCreate`, "pass"),
+    begin(cart, `${S}/TestRead`, "TestRead"),
+    end(cart, `${S}/TestRead`, "pass"),
+    end(cart, S, "pass"),
+    begin(cart, S, S, 2),
+    begin(cart, `${S}/TestCreate#01`, "TestCreate#01", 2),
+    end(cart, `${S}/TestCreate#01`, "fail", 2),
+    begin(cart, `${S}/TestList`, "TestList", 2),
+    end(cart, `${S}/TestList`, "pass", 2),
+    end(cart, S, "fail", 2),
+    verdict(cart, "fail"),
+  );
+  // -run ^S$/^TestCreate#01$: the internal instance runs no method.
+  const rerun = stream(
+    begin(cart, S, S),
+    end(cart, S, "pass", 1, 0.02),
+    begin(cart, S, S, 2),
+    begin(cart, `${S}/TestCreate#01`, "TestCreate#01", 2),
+    end(cart, `${S}/TestCreate#01`, "pass", 2, 0.02),
+    end(cart, S, "pass", 2, 0.02),
+    verdict(cart, "pass"),
+  );
+
+  it("rerunning one twin method keeps every other method of both twins", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws" });
+    store.merge({
+      stream: rerun,
+      folder: "/ws",
+      partial: new Map([[cart, coverOf([`${S}/TestCreate#01`])]]),
     });
 
-    const actions = store
-      .compose("/ws")
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => (JSON.parse(l) as { Action: string }).Action);
-    expect(actions).toEqual([
-      "run",
-      "run",
-      "run",
-      "pass",
-      "pass",
-      "pass",
-      "pass",
+    const w = lines(whole);
+    const r = lines(rerun);
+    // The kept methods in the order they ran, then the rerun as written.
+    expect(lines(store.compose("/ws"))).toEqual([
+      ...w.slice(1, 3),
+      ...w.slice(3, 5),
+      ...w.slice(9, 11),
+      ...r,
+    ]);
+  });
+
+  it("keeps the other twin's suite lines when a rerun stopped before it", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws" });
+    // -run ^S$/^TestRead$, stopped after the internal instance.
+    const stopped = stream(
+      begin(cart, S, S),
+      begin(cart, `${S}/TestRead`, "TestRead"),
+      end(cart, `${S}/TestRead`, "pass", 1, 0.02),
+      end(cart, S, "pass", 1, 0.02),
+      verdict(cart, "fail"),
+    );
+    store.merge({
+      stream: stopped,
+      folder: "/ws",
+      partial: new Map([[cart, coverOf([`${S}/TestRead`])]]),
+    });
+
+    const w = lines(whole);
+    const st = lines(stopped);
+    expect(lines(store.compose("/ws"))).toEqual([
+      ...w.slice(1, 3),
+      ...w.slice(6, 12),
+      ...st,
     ]);
   });
 });

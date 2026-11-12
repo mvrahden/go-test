@@ -98,11 +98,13 @@ gotest spec ./pkg/user
 ```
 
 ```
-UserService (<1ms)
-  Create (<1ms)
-    ✓ creates a user with valid input (<1ms)
-    when email already exists (<1ms)
-      ✓ returns ErrDuplicate (<1ms)
+=== pkg/user — 2 passed ===
+
+UserService — 2 passed
+  Create
+    ✓ creates a user with valid input
+    when email already exists
+      ✓ returns ErrDuplicate
 
 1 suite, 2 behaviors: 2 passed
 ```
@@ -176,23 +178,25 @@ gotest spec ./pkg/user -v
 ```
 
 ```
-UserService (133ms)
-  Create (128ms)
-    when email is valid (128ms)
-      ✓ creates the user (8ms)
-      ✓ sends a welcome email (120ms)
-    when email already exists (<1ms)
-      ✓ returns ErrDuplicate (<1ms)
-  Delete (5ms)
-    ✓ soft-deletes the user (5ms)
-    ~ hard-deletes after 30 days — SKIPPED (<1ms)
+=== pkg/user — 4 passed, 1 skipped ===
+
+UserService — 4 passed, 1 skipped
+  Create
+    when email is valid
+      ✓ creates the user
+      ✓ sends a welcome email
+    when email already exists
+      ✓ returns ErrDuplicate
+  Delete
+    ✓ soft-deletes the user
+    – hard-deletes after 30 days — SKIPPED
 
 1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
 
-Every row shows the wall clock it occupied, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
+A row shows the wall clock it occupied once it reaches a second, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
 
-Generate a markdown specification document:
+Generate a markdown specification document ([A report a person reads](specs/spec/spec.md#requirement-a-report-a-person-reads)):
 
 ```bash
 gotest spec ./... --format=md --output=docs/behavior-spec.md

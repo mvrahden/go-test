@@ -44,6 +44,9 @@ const (
 // "https:// URI" stays one level instead of becoming three. Both readers of a
 // test path need this rule — the one parsing a run and the one predicting it
 // from source — and they have to agree, so it lives in one place.
+// A label can still hold a lone slash, so a reported name is placed by
+// Placer from the stream's order; this split is its fallback for a name
+// whose parent never appeared open.
 func SplitTestPath(path string) []string {
 	var segments []string
 	var cur strings.Builder

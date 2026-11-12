@@ -59,6 +59,12 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 				if suiteNode == nil {
 					continue
 				}
+				if pkg == lr.Pxtest {
+					suiteNode.External = true
+					if hasSuiteNamed(pkgNode.Nodes, suiteNode.Name) {
+						suiteNode.Variant = 2
+					}
+				}
 				pkgNode.Nodes = append(pkgNode.Nodes, suiteNode)
 				notes = append(notes, suiteNotes...)
 			}
@@ -76,6 +82,17 @@ func buildStaticSpec(loadResults []*gotestgen.LoadResult, broken []gotestgen.Bro
 
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Path < out[b].Path })
 	return out, notes
+}
+
+// hasSuiteNamed reports whether nodes holds an internal suite of that name:
+// the external suite of the same name is then the run's second.
+func hasSuiteNamed(nodes []*gotestspec.Node, name string) bool {
+	for _, n := range nodes {
+		if !n.External && n.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // carryExcluded carries an excluded suite's or method's flag down to every
@@ -146,13 +163,10 @@ func staticSuiteNode(suite *gotestast.TestSuiteSpec) (*gotestspec.Node, []string
 
 func staticBehaviorNodes(behaviors []*gotestast.Behavior, file string) []*gotestspec.Node {
 	var out []*gotestspec.Node
-	for _, b := range reportedBehaviors(behaviors) {
-		// The behavior carries the exact go test segment, "#01" and all,
-		// because that is what an observed result is keyed by. The tree shows
-		// duplicates under the name the developer wrote, so it drops the
-		// suffix here exactly as the stream parser does.
+	for _, b := range behaviors {
+		// The tree shows duplicates under the name the developer wrote.
 		node := &gotestspec.Node{
-			Name:        gotestspec.StripDuplicateSuffix(b.Name),
+			Name:        b.Written(),
 			Vocab:       vocabOf(b.Kind),
 			SourceLabel: b.Display,
 			File:        file,
@@ -205,11 +219,11 @@ func runStaticSpec(own OwnFlags, goTestArgs []string, projectConfig *config.Proj
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree, renderOpts...)
+		gotestspec.RenderMarkdown(w, tree, append(renderOpts, reportOptions(liveRun)...)...)
 	case "json":
-		gotestspec.RenderJSON(w, tree)
+		gotestspec.RenderJSON(w, tree, gotestspec.WithoutVerdicts())
 	default:
-		gotestspec.RenderTerminal(w, tree, renderOpts...)
+		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w, liveRun)...)...)
 	}
 
 	// Behaviors the walker could not enumerate are reported rather than

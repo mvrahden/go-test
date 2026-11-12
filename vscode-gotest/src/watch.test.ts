@@ -92,7 +92,16 @@ describe("WatchCycle", () => {
     );
 
     cycle.apply(
-      ev({ Action: "run", Test: "TestMySuite/TestFail" }) +
+      ev({
+        Action: "run",
+        Test: "TestMySuite",
+        Gotest: { Subtest: "TestMySuite" },
+      }) +
+        ev({
+          Action: "run",
+          Test: "TestMySuite/TestFail",
+          Gotest: { Subtest: "TestFail" },
+        }) +
         ev({
           Action: "output",
           Test: "TestMySuite/TestFail",
@@ -104,6 +113,27 @@ describe("WatchCycle", () => {
     );
 
     expect(failures.join("\n")).toContain("expected 1, got 2");
+  });
+
+  it("says in the log when the stream carries no placement", () => {
+    const { controller, run, cache } = fixture();
+    const log = vi.fn();
+    const cycle = new WatchCycle(
+      run as never,
+      controller as never,
+      cache as never,
+      "/ws",
+      log,
+    );
+
+    cycle.apply(
+      ev({ Action: "run", Test: "TestMySuite" }) +
+        ev({ Action: "run", Test: "TestMySuite/TestFail" }),
+    );
+
+    expect(log).toHaveBeenCalledWith(
+      "[runner] unstamped subtest events; CLI below the floor?",
+    );
   });
 
   it("ends its run and returns everything the cycle streamed", () => {

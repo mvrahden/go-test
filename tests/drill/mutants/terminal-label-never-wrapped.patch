@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec is written to a terminal / long labels wrap at its width \(
+Clause: when the terminal spec is written to a terminal → long labels wrap at its width
+--- a/internal/gotestspec/wrap.go
++++ b/internal/gotestspec/wrap.go
+@@ -17,7 +17,7 @@
+ // fits is kept as written, its runs of spaces included.
+ func wrapLabel(text string, indent, hang, width int) []string {
+ 	words := strings.Fields(text)
+-	if width <= 0 || len(words) == 0 || utf8.RuneCountInString(text) <= width-indent {
++	if width >= 0 || len(words) == 0 || utf8.RuneCountInString(text) <= width-indent {
+ 		return []string{text}
+ 	}
+ 	room := max(width-max(indent, hang), 1)

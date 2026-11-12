@@ -364,19 +364,25 @@ func catalogTestPath(data []byte, pkg, test string) bool {
 	if json.Unmarshal(data, &doc) != nil {
 		return false
 	}
-	var contains func([]node, []string) bool
-	contains = func(nodes []node, parts []string) bool {
+	// A node's name is a whole level, slashes included: the path is matched
+	// name by name, never split.
+	var contains func([]node, string) bool
+	contains = func(nodes []node, path string) bool {
 		for _, n := range nodes {
-			if !n.Excluded && n.Name == parts[0] {
-				if len(parts) == 1 || contains(n.Children, parts[1:]) {
-					return true
-				}
+			if n.Excluded {
+				continue
+			}
+			if path == n.Name {
+				return true
+			}
+			if rest, ok := strings.CutPrefix(path, n.Name+"/"); ok && contains(n.Children, rest) {
+				return true
 			}
 		}
 		return false
 	}
 	for _, p := range doc.Packages {
-		if strings.HasSuffix(p.Path, strings.TrimPrefix(pkg, ".")) && contains(p.Nodes, strings.Split("Test"+test, "/")) {
+		if strings.HasSuffix(p.Path, strings.TrimPrefix(pkg, ".")) && contains(p.Nodes, "Test"+test) {
 			return true
 		}
 	}

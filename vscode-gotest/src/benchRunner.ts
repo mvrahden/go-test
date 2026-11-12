@@ -10,6 +10,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { GoTestController } from "./testController.js";
 import type { DiscoveryCache } from "./discovery.js";
+import { withoutExternalId } from "./types.js";
 import {
   buildCliCommand,
   buildBenchArgs,
@@ -65,9 +66,10 @@ export function planBenchInvocations(targets: BenchTarget[]): BenchTarget[] {
  * benchTargetFromItemId decodes a benchmark TestItem id
  * ("<importPath>/<Suite>/<BenchmarkMethod>"). Import paths contain slashes,
  * suite and method names never do, so splitting from the right is exact.
+ * An external twin's marker is dropped: go test knows both by one name.
  */
 export function benchTargetFromItemId(id: string): BenchTarget | undefined {
-  const parts = id.split("/");
+  const parts = withoutExternalId(id).split("/");
   if (parts.length < 3) return undefined;
   const methodName = parts[parts.length - 1];
   const suiteName = parts[parts.length - 2];

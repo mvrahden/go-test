@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -51,6 +52,14 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		// rendering, not a test run.
 		fmt.Fprintf(os.Stderr, "FAIL: --render-only requires --input\n")
 		return 2
+	}
+
+	if own.Bool("--stamp") {
+		if input == "" {
+			fmt.Fprintf(os.Stderr, "FAIL: --stamp requires --input\n")
+			return 2
+		}
+		return stampInput(input, output)
 	}
 
 	view, err := parseSpecView(own, input)
@@ -172,6 +181,11 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
 
+	if err := gotestspec.CheckView(tree, view.options...); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
 	var w io.Writer = os.Stdout
 	if output != "" {
 		f, ferr := os.Create(output)
@@ -183,13 +197,14 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		w = f
 	}
 
-	renderSpec(w, tree, format, noColor, view.options)
+	renderSpec(w, tree, format, noColor, view.options, liveRun)
 
 	return enforceCoverage(coverProfile, minCoverage, code)
 }
 
-// renderSpec renders tree in format, under the view's options.
-func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor bool, view []gotestspec.RenderOption) {
+// renderSpec renders tree in format, under the view's options; live says
+// whether the run was made here.
+func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor bool, view []gotestspec.RenderOption, live bool) {
 	renderOpts := slices.Clone(view)
 	if noColor {
 		renderOpts = append(renderOpts, gotestspec.WithNoColor())
@@ -197,11 +212,11 @@ func renderSpec(w io.Writer, tree []*gotestspec.Package, format string, noColor 
 
 	switch format {
 	case "md", "markdown":
-		gotestspec.RenderMarkdown(w, tree, view...)
+		gotestspec.RenderMarkdown(w, tree, append(slices.Clone(view), reportOptions(live)...)...)
 	case "json":
 		gotestspec.RenderJSON(w, tree, view...)
 	default:
-		gotestspec.RenderTerminal(w, tree, renderOpts...)
+		gotestspec.RenderTerminal(w, tree, append(renderOpts, terminalOptions(w, live)...)...)
 	}
 }
 
@@ -239,6 +254,33 @@ func (s *declaredSource) overlay(events []gotestspec.TestEvent) ([]*gotestspec.P
 	return gotestspec.Overlay(declared, gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx))), nil
 }
 
+// stampInput writes a saved stream back with the stamps gotest -json adds,
+// placed by the stream's own order; a stamped event is kept as it is.
+func stampInput(input, output string) int {
+	var data []byte
+	var err error
+	if input == "-" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(input) //nolint:gosec // G304: the file the caller names
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: reading input: %s\n", err)
+		return 2
+	}
+	stamped := gotestrunner.StampStream(data)
+	if output == "" {
+		_, err = os.Stdout.Write(stamped)
+	} else {
+		err = os.WriteFile(output, stamped, 0o600)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: writing output: %s\n", err)
+		return 2
+	}
+	return 0
+}
+
 func runSpecFromInput(input, format, output string, noColor, renderOnly bool, source *declaredSource, view []gotestspec.RenderOption) int {
 	var r io.Reader
 	if input == "-" {
@@ -267,6 +309,11 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
 		return 2
 	}
 
+	if err := gotestspec.CheckView(tree, view...); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
+
 	var w io.Writer = os.Stdout
 	if output != "" {
 		of, ferr := os.Create(output)
@@ -278,7 +325,7 @@ func runSpecFromInput(input, format, output string, noColor, renderOnly bool, so
 		w = of
 	}
 
-	renderSpec(w, tree, format, noColor, view)
+	renderSpec(w, tree, format, noColor, view, savedStream)
 
 	// The same exit rule as `summary --input`: a renderer fed a failing stream
 	// must not exit 0 — in a pipe without pipefail this exit code is the only
@@ -402,7 +449,7 @@ var hideWords = map[string]gotestspec.Status{
 	"none": gotestspec.StatusNone,
 }
 
-// parseSpecView reads --declared and --hide. Either gives each JSON package
+// parseSpecView reads --declared, --hide, --match and --only. Either gives each JSON package
 // its own stats. --hide= with nothing after it hides nothing.
 func parseSpecView(own OwnFlags, input string) (specView, error) {
 	var view specView
@@ -432,8 +479,42 @@ func parseSpecView(own OwnFlags, input string) (specView, error) {
 		}
 		view.options = append(view.options, gotestspec.WithHidden(hidden...))
 	}
+	if own.Given("--match") || own.Given("--only") {
+		if static {
+			return view, fmt.Errorf("--match and --only select rows of a run, and --static has none")
+		}
+	}
+	if own.Given("--match") {
+		view.options = append(view.options, gotestspec.WithMatch(own.Value("--match")))
+	}
+	if own.Given("--only") {
+		pkg, position, err := parseOnly(own.Value("--only"))
+		if err != nil {
+			return view, err
+		}
+		view.options = append(view.options, gotestspec.WithOnly(pkg, position))
+	}
 	if view.declared || own.Given("--hide") {
 		view.options = append(view.options, gotestspec.WithPackageStats())
 	}
 	return view, nil
+}
+
+// parseOnly reads --only=<import path> or --only=<import path>:<i>.<j>…
+func parseOnly(value string) (pkg string, position []int, err error) {
+	pkg, path, hasPath := strings.Cut(value, ":")
+	if pkg == "" {
+		return "", nil, fmt.Errorf("--only needs an import path: --only=<import path>[:<i>.<j>…]")
+	}
+	if !hasPath || path == "" {
+		return pkg, nil, nil
+	}
+	for _, part := range strings.Split(path, ".") {
+		at, convErr := strconv.Atoi(part)
+		if convErr != nil || at < 0 {
+			return "", nil, fmt.Errorf("--only: %q is not a position: use <import path>:<i>.<j>… with whole numbers", path)
+		}
+		position = append(position, at)
+	}
+	return pkg, position, nil
 }

@@ -831,7 +831,7 @@
                 "duration": 0,
                 "focused": false,
                 "excluded": false,
-                "external": false,
+                "external": true,
                 "file": "suite_ext_test.go",
                 "line": 5,
                 "output": [],
@@ -1188,7 +1188,10 @@
         {
           "Action": "run",
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/unrun/excluded",
-          "Test": "TestX_ExcludedTestSuite"
+          "Test": "TestX_ExcludedTestSuite",
+          "Gotest": {
+            "Subtest": "TestX_ExcludedTestSuite"
+          }
         },
         {
           "Action": "output",
@@ -1253,7 +1256,10 @@
         {
           "Action": "run",
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
-          "Test": "TestPlainTestSuite"
+          "Test": "TestPlainTestSuite",
+          "Gotest": {
+            "Subtest": "TestPlainTestSuite"
+          }
         },
         {
           "Action": "output",
@@ -1265,7 +1271,10 @@
         {
           "Action": "run",
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
-          "Test": "TestPlainTestSuite/TestOne"
+          "Test": "TestPlainTestSuite/TestOne",
+          "Gotest": {
+            "Subtest": "TestOne"
+          }
         },
         {
           "Action": "output",
@@ -1290,7 +1299,10 @@
         {
           "Action": "run",
           "Package": "github.com/mvrahden/go-test/cmd/gotest/testdata/census/plain",
-          "Test": "TestPlainTestSuite/TestTwo"
+          "Test": "TestPlainTestSuite/TestTwo",
+          "Gotest": {
+            "Subtest": "TestTwo"
+          }
         },
         {
           "Action": "output",
@@ -1352,7 +1364,10 @@
         {
           "Action": "run",
           "Package": "gotest.runlevel/down",
-          "Test": "TestDownTestSuite"
+          "Test": "TestDownTestSuite",
+          "Gotest": {
+            "Subtest": "TestDownTestSuite"
+          }
         },
         {
           "Action": "output",
@@ -1438,6 +1453,7 @@
                 "focused": false,
                 "excluded": false,
                 "guarded": false,
+                "external": true,
                 "file": "benchplain_suite_test.go",
                 "line": 7,
                 "col": 6,
@@ -1496,6 +1512,7 @@
                 "focused": false,
                 "excluded": false,
                 "guarded": false,
+                "external": true,
                 "file": "fuzzplain_suite_test.go",
                 "line": 9,
                 "col": 6,
@@ -1543,6 +1560,7 @@
                 "focused": false,
                 "excluded": false,
                 "guarded": false,
+                "external": true,
                 "file": "plain_suite_test.go",
                 "line": 5,
                 "col": 6,
@@ -1589,6 +1607,7 @@
                 "focused": false,
                 "excluded": false,
                 "guarded": false,
+                "external": true,
                 "file": "skipped_suite_test.go",
                 "line": 7,
                 "col": 6,
@@ -1887,6 +1906,7 @@
                 "focused": false,
                 "excluded": false,
                 "guarded": false,
+                "external": true,
                 "file": "suite_ext_test.go",
                 "line": 5,
                 "col": 6,

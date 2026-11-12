@@ -95,6 +95,8 @@ var (
 	ExportCheckFormat   = checkFormat
 )
 
+var ExportRenderSpec = renderSpec
+
 // ExportSetStdoutIsTerminal swaps the terminal probe and returns its restorer.
 func ExportSetStdoutIsTerminal(f func() bool) func() {
 	prev := stdoutIsTerminal
@@ -113,6 +115,7 @@ var (
 	ExportNewDiscoverOutput  = newDiscoverOutput
 	ExportBuildDiscoverSuite = buildDiscoverSuite
 	ExportDiscover           = discover
+	ExportTwinTestNames      = twinTestNames
 )
 
 // flags.go
@@ -270,3 +273,9 @@ func ExportHoldForcedExit() (release func()) {
 	forcedExit.Lock()
 	return forcedExit.Unlock
 }
+
+// provenance.go
+var (
+	ExportReadProvenance = readProvenance
+	ExportModulePath     = modulePath
+)

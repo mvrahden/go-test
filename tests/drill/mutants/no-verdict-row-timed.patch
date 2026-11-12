@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when a behavior started and reported no verdict / shows no duration \(
+Clause: when a behavior started and reported no verdict → shows no duration
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -318,7 +318,7 @@
+ 
+ 	// A node without a verdict, declared and not reported or started and
+ 	// never ended, took no time it can show; it says so instead.
+-	unrun := noVerdict(n) && !bare && (n.NotRun || n.Kind != KindBenchmark)
++	unrun := n.NotRun && !bare
+ 	if unrun && isLeaf {
+ 		lead, lw := mark(StatusNone)
+ 		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display,

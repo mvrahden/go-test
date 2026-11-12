@@ -18,6 +18,7 @@ var (
 	ExportANSIColors          = ansiColors
 	ExportCollectFailures     = collectFailures
 	ExportStripANSI           = stripANSI
+	ExportWrapLabel           = wrapLabel
 )
 
 // stripANSI removes color escape sequences so tests compare visible text.
@@ -39,7 +40,6 @@ func stripANSI(s string) string {
 }
 
 var (
-	ExportSplitTestPath    = splitTestPath
 	ExportNoDiagnosticNote = noDiagnosticNote
 	ExportEscapeData       = escapeData
 	ExportEscapeProperty   = escapeProperty

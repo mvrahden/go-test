@@ -25,6 +25,7 @@ import {
   itemIdOf,
   nearestItemId,
   linkSources,
+  SpecViewPanel,
 } from "./specView.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -143,6 +144,50 @@ describe("buildSpecBody", () => {
     );
     expect(html).toMatch(
       /<details class="branch fail" data-display="TestFailedTestSuite" open>/,
+    );
+  });
+
+  it("gives each branch its package and its place among the shown rows, with a copy button", () => {
+    const html = body([
+      {
+        path: "example.com/p",
+        status: "pass",
+        duration: 0,
+        nodes: [
+          node("TestAATestSuite", "pass", [node("x", "pass")]),
+          node("TestBBTestSuite", "pass", [
+            node("TestM", "pass", [node("gets_./", "pass")]),
+          ]),
+        ],
+      },
+    ]);
+    const summaries = html.match(/<summary class="node[^>]*>/g) ?? [];
+    expect(summaries).toHaveLength(3);
+    expect(summaries[0]).toContain('data-pkg="example.com/p"');
+    expect(summaries[0]).toContain('data-position="0"');
+    expect(summaries[1]).toContain('data-position="1"');
+    expect(summaries[2]).toContain('data-position="1.0"');
+    expect(html).toContain('data-act="copyNode"');
+  });
+
+  it("lists the item ids above a row, nearest last, so a slash in a name cannot mislead", () => {
+    const html = body([
+      {
+        path: "example.com/p",
+        status: "pass",
+        duration: 0,
+        nodes: [
+          node("TestSTestSuite", "pass", [
+            node("TestM", "pass", [node("gets_./", "pass")]),
+          ]),
+        ],
+      },
+    ]);
+    const leaf = html.match(
+      /<div class="leaf[^>]*data-display="gets_\.\/"[^>]*>/,
+    );
+    expect(leaf?.[0]).toContain(
+      'data-ancestors="[&quot;example.com/p&quot;,&quot;example.com/p/STestSuite&quot;,&quot;example.com/p/STestSuite/TestM&quot;]"',
     );
   });
 
@@ -381,20 +426,95 @@ describe("encodeStateForScript", () => {
 });
 
 describe("itemIdOf", () => {
+  const leaf = (name: string, extra: Partial<Node> = {}) =>
+    node(name, "pass", [], extra);
+
   it("names a node by the id the Test Explorer gives it", () => {
-    expect(itemIdOf("example.com/cart", "TestCartTestSuite")).toBe(
-      "example.com/cart/CartTestSuite",
+    const suite = itemIdOf("example.com/cart", null, leaf("TestCartTestSuite"));
+    expect(suite).toBe("example.com/cart/CartTestSuite");
+    const method = itemIdOf("example.com/cart", suite, leaf("TestAdd"));
+    expect(itemIdOf("example.com/cart", method, leaf("when_empty"))).toBe(
+      "example.com/cart/CartTestSuite/TestAdd/when_empty",
     );
-    expect(
-      itemIdOf("example.com/cart", "TestCartTestSuite/TestAdd/when_empty"),
-    ).toBe("example.com/cart/CartTestSuite/TestAdd/when_empty");
-    expect(itemIdOf("example.com/cart", "TestPlain")).toBe(
+    expect(itemIdOf("example.com/cart", null, leaf("TestPlain"))).toBe(
       "example.com/cart/Plain",
     );
   });
 
-  it("names no item for a fixture node", () => {
-    expect(itemIdOf("example.com/cart", "Test_DBFixture")).toBeUndefined();
+  it("names no item for a fixture node or a row beneath one", () => {
+    expect(
+      itemIdOf("example.com/cart", null, leaf("Test_DBFixture")),
+    ).toBeUndefined();
+    expect(
+      itemIdOf("example.com/cart", undefined, leaf("TestAdd")),
+    ).toBeUndefined();
+  });
+
+  it("marks only an external twin's run, not a lone external suite", () => {
+    expect(
+      itemIdOf(
+        "p",
+        null,
+        leaf("TestTwinsTestSuite", { external: true, variant: 2 }),
+      ),
+    ).toBe("p/TwinsTestSuite~external");
+    expect(
+      itemIdOf("p", null, leaf("TestLoneTestSuite", { external: true })),
+    ).toBe("p/LoneTestSuite");
+  });
+});
+
+describe("an external twin's rows", () => {
+  const pkg: SpecPackage = {
+    path: "example.com/twins",
+    status: "pass",
+    duration: 0,
+    nodes: [
+      node("TestTwinsTestSuite", "pass", [
+        node("TestCreate", "pass", [], { kind: "method" }),
+      ]),
+      node(
+        "TestTwinsTestSuite",
+        "pass",
+        [
+          node("TestCreate", "pass", [node("when_empty", "pass")], {
+            kind: "method",
+            reported: "TestCreate#01",
+          }),
+        ],
+        { external: true, variant: 2 },
+      ),
+    ],
+  };
+  const twin = "example.com/twins/TwinsTestSuite~external";
+  const rows = () =>
+    [
+      ...body([pkg]).matchAll(
+        /data-id="([^"]+)"(?: data-ancestors="([^"]+)")?/g,
+      ),
+    ].map((m) => ({
+      id: m[1],
+      ancestors: m[2]
+        ? (JSON.parse(m[2].replace(/&quot;/g, '"')) as string[])
+        : [],
+    }));
+
+  it("name the twin's items, its method by the name go test reported", () => {
+    expect(rows().map((r) => r.id)).toEqual([
+      "example.com/twins/TwinsTestSuite",
+      "example.com/twins/TwinsTestSuite/TestCreate",
+      twin,
+      `${twin}/TestCreate#01`,
+      `${twin}/TestCreate#01/when_empty`,
+    ]);
+  });
+
+  it("resolve to the twin's nearest item", () => {
+    const tree = new Set(["example.com/twins", twin, `${twin}/TestCreate#01`]);
+    const behavior = rows().find((r) => r.id.endsWith("when_empty"))!;
+    expect(
+      nearestItemId(behavior.id, (id) => tree.has(id), behavior.ancestors),
+    ).toBe(`${twin}/TestCreate#01`);
   });
 });
 
@@ -405,6 +525,21 @@ describe("nearestItemId", () => {
     expect(nearestItemId("p/S/TestM", has)).toBe("p/S/TestM");
     expect(nearestItemId("p/S/TestM/row_101", has)).toBe("p/S/TestM");
     expect(nearestItemId("q/T", has)).toBeUndefined();
+  });
+
+  it("falls to the package item when neither the node nor its suite is an item", () => {
+    const has = (id: string) => id === "p";
+    expect(
+      nearestItemId("p/S/TestM/gets_./", has, ["p", "p/S", "p/S/TestM"]),
+    ).toBe("p");
+  });
+
+  it("takes the nearest ancestor from the list, not from cutting at a slash", () => {
+    const tree = new Set(["p/S", "p/S/TestM", "p/S/TestM/gets_."]);
+    const has = (id: string) => tree.has(id);
+    const id = "p/S/TestM/gets_./";
+    expect(nearestItemId(id, has, ["p/S", "p/S/TestM"])).toBe("p/S/TestM");
+    expect(nearestItemId(id, has)).toBe("p/S/TestM/gets_.");
   });
 });
 
@@ -443,6 +578,58 @@ describe("linkSources", () => {
       expect(linkSources("    gone_test.go:3: boom", dir)).toBe(
         "    gone_test.go:3: boom",
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the kept runs on disk", () => {
+  const channel = {
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    debug: () => {},
+  } as never;
+  // A record as this build writes it, under the envelope version given.
+  const file = (version: number) =>
+    JSON.stringify({
+      version,
+      data: [
+        {
+          path: "example.com/cart",
+          folder: "/ws",
+          pkgLines: ['{"Action":"pass","Package":"example.com/cart"}'],
+          tests: [
+            [
+              "1\u0000TestCartTestSuite",
+              [
+                {
+                  seq: 0,
+                  line: '{"Action":"pass","Package":"example.com/cart","Test":"TestCartTestSuite"}',
+                },
+              ],
+            ],
+          ],
+          runLevel: false,
+        },
+      ],
+    });
+  const keptBy = (panel: SpecViewPanel) =>
+    (panel as unknown as { runs: { size: number } }).runs.size;
+
+  it("restore drops a store of the previous version", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "gotest-specruns-"));
+    try {
+      writeFileSync(path.join(dir, "specRuns.json"), file(1));
+      const old = new SpecViewPanel(channel, undefined, dir);
+      await old.load();
+      expect(keptBy(old)).toBe(0);
+
+      writeFileSync(path.join(dir, "specRuns.json"), file(2));
+      const current = new SpecViewPanel(channel, undefined, dir);
+      await current.load();
+      expect(keptBy(current)).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

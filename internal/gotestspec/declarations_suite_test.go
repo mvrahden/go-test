@@ -46,7 +46,7 @@ func declsOf(pkg string, entries map[string]gotestspec.Declaration) gotestspec.D
 }
 
 var snakeCaseDecl = map[string]gotestspec.Declaration{
-	"TestKeysTestSuite/TestEncode/returns_snake_case_keys": {Label: "returns snake_case keys"},
+	gotestspec.DeclKey("TestKeysTestSuite", "TestEncode", "returns_snake_case_keys"): {Label: "returns snake_case keys"},
 }
 
 func (s *DeclarationsTestSuite) TestBuildTree_ShowsTheDeclaredLabel(t *gotest.T, _ *declarationsCtx) {
@@ -77,7 +77,7 @@ func (s *DeclarationsTestSuite) TestBuildTree_DeclarationsLeaveNamesAlone(t *got
 
 func (s *DeclarationsTestSuite) TestBuildTree_SpeaksTheDeclaredVocabulary(t *gotest.T, _ *declarationsCtx) {
 	node := declTree(t, gotestspec.WithDeclarations(declsOf("example.com/pkg", map[string]gotestspec.Declaration{
-		"TestKeysTestSuite/TestEncode/returns_snake_case_keys": {Label: "returns snake_case keys", Vocab: gotestspec.VocabWhen},
+		gotestspec.DeclKey("TestKeysTestSuite", "TestEncode", "returns_snake_case_keys"): {Label: "returns snake_case keys", Vocab: gotestspec.VocabWhen},
 	})))
 
 	gotest.Equal(t, "when returns snake_case keys", node.Display)
@@ -87,7 +87,7 @@ func (s *DeclarationsTestSuite) TestBuildTree_SpeaksTheDeclaredVocabulary(t *got
 // The glyph already plays the role of "it", so an expectation stands on its own.
 func (s *DeclarationsTestSuite) TestBuildTree_ExpectationsTakeNoConnective(t *gotest.T, _ *declarationsCtx) {
 	node := declTree(t, gotestspec.WithDeclarations(declsOf("example.com/pkg", map[string]gotestspec.Declaration{
-		"TestKeysTestSuite/TestEncode/returns_snake_case_keys": {Label: "returns snake_case keys", Vocab: gotestspec.VocabIt},
+		gotestspec.DeclKey("TestKeysTestSuite", "TestEncode", "returns_snake_case_keys"): {Label: "returns snake_case keys", Vocab: gotestspec.VocabIt},
 	})))
 
 	gotest.Equal(t, "returns snake_case keys", node.Display)
@@ -139,8 +139,33 @@ func (s *DeclarationsTestSuite) TestVocabApply(t *gotest.T, _ *declarationsCtx) 
 // -run filter, snapshot key and stored baseline in the wild would break.
 func (s *DeclarationsTestSuite) TestBuildTree_VocabularyLeavesNamesAlone(t *gotest.T, _ *declarationsCtx) {
 	node := declTree(t, gotestspec.WithDeclarations(declsOf("example.com/pkg", map[string]gotestspec.Declaration{
-		"TestKeysTestSuite/TestEncode/returns_snake_case_keys": {Label: "returns snake_case keys", Vocab: gotestspec.VocabWhen},
+		gotestspec.DeclKey("TestKeysTestSuite", "TestEncode", "returns_snake_case_keys"): {Label: "returns snake_case keys", Vocab: gotestspec.VocabWhen},
 	})))
 
 	gotest.Equal(t, "returns_snake_case_keys", node.Name)
+}
+
+const slashLevelStream = `{"Action":"run","Package":"example.com/pkg","Test":"TestS"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestS/TestM"}
+{"Action":"run","Package":"example.com/pkg","Test":"TestS/TestM/a/b"}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestS/TestM/a/b","Elapsed":0.001}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestS/TestM","Elapsed":0.002}
+{"Action":"pass","Package":"example.com/pkg","Test":"TestS","Elapsed":0.003}
+{"Action":"pass","Package":"example.com/pkg","Elapsed":0.004}
+`
+
+func slashLevelLabel(t *gotest.T, key string) string {
+	events, err := gotestspec.ParseEvents(strings.NewReader(slashLevelStream))
+	gotest.NoError(t, err)
+	idx := declsOf("example.com/pkg", map[string]gotestspec.Declaration{key: {Label: "a/b"}})
+	pkgs := gotestspec.BuildTree(events, gotestspec.WithDeclarations(idx))
+	gotest.Len(t, pkgs, 1)
+	node := pkgs[0].Nodes[0].Children[0].Children[0]
+	return node.SourceLabel
+}
+
+// "a/b" written as one level and "a" then "b" are different declarations.
+func (s *DeclarationsTestSuite) TestOneLevelWithASlashIsNotTwoLevels(t *gotest.T, _ *declarationsCtx) {
+	gotest.Equal(t, "a/b", slashLevelLabel(t, gotestspec.DeclKey("TestS", "TestM", "a/b")))
+	gotest.Empty(t, slashLevelLabel(t, gotestspec.DeclKey("TestS", "TestM", "a", "b")))
 }

@@ -2,12 +2,13 @@ Expect: ^FAIL .*conformance/spec .* / when an It's label is an earlier It's labe
 Clause: when an It's label is an earlier It's label, a slash and more → a run's spec shows both as Its under their When
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -410,7 +410,7 @@
- func joinUnstartedLevels(segments []string, nmap map[string]*Node, placed map[string][]string) []string {
- 	for i := len(segments) - 1; i >= 1; i-- {
- 		parent := strings.Join(segments[:i], "/")
--		if n := nmap[parent]; n == nil || n.Status != StatusNone {
-+		if n := nmap[parent]; n == nil {
- 			continue
- 		}
- 		head := segments[:i]
+@@ -430,6 +430,9 @@
+ func (b *treeBuild) place(ev *TestEvent) *treeEntry {
+ 	action, test := ev.Action, ev.Test
+ 	pl := b.placement(ev)
++	if i := strings.LastIndex(test, "/"); action == ActionRun && i > 0 && b.entries[treeKey{pl.Instance, test[:i]}] != nil {
++		pl.Parent, pl.Own, pl.Written = test[:i], test[i+1:], test[i+1:]
++	}
+ 	key := treeKey{pl.Instance, test}
+ 	e := b.entries[key]
+ 	switch {

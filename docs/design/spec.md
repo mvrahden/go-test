@@ -154,9 +154,12 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--coverage=<path>` | Coverage profile path for `summary` subcommand |
 | `--badge=<path>` | Write a self-contained coverage badge SVG (`summary`); adds `-coverprofile` when neither the caller nor `--min` did |
 | `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
+| `--stamp` | With `--input`, write the stream back with each test event placed as `gotest -json` places it, instead of rendering it (`spec`; [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream)) |
 | `--static` | Render the specification from source without running the suites (`spec`); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
 | `--declared` | With `--input`, lay the stream's verdicts over the specification the packages' source declares (`spec`; [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)) |
 | `--hide=<statuses>` | Leave out of the `spec` rendering the rows whose status is one of `pass`, `fail`, `skip`, `none`, without changing what is counted ([Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status)) |
+| `--match=<text>` | Keep of the `spec` rendering the behaviors whose label holds the text, and their groups; counts are those of what is kept ([Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows)) |
+| `--only=<import path>[:<i>.<j>…]` | Keep of the `spec` rendering one package, or the node at that position among the shown children, with what is under it; counts are those of what is kept ([Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows)) |
 | `--bench` | Benchmark mode for `watch`: re-run benchmarks on change with ns/op deltas |
 | `--save=<path>` | Save a benchmark run as a JSON baseline (`bench`; a bare `--save=` uses `bench.baseline` from `.gotest.yml`, and saving to the configured baseline promotes the run without comparing it) |
 | `--against=<path>` | Compare a benchmark run against a saved baseline and print the delta table (`bench`; defaults to `bench.baseline`). A baseline whose `goos`, `goarch`, `goVersion`, `cpu` or `gomaxprocs` differs warns on stderr and reports `envMismatch`; the comparison still runs and the exit code is unchanged. What the comparison does with benchmarks on one side alone, with few samples and with one file for both flags is pinned below |
@@ -1162,21 +1165,23 @@ Exit codes: 0 as above; 1 while any marker is left, including one an earlier run
 ```
 $ gotest spec ./pkg/user
 
-UserService (133ms)
-  Create (128ms)
-    when email is valid (128ms)
-      ✓ creates the user (8ms)
-      ✓ sends a welcome email (120ms)
-    when email already exists (<1ms)
-      ✓ returns ErrDuplicate (<1ms)
-  Delete (5ms)
-    ✓ soft-deletes the user (5ms)
-    ~ hard-deletes after 30 days — SKIPPED (<1ms)
+=== pkg/user — 4 passed, 1 skipped ===
 
-2 suites, 5 behaviors: 4 passed, 1 skipped
+UserService — 4 passed, 1 skipped
+  Create
+    when email is valid
+      ✓ creates the user
+      ✓ sends a welcome email
+    when email already exists
+      ✓ returns ErrDuplicate
+  Delete
+    ✓ soft-deletes the user
+    – hard-deletes after 30 days — SKIPPED
+
+1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
 
-Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from `/`-separated test paths, and strips Go naming conventions for display.
+Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from where each test sits ([Where a test event's test sits](../../specs/cli/spec.md#requirement-where-a-test-events-test-sits), [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label)), and strips Go naming conventions for display.
 
 **Labels come from the source.** A subtest name cannot be turned back into the description that produced it: `go test` writes an underscore for every space, so `returns snake_case keys` and `returns snake case keys` arrive as the same name. The renderer therefore reads the declared descriptions from source, with the same walker that backs `--static` and `discover`, and shows each behavior under the words the developer wrote.
 
@@ -1184,7 +1189,7 @@ Internally runs `go test -json`, parses the event stream, reconstructs the suite
 - Behaviors the source cannot enumerate (a `When` behind a condition, a table that is not a literal) and packages a replay cannot reach (a stream from another module, a checkout without the source) fall back to reconstructing the label from the name. Loading never fails a render.
 - Subtest *names* are untouched either way, so `-run` filters, snapshot keys and saved baselines are unaffected.
 
-**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/~ icon plays the role of "it"). You write the condition; gotest supplies the connective.
+**Vocabulary.** The `when` prefix above is applied by the renderer, not written in the label: `t.When("email is valid")` displays as `when email is valid`, while `It` labels render verbatim (the ✓/✗/– mark plays the role of "it"). You write the condition; gotest supplies the connective.
 
 - Which call declared a subtest is read from source alongside the description and travels with it, so `gotest spec`, `gotest discover` and a replayed stream render one behavior one way.
 - A label that already opens with a connective of its own is left alone rather than doubled. The connectives: when, with, without, given, if, unless, after, before, while, once, on, upon, as, for, during, under, whenever, matched as a whole word in any case, with a space or an underscore after it. "with an empty cache" stays as written; "withdrawing funds" becomes "when withdrawing funds".
@@ -1192,7 +1197,7 @@ Internally runs `go test -json`, parses the event stream, reconstructs the suite
 
 ### Durations
 
-Every row carries the wall clock it occupied, and never the sum of the rows beneath it.
+A row carries the wall clock it occupied from one second up, and never the sum of the rows beneath it.
 A sum is an integral over occupancy rather than an interval, so under parallelism it reports more time than the clock did: three 50ms methods sharing 58ms of one suite cost 58ms, not 160ms.
 The difference between a row and its children is therefore information — time the row held itself (the subprocess a `When` starts before its assertions), or children that overlapped.
 
@@ -1204,7 +1209,7 @@ Descendants of a parked node keep clean timestamps; only the parked node's own t
 A package row is not something that executes, so it is worth the clock during which one of its suites was running: the union of their windows, overlap counted once, which also drops the gap between windows when a tree holds results from more than one run.
 No row is ever shorter than what it contains — `go test` reports a parked node's measure to 10ms while a child's bracket is exact, so a row is floored by its children, which can only repair that rounding and never invent time.
 
-The same numbers reach `--format=md` and the `duration` field of `--format=json`, in seconds.
+The same numbers reach the `duration` field of `--format=json`, in seconds; `--format=md` shows them from one second up ([A report a person reads](../../specs/spec/spec.md#requirement-a-report-a-person-reads)).
 
 Output formats:
 
@@ -1221,10 +1226,10 @@ gotest ./... -v --spec                               # spec view instead of defa
 ### `--static`
 
 Builds the same tree from the source instead of from a run: no node carries a status or a duration, because nothing executed.
-The names are the ones `go test` would produce, including the `#01` it appends to a description repeated among its siblings and the extra level a single slash introduces — a statically read behavior and an observed one have to be the same node, not two.
+The names are the ones `go test` would produce, including the `#01` it appends to a description repeated among its siblings — a statically read behavior and an observed one have to be the same node, not two. How a label with a slash and a suite declared in both test packages read on every surface: [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label), [Suites of both test packages](../../specs/spec/spec.md#requirement-suites-of-both-test-packages).
 
 Where a method declares behaviors whose names or existence depend on runtime values — a `When` behind a condition, a non-literal description, an `Each` over a table that is not a literal — the method node is marked incomplete and the detail goes to stderr as `incomplete: …` lines.
-That marking is on the node, not only on stderr, so it survives into every format: `— INCOMPLETE` in the terminal tree, an `_Incomplete: …_` note in markdown, and `"incomplete": true` in JSON.
+That marking is on the node, not only on stderr, so it survives into every format, as `"incomplete": true` in JSON ([Table rows named by constants](../../specs/spec/spec.md#requirement-table-rows-named-by-constants)).
 A run-derived tree never sets the field, since what ran is by definition all there was.
 
 `--static` and `--input` are mutually exclusive: one asks for the specification in the source, the other for the one in a recorded run.
@@ -1271,7 +1276,7 @@ No tests are executed.
 
 `behaviors` carries the `When`/`It` tree each method declares, read from source:
 
-- `name` is the subtest segment `go test` will produce, so it matches an observed run byte for byte. Two rewrites the source does not spell out make that true: a description repeated among its siblings gains the `#01` suffix the testing package appends, and a description containing a single slash becomes one node per level (a run of slashes, as in `https://`, is not a separator and stays within one level).
+- `name` is the subtest level `go test` will produce, so it matches an observed run byte for byte: a description repeated among its siblings gains the `#01` suffix the testing package appends, which the source does not spell out. A label with a slash is one behavior ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover), [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label)).
 - `display` is the text the developer wrote, spoken in its vocabulary: the same string `gotest spec` renders for this node, so an editor showing both spells one behavior one way.
 - `kind` names the call it came from (`when`, `it`, `each`); `line` locates it.
 - `behaviorsComplete` reports whether the tree is exhaustive. `false` means the method declares behaviors whose names or existence depend on runtime values (a condition, a loop, a non-literal description, a table that is not a literal), so the list is a floor rather than a total and the remainder appears once the method has run. Consumers must not present an incomplete list as the whole specification.
@@ -1282,10 +1287,10 @@ No tests are executed.
     "importPath": …, "dir": …, "modulePath": …, "testOnly": bool, "broken": bool,
     "suites": [ {
       "name": …, "file": …, "line": …, "col": …,
-      "parallel": bool, "focused": bool, "excluded": bool, "guarded": bool,
+      "parallel": bool, "focused": bool, "excluded": bool, "guarded": bool, "external": bool,
       "lifecycle": ["BeforeAll", …],
       "fixtures": ["E2ESetupFixture", …],
-      "methods": [ { "name": …, "file": …, "line": …, "col": …,
+      "methods": [ { "name": …, "testName": …, "file": …, "line": …, "col": …,
                      "focused": bool, "excluded": bool, "parallel": bool,
                      "behaviors": [ { "name": …, "display": …, "kind": …, "line": …,
                                       "children": [ … ] } ],
@@ -1299,6 +1304,7 @@ No tests are executed.
 ```
 
 File paths are basenames; positions are 1-based.
+`external` is present, and true, on each suite of the external test package ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover)); `testName` is present on a method of such a suite when go test names it otherwise, as `TestCreate#01` for a method its internal twin also declares.
 `warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
 
 - a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;

@@ -1,8 +1,9 @@
 // The Spec View's memory of runs: the newest go test -json lines for every
 // test of every package it has seen, kept as the raw stream so the CLI can
 // render it. A package is one record no matter how many producers reported
-// it, and inside a package every test path keeps the lines of the newest run
-// that reported it, so a rerun of one method leaves its siblings as they were.
+// it, and inside a package every test path of every suite instance keeps the
+// lines of the newest run that reported it, so a rerun of one method leaves
+// its siblings, and its twin's, as they were.
 
 export interface RunPiece {
   // The -json stdout of one go test invocation.
@@ -20,8 +21,8 @@ export interface PackageRecord {
   // Lines without a test: the package's start, output and verdict, and the
   // build lines its verdict names.
   pkgLines: string[];
-  // Test path to its lines, in the order the paths were first seen.
-  tests: Map<string, string[]>;
+  // testKey(instance, test path) to its lines.
+  tests: Map<string, KeptLine[]>;
   // Booked by the CLI for the run itself rather than for an import path (a
   // run that was interrupted, shared fixtures that did not come up): its
   // events carry RunLevel. It belongs to the folder's newest run, not to a
@@ -29,13 +30,27 @@ export interface PackageRecord {
   runLevel: boolean;
 }
 
+// A kept line and its place in the order lines were merged, across runs.
+export interface KeptLine {
+  seq: number;
+  line: string;
+}
+
 export interface StoredRecord {
   path: string;
   folder: string;
   pkgLines: string[];
-  tests: [string, string[]][];
+  tests: [string, KeptLine[]][];
   runLevel: boolean;
 }
+
+// testKey names a test path within one instance of its top-level name: a
+// suite in both test packages runs twice under one name.
+export function testKey(instance: number, test: string): string {
+  return `${instance}\u0000${test}`;
+}
+
+const testOf = (key: string) => key.slice(key.indexOf("\u0000") + 1);
 
 interface Parsed {
   Action?: string;
@@ -44,12 +59,12 @@ interface Parsed {
   ImportPath?: string;
   FailedBuild?: string;
   RunLevel?: boolean;
+  Gotest?: { Instance?: number };
 }
 
 interface PieceGroup {
   pkgLines: string[];
-  tests: Map<string, string[]>;
-  topRuns: Map<string, number>;
+  tests: Map<string, KeptLine[]>;
   failedBuilds: string[];
   // Whether any of its lines carried the CLI's RunLevel marker.
   runLevel: boolean;
@@ -57,6 +72,8 @@ interface PieceGroup {
 
 export class SpecStore {
   private records = new Map<string, PackageRecord>();
+  // Advanced by every merged line, so lines of later runs sort after.
+  private seq = 0;
 
   get size(): number {
     return this.records.size;
@@ -68,6 +85,7 @@ export class SpecStore {
 
   clear(): void {
     this.records.clear();
+    this.seq = 0;
   }
 
   // merge folds a run into what is kept. It reports the packages it touched.
@@ -103,7 +121,6 @@ export class SpecStore {
         group = {
           pkgLines: [],
           tests: new Map(),
-          topRuns: new Map(),
           failedBuilds: [],
           runLevel: false,
         };
@@ -115,15 +132,18 @@ export class SpecStore {
         if (ev.FailedBuild) group.failedBuilds.push(ev.FailedBuild);
         continue;
       }
-      let lines = group.tests.get(ev.Test);
+      // An event without the stamp's Instance is of the first instance.
+      const instance = ev.Gotest?.Instance;
+      const key = testKey(
+        typeof instance === "number" && instance >= 2 ? instance : 1,
+        ev.Test,
+      );
+      let lines = group.tests.get(key);
       if (!lines) {
         lines = [];
-        group.tests.set(ev.Test, lines);
+        group.tests.set(key, lines);
       }
-      lines.push(line);
-      if (ev.Action === "run" && !ev.Test.includes("/")) {
-        group.topRuns.set(ev.Test, (group.topRuns.get(ev.Test) ?? 0) + 1);
-      }
+      lines.push({ seq: this.seq++, line });
     }
 
     // The newest run of a folder speaks for its run-level bookings: one it
@@ -163,6 +183,11 @@ export class SpecStore {
     return Array.from(groups.keys());
   }
 
+  // folderOf is the folder whose CLI renders a package.
+  folderOf(pkg: string): string | undefined {
+    return this.records.get(pkg)?.folder;
+  }
+
   // folders lists the folders whose CLI renders something.
   folders(): string[] {
     return Array.from(
@@ -170,22 +195,19 @@ export class SpecStore {
     );
   }
 
-  // compose writes the kept lines of a folder's packages as one stream, as
-  // go test orders them: a package's tests before its verdict, and every
-  // test's start before any verdict, since the CLI reads a slash in a name as
-  // one subtest only while the test above it still runs.
+  // compose writes the kept lines of a folder's packages as one stream: a
+  // package's test lines in the order they were merged, then its own lines.
+  // A single run's test lines thus reach the CLI as written (its package
+  // lines go last); lines of several runs are stamped, and the CLI places
+  // those by their stamps.
   compose(folder: string): string {
     const out: string[] = [];
     for (const record of this.records.values()) {
       if (record.folder !== folder) continue;
-      const rest: string[] = [];
-      for (const lines of record.tests.values()) {
-        for (const l of lines) {
-          if (l.includes('"Action":"run"')) out.push(l);
-          else rest.push(l);
-        }
-      }
-      out.push(...rest, ...record.pkgLines);
+      const kept = Array.from(record.tests.values()).flat();
+      kept.sort((a, b) => a.seq - b.seq);
+      for (const k of kept) out.push(k.line);
+      out.push(...record.pkgLines);
     }
     return out.length > 0 ? out.join("\n") + "\n" : "";
   }
@@ -204,8 +226,12 @@ export class SpecStore {
   // by another build, or damaged — restores nothing.
   restore(stored: unknown): void {
     this.records.clear();
+    this.seq = 0;
     if (!Array.isArray(stored) || !stored.every(isStoredRecord)) return;
     for (const r of stored) {
+      for (const [, lines] of r.tests) {
+        for (const k of lines) this.seq = Math.max(this.seq, k.seq + 1);
+      }
       this.records.set(r.path, {
         folder: r.folder,
         pkgLines: r.pkgLines,
@@ -232,6 +258,16 @@ export class SpecStore {
 const isStrings = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((s) => typeof s === "string");
 
+const isKeptLines = (v: unknown): v is KeptLine[] =>
+  Array.isArray(v) &&
+  v.every(
+    (k) =>
+      !!k &&
+      typeof k === "object" &&
+      typeof (k as KeptLine).seq === "number" &&
+      typeof (k as KeptLine).line === "string",
+  );
+
 function isStoredRecord(v: unknown): v is StoredRecord {
   if (!v || typeof v !== "object") return false;
   const r = v as Record<string, unknown>;
@@ -246,56 +282,28 @@ function isStoredRecord(v: unknown): v is StoredRecord {
         Array.isArray(t) &&
         t.length === 2 &&
         typeof t[0] === "string" &&
-        isStrings(t[1]),
+        isKeptLines(t[1]),
     )
   );
 }
 
-// mergeTests keeps every path the newer run neither reported nor asked for,
-// in its place, and takes the newer lines for the rest. A suite that ran
-// twice in one package (its internal and external test files) is one unit:
-// its runs cannot be told apart path by path.
+// mergeTests keeps every test path of every instance the newer run neither
+// reported nor asked for, and takes the newer lines for the rest.
 function mergeTests(
-  kept: Map<string, string[]>,
+  kept: Map<string, KeptLine[]>,
   newer: PieceGroup,
   covered: (testPath: string) => boolean,
-): Map<string, string[]> {
-  const twice = new Set<string>();
-  for (const [top, n] of newer.topRuns) if (n > 1) twice.add(top);
-  const keptTwice = topsRunTwice(kept);
-  for (const top of keptTwice) if (newer.tests.has(top)) twice.add(top);
-  const underTwice = (p: string) => twice.has(topOf(p));
-
-  const merged = new Map<string, string[]>();
-  for (const [path, lines] of kept) {
-    const fresh = newer.tests.get(path);
-    if (fresh && !underTwice(path)) {
-      merged.set(path, fresh);
-      continue;
-    }
-    if (underTwice(path) || covered(path)) continue;
-    merged.set(path, lines);
+): Map<string, KeptLine[]> {
+  const merged = new Map<string, KeptLine[]>();
+  for (const [key, lines] of kept) {
+    const fresh = newer.tests.get(key);
+    if (fresh) merged.set(key, fresh);
+    else if (!covered(testOf(key))) merged.set(key, lines);
   }
-  for (const [path, lines] of newer.tests) {
-    if (!merged.has(path)) merged.set(path, lines);
+  for (const [key, lines] of newer.tests) {
+    if (!merged.has(key)) merged.set(key, lines);
   }
   return merged;
-}
-
-function topOf(path: string): string {
-  const i = path.indexOf("/");
-  return i < 0 ? path : path.slice(0, i);
-}
-
-function topsRunTwice(tests: Map<string, string[]>): Set<string> {
-  const twice = new Set<string>();
-  for (const [path, lines] of tests) {
-    if (path.includes("/")) continue;
-    let runs = 0;
-    for (const line of lines) if (line.includes('"Action":"run"')) runs++;
-    if (runs > 1) twice.add(path);
-  }
-  return twice;
 }
 
 // coverOf answers whether a -run filter built from these test paths asked

@@ -1,6 +1,9 @@
 package gotestspec_test
 
 import (
+	"bytes"
+	"strings"
+
 	"github.com/mvrahden/go-test/internal/gotestspec"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -34,8 +37,8 @@ func (s *DeclaredTestSuite) TestSameNamedSuitesPairInRunOrder(t *gotest.T) {
 {"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
 {"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
 {"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
-{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove#01"}
-{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove#01","Elapsed":0.01}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove"}
+{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove","Elapsed":0.01}
 {"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
 {"Action":"fail","Package":"example.com/unit","Elapsed":0.05}`)
 	declared := []*gotestspec.Package{declaredOf("example.com/unit",
@@ -120,4 +123,76 @@ func (s *DeclaredTestSuite) TestASuiteOfBenchmarksOnlyIsLeftOut(t *gotest.T) {
 	gotest.Len(t, tree[0].Nodes, 1)
 	gotest.Equal(t, "TestDispatchTestSuite", tree[0].Nodes[0].Name)
 	gotest.Equal(t, 1, gotestspec.CollectStats(tree).NotRun)
+}
+
+func (s *DeclaredTestSuite) TestALoneExternalSuitePairsWithTheRun(t *gotest.T) {
+	observed := treeOf(t, `{"Action":"run","Package":"example.com/ext","Test":"TestExtTestSuite"}
+{"Action":"run","Package":"example.com/ext","Test":"TestExtTestSuite/TestCreate"}
+{"Action":"pass","Package":"example.com/ext","Test":"TestExtTestSuite/TestCreate","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/ext","Test":"TestExtTestSuite","Elapsed":0.02}
+{"Action":"pass","Package":"example.com/ext","Elapsed":0.05}`)
+	declared := []*gotestspec.Package{declaredOf("example.com/ext",
+		&gotestspec.Node{Name: "TestExtTestSuite", External: true, Children: []*gotestspec.Node{method("TestCreate")}},
+	)}
+
+	tree := gotestspec.Overlay(declared, observed)
+	gotest.Len(t, tree[0].Nodes, 1)
+	suite := tree[0].Nodes[0]
+	gotest.Equal(t, gotestspec.StatusPass, suite.Status)
+	gotest.True(t, suite.External)
+	gotest.Equal(t, gotestspec.StatusPass, suite.Children[0].Status)
+}
+
+func (s *DeclaredTestSuite) TestTwinsPairInternalFirst(t *gotest.T) {
+	observed := treeOf(t, `{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate"}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove"}
+{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove","Elapsed":0.01}
+{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"fail","Package":"example.com/unit","Elapsed":0.05}`)
+	declared := []*gotestspec.Package{declaredOf("example.com/unit",
+		&gotestspec.Node{Name: "TestUnitTestSuite", External: true, Variant: 2, Children: []*gotestspec.Node{method("TestRemove")}},
+		&gotestspec.Node{Name: "TestUnitTestSuite", Children: []*gotestspec.Node{method("TestCreate")}},
+	)}
+
+	tree := gotestspec.Overlay(declared, observed)
+	gotest.Len(t, tree[0].Nodes, 2)
+	internal, external := tree[0].Nodes[0], tree[0].Nodes[1]
+	gotest.False(t, internal.External)
+	gotest.Equal(t, gotestspec.StatusPass, internal.Status)
+	gotest.Equal(t, "TestCreate", internal.Children[0].Name)
+	gotest.True(t, external.External)
+	gotest.Equal(t, 2, external.Variant)
+	gotest.Equal(t, gotestspec.StatusFail, external.Status)
+}
+
+// The twin's TestCreate is reported TestCreate#01; the declared spec keeps
+// that, and the JSON says it beside the written name.
+func (s *DeclaredTestSuite) TestATwinsMethodKeepsTheNameGoTestReported(t *gotest.T) {
+	observed := treeOf(t, `{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate"}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate#01"}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate#01","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"pass","Package":"example.com/unit","Elapsed":0.05}`)
+	declared := []*gotestspec.Package{declaredOf("example.com/unit",
+		&gotestspec.Node{Name: "TestUnitTestSuite", Children: []*gotestspec.Node{method("TestCreate")}},
+		&gotestspec.Node{Name: "TestUnitTestSuite", External: true, Children: []*gotestspec.Node{method("TestCreate")}},
+	)}
+
+	tree := gotestspec.Overlay(declared, observed)
+	gotest.Len(t, tree[0].Nodes, 2)
+	gotest.Zero(t, tree[0].Nodes[0].Children[0].Reported)
+	gotest.Equal(t, "TestCreate#01", tree[0].Nodes[1].Children[0].Reported)
+	var out bytes.Buffer
+	gotestspec.RenderJSON(&out, tree)
+	gotest.Equal(t, 1, strings.Count(out.String(), `"reported"`))
+	gotest.Contains(t, out.String(), `"name":"TestCreate","display":"Create",`)
+	gotest.Contains(t, out.String(), `"reported":"TestCreate#01"`)
 }

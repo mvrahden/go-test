@@ -687,6 +687,60 @@ describe("GoTestController broken packages", () => {
   });
 });
 
+describe("GoTestController external twins", () => {
+  beforeEach(() => {
+    mockWorkspaceFolders.length = 0;
+    mockGetWorkspaceFolder.mockReset();
+    mockWorkspaceFolders.push({ name: "ws", uri: { fsPath: "/ws" } });
+  });
+
+  function build(suites: any[]) {
+    const cache = createMockCache([
+      {
+        importPath: "example.com/proj/pkg",
+        dir: "/ws/pkg",
+        wsDir: "/ws",
+        suites,
+      },
+    ]);
+    const ctrl = createController(cache);
+    ctrl.rebuild();
+    return (ctrl.testController.items as any)._map.get("example.com/proj/pkg");
+  }
+
+  it("gives an external twin its own item, tagged, and its copied method the #01 id", () => {
+    const internal = makeSuite("UserRepositoryTestSuite");
+    const external = makeSuite("UserRepositoryTestSuite");
+    external.external = true;
+    external.methods[0].testName = "TestOne#01";
+    const pkgItem = build([internal, external]);
+    const base = "example.com/proj/pkg/UserRepositoryTestSuite";
+
+    expect(collectIds(pkgItem.children).sort()).toEqual([
+      base,
+      `${base}~external`,
+    ]);
+    const twin = pkgItem.children.get(`${base}~external`);
+    expect(twin.tags.map((t: any) => t.id)).toContain("external");
+    expect(pkgItem.children.get(base).tags.map((t: any) => t.id)).not.toContain(
+      "external",
+    );
+    expect(collectIds(twin.children)).toEqual([`${base}~external/TestOne#01`]);
+    expect(collectIds(pkgItem.children.get(base).children)).toEqual([
+      `${base}/TestOne`,
+    ]);
+  });
+
+  it("keeps the plain id for a lone external suite", () => {
+    const lone = makeSuite("OnlyExternalTestSuite");
+    lone.external = true;
+    const pkgItem = build([lone]);
+    expect(collectIds(pkgItem.children)).toEqual([
+      "example.com/proj/pkg/OnlyExternalTestSuite",
+    ]);
+  });
+});
+
 describe("GoTestController benchmark items", () => {
   beforeEach(() => {
     mockWorkspaceFolders.length = 0;

@@ -4,7 +4,10 @@
 // or has to admit it cannot see.
 package behaviors
 
-import "github.com/mvrahden/go-test/pkg/gotest"
+import (
+	"github.com/mvrahden/go-test/internal/gotestast/testdata/behaviors/names"
+	"github.com/mvrahden/go-test/pkg/gotest"
+)
 
 type WalkerTestSuite struct{}
 
@@ -30,7 +33,7 @@ func (s *WalkerTestSuite) TestDuplicateSiblings(t *gotest.T) {
 	})
 }
 
-// A single slash is a level separator; a run of them is not.
+// A slash in a label is part of it: one subtest, however many slashes.
 func (s *WalkerTestSuite) TestSlashes(t *gotest.T) {
 	t.When("a/b grouping", func(t *gotest.T) {
 		t.It("works", func(t *gotest.T) { gotest.True(t, true) })
@@ -41,6 +44,60 @@ func (s *WalkerTestSuite) TestSlashes(t *gotest.T) {
 	t.When("https:// URI", func(t *gotest.T) {
 		t.It("stays one level", func(t *gotest.T) { gotest.True(t, true) })
 	})
+}
+
+// Labels that begin or end with a slash, beside a When whose own label ends in one.
+func (s *WalkerTestSuite) TestWholeNames(t *gotest.T) {
+	t.It("gets ./", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("/abs/pkg", func(t *gotest.T) { gotest.True(t, true) })
+	t.When("reads specs/", func(t *gotest.T) {
+		t.It("holds", func(t *gotest.T) { gotest.True(t, true) })
+	})
+	t.It("b#01", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+// go test counts a name by the whole path, so a sibling spelled like a
+// nested path collides with it.
+func (s *WalkerTestSuite) TestFullNameRepeat(t *gotest.T) {
+	t.When("a", func(t *gotest.T) {
+		t.It("b", func(t *gotest.T) { gotest.True(t, true) })
+	})
+	t.It("a/b", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestRepeatedLeaf(t *gotest.T) {
+	t.It("x", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("x", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestEmptyLabel(t *gotest.T) {
+	t.It("", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestExplicitNumber(t *gotest.T) {
+	t.It("a#01", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+// A written "a#01" takes that number from a later repeat of "a".
+func (s *WalkerTestSuite) TestExplicitNumberFirst(t *gotest.T) {
+	t.It("a#01", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+// A written "a#01" after a repeat of "a" already took that number.
+func (s *WalkerTestSuite) TestExplicitNumberLast(t *gotest.T) {
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a", func(t *gotest.T) { gotest.True(t, true) })
+	t.It("a#01", func(t *gotest.T) { gotest.True(t, true) })
+}
+
+func (s *WalkerTestSuite) TestRepeatedRows(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []keyedRow{{"r", 1}, {"r", 2}}) {
+		sub.It("y", func(it *gotest.T) { gotest.NotZero(it, tc.N) })
+	}
 }
 
 type keyedRow struct {
@@ -102,4 +159,105 @@ func (s *WalkerTestSuite) TestComputedDescription(t *gotest.T) {
 
 func (s *WalkerTestSuite) TestNoBehaviorsAtAll(t *gotest.T) {
 	gotest.True(t, true)
+}
+
+const localName = "local name"
+
+type typedName string
+
+const typedConst typedName = "typed name"
+
+const prefix = "pre "
+
+type bothRow struct {
+	Desc string
+	Name string
+}
+
+type intNameRow struct {
+	Name int
+}
+
+var runtimeName = "known late"
+
+// The type checker knows each of these rows' names.
+func (s *WalkerTestSuite) TestConstantRows(t *gotest.T) {
+	for sub := range gotest.Each(t, []bothRow{
+		{Name: names.PSuite},
+		{Name: localName},
+		{Name: prefix + "x"},
+		{Desc: "", Name: "n"},
+		{Desc: "d", Name: "n"},
+	}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+type typedRow struct{ Name typedName }
+
+// A field of a string kind counts, and the type checker knows its value.
+func (s *WalkerTestSuite) TestTypedConstantRows(t *gotest.T) {
+	for sub := range gotest.Each(t, []typedRow{{Name: typedConst}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// Only a run knows a variable's value, so the row is not listed.
+func (s *WalkerTestSuite) TestVariableRow(t *gotest.T) {
+	for sub := range gotest.Each(t, []bothRow{{Name: "first"}, {Name: runtimeName}, {Name: "third"}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// A Name that is not a string kind does not name the row.
+func (s *WalkerTestSuite) TestIntNameRow(t *gotest.T) {
+	for sub := range gotest.Each(t, []intNameRow{{Name: 3}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// A Desc a variable sets beats a Name the reader could read.
+func (s *WalkerTestSuite) TestVariableDescBeatsName(t *gotest.T) {
+	for sub := range gotest.Each(t, []bothRow{{Desc: runtimeName, Name: "n"}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+type baseName struct{ Name string }
+
+type embeddedRow struct {
+	baseName
+	N int
+}
+
+type shadowRow struct {
+	baseName
+	Name string
+}
+
+// A Name promoted from an embedded struct names the row, so a run knows it.
+func (s *WalkerTestSuite) TestPromotedNameSet(t *gotest.T) {
+	for sub := range gotest.Each(t, []embeddedRow{{baseName: baseName{Name: "promoted"}}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+func (s *WalkerTestSuite) TestPromotedNameUnset(t *gotest.T) {
+	for sub := range gotest.Each(t, []embeddedRow{{N: 1}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// A Name declared on the row itself hides the promoted one.
+func (s *WalkerTestSuite) TestShadowedName(t *gotest.T) {
+	for sub := range gotest.Each(t, []shadowRow{{Name: "direct"}}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
+}
+
+// Rows that are not structs have no field to name them.
+func (s *WalkerTestSuite) TestNonStructRows(t *gotest.T) {
+	for sub := range gotest.Each(t, []string{"a", "b"}) {
+		sub.It("runs", func(it *gotest.T) {})
+	}
 }

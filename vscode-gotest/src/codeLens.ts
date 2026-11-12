@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
 import type { DiscoveryCache } from "./discovery.js";
+import { methodItemId, suiteItemId } from "./types.js";
 import { sessionCrasherCounts } from "./fuzz.js";
 import { hostPlatform, type BenchResultStore } from "./benchResultStore.js";
 import { formatBenchAnnotation } from "./benchReport.js";
@@ -98,7 +99,7 @@ export class GoTestCodeLensProvider
       const suiteInFile = path.join(pkg.dir, suite.file) === docPath;
       if (suiteInFile) {
         const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
-        const testPath = `${importPath}/${suite.name}`;
+        const testPath = suiteItemId(importPath, suite, pkg.suites);
 
         lenses.push(
           new vscode.CodeLens(range, {
@@ -123,7 +124,10 @@ export class GoTestCodeLensProvider
       for (let i = 0; i < fileMethods.length; i++) {
         const method = fileMethods[i];
         const range = new vscode.Range(method.line - 1, 0, method.line - 1, 0);
-        const testPath = `${importPath}/${suite.name}/${method.name}`;
+        const testPath = methodItemId(
+          suiteItemId(importPath, suite, pkg.suites),
+          method,
+        );
 
         lenses.push(
           new vscode.CodeLens(range, {
@@ -236,7 +240,9 @@ export class GoTestCodeLensProvider
           new vscode.CodeLens(range, {
             title: "▶ Run",
             command: "gotest.runTest",
-            arguments: [`${importPath}/${suite.name}/${method.name}`],
+            arguments: [
+              methodItemId(suiteItemId(importPath, suite, pkg.suites), method),
+            ],
           }),
           new vscode.CodeLens(range, {
             title: "▶ Fuzz",
@@ -267,7 +273,7 @@ export class GoTestCodeLensProvider
 
       if (suiteInFile && suiteHasSnapshots) {
         const range = new vscode.Range(suite.line - 1, 0, suite.line - 1, 0);
-        const testPath = `${importPath}/${suite.name}`;
+        const testPath = suiteItemId(importPath, suite, pkg.suites);
         lenses.push(
           new vscode.CodeLens(range, {
             title: "↻ Update Snapshots",

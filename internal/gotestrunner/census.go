@@ -71,6 +71,9 @@ type streamEvent struct {
 	Test    string  `json:"Test,omitempty"`
 	Output  string  `json:"Output,omitempty"`
 	Elapsed float64 `json:"Elapsed,omitempty"`
+	// Gotest is the event's stamp: read from the stream, and carried by a
+	// booked event of a later instance.
+	Gotest *protocol.Stamp `json:"Gotest,omitempty"`
 }
 
 // verdictIndex keeps, from the JSON stream written through it, the last
@@ -85,6 +88,9 @@ type verdictIndex struct {
 	benchOrder []CensusCase
 	running    map[CensusCase]bool
 	started    []CensusCase
+	// instance is the run of its top-level name a unit last started in:
+	// a suite of both test packages runs twice in one process.
+	instance map[CensusCase]int
 	// resulted holds the units that printed a result line of their own
 	// (--- PASS/FAIL/SKIP); cut holds those the converter failed without one,
 	// because the binary ended under them. A cut unit is what a deadline cut
@@ -174,6 +180,13 @@ func (x *verdictIndex) observe(line []byte) {
 				x.started = append(x.started, key)
 			}
 			x.running[key] = true
+			if x.instance == nil {
+				x.instance = map[CensusCase]int{}
+			}
+			x.instance[key] = 1
+			if ev.Gotest != nil && ev.Gotest.Instance > 1 {
+				x.instance[key] = ev.Gotest.Instance
+			}
 			x.ranNow = append(x.ranNow, key)
 			delete(x.resulted, key)
 			delete(x.waiting, key)
@@ -418,11 +431,7 @@ func (c *OutputCollector) takeCensus(cfg PipelineConfig, declared DeclaredUnits,
 		code = 2
 	}
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
-	w := c.jsonTarget()
-	for i := range booked {
-		line, _ := json.Marshal(booked[i])
-		_, _ = w.Write(append(line, '\n'))
-	}
+	writeBooked(c.jsonTarget(), booked)
 	return code
 }
 
@@ -455,10 +464,19 @@ func (x *verdictIndex) suiteFailures(units []CensusCase) []streamEvent {
 		seen[suite] = true
 		v, settled := x.last[suite]
 		if _, started := x.running[suite]; settled || started {
-			fail = append(fail, streamEvent{Time: v.Time, Action: "fail", Package: suite.Pkg, Test: suite.Path, Elapsed: v.Elapsed})
+			fail = append(fail, streamEvent{Time: v.Time, Action: "fail", Package: suite.Pkg, Test: suite.Path, Elapsed: v.Elapsed, Gotest: x.stamp(suite)})
 		}
 	}
 	return fail
+}
+
+// stamp is what a booked event of unit carries: the instance it last
+// started in, when that is a later one.
+func (x *verdictIndex) stamp(unit CensusCase) *protocol.Stamp {
+	if n := x.instance[unit]; n > 1 {
+		return &protocol.Stamp{Instance: n}
+	}
+	return nil
 }
 
 // cutShortUnits returns the suites whose process the run's context ended.
@@ -484,19 +502,15 @@ func (c *OutputCollector) bookDeadline(dispatchErr error) []CensusCase {
 	running := c.verdicts.runningUnits()
 	booked := make([]streamEvent, 0, 2*len(running))
 	for _, r := range running {
-		booked = append(booked, streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n"})
+		booked = append(booked, streamEvent{Action: "output", Package: r.Pkg, Test: r.Path, Output: "    gotest: --timeout expired while this test was running\n", Gotest: c.verdicts.stamp(r)})
 		// A unit the converter already failed keeps that verdict.
 		if c.verdicts.running[r] {
-			booked = append(booked, streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path})
+			booked = append(booked, streamEvent{Action: "fail", Package: r.Pkg, Test: r.Path, Gotest: c.verdicts.stamp(r)})
 		}
 	}
 	booked = append(booked, c.verdicts.suiteFailures(running)...)
 	booked = append(booked, c.verdicts.packageFailures(booked)...)
-	w := c.jsonTarget()
-	for i := range booked {
-		line, _ := json.Marshal(booked[i])
-		_, _ = w.Write(append(line, '\n'))
-	}
+	writeBooked(c.jsonTarget(), booked)
 	return running
 }
 
@@ -542,4 +556,15 @@ func (x *verdictIndex) packageFailures(booked []streamEvent) []streamEvent {
 		fail = append(fail, streamEvent{Time: v.Time, Action: "fail", Package: pkg, Elapsed: v.Elapsed})
 	}
 	return fail
+}
+
+// writeBooked writes the events the run booked itself, stamped like a suite
+// process's; an event that carries its stamp keeps it.
+func writeBooked(w io.Writer, booked []streamEvent) {
+	var block []byte
+	for i := range booked {
+		line, _ := json.Marshal(booked[i])
+		block = append(append(block, line...), '\n')
+	}
+	_, _ = w.Write(stampBlock(block))
 }

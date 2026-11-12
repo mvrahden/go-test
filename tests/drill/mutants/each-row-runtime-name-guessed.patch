@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / the spec read from source lists no row for it and marks its method incomplete
+Clause: when a table row's name is known only at run time → the spec read from source lists no row for it and marks its method incomplete
+Clause: when a table row's name is known only at run time → the declared spec under the run shows the row the run reported
+--- a/internal/gotestast/behaviors.go
++++ b/internal/gotestast/behaviors.go
+@@ -347,7 +347,7 @@ func (w *behaviorWalker) eachEntryName(elt ast.Expr, index int) (name string, kn
+ 		}
+ 		value, ok := w.stringConstant(expr)
+ 		if !ok {
+-			return "", false
++			return byIndex, true
+ 		}
+ 		if value != "" {
+ 			return value, true

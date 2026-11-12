@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec .* / when a label opens a list, a heading, a quote or a code block / the Markdown spec shows it as text \(
+Clause: when a label opens a list, a heading, a quote or a code block → the Markdown spec shows it as text
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -292,7 +292,9 @@
+ // a heading, quote, list marker or ordered-list number would start a block.
+ // Leading blanks go: four of them would open a code block.
+ func escapeItemStart(label string) string {
+-	label = strings.TrimLeft(label, " \t")
++	if label != "" {
++		return EscapeLabel(label)
++	}
+ 	if label == "" {
+ 		return ""
+ 	}

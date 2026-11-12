@@ -36,6 +36,7 @@ func (s *ExcludedAndDeclaredTestSuite) TestAnExcludedSuite(t *gotest.T) {
 }
 
 type declaredBehavior struct {
+	Name     string             `json:"name"`
 	Display  string             `json:"display"`
 	Kind     string             `json:"kind"`
 	Children []declaredBehavior `json:"children"`

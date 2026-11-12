@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"time"
+
+	"github.com/mvrahden/go-test/internal/protocol"
 )
 
 type Action string
@@ -47,6 +49,8 @@ type TestEvent struct {
 	// RunLevel marks an event of a package gotest's run booked for itself
 	// ("shared fixtures", "interrupted", …) rather than for an import path.
 	RunLevel bool `json:"RunLevel"`
+	// Gotest says where the test sits, when gotest's runner wrote the event.
+	Gotest *protocol.Stamp `json:"Gotest,omitempty"`
 }
 
 func ParseEvents(r io.Reader) ([]TestEvent, error) {

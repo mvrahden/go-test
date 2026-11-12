@@ -28,6 +28,8 @@ type specNode struct {
 	Status     string     `json:"status"`
 	Duration   float64    `json:"duration"`
 	Incomplete bool       `json:"incomplete"`
+	External   bool       `json:"external"`
+	Variant    int        `json:"variant"`
 	File       string     `json:"file"`
 	Line       int        `json:"line"`
 	Children   []specNode `json:"children"`

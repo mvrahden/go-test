@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/spec .* / when the Markdown spec of a run with failures and rows not run / an external suite's heading is marked EXTERNAL \(
+Clause: when the Markdown spec of a run with failures and rows not run → an external suite's heading is marked EXTERNAL
+--- a/internal/gotestspec/markdown.go
++++ b/internal/gotestspec/markdown.go
+@@ -152,9 +152,6 @@
+ 	if n.Focused {
+ 		heading += " — FOCUSED"
+ 	}
+-	if n.External {
+-		heading += " — EXTERNAL"
+-	}
+ 	if bare && n.Excluded {
+ 		// Read from source, a parked suite still lists what it declares;
+ 		// unmarked, those behaviors read as live ones.

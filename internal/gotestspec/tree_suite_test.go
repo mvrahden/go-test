@@ -2,6 +2,7 @@
 package gotestspec_test //nolint:fail-guard
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestspec"
@@ -179,33 +180,6 @@ func (s *TreeTestSuite) TestCollectStats_StdlibOnly(t *gotest.T, _ *treeCtx) {
 	mustEq(t, "behaviors", stats.Behaviors, 0)
 	mustEq(t, "tests", stats.Tests, 2)
 	mustEq(t, "passed", stats.Passed, 2)
-}
-
-func (s *TreeTestSuite) TestSplitTestPath(t *gotest.T, _ *treeCtx) {
-	for sub, tc := range gotest.Each(t, []struct {
-		Desc string
-		path string
-		want []string
-	}{
-		{Desc: "single segment", path: "TestFoo", want: []string{"TestFoo"}},
-		{Desc: "two segments", path: "TestFoo/bar", want: []string{"TestFoo", "bar"}},
-		{Desc: "three segments", path: "TestFoo/bar/baz", want: []string{"TestFoo", "bar", "baz"}},
-		{Desc: "consecutive double slash preserved", path: "TestFoo/https://example.com", want: []string{"TestFoo", "https://example.com"}},
-		{Desc: "consecutive triple slash preserved", path: "TestFoo/a///b", want: []string{"TestFoo", "a///b"}},
-		{Desc: "empty string", path: "", want: []string{}},
-		{Desc: "trailing slash", path: "TestFoo/bar/", want: []string{"TestFoo", "bar"}},
-		{Desc: "mixed normal and double slash", path: "TestSuite/method/https://host/path", want: []string{"TestSuite", "method", "https://host", "path"}},
-	}) {
-		got := gotestspec.ExportSplitTestPath(tc.path)
-		if len(got) != len(tc.want) {
-			fatalf(sub, "splitTestPath(%q) = %v, want %v", tc.path, got, tc.want)
-		}
-		for i := range got {
-			if got[i] != tc.want[i] {
-				sub.Errorf("splitTestPath(%q)[%d] = %q, want %q", tc.path, i, got[i], tc.want[i])
-			}
-		}
-	}
 }
 
 // Go runs a same-named suite from ptest and pxtest twice and appends #01 to
@@ -512,4 +486,239 @@ func (s *TreeTestSuite) TestBuildTree_DuplicateSuiteMethodsWithoutSuffix(t *gote
 	mustEq(t, "external method", external.Children[0].Name, "TestSecret")
 	mustEq(t, "external status", external.Status, gotestspec.StatusFail)
 	mustEq(t, "external", external.External, true)
+}
+
+// methodOf returns the only suite's only method, halting otherwise.
+func methodOf(t *gotest.T, tree []*gotestspec.Package) *gotestspec.Node {
+	mustLen(t, "packages", tree, 1)
+	mustLen(t, "root nodes", tree[0].Nodes, 1)
+	mustLen(t, "methods", tree[0].Nodes[0].Children, 1)
+	return tree[0].Nodes[0].Children[0]
+}
+
+func (s *TreeTestSuite) TestATrailingSlashLabelIsOneBehavior(t *gotest.T, _ *treeCtx) {
+	m := methodOf(t, treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/gets_./"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/gets_./","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`))
+	mustLen(t, "behaviors", m.Children, 1)
+	mustEq(t, "behavior name", m.Children[0].Name, "gets_./")
+	mustEq(t, "behavior status", m.Children[0].Status, gotestspec.StatusPass)
+}
+
+func (s *TreeTestSuite) TestALeadingSlashLabelIsOneBehavior(t *gotest.T, _ *treeCtx) {
+	m := methodOf(t, treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM//abs/pkg"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM//abs/pkg","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`))
+	mustEq(t, "method name", m.Name, "TestM")
+	mustLen(t, "behaviors", m.Children, 1)
+	mustEq(t, "behavior name", m.Children[0].Name, "/abs/pkg")
+	mustEq(t, "behavior status", m.Children[0].Status, gotestspec.StatusPass)
+}
+
+func (s *TreeTestSuite) TestAGroupEndingInASlashKeepsItsChild(t *gotest.T, _ *treeCtx) {
+	m := methodOf(t, treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/reads_specs/"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/reads_specs//holds"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/reads_specs//holds","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/reads_specs/","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`))
+	mustLen(t, "groups", m.Children, 1)
+	group := m.Children[0]
+	mustEq(t, "group name", group.Name, "reads_specs/")
+	mustLen(t, "group children", group.Children, 1)
+	mustEq(t, "child name", group.Children[0].Name, "holds")
+	mustEq(t, "child status", group.Children[0].Status, gotestspec.StatusPass)
+}
+
+func (s *TreeTestSuite) TestADotThenDotPkgAreSiblings(t *gotest.T, _ *treeCtx) {
+	m := methodOf(t, treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/."}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/.","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/./pkg"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/./pkg","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`))
+	mustLen(t, "siblings", m.Children, 2)
+	mustEq(t, "first name", m.Children[0].Name, ".")
+	mustEq(t, "second name", m.Children[1].Name, "./pkg")
+	mustEq(t, "first status", m.Children[0].Status, gotestspec.StatusPass)
+	mustEq(t, "second status", m.Children[1].Status, gotestspec.StatusPass)
+}
+
+// The external twin's TestCreate is written TestCreate#01, its own TestRemove
+// without a suffix; each lands in its own suite.
+func (s *TreeTestSuite) TestTwinSuitesKeepTheirOwnMethods(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate"}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate#01"}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate#01","Elapsed":0.01}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove"}
+{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite/TestRemove","Elapsed":0.01}
+{"Action":"fail","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+{"Action":"fail","Package":"example.com/unit","Elapsed":0.05}`)
+	mustLen(t, "packages", tree, 1)
+	mustLen(t, "root nodes", tree[0].Nodes, 2)
+	internal, external := tree[0].Nodes[0], tree[0].Nodes[1]
+	mustEq(t, "internal external", internal.External, false)
+	mustEq(t, "internal variant", internal.Variant, 0)
+	mustLen(t, "internal methods", internal.Children, 1)
+	mustEq(t, "internal method", internal.Children[0].Name, "TestCreate")
+	mustEq(t, "internal status", internal.Status, gotestspec.StatusPass)
+	mustEq(t, "external external", external.External, true)
+	mustEq(t, "external variant", external.Variant, 2)
+	mustLen(t, "external methods", external.Children, 2)
+	mustEq(t, "external first method", external.Children[0].Name, "TestCreate")
+	mustEq(t, "external second method", external.Children[1].Name, "TestRemove")
+	mustEq(t, "external first method reported", external.Children[0].Reported, "TestCreate#01")
+	mustEq(t, "external second method reported", external.Children[1].Reported, "")
+	mustEq(t, "internal method reported", internal.Children[0].Reported, "")
+	mustEq(t, "external status", external.Status, gotestspec.StatusFail)
+}
+
+func (s *TreeTestSuite) TestAnOrphanedSubtestStillLands(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/a/b"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/a/b","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`)
+	m := methodOf(t, tree)
+	mustEq(t, "suite status", tree[0].Nodes[0].Status, gotestspec.StatusPass)
+	mustEq(t, "method name", m.Name, "TestM")
+	mustLen(t, "method children", m.Children, 1)
+	a := m.Children[0]
+	mustEq(t, "group name", a.Name, "a")
+	mustLen(t, "group children", a.Children, 1)
+	mustEq(t, "leaf name", a.Children[0].Name, "b")
+	mustEq(t, "leaf status", a.Children[0].Status, gotestspec.StatusPass)
+}
+
+func (s *TreeTestSuite) TestFuzzSeedsKeepTheirNames(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"FuzzCodecTestSuite_FuzzRoundTrip"}
+{"Action":"run","Package":"p","Test":"FuzzCodecTestSuite_FuzzRoundTrip/seed#0"}
+{"Action":"pass","Package":"p","Test":"FuzzCodecTestSuite_FuzzRoundTrip/seed#0","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"FuzzCodecTestSuite_FuzzRoundTrip","Elapsed":0.01}
+{"Action":"pass","Package":"p","Elapsed":0.02}`)
+	target := methodOf(t, tree)
+	mustEq(t, "target kind", target.Kind, gotestspec.KindFuzz)
+	mustLen(t, "seeds", target.Children, 1)
+	mustEq(t, "seed name", target.Children[0].Name, "seed#0")
+	mustEq(t, "seed display", target.Children[0].Display, "seed #1")
+}
+
+// A child reported before its parents is hung on guessed levels; the
+// parents' runs, arriving later, put each where it sits and drop the guess.
+func (s *TreeTestSuite) TestAParentsLateRunReplacesItsGuess(t *gotest.T, _ *treeCtx) {
+	m := methodOf(t, treeOf(t, `{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/x/y/leaf"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/x/y/leaf","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/x/y"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/x/y","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`))
+	mustLen(t, "method children", m.Children, 1)
+	group := m.Children[0]
+	mustEq(t, "group name", group.Name, "x/y")
+	mustEq(t, "group status", group.Status, gotestspec.StatusPass)
+	mustLen(t, "group children", group.Children, 1)
+	mustEq(t, "leaf name", group.Children[0].Name, "leaf")
+}
+
+// stampedTwins is a stamped stream: a suite of both test packages, and a
+// paused "." beside "./pkg", which only the stream's order told apart.
+var stampedTwins = []string{
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite","Gotest":{"Subtest":"TestSTestSuite"}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate","Gotest":{"Subtest":"TestCreate"}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate/.","Gotest":{"Subtest":"."}}`,
+	`{"Action":"pause","Package":"p","Test":"TestSTestSuite/TestCreate/."}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate/./pkg","Gotest":{"Subtest":"./pkg"}}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestCreate/./pkg","Elapsed":0}`,
+	`{"Action":"cont","Package":"p","Test":"TestSTestSuite/TestCreate/."}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestCreate/.","Elapsed":0}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestCreate","Elapsed":0}`,
+	`{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite","Gotest":{"Subtest":"TestSTestSuite","Instance":2}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate#01","Gotest":{"Subtest":"TestCreate#01","Repeat":1,"Instance":2}}`,
+	`{"Action":"run","Package":"p","Test":"TestSTestSuite/TestCreate#01/when_x","Gotest":{"Subtest":"when_x","Instance":2}}`,
+	`{"Action":"output","Package":"p","Test":"TestSTestSuite/TestCreate#01/when_x","Output":"    boom\n","Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Test":"TestSTestSuite/TestCreate#01/when_x","Elapsed":0,"Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Test":"TestSTestSuite/TestCreate#01","Elapsed":0,"Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Test":"TestSTestSuite","Elapsed":0,"Gotest":{"Instance":2}}`,
+	`{"Action":"fail","Package":"p","Elapsed":0.01}`,
+}
+
+// hoistRuns puts every run event first, as a stream composed of several
+// runs can.
+func hoistRuns(lines []string) []string {
+	var runs, rest []string
+	for _, l := range lines {
+		if strings.Contains(l, `"Action":"run"`) {
+			runs = append(runs, l)
+		} else {
+			rest = append(rest, l)
+		}
+	}
+	return append(runs, rest...)
+}
+
+func renderedTree(t *gotest.T, lines []string) string {
+	var b strings.Builder
+	gotestspec.RenderJSON(&b, treeOf(t, strings.Join(lines, "\n")))
+	return b.String()
+}
+
+func (s *TreeTestSuite) TestAStampedStreamNeedsNoOrder(t *gotest.T, _ *treeCtx) {
+	want := renderedTree(t, stampedTwins)
+	mustEq(t, "hoisted stamped tree", renderedTree(t, hoistRuns(stampedTwins)), want)
+
+	unstamped := make([]string, len(stampedTwins))
+	for i, l := range stampedTwins {
+		unstamped[i] = regexp.MustCompile(`,"Gotest":\{[^{}]*\}`).ReplaceAllString(l, "")
+	}
+	mustEq(t, "unstamped tree in stream order", renderedTree(t, unstamped), want)
+	// The hoisting matters: without stamps it misplaces.
+	if renderedTree(t, hoistRuns(unstamped)) == want {
+		t.Errorf("hoisting an unstamped stream changed nothing; the test does not reorder")
+	}
+}
+
+// A package that is stamped in part, as a stream composed from an older and
+// a newer CLI is, places its unstamped events by the fallback split.
+func (s *TreeTestSuite) TestAnUnstampedEventOfAStampedPackageFallsBack(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestATestSuite","Gotest":{"Subtest":"TestATestSuite"}}
+{"Action":"pass","Package":"p","Test":"TestATestSuite","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestSTestSuite"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM"}
+{"Action":"run","Package":"p","Test":"TestSTestSuite/TestM/a/b"}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM/a/b","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite/TestM","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestSTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.01}`)
+	mustLen(t, "root nodes", tree[0].Nodes, 2)
+	suite := tree[0].Nodes[1]
+	mustEq(t, "suite name", suite.Name, "TestSTestSuite")
+	mustEq(t, "suite status", suite.Status, gotestspec.StatusPass)
+	mustLen(t, "methods", suite.Children, 1)
+	m := suite.Children[0]
+	mustLen(t, "method children", m.Children, 1)
+	mustEq(t, "split level", m.Children[0].Name, "a")
+	mustLen(t, "split children", m.Children[0].Children, 1)
+	mustEq(t, "split leaf", m.Children[0].Children[0].Name, "b")
+	mustEq(t, "leaf status", m.Children[0].Children[0].Status, gotestspec.StatusPass)
 }
