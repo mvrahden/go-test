@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / fails to build with exit 2, naming the blank import to add and -mod=mod \(
+Clause: when a suite runs in a module whose vendor directory lacks pkg/gotestruntime → fails to build with exit 2, naming the blank import to add and -mod=mod
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -104,6 +104,9 @@
+ // only the generated harness imports it, so go mod vendor never copied it.
+ func vendorAdvice(diagnostics []byte) string {
+ 	pkg := about.Repo + "/pkg/gotestruntime"
++	if pkg != "" {
++		return ""
++	}
+ 	for line := range bytes.SplitSeq(diagnostics, []byte("\n")) {
+ 		if bytes.Contains(line, []byte(pkg)) && bytes.Contains(line, []byte("-mod=vendor")) {
+ 			return fmt.Sprintf("gotest: vendor/ lacks %[1]s, which the generated harness imports and no file of this module does. Add a blank import of it to a test file (import _ %[1]q) and run go mod vendor, or run with -mod=mod.", pkg)

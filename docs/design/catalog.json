@@ -9525,6 +9525,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "fails to build with exit 2, naming the blank import to add and -mod=mod",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "vendored_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 42,
+                      "name": "fails_to_build_with_exit_2,_naming_the_blank_import_to_add_and_-mod=mod",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite runs in a module whose vendor directory lacks pkg/gotestruntime",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "vendored_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 41,
+                  "name": "a_suite_runs_in_a_module_whose_vendor_directory_lacks_pkg/gotestruntime",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AModuleVendoredWithoutTheRuntime",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "vendored_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestAModuleVendoredWithoutTheRuntime",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIVendored",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "vendored_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestCLIVendoredTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 0 and prints the version on stdout",
                       "duration": 0,
                       "excluded": false,
@@ -29207,13 +29268,13 @@
     }
   ],
   "stats": {
-    "behaviors": 848,
+    "behaviors": 849,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 116,
+    "suites": 117,
     "tests": 0
   }
 }

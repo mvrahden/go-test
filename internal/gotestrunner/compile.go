@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
 
@@ -93,7 +94,22 @@ func compileError(pkgPath string, err error, diagnostics []byte) error {
 	if len(diagnostics) == 0 {
 		return fmt.Errorf("compile %s: %w", pkgPath, err)
 	}
+	if advice := vendorAdvice(diagnostics); advice != "" {
+		return fmt.Errorf("compile %s: %w\n%s\n%s", pkgPath, err, diagnostics, advice)
+	}
 	return fmt.Errorf("compile %s: %w\n%s", pkgPath, err, diagnostics)
+}
+
+// vendorAdvice names the fix for a vendor directory that lacks the runtime:
+// only the generated harness imports it, so go mod vendor never copied it.
+func vendorAdvice(diagnostics []byte) string {
+	pkg := about.Repo + "/pkg/gotestruntime"
+	for line := range bytes.SplitSeq(diagnostics, []byte("\n")) {
+		if bytes.Contains(line, []byte(pkg)) && bytes.Contains(line, []byte("-mod=vendor")) {
+			return fmt.Sprintf("gotest: vendor/ lacks %[1]s, which the generated harness imports and no file of this module does. Add a blank import of it to a test file (import _ %[1]q) and run go mod vendor, or run with -mod=mod.", pkg)
+		}
+	}
+	return ""
 }
 
 func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir, cacheDir string, compileParallel int) ([]CompileResult, []BuildFailure) {
