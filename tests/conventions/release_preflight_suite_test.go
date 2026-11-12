@@ -47,6 +47,21 @@ var isolatedGit = []string{"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1
 
 type preflightRepo struct{ dir, bin, sha, log string }
 
+const skillFile = "skills/writing-gotest-tests/SKILL.md"
+
+// skillDescribing is a skill whose version line names minor, as the real one does.
+func skillDescribing(minor string) string {
+	return "# Writing gotest tests\n\nThis skill describes **" + minor + "**. On a release you could not upgrade from, read the notes.\n"
+}
+
+// commitAndPush records the working tree on main and pushes it.
+func (r *preflightRepo) commitAndPush(t *gotest.T, msg string) {
+	r.git(t, "add", "-A")
+	r.commit(t, msg)
+	r.git(t, "push", "-q", "origin", "main")
+	r.sha = strings.TrimSpace(r.git(t, "rev-parse", "HEAD"))
+}
+
 // stagePreflight makes a repository on main with go.mod and the two floor
 // files, pushed to a bare origin with tag v1.37.0, and a bin directory
 // holding the stand-ins. An empty floor leaves the constant out of its file.
@@ -64,6 +79,7 @@ func stagePreflight(t *gotest.T, runtimeFloor, cliFloor string) preflightRepo {
 	r.write(t, "go.mod", "module example.com/rel\n")
 	r.write(t, "internal/gotestgen/runtimeversion.go", runtimeSrc)
 	r.write(t, "vscode-gotest/src/cli.ts", cliSrc)
+	r.write(t, skillFile, skillDescribing("v1.38"))
 	for _, name := range []string{"curl", "gh"} {
 		gotest.NoError(t, os.WriteFile(filepath.Join(r.bin, name), []byte(preflightStandIn), 0o700)) //nolint:gosec // G306: an executable
 	}
@@ -142,9 +158,38 @@ func (s *ReleasePreflightTestSuite) TestTheFloorItselfMayBeReleased(t *gotest.T)
 
 func (s *ReleasePreflightTestSuite) TestAboveTheFloorsMayBeReleased(t *gotest.T) {
 	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	r.write(t, skillFile, skillDescribing("v1.39"))
+	r.commitAndPush(t, "skill")
 	exit, stdout, stderr := r.run(t, "v1.39.0")
 	gotest.Equal(t, 0, exit, "stdout: %s\nstderr: %s", stdout, stderr)
 	gotest.Contains(t, stdout, "preflight: v1.39.0 may be released from "+r.sha, "stdout: %s\nstderr: %s", stdout, stderr)
+}
+
+func (s *ReleasePreflightTestSuite) TestTheSkillDescribingTheReleaseMayBeReleased(t *gotest.T) {
+	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	exit, stdout, stderr := r.run(t, "v1.38.2")
+	gotest.Equal(t, 0, exit, "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stdout, "ok    "+skillFile+" describes v1.38", "stdout: %s\nstderr: %s", stdout, stderr)
+}
+
+func (s *ReleasePreflightTestSuite) TestASkillDescribingAnotherVersionIsRefused(t *gotest.T) {
+	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	exit, stdout, stderr := r.run(t, "v1.39.0")
+	gotest.Equal(t, 1, exit, "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stderr, "preflight: v1.39.0 is not the version "+skillFile+" describes (v1.38) at ", "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stderr, `update its "This skill describes" line to v1.39`, "stdout: %s\nstderr: %s", stdout, stderr)
+	_, err := os.Stat(r.log)
+	gotest.ErrorIs(t, err, fs.ErrNotExist, "nothing may ask the proxy or gh; stdout: %s\nstderr: %s", stdout, stderr)
+}
+
+func (s *ReleasePreflightTestSuite) TestASkillWithoutItsVersionLineIsRefused(t *gotest.T) {
+	r := stagePreflight(t, "v1.38.0", "v1.38.0")
+	r.write(t, skillFile, "# Writing gotest tests\n\nNo version here.\n")
+	r.commitAndPush(t, "skill")
+	exit, stdout, stderr := r.run(t, "v1.38.0")
+	gotest.Equal(t, 1, exit, "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stderr, "preflight: cannot read the version "+skillFile+" describes at ", "stdout: %s\nstderr: %s", stdout, stderr)
+	gotest.Contains(t, stderr, `it needs a line such as "This skill describes **v1.38**."`, "stdout: %s\nstderr: %s", stdout, stderr)
 }
 
 func (s *ReleasePreflightTestSuite) TestTheFloorsAreReadFromTheCommit(t *gotest.T) {
@@ -179,6 +224,7 @@ func (s *ReleasePreflightTestSuite) TestTheRepositorysOwnFloorFilesAreRead(t *go
 		gotest.NoError(t, err)
 		r.write(t, rel, string(data))
 	}
+	r.write(t, skillFile, skillDescribing("v999.0"))
 	r.commit(t, "real", "-a")
 	r.git(t, "push", "-q", "origin", "main")
 	exit, stdout, stderr := r.run(t, "v999.0.0")
