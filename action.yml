@@ -92,6 +92,7 @@ runs:
       run: go install github.com/mvrahden/go-test/cmd/gotest@"$GOTEST_VERSION"
 
     - name: Resolve the gotest command
+      id: resolve
       if: ${{ inputs.version == 'gomod' }}
       shell: bash
       run: |
@@ -101,7 +102,14 @@ runs:
         # workspace go.sum is the union of its modules'.
         pkg=github.com/mvrahden/go-test/cmd/gotest
         notice="::notice title=gotest::go.mod does not declare the gotest tool; declare it with: go get -tool $pkg@<pinned version>"
-        if go tool 2>/dev/null | grep -q "($pkg)"; then
+        # Read from go.mod, of every use module in a workspace: the go tool
+        # listing differs between Go releases.
+        declared=
+        while IFS= read -r gomod; do
+          json=$(go mod edit -json "$gomod" 2>/dev/null) || continue
+          case "$json" in *"\"Path\": \"$pkg\""*) declared=1 ;; esac
+        done < <(go list -m -f '{{.GoMod}}' 2>/dev/null)
+        if [ -n "$declared" ]; then
           echo "GOTEST_CMD=go tool $pkg" >> "$GITHUB_ENV"
         elif [ -n "$(go env GOWORK)" ]; then
           go list -m 2>/dev/null | grep -qx github.com/mvrahden/go-test || echo "$notice"

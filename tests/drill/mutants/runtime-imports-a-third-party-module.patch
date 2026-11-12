@@ -1,0 +1,25 @@
+Expect: ^FAIL .*conformance/cli .* / runs its suites and exits 0 \(
+Clause: when a tidied module requires gotest and declares no tool directive → runs its suites and exits 0
+--- a/internal/control/control_unix.go
++++ b/internal/control/control_unix.go
+@@ -8,6 +8,8 @@
+ 	"strconv"
+ 	"sync"
+ 	"syscall"
++
++	"golang.org/x/sys/unix"
+ )
+ 
+ // movedFD is the lowest descriptor Claim moves the channel to, out of the
+@@ -62,9 +64,9 @@
+ 	if syscall.Fstat(fd, &st) != nil || st.Mode&syscall.S_IFMT != syscall.S_IFSOCK {
+ 		return nil
+ 	}
+-	if moved, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(fd), syscall.F_DUPFD_CLOEXEC, movedFD); errno == 0 {
++	if moved, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, movedFD); err == nil {
+ 		_ = syscall.Close(fd)
+-		fd = int(moved)
++		fd = moved
+ 	} else {
+ 		// A descriptor limit at or below movedFD leaves the channel in place,
+ 		// and so does OpenBSD, where syscall.Syscall takes no fcntl.

@@ -359,7 +359,7 @@ func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []got
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			proc, err := StartSharedFixtures(ctx, overlay.WorkDir, fixtures, setupTimeout)
+			proc, err := StartSharedFixtures(ctx, overlay.WorkDir, fixtures, setupTimeout, buildFlags...)
 			if err != nil {
 				p.setupErr = fmt.Errorf("shared fixture setup failed: %w", err)
 				return
@@ -693,7 +693,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			// after every suite has stopped. The pipeline ctx stays attached
 			// as the safety net so an abnormal runner death still releases
 			// the process group.
-			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, win.Fixtures, resolvedSetupTimeout)
+			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, win.Fixtures, resolvedSetupTimeout, pf.BuildFlags...)
 			if err != nil {
 				fixtureStartErr = err
 				if ctx.Err() == nil {

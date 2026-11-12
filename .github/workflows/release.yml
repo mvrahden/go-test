@@ -83,7 +83,7 @@ jobs:
     timeout-minutes: 5
     needs: [preflight, test, drill-shards]
     permissions:
-      contents: write
+      contents: read
     strategy:
       matrix:
         include:
@@ -113,18 +113,52 @@ jobs:
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
           version="$TAG ($(git rev-parse --short HEAD))"
           go build -ldflags="-s -w -X 'github.com/mvrahden/go-test/internal/about.Version=${version}'" -o "gotest-${GOOS}-${GOARCH}${ext}" ./cmd/gotest
+      - name: Keep the binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: gotest-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: gotest-*
+          if-no-files-found: error
+
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: gotest-*
+          path: dist
+          merge-multiple: true
+      - name: Smoke-run the binary
+        id: smoke
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          bin="$PWD/dist/gotest-linux-amd64"
+          chmod +x "$bin"
+          reported=$("$bin" version)
+          case "$reported" in
+            "gotest $TAG ("*) ;;
+            *) echo "::error::gotest-linux-amd64 reports '$reported', not $TAG"; exit 1 ;;
+          esac
+          (cd examples && "$bin" ./cart/...)
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          gh release upload "$TAG" gotest-*
+          gh release upload "$TAG" dist/gotest-*
 
   update-major-tag:
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: build
+    needs: publish
     permissions:
       contents: write
     steps:
@@ -142,7 +176,7 @@ jobs:
 
   extension:
     if: ${{ !github.event.release.prerelease }}
-    needs: build
+    needs: publish
     permissions:
       contents: write
       id-token: write

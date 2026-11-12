@@ -778,6 +778,7 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |
 | `e2e-assertion-line-left-to-testing` | testing's location for a failure points into gotest | canary: the trimpath helper check sees the failure not naming both lines |
 | `fixs-external-overlay-dropped` | the overlay leaves out the external test package's harness | fixtures conformance: the external test package's suite never runs |
+| `fixture-program-built-without-the-run-flags` | the shared fixture program is built without the run's build flags | conformance: a fixture behind a build tag does not come up |
 | `lcs-spec-ignores-the-interrupt` | `spec` runs without the shutdown handling | lifecycle conformance: an interrupted spec run does not exit 130 |
 | `lcs-failed-run-kills-the-shared-fixture` | a failed run kills the shared fixture process instead of releasing it | lifecycle conformance: the FailFast run never runs the shared fixture's AfterAll |
 | `lcs-stop-during-teardown-reads-as-interrupt` | the exit code reads the stop that arrived after the last verdict | lifecycle conformance: a green run interrupted during its teardown exits 130 |
@@ -806,6 +807,7 @@ shards of one run do not add up to every mutant exactly once.
 | `budget-line-leaves-out-the-fixtures` | the teardown budget a suite process sends is its setup timeout alone | canary: the stopbudget suite whose budget outlasts its linger is killed first |
 | `channel-cloexec-dropped` | the channel is moved without close-on-exec, so a process a test starts inherits it | canary: the channel fixture's child finds a socket among its descriptors |
 | `channel-type-unchecked` | the channel's variable is taken for a descriptor of any type, so a regular file it names is closed | canary: the channel fixture's child cannot write to its descriptor 3 |
+| `runtime-imports-a-third-party-module` | the control channel calls golang.org/x/sys again, a module tidy cannot keep | conformance: the tidied module's run fails to build for a missing go.sum entry |
 | `signal-forces-under-the-runner` | under the runner a second signal during a stop forces it | canary: the outside run's second SIGTERM releases the fixture without AfterAll |
 | `signal-not-announced` | a stop a signal from outside began is neither told to the runner nor ends by the signal | canary: the outside run's stream names no stop from outside and the run passes |
 | `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |

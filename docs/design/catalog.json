@@ -7994,6 +7994,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "runs its suites and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "tidymodule_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 31,
+                      "name": "runs_its_suites_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a tidied module requires gotest and declares no tool directive",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "tidymodule_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "a_tidied_module_requires_gotest_and_declares_no_tool_directive",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WithoutTheToolDirective",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "tidymodule_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestWithoutTheToolDirective",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLITidyModule",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "tidymodule_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestCLITidyModuleTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "exits 0 and prints the version on stdout",
                       "duration": 0,
                       "excluded": false,
@@ -10540,6 +10601,98 @@
           "kind": "suite",
           "line": 12,
           "name": "TestFixtureBoundSharedTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "display": "the tag alone",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "fixs_buildflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 25,
+                          "name": "the_tag_alone",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        },
+                        {
+                          "children": [],
+                          "display": "the tag beside a flag only go test takes",
+                          "duration": 0,
+                          "excluded": false,
+                          "external": false,
+                          "file": "fixs_buildflags_suite_test.go",
+                          "focused": false,
+                          "kind": "block",
+                          "line": 26,
+                          "name": "the_tag_beside_a_flag_only_go_test_takes",
+                          "output": [],
+                          "status": "none",
+                          "vocab": "each"
+                        }
+                      ],
+                      "display": "the fixture comes up and the suite that binds it passes",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "fixs_buildflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "the_fixture_comes_up_and_the_suite_that_binds_it_passes",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a shared fixture is declared in a file behind a build tag and the run sets the tag",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "fixs_buildflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 19,
+                  "name": "a_shared_fixture_is_declared_in_a_file_behind_a_build_tag_and_the_run_sets_the_tag",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFixtureBehindABuildTag",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "fixs_buildflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 18,
+              "name": "TestAFixtureBehindABuildTag",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureBuildFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "fixs_buildflags_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestFixtureBuildFlagsTestSuite",
           "output": [],
           "status": "none"
         },
@@ -25965,13 +26118,13 @@
     }
   ],
   "stats": {
-    "behaviors": 750,
+    "behaviors": 753,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 108,
+    "suites": 110,
     "tests": 0
   }
 }

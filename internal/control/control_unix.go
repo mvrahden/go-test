@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
-
-	"golang.org/x/sys/unix"
 )
 
 // movedFD is the lowest descriptor Claim moves the channel to, out of the
@@ -64,11 +62,12 @@ func claim(v string) *Endpoint {
 	if syscall.Fstat(fd, &st) != nil || st.Mode&syscall.S_IFMT != syscall.S_IFSOCK {
 		return nil
 	}
-	if moved, err := unix.FcntlInt(uintptr(fd), unix.F_DUPFD_CLOEXEC, movedFD); err == nil {
+	if moved, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(fd), syscall.F_DUPFD_CLOEXEC, movedFD); errno == 0 {
 		_ = syscall.Close(fd)
-		fd = moved
+		fd = int(moved)
 	} else {
-		// A descriptor limit at or below movedFD leaves the channel in place.
+		// A descriptor limit at or below movedFD leaves the channel in place,
+		// and so does OpenBSD, where syscall.Syscall takes no fcntl.
 		syscall.CloseOnExec(fd)
 	}
 	if err := syscall.SetNonblock(fd, true); err != nil {
