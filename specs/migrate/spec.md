@@ -90,6 +90,11 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 - **WHEN** InDelta compares two values that may both be NaN, or takes a delta that may be NaN
 - **THEN** migrate leaves it unconverted under a marker naming the NaN
 
+#### Scenario: Assertions with an exact gotest form
+- **WHEN** a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer
+- **THEN** migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles
+- **AND** Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason
+
 #### Scenario: TearDownSuite after a SetupSuite that can stop early
 - **WHEN** a suite declares TearDownSuite and a SetupSuite that can stop early
 - **THEN** migrate marks AfterAll, which gotest runs even after BeforeAll stopped

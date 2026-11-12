@@ -24560,6 +24560,67 @@
               "name": "TestCommentsTrailingConvertedCalls",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 591,
+                      "name": "migrate_writes_gotest.Fail,_gotest.TimeWithin,_and_gotest.Greater_and_gotest.Less_against_0,_and_the_result_compiles",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "verdicts_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 613,
+                      "name": "Fail_with_a_second_message,_Positive_on_a_float_and_NotPanics_stay_unconverted_under_markers_giving_the_reason",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "verdicts_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 590,
+                  "name": "a_suite_calls_FailNow_or_Fail_with_one_message,_WithinDuration,_and_Positive_or_Negative_on_an_integer",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AssertionsWithAnExactGotestForm",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "verdicts_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 589,
+              "name": "TestAssertionsWithAnExactGotestForm",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "MigrateVerdicts",
@@ -26985,7 +27046,7 @@
     }
   ],
   "stats": {
-    "behaviors": 783,
+    "behaviors": 785,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

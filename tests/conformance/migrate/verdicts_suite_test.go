@@ -585,3 +585,43 @@ func (s *MigrateVerdictsTestSuite) TestCommentsTrailingConvertedCalls(t *gotest.
 		})
 	})
 }
+
+func (s *MigrateVerdictsTestSuite) TestAssertionsWithAnExactGotestForm(t *gotest.T) {
+	t.When("a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer", func(w *gotest.T) {
+		w.It("migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("\t\"time\"\n", "", `func (s *VSuite) TestA() {
+	now := time.Now()
+	s.WithinDuration(now, now, time.Second)
+	s.Positive(1)
+	s.Negative(-1)
+	if now.IsZero() {
+		s.Fail("zero time")
+		s.Require().FailNow("zero time")
+	}
+}
+`)})
+			gotest.Equal(it, 0, exit, out)
+			for _, want := range []string{
+				"\tgotest.TimeWithin(t, now, now, time.Second)\n",
+				"\tgotest.Greater(t, 1, 0)\n",
+				"\tgotest.Less(t, -1, 0)\n",
+				"\t\tgotest.Fail(t, \"zero time\")\n\t\tgotest.Fail(t, \"zero time\")\n",
+			} {
+				gotest.Contains(it, out, want)
+			}
+		})
+		w.It("Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason", func(it *gotest.T) {
+			exit, out := s.migrated(it, map[string]string{"p/a_test.go": suiteFile("", "", `func (s *VSuite) TestA() {
+	f := 1.5
+	s.Positive(f)
+	s.Fail("first", "second %d", 1)
+	s.NotPanics(func() {})
+}
+`)})
+			gotest.Equal(it, 1, exit, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): Positive on float64: only an integer[^\n]*\n\ts\.Positive\(f\)\n`, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): testify Fail printed its failure message[^\n]*\n\ts\.Fail\("first", "second %d", 1\)\n`, out)
+			gotest.Regexp(it, `// TODO\(gotest-migrate\): NotPanics has no gotest form[^\n]*\n\ts\.NotPanics\(func\(\) \{\}\)\n`, out)
+		})
+	})
+}

@@ -58,6 +58,11 @@ var assertionMap = map[string]string{
 	"InDelta":        "InDelta",
 	"JSONEq":         "JSONEq",
 	"Panics":         "Panics",
+	"Fail":           "Fail",
+	"FailNow":        "Fail",
+	"WithinDuration": "TimeWithin",
+	"Positive":       "Greater",
+	"Negative":       "Less",
 }
 
 // gotestAssertion is the gotest function for a testify assertion, its
