@@ -120,7 +120,7 @@ This changes how you work. With a 1-second loop, you write smaller increments. Y
 
 ## The CI guard
 
-The `F_` prefix is a development tool. It is not meant to be committed. If it reaches your main branch, it silently skips every other test of the run. This is the kind of mistake that passes code review because the tests are green, they just are not running.
+The `F_` prefix is a development tool. It is not meant to be committed. If it reaches your main branch, it skips every other test of the run, and outside CI mode only a note on stderr says so. This is the kind of mistake that passes code review because the tests are green, they just are not running.
 
 gotest's CI mode catches this. When running with the `--ci` flag (or when the `CI` environment variable is set, which most CI providers do automatically), gotest checks for focus prefixes before running any tests. If it finds any, the build fails immediately with an explicit error:
 
