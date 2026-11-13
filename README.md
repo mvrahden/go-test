@@ -713,7 +713,7 @@ func (s *Suite) TestParsing(t *gotest.T) {
 }
 ```
 
-Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`.
+Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`. Over a literal table, `gotest spec --declared` lists the rows a failing row left unrun, as not run.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Testing a Callback
