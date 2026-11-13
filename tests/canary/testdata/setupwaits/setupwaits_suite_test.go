@@ -111,3 +111,19 @@ func (s *SlowTestSuite) BeforeAll(t *gotest.T) {
 func (s *SlowTestSuite) AfterAll(t *gotest.T) {}
 
 func (s *SlowTestSuite) TestServed(t *gotest.T) {}
+
+// StdSlowTestSuite is SlowTestSuite with a BeforeAll that takes a *testing.T
+// and wraps it.
+type StdSlowTestSuite struct{}
+
+func (s *StdSlowTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{SetupTimeout: 200 * time.Millisecond}
+}
+
+func (s *StdSlowTestSuite) BeforeAll(t *testing.T) {
+	gotest.Go(gotest.NewT(t), func() { time.Sleep(4 * time.Second) })
+}
+
+func (s *StdSlowTestSuite) AfterAll(t *testing.T) {}
+
+func (s *StdSlowTestSuite) TestServed(t *testing.T) {}
