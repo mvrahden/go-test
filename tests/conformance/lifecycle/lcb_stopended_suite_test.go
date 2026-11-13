@@ -30,7 +30,7 @@ func (s *DeadlineStopEndedTestSuite) TestAMethodThatHonoursItsContext(t *gotest.
 		gotest.NoError(w, err)
 
 		w.It("the method is booked failed in -json, and spec shows it failed", func(it *gotest.T) {
-			gotest.Contains(it, outputOf(&stream, "TestWaitsTestSuite/TestWaits"), "run stopping: the stop ended this method while it ran", "stream:\n%s", stream.Stdout)
+			gotest.Contains(it, outputOf(&stream, "TestWaitsTestSuite/TestWaits"), "run stopping: the stop came while this method ran", "stream:\n%s", stream.Stdout)
 			gotest.Equal(it, "fail", stream.Verdict("TestWaitsTestSuite/TestWaits"), "stream:\n%s", stream.Stdout)
 			gotest.Equal(it, 1, spec.Exit, "stdout: %s\nstderr: %s", spec.Stdout, spec.Stderr)
 			gotest.Contains(it, spec.Stdout, "✗ Waits", "stderr: %s", spec.Stderr)

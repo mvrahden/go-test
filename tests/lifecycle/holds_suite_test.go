@@ -214,7 +214,7 @@ func (s *HoldsTestSuite) TestAFixtureSetupFailureIsNotLocatedInTheRuntime(t *got
 
 func (s *HoldsTestSuite) TestAFixtureTeardownFailureSaysWhatFailed(t *gotest.T) {
 	code, out := s.edges(t, []string{"EDGES_FAIL=teardown"}, "-run", "TestBoundTestSuite")
-	gotest.Regexp(t, `(?m)^\s+fixture teardown failed: EdgeFixture\.AfterAll: the edge fixture would not let go$`, out, "the teardown's error is not in the holding test's output")
+	gotest.Regexp(t, `(?m)^\s+fixture\.go:\d+: fixture teardown failed: EdgeFixture\.AfterAll: the edge fixture would not let go$`, out, "the teardown's error is not in the holding test's output")
 	gotest.NotContains(t, out, "hold.go:")
 	gotest.Equal(t, 1, code, out)
 }
