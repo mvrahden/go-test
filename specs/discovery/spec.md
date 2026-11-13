@@ -214,9 +214,9 @@ discover SHALL report a package holding a case no run reaches, or a generic suit
 
 #### Scenario: Discover reads cases no run reaches
 - **WHEN** discover reads a package declaring cases no run reaches
-- **THEN** it reports the package broken with the refusal at the type's first such method
-- **AND** it warns of no other method of that type
-- **AND** it reports a generic suite no alias instantiates broken with the refusal at its declaration
+- **THEN** reports the package broken with the refusal at the type's first such method
+- **AND** warns of no other method of that type
+- **AND** reports a generic suite no alias instantiates broken with the refusal at its declaration
 - **AND** a Benchmark or Fuzz method on a helper a suite calls, or on a type a non-test file declares, is still warned of as never running
 
 ### Requirement: A case prefix alone

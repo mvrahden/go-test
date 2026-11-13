@@ -12900,7 +12900,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "it reports the package broken with the refusal at the type's first such method",
+                      "display": "reports the package broken with the refusal at the type's first such method",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -12908,14 +12908,14 @@
                       "focused": false,
                       "kind": "block",
                       "line": 45,
-                      "name": "it_reports_the_package_broken_with_the_refusal_at_the_type's_first_such_method",
+                      "name": "reports_the_package_broken_with_the_refusal_at_the_type's_first_such_method",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     },
                     {
                       "children": [],
-                      "display": "it warns of no other method of that type",
+                      "display": "warns of no other method of that type",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -12923,14 +12923,14 @@
                       "focused": false,
                       "kind": "block",
                       "line": 55,
-                      "name": "it_warns_of_no_other_method_of_that_type",
+                      "name": "warns_of_no_other_method_of_that_type",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
                     },
                     {
                       "children": [],
-                      "display": "it reports a generic suite no alias instantiates broken with the refusal at its declaration",
+                      "display": "reports a generic suite no alias instantiates broken with the refusal at its declaration",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -12938,7 +12938,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 59,
-                      "name": "it_reports_a_generic_suite_no_alias_instantiates_broken_with_the_refusal_at_its_declaration",
+                      "name": "reports_a_generic_suite_no_alias_instantiates_broken_with_the_refusal_at_its_declaration",
                       "output": [],
                       "status": "none",
                       "vocab": "it"

@@ -1,5 +1,5 @@
-Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / it warns of no other method of that type \(
-Clause: when discover reads a package declaring cases no run reaches → it warns of no other method of that type
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / warns of no other method of that type \(
+Clause: when discover reads a package declaring cases no run reaches → warns of no other method of that type
 --- a/cmd/gotest/discover.go
 +++ b/cmd/gotest/discover.go
 @@ -232,7 +232,7 @@

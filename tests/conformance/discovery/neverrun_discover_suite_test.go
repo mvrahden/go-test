@@ -42,7 +42,7 @@ func discoverShape(t *gotest.T, pkg string) discovered {
 
 func (s *NeverRunDiscoverTestSuite) TestDiscover(t *gotest.T) {
 	t.When("discover reads a package declaring cases no run reaches", func(w *gotest.T) {
-		w.It("it reports the package broken with the refusal at the type's first such method", func(it *gotest.T) {
+		w.It("reports the package broken with the refusal at the type's first such method", func(it *gotest.T) {
 			out := discoverShape(it, "orphantype")
 			gotest.True(it, out.Packages[0].Broken)
 			gotest.Empty(it, out.Packages[0].Suites)
@@ -52,11 +52,11 @@ func (s *NeverRunDiscoverTestSuite) TestDiscover(t *gotest.T) {
 			gotest.Equal(it, 21, out.Warnings[0].Col)
 			gotest.Equal(it, orphanTypeRefusal, out.Warnings[0].Message)
 		})
-		w.It("it warns of no other method of that type", func(it *gotest.T) {
+		w.It("warns of no other method of that type", func(it *gotest.T) {
 			out := discoverShape(it, "orphantype")
 			gotest.Len(it, out.Warnings, 1, "warnings: %v", out.Warnings)
 		})
-		w.It("it reports a generic suite no alias instantiates broken with the refusal at its declaration", func(it *gotest.T) {
+		w.It("reports a generic suite no alias instantiates broken with the refusal at its declaration", func(it *gotest.T) {
 			out := discoverShape(it, "orphangeneric")
 			gotest.True(it, out.Packages[0].Broken)
 			gotest.Len(it, out.Warnings, 1, "warnings: %v", out.Warnings)

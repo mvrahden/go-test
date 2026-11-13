@@ -1,7 +1,7 @@
-Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / it reports the package broken with the refusal at the type's first such method \(
-Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / it reports a generic suite no alias instantiates broken with the refusal at its declaration \(
-Clause: when discover reads a package declaring cases no run reaches → it reports the package broken with the refusal at the type's first such method
-Clause: when discover reads a package declaring cases no run reaches → it reports a generic suite no alias instantiates broken with the refusal at its declaration
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / reports the package broken with the refusal at the type's first such method \(
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / reports a generic suite no alias instantiates broken with the refusal at its declaration \(
+Clause: when discover reads a package declaring cases no run reaches → reports the package broken with the refusal at the type's first such method
+Clause: when discover reads a package declaring cases no run reaches → reports a generic suite no alias instantiates broken with the refusal at its declaration
 --- a/cmd/gotest/discover.go
 +++ b/cmd/gotest/discover.go
 @@ -195,7 +195,7 @@
