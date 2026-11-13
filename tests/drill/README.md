@@ -1,5 +1,3 @@
-| `migrate-workspace-dir-resolved` | migrate loads a directory by its resolved path, which the go command judges outside a go.work reached through a symlink | conformance: the migrate It for a workspace through a symlinked directory sees the file left unchecked |
-| `scaffold-working-directory-resolved` | `scaffold` loads a type's package from its directory as the go command resolves it, not as the working directory names it | conformance: the CLI scaffold It for a symlinked working directory sees the generated file named by a path through the real directory |
 # Mutation drill
 
 The drill is a test of the tests. gotest runs its own test suites, so a bug
@@ -85,6 +83,7 @@ four shards, retains each shard's logs and phase timings even on failure, and
 then checks with `--check-shards` that the shards split the mutants exactly.
 
 `bash tests/drill/drill.sh <name> ...` selects named mutants; no names selects all.
+`bash tests/drill/drill.sh --check-patches` (`make drill-check`) applies no patch and judges none: it names every patch that no longer applies exactly.
 
 | Variable | Meaning |
 |---|---|
@@ -93,6 +92,7 @@ then checks with `--check-shards` that the shards split the mutants exactly.
 | `DRILL_TIMEOUT` | Independent deadline per mutant in seconds, default 600. |
 | `DRILL_LOGS` | Parent for a unique log directory per invocation; the actual path is printed. |
 | `DRILL_TIMINGS` | Optional JSON file mapping mutant names to previous elapsed seconds. All shards must read the same file. |
+| `DRILL_CHANGED` | A file listing changed paths, one per line, relative to the checkout root. Set, the drill judges only the mutants that change can touch: its own patch, a file it patches, a file in a package that judges it, or the spec file stating a clause it names; a change to the driver, the planner, the testkit or the module's requirements selects all. All shards must read the same list. It cannot be combined with named mutants. |
 
 Historical durations schedule long mutants first and greedily balance projected
 shard wall time, accounting for the serial timing-sensitive tail: a shared
@@ -108,7 +108,7 @@ observations; merge their objects to supply the next run's input.
 CI reads the committed `tests/drill/timings.json` (a path relative to the
 checkout root). `bash tests/drill/timings.sh [run-id ...]` rewrites it from
 those files in the given runs' drill artifacts, by default the last three
-successful `quality.yml` runs on main: each mutant's longest observation,
+successful `nightly.yml` runs on main: each mutant's longest observation,
 rounded to 0.1s, and only mutants that have a patch.
 Every result also records copy, patch, build, judge and render durations. A
 `*.phase.json` file identifies the active phase if a worker times out.
@@ -743,6 +743,8 @@ shards of one run do not add up to every mutant exactly once.
 | `scaffold-suite-name-read-from-non-test-files` | the suite-name check reads only the package's non-test files | conformance: the CLI scaffold It for a suite name a test file declares sees exit 0 and a duplicate written |
 | `scaffold-subject-self-qualified` | the type scaffold names its subject through its own package | conformance: the CLI scaffold It for a type with methods sees go vet fail |
 | `scaffold-ignores-symlinks` | `scaffold` loads a file's package by its directory as a pattern, not from the directory itself | conformance: the CLI scaffold It for a file named through a symlinked directory fails with exit 1 |
+| `scaffold-working-directory-resolved` | `scaffold` loads a type's package from its directory as the go command resolves it, not as the working directory names it | conformance: the CLI scaffold It for a symlinked working directory sees the generated file named by a path through the real directory |
+| `migrate-workspace-dir-resolved` | migrate loads a directory by its resolved path, which the go command judges outside a go.work reached through a symlink | conformance: the migrate It for a workspace through a symlinked directory sees the file left unchecked |
 | `focus-decided-per-package` | the generator decides focus for each package on its own, not for the whole run | canary: the `shapes/focusacross` unfocused suite is not skipped and its fixtures start |
 | `focus-decided-per-variant` | the external test package decides its focus on its own | canary: the `shapes/focusvariants` external suite is not skipped |
 | `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
