@@ -34,7 +34,9 @@ jobs:
 
 - The action's `version` input defaults to `gomod`: the CLI version is
   resolved from the consumer's go.mod — the same skew-free property as the
-  tool directive. Other inputs: `packages`, `race`, `coverage`,
+  tool directive. The action builds that CLI once per job; without a
+  declared tool it resolves the CLI's dependencies in a copy of go.mod, so
+  the checkout's go.sum stays as committed. Other inputs: `packages`, `race`, `coverage`,
   `min-coverage`, `flags` (`--double-dash` style), `go-test-flags`
   (`-single-dash` style), `badge` (+ `badge-branch`, default `ci/badges`).
   The action adds a failure-focused summary, GitHub annotations, and

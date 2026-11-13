@@ -6,6 +6,14 @@ invocation runs tests — there is NO `test` subcommand:
 - `go tool gotest ./...` — run suites (never stdlib tests; those need
   `go test`). Passthrough flags work: `-v`, `-race`, `-count`, `-run`,
   `-json` (streams `go test -json` events incl. every subtest name).
+  `-o` is refused with exit 2, and so are (v1.38+) `-c`, `-n`, `-overlay`,
+  `-fuzz` (use `gotest fuzz`), and a profile flag (`-cpuprofile`, `-trace`, …) on a run
+  that starts more than one suite process. `-run '^Test<Suite>$'` reaches
+  only that suite's process and replays none of its fuzz seeds (v1.38+):
+  name the `Fuzz<Suite>_<Method>` wrapper too, or drop the anchors.
+  Outside CI mode a focused run notes on stderr that `F_` narrows it
+  (v1.38+), and a text run fails with exit 2 when a suite's binary ran no
+  tests (v1.38+).
 - `go tool gotest spec ./...` — run + render the behavioral spec view.
   `--format terminal|md|json` (terminal is the default), `--output <file>`; `--input <file|->` re-renders a
   captured `go test -json` stream WITHOUT running (v1.29+: it still reads
@@ -20,8 +28,10 @@ invocation runs tests — there is NO `test` subcommand:
   off before every package reported, exits 2 too. `--static` renders the
   spec from source without running anything — nodes carry no verdict, and
   incompletely enumerable methods are reported on stderr. `--declared`
-  (with `--input`) lays the stream's verdicts over the specification the
-  source declares, so a behavior that never ran shows as not run;
+  lays the verdicts over the specification the source declares, so a
+  behavior that never ran shows as not run: with `--input` a saved
+  stream's, and without it the run's own (v1.38+; below, `--input` was
+  required);
   `--hide=pass` (or `fail`, `skip`, `none`, comma-separated) leaves rows
   out of the rendering and none out of the counts; `--match=<text>` and
   `--only=<import path>` keep part of the rendering, with the counts of
@@ -46,7 +56,14 @@ invocation runs tests — there is NO `test` subcommand:
   `-disable-nolint` ignores `//nolint` comments.
   Integrity rules yield only to `//nolint:<rule>` (on the line, directly
   above it, or file-wide trailing the `package` line); others
-  also to `.gotest.yml` `lint.skip` / `-skip-<rule>`.
+  also to `.gotest.yml` `lint.skip` / `-skip-<rule>`. A plain finding
+  line ends with its rule, `file:line:col: message (rule)` (v1.38+);
+  `-nolint-allow` names other linters a `//nolint` may name (v1.38+, also
+  `.gotest.yml` `lint.nolint-allow`); `--github=false` keeps the plain
+  report inside GitHub Actions. golangci-lint can run the same analyzer
+  as the module plugin `github.com/mvrahden/go-test/pkg/lint/golangci`
+  (v1.38+), at the gotest version go.mod requires; `go doc
+  github.com/mvrahden/go-test/pkg/lint` shows the setup.
 - `go tool gotest discover ./...` — static suite metadata as JSON: suites,
   methods, direct suite→fixture edges, and (v1.27+) each method's declared
   `When`/`It` tree — `name` is the subtest segment `go test` will print,
@@ -58,8 +75,11 @@ invocation runs tests — there is NO `test` subcommand:
   description or table) is missing and `behaviorsComplete: false` says
   so — never present an incomplete list as the whole specification.
 - `go tool gotest scaffold ./pkg/path.TypeName` — generate a suite; an
-  interface target generates a generic contract suite. `--fuzz` adds fuzz
-  round-trip skeletons. Own-module targets
+  interface target generates a generic contract suite.
+  `go tool gotest scaffold --fuzz ./pkg/path.FuncName` takes a
+  single-parameter package-level function instead and scaffolds a
+  `Fuzz<Func>` method for it, with round-trip and crash-safety skeletons.
+  Own-module targets
   only (it writes into the target package's directory).
 - `go tool gotest migrate ./...` — testify/suite conversion (see
   `migration.md` for its scope); `--dry-run` prints the diff of every edit
@@ -228,7 +248,9 @@ short is not censused: an interrupt exits 130, and a `--timeout` that expires
 before the last verdict exits 1 on every command. It prints `FAIL: global
 --timeout exceeded after <d> while running: <pkg> <test>` (up to five, then
 `… N more`), naming the hung method, or only its suite in a plain text test
-run; `gotest bench` names the hung benchmark in text and `--json` alike. A
+run. A suite the deadline stopped fails its package even when every method
+it ran passed, and the FAIL line names that suite when no method was still
+running (v1.38+); `gotest bench` names the hung benchmark in text and `--json` alike. A
 suite that hangs in its `BeforeAll`, or in a package fixture's `BeforeAll`, is
 named as the suite. A test whose suite process ended on its own, or that was
 still waiting for a `-parallel` slot, is never named. Each one is booked into

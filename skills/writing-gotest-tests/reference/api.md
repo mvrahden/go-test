@@ -49,7 +49,7 @@ For nil checks on slices, maps, or functions: `gotest.NotNil(t, x)` / `gotest.Ni
 ### Collections
 
 ```go
-gotest.Empty(t, object any)                          // nil, or len == 0 (string, slice, map, chan, array; a pointer is followed); any other type fails the type guard
+gotest.Empty(t, object any)                          // nil, or len == 0 (string, slice, map, chan, array; a pointer is followed and must reach one); any other type fails the type guard
 gotest.NotEmpty(t, object any)
 gotest.Len(t, object any, length int)                // exact length check
 gotest.Contains(t, haystack, needle any)             // substring (string), element (slice/array), key (map)
@@ -98,6 +98,8 @@ gotest.JSONEq(t, expected, actual any)  // structural JSON equality
                                          // accepts: string, []byte, json.RawMessage, io.Reader, or any marshalable value
 ```
 
+A named string type is read as JSON text, unless it implements `json.Marshaler` or `encoding.TextMarshaler`: `Color("red")` is the text `red`, not the JSON string `"red"`, and JSON text must be valid UTF-8 (v1.38+).
+
 ### Time
 
 ```go
@@ -129,12 +131,14 @@ A baseline saved under the older key, without such a suffix, is still compared, 
 Under `-trimpath` the baselines are looked up in the package directory go test runs in, so a snapshot taken in a helper of another package lands beside the package under test.
 A name that spans lines or spells a section header is refused ([Snapshot names](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-snapshot-names)).
 `GOTEST_UPDATE_SNAPSHOTS` and `GOTEST_CI` are off when unset or set to `0`, `f`, `F`, `false`, `FALSE` or `False`, and on for any other value; with updates off a stale baseline fails and stays untouched ([Snapshot updates switched off](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-snapshot-updates-switched-off)).
+Under `--ci` or `--update-snapshots` a whole suite that passed names the sections of its snapshot files no test read (v1.38+, [Sections no test read](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-sections-no-test-read)).
 
 ### Typing
 
 Assertions take the types they are given at face value and say what they cannot work with:
 
 - `Regexp` and `Contains` treat a named string type as a string ([Named string types](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-named-string-types)); a `Contains` needle the haystack cannot hold fails naming both types and, for a number of another numeric type, the type to convert it to ([A needle of the wrong type](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-a-needle-of-the-wrong-type)), and a nil needle is the nil element or key of a slice or map whose elements or keys can be nil ([A nil needle](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-a-nil-needle)).
+- `Less`, `LessOrEqual`, `Greater` and `GreaterOrEqual` fail on a NaN operand (v1.38+, [Ordering a NaN](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-ordering-a-nan)); `Empty` and `NotEmpty` on a pointer to a struct or a number fail the type guard (v1.38+): use `NotNil` or `NotZero`.
 - `InDelta` fails on a NaN delta and holds equal infinities within any delta ([InDelta at the edges of float64](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64)), and measures integers exactly ([InDelta on integers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-on-integers)).
 - A first extra argument of any string kind formats the rest; any other puts every extra argument in the message, and `ErrorAs` names the type it expected ([Failure messages](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-failure-messages)).
 - `JSONEq` compares numbers by value ([JSON numbers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-json-numbers)) and refuses anything after the value ([One JSON value](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-one-json-value)), and `Equal` on values that do not fit one short line marks the lines that differ in a diff of their field-by-field renderings, each hunk led by the path of its first change such as `at [1].Name:` ([Mismatch diffs](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-mismatch-diffs), [Renderings](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-renderings), [Mismatches without a diff](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-mismatches-without-a-diff)); it names different dynamic types, diffs values that render alike by their raw fields or says where the rendering hides the difference, and never shows an address ([Values that look alike](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-values-that-look-alike)).
@@ -197,7 +201,7 @@ gotest.Go(t, func() { srv.Serve(l) })   // AfterEach closes the listener
 
 A `defer wait()` here deadlocks instead: the test's own defers run before `AfterEach`,
 so it waits for a goroutine nothing has stopped yet.
-A fatal assertion on the goroutine fails the method at the wait, and a skip there skips it ([Goroutines started by gotest.Go](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
+A fatal assertion on the goroutine fails the method at the wait, and a skip there skips it; the wait is held to the method's declared `Timeout` (v1.38+) ([Goroutines started by gotest.Go](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-started-by-gotestgo)).
 In `BeforeAll` this holds for the hook's `t` and every `T` derived from it (`When`, `It`, `Each` rows, `gotest.NewTWithDeadline`), and in a hook taking `*testing.T` for `gotest.NewT(t)`, `NewTWithDeadline(t)` and `NewTWithContext(t, ctx)`: each goroutine started on one is waited for after `AfterAll`, before the fixtures are released, even when another fails ([Goroutines BeforeAll starts](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-goroutines-beforeall-starts)).
 A subtest such a hook starts itself with `t.Run` is not one: a goroutine started on it is waited for when that subtest ends, before `AfterAll`.
 
@@ -212,6 +216,7 @@ type MyServiceTestSuite struct { /* state */ }           // test suite
 - Name must end with `TestSuite`
 - All methods must use pointer receivers
 - Must declare at least one `Test*`, `Benchmark*` or `Fuzz*` method, an excluded `X_` one included; a `*TestSuite` type with none is refused at its declaration, so give a helper type a name that does not end in `TestSuite` ([Suites without a case](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suites-without-a-case)). Without a `Test*` method there is no `Test<Suite>` function: a test run opens the suite only to replay its `Fuzz*` seeds
+- The converse is refused too (v1.38+): in a test file, a type that is no suite and declares `Test*`, `Benchmark*` or `Fuzz*` methods taking `*gotest.T`, `*gotest.B` or `*gotest.F` fails the run, at its first such method, unless a test file calls them ([Cases no run reaches](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-cases-no-run-reaches)); `gotest lint` reports the same methods under `dropped-case` ([Cases that never run](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-cases-that-never-run))
 - One `type` declaration per suite or fixture: inside a grouped `type ( … )` block it is rejected at its declaration; `gotest lint -fix` moves it out ([Suite and fixture declarations](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suite-and-fixture-declarations))
 - Never embed a suite (a base suite) in another: it is rejected at the field. Share tests through a generic contract suite instead; embed only plain types, and bind fixtures through named pointer fields ([Suite and fixture declarations](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-suite-and-fixture-declarations)). `gotest migrate` turns a testify base suite of the migrated test files into a named field and a helper type, `BaseTestSuite` becoming `BaseSuiteHelper` ([Base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites))
 
@@ -223,6 +228,8 @@ func (s *MyTestSuite) TestRead(t *gotest.T) {}
 ```
 
 Methods can also accept `*testing.T` for stdlib compatibility.
+
+A case needs a name after its prefix: a method named just `Test`, `Benchmark` or `Fuzz` that takes the case's `T`, `B` or `F` is refused at the method (v1.38+, [A case prefix alone](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-a-case-prefix-alone)); go test would never run it.
 
 A test that calls `os.Exit` fails, `os.Exit(0)` included, as under `go test`.
 
@@ -253,10 +260,11 @@ would clean up was never created.
 A panic in a method ends the suite as it would under `go test`: the method's own
 teardown and `AfterAll` run, and in a parallel suite the siblings still running are cut
 short with it ([A panic among parallel methods](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-panic-among-parallel-methods)).
+The report names the line of your code the panic happened at, ahead of one stack (v1.38+, [A method's panic is printed once](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-methods-panic-is-printed-once)).
 
 **Returning BeforeEach (required for `Parallel: true`):**
 
-When `SuiteConfig` enables `Parallel` on a suite with per-test state, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state (field-less suites, or suites whose only fields are fixture pointers, may be parallel without one). The generator rejects a `BeforeEach` that returns nothing in a parallel suite, but it cannot see methods writing suite fields — with no `BeforeEach`, or beside a returning one: that compiles, and races. Test methods and `AfterEach` then accept this context as an additional parameter:
+When `SuiteConfig` enables `Parallel` on a suite with per-test state, `BeforeEach` must return a context struct pointer to give each parallel test its own isolated state (field-less suites, or suites whose only fields are fixture pointers, may be parallel without one). The generator rejects a `BeforeEach` that returns nothing in a parallel suite, but it cannot see methods writing suite fields — with no `BeforeEach`, or beside a returning one: that compiles, and races. It also refuses (v1.38+) a parallel suite with two or more test methods that binds a package fixture whose `BeforeEach` or `AfterEach` uses the fixture, since the methods share it ([Fixture per-method hooks under a parallel suite](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-fixture-per-method-hooks-under-a-parallel-suite)), and `Setenv` in a parallel suite's test method, `BeforeEach` or `AfterEach`; set it in `BeforeAll` ([Setenv under a parallel suite](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-setenv-under-a-parallel-suite)). Test methods and `AfterEach` then accept this context as an additional parameter:
 
 ```go
 type testCtx struct {
@@ -330,7 +338,7 @@ to a budget: being failed against a number you did not choose is not a verdict y
 On a machine slower than the one the budgets were written on, `GOTEST_TIMEOUT_SCALE=2` doubles every suite and fixture budget, declared or default, deadline and verdict alike; processes the tests start do not inherit it ([Budgets scaled for a slow machine](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-budgets-scaled-for-a-slow-machine)).
 
 `SetupTimeout` works the same way for `BeforeAll`, `AfterAll` and the wait on the goroutines
-`BeforeAll` started with `gotest.Go`, including for a setup that hangs and never returns. A declared fixture `Timeout` is judged when the hook
+`BeforeAll` started with `gotest.Go`, including for a setup that hangs and never returns. `BeforeAll`'s `t.Context()` carries the `SetupTimeout` only while `BeforeAll` runs; once it returned the context has no deadline and ends when the methods are done, before `AfterAll` (v1.38+, [What BeforeAll takes from its T](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-what-beforeall-takes-from-its-t)). A declared fixture `Timeout` is judged when the hook
 returns: a `BeforeAll` that succeeds only after it fails the fixture without a retry
 (the work is done; a retry would build it twice), and its `AfterAll` still runs. A
 fixture hook that never returns is not failed by its `Timeout`; the run's other deadlines end
@@ -410,7 +418,9 @@ When both fixture and suite define `BeforeEach`/`AfterEach`, the fixture's hooks
 fixture.BeforeEach -> suite.BeforeEach -> test -> suite.AfterEach -> fixture.AfterEach.
 A fixture's `AfterEach` runs only when every fixture `BeforeEach` up to its own in dependency order returned without an error, a fixture with no `BeforeEach` included ([Fixture per-method hooks in dependency order](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-fixture-per-method-hooks-in-dependency-order)).
 So a `BeforeEach` that returns an error or panics gets no `AfterEach`: it releases what it acquired before returning.
-An error a fixture's `BeforeEach` or `AfterEach` returns is reported at the hook's declaration ([Where a fixture hook failure is reported](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)).
+An error a fixture's `BeforeEach` or `AfterEach` returns is reported at the hook's declaration ([Where a fixture hook failure is reported](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-where-a-fixture-hook-failure-is-reported)), and so is a failed `BeforeAll` or `AfterAll`, naming the fixture, the hook and the error (v1.38+, [What a failed fixture BeforeAll or AfterAll says](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-what-a-failed-fixture-beforeall-or-afterall-says)).
+A fixture's `AfterEach` gets a context a stop does not end, which ends at a `Timeout` the suite declares (v1.38+, [The context a fixture's AfterEach gets](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-the-context-a-fixtures-aftereach-gets)): a release that must happen even after an overrun does not wait on it.
+Under a suite with `Parallel: true` and two or more test methods, a fixture `BeforeEach`/`AfterEach` that uses the fixture is refused (v1.38+, see Returning BeforeEach above).
 
 Fixtures compose via pointer fields (DAG — dependencies set up first):
 
@@ -456,6 +466,7 @@ run fails: its `AfterAll` never ran and whatever it held is orphaned.
 
 Cross-package fixtures that run in a subprocess. Name must end with `SharedFixture`.
 State transfers via JSON serialization — non-serializable fields are reconstructed via `Hydrate`.
+Only named exported fields are transferred (v1.38+, [Shared fixture fields the state cannot carry](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-shared-fixture-fields-the-state-cannot-carry)): an embedded interface or non-struct type is refused unless `Hydrate` assigns it, an embedded struct with exported fields unless `Hydrate` assigns it or every field it promotes, and a transfer field whose type holds an interface with methods (a container handle, a logger) unless `Hydrate` assigns it; unexport a handle only `BeforeAll` and `AfterAll` use.
 
 ```go
 type PostgresSharedFixture struct {
@@ -525,6 +536,7 @@ type ProductIndexTestSuite = IndexContractTestSuite[Product]
 ```
 
 Each type alias produces a separate suite that runs independently.
+A generic suite in a test file that no alias instantiates is refused at its declaration, an `X_` one aside (v1.38+, [Cases no run reaches](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-cases-no-run-reaches)).
 
 ## Parallel Semantics
 
@@ -549,6 +561,8 @@ t.Name() string                                      // the test's name (the wra
 t.It("description", func(it *gotest.T) { ... })     // BDD-style subtest
 t.When("condition", func(w *gotest.T) { ... })       // BDD-style subtest
 ```
+
+A temp dir or an environment variable `BeforeAll` takes from its `t` lasts until `AfterAll` has returned (v1.38+, [What BeforeAll takes from its T](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-what-beforeall-takes-from-its-t)). In a parallel suite, `t.Setenv` in a test method, `BeforeEach` or `AfterEach` is refused at generation, since testing panics there; call it in `BeforeAll` (v1.38+, [Setenv under a parallel suite](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-setenv-under-a-parallel-suite)).
 
 `*gotest.B` and `*gotest.F` carry the same core; `f.Setenv` and `f.TempDir` are for the seeding phase, before `f.Fuzz` (inside the fuzz function use the `*gotest.T`'s):
 

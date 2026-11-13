@@ -651,3 +651,31 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).read")`;
    `goleak.VerifyTestMain` still sees nothing. Before v1.38 it was
    `(*watcher).loop`, and an ignore line naming that now matches nothing.
+
+3. **Shapes that never ran are refused** — the run fails with exit 2 on a
+   test-file type that is no suite but carries case methods taking
+   `*gotest.T`/`B`/`F` nothing calls, a generic suite in a test file no
+   alias instantiates, a method named just `Test`, `Benchmark` or `Fuzz`,
+   `Setenv` in a parallel suite's method or per-method hook, a fixture
+   `BeforeEach`/`AfterEach` that uses the fixture under a parallel suite
+   with two or more methods, and a shared fixture field the state cannot
+   carry ([cases no run reaches](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-cases-no-run-reaches)).
+   Before v1.38 most of these ran nothing in silence, and `Setenv`
+   panicked the suite process.
+
+4. **Assertions read their operands strictly** — an ordering assertion on
+   a NaN fails, `Empty`/`NotEmpty` on a pointer to a struct or a number
+   fail the type guard (it was a nil check), and `JSONEq` reads a named
+   string type as JSON text. A check that passed before on these shapes
+   may fail now.
+
+5. **What `BeforeAll` takes lasts the suite** — a `TempDir`, a `Setenv`
+   and a `t.T().Cleanup` registered in `BeforeAll` last until `AfterAll`
+   has returned, and `BeforeAll`'s context loses the `SetupTimeout`
+   deadline once it returned. Before v1.38 they ended before `AfterAll`.
+
+6. **`-run '^Test<Suite>$'` replays no fuzz seeds** — each suite process
+   gets the pattern narrowed to its own functions; name the
+   `Fuzz<Suite>_<Method>` wrapper to replay them. `-c`, `-n`,
+   `-overlay`, `-fuzz` and a profile flag over several suite processes
+   are refused with exit 2.

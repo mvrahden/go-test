@@ -114,7 +114,10 @@ those are your job, below.
    A generic suite runs only through one
    type alias per concrete type
    (`type ArticleIndexTestSuite = IndexContractTestSuite[Article]`);
-   without an alias it silently never runs.
+   without an alias it never runs, and the run refuses it (v1.38+).
+   Case-named methods taking `*gotest.T`/`B`/`F` on a test-file type
+   that is no suite are refused unless a test file calls them, and so is
+   a method named just `Test`, `Benchmark` or `Fuzz` (v1.38+).
 2. **Lifecycle hooks own resources.** Setup in `BeforeEach` (or `BeforeAll`
    for expensive read-only state), teardown in `AfterEach`/`AfterAll` —
    per-test state on suite fields in a sequential suite, in the returned
@@ -174,8 +177,12 @@ those are your job, below.
    that is nil — every hook under a benchmark, `BeforeAll`/`AfterAll` under
    a fuzz target — unless the hook checks it for nil; a helper the hook
    calls is not inspected, so keep `t.T()` out of those helpers.
-   Legitimate reasons to stay sequential: `Setenv` (panics in parallel
-   tests), shared live resources without per-test
+   A parallel suite with two or more methods also refuses a bound package
+   fixture whose `BeforeEach`/`AfterEach` uses the fixture (v1.38+): do
+   that per-method work in the returning `BeforeEach`.
+   Legitimate reasons to stay sequential: `Setenv` in a method or a
+   per-method hook (panics in parallel tests; refused at generation,
+   v1.38+; `BeforeAll` may call it), shared live resources without per-test
    keys/schemas (`-race` is process-local and cannot see datastore
    contention — it is necessary, not sufficient).
 5. **Poll, never sleep.** `gotest.Eventually(t, waitFor, tick, func(poll
