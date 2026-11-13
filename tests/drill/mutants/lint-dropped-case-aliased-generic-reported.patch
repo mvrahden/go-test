@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/lint LinterRules / DroppedCases / when a test file d
 Clause: when a test file declares a generic suite with a case → lint leaves the suite an alias instantiates unreported
 --- a/internal/lint/droppedcase.go
 +++ b/internal/lint/droppedcase.go
-@@ -89,7 +89,7 @@
+@@ -134,11 +134,11 @@
  		return
  	}
  	obj, ok := pass.TypesInfo.Defs[ts.Name].(*types.TypeName)
@@ -11,3 +11,8 @@ Clause: when a test file declares a generic suite with a case → lint leaves th
  		return
  	}
  	named, ok := obj.Type().(*types.Named)
+-	if !ok || !hasCaseMethod(named) || !refusedAt(pass, ts.Name.Pos()) {
++	if !ok || !hasCaseMethod(named) {
+ 		return
+ 	}
+ 	report(pass, DroppedCase, span{ts.Name.Pos(), ts.Name.End()},
