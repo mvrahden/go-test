@@ -84,8 +84,8 @@ func eventPaths(t *gotest.T, wf workflowFile, event string) []string {
 func (s *WorkflowsTestSuite) TestEveryJobHasATimeout(t *gotest.T) {
 	var missing []string
 	for file, wf := range readWorkflows(t) {
-		for name, job := range wf.Jobs {
-			if job.Uses == "" && job.TimeoutMinutes == 0 {
+		for name := range wf.Jobs {
+			if job := wf.Jobs[name]; job.Uses == "" && job.TimeoutMinutes == 0 {
 				missing = append(missing, file+": "+name)
 			}
 		}
@@ -99,9 +99,10 @@ var pinned = regexp.MustCompile(`^[^@]+@[0-9a-f]{40}$`)
 func (s *WorkflowsTestSuite) TestActionsArePinnedByCommit(t *gotest.T) {
 	var uses []string
 	for file, wf := range readWorkflows(t) {
-		for name, job := range wf.Jobs {
-			for _, st := range job.Steps {
-				if st.Uses != "" {
+		for name := range wf.Jobs {
+			steps := wf.Jobs[name].Steps
+			for i := range steps {
+				if st := &steps[i]; st.Uses != "" {
 					uses = append(uses, file+": "+name+": "+st.Uses)
 				}
 			}
@@ -118,8 +119,8 @@ func (s *WorkflowsTestSuite) TestActionsArePinnedByCommit(t *gotest.T) {
 			} `yaml:"runs"`
 		}
 		gotest.NoError(t, yaml.Unmarshal(data, &action), "%s", file)
-		for _, st := range action.Runs.Steps {
-			if st.Uses != "" {
+		for i := range action.Runs.Steps {
+			if st := &action.Runs.Steps[i]; st.Uses != "" {
 				uses = append(uses, filepath.ToSlash(file)+": "+st.Uses)
 			}
 		}

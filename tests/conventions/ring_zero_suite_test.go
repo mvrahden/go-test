@@ -158,7 +158,7 @@ func (s *RingZeroTestSuite) TestRingZeroFilesCheckWithPlainGo(t *gotest.T) {
 			if !strings.HasSuffix(path, "_test.go") || about.PSuiteRegex.MatchString(d.Name()) {
 				return nil
 			}
-			src, err := os.ReadFile(path)
+			src, err := os.ReadFile(path) //nolint:gosec // G122: the repository's own test files
 			if err != nil || !isRingZero(src) {
 				return err
 			}

@@ -30,7 +30,7 @@ func (s *LintPluginTestSuite) SuiteGuard() string {
 
 // lintPlugin runs the target on dir and returns its output and exit code.
 func (s *LintPluginTestSuite) lintPlugin(t *gotest.T, dir string) (string, int) {
-	cmd := exec.CommandContext(t.Context(), "make", "-s", "lint-plugin", "PLUGIN_DIR="+dir)
+	cmd := exec.CommandContext(t.Context(), "make", "-s", "lint-plugin", "PLUGIN_DIR="+dir) //nolint:gosec // G204: the repository's own make target
 	cmd.Dir = filepath.Join("..", "..")
 	cmd.Env = append(os.Environ(), "GOFLAGS=")
 	out, _ := cmd.CombinedOutput()

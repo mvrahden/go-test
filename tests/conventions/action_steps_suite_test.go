@@ -55,14 +55,14 @@ func readAction(t *gotest.T) actionFile {
 
 // actionStepNamed is the step with that id, or, when no step has it, that name.
 func actionStepNamed(t *gotest.T, action actionFile, key string) workflowStep {
-	for _, st := range action.Runs.Steps {
-		if st.ID == key {
-			return st
+	for i := range action.Runs.Steps {
+		if action.Runs.Steps[i].ID == key {
+			return action.Runs.Steps[i]
 		}
 	}
-	for _, st := range action.Runs.Steps {
-		if st.Name == key {
-			return st
+	for i := range action.Runs.Steps {
+		if action.Runs.Steps[i].Name == key {
+			return action.Runs.Steps[i]
 		}
 	}
 	gotest.Fail(t, "action.yml has no step with id or name "+key)
@@ -74,7 +74,7 @@ var inputExpr = regexp.MustCompile(`^\$\{\{\s*inputs\.([\w-]+)\s*\}\}$`)
 // inputEnv is the environment GitHub gives the step for these inputs: every
 // variable its env: maps from an input, set to the given value or the
 // input's default. Each given input must be read by the step.
-func inputEnv(t *gotest.T, action actionFile, st workflowStep, inputs map[string]string) []string {
+func inputEnv(t *gotest.T, action actionFile, st *workflowStep, inputs map[string]string) []string {
 	read := map[string]bool{}
 	var env []string
 	for name, expr := range st.Env {
@@ -124,7 +124,7 @@ func (s *ActionStepsTestSuite) stepIn(t *gotest.T, dir, key string, inputs map[s
 	tools := t.TempDir()
 	cli, log := filepath.Join(tools, "gotest"), filepath.Join(tools, "calls")
 	gotest.NoError(t, os.WriteFile(cli, []byte(loggingCLI), 0o700)) //nolint:gosec // G306: an executable
-	vars := append(inputEnv(t, action, st, inputs), "GOTEST_BIN="+cli, "STANDIN_LOG="+log, "GO_LOG="+filepath.Join(tools, "go.log"))
+	vars := append(inputEnv(t, action, &st, inputs), "GOTEST_BIN="+cli, "STANDIN_LOG="+log, "GO_LOG="+filepath.Join(tools, "go.log"))
 	run := runActionStep(t, st.Run, dir, map[string]string{"go": coverGo}, append(vars, env...)...)
 	calls, _ := os.ReadFile(log)
 	return run, strings.TrimSpace(string(calls))
@@ -161,7 +161,7 @@ func (s *ActionStepsTestSuite) TestAVersionIsInstalled(t *gotest.T) {
 	install := actionStepNamed(t, action, "Install gotest")
 	gotest.Contains(t, install.If, "inputs.version != 'gomod'", "the install step runs only for a version tag")
 	log := filepath.Join(t.TempDir(), "go.log")
-	env := append(inputEnv(t, action, install, map[string]string{"version": "v1.36.0"}), "GO_LOG="+log)
+	env := append(inputEnv(t, action, &install, map[string]string{"version": "v1.36.0"}), "GO_LOG="+log)
 	run := runActionStep(t, install.Run, t.TempDir(), map[string]string{"go": coverGo}, env...)
 	gotest.Equal(t, 0, run.exit, "stderr: %s", run.stderr)
 	data, err := os.ReadFile(log)
@@ -208,7 +208,7 @@ func (s *ActionStepsTestSuite) TestTheFuzzCacheStepsFollowTheirInput(t *gotest.T
 // git runs git in dir with no user or system configuration and returns its
 // trimmed output.
 func (s *ActionStepsTestSuite) git(t *gotest.T, dir string, args ...string) string {
-	cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...)
+	cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...) //nolint:gosec // G204: git on the test's own repositories
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
 	out, err := cmd.CombinedOutput()
 	gotest.NoError(t, err, "git %v: %s", args, out)
@@ -223,7 +223,7 @@ func (s *ActionStepsTestSuite) TestTheBadgeGoesToTheNamedBranchOfTheDefaultBranc
 	gotest.NoError(t, os.WriteFile(badge, []byte("<svg>81.5</svg>"), 0o600))
 	action := readAction(t)
 	st := actionStepNamed(t, action, "Publish coverage badge")
-	env := append(inputEnv(t, action, st, map[string]string{"badge-branch": "metrics"}),
+	env := append(inputEnv(t, action, &st, map[string]string{"badge-branch": "metrics"}),
 		"BADGE_FILE="+badge, "COVERAGE=81.5", "DEFAULT_BRANCH=main",
 		"GH_TOKEN=tok", "GITHUB_REPOSITORY=o/r", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_COUNT=1",
 		"GIT_CONFIG_KEY_0=url.file://"+bare+".insteadOf", "GIT_CONFIG_VALUE_0=https://x-access-token:tok@github.com/o/r.git")

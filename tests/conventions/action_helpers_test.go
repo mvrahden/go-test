@@ -32,7 +32,8 @@ func actionStep(t *gotest.T, key string) string {
 	}
 	gotest.NoError(t, yaml.Unmarshal(data, &action))
 	byName := ""
-	for _, st := range action.Runs.Steps {
+	for i := range action.Runs.Steps {
+		st := &action.Runs.Steps[i]
 		if st.ID == key {
 			return st.Run
 		}

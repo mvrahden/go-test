@@ -59,7 +59,7 @@ func (s *CoverageTotalTestSuite) BeforeAll(t *gotest.T) {
 	goIn(t, s.dir, nil, "build", "-cover", "-covermode=atomic", "-o", "tool", "./cmd/tool")
 	data := filepath.Join(s.dir, "data")
 	gotest.NoError(t, os.MkdirAll(data, 0o750))
-	cmd := exec.CommandContext(t.Context(), filepath.Join(s.dir, "tool"))
+	cmd := exec.CommandContext(t.Context(), filepath.Join(s.dir, "tool")) //nolint:gosec // G204: the binary built just above
 	cmd.Env = append(os.Environ(), "GOCOVERDIR="+data)
 	out, err := cmd.CombinedOutput()
 	gotest.NoError(t, err, "tool: %s", out)

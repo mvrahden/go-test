@@ -147,14 +147,14 @@ func (s *NightlyTestSuite) TestAGoTipFailureAloneHasItsOwnIssue(t *gotest.T) {
 }
 
 // actionStepOf is the job's step that runs the action.
-func actionStepOf(t *gotest.T, job workflowJob) workflowStep {
+func actionStepOf(t *gotest.T, job *workflowJob) workflowStep {
 	at := slices.IndexFunc(job.Steps, func(st workflowStep) bool { return st.Uses == "./" })
 	gotest.GreaterOrEqual(t, at, 0, "the job has no step that runs the action")
 	return job.Steps[at]
 }
 
 // runOf is the run script of the job's step with that name.
-func runOf(t *gotest.T, job workflowJob, name string) string {
+func runOf(t *gotest.T, job *workflowJob, name string) string {
 	at := slices.IndexFunc(job.Steps, func(st workflowStep) bool { return st.Name == name })
 	gotest.GreaterOrEqual(t, at, 0, "the job has no step %q", name)
 	return job.Steps[at].Run
@@ -173,10 +173,13 @@ func without(with map[string]string, keys ...string) map[string]string {
 
 func (s *NightlyTestSuite) TestTheNightlyRunsTheGateAsPushesDo(t *gotest.T) {
 	nightly, test, quality := readWorkflow(t, "nightly.yml"), readWorkflow(t, "test.yml"), readWorkflow(t, "quality.yml")
-	gotest.Equal(t, without(actionStepOf(t, test.Jobs["test"]).With, "badge", "events-file"), without(actionStepOf(t, nightly.Jobs["gate"]).With, "events-file"))
-	gotest.Equal(t, actionStepOf(t, test.Jobs["platform-test"]).With, actionStepOf(t, nightly.Jobs["platform"]).With)
-	gotest.Equal(t, actionStepOf(t, test.Jobs["platform-test"]).Env, actionStepOf(t, nightly.Jobs["platform"]).Env)
-	gotest.Equal(t, runOf(t, quality.Jobs["drill"], "Drill"), runOf(t, nightly.Jobs["drill"], "Drill"))
+	testJob, gateJob := test.Jobs["test"], nightly.Jobs["gate"]
+	platformTest, platform := test.Jobs["platform-test"], nightly.Jobs["platform"]
+	qualityDrill, nightlyDrill := quality.Jobs["drill"], nightly.Jobs["drill"]
+	gotest.Equal(t, without(actionStepOf(t, &testJob).With, "badge", "events-file"), without(actionStepOf(t, &gateJob).With, "events-file"))
+	gotest.Equal(t, actionStepOf(t, &platformTest).With, actionStepOf(t, &platform).With)
+	gotest.Equal(t, actionStepOf(t, &platformTest).Env, actionStepOf(t, &platform).Env)
+	gotest.Equal(t, runOf(t, &qualityDrill, "Drill"), runOf(t, &nightlyDrill, "Drill"))
 	gotest.Contains(t, eventPaths(t, nightly, "pull_request"), ".github/workflows/nightly.yml")
 	_, scheduled := nightly.On["schedule"]
 	gotest.True(t, scheduled)
@@ -188,7 +191,8 @@ func (s *NightlyTestSuite) TestGoTipCannotFailTheRunAndIsStillReported(t *gotest
 	gotest.Zero(t, tip.ContinueOnErr.Value, "a job-level continue-on-error hides the outcome from the report")
 	at := slices.IndexFunc(tip.Steps, func(st workflowStep) bool { return st.ID == "install" })
 	gotest.GreaterOrEqual(t, at, 0, "go-tip has no install step")
-	for _, st := range tip.Steps[at:] {
+	for i := at; i < len(tip.Steps); i++ {
+		st := &tip.Steps[i]
 		gotest.Equal(t, "true", st.ContinueOnErr.Value, "go-tip step %q can fail the run", st.Name)
 	}
 	data, err := os.ReadFile(filepath.Join(workflowsDir, "nightly.yml"))
