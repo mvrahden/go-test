@@ -36,7 +36,7 @@ func (s *CLIOutputFileTestSuite) TestAReportWrittenToAFile(t *gotest.T) {
 		w.It("the file holds no color codes", func(it *gotest.T) {
 			for row, sub := range gotest.Each(it, []struct{ Desc string }{{Desc: "spec"}, {Desc: "summary"}}) {
 				out := filepath.Join(row.TempDir(), "report.txt")
-				cmd := exec.CommandContext(row.Context(), s.cli, sub.Desc, "--input=../testdata/specstreams/failed.jsonl", "--output="+out)
+				cmd := exec.CommandContext(row.Context(), s.cli, sub.Desc, "--input=../testdata/specstreams/failed.jsonl", "--output="+out) //nolint:gosec // G204: the CLI under test
 				cmd.Env = append(testkit.ChildEnv(row.TempDir()), "NO_COLOR=")
 				null, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 				gotest.NoError(row, err)
