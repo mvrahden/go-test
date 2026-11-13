@@ -57,6 +57,7 @@ var witnesses = []witness{
 	{file: "reference/migration.md", quote: "never writes", label: "v1.37+", path: "specs/migrate/spec.md", literal: "### Requirement: Module files"},
 	{file: "reference/ci.md", quote: "action's run as Ctrl-C does", label: "v1.37+", path: "action.yml", literal: "trap 'kill -INT"},
 	{file: "reference/ci.md", quote: "also stops on", label: "v1.37+", path: "cmd/gotest/signals_unix.go", literal: "SIGHUP"},
+	{file: "reference/cli.md", quote: "`gotest clean --cache`", label: "v1.38+", path: "cmd/gotest/clean.go", literal: "--cache"},
 }
 
 var (
