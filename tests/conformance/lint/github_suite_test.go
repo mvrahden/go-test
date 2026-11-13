@@ -56,7 +56,7 @@ func (s *LinterGitHubTestSuite) TestSwitchedOff(t *gotest.T) {
 			gotest.NoError(it, err)
 			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
 			gotest.NotContains(it, run.Stdout, "::error")
-			gotest.Regexp(it, `fixture,shared\.go:8:6: shared fixture "TagSharedFixture"`, run.Stderr)
+			gotest.Regexp(it, `fixture,shared\.go:9:2: shared fixture "TagSharedFixture"`, run.Stderr)
 		})
 	})
 	t.When("--github is given a value that is no boolean", func(w *gotest.T) {
