@@ -36,7 +36,7 @@ func (s *SpecRepeatTestSuite) TestAMethodThatFailsInOneRunOfThree(t *gotest.T) {
 			gotest.Len(it, runs, 3)
 			for i, n := range runs {
 				gotest.False(it, n.External, "run %d", i+1)
-				gotest.Equal(it, i+1, n.Run)
+				gotest.Equal(it, int32(i+1), n.Run)
 				gotest.Equal(it, 3, n.Runs)
 			}
 			terminal := spec(it, 1, repeatPkg, "-count=3")
@@ -106,14 +106,14 @@ func (s *SpecRepeatTestSuite) TestAStdlibTestOfBothTestPackages(t *gotest.T) {
 			nodes := stdTwins(doc)
 			gotest.Len(it, nodes, 4)
 			var external []bool
-			var runs []int
+			var runs []int32
 			for _, n := range nodes {
 				external = append(external, n.External)
 				runs = append(runs, n.Run)
 				gotest.Equal(it, 2, n.Runs)
 			}
 			gotest.Equal(it, []bool{false, true, false, true}, external)
-			gotest.Equal(it, []int{1, 1, 2, 2}, runs)
+			gotest.Equal(it, []int32{1, 1, 2, 2}, runs)
 			terminal := spec(it, 1, "--input="+twice)
 			gotest.Contains(it, terminal.Stdout, "Foo — EXTERNAL — RUN 2 OF 2")
 		})

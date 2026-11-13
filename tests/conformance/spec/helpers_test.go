@@ -23,18 +23,19 @@ type specPackage struct {
 }
 
 type specNode struct {
-	Name       string     `json:"name"`
-	Display    string     `json:"display"`
-	Status     string     `json:"status"`
-	Duration   float64    `json:"duration"`
-	Incomplete bool       `json:"incomplete"`
-	External   bool       `json:"external"`
-	Variant    int        `json:"variant"`
-	Run        int        `json:"run"`
-	Runs       int        `json:"runs"`
-	File       string     `json:"file"`
-	Line       int        `json:"line"`
-	Children   []specNode `json:"children"`
+	Name       string  `json:"name"`
+	Display    string  `json:"display"`
+	Status     string  `json:"status"`
+	Duration   float64 `json:"duration"`
+	Incomplete bool    `json:"incomplete"`
+	External   bool    `json:"external"`
+	// int32 keeps the node under gocritic's copy threshold.
+	Variant  int32      `json:"variant"`
+	Run      int32      `json:"run"`
+	Runs     int32      `json:"runs"`
+	File     string     `json:"file"`
+	Line     int        `json:"line"`
+	Children []specNode `json:"children"`
 }
 
 type specStats struct {

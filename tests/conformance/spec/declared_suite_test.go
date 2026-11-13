@@ -313,7 +313,7 @@ func (s *SpecDeclaredTestSuite) TestALiveRunUnderItsDeclaredSpecification(t *got
 			}
 			gotest.Len(it, runs, 2)
 			for i, r := range runs {
-				gotest.Equal(it, i+1, r.Run)
+				gotest.Equal(it, int32(i+1), r.Run)
 				gotest.Equal(it, "none", node(it, r.Children, "TestRowsAfterAFailure", "third").Status, "run %d", i+1)
 				gotest.Equal(it, "skip", node(it, r.Children, "X_TestParked").Status, "run %d", i+1)
 			}
