@@ -12,7 +12,7 @@ You write gotest suites, open VS Code's Testing sidebar — and it's empty. No t
 
 The [gotest VS Code extension](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) exists to close this gap. Because it's purpose-built for suite-based testing rather than a generic test runner, it can surface things standard tooling can't: the suite hierarchy, the behavioral spec view, and coverage that survives across runs.
 
-Installation is one command — `code --install-extension mvrahden.gotest` — or grab it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) or [Open VSX](https://open-vsx.org/extension/mvrahden/gotest). The extension requires gotest v1.27.0 or newer and validates the CLI version on activation. The rest of this post is the feature tour.
+Installation is one command — `code --install-extension mvrahden.gotest` — or grab it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mvrahden.gotest) or [Open VSX](https://open-vsx.org/extension/mvrahden/gotest). The extension requires a gotest release at or above the floor it names, validates the CLI version on activation and never runs `gotest@latest` on its own. In a Go workspace whose `go.mod` does not use gotest it stays idle: no discovery, no git setting, no Spec View button. The rest of this post is the feature tour.
 
 ## Why your editor can't see gotest suites
 
@@ -102,7 +102,7 @@ The Spec View is an interactive panel, not static text. It supports:
 - **Live updates** — auto-refreshes from test runs, coverage runs, and watch mode cycles.
 - **Persistence** — the panel survives editor reload and restores its last state.
 
-The Spec View is what connects the editor experience to the [tests-as-documentation]({{< ref "/blog/tests-as-documentation" >}}) philosophy. Your tests define what the system does. The Spec View renders that definition as a living document, always in sync with the code.
+The Spec View is what connects the editor experience to the [tests-as-documentation]({{< ref "/blog/tests-as-documentation" >}}) philosophy. Your tests define what the system does. The Spec View renders that definition as a living document, regenerated from every run; when a render fails, it keeps the last picture under a notice that says it is out of date.
 
 ## Coverage
 

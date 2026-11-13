@@ -659,7 +659,7 @@ percentage = covered / total</div>
     <!-- 10. CLI Reference -->
     <section class="ref-section" id="cli">
       <h2>CLI Reference</h2>
-      <p class="lead">One command, multiple modes. All <code>go test</code> flags pass through unchanged.</p>
+      <p class="lead">One command, multiple modes. The <code>go test</code> flags keep their meaning; the few that would break what gotest does are refused with the reason.</p>
 
       <h3>Commands</h3>
       <table class="ref-table">
@@ -724,7 +724,7 @@ percentage = covered / total</div>
       </table>
 
       <div class="callout">
-        Standard <code>go test</code> flags work unchanged: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-skip</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>.
+        Standard <code>go test</code> flags keep their meaning: <code>-v</code>, <code>-race</code>, <code>-cover</code>, <code>-count</code>, <code>-run</code>, <code>-skip</code>, <code>-list</code>, <code>-json</code>, <code>-short</code>, <code>-timeout</code>. <code>-o</code>, <code>-c</code>, <code>-n</code>, <code>-overlay</code> and <code>-fuzz</code> exit <code>2</code> with the reason, since gotest builds the binaries itself and fuzzes through <code>gotest fuzz</code>, and so does a profile flag such as <code>-cpuprofile</code> on a run that starts more than one suite process. <code>-run</code> reaches each suite process narrowed to that suite, so <code>-run '^TestMySuite$'</code> replays none of its fuzz seeds.
         Every matched package ends in a verdict, as with <code>go test</code>, printed in package order: one gotest runs nothing in reports <code>[no test files]</code>, <code>[no suites]</code> (stdlib tests only, standard library packages too) or <code>0.000s [no tests to run]</code> (benchmarks only, every suite excluded with <code>X_</code>, or <code>-run</code> deselected every suite), in text and in <code>-json</code>, where each package opens with one <code>start</code> event as in <code>go test -json</code>.
         Patterns that match no package at all verified nothing: every run mode exits <code>2</code> with <code>FAIL: "&lt;pattern&gt;" matched no packages</code> on stderr. A pattern that matches nothing beside others that did only warns, as with <code>go test</code>. <code>generate</code> and <code>discover</code>, which verify nothing, only warn and exit <code>0</code>. An empty pattern (<code>""</code>) is the current directory, as with <code>go test</code>. gotest takes packages, not files: a <code>.go</code> file argument exits <code>2</code> and names it.
       </div>
@@ -733,7 +733,7 @@ percentage = covered / total</div>
     <!-- 11. Linter -->
     <section class="ref-section" id="linter">
       <h2>Linter</h2>
-      <p class="lead">Thirty-three rules in three tiers. A rule's tier determines how it may be suppressed.</p>
+      <p class="lead">Thirty-four rules in three tiers. A rule's tier determines how it may be suppressed.</p>
 
       <h3>Integrity rules</h3>
       <p>Violations can make test outcomes unreliable or leak resources. These rules can only be suppressed per line — never project-wide.</p>
@@ -751,9 +751,10 @@ percentage = covered / total</div>
           <tr><td><code>assertion-type-guard</code></td><td><code>Nil</code>/<code>Empty</code> on types their runtime guards would reject.</td></tr>
           <tr><td><code>shared-fixture-undeclared</code></td><td>Suite reads a shared fixture it never declared — window scheduling only starts declared fixtures, so the read may hit one that never started or is already released.</td></tr>
           <tr><td><code>generated-file</code></td><td>Generated overlay files present in source control.</td></tr>
-          <tr><td><code>bench-loop</code></td><td><code>Benchmark*</code> methods that never touch <code>b.Loop()</code>/<code>b.N</code> — nothing iterates, so the numbers lie.</td></tr>
+          <tr><td><code>bench-loop</code></td><td><code>Benchmark*</code> methods that neither touch <code>b.Loop()</code>/<code>b.N</code> nor hand <code>b</code> to a helper that does — nothing iterates, so the numbers lie.</td></tr>
           <tr><td><code>fuzz-determinism</code></td><td>Fuzz targets reading <code>time.Now</code>, <code>math/rand</code> or <code>os.Getenv</code> — corpus replay and coverage guidance degrade.</td></tr>
           <tr><td><code>generation-rejects</code></td><td>Every shape the generator rejects, at the place and with the message it gives — such a package does not run at all.</td></tr>
+          <tr><td><code>dropped-case</code></td><td>A <code>Test</code>, <code>Benchmark</code> or <code>Fuzz</code> method taking <code>*gotest.T</code>, <code>B</code> or <code>F</code> that no suite runs: on a type without the <code>TestSuite</code> suffix, named just <code>Test</code>, or on a generic suite no alias instantiates.</td></tr>
           <tr><td><code>suite-declaration</code></td><td>A suite or fixture declared inside a <code>type ( … )</code> block — the fix gives it its own declaration, doc comment kept.</td></tr>
           <tr><td><code>no-embedding</code></td><td>An embedded suite, fixture or type carrying a method gotest reads, or a suite-typed field — reported at the field with the alternative.</td></tr>
           <tr><td><code>fixture-hook-call</code></td><td>A suite or fixture method calling a lifecycle hook of its own or of a fixture it holds — the harness calls it too, so it runs twice; a shared fixture's <code>BeforeAll</code> or <code>AfterAll</code> may call its own <code>Hydrate</code> or <code>Dehydrate</code>, which its process never runs.</td></tr>
@@ -808,7 +809,7 @@ percentage = covered / total</div>
       </table>
 
       <div class="callout">
-        The linter is a standard <code>go/analysis</code> analyzer, built into the CLI as <code>gotest lint</code>. There is no golangci-lint plugin — run it as its own CI step alongside your existing linter. In GitHub Actions, <code>gotest lint</code> auto-detects the runner (<code>GITHUB_ACTIONS=true</code>, or explicitly via <code>--github</code>) and additionally emits inline PR annotations per finding plus a findings table in the step summary; exit codes and suppression are unchanged.
+        The linter is a standard <code>go/analysis</code> analyzer, built into the CLI as <code>gotest lint</code>, and <code>pkg/lint</code> exports it for other drivers: golangci-lint loads it as the module plugin <code>github.com/mvrahden/go-test/pkg/lint/golangci</code> at the gotest version your <code>go.mod</code> requires, and <code>go vet -vettool</code> runs it through a small <code>main</code>; the <code>pkg/lint</code> package documentation shows both. Each plain finding line ends with its rule in parentheses, the id <code>//nolint:&lt;rule&gt;</code> takes. In GitHub Actions, <code>gotest lint</code> auto-detects the runner (<code>GITHUB_ACTIONS=true</code>, or explicitly via <code>--github</code>) and additionally emits inline PR annotations per finding plus a findings table in the step summary; exit codes and suppression are unchanged.
       </div>
     </section>
 
@@ -826,7 +827,7 @@ Coverage: 82.4%</pre>
       </div>
       <div class="code-block">
         <div class="code-label">Failures show assertion output only</div>
-        <pre>3 of 147 tests failed
+        <pre>3 tests failed, 144 passed
 
 FAIL  pkg/foo TestValidateInput / empty string (12ms)
       foo_test.go:42: expected error, got nil

@@ -65,13 +65,13 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
 And the spec output reads:
 
 {{< spec title="gotest spec" >}}
-UserService <span class="t-time">(6ms)</span>
+UserService — 3 passed <span class="t-time">(6ms)</span>
   Create <span class="t-time">(6ms)</span>
-    email is valid <span class="t-time">(4ms)</span>
-      <span class="t-pass">✓</span> creates the user <span class="t-time">(3ms)</span>
-      <span class="t-pass">✓</span> assigns an ID <span class="t-time">(<1ms)</span>
-    email is duplicate <span class="t-time">(1ms)</span>
-      <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(1ms)</span>
+    when email is valid
+      <span class="t-pass">✓</span> creates the user
+      <span class="t-pass">✓</span> assigns an ID
+    when email is duplicate
+      <span class="t-pass">✓</span> returns ErrDuplicate
 {{< /spec >}}
 
 That output is a behavioral specification. Not because it uses special keywords, but because the test structure — type, method, When, It — maps directly to subject, capability, context, behavior. The specification emerges from Go's own constructs.
@@ -197,26 +197,26 @@ In closure-based BDD frameworks, parameterized tests are awkward. You either gen
 When every suite follows this convention — struct = subject, method = capability, When = context, It = behavior — the spec output for the entire project reads as a complete behavioral specification:
 
 {{< spec title="gotest spec ./..." >}}
-UserService <span class="t-time">(9ms)</span>
+UserService — 5 passed <span class="t-time">(9ms)</span>
   Create <span class="t-time">(6ms)</span>
-    email is valid <span class="t-time">(4ms)</span>
-      <span class="t-pass">✓</span> creates the user <span class="t-time">(3ms)</span>
-      <span class="t-pass">✓</span> assigns an ID <span class="t-time">(<1ms)</span>
-    email is duplicate <span class="t-time">(1ms)</span>
-      <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(1ms)</span>
+    when email is valid
+      <span class="t-pass">✓</span> creates the user
+      <span class="t-pass">✓</span> assigns an ID
+    when email is duplicate
+      <span class="t-pass">✓</span> returns ErrDuplicate
   Delete <span class="t-time">(3ms)</span>
-    user exists <span class="t-time">(2ms)</span>
-      <span class="t-pass">✓</span> removes the user <span class="t-time">(2ms)</span>
-    user does not exist <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns ErrNotFound <span class="t-time">(<1ms)</span>
+    when user exists
+      <span class="t-pass">✓</span> removes the user
+    when user does not exist
+      <span class="t-pass">✓</span> returns ErrNotFound
 
-OrderService <span class="t-time">(12ms)</span>
+OrderService — 3 passed <span class="t-time">(12ms)</span>
   Place <span class="t-time">(12ms)</span>
-    stock is sufficient <span class="t-time">(9ms)</span>
-      <span class="t-pass">✓</span> creates the order <span class="t-time">(6ms)</span>
-      <span class="t-pass">✓</span> decrements stock <span class="t-time">(3ms)</span>
-    stock is insufficient <span class="t-time">(2ms)</span>
-      <span class="t-pass">✓</span> returns ErrInsufficientStock <span class="t-time">(2ms)</span>
+    when stock is sufficient
+      <span class="t-pass">✓</span> creates the order
+      <span class="t-pass">✓</span> decrements stock
+    when stock is insufficient
+      <span class="t-pass">✓</span> returns ErrInsufficientStock
 {{< /spec >}}
 
 This is not a testing report. It is a specification document — generated from tests that are also the implementation verification. The tests and the spec are the same artifact. A new team member reads this output and knows what the system does. A product manager reads it and confirms the feature coverage. This is what North meant by BDD: the tests *are* the specification. For how to export this output as markdown and treat it as a real documentation artifact, see [Go Tests as Living Documentation]({{< ref "/blog/tests-as-documentation" >}}).

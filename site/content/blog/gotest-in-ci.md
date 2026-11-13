@@ -41,7 +41,7 @@ Coverage: 82.4%
 When tests fail, it shows only the failing tests with their assertion output — no `=== RUN`, no `=== CONT`, no `--- PASS` noise:
 
 {{< terminal title="failures show assertion output only" >}}
-2 of 41 tests failed
+2 tests failed, 39 passed
 
 FAIL  github.com/mvrahden/go-test/examples/auth TokenValidator / ValidateToken / when the token is valid / extracts the email claim (<1ms)
       suite_test.go:29: Equal failed:
@@ -89,7 +89,7 @@ jobs:
 
 That is the entire CI setup. The action does the following:
 
-1. **Installs gotest.** By default (`version: gomod`), it runs the gotest your `go.mod` selects (`go tool gotest` when the tool is declared). This keeps the CI version in sync with local development — no version drift.
+1. **Installs gotest.** By default (`version: gomod`), it builds the gotest your `go.mod` selects once per job and runs that binary, leaving the checkout's `go.sum` as committed. This keeps the CI version in sync with local development — no version drift.
 1. **Runs tests** with `gotest summary --github`. The `--github` flag is auto-detected in GitHub Actions via the `$GITHUB_ACTIONS` environment variable.
 1. **Reports failures** as GitHub `::error` annotations. These appear inline on the PR diff, pointing at the exact file and line of each failing assertion.
 1. **Writes a step summary** to the job summary panel with pass/fail counts and coverage.
@@ -136,7 +136,7 @@ You can use these in subsequent steps, for example to post a coverage comment or
 
 ## Version resolution
 
-The default `version: gomod` strategy runs the gotest your `go.mod` pins, through `go tool gotest` when the tool is declared, which means CI runs the exact same version you use locally. No separate install step, no version drift.
+The default `version: gomod` strategy builds the gotest your `go.mod` pins, once per job, which means CI runs the exact same version you use locally; without a declared tool the action resolves the CLI's dependencies in a copy of `go.mod` and notes the `go get -tool` line that declares it. No separate install step, no version drift.
 
 For this to work, gotest needs to be in your `go.mod`. The cleanest way is a `tool` directive (Go 1.24+):
 
