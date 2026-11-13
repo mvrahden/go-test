@@ -4,11 +4,15 @@ Expect: specmarkdown: a label breaks its line
 Clause: when a label holds a pipe, a backslash, an angle bracket, a backtick or a line break → keeps each behavior on one line of the outline
 --- a/internal/gotestspec/markdown.go
 +++ b/internal/gotestspec/markdown.go
-@@ -390,7 +390,6 @@
+@@ -412,11 +412,10 @@
+ 	"]", `\]`,
+ 	"&", "&amp;",
  	"<", "&lt;",
  	">", "&gt;",
  	"\r\n", " ",
 -	"\n", " ",
  	"\r", " ",
  )
- 
+
+ // EscapeMarkdown is the escape for a table cell of names gotest prints. A line
+ // break becomes a space: a cell is one line.
