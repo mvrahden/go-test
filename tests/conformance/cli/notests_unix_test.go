@@ -14,7 +14,7 @@ import (
 // functions, as a binary built without the generated harness would run.
 func (s *CLINoTestsTestSuite) TestASuiteWhoseBinaryRunsNoneOfItsTests(t *gotest.T) {
 	wrap := filepath.Join(t.TempDir(), "wrap.sh")
-	gotest.NoError(t, os.WriteFile(wrap, []byte("#!/bin/sh\nbin=\"$1\"; shift\nexec \"$bin\" \"$@\" -test.run='^NoSuchTest$'\n"), 0o700))
+	gotest.NoError(t, os.WriteFile(wrap, []byte("#!/bin/sh\nbin=\"$1\"; shift\nexec \"$bin\" \"$@\" -test.run='^NoSuchTest$'\n"), 0o700)) //nolint:gosec // G306: an executable
 	run, err := testkit.RunCLI(t.Context(), ".", "-exec", wrap, "../testdata/passing/")
 	gotest.NoError(t, err)
 	t.When("a suite's binary runs none of its tests in a text run without a pattern", func(w *gotest.T) {
