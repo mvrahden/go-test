@@ -32,7 +32,7 @@ func vettool(t *gotest.T) string {
 
 // vet runs go vet with bin over pkg and returns what it printed.
 func vet(t *gotest.T, bin, pkg string) (string, error) {
-	out, err := exec.CommandContext(t.Context(), "go", "vet", "-vettool="+bin, pkg).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "go", "vet", "-vettool="+bin, pkg).CombinedOutput() //nolint:gosec // G204: the vet tool this test built
 	return string(out), err
 }
 
