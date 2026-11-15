@@ -1,0 +1,35 @@
+Expect: atrest: markers .*, want long at most short\+10: the suite process allocates while its test waits
+Expect: atrest: markers .*, want allocs per run=0
+Judge: ./tests/canary CanaryLifecycleTestSuite/TestASuiteProcessAtRest
+Clause: when a method of a suite under the runner only sleeps while it counts the process's heap allocations → counts at most 10 more in a window one second longer than in a short one
+Clause: when a method of a suite under the runner only sleeps while it counts the process's heap allocations → gets 0 from testing.AllocsPerRun of a function that only sleeps
+--- a/pkg/gotestruntime/stop.go
++++ b/pkg/gotestruntime/stop.go
+@@ -265,12 +265,27 @@
+ 	go w.loop()
+ 	if w.link != nil {
+ 		go w.read()
++		go w.poll()
+ 	} else {
+ 		close(w.readDone)
+ 	}
+ 	return w
+ }
+ 
++// poll looks for a stop file every 25ms until quit closes.
++func (w *watcher) poll() {
++	tick := time.NewTicker(25 * time.Millisecond)
++	defer tick.Stop()
++	for {
++		select {
++		case <-w.quit:
++			return
++		case <-tick.C:
++			_, _ = os.Stat(os.DevNull + ".stop")
++		}
++	}
++}
++
+ // underRunner reports whether the gotest runner started this watcher's
+ // process, which then has its channel.
+ func (w *watcher) underRunner() bool { return w.link != nil }

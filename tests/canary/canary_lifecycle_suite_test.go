@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -277,4 +278,34 @@ func (s *CanaryLifecycleTestSuite) TestASecondStopSignalReleasesAtOnce(t *gotest
 	if !strings.Contains(out, "the runner forced the stop") || !slices.Contains(markers, "fixture.AfterAll") || took > 4*time.Second {
 		t.Errorf("stopgrace: markers %v, want the fixture released at once on the second signal (the run ended %s after the first):\n%s", markers, took, out)
 	}
+}
+
+// A suite process under the runner allocates nothing of its own accord
+// while its test only sleeps: a long window counts no more than a short one,
+// and testing.AllocsPerRun of a sleep reports 0.
+func (s *CanaryLifecycleTestSuite) TestASuiteProcessAtRest(t *gotest.T) {
+	dir := t.TempDir()
+	r := s.run(t, "atrest", dir)
+	markers, _ := testkit.ReadMarkers(filepath.Join(dir, testkit.MarkersFile))
+	if r.code != 0 {
+		t.Errorf("atrest: exit code %d, want 0\n%s%s", r.code, r.stream, r.stderr)
+	}
+	if short, long := markerNumber(markers, "short="), markerNumber(markers, "long="); short < 0 || long > short+10 {
+		t.Errorf("atrest: markers %v, want long at most short+10: the suite process allocates while its test waits", markers)
+	}
+	if !slices.Contains(markers, "allocs per run=0") {
+		t.Errorf("atrest: markers %v, want allocs per run=0: testing.AllocsPerRun counts the suite process's own allocations", markers)
+	}
+}
+
+// markerNumber reads the number a marker with prefix carries, -1 without one.
+func markerNumber(markers []string, prefix string) int {
+	for _, m := range markers {
+		if strings.HasPrefix(m, prefix) {
+			if n, err := strconv.Atoi(strings.TrimPrefix(m, prefix)); err == nil {
+				return n
+			}
+		}
+	}
+	return -1
 }

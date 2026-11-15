@@ -347,6 +347,14 @@ The runner's first stop SHALL reach a suite process as a line on the control cha
 - **WHEN** the last suite of a process under the runner ends
 - **THEN** leaves no goroutine reading the channel for a leak check in TestMain to find
 
+### Requirement: A suite process at rest
+A suite process under the runner SHALL allocate nothing on the heap of its own accord while its tests wait: waiting for a stop on its channel SHALL not poll. A test that counts the process's heap allocations, by `runtime.MemStats` or `testing.AllocsPerRun`, SHALL count those of its own code alone, as it would under plain `go test`.
+
+#### Scenario: A method that only waits
+- **WHEN** a method of a suite under the runner only sleeps while it counts the process's heap allocations
+- **THEN** counts at most 10 more in a window one second longer than in a short one
+- **AND** gets 0 from testing.AllocsPerRun of a function that only sleeps
+
 ### Requirement: A stop before the first suite opens
 A stop the runner sends while a suite process runs its init or TestMain, before its first suite opens, SHALL be read when that suite opens: every suite the process opens then SHALL skip with the reason run stopping and set up no fixture.
 
