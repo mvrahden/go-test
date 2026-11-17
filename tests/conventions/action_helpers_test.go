@@ -63,7 +63,7 @@ func runActionStep(t *gotest.T, script, dir string, bins map[string]string, env 
 	output, envFile := filepath.Join(base, "output"), filepath.Join(base, "env")
 	cmd := exec.CommandContext(t.Context(), "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script) //nolint:gosec // G204: the action's own script
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "PWD="+dir,
+	cmd.Env = append(stepEnviron(), "PWD="+dir,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"RUNNER_TEMP="+temp, "RUNNER_OS=Linux",
 		"GITHUB_OUTPUT="+output, "GITHUB_ENV="+envFile, "GITHUB_STEP_SUMMARY="+filepath.Join(base, "summary"))
@@ -94,4 +94,18 @@ func unixActionGuard() string {
 		return "bash not found"
 	}
 	return ""
+}
+
+// stepEnviron is this process's environment without what the Action passes
+// its own steps: under CI these tests run inside it, and a step under test
+// would otherwise read the outer run's inputs.
+func stepEnviron() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "INPUT_") || strings.HasPrefix(kv, "GOTEST_BIN=") || strings.HasPrefix(kv, "GOTEST_CMD=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
 }
