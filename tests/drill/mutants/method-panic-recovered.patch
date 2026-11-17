@@ -8,6 +8,6 @@ Clause: when a parallel method panics while a sibling is still running → After
  		}
  		passed := t.Run(c.Name, func(it *testing.T) {
 +			defer func() { _ = recover() }()
- 			if m.Parallel {
- 				it.Parallel()
- 				// The first cleanup runs last: it sees the failures the others
+ 			// What a skipped method would have read is not unread.
+ 			it.Cleanup(func() {
+ 				if it.Skipped() {

@@ -1,0 +1,13 @@
+Expect: a helper's cleanup was held to the method's Timeout
+Judge: ./tests/lifecycle HoldsTestSuite/TestAHelpersCleanupIsNotHeldToTheMethodsTimeout
+Clause: when a cleanup a method's helper registered on its testing.T runs past the method's declared Timeout → the method passes
+--- a/pkg/gotestruntime/methodbudget.go
++++ b/pkg/gotestruntime/methodbudget.go
+@@ -77,7 +77,6 @@
+ 		cancel()
+ 	})
+ 	return m, func() {
+-		m.watchOff()
+ 		m.enter("cleanup (the wait on a goroutine started with gotest.Go) ")
+ 		setupwaits.Hold(it, m.holdWait)
+ 	}

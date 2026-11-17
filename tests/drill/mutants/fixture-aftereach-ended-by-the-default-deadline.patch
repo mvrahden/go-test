@@ -1,0 +1,14 @@
+Expect: a fixture AfterEach got a context the default deadline ends
+Judge: ./pkg/gotestruntime LifetimesTestSuite/TestAFixtureAfterEachContextOutlivesTheDefaultDeadline
+Clause: when a method of a suite that declares no Timeout runs past the default deadline and its fixture's AfterEach returns its context's error → that context has not ended and the method passes
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -112,7 +112,7 @@
+ 						// not end its context; a declared Timeout does, the
+ 						// default deadline does not.
+ 						ctx := context.WithoutCancel(mt.t.Context())
+-						if budget.Timeout > 0 {
++						if budget.Timeout >= 0 {
+ 							ctx = AfterEachT(mt.t).Context()
+ 						}
+ 						if err := f.After(ctx); err != nil { //nolint:fail-guard // the method has run; report and go on

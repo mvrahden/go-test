@@ -107,6 +107,7 @@ func (s *StopGraceTestSuite) TestABodyIgnoringItsContext(t *gotest.T) {
 			gotest.GreaterOrEqual(it, took, 5*time.Second)
 			gotest.Less(it, took, 20*time.Second)
 			gotest.NotContains(it, run.Markers, "body returned")
+			gotest.NotContains(it, run.Stdout, "the stop came while this method ran")
 		})
 		w.It("releases the fixture without running AfterAll", func(it *gotest.T) {
 			gotest.Contains(it, run.Markers, "fixture.AfterAll")

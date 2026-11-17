@@ -144,3 +144,63 @@ func (s *FixtureHooksTestSuite) TestAFixtureBeforeAllOrAfterAllGoesWrong(t *gote
 		})
 	})
 }
+
+func (s *FixtureHooksTestSuite) TestTheContextAFixtureAfterEachGets(t *gotest.T) {
+	t.When("a fixture's AfterEach waits on its context past the method's Timeout", func(w *gotest.T) {
+		run, out := runHooks(w, "fixture.AfterEach", "wait")
+		w.It("its context ends at the Timeout and the method fails at that hook", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Contains(it, run.Markers, "fixture.AfterEach saw its context end")
+			gotest.Equal(it, "fail", run.Verdict(gridBody))
+			gotest.Regexp(it, `(?m)^\s+fixture\.go:\d+: GridFixture\.AfterEach exceeded its configured Timeout of 300ms`, out)
+		})
+	})
+	t.When("a method of a suite that declares no Timeout runs past the default deadline and its fixture's AfterEach returns its context's error", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"GOTEST_TIMEOUT_SCALE=0.01"}, "../testdata/aftereachdefault/")
+		gotest.NoError(w, err)
+		w.It("that context has not ended and the method passes", func(it *gotest.T) {
+			out := outputOf(&run, "")
+			gotest.Equal(it, "pass", run.Verdict("TestSlowTestSuite/TestSlow"), "stdout: %s", run.Stdout)
+			gotest.NotContains(it, out, "ReleaseFixture.AfterEach failed")
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+		})
+	})
+}
+
+func (s *FixtureHooksTestSuite) TestAFixtureHookLeavesThroughGoexit(t *gotest.T) {
+	t.When("a package fixture's BeforeAll leaves through runtime.Goexit", func(w *gotest.T) {
+		run, out := runHooks(w, "fixture.BeforeAll", "goexit")
+		w.It("fails the suite, which never opens, saying how the hook left, and still runs the fixture's AfterAll", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "fail", run.Verdict(gridSuite))
+			gotest.Equal(it, []string{"fixture.BeforeAll", "fixture.AfterAll"}, run.Markers)
+			gotest.Contains(it, out, "GridFixture.BeforeAll left through runtime.Goexit")
+		})
+	})
+	t.When("a package fixture's AfterAll leaves through runtime.Goexit", func(w *gotest.T) {
+		run, _ := runHooks(w, "fixture.AfterAll", "goexit")
+		w.It("fails the run after every other hook ran", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, gridCleanRun, run.Markers)
+		})
+	})
+}
+
+func (s *FixtureHooksTestSuite) TestWhatAFailedFixtureBeforeAllOrAfterAllSays(t *gotest.T) {
+	t.When("a package fixture's BeforeAll returns an error", func(w *gotest.T) {
+		run, _ := runHooks(w, "fixture.BeforeAll", "error")
+		w.It("the suite's output names the fixture, the hook and the error, and no file of the runtime", func(it *gotest.T) {
+			out := outputOf(&run, gridSuite)
+			gotest.Contains(it, out, "fixture setup: GridFixture.BeforeAll: fixture.BeforeAll failed")
+			gotest.NotContains(it, out, "hold.go")
+		})
+	})
+	t.When("a package fixture's AfterAll returns an error", func(w *gotest.T) {
+		run, _ := runHooks(w, "fixture.AfterAll", "error")
+		w.It("the suite's output names the fixture, the hook and the error, and no file of the runtime", func(it *gotest.T) {
+			out := outputOf(&run, gridSuite)
+			gotest.Contains(it, out, "fixture teardown failed: GridFixture.AfterAll: fixture.AfterAll failed")
+			gotest.NotContains(it, out, "hold.go")
+		})
+	})
+}

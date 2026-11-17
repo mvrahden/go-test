@@ -1,0 +1,13 @@
+Expect: the wait on the goroutine was not held to the Timeout
+Judge: ./tests/lifecycle HoldsTestSuite/TestAGoWaitIsHeldToTheMethodsTimeout
+Clause: when a goroutine a method started with gotest.Go is still running when the method's declared Timeout passes → fails the method with a verdict naming the wait and its Timeout
+--- a/pkg/gotestruntime/methodbudget.go
++++ b/pkg/gotestruntime/methodbudget.go
+@@ -79,7 +79,6 @@
+ 	return m, func() {
+ 		m.watchOff()
+ 		m.enter("cleanup (the wait on a goroutine started with gotest.Go) ")
+-		setupwaits.Hold(it, m.holdWait)
+ 	}
+ }
+

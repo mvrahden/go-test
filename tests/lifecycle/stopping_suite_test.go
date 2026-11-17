@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -81,6 +82,7 @@ func (s *StoppingTestSuite) TestAStopDuringSetupReleasesWhatCameUp(t *gotest.T) 
 // its context ends — so the teardown gets it back instead of waiting it out.
 func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
 	cmd, c := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1")
+	cmd.Args = append(cmd.Args, "-test.v")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
 	c.started()
 
@@ -92,6 +94,32 @@ func (s *StoppingTestSuite) TestAStopStopsTheTestsFirst(t *gotest.T) {
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
 	gotest.Less(t, time.Since(began), 10*time.Second, "the teardown waited for the test")
 	gotest.True(t, endedOnItsOwn(err), "the process ends with its own status, not by the signal: %v", err)
+	// The method running when the stop came says so; the one done before the
+	// stop does not.
+	out := cmd.Stdout.(*strings.Builder).String()
+	gotest.Contains(t, methodOutput(out, "TestHoldingTestSuite/TestHolds"), stopEndedLine, "the method running when the stop came did not say so:\n%s", out)
+	gotest.NotContains(t, methodOutput(out, "TestHoldingTestSuite/TestAReturnsFirst"), stopEndedLine, "a method that returned before the stop said the stop came while it ran:\n%s", out)
+}
+
+const stopEndedLine = "run stopping: the stop came while this method ran"
+
+// methodOutput is what a -test.v run printed between test's RUN line and the
+// next line of the testing package.
+func methodOutput(out, test string) string {
+	var b strings.Builder
+	in := false
+	for _, l := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(l)
+		switch {
+		case trimmed == "=== RUN   "+test || trimmed == "=== CONT  "+test || trimmed == "=== NAME  "+test:
+			in = true
+		case strings.HasPrefix(trimmed, "=== ") || strings.HasPrefix(trimmed, "--- "):
+			in = false
+		case in:
+			b.WriteString(trimmed + "\n")
+		}
+	}
+	return b.String()
 }
 
 // The runner's channel is taken once and its variable out of the
@@ -113,6 +141,7 @@ func (s *StoppingTestSuite) TestTheRunnersChannelStaysWithTheRunner(t *gotest.T)
 // of waiting its budget out.
 func (s *StoppingTestSuite) TestAMethodIgnoringItsContextIsCutShort(t *gotest.T) {
 	cmd, c := s.announced(t, "hold", "TestHoldingTestSuite", "STOPPING_HOLD=1", "STOPPING_IGNORE_CONTEXT=1")
+	cmd.Args = append(cmd.Args, "-test.v")
 	tree, log := startTreeUntil(t, cmd, "STOPPING_LOG", "running")
 	c.started()
 	began := time.Now()
@@ -120,6 +149,7 @@ func (s *StoppingTestSuite) TestAMethodIgnoringItsContextIsCutShort(t *gotest.T)
 	err := waitWithin(t, tree, cmd, 20*time.Second)
 	c.close()
 	gotest.Equal(t, []string{"db up", "running", "pool down", "db down"}, readEvents(log))
+	gotest.NotContains(t, cmd.Stdout.(*strings.Builder).String(), stopEndedLine, "a method cut short said the stop came while it ran")
 	gotest.Less(t, time.Since(began), 15*time.Second, "the stop waited for the method")
 	gotest.False(t, endedOnItsOwn(err), "the process ends by the signal, its method cut short: %v", err)
 }

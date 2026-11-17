@@ -23,9 +23,12 @@ import (
 // AfterAll runs, then this cleanup releases the fixtures.
 func HoldFixtures(tb testing.TB, build func() MainConfig) {
 	refuseLegacyRunner(tb)
+	// Failures are reported through reportAt: tb.Fatalf would locate them
+	// in this file.
 	cfg, err := buildConfig(build)
 	if err != nil {
-		tb.Fatalf("fixture setup: %v", err)
+		reportAt(tb, "", "fixture setup: "+err.Error())
+		tb.FailNow()
 		return
 	}
 	drainLink() // a stop that came while no suite was open sets nothing up
@@ -36,18 +39,23 @@ func HoldFixtures(tb testing.TB, build func() MainConfig) {
 		// Not a setup that failed: none was attempted.
 		var refused *RunnerRequiredError
 		if errors.As(err, &refused) {
-			tb.Fatal(refused.report())
+			reportAt(tb, "", refused.report())
+			tb.FailNow()
 			return
 		}
-		tb.Fatalf("fixture setup: %v", err)
+		reportAt(tb, failureAt(err), "fixture setup: "+err.Error())
+		tb.FailNow()
 		return
 	}
 	tb.Cleanup(func() {
 		failed := dag.Teardown()
 		unhold(dag)
 		stopWatch()
-		if failed {
-			tb.Errorf("fixture teardown failed")
+		for _, f := range dag.failures {
+			reportAt(tb, f.where(), fmt.Sprintf("fixture teardown failed: %s.%s: %v", f.fixture, f.hook, f.err))
+		}
+		if failed && len(dag.failures) == 0 {
+			reportAt(tb, "", "fixture teardown failed")
 		}
 	})
 }

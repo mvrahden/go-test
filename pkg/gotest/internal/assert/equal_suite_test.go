@@ -464,6 +464,8 @@ func (s *EqualTestSuite) TestCheckEqual_DifferenceBeyondTheLineCap_IsNamed(t *go
 	mustEqualMessage(t, "beyond the cap", assert.CheckEqual(a, b), joinLines(
 		"Equal failed:",
 		"  the renderings are cut at 50000 lines; the values first differ at [99999]",
+		"  expected there: 99999",
+		"  actual there:   -1",
 	))
 }
 
@@ -676,7 +678,22 @@ func (s *EqualTestSuite) TestCheckEqual_CutRenderings_NameTheFirstDifferingKey(t
 	mustEqualMessage(t, "cut map", assert.CheckEqual(a, b), joinLines(
 		"Equal failed:",
 		`  the renderings are cut at 50000 lines; the values first differ at ["k9"]`,
+		"  expected there: 9",
+		"  actual there:   -1",
 	))
+}
+
+func (s *EqualTestSuite) TestCheckEqual_CutRenderings_ShowTheValuesThere(t *gotest.T, _ *ring0Ctx) {
+	a, b := make([]int, 60000), make([]int, 60000)
+	a[59999], b[59999] = 7, 8
+	const want = "the values first differ at [59999]\n  expected there: 7\n  actual there:   8"
+	if got := assert.CheckEqual(a, b); !strings.Contains(got, want) {
+		t.Errorf("cut renderings do not show the two values at their first difference:\n%.300s", got)
+	}
+	short := append([]int(nil), a[:59999]...)
+	if got := assert.CheckEqual(a, short); !strings.Contains(got, "expected there: 7\n  actual there:   <none>") {
+		t.Errorf("a missing element is not shown as <none>:\n%.300s", got)
+	}
 }
 
 func (s *EqualTestSuite) TestCheckEqual_DeletedElement_IsMarkedWhole(t *gotest.T, _ *ring0Ctx) {

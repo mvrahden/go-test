@@ -2,8 +2,8 @@
 // misbehaves at one of them, named by HOOKS_AT, in the way HOOKS_MODE says:
 // error (a fixture hook returns one), assert (a suite hook fails an
 // assertion), panic, overrun (the hook sleeps a second, past the suite's
-// 300ms Timeout) or wait (the hook waits on its context, and marks that it
-// saw it end).
+// 300ms Timeout), wait (the hook waits on its context, and marks that it
+// saw it end) or goexit (the hook leaves through runtime.Goexit).
 package hooks
 
 import (
@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -47,7 +48,7 @@ func misbehaves(hook string) bool {
 }
 
 // fixtureHook marks the hook and goes wrong when told to; a fixture hook can
-// return an error, panic, overrun or wait.
+// return an error, panic, overrun, wait or leave through runtime.Goexit.
 func fixtureHook(ctx context.Context, hook string) error {
 	mark(hook)
 	if !misbehaves(hook) {
@@ -61,6 +62,9 @@ func fixtureHook(ctx context.Context, hook string) error {
 		return nil
 	case "wait":
 		waitOn(ctx, hook)
+		return nil
+	case "goexit":
+		runtime.Goexit()
 		return nil
 	default:
 		return errors.New(hook + " failed")

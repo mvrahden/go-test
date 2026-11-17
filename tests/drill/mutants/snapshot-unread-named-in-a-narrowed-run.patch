@@ -1,0 +1,14 @@
+Expect: a narrowed run named unread sections
+Judge: ./tests/lifecycle HoldsTestSuite/TestANarrowedRunNamesNoUnreadSection
+Clause: when -run names one method of the suite → names no unread section
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -421,7 +421,7 @@
+ 		}
+ 		return ""
+ 	}
+-	return !strings.Contains(value("test.run"), "/") && value("test.skip") == "" &&
++	return value("test.skip") == "" &&
+ 		value("test.bench") == "" && value("test.fuzz") == ""
+ }
+

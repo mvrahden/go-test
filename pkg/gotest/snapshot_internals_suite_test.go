@@ -27,7 +27,10 @@ func (s *SnapshotInternalsTestSuite) BeforeEach(t *gotest.T) {
 	// The package directory, where go test runs the binary: the caller's file
 	// would do as well, until -trimpath makes it a path nothing can open.
 	dir, err := os.Getwd()
-	gotest.NoError(t, err)
+	if err != nil {
+		t.Errorf("os.Getwd: %v", err)
+		t.FailNow()
+	}
 	s.dir = dir
 	s.snapDir = t.TempDir()
 	s.restore = gotest.ExportRedirectSnapshots(s.snapDir)
@@ -289,5 +292,51 @@ func (s *SnapshotInternalsTestSuite) TestExternalBySymbol(t *gotest.T) {
 		if ext != tc.ext || known != tc.known {
 			sub.Errorf("externalBySymbol(%q): got (%v, %v), want (%v, %v)", tc.symbol, ext, known, tc.ext, tc.known)
 		}
+	}
+}
+
+func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_InAPollIsKeyedByItsTest(t *gotest.T) {
+	// GOTEST_CI=0: the poll writes a fresh baseline, which CI mode refuses.
+	t.Setenv("GOTEST_CI", "0")
+	// A poll runs on a goroutine of its own, so the recorder's FailNow ends
+	// that goroutine and its message is read here.
+	poll := gotest.ExportNamedR("TestOrdersTestSuite/TestTotal")
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		gotest.MatchSnapshot(poll, "polled", "in a poll")
+	}()
+	<-done
+	if poll.Failed() {
+		t.Errorf("MatchSnapshot failed in the poll: %s", poll.Message())
+	}
+	data, err := os.ReadFile(s.snap("TestOrdersTestSuite_ext.snap"))
+	if err != nil || !strings.Contains(string(data), "=== SNAP TestTotal in a poll ===\npolled\n") {
+		t.Errorf("a poll's snapshot was not filed under its test: %v\n%s", err, data)
+	}
+	if _, err := os.Stat(s.snap("unknown_ext.snap")); !os.IsNotExist(err) {
+		t.Errorf("a poll's snapshot was filed under unknown: %v", err)
+	}
+}
+
+func (s *SnapshotInternalsTestSuite) TestUnreadSectionsAreNamed(t *gotest.T) {
+	t.Setenv("GOTEST_CI", "1")
+	path := s.snap("TestSnapshotInternalsTestSuite_ext.snap")
+	baseline := "=== SNAP TestGone ===\nold\n=== SNAP TestUnreadSectionsAreNamed ===\nv\n"
+	if err := os.WriteFile(path, []byte(baseline), 0o600); err != nil {
+		t.Errorf("write the baseline: %v", err)
+		t.FailNow()
+	}
+	gotest.MatchSnapshot(t, "v")
+	notes := gotest.ExportUnreadSections("TestSnapshotInternalsTestSuite")
+	if len(notes) != 1 || !strings.Contains(notes[0], "TestSnapshotInternalsTestSuite_ext.snap holds 1 section no test of this run read: [TestGone]; delete them if their tests are gone") {
+		t.Errorf("no unread section was named: %q", notes)
+	}
+	if data, _ := os.ReadFile(path); string(data) != baseline {
+		t.Errorf("the baseline file was rewritten:\n%s", data)
+	}
+	t.Setenv("GOTEST_CI", "0")
+	if notes := gotest.ExportUnreadSections("TestSnapshotInternalsTestSuite"); len(notes) != 0 {
+		t.Errorf("unread sections were named outside GOTEST_CI and GOTEST_UPDATE_SNAPSHOTS: %q", notes)
 	}
 }

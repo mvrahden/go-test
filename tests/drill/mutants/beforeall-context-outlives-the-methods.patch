@@ -1,0 +1,14 @@
+Expect: BeforeAll's context was still live in AfterAll
+Judge: ./pkg/gotestruntime LifetimesTestSuite/TestBeforeAllContextOutlivesItsSetupTimeout
+Clause: when a suite's methods run past its SetupTimeout → that context has ended by the time AfterAll runs
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -126,7 +126,7 @@
+ 	if timeout <= 0 {
+ 		return testScopedT(t, timeout), func() {}
+ 	}
+-	parent, cancel := context.WithCancel(t.Context())
++	parent, cancel := context.WithCancel(context.WithoutCancel(t.Context()))
+ 	if runstate.StopContext().Err() != nil {
+ 		cancel()
+ 	}

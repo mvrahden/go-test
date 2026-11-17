@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -239,10 +241,10 @@ func (s *RuntimeTestSuite) TestRetry_CancelDuringTheReleaseReleasesOnce(t *gotes
 
 	_, err := gotestruntime.SetupFixtureDAG(ctx, gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
 
-	gotest.ErrorIs(t, err, context.Canceled)
-	gotest.Equal(t, 1, attempts)
+	mustErrorIs(t, err, context.Canceled)
+	mustEqual(t, 1, attempts)
 	// The release between attempts already ran: the teardown does not repeat it.
-	gotest.Equal(t, 1, afterAlls)
+	mustEqual(t, 1, afterAlls)
 }
 
 func (s *RuntimeTestSuite) TestRetry_DelayObservedBetweenAttempts(t *gotest.T) {
@@ -560,8 +562,8 @@ func (s *RuntimeTestSuite) TestChildFailure_ReportsTheCause(t *gotest.T) {
 		BeforeAll: func(ctx context.Context) error { <-aFailed; <-ctx.Done(); return ctx.Err() }}
 	err := gotestruntime.ExportSetupDAG(context.Background(), []*gotestruntime.FixtureNode{a, b}, nil, gotestruntime.ExportNewNodeTracker())
 	// B saw its context end, but the error the run reports is why: A's failure.
-	gotest.ErrorContains(t, err, "A refused to start")
-	gotest.NotContains(t, err.Error(), "context canceled")
+	mustErrorContain(t, err, "A refused to start")
+	mustNotContain(t, err.Error(), "context canceled")
 }
 
 func (s *RuntimeTestSuite) TestChildFailure_SkippedChildIsNotTornDown(t *gotest.T) {
@@ -1420,8 +1422,8 @@ func (s *RuntimeTestSuite) TestDAG_FailedHydrateIsDehydrated(t *gotest.T) {
 				},
 			}
 			_, err := gotestruntime.SetupFixtureDAG(it.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
-			gotest.ErrorContains(it, err, "pool half open")
-			gotest.Equal(it, 1, dehydrated)
+			mustErrorContain(it, err, "pool half open")
+			mustEqual(it, 1, dehydrated)
 		})
 	}
 
@@ -1440,8 +1442,8 @@ func (s *RuntimeTestSuite) TestDAG_FailedHydrateIsDehydrated(t *gotest.T) {
 			},
 		}
 		_, err := gotestruntime.SetupFixtureDAG(it.Context(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
-		gotest.ErrorContains(it, err, "unmarshal")
-		gotest.Zero(it, dehydrated)
+		mustErrorContain(it, err, "unmarshal")
+		mustEqual(it, 0, dehydrated)
 	})
 }
 
@@ -1745,4 +1747,41 @@ func under(parent *gotestruntime.FixtureNode, children ...*gotestruntime.Fixture
 		c.DependsOn = append(c.DependsOn, parent.Name)
 	}
 	return append([]*gotestruntime.FixtureNode{parent}, children...)
+}
+
+func (s *RuntimeTestSuite) TestSetupDAG_BeforeAllLeavingThroughGoexitFails(t *gotest.T) {
+	released := false
+	node := &gotestruntime.FixtureNode{
+		Name:      "Probe",
+		Config:    gotest.DefaultFixtureConfig(),
+		BeforeAll: func(context.Context) error { runtime.Goexit(); return nil },
+		AfterAll:  func(context.Context) error { released = true; return nil },
+	}
+	dag, err := gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+	if err == nil {
+		dag.Teardown()
+		fatalf(t, "a fixture BeforeAll that left through runtime.Goexit came up without an error")
+	}
+	if !strings.Contains(err.Error(), "Probe.BeforeAll left through runtime.Goexit") {
+		t.Errorf("the setup error does not say how the hook left: %v", err)
+	}
+	if !released {
+		t.Errorf("the fixture whose BeforeAll left through runtime.Goexit was not released")
+	}
+}
+
+func (s *RuntimeTestSuite) TestTeardownDAG_AfterAllLeavingThroughGoexitFails(t *gotest.T) {
+	node := &gotestruntime.FixtureNode{
+		Name:      "Probe",
+		Config:    gotest.DefaultFixtureConfig(),
+		BeforeAll: func(context.Context) error { return nil },
+		AfterAll:  func(context.Context) error { runtime.Goexit(); return nil },
+	}
+	dag, err := gotestruntime.SetupFixtureDAG(context.Background(), gotestruntime.MainConfig{Fixtures: []*gotestruntime.FixtureNode{node}})
+	if err != nil {
+		fatalf(t, "setup: %v", err)
+	}
+	if !dag.Teardown() {
+		t.Errorf("a fixture AfterAll that left through runtime.Goexit was counted as a clean teardown")
+	}
 }

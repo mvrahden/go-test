@@ -1,0 +1,14 @@
+Expect: the panic carries a stack of its own beside the runtime's traceback
+Judge: ./pkg/gotestruntime PanicSiteTestSuite/TestAMethodPanicCarriesNoSecondStack
+Clause: when a test method panics → the report names the line it happened at, and its stack shows that line once
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -187,7 +187,7 @@
+ // the user's line it happened at and carries no stack: the process's own
+ // traceback still shows it.
+ func AfterEach(after func()) {
+-	if p := carry.InPlace(recover(), "the test method, ahead of its AfterEach", panicSite); p != nil {
++	if p := carry.From(recover(), "the test method, ahead of its AfterEach"); p != nil {
+ 		defer panic(p)
+ 	}
+ 	enterPhase("AfterEach ")

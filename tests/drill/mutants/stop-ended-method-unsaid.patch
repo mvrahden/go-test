@@ -1,0 +1,13 @@
+Expect: the method running when the stop came did not say so
+Judge: ./tests/lifecycle StoppingTestSuite/TestAStopStopsTheTestsFirst
+Clause: when the run is interrupted while a method holds and the method returns once its context ends → writes run stopping: the stop came while this method ran in that method's output, and in none of a method that returned before the stop
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -126,7 +126,6 @@
+ 				}
+ 				mt.enter("")
+ 				defer runstate.EnterBody(it, "a method")()
+-				defer sayStopEnded(it)()
+ 				method()
+ 			})
+ 		})

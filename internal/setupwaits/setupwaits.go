@@ -2,7 +2,8 @@
 // starts with gotest.Go, so they can be waited for after AfterAll, which is
 // what stops them. pkg/gotestruntime opens and drains a suite's set and
 // pkg/gotest registers into it: pkg/gotestruntime imports pkg/gotest, so
-// neither can hold it for the other.
+// neither can hold it for the other. For the same reason it carries what
+// holds the waits a method's cleanups run to the method's Timeout.
 package setupwaits
 
 import (

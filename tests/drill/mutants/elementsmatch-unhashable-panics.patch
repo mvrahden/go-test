@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / .*CheckElementsMatch_Unhashable
+Judge: ./pkg/gotest/internal/assert
+Clause: when ElementsMatch or Subset is given elements of an interface type that hold slices → fails naming the element's type and Equal
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -439,7 +439,7 @@
+ 	}
+ 	defer func() {
+ 		if r := recover(); r != nil {
+-			msg = unhashable("ElementsMatch", r, listA, listB)
++			msg = ""
+ 		}
+ 	}()
+ 	counts := make(map[V]int, len(listA))

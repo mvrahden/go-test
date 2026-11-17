@@ -2,9 +2,11 @@ package gotestruntime
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/callsite"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -15,6 +17,10 @@ type SharedStateNode struct {
 	Target    any
 	Hydrate   func(ctx context.Context) error
 	Dehydrate func(ctx context.Context) error
+	// HydrateAt and DehydrateAt locate the hooks as FixtureNode.BeforeAllAt
+	// does.
+	HydrateAt   string
+	DehydrateAt string
 }
 
 // FixtureNode describes one fixture in the dependency graph.
@@ -34,6 +40,11 @@ type FixtureNode struct {
 	AfterAll    func(ctx context.Context) error
 	SharedState *SharedStateNode // non-nil for shared fixture nodes
 	DependsOn   []string
+	// BeforeAllAt and AfterAllAt locate the hooks (file:line, the file
+	// relative to the package directory); a failure is reported there. Empty,
+	// as from a harness generated before them, reports it unlocated.
+	BeforeAllAt string
+	AfterAllAt  string
 }
 
 type MainConfig struct {
@@ -47,4 +58,29 @@ type FixtureDAG struct {
 	tracker *nodeTracker
 	torn    sync.Once
 	failed  bool
+	// failures are the hooks the teardown saw fail, in the fixtures' order.
+	failures []*hookFailure
+}
+
+// hookFailure is a fixture hook that failed: the fixture, the hook, where
+// it is declared (file:line, or empty) and its error, whose text it keeps.
+type hookFailure struct {
+	fixture, hook, at string
+	err               error
+}
+
+func (f *hookFailure) Error() string { return f.err.Error() }
+func (f *hookFailure) Unwrap() error { return f.err }
+
+// where is where the hook is declared, in testing's form, or empty.
+func (f *hookFailure) where() string { return callsite.Declared(f.at) }
+
+// failureAt is where the hook that failed in err is declared, in testing's
+// form, or empty when err names no hook or its hook no place.
+func failureAt(err error) string {
+	var f *hookFailure
+	if !errors.As(err, &f) {
+		return ""
+	}
+	return f.where()
 }

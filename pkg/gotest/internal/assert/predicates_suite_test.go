@@ -74,6 +74,8 @@ func (s *PredicatesTestSuite) TestIsNilable(t *gotest.T, _ *predicatesCtx) {
 func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 	empty := []int{}
 	full := []int{1}
+	zero := 0
+	ptrToEmpty := &empty
 	for _, c := range []struct {
 		what string
 		in   any
@@ -109,6 +111,10 @@ func (s *PredicatesTestSuite) TestIsEmpty(t *gotest.T, _ *predicatesCtx) {
 		{"chan", make(chan int), true},
 		{"int", 0, false},
 		{"struct", struct{}{}, false},
+		{"pointer to an int", &zero, false},
+		{"pointer to a struct", &struct{}{}, false},
+		{"nil pointer to an int", (*int)(nil), true},
+		{"pointer to a pointer to a slice", &ptrToEmpty, true},
 	} {
 		if got := assert.IsEmptyable(c.in); got != c.want {
 			t.Errorf("IsEmptyable(%s): got %v, want %v", c.what, got, c.want)
@@ -247,6 +253,32 @@ func (s *PredicatesTestSuite) TestNormalizeJSON(t *gotest.T, _ *predicatesCtx) {
 	if _, err := assert.NormalizeJSON("{\"a\":1}\n \t"); err != nil {
 		t.Errorf("NormalizeJSON(trailing whitespace): %v", err)
 	}
+	if got, err := assert.NormalizeJSON(jsonText(`{"a":1}`)); err != nil {
+		t.Errorf("NormalizeJSON(named string): %v", err)
+	} else if m, ok := got.(map[string]any); !ok || m["a"] != want["a"] {
+		t.Errorf("NormalizeJSON(named string): got %#v, want %#v", got, want)
+	}
+	if _, err := assert.NormalizeJSON(jsonText("{not json")); err == nil || !strings.Contains(err.Error(), "is read as JSON text, as a string is; marshal it to compare it as a value") {
+		t.Errorf("NormalizeJSON(invalid named string): got %v, want the hint", err)
+	}
+	if got, err := assert.NormalizeJSON(shout("a")); err != nil || got != "A" {
+		t.Errorf("NormalizeJSON(named string with MarshalJSON): got %#v, %v, want \"A\"", got, err)
+	}
+	for _, in := range []any{"\"a\xff\"", []byte("\"a\xff\""), jsonText("\"a\xff\"")} {
+		if _, err := assert.NormalizeJSON(in); err == nil || !strings.Contains(err.Error(), "invalid UTF-8 at byte 2") {
+			t.Errorf("NormalizeJSON(%T with an invalid byte): got %v, want invalid UTF-8 at byte 2", in, err)
+		}
+	}
+}
+
+// jsonText is JSON text of a named string type.
+type jsonText string
+
+// shout is a named string that marshals itself.
+type shout string
+
+func (s shout) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + strings.ToUpper(string(s)) + `"`), nil
 }
 
 func (s *PredicatesTestSuite) TestReadAndRestore(t *gotest.T, _ *predicatesCtx) {
@@ -337,5 +369,40 @@ func (s *PredicatesTestSuite) TestJSONEqual(t *gotest.T, _ *predicatesCtx) {
 		if got := assert.JSONEqual(norm(c.expected), norm(c.actual)); got != c.want {
 			t.Errorf("JSONEqual(%s): got %v, want %v", c.what, got, c.want)
 		}
+	}
+}
+
+// nilErr is an error whose Error method reads through its receiver.
+type nilErr struct{ msg string }
+
+func (e *nilErr) Error() string { return e.msg }
+
+func (s *PredicatesTestSuite) TestErrorText(t *gotest.T, _ *predicatesCtx) {
+	if got := assert.ErrorText(io.EOF); got != "EOF" {
+		t.Errorf("ErrorText(io.EOF): got %q", got)
+	}
+	var typedNil *nilErr
+	got := assert.ErrorText(typedNil)
+	for _, want := range []string{"*assert_test.nilErr(nil), a nil pointer in a non-nil error; its Error method panicked:", "nil pointer dereference"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ErrorText(typed nil): got %q, want it to hold %q", got, want)
+		}
+	}
+}
+
+func (s *PredicatesTestSuite) TestCheckElementsMatch_Unhashable(t *gotest.T, _ *predicatesCtx) {
+	a, b := []any{[]int{1}, "x"}, []any{"x", []int{1}}
+	const want = "an element of type []int cannot be compared with ==; compare such lists with Equal"
+	if got := assert.CheckElementsMatch(a, b); !strings.Contains(got, "ElementsMatch failed:") || !strings.Contains(got, want) {
+		t.Errorf("CheckElementsMatch(unhashable): got %q", got)
+	}
+	if got := assert.CheckSubset(a, b); !strings.Contains(got, "Subset failed:") || !strings.Contains(got, want) {
+		t.Errorf("CheckSubset(unhashable): got %q", got)
+	}
+	if got := assert.CheckElementsMatch([]any{1, "x"}, []any{"x", 1}); got != "" {
+		t.Errorf("CheckElementsMatch(hashable any): got %q", got)
+	}
+	if got := assert.CheckElementsMatch([]int{1, 1, 2}, []int{1, 2, 2}); !strings.Contains(got, "is in listB but not enough times in listA") {
+		t.Errorf("CheckElementsMatch(duplicate counts): got %q", got)
 	}
 }

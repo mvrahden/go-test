@@ -1,0 +1,16 @@
+Expect: BeforeAll's context did not end at its SetupTimeout
+Judge: ./pkg/gotestruntime LifetimesTestSuite/TestBeforeAllContextEndsAtTheSetupTimeoutWhileItRuns
+Clause: when BeforeAll waits on its context past the SetupTimeout → its context ends at the SetupTimeout
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -137,9 +137,7 @@
+ 		if judged != nil {
+ 			<-judged
+ 		}
+-		if !over.Load() {
+-			ctx.end(context.DeadlineExceeded)
+-		}
++		return
+ 	})
+ 	t.Cleanup(func() {
+ 		timer.Stop()

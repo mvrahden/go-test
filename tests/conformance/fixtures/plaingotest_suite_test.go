@@ -57,7 +57,7 @@ func (s *PlainGoTestTestSuite) TestSharedFixtureSuite(t *gotest.T) {
 	t.When("a suite binding a shared fixture runs under plain go test", func(w *gotest.T) {
 		w.It("fails naming the shared fixture it binds and go tool gotest, before any method runs", func(it *gotest.T) {
 			gotest.Equal(it, 1, s.exit, s.out)
-			gotest.Regexp(it, `(?m)^\s+\S+: suite binds shared fixture RetrySharedFixture, whose state only the gotest runner provides; run via go tool gotest$`, s.out)
+			gotest.Regexp(it, `(?m)^\s+suite binds shared fixture RetrySharedFixture, whose state only the gotest runner provides; run via go tool gotest$`, s.out)
 			gotest.NotContains(it, s.out, "=== RUN   TestRetryTestSuite/TestStateArrived")
 		})
 	})

@@ -2,7 +2,9 @@
 package assert_test //nolint:fail-guard
 
 import (
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -77,5 +79,25 @@ func (s *HelperTestSuite) TestCallerFrame_ThroughHelper_ReturnsOutermostUserFram
 	}
 	if !strings.Contains(frame, "helper_suite_test.go:") {
 		fatalf(t, "expected 'helper_suite_test.go:' in frame, got: %q", frame)
+	}
+}
+
+func (s *HelperTestSuite) TestIsGotestSource_OnlyThisModule(t *gotest.T, _ *ring0Ctx) {
+	_, self, _, _ := runtime.Caller(0) // …/pkg/gotest/internal/assert/helper_suite_test.go
+	dir := filepath.ToSlash(filepath.Dir(self))
+	for _, c := range []struct {
+		file string
+		want bool
+	}{
+		{dir + "/trace.go", true},
+		{strings.TrimSuffix(dir, "gotest/internal/assert") + "gotestruntime/harness.go", true},
+		{dir + "/helper_suite_test.go", false},
+		{"/home/u/shop/pkg/gotest/checks.go", false},
+		{"/home/u/shop/pkg/gotestruntime/boot.go", false},
+		{"example.com/shop/pkg/gotest/checks.go", false},
+	} {
+		if got := assert.IsGotestSource(c.file); got != c.want {
+			t.Errorf("IsGotestSource(%s): got %v, want %v", c.file, got, c.want)
+		}
 	}
 }

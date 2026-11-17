@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,8 +40,10 @@ type Suite struct {
 
 // OpenSuite runs the frame every generated Test, Benchmark and Fuzz wrapper
 // shares: the guard, the fixtures, the config, BeforeAll, and AfterAll as
-// tb's cleanup. A suite its guard skips sets up no fixtures; the fixtures are
-// held before AfterAll is registered, so they are torn down after it. It
+// tb's cleanup, registered once BeforeAll returned so that what BeforeAll
+// took from its T lasts through AfterAll. A suite its guard skips sets up no
+// fixtures; the fixtures are held before AfterAll is registered, so they are
+// torn down after it. It
 // returns the config the suite runs under and the budget it declared, which
 // is zero without a SuiteConfig.
 func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
@@ -74,7 +77,8 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 		stopWatch()
 	})
 	if _, err := timeoutScale(); err != nil {
-		tb.Fatal(err)
+		reportAt(tb, "", err.Error()) // tb.Fatal would locate it in this file
+		tb.FailNow()
 	}
 	if s.Fixtures != nil {
 		s.Fixtures(tb)
@@ -87,14 +91,20 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 	}
 	// Never wait on the suite's subtests here: on panic, testing runs ancestor
 	// cleanups from the panicking goroutine, and the wait would deadlock.
-	tb.Cleanup(func() {
+	// Registered once BeforeAll has returned, however it returned, so it runs
+	// ahead of the cleanups BeforeAll registered on tb: its temp dirs, its
+	// Setenv restores.
+	defer tb.Cleanup(func() {
 		if bench {
 			defer failOnPanic(b)
 		}
-		// The waits on goroutines BeforeAll started come after AfterAll, which
-		// is what stops them; as cleanups of tb they would run first.
-		defer drainSetupWaits(tb, budget.SetupTimeout)
-		RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
+		func() {
+			// The waits on goroutines BeforeAll started come after AfterAll,
+			// which is what stops them; as cleanups of tb they would run first.
+			defer drainSetupWaits(tb, budget.SetupTimeout)
+			RunTeardown(tb, cfg.SetupTimeout, budget.SetupTimeout, s.AfterAll)
+		}()
+		noteSuiteEnd(tb)
 	})
 	RunSetup(tb, cfg.SetupTimeout, budget.SetupTimeout, s.BeforeAll)
 	return cfg, budget
@@ -104,8 +114,47 @@ func OpenSuite(tb testing.TB, s Suite) (cfg, budget gotest.SuiteConfig) {
 // goroutines it, or any T derived from it, starts with gotest.Go are kept for
 // [drainSetupWaits].
 func SetupT(t testing.TB, timeout time.Duration) *gotest.T {
-	scoped := testScopedT(t, timeout)
+	scoped, _ := setupScopedT(t, timeout, nil)
 	return gotest.NewTWithContext(t, setupwaits.Open(scoped.Context(), t))
+}
+
+// setupScopedT builds BeforeAll's T: a positive timeout is its deadline and
+// ends it until returned is called. From then on Deadline reports none, and
+// the context ends with t's (just before t's cleanups, so before AfterAll) or
+// at a stop. Like [testScopedT] otherwise.
+//
+// With judged, the watch of a declared budget, the deadline ends the context
+// only once the watch has judged, so a BeforeAll waiting on it is still
+// running, and located, when the verdict is written.
+func setupScopedT(t testing.TB, timeout time.Duration, judged <-chan struct{}) (tt *gotest.T, returned func()) {
+	if timeout <= 0 {
+		return testScopedT(t, timeout), func() {}
+	}
+	parent, cancel := context.WithCancel(t.Context())
+	if runstate.StopContext().Err() != nil {
+		cancel()
+	}
+	stop := context.AfterFunc(runstate.StopContext(), cancel)
+	ctx := newBudgetContext(parent, time.Now().Add(timeout))
+	var over atomic.Bool
+	timer := time.AfterFunc(timeout, func() {
+		if judged != nil {
+			<-judged
+		}
+		if !over.Load() {
+			ctx.end(context.DeadlineExceeded)
+		}
+	})
+	t.Cleanup(func() {
+		timer.Stop()
+		stop()
+		cancel()
+	})
+	return gotest.NewTWithContext(t, ctx), func() {
+		over.Store(true)
+		timer.Stop()
+		ctx.dropDeadline()
+	}
 }
 
 // drainSetupWaits waits for the goroutines tb's BeforeAll started, held to
@@ -137,9 +186,11 @@ func drain(set *setupwaits.Set) {
 // AfterEach runs after, a test method's AfterEach, from the defer that pairs it
 // with BeforeEach. A panic in BeforeEach or the method is recovered first and
 // re-raised once after returns: a fatal assertion in after would otherwise
-// end the goroutine and discard the panic with it.
+// end the goroutine and discard the panic with it. The re-raised panic names
+// the user's line it happened at and carries no stack: the process's own
+// traceback still shows it.
 func AfterEach(after func()) {
-	if p := carry.From(recover(), "the test method, ahead of its AfterEach"); p != nil {
+	if p := carry.InPlace(recover(), "the test method, ahead of its AfterEach", panicSite); p != nil {
 		defer panic(p)
 	}
 	enterPhase("AfterEach ")
@@ -191,20 +242,26 @@ func TestT(t *testing.T, timeout time.Duration) *gotest.T {
 	return testScopedT(t, timeout)
 }
 
-// RunSetup runs a suite's BeforeAll. timeout bounds the context it receives;
-// budget is the deadline it is held to by verdict, or zero for a suite that
-// declared no config of its own.
+// RunSetup runs a suite's BeforeAll. timeout bounds the context it receives
+// while BeforeAll runs; once it returned, the context has no deadline and ends
+// when t's methods are done, before AfterAll, or at a stop. budget is the
+// deadline it is held to by verdict, or zero for a suite that declared no
+// config of its own.
 func RunSetup(t testing.TB, timeout, budget time.Duration, beforeAll func(*gotest.T)) {
-	tt := SetupT(t, timeout)
+	// Watching before the context's timer starts, as a method's watch does.
+	// Deferred: the watch also ends when BeforeAll exits via Goexit.
+	end, judged := watchPhaseJudged(t, budget, "BeforeAll ", "SetupTimeout")
+	defer end()
+	scoped, returned := setupScopedT(t, timeout, judged)
+	tt := gotest.NewTWithContext(t, setupwaits.Open(scoped.Context(), t))
 	if defaultApplies(timeout, budget) {
 		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" BeforeAll", "SetupTimeout", timeout)()
 	}
-	watchWhile(t, budget, "BeforeAll ", "SetupTimeout", func() {
-		// A stop gives BeforeAll the grace a method body gets: AfterAll
-		// cannot run before it returns.
-		defer runstate.EnterBody(t, "BeforeAll")()
-		beforeAll(tt)
-	})
+	// A stop gives BeforeAll the grace a method body gets: AfterAll cannot
+	// run before it returns.
+	defer runstate.EnterBody(t, "BeforeAll")()
+	defer returned()
+	beforeAll(tt)
 }
 
 // RunTeardown runs a suite's AfterAll from inside t.Cleanup, on the same terms
@@ -214,7 +271,25 @@ func RunTeardown(t testing.TB, timeout, budget time.Duration, afterAll func(*got
 	if defaultApplies(timeout, budget) {
 		defer noteDefaultDeadline(t, tt.Context(), t.Name()+" AfterAll", "SetupTimeout", timeout)()
 	}
-	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() { afterAll(tt) })
+	watchWhile(t, budget, "AfterAll ", "SetupTimeout", func() {
+		returned := false
+		defer func() {
+			if returned {
+				return
+			}
+			// A panic goes on as it came; testing reports it.
+			if r := recover(); r != nil {
+				panic(r)
+			}
+			// A FailNow or SkipNow on t's own T leaves its verdict; one on
+			// another test's leaves none.
+			if !t.Failed() && !t.Skipped() {
+				reportAt(t, "", "AfterAll left through runtime.Goexit without a verdict, as a FailNow or SkipNow on another test's T does; use the t the hook was given")
+			}
+		}()
+		afterAll(tt)
+		returned = true
+	})
 }
 
 // watchWhile runs a lifecycle phase and fails tb the moment timeout passes with
@@ -248,8 +323,15 @@ func watchWhile(tb testing.TB, timeout time.Duration, what, budget string, run f
 // legal: the testing package panics on a log from a test that has already
 // completed, and the test cannot complete before the watch has ended.
 func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end func()) {
+	end, _ = watchPhaseJudged(tb, timeout, what, budget)
+	return end
+}
+
+// watchPhaseJudged is [watchPhase] that also returns judged, which closes
+// once the watch has judged the deadline or ended; nil without a watch.
+func watchPhaseJudged(tb testing.TB, timeout time.Duration, what, budget string) (end func(), judged <-chan struct{}) {
 	if timeout <= 0 {
-		return func() {}
+		return func() {}, nil
 	}
 	due, done, stopped := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	timer := time.AfterFunc(timeout, func() { close(due) })
@@ -262,7 +344,7 @@ func watchPhase(tb testing.TB, timeout time.Duration, what, budget string) (end 
 		timer.Stop()
 		close(done)
 		<-stopped
-	})
+	}), stopped
 }
 
 // watchDeadline fails tb if the phase, running on goroutine gid, has not
@@ -314,6 +396,33 @@ func watchDeadline(tb testing.TB, gid uint64, timeout time.Duration, what func()
 	}
 	reportAt(tb, at, fmt.Sprintf("%sexceeded its configured %s of %s and is still running%s", phase, budget, timeout, suffix))
 	return true
+}
+
+// noteSuiteEnd writes the notes other packages have on tb's suite, once it
+// ran whole and passed: a test, not failed, skipped or stopped, under flags
+// that select all of it.
+func noteSuiteEnd(tb testing.TB) {
+	t, ok := tb.(*testing.T)
+	if !ok || t.Failed() || t.Skipped() || runstate.StopContext().Err() != nil || !wholeRun() {
+		return
+	}
+	for _, note := range runstate.SuiteEnded(t.Name()) {
+		fmt.Fprintln(defaultDeadlineOut(tb), note)
+	}
+}
+
+// wholeRun reports whether the flags select every test of a suite they
+// select: -run names no subtest, -skip is empty, and no benchmark or fuzz
+// target is selected.
+func wholeRun() bool {
+	value := func(name string) string {
+		if f := flag.Lookup(name); f != nil {
+			return f.Value.String()
+		}
+		return ""
+	}
+	return !strings.Contains(value("test.run"), "/") && value("test.skip") == "" &&
+		value("test.bench") == "" && value("test.fuzz") == ""
 }
 
 // test2json reports whether the binary runs under -test.v=test2json.

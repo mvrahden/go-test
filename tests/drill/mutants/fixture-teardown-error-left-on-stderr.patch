@@ -1,0 +1,17 @@
+Expect: the teardown's error is not in the holding test's output
+Judge: ./tests/lifecycle HoldsTestSuite/TestAFixtureTeardownFailureSaysWhatFailed
+Clause: when a package fixture's AfterAll returns an error → the suite's output names the fixture, the hook and the error, and no file of the runtime
+--- a/pkg/gotestruntime/hold.go
++++ b/pkg/gotestruntime/hold.go
+@@ -51,10 +51,7 @@
+ 		failed := dag.Teardown()
+ 		unhold(dag)
+ 		stopWatch()
+-		for _, f := range dag.failures {
+-			reportAt(tb, f.where(), fmt.Sprintf("fixture teardown failed: %s.%s: %v", f.fixture, f.hook, f.err))
+-		}
+-		if failed && len(dag.failures) == 0 {
++		if failed {
+ 			reportAt(tb, "", "fixture teardown failed")
+ 		}
+ 	})

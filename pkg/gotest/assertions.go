@@ -61,7 +61,7 @@ func Consistently(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	polls := 0
 	for {
 		polls++
-		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
+		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, waitFor))
 		if !ok {
 			failf(t, "Consistently failed on poll %d:\n    %s", polls, abandonedPoll(waitFor))
 			return
@@ -114,9 +114,10 @@ const (
 // pollUntil runs fn on a goroutine of its own, as Record does, and gives it
 // until limit; ok is false when fn is still running then. A poll given up on
 // keeps running, since Go cannot stop it; a panic it raises later is written
-// to stderr with its stack, since the test has moved on.
-func pollUntil(fn func(*R), limit time.Time) (rec *R, ok bool) {
-	r := &R{}
+// to stderr with its stack, since the test has moved on. The recorder
+// carries name, the polling test's, which a snapshot through it is keyed by.
+func pollUntil(name string, fn func(*R), limit time.Time) (rec *R, ok bool) {
+	r := &R{name: name}
 	var state atomic.Int32
 	done := make(chan *capturedPanic, 1) // buffered: a poll given up on still exits
 	go func() {
@@ -177,29 +178,23 @@ func Contains(t testingT, s, contains any, msgAndArgs ...any) {
 
 // ElementsMatch asserts that listA and listB contain the same elements regardless of order.
 func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any) {
-	if len(listA) != len(listB) {
-		fail(t, fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB)), msgAndArgs)
-		return
-	}
-	counts := make(map[V]int, len(listA))
-	for _, v := range listA {
-		counts[v]++
-	}
-	for _, v := range listB {
-		counts[v]--
-		if counts[v] < 0 {
-			fail(t, fmt.Sprintf("ElementsMatch failed:\n  element %#v is in listB but not enough times in listA", v), msgAndArgs)
-			return
-		}
+	if msg := assert.CheckElementsMatch(listA, listB); msg != "" {
+		fail(t, msg, msgAndArgs)
 	}
 }
 
-// Empty asserts that object is empty: nil, zero-length, or a pointer to an empty value.
-// Applies to slices, maps, arrays, channels, strings, and pointers. Fails with a type
-// guard error for non-emptyable types (e.g. int, bool, func); use Nil or Zero instead.
+// Empty asserts that object is empty: nil, a nil pointer, or a zero-length slice,
+// map, array, channel or string. A non-nil pointer is followed to what it points
+// to, which must be one of those. Any other type fails with a type guard error,
+// a pointer to a struct or a number included (e.g. int, bool, func, *T); use Nil
+// or Zero instead.
 func Empty(t testingT, object any, msgAndArgs ...any) {
 	if !assert.IsEmptyable(object) {
-		fail(t, fmt.Sprintf("Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero", object), msgAndArgs)
+		guard := "Empty: type %T cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero"
+		if reflect.ValueOf(object).Kind() == reflect.Ptr {
+			guard = "Empty: %T points to a value that cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero"
+		}
+		fail(t, fmt.Sprintf(guard, object), msgAndArgs)
 		return
 	}
 	if !assert.IsEmpty(object) {
@@ -241,8 +236,8 @@ func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
 		fail(t, "ErrorContains failed:\n  expected an error but got nil", msgAndArgs)
 		return
 	}
-	if !strings.Contains(err.Error(), contains) {
-		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", err.Error(), contains), msgAndArgs)
+	if text := assert.ErrorText(err); !strings.Contains(text, contains) {
+		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", text, contains), msgAndArgs)
 	}
 }
 
@@ -268,7 +263,7 @@ func Eventually(t testingT, waitFor, tick time.Duration, fn func(poll *R)) {
 	polls := 0
 	for {
 		polls++
-		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
+		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, waitFor))
 		if !ok {
 			failf(t, "Eventually failed after %v (%d polls):\n  %s", waitFor, polls, abandonedPoll(waitFor))
 			return
@@ -318,7 +313,10 @@ func InDelta[V numeric](t testingT, expected, actual V, delta float64, msgAndArg
 }
 
 // JSONEq asserts that expected and actual represent the same JSON structure, ignoring key order.
-// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
+// A string, []byte, json.RawMessage or io.Reader is read as JSON text, as is a
+// value of a named string type that implements neither json.Marshaler nor
+// encoding.TextMarshaler; text with invalid UTF-8 fails, naming the byte. Any
+// other value is marshaled first.
 func JSONEq(t testingT, expected, actual any, msgAndArgs ...any) {
 	expNorm, err := assert.NormalizeJSON(expected)
 	if err != nil {
@@ -370,7 +368,7 @@ func LessOrEqual[V cmp.Ordered](t testingT, a, b V, msgAndArgs ...any) {
 // NoError asserts that err is nil.
 func NoError(t testingT, err error, msgAndArgs ...any) {
 	if err != nil {
-		fail(t, fmt.Sprintf("NoError failed:\n  unexpected error: %s", err.Error()), msgAndArgs)
+		fail(t, "NoError failed:\n  unexpected error: "+assert.ErrorText(err), msgAndArgs)
 	}
 }
 
@@ -398,12 +396,18 @@ func Nil(t testingT, object any, msgAndArgs ...any) {
 	}
 }
 
-// NotEmpty asserts that object is NOT empty: not nil and non-zero length, or a pointer to a non-empty value.
-// Applies to slices, maps, arrays, channels, strings, and pointers. Fails with a type
-// guard error for non-emptyable types (e.g. int, bool, func); use NotNil or NotZero instead.
+// NotEmpty asserts that object is NOT empty: a slice, map, array, channel or string
+// of non-zero length. A non-nil pointer is followed to what it points to, which
+// must be one of those; a nil pointer is empty. Any other type fails with a type
+// guard error, a pointer to a struct or a number included (e.g. int, bool, func,
+// *T); use NotNil or NotZero instead.
 func NotEmpty(t testingT, object any, msgAndArgs ...any) {
 	if !assert.IsEmptyable(object) {
-		fail(t, fmt.Sprintf("NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero", object), msgAndArgs)
+		guard := "NotEmpty: type %T cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero"
+		if reflect.ValueOf(object).Kind() == reflect.Ptr {
+			guard = "NotEmpty: %T points to a value that cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero"
+		}
+		fail(t, fmt.Sprintf(guard, object), msgAndArgs)
 		return
 	}
 	if assert.IsEmpty(object) {
@@ -522,15 +526,8 @@ func compilePattern(pattern string) (*regexp.Regexp, error) {
 
 // Subset asserts that every element of subset exists in list.
 func Subset[V comparable](t testingT, list, subset []V, msgAndArgs ...any) {
-	set := make(map[V]struct{}, len(list))
-	for _, v := range list {
-		set[v] = struct{}{}
-	}
-	for _, v := range subset {
-		if _, ok := set[v]; !ok {
-			fail(t, fmt.Sprintf("Subset failed:\n  element %#v from subset not found in list", v), msgAndArgs)
-			return
-		}
+	if msg := assert.CheckSubset(list, subset); msg != "" {
+		fail(t, msg, msgAndArgs)
 	}
 }
 

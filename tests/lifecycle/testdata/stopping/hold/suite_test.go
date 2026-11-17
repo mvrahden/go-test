@@ -11,6 +11,9 @@ type HoldingTestSuite struct {
 	Pool *PoolFixture
 }
 
+// TestAReturnsFirst returns before the stop comes.
+func (s *HoldingTestSuite) TestAReturnsFirst(t *gotest.T) {}
+
 func (s *HoldingTestSuite) TestHolds(t *gotest.T) {
 	if !on("STOPPING_HOLD") {
 		return

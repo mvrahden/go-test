@@ -1,0 +1,14 @@
+Expect: a method that returned before the stop said the stop came while it ran
+Judge: ./tests/lifecycle StoppingTestSuite/TestAStopStopsTheTestsFirst
+Clause: when the run is interrupted while a method holds and the method returns once its context ends → writes run stopping: the stop came while this method ran in that method's output, and in none of a method that returned before the stop
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -155,7 +155,7 @@
+ 		return func() {}
+ 	}
+ 	return func() {
+-		if runstate.StopContext().Err() != nil {
++		if true {
+ 			fmt.Fprintln(t.Output(), stopEndedLine)
+ 		}
+ 	}

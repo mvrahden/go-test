@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / NormalizeJSON
+Judge: ./pkg/gotest/internal/assert
+Clause: when JSONEq is given JSON text holding a byte that is not valid UTF-8 → fails naming the offset of that byte
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -255,7 +255,7 @@
+ 		return decodeJSON(raw, "")
+ 	}
+ 	// Marshalled values are valid UTF-8; text given as is may not be.
+-	if at := invalidUTF8(raw); at >= 0 {
++	if at := invalidUTF8(raw); false && at >= 0 {
+ 		return nil, fmt.Errorf("failed to unmarshal JSON: invalid UTF-8 at byte %d", at)
+ 	}
+ 	return decodeJSON(raw, named)

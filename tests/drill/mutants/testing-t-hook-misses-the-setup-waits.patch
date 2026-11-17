@@ -1,12 +1,12 @@
-Expect: setupwaits: the suite whose \*testing.T BeforeAll started goroutines did not pass
-Judge: ./tests/canary CanaryTestSuite/TestATestingTHooksGoroutineIsWaitedForAfterAfterAll
-Clause: when a BeforeAll taking a *testing.T starts goroutines with gotest.Go on gotest.NewT(t) and NewTWithDeadline(t) that only AfterAll stops → the suite passes: the waits come after AfterAll
+Expect: setupwaits: no SetupTimeout verdict names the wait a \*testing.T BeforeAll started
+Judge: ./tests/canary CanaryTestSuite/TestATestingTHooksWaitIsHeldToTheSetupTimeout
+Clause: when a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll → fails the suite with a verdict naming the wait and its SetupTimeout
 --- a/pkg/gotest/utils.go
 +++ b/pkg/gotest/utils.go
 @@ -196,7 +196,7 @@
  		returned = true
  	}()
- 
+
 -	set := setupwaits.Of(t.Context(), t.testingTB())
 +	set := setupwaits.Of(t.Context(), nil)
  	tb := t.testingTB()

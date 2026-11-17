@@ -34,6 +34,9 @@ func ExportRun(runTests func() int, cfg MainConfig) int {
 	return code
 }
 
+// ExportFailureAt is where the hook that failed in err is declared.
+var ExportFailureAt = failureAt
+
 // ExportBuildConfig runs a hold's build the way HoldFixtures does.
 var ExportBuildConfig = buildConfig
 
@@ -79,3 +82,7 @@ func ExportSetTimeoutScale(f float64) (restore func()) {
 	timeoutScale = func() (float64, error) { return f, nil }
 	return func() { timeoutScale = prev }
 }
+
+// ExportUserFrameAtPanic reads a goroutine traceback as AfterEach does when
+// it carries a method's panic.
+var ExportUserFrameAtPanic = userFrameAtPanic

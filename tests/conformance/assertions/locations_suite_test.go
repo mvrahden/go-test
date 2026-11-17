@@ -94,3 +94,14 @@ func (s *FailureLocationsTestSuite) TestHelperInARequiredModuleUnderTrimpath(t *
 		})
 	})
 }
+
+func (s *FailureLocationsTestSuite) TestAHelperInADirectoryNamedLikeGotests(t *gotest.T) {
+	run, err := testkit.RunCLI(t.Context(), ".", "-v", "../testdata/locshadow/")
+	gotest.NoError(t, err)
+	t.When("a helper fails in a file under a pkg/gotest directory of the user's module", func(w *gotest.T) {
+		w.It("the failure names the helper's line and the caller's", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Regexp(it, `(?m)^\s+checks\.go:9: locshadow_suite_test\.go:13: Greater failed`, run.Stdout)
+		})
+	})
+}

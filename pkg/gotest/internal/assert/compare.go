@@ -10,37 +10,50 @@ import (
 // CheckGreater returns "" if a > b.
 // Otherwise it returns a formatted error string.
 func CheckGreater[T cmp.Ordered](a, b T) string {
-	if cmp.Compare(a, b) > 0 {
+	if a > b {
 		return ""
 	}
-	return fmt.Sprintf("Greater failed:\n  %s is not greater than %s", FormatValue(a), FormatValue(b))
+	return fmt.Sprintf("Greater failed:\n  %s is not greater than %s%s", FormatValue(a), FormatValue(b), nanNote(a, b))
 }
 
 // CheckGreaterOrEqual returns "" if a >= b.
 // Otherwise it returns a formatted error string.
 func CheckGreaterOrEqual[T cmp.Ordered](a, b T) string {
-	if cmp.Compare(a, b) >= 0 {
+	if a >= b {
 		return ""
 	}
-	return fmt.Sprintf("GreaterOrEqual failed:\n  %s is not greater than or equal to %s", FormatValue(a), FormatValue(b))
+	return fmt.Sprintf("GreaterOrEqual failed:\n  %s is not greater than or equal to %s%s", FormatValue(a), FormatValue(b), nanNote(a, b))
 }
 
 // CheckLess returns "" if a < b.
 // Otherwise it returns a formatted error string.
 func CheckLess[T cmp.Ordered](a, b T) string {
-	if cmp.Compare(a, b) < 0 {
+	if a < b {
 		return ""
 	}
-	return fmt.Sprintf("Less failed:\n  %s is not less than %s", FormatValue(a), FormatValue(b))
+	return fmt.Sprintf("Less failed:\n  %s is not less than %s%s", FormatValue(a), FormatValue(b), nanNote(a, b))
 }
 
 // CheckLessOrEqual returns "" if a <= b.
 // Otherwise it returns a formatted error string.
 func CheckLessOrEqual[T cmp.Ordered](a, b T) string {
-	if cmp.Compare(a, b) <= 0 {
+	if a <= b {
 		return ""
 	}
-	return fmt.Sprintf("LessOrEqual failed:\n  %s is not less than or equal to %s", FormatValue(a), FormatValue(b))
+	return fmt.Sprintf("LessOrEqual failed:\n  %s is not less than or equal to %s%s", FormatValue(a), FormatValue(b), nanNote(a, b))
+}
+
+// nanNote is the note a failed ordering of a NaN operand ends in, or "".
+func nanNote[T cmp.Ordered](a, b T) string {
+	if isNaN(a) || isNaN(b) {
+		return "\n  a NaN operand is neither less than, equal to nor greater than any number"
+	}
+	return ""
+}
+
+func isNaN(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.CanFloat() && math.IsNaN(rv.Float())
 }
 
 // Numeric is every type InDelta measures.
