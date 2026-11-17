@@ -184,7 +184,7 @@ runs:
           case "$INPUT_GO_TEST_FLAGS" in *\"*|*\'*)
             echo "::error::go-test-flags must not contain quotes: one entry per word or line"; exit 2;;
           esac
-          read -ra gtflags -d '' <<< "$INPUT_GO_TEST_FLAGS" || true
+          read -r -d '' -a gtflags <<< "$INPUT_GO_TEST_FLAGS" || true
         fi
 
         # A -coverprofile the caller passes through go-test-flags is the
@@ -224,14 +224,14 @@ runs:
           case "$INPUT_FLAGS" in *\"*|*\'*)
             echo "::error::flags must not contain quotes: one entry per word or line"; exit 2;;
           esac
-          read -ra extra -d '' <<< "$INPUT_FLAGS" || true
+          read -r -d '' -a extra <<< "$INPUT_FLAGS" || true
           args+=("${extra[@]}")
         fi
 
         case "$INPUT_PACKAGES" in *\"*|*\'*)
           echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
         esac
-        read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
+        read -r -d '' -a pkgs <<< "$INPUT_PACKAGES" || true
         args+=("${pkgs[@]}")
 
         if [ "$INPUT_RACE" = "true" ]; then
@@ -405,14 +405,14 @@ runs:
           case "$INPUT_FLAGS" in *\"*|*\'*)
             echo "::error::flags must not contain quotes: one entry per word or line"; exit 2;;
           esac
-          read -ra extra -d '' <<< "$INPUT_FLAGS" || true
+          read -r -d '' -a extra <<< "$INPUT_FLAGS" || true
           args+=("${extra[@]}")
         fi
 
         case "$INPUT_PACKAGES" in *\"*|*\'*)
           echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
         esac
-        read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
+        read -r -d '' -a pkgs <<< "$INPUT_PACKAGES" || true
         args+=("${pkgs[@]}")
 
         set +e
@@ -489,7 +489,7 @@ runs:
           echo "::error::packages must not contain quotes: one entry per word or line"; exit 2;;
         esac
         pkgs=()
-        read -ra pkgs -d '' <<< "$INPUT_PACKAGES" || true
+        read -r -d '' -a pkgs <<< "$INPUT_PACKAGES" || true
 
         set +e
         args=(fuzz)
