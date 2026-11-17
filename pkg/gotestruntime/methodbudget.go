@@ -115,8 +115,7 @@ func (m *method) startWatch() bool {
 		defer close(w.stopped)
 		if watchDeadline(m.it, m.gid, m.budget, m.phaseName, "Timeout", m.due, w.done) {
 			m.judged.Store(true)
-			m.ctx.end(context.DeadlineExceeded)
-			m.after.end(context.DeadlineExceeded)
+			m.expire()
 		}
 	}()
 	return true
@@ -140,8 +139,7 @@ func (m *method) watchOff() {
 	expired := m.expired
 	m.mu.Unlock()
 	if expired {
-		m.ctx.end(context.DeadlineExceeded)
-		m.after.end(context.DeadlineExceeded)
+		m.expire()
 	}
 }
 
@@ -154,9 +152,15 @@ func (m *method) deadlinePassed() {
 	watching := m.watch != nil
 	m.mu.Unlock()
 	if !watching {
-		m.ctx.end(context.DeadlineExceeded)
-		m.after.end(context.DeadlineExceeded)
+		m.expire()
 	}
+}
+
+// expire ends the method's contexts at its deadline, AfterEach's first: a
+// hook woken by the method's context may return, and AfterEach start, at once.
+func (m *method) expire() {
+	m.after.end(context.DeadlineExceeded)
+	m.ctx.end(context.DeadlineExceeded)
 }
 
 // afterTs holds, per running budgeted method's T, the T its AfterEach gets.

@@ -4,7 +4,10 @@ package gotestruntime_test //nolint:fail-guard
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,4 +131,58 @@ func (s *LifetimesTestSuite) TestAFixtureAfterEachContextOutlivesTheDefaultDeadl
 	if !passed {
 		t.Errorf("a method past the default deadline failed at its fixture's AfterEach")
 	}
+}
+
+// overrunChildEnv makes the test below the child that overruns the methods.
+const overrunChildEnv = "GOTEST_LIFETIMES_OVERRUN_CHILD"
+
+// The fixture AfterEach after a BeforeEach that waited out the Timeout must
+// find its own context ended too. A miss is rare, so the child overruns a
+// thousand methods; every one of them fails, so it runs in a process of its own.
+// A method whose Timeout passed before its fixture's BeforeEach started runs
+// neither hook, and is not counted.
+func (s *LifetimesTestSuite) TestAFixtureAfterEachContextHasEndedOnceItsBeforeEachSawTheTimeout(t *gotest.T) {
+	if os.Getenv(overrunChildEnv) != "" {
+		ran, live := 0, 0
+		for range 1000 {
+			var err error
+			after := false
+			t.T().Run("overrun", func(tt *testing.T) { //nolint:t-escape // RunMethods takes the raw testing.T
+				cfg := gotest.SuiteConfig{Timeout: 2 * time.Millisecond}
+				gotestruntime.RunMethods(tt, cfg, cfg, gotestruntime.Methods{
+					Fixtures: []gotestruntime.EachHooks{{
+						Name:   "Probe",
+						Before: func(ctx context.Context) error { <-ctx.Done(); return nil },
+						After:  func(ctx context.Context) error { after, err = true, ctx.Err(); return nil },
+					}},
+					Cases: []gotestruntime.Method{{Name: "TestOne", Run: func(_ *gotest.T, run func(func())) { run(func() {}) }}},
+				})
+			})
+			if after {
+				ran++
+				if err == nil {
+					live++
+				}
+			}
+		}
+		fmt.Printf("ran=%d live=%d\n", ran, live)
+		return
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^TestLifetimesTestSuite$/^TestAFixtureAfterEachContextHasEndedOnceItsBeforeEachSawTheTimeout$", "-test.count=1") //nolint:gosec // G204: this test binary
+	cmd.Env = append(os.Environ(), overrunChildEnv+"=1")
+	out, _ := cmd.CombinedOutput() // the child fails: every method overran
+	line := grepLine(string(out), "live=")
+	if !strings.Contains(line, " live=0\n") || strings.HasPrefix(line, "ran=0 ") {
+		t.Errorf("a fixture AfterEach saw a live context after its BeforeEach saw the Timeout, or none ran:\n%s", line)
+	}
+}
+
+// grepLine returns the first line of out holding substr, or all of out.
+func grepLine(out, substr string) string {
+	for line := range strings.Lines(out) {
+		if strings.Contains(line, substr) {
+			return line
+		}
+	}
+	return out
 }

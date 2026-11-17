@@ -10,5 +10,5 @@ Clause: when a fixture's BeforeEach or AfterEach returns an error, panics or ove
 -		if watchDeadline(m.it, m.gid, m.budget, m.phaseName, "Timeout", m.due, w.done) {
 +		if watchDeadline(m.it, m.gid, m.budget, func() string { return "" }, "Timeout", m.due, w.done) {
  			m.judged.Store(true)
- 			m.ctx.end(context.DeadlineExceeded)
- 			m.after.end(context.DeadlineExceeded)
+ 			m.expire()
+ 		}
