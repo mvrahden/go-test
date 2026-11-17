@@ -144,6 +144,39 @@ func (s *BaselineTestSuite) TestFromPackages(t *gotest.T) {
 		})
 	})
 
+	t.When("the stream files a sub-benchmark's first result line outside it", func(w *gotest.T) {
+		// The leaf has no line of its own: go test filed it at the package,
+		// or under the benchmark above it. Both are read by the line's name.
+		const atPackage = `
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit/long"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit/long","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long-8   \t 100 \t 10.0 ns/op\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long-8   \t 100 \t 11.0 ns/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Elapsed":0.02}
+`
+		const underParent = `
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit/long"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit/long","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long\n"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkSplit","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long-8   \t 100 \t 10.0 ns/op\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"BenchmarkFooTestSuite/BenchmarkSplit/long-8   \t 100 \t 11.0 ns/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Elapsed":0.02}
+`
+		for _, c := range []struct{ where, stream string }{{"at the package", atPackage}, {"under the benchmark above it", underParent}} {
+			w.It("keeps the benchmark with every repetition when the line is "+c.where, func(it *gotest.T) {
+				b := gotestbench.FromPackages(buildTree(it, c.stream))
+				gotest.Len(it, b.Results, 1)
+				gotest.Equal(it, "BenchmarkSplit/long", b.Results[0].Name)
+				gotest.Len(it, b.Results[0].Samples, 2)
+				gotest.InDelta(it, 10.0, b.Results[0].Samples[0].NsPerOp, 0.001)
+				gotest.InDelta(it, 11.0, b.Results[0].Samples[1].NsPerOp, 0.001)
+			})
+		}
+	})
+
 	t.When("a -count=4 run leaves repetitions 2..N as package-level output", func(w *gotest.T) {
 		w.It("harvests all 4 repetitions into Samples on the matching Result", func(it *gotest.T) {
 			// Mirrors real go test -json -count=4 output: only the first
