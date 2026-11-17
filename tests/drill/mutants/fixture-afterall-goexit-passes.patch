@@ -1,0 +1,14 @@
+Expect: a fixture AfterAll that left through runtime.Goexit was counted as a clean teardown
+Judge: ./pkg/gotestruntime RuntimeTestSuite/TestTeardownDAG_AfterAllLeavingThroughGoexitFails
+Clause: when a package fixture's AfterAll leaves through runtime.Goexit → fails the run after every other hook ran
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -227,7 +227,7 @@
+ 			}
+ 			// As in setupDAG: unset only when the hook left through
+ 			// runtime.Goexit, which counts as a failed teardown.
+-			finished := false
++			finished := true
+ 			defer func() {
+ 				if !finished {
+ 					fmt.Fprintln(os.Stderr, goexited(node, "AfterAll", "Dehydrate"))

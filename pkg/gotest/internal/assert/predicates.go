@@ -2,6 +2,7 @@ package assert
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // The predicates decide what every assertion that asks counts as nil, empty,
@@ -170,7 +172,8 @@ func IsNilable(object any) bool {
 	return false
 }
 
-// IsEmptyable reports whether object is of a kind that can be empty.
+// IsEmptyable reports whether object is of a kind that can be empty. A nil
+// pointer is empty; any other pointer is followed to what it points to.
 func IsEmptyable(object any) bool {
 	if object == nil {
 		return true
@@ -178,8 +181,10 @@ func IsEmptyable(object any) bool {
 	rv := reflect.ValueOf(object)
 	switch rv.Kind() {
 	case reflect.Slice, reflect.Map, reflect.Array,
-		reflect.Chan, reflect.String, reflect.Ptr:
+		reflect.Chan, reflect.String:
 		return true
+	case reflect.Ptr:
+		return rv.IsNil() || IsEmptyable(rv.Elem().Interface())
 	}
 	return false
 }
@@ -216,9 +221,13 @@ func ReadAndRestore(r io.Reader) ([]byte, error) {
 }
 
 // NormalizeJSON converts a value to a JSON-comparable form.
-// Accepts string, []byte, json.RawMessage, io.Reader, or any JSON-marshalable value.
+// Accepts string, []byte, json.RawMessage, io.Reader, a named string type
+// (read as JSON text unless it implements json.Marshaler or
+// encoding.TextMarshaler), or any JSON-marshalable value. Text must be UTF-8.
 func NormalizeJSON(v any) (any, error) {
 	var raw []byte
+	// A named string is JSON text, unless it marshals itself.
+	named := ""
 	switch val := v.(type) {
 	case string:
 		raw = []byte(val)
@@ -233,18 +242,61 @@ func NormalizeJSON(v any) (any, error) {
 		}
 		raw = b
 	default:
+		if isJSONText(v) {
+			named = fmt.Sprintf("%T", v)
+			raw = []byte(reflect.ValueOf(v).String())
+			break
+		}
 		var err error
 		raw, err = json.Marshal(val)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal value: %w", err)
 		}
+		return decodeJSON(raw, "")
 	}
+	// Marshalled values are valid UTF-8; text given as is may not be.
+	if at := invalidUTF8(raw); at >= 0 {
+		return nil, fmt.Errorf("failed to unmarshal JSON: invalid UTF-8 at byte %d", at)
+	}
+	return decodeJSON(raw, named)
+}
+
+// isJSONText reports whether v is of a named string type that implements
+// neither json.Marshaler nor encoding.TextMarshaler.
+func isJSONText(v any) bool {
+	if reflect.ValueOf(v).Kind() != reflect.String {
+		return false
+	}
+	_, m := v.(json.Marshaler)
+	_, tm := v.(encoding.TextMarshaler)
+	return !m && !tm
+}
+
+// invalidUTF8 is the offset of the first byte of b that is not valid UTF-8,
+// or -1.
+func invalidUTF8(b []byte) int {
+	for i := 0; i < len(b); {
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError && size == 1 {
+			return i
+		}
+		i += size
+	}
+	return -1
+}
+
+// decodeJSON decodes the one JSON value raw holds; named, when not empty, is
+// the named string type raw came from, which a decoder error names.
+func decodeJSON(raw []byte, named string) (any, error) {
 	// Numbers stay as written: decoding them into float64 would make
 	// 9007199254740993 and 9007199254740992 the same JSON.
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	var out any
 	if err := dec.Decode(&out); err != nil {
+		if named != "" {
+			return nil, fmt.Errorf("failed to unmarshal JSON: %w (a %s is read as JSON text, as a string is; marshal it to compare it as a value)", err, named)
+		}
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	// Anything but whitespace after the value, a stray } or ] included, is an error.
@@ -361,4 +413,77 @@ func allDigits(s string) bool {
 		}
 	}
 	return true
+}
+
+// ErrorText is err.Error(), or, when that panics, a text naming err's type
+// and the panic: a nil pointer in a non-nil error is the usual cause.
+func ErrorText(err error) (text string) {
+	defer func() {
+		if r := recover(); r != nil {
+			if rv := reflect.ValueOf(err); rv.Kind() == reflect.Ptr && rv.IsNil() {
+				text = fmt.Sprintf("%T(nil), a nil pointer in a non-nil error; its Error method panicked: %v", err, r)
+				return
+			}
+			text = fmt.Sprintf("%T, whose Error method panicked: %v", err, r)
+		}
+	}()
+	return err.Error()
+}
+
+// CheckElementsMatch returns "" if listA and listB hold the same elements
+// the same number of times, in any order. Otherwise it returns a formatted
+// error string.
+func CheckElementsMatch[V comparable](listA, listB []V) (msg string) {
+	if len(listA) != len(listB) {
+		return fmt.Sprintf("ElementsMatch failed:\n  lists have different lengths: %d vs %d", len(listA), len(listB))
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			msg = unhashable("ElementsMatch", r, listA, listB)
+		}
+	}()
+	counts := make(map[V]int, len(listA))
+	for _, v := range listA {
+		counts[v]++
+	}
+	for _, v := range listB {
+		counts[v]--
+		if counts[v] < 0 {
+			return fmt.Sprintf("ElementsMatch failed:\n  element %#v is in listB but not enough times in listA", v)
+		}
+	}
+	return ""
+}
+
+// CheckSubset returns "" if every element of subset is in list. Otherwise it
+// returns a formatted error string.
+func CheckSubset[V comparable](list, subset []V) (msg string) {
+	defer func() {
+		if r := recover(); r != nil {
+			msg = unhashable("Subset", r, list, subset)
+		}
+	}()
+	set := make(map[V]struct{}, len(list))
+	for _, v := range list {
+		set[v] = struct{}{}
+	}
+	for _, v := range subset {
+		if _, ok := set[v]; !ok {
+			return fmt.Sprintf("Subset failed:\n  element %#v from subset not found in list", v)
+		}
+	}
+	return ""
+}
+
+// unhashable names the first element of lists that == cannot compare, which
+// made a map of them panic with r; any other panic goes on.
+func unhashable[V comparable](name string, r any, lists ...[]V) string {
+	for _, l := range lists {
+		for _, v := range l {
+			if !reflect.ValueOf(v).Comparable() {
+				return fmt.Sprintf("%s failed:\n  an element of type %T cannot be compared with ==; compare such lists with Equal", name, any(v))
+			}
+		}
+	}
+	panic(r)
 }

@@ -7,6 +7,12 @@ import (
 // EachTestSuite tests the Each helper for parameterized subtests.
 type EachTestSuite struct{}
 
+func (s *EachTestSuite) SuiteConfig() gotest.SuiteConfig {
+	cfg := gotest.DefaultSuiteConfig()
+	cfg.Parallel = true
+	return cfg
+}
+
 func (s *EachTestSuite) TestEach(t *gotest.T) {
 	type entry struct {
 		Desc  string
@@ -93,6 +99,19 @@ func (s *EachTestSuite) TestEach(t *gotest.T) {
 				gotest.Greater(sub, tc.Value, 0)
 			}
 			gotest.Equal(it, 2, count)
+		})
+	})
+}
+
+func (s *EachTestSuite) TestOnATWithoutATestingT(t *gotest.T) {
+	t.When("Each is given a T built from a testing.TB that is not a *testing.T", func(w *gotest.T) {
+		w.It("panics on the caller, naming Each", func(it *gotest.T) {
+			hookT := gotest.NewTFromTB(it.T()) // as a hook's T under a benchmark: T() is nil
+			got := gotest.Panics(it, func() {
+				for range gotest.Each(hookT, []int{1}) {
+				}
+			})
+			gotest.Equal(it, any("gotest: Each is unavailable in benchmark/fuzz lifecycle hooks"), got)
 		})
 	})
 }

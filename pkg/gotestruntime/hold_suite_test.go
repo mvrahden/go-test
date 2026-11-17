@@ -1,7 +1,10 @@
 package gotestruntime_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -40,6 +43,30 @@ func (s *HoldTestSuite) TestBuildConfig(t *gotest.T) {
 	})
 }
 
+func (s *HoldTestSuite) TestWhereASetupFailureIsReported(t *gotest.T) {
+	t.When("the fixture whose BeforeAll failed names where it is declared", func(w *gotest.T) {
+		w.It("the failure is located there", func(it *gotest.T) {
+			node := &gotestruntime.FixtureNode{
+				Name: "Probe", Config: gotest.DefaultFixtureConfig(), BeforeAllAt: "fixture.go:12",
+				BeforeAll: func(context.Context) error { return errors.New("would not come up") },
+			}
+			err := gotestruntime.ExportSetupDAG(it.Context(), []*gotestruntime.FixtureNode{node}, nil, gotestruntime.ExportNewNodeTracker())
+			gotest.ErrorContains(it, err, "Probe.BeforeAll: would not come up")
+			gotest.Equal(it, "fixture.go:12", gotestruntime.ExportFailureAt(err))
+		})
+	})
+	t.When("it names none", func(w *gotest.T) {
+		w.It("the failure is unlocated", func(it *gotest.T) {
+			node := &gotestruntime.FixtureNode{
+				Name: "Probe", Config: gotest.DefaultFixtureConfig(),
+				BeforeAll: func(context.Context) error { return errors.New("would not come up") },
+			}
+			err := gotestruntime.ExportSetupDAG(it.Context(), []*gotestruntime.FixtureNode{node}, nil, gotestruntime.ExportNewNodeTracker())
+			gotest.Empty(it, gotestruntime.ExportFailureAt(err))
+		})
+	})
+}
+
 // Sequential: the watcher is process-wide, and a method sets the environment.
 type HoldWatchTestSuite struct{}
 
@@ -59,10 +86,21 @@ func (s *HoldWatchTestSuite) TestWatcher(t *gotest.T) {
 	})
 }
 
-// fatalRecorder records what a hold fails with instead of failing the test.
+// fatalRecorder records what a hold fails with instead of failing the test:
+// each FailNow records the output written since the last one.
 type fatalRecorder struct {
 	testing.TB
+	out    strings.Builder
 	fatals []string
+}
+
+func (r *fatalRecorder) Output() io.Writer { return &r.out }
+
+func (r *fatalRecorder) Fail() {}
+
+func (r *fatalRecorder) FailNow() {
+	r.fatals = append(r.fatals, strings.TrimSpace(r.out.String()))
+	r.out.Reset()
 }
 
 func (r *fatalRecorder) Fatal(args ...any) { r.fatals = append(r.fatals, fmt.Sprint(args...)) }

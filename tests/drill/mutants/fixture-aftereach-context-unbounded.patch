@@ -1,0 +1,14 @@
+Expect: a fixture AfterEach got a context without the method's deadline
+Judge: ./pkg/gotestruntime LifetimesTestSuite/TestAFixtureAfterEachContextEndsAtTheTimeout
+Clause: when a fixture's AfterEach waits on its context past the method's Timeout → its context ends at the Timeout and the method fails at that hook
+--- a/pkg/gotestruntime/methods.go
++++ b/pkg/gotestruntime/methods.go
+@@ -113,7 +113,7 @@
+ 						// default deadline does not.
+ 						ctx := context.WithoutCancel(mt.t.Context())
+ 						if budget.Timeout > 0 {
+-							ctx = AfterEachT(mt.t).Context()
++							ctx = context.Background()
+ 						}
+ 						if err := f.After(ctx); err != nil { //nolint:fail-guard // the method has run; report and go on
+ 							reportAt(it, callsite.Declared(f.AfterAt), fmt.Sprintf("%s.AfterEach failed: %v", f.Name, err))

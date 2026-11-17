@@ -59,7 +59,11 @@ func CheckEqual(expected, actual any) string {
 
 	re, ra := render(expected, false, typed), render(actual, false, typed)
 	if cut := cmp.Or(re.cut, ra.cut); cut != "" {
-		fmt.Fprintf(&sb, "  the renderings are cut at %s; the values first differ %s", cut, where(firstDifference(expected, actual)))
+		at, xv, yv := firstDifferenceValues(expected, actual)
+		fmt.Fprintf(&sb, "  the renderings are cut at %s; the values first differ %s", cut, where(at))
+		// Values of different types there are named with their types.
+		typedThere := typed || xv.IsValid() && yv.IsValid() && xv.Type() != yv.Type()
+		fmt.Fprintf(&sb, "\n  expected there: %s\n  actual there:   %s", valueThere(xv, typedThere), valueThere(yv, typedThere))
 		if !re.equal(ra) {
 			sb.WriteString("\n")
 			writeDiff(&sb, re, ra)
@@ -89,6 +93,20 @@ func CheckEqual(expected, actual any) string {
 	fmt.Fprintf(&sb, "  values differ%s in ways their rendering does not show (NaN, a func, or state the rendering omits)\n", at)
 	sb.WriteString("  both:     " + valueBlock(expected, re))
 	return sb.String()
+}
+
+// valueThere renders a value found at a difference on one line: <none> for
+// a side without one, and its type alone when it is too long.
+func valueThere(v reflect.Value, typed bool) string {
+	if !v.IsValid() {
+		return "<none>"
+	}
+	r := &renderer{onPath: map[visit]bool{}, budget: compactMax}
+	r.flat(v, typed)
+	if r.over || r.multiline {
+		return "a " + v.Type().String() + " too long for one line"
+	}
+	return r.sb.String()
 }
 
 // sideBySide writes both values when each renders on one short line and

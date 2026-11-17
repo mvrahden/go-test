@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Predicates / NormalizeJSON
+Judge: ./pkg/gotest/internal/assert
+Clause: when JSONEq is given JSON text of a named string type → reads it as JSON, as it reads a string
+--- a/pkg/gotest/internal/assert/predicates.go
++++ b/pkg/gotest/internal/assert/predicates.go
+@@ -242,7 +242,7 @@
+ 		}
+ 		raw = b
+ 	default:
+-		if isJSONText(v) {
++		if false && isJSONText(v) {
+ 			named = fmt.Sprintf("%T", v)
+ 			raw = []byte(reflect.ValueOf(v).String())
+ 			break

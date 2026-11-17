@@ -1,0 +1,14 @@
+Expect: pkg/gotest/internal/assert Compare / .*CheckOrdering_NaNOperandFails
+Judge: ./pkg/gotest/internal/assert
+Clause: when an ordering assertion is given a NaN operand → fails: NaN is neither below nor above any number
+--- a/pkg/gotest/internal/assert/compare.go
++++ b/pkg/gotest/internal/assert/compare.go
+@@ -28,7 +28,7 @@
+ // CheckLess returns "" if a < b.
+ // Otherwise it returns a formatted error string.
+ func CheckLess[T cmp.Ordered](a, b T) string {
+-	if a < b {
++	if a < b || nanNote(a, b) != "" {
+ 		return ""
+ 	}
+ 	return fmt.Sprintf("Less failed:\n  %s is not less than %s%s", FormatValue(a), FormatValue(b), nanNote(a, b))

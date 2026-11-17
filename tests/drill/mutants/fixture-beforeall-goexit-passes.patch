@@ -1,0 +1,14 @@
+Expect: a fixture BeforeAll that left through runtime.Goexit came up without an error
+Judge: ./pkg/gotestruntime RuntimeTestSuite/TestSetupDAG_BeforeAllLeavingThroughGoexitFails
+Clause: when a package fixture's BeforeAll leaves through runtime.Goexit → fails the suite, which never opens, saying how the hook left, and still runs the fixture's AfterAll
+--- a/pkg/gotestruntime/runtime.go
++++ b/pkg/gotestruntime/runtime.go
+@@ -48,7 +48,7 @@
+ 			defer close(done[node.Name])
+ 			// Set on every way out of the setup but runtime.Goexit, which a
+ 			// FailNow or SkipNow on a testing.TB in the hook causes.
+-			finished := false
++			finished := true
+ 			defer func() {
+ 				r := recover()
+ 				if r == nil && finished {

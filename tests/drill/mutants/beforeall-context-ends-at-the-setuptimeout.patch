@@ -1,0 +1,14 @@
+Expect: BeforeAll's context ended while the suite still ran
+Judge: ./pkg/gotestruntime LifetimesTestSuite/TestBeforeAllContextOutlivesItsSetupTimeout
+Clause: when a suite's methods run past its SetupTimeout → the context BeforeAll got is still live in them
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -254,7 +254,7 @@
+ 	// A stop gives BeforeAll the grace a method body gets: AfterAll cannot
+ 	// run before it returns.
+ 	defer runstate.EnterBody(t, "BeforeAll")()
+-	defer returned()
++	_ = returned
+ 	beforeAll(tt)
+ }
+ 

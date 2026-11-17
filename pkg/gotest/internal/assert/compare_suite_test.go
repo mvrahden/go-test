@@ -102,3 +102,15 @@ func (s *CompareTestSuite) TestCheckInDelta_DifferenceDoesNotOverflow(t *gotest.
 	mustFail(t, assert.CheckInDelta(uint64(0), uint64(math.MaxUint64), 1e19), "uint64 extremes, delta just below the distance", "= 18446744073709551615 exceeds delta 1e+19")
 	mustPass(t, assert.CheckInDelta(uint64(0), uint64(math.MaxUint64), math.Inf(1)), "uint64 extremes, infinite delta")
 }
+
+func (s *CompareTestSuite) TestCheckOrdering_NaNOperandFails(t *gotest.T, _ *ring0Ctx) {
+	nan := math.NaN()
+	const note = "a NaN operand is neither less than, equal to nor greater than any number"
+	mustFail(t, assert.CheckLess(nan, 5.0), "NaN < 5", "Less failed", note)
+	mustFail(t, assert.CheckLessOrEqual(nan, 0.01), "NaN <= 0.01", "LessOrEqual failed", note)
+	mustFail(t, assert.CheckGreater(5.0, nan), "5 > NaN", "Greater failed", note)
+	mustFail(t, assert.CheckGreaterOrEqual(nan, nan), "NaN >= NaN", "GreaterOrEqual failed", note)
+	mustFail(t, assert.CheckLess(float32(1), float32(nan)), "float32 1 < NaN", "Less failed", note)
+	mustPass(t, assert.CheckLess(math.Inf(-1), 5.0), "-Inf < 5")
+	mustPass(t, assert.CheckGreaterOrEqual(math.Inf(1), math.Inf(1)), "+Inf >= +Inf")
+}

@@ -73,6 +73,12 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			continue
 		}
 		passed := t.Run(c.Name, func(it *testing.T) {
+			// What a skipped method would have read is not unread.
+			it.Cleanup(func() {
+				if it.Skipped() {
+					runstate.MarkSkipped(it.Name())
+				}
+			})
 			if m.Parallel {
 				it.Parallel()
 				// The first cleanup runs last: it sees the failures the others
@@ -89,8 +95,8 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 			if runstate.StopContext().Err() != nil {
 				skipStopping(it)
 			}
-			// The budget covers the fixture hooks, the suite hooks and the body:
-			// ended last, after every AfterEach registered below.
+			// The budget covers the fixture hooks, the suite hooks, the body and
+			// the waits on the method's gotest.Go goroutines among its cleanups.
 			mt, end := openMethod(it, cfg.Timeout, budget.Timeout)
 			defer end()
 			for _, f := range m.Fixtures {
@@ -108,9 +114,14 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				if f.After != nil {
 					defer func() {
 						mt.enter(f.Name + ".AfterEach ")
-						// Releases what BeforeEach acquired, so neither the
-						// deadline nor a stop ends its context.
-						if err := f.After(context.Background()); err != nil { //nolint:fail-guard // the method has run; report and go on
+						// Releases what BeforeEach acquired, so a stop does
+						// not end its context; a declared Timeout does, the
+						// default deadline does not.
+						ctx := context.WithoutCancel(mt.t.Context())
+						if budget.Timeout > 0 {
+							ctx = AfterEachT(mt.t).Context()
+						}
+						if err := f.After(ctx); err != nil { //nolint:fail-guard // the method has run; report and go on
 							reportAt(it, callsite.Declared(f.AfterAt), fmt.Sprintf("%s.AfterEach failed: %v", f.Name, err))
 						}
 					}()
@@ -126,6 +137,7 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 				}
 				mt.enter("")
 				defer runstate.EnterBody(it, "a method")()
+				defer sayStopEnded(it)()
 				method()
 			})
 		})
@@ -140,6 +152,25 @@ func RunMethods(t *testing.T, cfg, budget gotest.SuiteConfig, m Methods) {
 func skipFailFast(t *testing.T, first string) {
 	fmt.Fprintln(t.Output(), "FailFast: "+first)
 	t.SkipNow()
+}
+
+// stopEndedLine is the line a method body that was running when the stop
+// came writes to its output, whether the stop ended it or not; the runner's
+// stream reads this exact text.
+const stopEndedLine = "run stopping: the stop came while this method ran"
+
+// sayStopEnded returns what to run once a method body returned: when a stop
+// came while it ran, the body says so in t's output. A body that began after
+// the stop, or one cut short after the grace, never says it.
+func sayStopEnded(t *testing.T) func() {
+	if runstate.StopContext().Err() != nil {
+		return func() {}
+	}
+	return func() {
+		if runstate.StopContext().Err() != nil {
+			fmt.Fprintln(t.Output(), stopEndedLine)
+		}
+	}
 }
 
 // skipStopping skips t, a method a stopped run never started, with no

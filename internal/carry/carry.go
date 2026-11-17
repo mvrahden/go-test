@@ -14,20 +14,33 @@ import (
 // re-raised it, which points at gotest internals rather than at the code that
 // actually panicked. The runtime prints a panic value that implements
 // fmt.Stringer via String, so the whole thing lands in the output unchanged.
+//
+// One re-raised from the deferred call that recovered it carries no stack:
+// the runtime's own traceback still shows where it happened, so it names
+// only that line.
 type Panic struct {
 	value any
 	stack []byte
 	where string
+	at    string // the line it happened at, for one without a stack
 }
 
 func (c *Panic) String() string {
-	return fmt.Sprintf("%v\n\n[recovered from %s]\n%s", c.value, c.where, c.stack)
+	switch {
+	case c.stack != nil:
+		return fmt.Sprintf("%v\n\n[recovered from %s]\n%s", c.value, c.where, c.stack)
+	case c.at != "":
+		return fmt.Sprintf("%v\n\n[panicked at %s; recovered from %s]", c.value, c.at, c.where)
+	default:
+		return fmt.Sprintf("%v\n\n[recovered from %s]", c.value, c.where)
+	}
 }
 
 // Unwrap exposes the original panic value to anything that recovers this.
 func (c *Panic) Unwrap() any { return c.value }
 
-// Stack is the stack from where the panic happened.
+// Stack is the stack from where the panic happened; empty for one [InPlace]
+// made.
 func (c *Panic) Stack() []byte { return c.stack }
 
 // From converts a recovered value into a Panic. Callers must invoke recover()
@@ -44,4 +57,17 @@ func From(v any, where string) *Panic {
 		return c // already captured further in; keep the original stack
 	}
 	return &Panic{value: v, stack: debug.Stack(), where: where}
+}
+
+// InPlace is [From] for a panic re-raised from the deferred call that
+// recovered it, on the goroutine it happened on: no stack, and at() as the
+// line it happened at. A panic already carried keeps its stack.
+func InPlace(v any, where string, at func() string) *Panic {
+	if v == nil {
+		return nil
+	}
+	if c, ok := v.(*Panic); ok {
+		return c
+	}
+	return &Panic{value: v, where: where, at: at()}
 }

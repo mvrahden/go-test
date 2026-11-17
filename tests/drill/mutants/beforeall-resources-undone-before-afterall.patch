@@ -1,0 +1,14 @@
+Expect: AfterAll found BeforeAll's temp dir gone
+Judge: ./pkg/gotestruntime LifetimesTestSuite/TestBeforeAllResourcesLastThroughAfterAll
+Clause: when BeforeAll takes a temporary directory and sets an environment variable through its T → AfterAll still finds both
+--- a/pkg/gotestruntime/harness.go
++++ b/pkg/gotestruntime/harness.go
+@@ -92,7 +92,7 @@
+ 	// Registered once BeforeAll has returned, however it returned, so it runs
+ 	// ahead of the cleanups BeforeAll registered on tb: its temp dirs, its
+ 	// Setenv restores.
+-	defer tb.Cleanup(func() {
++	tb.Cleanup(func() {
+ 		if bench {
+ 			defer failOnPanic(b)
+ 		}

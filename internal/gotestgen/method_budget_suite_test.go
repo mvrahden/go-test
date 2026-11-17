@@ -50,12 +50,12 @@ func (s *MethodBudgetTestSuite) TestAHookOverrunsTheTimeout(t *gotest.T) {
 		w.It("fails the method located at the hook, naming it", func(it *gotest.T) {
 			gotest.Regexp(it, verdictAt(it, "fixture-before", "WaitingFixture.BeforeEach "), run.output)
 		})
-		w.It("runs neither the suite's BeforeEach nor the body, and still runs the fixture's AfterEach with a live context", func(it *gotest.T) {
+		w.It("runs neither the suite's BeforeEach nor the body, and still runs the fixture's AfterEach, its context ended at the Timeout", func(it *gotest.T) {
 			out := methodOutput(run.output, "TestFixtureWaitsTestSuite/TestOne")
 			gotest.Contains(it, run.output, "--- FAIL: TestFixtureWaitsTestSuite/TestOne", run.output)
 			gotest.NotContains(it, out, "MARK:suite BeforeEach", run.output)
 			gotest.NotContains(it, out, "MARK:body", run.output)
-			gotest.Contains(it, out, "MARK:fixture AfterEach ctx <nil>", run.output)
+			gotest.Contains(it, out, "MARK:fixture AfterEach ctx context deadline exceeded", run.output)
 		})
 	})
 

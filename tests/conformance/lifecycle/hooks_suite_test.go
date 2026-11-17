@@ -3,6 +3,7 @@ package lifecycle_test
 import (
 	"time"
 
+	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -102,6 +103,19 @@ func (s *SuiteHooksTestSuite) TestAFixtureEachHookGoesWrong(t *gotest.T) {
 			}) {
 				checkGrid(sub, &row)
 			}
+		})
+	})
+}
+
+func (s *SuiteHooksTestSuite) TestAfterAllLeavesThroughGoexit(t *gotest.T) {
+	t.When("a suite's AfterAll leaves through runtime.Goexit without a verdict", func(w *gotest.T) {
+		run, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"HOOKS_AT=suite.AfterAll", "HOOKS_MODE=goexit"}, "../testdata/hooks/")
+		gotest.NoError(w, err)
+		w.It("fails the suite, saying AfterAll left through runtime.Goexit", func(it *gotest.T) {
+			gotest.Equal(it, 1, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, "fail", run.Verdict(suite))
+			gotest.Contains(it, run.Stdout, "AfterAll left through runtime.Goexit without a verdict")
+			gotest.True(it, run.MarkerOrder("suite.AfterAll", "fixture.AfterAll"), "markers: %v", run.Markers)
 		})
 	})
 }

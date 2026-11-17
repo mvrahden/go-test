@@ -795,6 +795,15 @@ func (s *CanaryTestSuite) TestTheWaitOnSetupGoroutinesIsHeldToTheSetupTimeout(t 
 	}
 }
 
+// So is the wait on a goroutine a *testing.T BeforeAll started on gotest.NewT(t).
+func (s *CanaryTestSuite) TestATestingTHooksWaitIsHeldToTheSetupTimeout(t *gotest.T) {
+	r := s.runWith(t, "setupwaits", t.TempDir(), nil, "-timeout=20s", "-run=TestStdSlowTestSuite")
+	if !slices.Contains(r.rows, "setupwaits fail TestStdSlowTestSuite") ||
+		!strings.Contains(r.stream, "the wait on a goroutine BeforeAll started with gotest.Go exceeded its configured SetupTimeout") {
+		t.Errorf("setupwaits: no SetupTimeout verdict names the wait a *testing.T BeforeAll started: %v", r.rows)
+	}
+}
+
 // A row that skips skips itself and the method; a row that ends the method's
 // own T ends the method with that verdict alone.
 func (s *CanaryTestSuite) TestEachRowsEndTheMethodWithTheirVerdict(t *gotest.T) {

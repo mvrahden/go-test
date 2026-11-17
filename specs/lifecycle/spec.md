@@ -74,7 +74,7 @@ Every row of an Each table SHALL be its own subtest with its own verdict; a row 
 - **THEN** stops at the break and the method goes on
 
 ### Requirement: Goroutines started by gotest.Go
-A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at the wait, a skip there SHALL skip the method at the wait, and a goroutine that leaves through runtime.Goexit with neither SHALL fail the method with a message that says so.
+A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at the wait, a skip there SHALL skip the method at the wait, and a goroutine that leaves through runtime.Goexit with neither SHALL fail the method with a message that says so; the wait SHALL be held to the method's declared Timeout, and no other cleanup of the method SHALL be.
 
 #### Scenario: A goroutine fails a fatal assertion
 - **WHEN** a goroutine started by gotest.Go fails a fatal assertion
@@ -87,6 +87,14 @@ A fatal assertion on a goroutine started by gotest.Go SHALL fail the method at t
 #### Scenario: A goroutine leaves without a verdict
 - **WHEN** a goroutine started by gotest.Go leaves through runtime.Goexit without a verdict
 - **THEN** the wait on it fails the method, saying the goroutine exited via runtime.Goexit
+
+#### Scenario: A goroutine outlasts the method's Timeout
+- **WHEN** a goroutine a method started with gotest.Go is still running when the method's declared Timeout passes
+- **THEN** fails the method with a verdict naming the wait and its Timeout
+
+#### Scenario: Another cleanup outlasts the method's Timeout
+- **WHEN** a cleanup a method's helper registered on its testing.T runs past the method's declared Timeout
+- **THEN** the method passes
 
 ### Requirement: Goroutines BeforeAll starts
 A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived from it, SHALL be waited for after AfterAll, as SHALL one it starts while that wait runs; the wait SHALL cover every goroutine before the fixture is released, even when the last one fails or panics, and SHALL be held to a declared SetupTimeout. The cases of the last goroutine are the table in `tests/conformance/lifecycle/goroutines_suite_test.go`.
@@ -115,12 +123,42 @@ A goroutine BeforeAll starts with gotest.Go, on the hook's T or any T derived fr
 - **WHEN** a goroutine BeforeAll started runs past the suite's declared SetupTimeout after AfterAll
 - **THEN** fails the suite with a verdict naming the wait and its SetupTimeout
 
+### Requirement: What BeforeAll takes from its T
+The context of the T a suite's BeforeAll gets SHALL carry the SetupTimeout as its deadline and end at it only while BeforeAll is still running; once BeforeAll has returned it SHALL carry no deadline and SHALL end when the suite's methods are done, before AfterAll runs, or at a stop. A temporary directory and an environment variable BeforeAll takes from its T SHALL last until AfterAll has returned.
+
+#### Scenario: Methods that run past the SetupTimeout
+- **WHEN** a suite's methods run past its SetupTimeout
+- **THEN** the context BeforeAll got is still live in them
+- **AND** that context has ended by the time AfterAll runs
+
+#### Scenario: BeforeAll waits past the SetupTimeout
+- **WHEN** BeforeAll waits on its context past the SetupTimeout
+- **THEN** its context ends at the SetupTimeout
+
+#### Scenario: A temporary directory and an environment variable from BeforeAll
+- **WHEN** BeforeAll takes a temporary directory and sets an environment variable through its T
+- **THEN** AfterAll still finds both
+
 ### Requirement: A panic ahead of a failing AfterEach
 A panic in a test method or its BeforeEach SHALL be reported and fail the test even when AfterEach then fails a fatal assertion, and AfterEach SHALL still run.
 
 #### Scenario: BeforeEach panics and AfterEach fails
 - **WHEN** a test method's BeforeEach panics and its AfterEach fails a fatal assertion
 - **THEN** the test fails with the panic reported, and its AfterEach still runs
+
+### Requirement: A method's panic is printed once
+A panic in a test method SHALL be reported with the line of the user's it happened at ahead of one stack, the runtime's own.
+
+#### Scenario: A method panics
+- **WHEN** a test method panics
+- **THEN** the report names the line it happened at, and its stack shows that line once
+
+### Requirement: A suite's AfterAll that leaves through runtime.Goexit
+A suite's AfterAll that leaves through runtime.Goexit without failing or skipping its own T SHALL fail the suite with a message that says so.
+
+#### Scenario: AfterAll leaves without a verdict
+- **WHEN** a suite's AfterAll leaves through runtime.Goexit without a verdict
+- **THEN** fails the suite, saying AfterAll left through runtime.Goexit
 
 ### Requirement: A context the default deadline ended
 When the default deadline of a suite that declares no Timeout or SetupTimeout ends the context of a test method, BeforeAll or AfterAll still running, the harness SHALL write one line naming it and the default, unbuffered on stderr or, under -json, with its test, and SHALL leave its verdict as it is. A declared budget reports its own verdict, so it gets no such line, and neither does a context a stop or the end of its phase ended.
@@ -246,7 +284,7 @@ A run stopped while a group runs SHALL skip every suite not started, the later g
 - **AND** starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
 
 ### Requirement: Stopping a run
-A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the Ctrl-C that stopped it.
+A run interrupted while a method holds SHALL exit 130 when gotest runs directly, end the holding method's context, skip the methods that have not started with the reason run stopping, and run AfterAll before the fixture is released; a method running when the stop came SHALL say so. Under the gotest runner the suite's process then ends with its tests' own status, and the -json stream ends with a failed run naming the suites it stopped; under plain go test it ends by the Ctrl-C that stopped it.
 
 #### Scenario: Interrupted while a method holds
 - **WHEN** the run is interrupted while a method holds
@@ -255,6 +293,10 @@ A run interrupted while a method holds SHALL exit 130 when gotest runs directly,
 - **AND** skips the methods that have not started with the reason run stopping
 - **AND** runs AfterAll before the fixture is released
 - **AND** ends the stream with a failed run naming the suite it stopped, the tests' own verdicts kept
+
+#### Scenario: A method running when the stop came
+- **WHEN** the run is interrupted while a method holds and the method returns once its context ends
+- **THEN** writes run stopping: the stop came while this method ran in that method's output, and in none of a method that returned before the stop
 
 ### Requirement: A signal from outside the runner
 Under the runner, a SIGINT or SIGTERM the runner did not send SHALL start a first stop, the holding method's context ended and AfterAll run before the fixture is released; the stream SHALL name it a stop from outside the runner and the package SHALL fail. A signal during a stop SHALL change nothing and SHALL never force it, and one landing after the runner's stop settled the run SHALL NOT end the process: it ends with its tests' own status, every verdict in the stream.

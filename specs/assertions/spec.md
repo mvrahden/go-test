@@ -25,8 +25,12 @@ An assertion that fails SHALL name the line it failed at and the assertion, in a
 - **WHEN** a behavior another module declares fails in its helper, the module's path having no dot, required through a replace and built with -trimpath
 - **THEN** the failure names the helper's line and the caller's
 
+#### Scenario: A helper in a directory named like gotest's
+- **WHEN** a helper fails in a file under a pkg/gotest directory of the user's module
+- **THEN** the failure names the helper's line and the caller's
+
 ### Requirement: Named string types
-Regexp and Contains SHALL treat a value of a named string type as the string it holds.
+Regexp, Contains and JSONEq SHALL treat a value of a named string type as the string it holds; JSONEq marshals one that implements json.Marshaler or encoding.TextMarshaler.
 
 #### Scenario: A named pattern type
 - **WHEN** Regexp is given a pattern of a named string type
@@ -35,6 +39,10 @@ Regexp and Contains SHALL treat a value of a named string type as the string it 
 #### Scenario: Named string haystack and needle
 - **WHEN** Contains compares named string kinds
 - **THEN** checks the substring as it does for strings
+
+#### Scenario: JSON text of a named string type
+- **WHEN** JSONEq is given JSON text of a named string type
+- **THEN** reads it as JSON, as it reads a string
 
 ### Requirement: A needle of the wrong type
 Contains and NotContains SHALL fail, naming the haystack's type and the needle's, when the needle could be no element or key of the haystack, and SHALL name the type to convert it to only when the conversion keeps its value: a string kind to a string kind, a number that converts to the element type and back unchanged, sign included, and a rune, byte or byte slice to the string it is looked for in.
@@ -86,6 +94,17 @@ Contains SHALL take a nil needle as the nil element or key of a slice, array or 
 - **WHEN** Contains is asked for a nil substring of a string
 - **THEN** fails naming the string's type
 
+### Requirement: Empty and NotEmpty on pointers
+Empty and NotEmpty SHALL follow a pointer that is not nil to what it points to and SHALL fail the type guard when that has no length; a nil pointer SHALL be empty.
+
+#### Scenario: A pointer to a value with no length
+- **WHEN** NotEmpty is given a pointer that is not nil to a number or a struct
+- **THEN** fails the type guard, naming NotNil and NotZero
+
+#### Scenario: A pointer to a value with a length
+- **WHEN** Empty and NotEmpty are given a pointer to a slice, or a nil pointer
+- **THEN** the pointer is followed and the length decides, and the nil pointer is empty
+
 ### Requirement: InDelta at the edges of float64
 InDelta SHALL fail when the delta is NaN, and SHALL hold two equal infinities within any delta.
 
@@ -108,6 +127,13 @@ InDelta SHALL measure the distance between two integers exactly, neither roundin
 - **WHEN** InDelta compares the smallest and the largest int64
 - **THEN** measures their full distance, not one that wrapped around
 
+### Requirement: Ordering a NaN
+Greater, GreaterOrEqual, Less and LessOrEqual SHALL fail when either operand is NaN.
+
+#### Scenario: A NaN operand
+- **WHEN** an ordering assertion is given a NaN operand
+- **THEN** fails: NaN is neither below nor above any number
+
 ### Requirement: Failure messages
 A failure message SHALL format the extra arguments by the first when it is of any string kind and carry every extra argument when it is not, and ErrorAs SHALL name the type it expected when the error is of another type.
 
@@ -122,6 +148,17 @@ A failure message SHALL format the extra arguments by the first when it is of an
 #### Scenario: ErrorAs on another error type
 - **WHEN** ErrorAs is given an error of another type
 - **THEN** names the type it expected
+
+### Requirement: Values an assertion cannot read
+An assertion SHALL fail with a message, not panic, when an error's Error method panics or when list elements cannot be compared with ==.
+
+#### Scenario: A nil pointer in a non-nil error
+- **WHEN** NoError is given a non-nil error holding a nil pointer whose Error method panics
+- **THEN** fails naming the error's type and the panic
+
+#### Scenario: Elements that cannot be compared
+- **WHEN** ElementsMatch or Subset is given elements of an interface type that hold slices
+- **THEN** fails naming the element's type and Equal
 
 ### Requirement: JSON numbers
 JSONEq SHALL compare numbers by value: integers beyond float64's exact range stay distinct, an integer equals its decimal spelling at any exponent, and -0 equals 0.
@@ -148,6 +185,13 @@ JSONEq SHALL fail when an input holds anything but whitespace after its JSON val
 #### Scenario: A stray closing bracket
 - **WHEN** JSONEq is given a value followed by a stray } or ]
 - **THEN** fails: the input is not valid JSON
+
+### Requirement: JSON text in UTF-8
+JSONEq SHALL fail when JSON text it is given is not valid UTF-8.
+
+#### Scenario: Bytes that are not UTF-8
+- **WHEN** JSONEq is given JSON text holding a byte that is not valid UTF-8
+- **THEN** fails naming the offset of that byte
 
 ### Requirement: Mismatch diffs
 When Equal fails on values that do not each render on one short line, its message SHALL render both one field, element or entry per line and SHALL mark the lines that differ under "diff (-expected +actual):" in hunks with three lines of context, without file headers or line numbers, each hunk led by the path of its first change; that diff SHALL show a final newline only one side ends in, and a long changed line around its first difference, marking a missing final newline on it too.
@@ -185,7 +229,7 @@ When Equal fails on values that do not each render on one short line, its messag
 - **THEN** the hunk names the first differing byte, such as at [12]:, not the start of its row
 
 ### Requirement: Renderings
-A rendering SHALL follow pointers, include unexported fields and show no addresses; SHALL order map entries by key, and keys that render alike by their values; SHALL split text at its newlines, show bytes that are not text in hex, values of package sync by their type alone and unsigned integers in decimal; SHALL indent no deeper than level 32, naming the depth of the lines below it; and SHALL stop at 50,000 lines or 4 MiB, naming where the values first differ.
+A rendering SHALL follow pointers, include unexported fields and show no addresses; SHALL order map entries by key, and keys that render alike by their values; SHALL split text at its newlines, show bytes that are not text in hex, values of package sync by their type alone and unsigned integers in decimal; SHALL indent no deeper than level 32, naming the depth of the lines below it; and SHALL stop at 50,000 lines or 4 MiB, naming where the values first differ and the two values there.
 
 #### Scenario: Elements holding pointers
 - **WHEN** Equal fails on slices whose elements hold distinct pointers to equal values and one element differs
@@ -226,6 +270,7 @@ A rendering SHALL follow pointers, include unexported fields and show no address
 #### Scenario: Values too large to render
 - **WHEN** Equal fails on values whose renderings pass 50,000 lines and agree up to there
 - **THEN** the message says where they are cut and names the path of their first difference
+- **AND** shows the two values at that path
 
 ### Requirement: Mismatches without a diff
 When Equal fails on values that each render on one short line, its message SHALL show both and no diff; on two long single-line strings, or byte slices of text, it SHALL name the byte offset of their first difference and show both around it, with a caret under it that counts a wide character as two columns; on other values that each render on one line, one of them longer than 160 bytes, it SHALL show both around their first difference with a caret under it.
@@ -333,6 +378,10 @@ MatchSnapshot SHALL key each section by the exact subtest name and SHALL find th
 - **WHEN** the package is built with -trimpath
 - **THEN** the baselines are still found beside the test, _ext suffix included
 
+#### Scenario: A snapshot taken in a poll
+- **WHEN** MatchSnapshot is given the recorder of an Eventually or Consistently poll
+- **THEN** reads the section of the test that polls
+
 ### Requirement: Baselines keyed by the release before exact names
 When a section's exact key is missing, MatchSnapshot SHALL compare against the section under the key the release before exact names derived (a trailing #<digits> stripped), unless another test's exact key or another migration claimed it this run. Under GOTEST_CI it SHALL leave the file as it was; otherwise it SHALL rename a matching section to the exact key. Benchmark and fuzz snapshots, which that release filed under unknown.snap as _, SHALL NOT be migrated.
 
@@ -370,3 +419,18 @@ MatchSnapshot SHALL refuse a name that spans lines or spells a section header, b
 #### Scenario: A name that could forge a section
 - **WHEN** a snapshot name spans lines or spells a section header
 - **THEN** is refused before anything is written
+
+### Requirement: Sections no test read
+When a suite ran whole and passed under GOTEST_CI or GOTEST_UPDATE_SNAPSHOTS, MatchSnapshot SHALL name in one line the sections of the suite's snapshot file that no test of the run read, and SHALL leave the file and the verdict as they are. A run that -run narrows to a subtest, or -skip narrows at all, names none, and a section of a method that skipped itself is not unread.
+
+#### Scenario: A section whose test is gone
+- **WHEN** a suite that ran whole and passed under GOTEST_CI leaves a section of its snapshot file unread
+- **THEN** names the file and the section in one line, and leaves the file and the verdict as they are
+
+#### Scenario: A run narrowed to one method
+- **WHEN** -run names one method of the suite
+- **THEN** names no unread section
+
+#### Scenario: A method that skipped itself
+- **WHEN** a method of a suite that ran whole and passed under GOTEST_CI skips itself before it reads its section
+- **THEN** names the sections no test read but not that method's

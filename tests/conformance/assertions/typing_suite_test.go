@@ -461,6 +461,12 @@ func (s *AssertionTypingTestSuite) TestDiffShapes(t *gotest.T) {
 			gotest.True(it, m.Failed())
 			gotest.Contains(it, m.Message(), "the renderings are cut at 50000 lines; the values first differ at [59999]")
 		})
+		w.It("shows the two values at that path", func(it *gotest.T) {
+			a, b := make([]int, 60000), make([]int, 60000)
+			a[59999], b[59999] = 7, 8
+			m := gotest.Record(func(r *gotest.R) { gotest.Equal(r, a, b) })
+			gotest.Contains(it, m.Message(), "the values first differ at [59999]\n  expected there: 7\n  actual there:   8")
+		})
 	})
 }
 
@@ -601,4 +607,106 @@ func (m masked) GoString() string { return "masked(" + strconv.Itoa(m.Shown) + "
 type measure struct {
 	P *int
 	F float64
+}
+
+func (s *AssertionTypingTestSuite) TestOrderingNaN(t *gotest.T) {
+	t.When("an ordering assertion is given a NaN operand", func(w *gotest.T) {
+		w.It("fails: NaN is neither below nor above any number", func(it *gotest.T) {
+			nan := math.NaN()
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.Less(r, nan, 5.0) }),
+				gotest.Record(func(r *gotest.R) { gotest.LessOrEqual(r, nan, 0.01) }),
+				gotest.Record(func(r *gotest.R) { gotest.Greater(r, 5.0, nan) }),
+				gotest.Record(func(r *gotest.R) { gotest.GreaterOrEqual(r, nan, nan) }),
+			} {
+				gotest.True(it, m.Failed())
+				gotest.Contains(it, m.Message(), "a NaN operand is neither less than, equal to nor greater than any number")
+			}
+			ok := gotest.Record(func(r *gotest.R) { gotest.Less(r, 1.0, 5.0) })
+			gotest.False(it, ok.Failed(), ok.Message())
+		})
+	})
+}
+
+func (s *AssertionTypingTestSuite) TestEmptyOnPointers(t *gotest.T) {
+	type user struct{ Name string }
+	n := 0
+	t.When("NotEmpty is given a pointer that is not nil to a number or a struct", func(w *gotest.T) {
+		w.It("fails the type guard, naming NotNil and NotZero", func(it *gotest.T) {
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &n) }),
+				gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &user{}) }),
+			} {
+				gotest.True(it, m.Failed())
+				gotest.Contains(it, m.Message(), "points to a value that cannot be empty; for nil checks, use NotNil; for zero-value checks, use NotZero")
+			}
+			e := gotest.Record(func(r *gotest.R) { gotest.Empty(r, &n) })
+			gotest.Contains(it, e.Message(), "Empty: *int points to a value that cannot be empty; for nil checks, use Nil; for zero-value checks, use Zero")
+		})
+	})
+	t.When("Empty and NotEmpty are given a pointer to a slice, or a nil pointer", func(w *gotest.T) {
+		w.It("the pointer is followed and the length decides, and the nil pointer is empty", func(it *gotest.T) {
+			full, none := []int{1}, []int{}
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, &full) }),
+				gotest.Record(func(r *gotest.R) { gotest.Empty(r, &none) }),
+				gotest.Record(func(r *gotest.R) { gotest.Empty(r, (*user)(nil)) }),
+				gotest.Record(func(r *gotest.R) { gotest.Empty(r, (*int)(nil)) }),
+			} {
+				gotest.False(it, m.Failed(), m.Message())
+			}
+			m := gotest.Record(func(r *gotest.R) { gotest.NotEmpty(r, (*user)(nil)) })
+			gotest.Contains(it, m.Message(), "NotEmpty failed:\n  object is empty")
+		})
+	})
+}
+
+// doc is JSON text of a named string type.
+type doc string
+
+func (s *AssertionTypingTestSuite) TestJSONText(t *gotest.T) {
+	t.When("JSONEq is given JSON text of a named string type", func(w *gotest.T) {
+		w.It("reads it as JSON, as it reads a string", func(it *gotest.T) {
+			same := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, `{"a":1,"b":2}`, doc(`{"b":2,"a":1}`)) })
+			gotest.False(it, same.Failed(), same.Message())
+			bad := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, doc("{not json"), doc("{not json")) })
+			gotest.True(it, bad.Failed())
+			gotest.Contains(it, bad.Message(), "a assertions_test.doc is read as JSON text, as a string is; marshal it to compare it as a value")
+		})
+	})
+	t.When("JSONEq is given JSON text holding a byte that is not valid UTF-8", func(w *gotest.T) {
+		w.It("fails naming the offset of that byte", func(it *gotest.T) {
+			m := gotest.Record(func(r *gotest.R) { gotest.JSONEq(r, "\"\xff\"", "\"\xfe\"") })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "could not normalize expected: failed to unmarshal JSON: invalid UTF-8 at byte 1")
+		})
+	})
+}
+
+// missing is an error whose Error method reads through its receiver.
+type missing struct{ what string }
+
+func (e *missing) Error() string { return e.what }
+
+func (s *AssertionTypingTestSuite) TestValuesAnAssertionCannotRead(t *gotest.T) {
+	t.When("NoError is given a non-nil error holding a nil pointer whose Error method panics", func(w *gotest.T) {
+		w.It("fails naming the error's type and the panic", func(it *gotest.T) {
+			var e *missing
+			m := gotest.Record(func(r *gotest.R) { gotest.NoError(r, e) })
+			gotest.True(it, m.Failed())
+			gotest.Contains(it, m.Message(), "NoError failed:\n  unexpected error: *assertions_test.missing(nil), a nil pointer in a non-nil error; its Error method panicked:")
+		})
+	})
+	t.When("ElementsMatch or Subset is given elements of an interface type that hold slices", func(w *gotest.T) {
+		w.It("fails naming the element's type and Equal", func(it *gotest.T) {
+			a := []any{[]int{1}}
+			for _, m := range []*gotest.R{
+				gotest.Record(func(r *gotest.R) { gotest.ElementsMatch(r, a, a) }),
+				gotest.Record(func(r *gotest.R) { gotest.Subset(r, a, a) }),
+			} {
+				gotest.True(it, m.Failed())
+				gotest.Contains(it, m.Message(), "an element of type []int cannot be compared with ==; compare such lists with Equal")
+			}
+		})
+	})
 }

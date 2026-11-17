@@ -9,8 +9,8 @@ Clause: when the final Eventually poll passes after many ticks → passes
  	polls := 0
  	for {
  		polls++
--		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
-+		rec, ok := pollUntil(fn, pollLimit(deadline, tick))
+-		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, waitFor))
++		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, tick))
  		if !ok {
  			failf(t, "Consistently failed on poll %d:\n    %s", polls, abandonedPoll(waitFor))
  			return
@@ -18,8 +18,8 @@ Clause: when the final Eventually poll passes after many ticks → passes
  	polls := 0
  	for {
  		polls++
--		rec, ok := pollUntil(fn, pollLimit(deadline, waitFor))
-+		rec, ok := pollUntil(fn, pollLimit(deadline, tick))
+-		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, waitFor))
++		rec, ok := pollUntil(nameOf(t), fn, pollLimit(deadline, tick))
  		if !ok {
  			failf(t, "Eventually failed after %v (%d polls):\n  %s", waitFor, polls, abandonedPoll(waitFor))
  			return

@@ -15,19 +15,38 @@ type B struct {
 	b *testing.B
 }
 
+// NewB wraps a *testing.B, for a helper written against *testing.B that
+// calls code taking a *B.
 func NewB(b *testing.B) *B { return &B{b: b} }
 
-// B returns the underlying *testing.B; the methods after it delegate to it.
-// Errorf and Skipf name the caller's line, not gotest's.
-func (b *B) B() *testing.B                       { return b.b }
-func (b *B) Name() string                        { return b.b.Name() }
-func (b *B) Loop() bool                          { return b.b.Loop() }
-func (b *B) ReportAllocs()                       { b.b.ReportAllocs() }
-func (b *B) SetBytes(n int64)                    { b.b.SetBytes(n) }
+// B returns the underlying *testing.B.
+func (b *B) B() *testing.B { return b.b }
+
+// Name is the benchmark's name as testing gave it.
+func (b *B) Name() string { return b.b.Name() }
+
+// Loop reports whether the measured loop runs again: for b.Loop() { ... }.
+func (b *B) Loop() bool { return b.b.Loop() }
+
+// ReportAllocs reports the benchmark's allocations.
+func (b *B) ReportAllocs() { b.b.ReportAllocs() }
+
+// SetBytes records n bytes processed per iteration.
+func (b *B) SetBytes(n int64) { b.b.SetBytes(n) }
+
+// ReportMetric adds the metric n in unit to the benchmark's result.
 func (b *B) ReportMetric(n float64, unit string) { b.b.ReportMetric(n, unit) }
-func (b *B) Context() context.Context            { return b.b.Context() }
-func (b *B) Errorf(format string, args ...any)   { report(b.b, fmt.Sprintf(format, args...)) }
-func (b *B) FailNow()                            { b.b.FailNow() }
+
+// Context is the benchmark's context.
+func (b *B) Context() context.Context { return b.b.Context() }
+
+// Errorf fails the benchmark at the caller's line, not gotest's, and goes on.
+func (b *B) Errorf(format string, args ...any) { report(b.b, fmt.Sprintf(format, args...)) }
+
+// FailNow ends the benchmark now, as failed.
+func (b *B) FailNow() { b.b.FailNow() }
+
+// Skipf skips the benchmark at the caller's line, with the formatted reason.
 func (b *B) Skipf(format string, args ...any) {
 	assert.SkipInternalFrames(b.b)
 	b.b.Skipf(format, args...)

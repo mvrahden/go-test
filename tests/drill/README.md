@@ -274,16 +274,25 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-wrapped-sign-hinted` | a number whose conversion wraps its sign both ways (`-1` for a `[]uint`) is told to convert | ring-0 predicates suite |
 | `each-method-t-reported-as-a-goexit` | a row that skips or fails the method's own T is reported as leaving through Goexit without a verdict | canary: the eachskip method that skips in a row fails, saying its row left without a verdict |
 | `empty-always-true` | `IsEmpty` reports every value as empty | ring-0 predicates suite, and the canary's `Empty` row |
+| `notempty-pointer-to-a-number-passes` | `IsEmptyable` takes every pointer as one that can be empty, so `NotEmpty` on a pointer to a number is a nil check | ring-0 predicates suite |
+| `noerror-error-method-panics` | `ErrorText` reads `<nil>` for an error whose `Error` method panicked, naming neither its type nor the panic | ring-0 predicates suite |
+| `elementsmatch-unhashable-panics` | `CheckElementsMatch` passes lists whose elements `==` cannot compare | ring-0 predicates suite |
 | `fail-is-noop` | `fail()` in `pkg/gotest` records nothing | canary: the fixtures that must fail stay green |
 | `failfast-drops-the-skipped` | a FailFast suite drops the methods it did not run instead of reporting them | canary: the FailFast fixture's later methods have no skip verdict |
 | `failfast-reads-before-cleanup` | a parallel FailFast method's verdict is read before its cleanups ran | canary: both methods of the cleanup-failing FailFast fixture run under `-parallel=1` |
 | `failfast-skip-located-in-runtime` | a FailFast skip is located in the runtime's `methods.go` | canary: the FailFast fixture's skips name a runtime file |
 | `failfast-trips-before-a-failure` | a FailFast suite trips before any method failed, so its first method is skipped | canary: the FailFast fixture's run exits 0 and its first method has no fail verdict |
 | `failfast-trips-on-the-suite` | FailFast trips on a failure the suite recorded before its methods | canary: the soft-failing FailFast fixture's second method is not run |
+| `fixture-afterall-goexit-passes` | a fixture `AfterAll` that left through `runtime.Goexit` counts as a clean teardown | ring-0 runtime suite |
+| `fixture-beforeall-goexit-passes` | a fixture `BeforeAll` that left through `runtime.Goexit` comes up without an error | ring-0 runtime suite |
+| `fixture-aftereach-context-unbounded` | a fixture's `AfterEach` gets `context.Background()`, so the method's declared Timeout does not end it | ring-0 lifetimes suite |
+| `fixture-aftereach-ended-by-the-default-deadline` | a fixture's `AfterEach` gets a context the default deadline ends, so a release that honours it fails a suite that declares no Timeout | ring-0 lifetimes suite |
 | `fixture-aftereach-only-never-runs` | a fixture with only an `AfterEach` never runs it | canary: the fixtureorder `AfterEach` ahead of the failed `BeforeEach` does not run |
 | `fixture-aftereach-only-runs-out-of-turn` | a fixture with only an `AfterEach` runs it whether or not its turn came | canary: the fixtureorder `AfterEach` behind the failed `BeforeEach` runs |
 | `fixture-aftereach-reported-in-runtime` | an error a fixture's `AfterEach` returns is located in the runtime's `methods.go` | canary: the fixtureafterfail failure names a runtime file, not the hook's |
 | `fixture-aftereach-without-before` | a fixture's `AfterEach` runs for a method whose fixture `BeforeEach` failed | canary: the fixturehookfail markers show an `AfterEach` after the failed `BeforeEach` |
+| `fixture-setup-located-in-runtime` | a failed fixture `BeforeAll` is reported with `tb.Fatalf`, located in the runtime's `hold.go` | lifecycle: the edges setup failure names `hold.go:` |
+| `fixture-teardown-error-left-on-stderr` | a failed fixture `AfterAll` is reported as a bare `fixture teardown failed`, its error only on stderr | lifecycle: the edges teardown line names no fixture, hook or error |
 | `fixture-beforeeach-after-a-fixture-overran` | a fixture's `BeforeEach` starts after an earlier fixture's overran the `Timeout` | canary: the hookoverrun later fixture's `BeforeEach` runs |
 | `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
@@ -293,6 +302,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
 | `go-goexit-unexplained` | a goroutine that left through `runtime.Goexit` with no verdict fails the method without saying why | canary: no failure of the goroutines fixture names the Goexit |
 | `go-skip-reported-as-a-failure` | a goroutine that skipped the test fails the method at the wait | canary: the goroutines fixture's skipping method fails |
+| `go-wait-outside-the-method-timeout` | the wait on a `gotest.Go` goroutine among the method's cleanups is held to no `Timeout` | lifecycle holds suite: the lingering goroutine's method passes |
+| `method-cleanups-held-to-the-timeout` | the method's watch runs through all its cleanups, so a helper's slow cleanup fails it, named as a `gotest.Go` wait | lifecycle holds suite: the slow-cleanup method fails |
 | `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
@@ -307,12 +318,14 @@ shards of one run do not add up to every mutant exactly once.
 | `long-rendering-cut` | two long single-line renderings are shown cut at 160 bytes, hiding a difference past the cut | ring-0 equal suite |
 | `long-unended-line-unmarked` | a long changed last line without a final newline is shown around its difference but without the `\ No newline at end of file` marker | ring-0 equal suite |
 | `method-panic-discarded-by-aftereach` | `gotestruntime.AfterEach` runs AfterEach in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics test method's panic is never reported |
+| `method-panic-carries-a-second-stack` | `gotestruntime.AfterEach` re-raises a method's panic with a stack of its own beside the runtime's traceback, and names no line | ring-0 panic-site suite |
 | `method-panic-recovered` | the method loop swallows a method's panic | canary: the panicking method passes and its sibling runs to the end |
 | `overrun-names-no-phase` | an overrun's verdict does not name the hook that overran | canary: the slow fixture's verdict does not name its `BeforeEach` |
 | `setup-waits-unwatched` | the wait on BeforeAll's goroutines is not held to the SetupTimeout | canary: the setupwaits slow suite gets no SetupTimeout verdict |
 | `shared-fixture-each-hooks-accepted` | a shared fixture another package declares with a `BeforeEach` passes generation, and the hook never runs | cli conformance: the cross-package shared fixture row exits 0 instead of 2 |
+| `suite-afterall-goexit-passes` | a suite `AfterAll` that left through `runtime.Goexit` without a verdict passes | lifecycle holds suite: the Goexit AfterAll suite exits 0 |
 | `suite-beforeeach-after-a-fixture-overran` | the suite's `BeforeEach` runs after a fixture's `BeforeEach` overran the `Timeout` | canary: the slow fixture's suite marks its `BeforeEach` |
-| `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a cleanup before AfterAll | canary: the setupwaits `*testing.T` suite does not pass |
+| `testing-t-hook-misses-the-setup-waits` | `gotest.Go` finds the suite's waits only through the T's context, so a T wrapped around a `*testing.T` hook waits as a plain cleanup, not held to the SetupTimeout | canary: the setupwaits `*testing.T` slow suite gets no SetupTimeout verdict |
 | `timeout-scale-any-value` | a `GOTEST_TIMEOUT_SCALE` that is no number runs the suites unscaled instead of failing them | canary: the `fast` run's methods run instead of failing their suites |
 | `timeout-scale-ignored` | `GOTEST_TIMEOUT_SCALE` multiplies no budget | canary: a 1.5s method and fixture fail their 1s budgets, and the overruns name 1s |
 | `timeout-scale-inherited` | the scale stays in the environment of the processes the tests start | canary: the method reading the environment fails |
@@ -377,6 +390,10 @@ shards of one run do not add up to every mutant exactly once.
 | `config-loaded-before-version` | `.gotest.yml` is loaded before version and help | cli conformance: version exits 2 under a config that does not parse |
 | `scaffold-absolute-path-read-as-relative` | scaffold reads every file path relative to the working directory | cli conformance: an absolute path is not scaffolded beside the file |
 | `beforeall-goroutine-waited-before-afterall` | the waits of goroutines BeforeAll started run before AfterAll | canary: the server suite deadlocks until go test's alarm instead of passing |
+| `beforeall-resources-undone-before-afterall` | the AfterAll cleanup is registered before BeforeAll runs, so BeforeAll's temp dir and Setenv are undone first | ring-0 lifetimes suite |
+| `beforeall-context-ends-at-the-setuptimeout` | BeforeAll's context keeps its SetupTimeout deadline after BeforeAll returned and ends mid-suite | ring-0 lifetimes suite |
+| `beforeall-context-outlives-the-methods` | BeforeAll's context ignores the end of the suite's methods and is still live in AfterAll | ring-0 lifetimes suite |
+| `beforeall-context-never-ends-in-setup` | BeforeAll's context is not ended at the SetupTimeout while BeforeAll waits on it | ring-0 lifetimes suite |
 | `bench-skip-ignored` | a bench run plans and dispatches the benchmark suites `-skip` names | fixtures conformance: the fixture of the benchmark suite `-skip` names still starts |
 | `bytes-one-per-line` | a byte slice that is not text renders one byte per line | ring-0 equal suite |
 | `bytes-text-as-hex` | a byte slice of text renders as hex, so its lines are not diffed as text | ring-0 equal suite |
@@ -393,6 +410,7 @@ shards of one run do not add up to every mutant exactly once.
 | `contains-type-guard-silent` | a slice needle of a type the slice cannot hold is reported absent, not refused | canary: no failure message names both types |
 | `contains-unhashable-key-looked-up` | a needle that is not comparable is looked up in a map, which panics | ring-0 predicates suite |
 | `cut-difference-unnamed` | renderings cut before they differ do not name where the values differ | ring-0 equal suite |
+| `cut-difference-values-unshown` | renderings cut before they differ name the path but not the two values there | ring-0 equal suite |
 | `deadline-from-testing-context` | NewTWithDeadline derives from testing's context, not the suite's | canary: the tighter T outlives the suite's deadline |
 | `deleted-element-misaligned` | a deleted element is marked from its middle into the next one's | ring-0 equal suite |
 | `depth-unnamed` | lines deeper than the indented levels do not name their depth | ring-0 format suite |
@@ -416,11 +434,14 @@ shards of one run do not add up to every mutant exactly once.
 | `indelta-infinities-differ` | `InDelta` fails two equal infinities | canary: the passing fixture's typed-arguments method fails |
 | `indelta-integers-as-float64` | `InDelta` measures signed integers through float64 | ring-0 compare suite |
 | `indelta-nan-delta-passes` | `InDelta` with a NaN delta passes | canary: the failing fixture's NaN-delta method passes |
+| `ordering-nan-operand-passes` | `Less` passes when an operand is NaN | ring-0 compare suite |
 | `jsoneq-exponent-zeros-kept` | `JSONEq` keeps a number's trailing zeros in its digits, so `100` and `1e2` differ | ring-0 predicates suite |
 | `jsoneq-negative-zero-signed` | `JSONEq` keeps the sign of zero, so `-0` and `0` differ | ring-0 predicates suite |
 | `jsoneq-numbers-as-float64` | `JSONEq` decodes numbers into float64 | canary: the failing fixture's big-integer method passes |
 | `jsoneq-numbers-by-spelling` | `JSONEq` compares numbers by spelling | canary: the passing fixture's `1` against `1.0` fails |
 | `jsoneq-trailing-data-accepted` | `JSONEq` ignores what follows the value | ring-0 predicates suite |
+| `jsoneq-invalid-utf8-accepted` | `JSONEq` decodes JSON text that is not valid UTF-8 | ring-0 predicates suite |
+| `jsoneq-named-string-marshaled` | `JSONEq` marshals a named string type instead of reading it as JSON text | ring-0 predicates suite |
 | `long-bytes-unpointed` | two long single-line byte slices of text show no offset of their first difference | ring-0 equal suite |
 | `long-line-unpointed` | a long changed line is shown cut instead of around its first difference | ring-0 equal suite |
 | `long-string-unpointed` | two long single-line strings that differ show no offset of their first difference | ring-0 equal suite |
@@ -469,6 +490,10 @@ shards of one run do not add up to every mutant exactly once.
 | `poll-final-skipped-consistently` | the deadline ends `Consistently` without a last poll | canary: the passing fixture's `Consistently` counts one poll, not two |
 | `snapshot-dir-from-file-only` | the snapshot dir is always beside the caller's file path | canary: under `-trimpath` the `snapshotting` baselines are not found |
 | `snapshot-ext-from-file-only` | the `_ext` suffix comes from opening the caller's file alone | canary: under `-trimpath` the `snapshotting` baselines are not found |
+| `snapshot-poll-recorder-unnamed` | a poll's recorder carries no test name, so a snapshot taken in a poll is filed under `unknown` | ring-0 snapshot internals suite |
+| `snapshot-skipped-method-section-unread` | a method that skipped itself is not recorded, so its section is named unread | lifecycle holds suite: the gated method's section is named |
+| `snapshot-unread-sections-unnamed` | a section no test of the run read is never named | ring-0 snapshot internals suite |
+| `snapshot-unread-named-in-a-narrowed-run` | a run that `-run` narrows to one method names the sections of the others as unread | lifecycle: the narrowed edges run names an unread section |
 | `snapshot-keys-strip-twin-suffix` | a snapshot key drops testing's `#01` and `#0` | canary: twins and unnamed rows share one baseline and the second fails |
 | `snapshot-name-unchecked` | a snapshot name that spans lines is written as it is | canary: the failing fixture's bad name passes |
 | `snapshot-update-switch-any-value` | `GOTEST_UPDATE_SNAPSHOTS=0` rewrites baselines | canary: the stale baseline passes and the file changes |
@@ -493,6 +518,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
 | `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the runner is gone |
+| `stop-ended-method-unsaid` | a method body running when the stop came returns without saying so | lifecycle: the held method's output under plain go test lacks `run stopping: the stop came while this method ran` |
+| `stop-ended-said-of-every-method` | every method body says the stop came while it ran, the one that returned before the stop too | lifecycle: the method done before the stop says the stop came while it ran |
 | `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
 | `stop-releases-before-afterall` | a stop releases the fixtures before the suite's AfterAll runs | canary: the stopped fixture's markers show the release ahead of AfterAll |
 | `stop-grace-past-5s` | a stopped method body that ignores its context gets 15s instead of 5s | canary: the stopgrace run does not say the body was cut short after 5s |
@@ -812,6 +839,7 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-bench-sample-iterations-lost` | a saved sample records 1 iteration, not the ones it ran | conformance: the bench It for saving with --json sees iterations other than 10 |
 | `e2e-bench-report-drops-gate` | the --json report leaves out the gate verdict | conformance: the bench It for comparing under a gate sees no gate |
 | `e2e-helper-caller-line-dropped` | a failure names the innermost user frame, not the caller | canary: the trimpath helper check sees the failure not naming both lines |
+| `user-directory-read-as-gotest` | a frame under any directory named `pkg/gotest` counts as gotest's own, so a user's helper there loses its line | ring-0 helper suite |
 | `e2e-assertion-line-left-to-testing` | testing's location for a failure points into gotest | canary: the trimpath helper check sees the failure not naming both lines |
 | `fixs-external-overlay-dropped` | the overlay leaves out the external test package's harness | fixtures conformance: the external test package's suite never runs |
 | `fixture-program-built-without-the-run-flags` | the shared fixture program is built without the run's build flags | conformance: a fixture behind a build tag does not come up |

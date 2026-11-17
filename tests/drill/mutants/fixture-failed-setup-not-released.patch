@@ -3,15 +3,18 @@ Judge: ./tests/canary CanaryTestSuite/TestAFixtureThatFailedToStartIsReleased
 Clause: when a package fixture's BeforeAll or AfterAll returns an error or panics → fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names
 --- a/pkg/gotestruntime/runtime.go
 +++ b/pkg/gotestruntime/runtime.go
-@@ -151,9 +151,10 @@
+@@ -162,12 +162,13 @@
  	// panicked or cancelled setup included, is released by AfterAll in the
  	// teardown pass. A setup cancelled before then has nothing to release,
  	// and neither has an attempt already released between retries.
 -	if err := runBeforeAllWithRetry(ctx, node, func(held bool) { tracker.setAttempted(node, held) }); err != nil {
 +	if err := runBeforeAllWithRetry(ctx, node, nil); err != nil {
- 		return err
+ 		if ctx.Err() != nil && errors.Is(err, context.Canceled) {
+ 			return err // a victim of another node's failure, or of a stop
+ 		}
+ 		return setupFailure(node, err)
  	}
 +	tracker.setAttempted(node, true)
  	return nil
  }
- 
+

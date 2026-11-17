@@ -14,6 +14,20 @@ import (
 type R struct {
 	failed  bool
 	message string
+	// name is the polling test's, for a poll's recorder; empty otherwise.
+	name string
+}
+
+// nameOf is the test name t answers to: a recorder's polling test, else
+// Name() when t has one, else "".
+func nameOf(t testingT) string {
+	if r, ok := t.(*R); ok {
+		return r.name
+	}
+	if named, ok := t.(interface{ Name() string }); ok {
+		return named.Name()
+	}
+	return ""
 }
 
 func (r *R) Errorf(format string, args ...any) {

@@ -4,13 +4,29 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/mvrahden/go-test/internal/callsite"
 )
 
-// gotestDirMarkers name the directories of gotest's own runtime code: the
-// assertion library and the harness that runs suite methods. Frames from
-// either are machinery, never the user's call site.
+// gotestRoots are the directories of gotest's own runtime code, the
+// assertion library and the harness that runs suite methods, as this file's
+// frames name them: a user's directory of the same name is not one. Nil when
+// the path of this file cannot be cut.
+var gotestRoots = sync.OnceValue(func() []string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil
+	}
+	root, cut := strings.CutSuffix(filepath.ToSlash(file), "pkg/gotest/internal/assert/trace.go")
+	if !cut || root == "" {
+		return nil
+	}
+	return []string{root + "pkg/gotest/", root + "pkg/gotestruntime/"}
+})
+
+// gotestDirMarkers name the same directories by their last elements, for
+// when gotestRoots are unknown.
 var gotestDirMarkers = []string{"/pkg/gotest/", "/pkg/gotestruntime/"}
 
 // CallerFrame returns the user's call site as "file:line",
@@ -74,8 +90,21 @@ func IsBoundary(fn string) bool {
 		strings.HasSuffix(fn, ".ƒƒ_GOTEST_exec")
 }
 
+// IsGotestSource reports whether file, not a test file, is gotest's own:
+// under gotest's pkg/gotest or pkg/gotestruntime, not a directory of the
+// user's named like them. Frames from there are machinery, never the user's
+// call site.
 func IsGotestSource(file string) bool {
 	if strings.HasSuffix(file, "_test.go") {
+		return false
+	}
+	if roots := gotestRoots(); roots != nil {
+		file = filepath.ToSlash(file)
+		for _, root := range roots {
+			if strings.HasPrefix(file, root) {
+				return true
+			}
+		}
 		return false
 	}
 	for _, marker := range gotestDirMarkers {

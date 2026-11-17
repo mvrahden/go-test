@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/runstate"
+	"github.com/mvrahden/go-test/internal/setupwaits"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -27,6 +28,7 @@ type method struct {
 	mu      sync.Mutex
 	watch   *phaseWatch // the watch running now, nil when none
 	expired bool        // the deadline has passed
+	judged  atomic.Bool // the watch failed the method for an overrun
 }
 
 // phaseWatch is one run of a method's watch: done ends it, stopped closes
@@ -34,10 +36,11 @@ type method struct {
 type phaseWatch struct{ done, stopped chan struct{} }
 
 // openMethod builds the T of the method it runs and, with a positive budget,
-// starts its watch; end stops the watch. The T's context ends at timeout, or
-// at the budget when there is one: then only after the watch has judged an
-// overrun, so a hook waiting on that context is still waiting, and located,
-// when the verdict is written.
+// starts its watch; end stops it after the hooks and the body, and from then
+// on only the waits on the method's gotest.Go goroutines restart it. The T's
+// context ends at timeout, or at the budget when there is one: then only
+// after the watch has judged an overrun, so a hook waiting on that context is
+// still waiting, and located, when the verdict is written.
 func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end func()) {
 	if budget <= 0 {
 		m = &method{it: it, t: TestT(it, timeout)}
@@ -61,26 +64,47 @@ func openMethod(it *testing.T, timeout, budget time.Duration) (m *method, end fu
 	m.enter("")
 	// Watching before the timer starts: the deadline then always finds the
 	// watch that judges it.
-	m.watchOn()
+	m.startWatch()
 	timer := time.AfterFunc(budget, m.deadlinePassed)
+	// Registered ahead of the method's own cleanups, this runs after them:
+	// until then the waits on its gotest.Go goroutines are held to the budget.
 	it.Cleanup(func() {
+		setupwaits.Unhold(it)
+		afterTs.Delete(m.t)
+		m.watchOff()
 		timer.Stop()
 		stop()
 		cancel()
 	})
 	return m, func() {
-		afterTs.Delete(m.t)
 		m.watchOff()
+		m.enter("cleanup (the wait on a goroutine started with gotest.Go) ")
+		setupwaits.Hold(it, m.holdWait)
 	}
 }
 
-// watchOn starts the method's watch unless one runs or the deadline has
-// passed, which leaves nothing to hold the method to.
-func (m *method) watchOn() {
+// holdWait holds the wait on a gotest.Go goroutine, running until done
+// closes, to the budget: one the deadline passed while it ran fails the
+// method, unless an overrun failed it already.
+func (m *method) holdWait(done <-chan struct{}) (release func()) {
+	select {
+	case <-done:
+		return func() {}
+	default:
+	}
+	if m.judged.Load() || !m.startWatch() {
+		return func() {}
+	}
+	return m.watchOff
+}
+
+// startWatch starts the method's watch unless one runs, and reports whether
+// it did.
+func (m *method) startWatch() bool {
 	m.mu.Lock()
-	if m.watch != nil || m.expired {
+	if m.watch != nil {
 		m.mu.Unlock()
-		return
+		return false
 	}
 	w := &phaseWatch{done: make(chan struct{}), stopped: make(chan struct{})}
 	m.watch = w
@@ -90,10 +114,11 @@ func (m *method) watchOn() {
 	go func() {
 		defer close(w.stopped)
 		if watchDeadline(m.it, m.gid, m.budget, m.phaseName, "Timeout", m.due, w.done) {
-			m.ctx.end(context.DeadlineExceeded)
-			m.after.end(context.DeadlineExceeded)
+			m.judged.Store(true)
+			m.expire()
 		}
 	}()
+	return true
 }
 
 // watchOff ends the watch running now, if any. Only the method's goroutine
@@ -114,8 +139,7 @@ func (m *method) watchOff() {
 	expired := m.expired
 	m.mu.Unlock()
 	if expired {
-		m.ctx.end(context.DeadlineExceeded)
-		m.after.end(context.DeadlineExceeded)
+		m.expire()
 	}
 }
 
@@ -128,9 +152,15 @@ func (m *method) deadlinePassed() {
 	watching := m.watch != nil
 	m.mu.Unlock()
 	if !watching {
-		m.ctx.end(context.DeadlineExceeded)
-		m.after.end(context.DeadlineExceeded)
+		m.expire()
 	}
+}
+
+// expire ends the method's contexts at its deadline, AfterEach's first: a
+// hook woken by the method's context may return, and AfterEach start, at once.
+func (m *method) expire() {
+	m.after.end(context.DeadlineExceeded)
+	m.ctx.end(context.DeadlineExceeded)
 }
 
 // afterTs holds, per running budgeted method's T, the T its AfterEach gets.
@@ -178,6 +208,7 @@ type budgetContext struct {
 	cancel   context.CancelCauseFunc
 	values   context.Context
 	deadline time.Time
+	dropped  atomic.Bool
 	done     chan struct{}
 	once     sync.Once
 	err      atomic.Pointer[error]
@@ -192,13 +223,30 @@ func newBudgetContext(parent context.Context, deadline time.Time) *budgetContext
 	return c
 }
 
-func (c *budgetContext) Deadline() (time.Time, bool) { return c.deadline, true }
-func (c *budgetContext) Done() <-chan struct{}       { return c.done }
-func (c *budgetContext) Value(key any) any           { return c.values.Value(key) }
+func (c *budgetContext) Done() <-chan struct{} { return c.done }
+func (c *budgetContext) Value(key any) any     { return c.values.Value(key) }
+
+func (c *budgetContext) Deadline() (time.Time, bool) {
+	if c.dropped.Load() {
+		return time.Time{}, false
+	}
+	return c.deadline, true
+}
+
+// dropDeadline withdraws the deadline: Deadline reports none from then on.
+// It bends context.Context's "successive calls return the same results", on
+// purpose: a deadline left in the past would time out every later use.
+func (c *budgetContext) dropDeadline() { c.dropped.Store(true) }
 
 func (c *budgetContext) Err() error {
 	if err := c.err.Load(); err != nil {
 		return *err
+	}
+	// The parent's end reaches end on an AfterFunc goroutine; a read right
+	// after it must already see it.
+	if err := c.values.Err(); err != nil {
+		c.end(err)
+		return *c.err.Load()
 	}
 	return nil
 }

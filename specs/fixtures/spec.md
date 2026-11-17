@@ -56,6 +56,17 @@ A package fixture whose BeforeAll returns an error or panics SHALL fail the run 
 - **WHEN** a package fixture's BeforeAll or AfterAll returns an error or panics
 - **THEN** fails the run with exit 1, runs the hooks its row names and gives the verdicts its row names
 
+### Requirement: A fixture hook that leaves through runtime.Goexit
+A package fixture's BeforeAll or AfterAll that leaves through runtime.Goexit, as a FailNow on a testing.TB does, SHALL fail the run as one that returned an error does.
+
+#### Scenario: BeforeAll leaves through runtime.Goexit
+- **WHEN** a package fixture's BeforeAll leaves through runtime.Goexit
+- **THEN** fails the suite, which never opens, saying how the hook left, and still runs the fixture's AfterAll
+
+#### Scenario: AfterAll leaves through runtime.Goexit
+- **WHEN** a package fixture's AfterAll leaves through runtime.Goexit
+- **THEN** fails the run after every other hook ran
+
 ### Requirement: Where a fixture hook failure is reported
 An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook's declaration, not inside the runtime, wherever it is declared: in the suite's package or in another package. The file is named by its base name, or by its full path under -fullpath.
 
@@ -75,6 +86,17 @@ An error a fixture BeforeEach or AfterEach returns SHALL be reported at the hook
 - **WHEN** a hook another package declares returns an error under -fullpath
 - **THEN** names the hook's file by its full path, as go test -fullpath does
 
+### Requirement: What a failed fixture BeforeAll or AfterAll says
+A package fixture's BeforeAll or AfterAll that fails SHALL be reported in the output of the suite's test, naming the fixture, the hook and the error, and never located in a file of the runtime.
+
+#### Scenario: A fixture BeforeAll error
+- **WHEN** a package fixture's BeforeAll returns an error
+- **THEN** the suite's output names the fixture, the hook and the error, and no file of the runtime
+
+#### Scenario: A fixture AfterAll error
+- **WHEN** a package fixture's AfterAll returns an error
+- **THEN** the suite's output names the fixture, the hook and the error, and no file of the runtime
+
 ### Requirement: Fixture per-method hooks in dependency order
 A suite's package fixtures SHALL take their per-method turns in dependency order, a fixture's turn coming only once every BeforeEach before it returned without an error inside the Timeout. In its turn a fixture runs its BeforeEach, if it has one; its AfterEach SHALL run, in reverse, exactly when its turn came and that BeforeEach returned without an error.
 
@@ -89,6 +111,17 @@ A suite's package fixtures SHALL take their per-method turns in dependency order
 #### Scenario: An AfterEach-only fixture after the one that fails
 - **WHEN** a fixture with only an AfterEach comes after a fixture whose BeforeEach fails
 - **THEN** does not run its AfterEach, as its turn never came
+
+### Requirement: The context a fixture's AfterEach gets
+A fixture's AfterEach SHALL get a context that a stop does not end and that, when the suite declares a Timeout, ends at it, as its BeforeEach's does; under the default deadline its context SHALL not end with the method's.
+
+#### Scenario: An AfterEach that waits on its context
+- **WHEN** a fixture's AfterEach waits on its context past the method's Timeout
+- **THEN** its context ends at the Timeout and the method fails at that hook
+
+#### Scenario: An AfterEach after the default deadline
+- **WHEN** a method of a suite that declares no Timeout runs past the default deadline and its fixture's AfterEach returns its context's error
+- **THEN** that context has not ended and the method passes
 
 ### Requirement: A failed shared setup is released
 A shared fixture whose setup fails on its last attempt SHALL fail the run and SHALL run its AfterAll after every attempt, before the next one starts.
