@@ -296,7 +296,20 @@ func (s *SnapshotInternalsTestSuite) TestExternalBySymbol(t *gotest.T) {
 }
 
 func (s *SnapshotInternalsTestSuite) TestMatchSnapshot_InAPollIsKeyedByItsTest(t *gotest.T) {
-	gotest.MatchSnapshot(gotest.ExportNamedR("TestOrdersTestSuite/TestTotal"), "polled", "in a poll")
+	// GOTEST_CI=0: the poll writes a fresh baseline, which CI mode refuses.
+	t.Setenv("GOTEST_CI", "0")
+	// A poll runs on a goroutine of its own, so the recorder's FailNow ends
+	// that goroutine and its message is read here.
+	poll := gotest.ExportNamedR("TestOrdersTestSuite/TestTotal")
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		gotest.MatchSnapshot(poll, "polled", "in a poll")
+	}()
+	<-done
+	if poll.Failed() {
+		t.Errorf("MatchSnapshot failed in the poll: %s", poll.Message())
+	}
 	data, err := os.ReadFile(s.snap("TestOrdersTestSuite_ext.snap"))
 	if err != nil || !strings.Contains(string(data), "=== SNAP TestTotal in a poll ===\npolled\n") {
 		t.Errorf("a poll's snapshot was not filed under its test: %v\n%s", err, data)
