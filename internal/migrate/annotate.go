@@ -315,7 +315,7 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 		}
 		switch {
 		case !mapped:
-			return "unmapped assertion " + name + " — convert manually"
+			return unmappedReason(name)
 		case why(call.Args) != "":
 			return why(call.Args)
 		case spread != "":
@@ -330,7 +330,7 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 		if u.isPkg(x, assertPkg, requirePkg) {
 			switch {
 			case related && !mapped && isTestifyAssertionName(name):
-				return "unmapped assertion " + name + " — convert manually"
+				return unmappedReason(name)
 			case related && mapped && len(call.Args) > 0 && why(call.Args[1:]) != "":
 				return why(call.Args[1:])
 			}
@@ -366,7 +366,7 @@ func (u *unit) unconvertedCall(f *ast.File, call *ast.CallExpr, tName, kind stri
 		case isTestifyAssertionName(name) && mapped:
 			return "unconverted assertion " + name + " — rewrite as gotest." + gotestName + "(" + tName + ", ...)"
 		case isTestifyAssertionName(name):
-			return "unmapped assertion " + name + " — convert manually"
+			return unmappedReason(name)
 		}
 	}
 	return ""
@@ -495,4 +495,12 @@ func leadingWhitespace(s string) string {
 		}
 	}
 	return s
+}
+
+// unmappedReason is the marker of an assertion migrate has no gotest form for.
+func unmappedReason(name string) string {
+	if name == "NotPanics" || name == "NotPanicsf" {
+		return "NotPanics has no gotest form — call the function directly: a panic fails the test, and under gotest it ends the suite's remaining methods too"
+	}
+	return "unmapped assertion " + name + " — convert manually"
 }

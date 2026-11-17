@@ -87,6 +87,62 @@ func rerun(t *gotest.T, run pkgRun) []migrate.MigrateResult {
 	return results
 }
 
+// commentsSrc holds line comments beside calls migrate converts.
+const commentsSrc = `package sample
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type item struct{ n int }
+
+type SampleSuite struct {
+	suite.Suite
+}
+
+func (s *SampleSuite) TestComments() {
+	s.NotNil(item{}) // always passes in testify
+	s.Zero(item{})
+	s.Equal(1, // first
+		1,
+	)
+	s.Equalf(1, 1, "n=%d", 1) // f
+	var v any = 1
+	n := 1 // count
+	s.Equal(v, n)
+}
+
+func TestSampleSuite(t *testing.T) {
+	suite.Run(t, new(SampleSuite))
+}
+`
+
+func (s *MigrateTestSuite) TestTrailingComments(t *gotest.T) {
+	t.When("a trailing comment follows a converted call", func(w *gotest.T) {
+		run := s.migrateFile(w, commentsSrc)
+		out := run.files["sample/sample_test.go"]
+
+		w.It("stays on the unconverted statement before it", func(it *gotest.T) {
+			gotest.Regexp(it, `\n\ts\.NotNil\(item\{\}\) // always passes in testify\n\tgotest\.Zero\(t, item\{\}\)\n`, out)
+		})
+		w.It("stays after the first argument of a call spread over lines", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tgotest.Equal(t, 1, // first\n\t\t1,\n\t)\n")
+		})
+		w.It("stays at the end of a formatted variant", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tgotest.Equal(t, 1, 1, \"n=%d\", 1) // f\n")
+		})
+		w.It("stays on its line before a call whose callee is instantiated", func(it *gotest.T) {
+			gotest.Contains(it, out, "\tn := 1 // count\n\tgotest.Equal[any](t, v, n)\n")
+		})
+		w.It("is left in place by a second migration", func(it *gotest.T) {
+			rerun(it, run)
+			gotest.Equal(it, out, readFiles(it, run.dir, run.files)["sample/sample_test.go"])
+		})
+	})
+}
+
 func (s *MigrateTestSuite) TestTodoMarkers(t *gotest.T) {
 	t.When("a suite has unconvertible hooks and assertions", func(w *gotest.T) {
 		out := s.migrateSource(w, todoInputSrc)
@@ -542,7 +598,7 @@ func (s *MigrateTestSuite) TestScopedRewrites(t *gotest.T) {
 
 		w.It("migrates the child and reports the base as a helper", func(it *gotest.T) {
 			gotest.Len(it, run.results, 2)
-			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true}, run.results[0])
+			gotest.Equal(it, migrate.MigrateResult{File: run.results[0].File, OldName: "BaseSuite", NewName: "BaseSuite", Helper: true, Soft: 1}, run.results[0])
 			gotest.Equal(it, "OrderTestSuite", run.results[1].NewName)
 			gotest.Zero(it, run.markers())
 		})

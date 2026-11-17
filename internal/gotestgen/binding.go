@@ -2,6 +2,7 @@ package gotestgen
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"path/filepath"
 	"sort"
@@ -39,6 +40,9 @@ type BoundFixture struct {
 	// is reported.
 	BeforeEachAt string
 	AfterEachAt  string
+	// EachHooksUsingFixture names the per-method hooks whose body uses the
+	// fixture: "BeforeEach", "AfterEach".
+	EachHooksUsingFixture []string
 
 	TransferFields []string // shared fixtures only
 	LocalFields    []string // shared fixtures only
@@ -159,6 +163,14 @@ func bind(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestas
 				for _, fm := range fixtures {
 					if bad := findHookedFixture(fm.resolved); bad != nil {
 						return nil, gotestast.At(suite.Pos(), fmt.Errorf("suite %s has fuzz methods but fixture %s defines BeforeEach/AfterEach — per-execution fixture hooks are not supported for fuzz targets", suite.Identifier(), bad.Identifier))
+					}
+				}
+			}
+
+			for _, fm := range fixtures {
+				if bad := findFixture(fm.resolved, func(f *BoundFixture) bool { return len(f.EachHooksUsingFixture) > 0 }); bad != nil {
+					if err := gotestast.ParallelFixtureHooks(suite, bad.Named.Obj().Name(), bad.EachHooksUsingFixture); err != nil {
+						return nil, gotestast.At(suite.Pos(), err)
 					}
 				}
 			}
@@ -310,6 +322,23 @@ func findHookedFixture(rf *BoundFixture) *BoundFixture {
 	return nil
 }
 
+// findFixture returns rf or the first of its transitive parents match holds
+// for, or nil.
+func findFixture(rf *BoundFixture, match func(*BoundFixture) bool) *BoundFixture {
+	if rf == nil {
+		return nil
+	}
+	if match(rf) {
+		return rf
+	}
+	for _, p := range rf.Parents {
+		if found := findFixture(p, match); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
 func hasChildSuitesRecursive(rf *BoundFixture) bool {
 	if len(rf.ChildSuites) > 0 {
 		return true
@@ -456,6 +485,21 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		HasHydrate:   declaredMethod(named, "Hydrate") != nil,
 		HasDehydrate: declaredMethod(named, "Dehydrate") != nil,
 		HasConfig:    detectConfigMethod(named, kind),
+	}
+
+	for _, hook := range []string{"BeforeEach", "AfterEach"} {
+		if declaredMethod(named, hook) == nil {
+			continue
+		}
+		// without the source, the hook is taken to use the fixture
+		var decl *ast.FuncDecl
+		var info *types.Info
+		if pkg != nil {
+			decl, info = gotestast.FindMethodDecl(pkg, baseName, hook), pkg.TypesInfo
+		}
+		if gotestast.HookUsesReceiver(decl, info) {
+			rf.EachHooksUsingFixture = append(rf.EachHooksUsingFixture, hook)
+		}
 	}
 
 	if isLocal {
@@ -728,14 +772,6 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		return nil
 	}
 
-	var allExported []string
-	for i := 0; i < st.NumFields(); i++ {
-		f := st.Field(i)
-		if f.Exported() && !f.Anonymous() {
-			allExported = append(allExported, f.Name())
-		}
-	}
-
 	var localFields map[string]bool
 	if hasHydrate {
 		pkg := r.findPackageForType(named)
@@ -744,6 +780,20 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 			if hydrateDecl != nil {
 				localFields = gotestast.ClassifyLocalFieldsRaw(hydrateDecl, baseName, pkg.Syntax, pkg.TypesInfo)
 			}
+		}
+	}
+
+	var allExported []string
+	for i := 0; i < st.NumFields(); i++ {
+		f := st.Field(i)
+		if f.Anonymous() {
+			if err := gotestast.EmbeddedFieldError(identifier, f, localFields, typePkg); err != nil {
+				return err
+			}
+			continue
+		}
+		if f.Exported() {
+			allExported = append(allExported, f.Name())
 		}
 	}
 
@@ -806,7 +856,7 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		for i := 0; i < st.NumFields(); i++ {
 			f := st.Field(i)
 			if f.Name() == fieldName {
-				if err := validateTransferFieldType(identifier, f); err != nil {
+				if err := gotestast.TransferFieldError(identifier, f); err != nil {
 					return err
 				}
 				break
@@ -872,54 +922,6 @@ func (r *binder) findLocalSpec(rf *BoundFixture) *gotestast.FixtureSpec {
 		}
 	}
 	return nil
-}
-
-func validateTransferFieldType(fixtureName string, field *types.Var) error {
-	if reason := nonSerializable(field.Type()); reason != "" {
-		return fmt.Errorf("shared fixture %q: transfer field %q has non-JSON-serializable type %s (%s) — assign it in Hydrate to make it a local field instead", fixtureName, field.Name(), field.Type(), reason)
-	}
-	return nil
-}
-
-func nonSerializable(t types.Type) string {
-	switch u := t.Underlying().(type) {
-	case *types.Chan:
-		return "channel"
-	case *types.Signature:
-		return "function"
-	case *types.Array:
-		return nonSerializable(u.Elem())
-	case *types.Slice:
-		return nonSerializable(u.Elem())
-	case *types.Map:
-		if r := nonSerializable(u.Key()); r != "" {
-			return r + " in map key"
-		}
-		if !isJSONMapKey(u.Key()) {
-			return "non-string/integer map key"
-		}
-		return nonSerializable(u.Elem())
-	case *types.Pointer:
-		return nonSerializable(u.Elem())
-	case *types.Struct:
-		for i := 0; i < u.NumFields(); i++ {
-			f := u.Field(i)
-			if !f.Exported() {
-				continue
-			}
-			if r := nonSerializable(f.Type()); r != "" {
-				return r + " in field " + f.Name()
-			}
-		}
-	}
-	return ""
-}
-
-func isJSONMapKey(t types.Type) bool {
-	if u, ok := t.Underlying().(*types.Basic); ok {
-		return u.Info()&(types.IsString|types.IsInteger) != 0
-	}
-	return false
 }
 
 // topoSortSharedFixtures returns shared fixtures sorted in topological order

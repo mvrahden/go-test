@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"go/types"
 
+	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/typeclass"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -139,4 +140,38 @@ func (s *TypeClassTestSuite) TestErrors(t *gotest.T) {
 			gotest.Equal(it, row.implements, typeclass.ImplementsError(row.typ), "ImplementsError(%s)", row.typ)
 		}
 	})
+}
+
+func (s *TypeClassTestSuite) TestCaseHandle(t *gotest.T) {
+	gotestPkg := types.NewPackage(about.Repo+"/pkg/gotest", "gotest")
+	testingPkg := types.NewPackage("testing", "testing")
+	otherPkg := types.NewPackage("example.com/other", "other")
+	in := func(pkg *types.Package, n string) types.Type {
+		return types.NewNamed(types.NewTypeName(token.NoPos, pkg, n, nil), types.NewStruct(nil, nil), nil)
+	}
+	ptr := func(t types.Type) types.Type { return types.NewPointer(t) }
+	rows := []struct {
+		Desc   string
+		typ    types.Type
+		handle typeclass.Handle
+		stdlib bool
+	}{
+		{"*gotest.T", ptr(in(gotestPkg, "T")), typeclass.TestHandle, false},
+		{"*gotest.B", ptr(in(gotestPkg, "B")), typeclass.BenchHandle, false},
+		{"*gotest.F", ptr(in(gotestPkg, "F")), typeclass.FuzzHandle, false},
+		{"*testing.T", ptr(in(testingPkg, "T")), typeclass.TestHandle, true},
+		{"*testing.B", ptr(in(testingPkg, "B")), typeclass.BenchHandle, true},
+		{"an alias of *gotest.T", alias("TP", ptr(in(gotestPkg, "T"))), typeclass.TestHandle, false},
+		{"a pointer to an alias of gotest.T", ptr(alias("TA", in(gotestPkg, "T"))), typeclass.TestHandle, false},
+		{"gotest.T by value", in(gotestPkg, "T"), typeclass.NoHandle, false},
+		{"*gotest.R", ptr(in(gotestPkg, "R")), typeclass.NoHandle, false},
+		{"*testing.M", ptr(in(testingPkg, "M")), typeclass.NoHandle, false},
+		{"a T of another package", ptr(in(otherPkg, "T")), typeclass.NoHandle, false},
+		{"a T of no package", ptr(named("T", types.NewStruct(nil, nil))), typeclass.NoHandle, false},
+	}
+	for it, row := range gotest.Each(t, rows) {
+		h, stdlib := typeclass.CaseHandle(row.typ)
+		gotest.Equal(it, row.handle, h)
+		gotest.Equal(it, row.stdlib, stdlib)
+	}
 }

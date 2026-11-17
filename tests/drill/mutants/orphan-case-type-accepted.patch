@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / a type nothing calls them on is refused at its first such method, told which suffix makes it a suite \(
+Clause: when a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite → a type nothing calls them on is refused at its first such method, told which suffix makes it a suite
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -149,7 +149,7 @@
+ 	}
+ 	for _, p := range casePrefixes {
+ 		if strings.HasPrefix(stripped, p.prefix) {
+-			return p, h == p.handle
++			return p, false && h == p.handle
+ 		}
+ 	}
+ 	return c, false

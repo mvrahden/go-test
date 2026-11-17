@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / one taking the T, B or F of that case is refused at the method, told to add a name \(
+Clause: when a suite declares a method named exactly Test, Benchmark or Fuzz → one taking the T, B or F of that case is refused at the method, told to add a name
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -731,7 +731,7 @@
+ 	// case's T is refused below, as go vet refuses such a test
+ 	misnamed := !IsGoTestName(m.Name())
+ 	// a case prefix alone is no case either, and is refused the same way
+-	bare := isBareCaseName(m.Name())
++	bare := false && isBareCaseName(m.Name())
+ 	if ok := IS_TEST_SUITE_METHOD.MatchString(m.Name()); !ok && !misnamed && !bare {
+ 		return -1, nil
+ 	}

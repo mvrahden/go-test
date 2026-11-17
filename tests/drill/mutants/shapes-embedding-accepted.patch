@@ -1,6 +1,6 @@
 Expect: shapes embedsuite: exit code
 Expect: shapes embedfixture: exit code
-Expect: shapes embedhooks: exit code
+Expect: shapes embedhooks: no line matches
 Expect: shapes fixtureembeds: exit code
 Judge: ./tests/canary CanaryDiscoveryTestSuite/TestDiscoveryShapesAreRejectedWhereWritten
 Clause: when a suite or fixture is declared → a suite embedding a suite is rejected at the field and pointed to contract suites

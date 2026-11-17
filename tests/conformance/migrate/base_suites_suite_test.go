@@ -441,3 +441,95 @@ func testifyFindings(t *gotest.T, stdout string) []string {
 	}
 	return got
 }
+
+// overriddenSrc is a base whose tests the children override in part, a
+// base a runner runs itself, and their children.
+const overriddenSrc = `package p
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type BaseSuite struct{ suite.Suite }
+
+func (b *BaseSuite) TestShadowed() { fmt.Println("RAN base TestShadowed") }
+
+func (b *BaseSuite) TestAPartly() { fmt.Println("RAN base TestAPartly") }
+
+func (b *BaseSuite) TestCalled() { fmt.Println("RAN base TestCalled") }
+
+type ASuite struct{ BaseSuite }
+
+func (s *ASuite) TestAPartly() { fmt.Println("RAN A TestAPartly") }
+
+func (s *ASuite) TestCalled() { s.BaseSuite.TestCalled() }
+
+func (s *ASuite) TestShadowed() { fmt.Println("RAN A TestShadowed") }
+
+type BSuite struct{ BaseSuite }
+
+func (s *BSuite) TestCalled() { fmt.Println("RAN B TestCalled") }
+
+func (s *BSuite) TestShadowed() { fmt.Println("RAN B TestShadowed") }
+
+func TestA(t *testing.T) { suite.Run(t, new(ASuite)) }
+
+func TestB(t *testing.T) { suite.Run(t, new(BSuite)) }
+`
+
+// ranBaseSrc is a base a runner runs itself, beside the child that
+// overrides its test.
+const ranBaseSrc = `package q
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type RanSuite struct{ suite.Suite }
+
+func (r *RanSuite) TestShadowed() { fmt.Println("RAN ran-base TestShadowed") }
+
+type CSuite struct{ RanSuite }
+
+func (s *CSuite) TestShadowed() { fmt.Println("RAN C TestShadowed") }
+
+func TestRan(t *testing.T) { suite.Run(t, new(RanSuite)) }
+
+func TestC(t *testing.T) { suite.Run(t, new(CSuite)) }
+`
+
+func (s *MigrateBaseSuitesTestSuite) TestABaseTestEveryChildOverrides(t *gotest.T) {
+	t.When("a base no runner runs declares a test that every suite embedding it overrides and nothing calls", func(w *gotest.T) {
+		dir, mig, run := s.migrateAndRun(w, map[string]string{"p/a_test.go": overriddenSrc})
+		out := readFile(w, dir, "p/a_test.go")
+		w.It("migrate removes it and names it in the closing summary, since testify never ran it", func(it *gotest.T) {
+			gotest.Equal(it, 0, mig.Exit, "stdout: %s\nstderr: %s\n%s", mig.Stdout, mig.Stderr, out)
+			gotest.NotContains(it, out, "func (b *BaseSuite) TestShadowed(")
+			gotest.Contains(it, mig.Stdout, "  tests a base declared that testify never ran, as every suite embedding it declares its own, removed:\n"+
+				"    "+filepath.FromSlash("p/a_test.go")+":12: BaseSuite.TestShadowed\n")
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+		})
+		w.It("a base test only some children override, one something calls, and the tests of a base a runner runs are kept", func(it *gotest.T) {
+			gotest.Contains(it, out, "func (b *BaseSuite) TestAPartly(t *gotest.T) {")
+			gotest.Contains(it, out, "func (b *BaseSuite) TestCalled(t *gotest.T) {")
+			gotest.Equal(it, "pass", run.Verdict("TestBTestSuite/TestAPartly"), "stdout: %s", run.Stdout)
+			gotest.Contains(it, run.Stdout, "RAN base TestCalled")
+			// A base a runner runs stays a suite; only its migrated source
+			// is read here.
+			ran := it.TempDir()
+			gotest.NoError(it, s.Mod.Write(ran, map[string]string{"q/a_test.go": ranBaseSrc}))
+			ranMig, err := testkit.RunCLIWithEnv(it.Context(), ran, moduleEnv, "migrate", "./...")
+			gotest.NoError(it, err)
+			gotest.Contains(it, readFile(it, ran, "q/a_test.go"), "func (r *RanTestSuite) TestShadowed(t *gotest.T) {")
+			gotest.NotContains(it, ranMig.Stdout, "removed:")
+			gotest.NotContains(it, mig.Stdout, "BaseSuite.TestAPartly")
+			gotest.NotContains(it, mig.Stdout, "BaseSuite.TestCalled")
+		})
+	})
+}

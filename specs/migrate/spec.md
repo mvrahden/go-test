@@ -6,7 +6,7 @@ What `gotest migrate` makes of testify suites: the code it writes, what it leave
 ## Requirements
 
 ### Requirement: Base suites
-Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets to a fresh base: the child SHALL hold the base in a named field and declare the hooks and tests testify ran on it through the base, the base SHALL become a helper type gotest does not run, a TestSuite suffix renamed SuiteHelper, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
+Migrate SHALL convert a testify suite embedding a base suite of the migrated test files, generic or not, by value or by a pointer each suite.Run sets afresh: the child SHALL hold the base in a named field and carry over only the hooks and tests testify ran on it, the base SHALL become a helper type gotest does not run, a TestSuite suffix renamed SuiteHelper, less the tests no suite ran, a child method calling a base method that gains t SHALL gain t, and no marker SHALL be left for the embedding.
 
 #### Scenario: A child of a base suite
 - **WHEN** a testify suite embeds a base suite of the migrated test files
@@ -26,6 +26,11 @@ Migrate SHALL convert a testify suite embedding a base suite of the migrated tes
 #### Scenario: A child's method calling the base
 - **WHEN** a method of the child without t calls a base method that gains t
 - **THEN** the method gains t, its callers pass it, and the migrated child runs without a marker
+
+#### Scenario: A base test every child overrides
+- **WHEN** a base no runner runs declares a test that every suite embedding it overrides and nothing calls
+- **THEN** migrate removes it and names it in the closing summary, since testify never ran it
+- **AND** a base test only some children override, one something calls, and the tests of a base a runner runs are kept
 
 ### Requirement: Base suites left as they are
 Migrate SHALL leave a suite's file unconverted under a marker giving the reason when its base cannot carry over: an embedding by any other pointer, which gotest's new leaves nil; a local or anonymous struct embedding a base, as gotest runs only package-level suites; a base in a non-test file of the suite's directory, as migrate changes only test files; a helper name already taken. A base of a package in another directory SHALL make migrate exit 2, naming its package, with nothing written.
@@ -47,7 +52,7 @@ Migrate SHALL leave a suite's file unconverted under a marker giving the reason 
 - **THEN** migrate exits 2 naming the base's package and writes nothing
 
 ### Requirement: Kept verdicts
-Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way.
+Migrate SHALL translate a testify assertion, hook or call only where gotest gives the verdict and the guarantees testify gave. Where a mechanical translation would change what a test passes or fails on, or what runs when, migrate SHALL leave the code unconverted or marked under a `TODO(gotest-migrate)` marker that gives the reason and names the gotest way. An assertion that let the test go on after failing is translated into gotest's, which stops it, and counted in the closing summary.
 
 #### Scenario: An assertion on a goroutine
 - **WHEN** an assertion runs on a goroutine a go statement starts
@@ -89,6 +94,11 @@ Migrate SHALL translate a testify assertion, hook or call only where gotest give
 #### Scenario: InDelta where a NaN decides
 - **WHEN** InDelta compares two values that may both be NaN, or takes a delta that may be NaN
 - **THEN** migrate leaves it unconverted under a marker naming the NaN
+
+#### Scenario: Assertions with an exact gotest form
+- **WHEN** a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer
+- **THEN** migrate writes gotest.Fail, gotest.TimeWithin, and gotest.Greater and gotest.Less against 0, and the result compiles
+- **AND** Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason
 
 #### Scenario: TearDownSuite after a SetupSuite that can stop early
 - **WHEN** a suite declares TearDownSuite and a SetupSuite that can stop early
@@ -143,3 +153,18 @@ Migrate SHALL remove the testify imports nothing uses any more, with the comment
 #### Scenario: A comment on a removed import
 - **WHEN** an import migrate removes carries a comment on its line or above it
 - **THEN** the comment goes with the import and the file stays as gofmt formats it
+
+### Requirement: Comments
+Migrate SHALL keep a comment that trails a statement at the end of that statement, whether it converts the statement or the one after it.
+
+#### Scenario: Comments trailing converted calls
+- **WHEN** line comments trail assertions migrate converts and an s.Run call it turns into t.It
+- **THEN** each comment stays at the end of its own statement
+
+### Requirement: The closing summary
+After it migrates a suite, migrate SHALL say on stdout what it did not keep: the number of assertions that let a test go on after failing and now stop it, the number of stdlib tests it left in the migrated files, which gotest does not run, each go test id that changed beside its new id, and each base test it removed, at its file and line. It SHALL print none of this where there is none.
+
+#### Scenario: What migrate did not keep
+- **WHEN** migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test
+- **THEN** the summary counts the assertions that now stop the test and the stdlib tests left, and lists the id that changed
+- **AND** a migration with none of these prints no such section

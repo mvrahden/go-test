@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / a fixture whose Hydrate assigns every one of them runs with its state \(
+Clause: when Hydrate assigns the fields a shared fixture's embedded struct promotes → a fixture whose Hydrate assigns every one of them runs with its state
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -22,7 +22,7 @@
+ 	fields := promotedExported(f.Type(), hydrated, map[types.Type]bool{})
+ 	var missing []string
+ 	for _, name := range fields {
+-		if !hydrated[name] {
++		if true || !hydrated[name] {
+ 			missing = append(missing, name)
+ 		}
+ 	}

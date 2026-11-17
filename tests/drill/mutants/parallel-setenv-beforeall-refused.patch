@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery ParallelShapes .* / a call in BeforeAll runs and its value reaches every method \(
+Clause: when a suite with Parallel: true calls Setenv on a T → a call in BeforeAll runs and its value reaches every method
+--- a/internal/gotestast/parallel.go
++++ b/internal/gotestast/parallel.go
+@@ -57,7 +57,7 @@
+ 	if !ts.th.ConfigParallel {
+ 		return nil
+ 	}
+-	methods := []*TestSuiteMethod{ts.th.BeforeEach, ts.th.AfterEach}
++	methods := []*TestSuiteMethod{ts.th.BeforeEach, ts.th.AfterEach, ts.th.BeforeAll}
+ 	for _, tc := range ts.th.TestCases {
+ 		if !tc.IsExcluded() {
+ 			methods = append(methods, tc)

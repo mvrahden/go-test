@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / a run on a platform the file is not for runs the package \(
+Clause: when the only caller of a helper, or the only alias of a generic suite, is in a test file a build constraint leaves out → a run on a platform the file is not for runs the package
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -114,7 +114,7 @@
+ 				}
+ 				method := decl.Name.Name
+ 				c, ok := caseOf(method, fn.Signature())
+-				if !ok || called[key+"."+method] || calledByName[method] || selectedLeftOut[method] {
++				if !ok || called[key+"."+method] || calledByName[method] || selectedLeftOut == nil {
+ 					continue
+ 				}
+ 				if f := byType[key]; f != nil {

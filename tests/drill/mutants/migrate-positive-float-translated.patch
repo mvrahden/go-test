@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / AssertionsWithAnExactGotestForm / when a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer / Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason \(
+Clause: when a suite calls FailNow or Fail with one message, WithinDuration, and Positive or Negative on an integer → Fail with a second message, Positive on a float and NotPanics stay unconverted under markers giving the reason
+--- a/internal/migrate/assertmap.go
++++ b/internal/migrate/assertmap.go
+@@ -29,7 +29,7 @@
+ 	case "Positive", "Negative":
+ 		// testify fails both on NaN; an integer, never NaN, keeps the verdict.
+ 		t := u.info.TypeOf(args[0])
+-		if b, ok := underOrNil(t).(*types.Basic); !ok || b.Info()&types.IsInteger == 0 {
++		if b, ok := underOrNil(t).(*types.Basic); false && (!ok || b.Info()&types.IsInteger == 0) {
+ 			ts := "an operand of unknown type"
+ 			if t != nil {
+ 				ts = types.TypeString(t, types.RelativeTo(u.pkgOf(f)))

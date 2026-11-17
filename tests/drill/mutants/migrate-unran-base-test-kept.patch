@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ABaseTestEveryChildOverrides / when a base no runner runs declares a test that every suite embedding it overrides and nothing calls / migrate removes it and names it in the closing summary, since testify never ran it \(
+Clause: when a base no runner runs declares a test that every suite embedding it overrides and nothing calls → migrate removes it and names it in the closing summary, since testify never ran it
+--- a/internal/migrate/transform.go
++++ b/internal/migrate/transform.go
+@@ -34,7 +34,6 @@
+ 		}
+ 	}
+ 	changed := u.derefPtrEmbeds(f)
+-	changed = u.dropUnran(f) || changed
+ 	changed = u.rewriteEmbedded(f) || changed
+ 
+ 	// A base kept as a helper under a name gotest would run is renamed

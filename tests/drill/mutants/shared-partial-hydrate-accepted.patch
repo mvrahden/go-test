@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / one whose Hydrate assigns only some is refused at the field, naming the fields it does not \(
+Clause: when Hydrate assigns the fields a shared fixture's embedded struct promotes → one whose Hydrate assigns only some is refused at the field, naming the fields it does not
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -26,7 +26,7 @@
+ 			missing = append(missing, name)
+ 		}
+ 	}
+-	if len(missing) == 0 {
++	if len(missing) < len(fields) || len(missing) == 0 {
+ 		return nil
+ 	}
+ 	typ := types.TypeString(f.Type(), types.RelativeTo(in))

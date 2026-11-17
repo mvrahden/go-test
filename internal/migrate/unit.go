@@ -32,6 +32,9 @@ type unitFile struct {
 	// generated: the file is headed "Code generated ... DO NOT EDIT." and
 	// is left as it is; its generator owns it.
 	generated bool
+	// soft counts the assertions converted from a form that let the test
+	// go on after failing: gotest's stop it.
+	soft int
 }
 
 // skipped reports whether the migration leaves uf as it is: generated, or
@@ -99,6 +102,11 @@ type suiteDecl struct {
 	// the suites embedding it call, which gotest does not run.
 	helper   bool
 	forwards []forward
+	// runner is the name of the suite.Run function the migration drops.
+	runner string
+	// unran are the tests of a helper base testify never ran, which the
+	// migration removes, each at its line in the source as it was.
+	unran []unranTest
 }
 
 func (s *suiteDecl) migrated() bool { return s.refusal == "" }
@@ -601,6 +609,7 @@ func (u *unit) migrate() error {
 		u.collectHooks()
 		u.collectNeedsT()
 		u.collectForwards()
+		u.collectUnran()
 		for _, s := range u.suites {
 			s.setupStops = s.migrated() && u.setupMayStop(s)
 		}

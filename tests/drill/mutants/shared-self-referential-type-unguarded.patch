@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / an interface field Hydrate assigns and a field of a type that refers to itself reach the suite \(
+Clause: when a shared fixture transfers a field whose type holds an interface with methods → an interface field Hydrate assigns and a field of a type that refers to itself reach the suite
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -70,7 +70,7 @@
+ // read once: a type that refers to itself is read no deeper.
+ func nonSerializable(t types.Type, seen map[*types.Named]bool) string {
+ 	if n, ok := types.Unalias(t).(*types.Named); ok {
+-		if seen[n] {
++		if false && seen[n] {
+ 			return ""
+ 		}
+ 		seen[n] = true

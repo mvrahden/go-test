@@ -3,8 +3,8 @@ Clause: when a run holds a focused method → a focused method in one package sk
 Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFocusIsRunWide
 --- a/internal/gotestgen/generator.go
 +++ b/internal/gotestgen/generator.go
-@@ -533,7 +533,8 @@
- 		if err := collectorError(lr.Pxtest, all[i].pxtest.Errs); err != nil {
+@@ -538,7 +538,8 @@
+ 		if err := orphanError(lr); err != nil {
  			return nil, nil, err
  		}
 -		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()

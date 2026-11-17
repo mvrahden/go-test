@@ -319,7 +319,7 @@ func (s *MigrateEmbedTestSuite) TestBaseShapes(t *gotest.T) {
 				"func (s *ChildTestSuite) TestShared(t *gotest.T) {\n\ts.base.TestShared(t)\n}",
 				"func (s *ChildTestSuite) TestOverridden(t *gotest.T) {\n\tgotest.True(t, true)",
 			}},
-			Gone:    []string{"s.base.TestOverridden"},
+			Gone:    []string{"s.base.TestOverridden", "func (b *BaseSuite) TestOverridden"},
 			Ran:     []string{"RAN base TestShared", "RAN child TestOverridden"},
 			Skipped: []string{"RAN base TestOverridden"},
 		},

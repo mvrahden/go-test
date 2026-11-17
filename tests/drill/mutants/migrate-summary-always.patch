@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/migrate MigrateVerdicts / WhatMigrateDidNotKeep / when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test / a migration with none of these prints no such section \(
+Clause: when migrate converts a suite with soft assertions, under a runner of another name, beside a plain testify test → a migration with none of these prints no such section
+--- a/cmd/gotest/migrate.go
++++ b/cmd/gotest/migrate.go
+@@ -150,9 +150,6 @@
+ // printNotKept prints what a migration did not keep, each line only where
+ // it has something to say.
+ func printNotKept(soft, stdlib int, ids, removed []string) {
+-	if soft == 0 && stdlib == 0 && len(ids) == 0 && len(removed) == 0 {
+-		return
+-	}
+ 	fmt.Println("Not kept, check by hand:")
+ 	if soft > 0 {
+ 		fmt.Printf("  assertions that let a test go on after failing and now stop it (s.X, s.Assert().X, assert.X): %d\n", soft)

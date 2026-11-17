@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/migrate MigrateBaseSuites / ABaseTestEveryChildOverrides / when a base no runner runs declares a test that every suite embedding it overrides and nothing calls / a base test only some children override, one something calls, and the tests of a base a runner runs are kept \(
+Clause: when a base no runner runs declares a test that every suite embedding it overrides and nothing calls → a base test only some children override, one something calls, and the tests of a base a runner runs are kept
+--- a/internal/migrate/embed.go
++++ b/internal/migrate/embed.go
+@@ -886,7 +886,7 @@
+ 				if !ok {
+ 					continue
+ 				}
+-				if k := methodKey(fn); strings.HasPrefix(k, prefix) && !ran[k] && !called[k] {
++				if k := methodKey(fn); strings.HasPrefix(k, prefix) && !ran[k] {
+ 					// Read now: removing an import later merges lines of the file.
+ 					b.unran = append(b.unran, unranTest{fd, u.fset.Position(fd.Pos()).Line})
+ 				}

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / a type a non-test file declares is left alone \(
+Clause: when a test file declares methods named as cases, taking a gotest T, B or F, on a type that is no suite → a type a non-test file declares is left alone
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -82,7 +82,7 @@
+ 		}
+ 		for _, file := range pkg.Syntax {
+ 			name := pkg.Fset.File(file.Pos()).Name()
+-			if !strings.HasSuffix(name, "_test.go") || about.PSuiteRegex.MatchString(name) {
++			if about.PSuiteRegex.MatchString(name) {
+ 				continue
+ 			}
+ 			for _, d := range file.Decls {

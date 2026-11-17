@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / one no alias instantiates is refused at its declaration, told to declare an alias \(
+Clause: when a test file declares a generic suite → one no alias instantiates is refused at its declaration, told to declare an alias
+--- a/internal/gotestast/orphans.go
++++ b/internal/gotestast/orphans.go
+@@ -91,7 +91,7 @@
+ 			}
+ 			for _, d := range file.Decls {
+ 				if gd, ok := d.(*ast.GenDecl); ok {
+-					if o, ok := uninstantiated(gd, pkg, suiteKeys); ok && !namedLeftOut[o.name] {
++					if o, ok := uninstantiated(gd, pkg, suiteKeys); false && ok && !namedLeftOut[o.name] {
+ 						out = append(out, &found{orphan: o.Orphan})
+ 					}
+ 					continue

@@ -7,7 +7,11 @@
 // type belongs to no class.
 package typeclass
 
-import "go/types"
+import (
+	"go/types"
+
+	"github.com/mvrahden/go-test/internal/about"
+)
 
 var errorType = types.Universe.Lookup("error").Type()
 
@@ -99,4 +103,39 @@ func IsErrorInterface(t types.Type) bool {
 // ImplementsError reports whether a value of t is assignable to error.
 func ImplementsError(t types.Type) bool {
 	return types.AssignableTo(types.Unalias(t), errorType)
+}
+
+// Handle is the testing handle a case takes.
+type Handle byte
+
+const (
+	NoHandle    Handle = 0
+	TestHandle  Handle = 'T'
+	BenchHandle Handle = 'B'
+	FuzzHandle  Handle = 'F'
+)
+
+// CaseHandle classifies t as the handle of a case: a pointer to T, B or F of
+// pkg/gotest or of testing, through aliases. stdlib reports testing's.
+func CaseHandle(t types.Type) (h Handle, stdlib bool) {
+	ptr, ok := types.Unalias(t).(*types.Pointer)
+	if !ok {
+		return NoHandle, false
+	}
+	n, ok := types.Unalias(ptr.Elem()).(*types.Named)
+	if !ok || n.Obj().Pkg() == nil {
+		return NoHandle, false
+	}
+	switch n.Obj().Pkg().Path() {
+	case "testing":
+		stdlib = true
+	case about.Repo + "/pkg/gotest":
+	default:
+		return NoHandle, false
+	}
+	switch name := n.Obj().Name(); name {
+	case "T", "B", "F":
+		return Handle(name[0]), stdlib
+	}
+	return NoHandle, false
 }

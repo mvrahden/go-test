@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate \(
+Clause: when a shared fixture embeds a type → one with exported fields is refused at the field, told to hold it in a named field or assign it in Hydrate
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -12,7 +12,7 @@
+ // fixture whose exported fields would not reach the suites. hydrated names
+ // the fields Hydrate assigns; in qualifies the type's name.
+ func EmbeddedFieldError(fixture string, f *types.Var, hydrated map[string]bool, in *types.Package) error {
+-	if !f.Anonymous() || hydrated[f.Name()] {
++	if true || !f.Anonymous() || hydrated[f.Name()] {
+ 		return nil
+ 	}
+ 	// a fixture embedded in a fixture is refused by the fixture rules

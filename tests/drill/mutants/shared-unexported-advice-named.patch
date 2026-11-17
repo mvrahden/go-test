@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery SharedFields .* / one of an unexported type is refused, told to hold it in an exported field of an exported type or assign it in Hydrate \(
+Clause: when a shared fixture embeds a type → one of an unexported type is refused, told to hold it in an exported field of an exported type or assign it in Hydrate
+--- a/internal/gotestast/transfer.go
++++ b/internal/gotestast/transfer.go
+@@ -48,7 +48,7 @@
+ // field named after it, or, for an unexported type, whose field of that
+ // name would not be transferred either, an exported field of an exported type.
+ func namedFieldAdvice(f *types.Var, typ string) string {
+-	if !f.Exported() {
++	if false && !f.Exported() {
+ 		return "an exported field of an exported type"
+ 	}
+ 	return fmt.Sprintf("a named field (%s %s)", f.Name(), typ)

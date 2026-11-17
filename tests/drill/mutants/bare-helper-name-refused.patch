@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRun .* / one taking no such parameter is a helper and the suite runs \(
+Clause: when a suite declares a method named exactly Test, Benchmark or Fuzz → one taking no such parameter is a helper and the suite runs
+--- a/internal/gotestast/spec.go
++++ b/internal/gotestast/spec.go
+@@ -774,7 +774,7 @@
+ 	}
+ 	if misnamed || bare {
+ 		prefix, ok := caseParamOf(m.Name(), sig)
+-		if ok && bare {
++		if bare {
+ 			return m.Pos(), fmt.Errorf("%s on %s is no %s: go test runs no %s without a name after the prefix; add one, or give the helper a name that is not %s", m.Name(), s.ts.Name.Name, prefix, prefix, m.Name())
+ 		}
+ 		if ok {

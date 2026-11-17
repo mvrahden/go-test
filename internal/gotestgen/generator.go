@@ -535,6 +535,9 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		if err := collectorError(lr.Pxtest, all[i].pxtest.Errs); err != nil {
 			return nil, nil, err
 		}
+		if err := orphanError(lr); err != nil {
+			return nil, nil, err
+		}
 		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()
 	}
 

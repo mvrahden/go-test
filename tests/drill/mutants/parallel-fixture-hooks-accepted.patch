@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery ParallelShapes .* / a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel \(
+Clause: when a suite with Parallel: true binds a package fixture that declares BeforeEach or AfterEach → a suite with two or more test methods whose fixture hook uses the fixture is refused at the suite, told to move the work into its returning BeforeEach or drop Parallel
+--- a/internal/gotestast/parallel.go
++++ b/internal/gotestast/parallel.go
+@@ -37,7 +37,7 @@
+ // ParallelFixtureHooks refuses a suite with Parallel: true and two or more
+ // test methods that binds fixture, whose named per-method hooks use it.
+ func ParallelFixtureHooks(s *TestSuiteSpec, fixture string, hooks []string) error {
+-	if !s.IsMethodParallel() || s.RunnableTests() < 2 || len(hooks) == 0 {
++	if true || !s.IsMethodParallel() || s.RunnableTests() < 2 || len(hooks) == 0 {
+ 		return nil
+ 	}
+ 	verb, hook := "uses", "hook"
