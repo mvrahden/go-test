@@ -3,6 +3,7 @@ package fixtures_test
 import (
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -24,8 +25,10 @@ func (s *FixtureWindowTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 func (s *FixtureWindowTestSuite) TestTheExclusiveTail(t *gotest.T) {
+	markers := t.TempDir()
+	warmPackage(t, markers, "../testdata/fixatail/")
 	began := time.Now()
-	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixatail/")
+	run, err := testkit.RunPackage(t.Context(), markers, "../testdata/fixatail/")
 	elapsed := time.Since(began)
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for the exclusive tail hangs past its declared 2s Timeout and no --setup-timeout is given", func(w *gotest.T) {
@@ -45,8 +48,9 @@ func (s *FixtureWindowTestSuite) TestTheExclusiveTail(t *gotest.T) {
 }
 
 func (s *FixtureWindowTestSuite) TestABenchSlot(t *gotest.T) {
+	cache := warmBench(t, "../testdata/fixabench/")
 	began := time.Now()
-	run, err := testkit.RunCLI(t.Context(), ".", "bench", "../testdata/fixabench/")
+	run, err := testkit.RunCLIWithEnv(t.Context(), ".", cache, "bench", "../testdata/fixabench/")
 	elapsed := time.Since(began)
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for a bench slot hangs past its declared 2s Timeout and no --setup-timeout is given", func(w *gotest.T) {
@@ -64,8 +68,10 @@ func (s *FixtureWindowTestSuite) TestABenchSlot(t *gotest.T) {
 }
 
 func (s *FixtureWindowTestSuite) TestATailFixturesTeardownBudget(t *gotest.T) {
+	markers := t.TempDir()
+	warmPackage(t, markers, "../testdata/fixatailbudget/")
 	began := time.Now()
-	run, err := testkit.RunPackage(t.Context(), t.TempDir(), "../testdata/fixatailbudget/")
+	run, err := testkit.RunPackage(t.Context(), markers, "../testdata/fixatailbudget/")
 	elapsed := time.Since(began)
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for the exclusive tail declares a 2s Timeout and its AfterAll never returns", func(w *gotest.T) {
@@ -81,8 +87,9 @@ func (s *FixtureWindowTestSuite) TestATailFixturesTeardownBudget(t *gotest.T) {
 }
 
 func (s *FixtureWindowTestSuite) TestABenchSlotFixturesTeardownBudget(t *gotest.T) {
+	cache := warmBench(t, "../testdata/fixabenchbudget/")
 	began := time.Now()
-	run, err := testkit.RunCLI(t.Context(), ".", "bench", "../testdata/fixabenchbudget/")
+	run, err := testkit.RunCLIWithEnv(t.Context(), ".", cache, "bench", "../testdata/fixabenchbudget/")
 	elapsed := time.Since(began)
 	gotest.NoError(t, err)
 	t.When("a shared fixture started for a bench slot declares a 2s Timeout and its AfterAll never returns", func(w *gotest.T) {
@@ -94,4 +101,23 @@ func (s *FixtureWindowTestSuite) TestABenchSlotFixturesTeardownBudget(t *gotest.
 			gotest.Less(it, elapsed, 60*time.Second, "stderr: %s", run.Stderr)
 		})
 	})
+}
+
+// warmPackage builds pkg into the binary cache of the runs that use markers,
+// selecting nothing, so no fixture starts. A bound on the run that follows
+// then measures the run, not how long a loaded machine takes to compile.
+func warmPackage(t *gotest.T, markers, pkg string) {
+	run, err := testkit.RunPackage(t.Context(), markers, pkg, "-run", "^$")
+	gotest.NoError(t, err)
+	gotest.Zero(t, run.Exit, "warm-up stderr: %s", run.Stderr)
+}
+
+// warmBench is warmPackage for a bench run: it returns the environment that
+// points the measured run at the binary cache the warm-up filled.
+func warmBench(t *gotest.T, pkg string) []string {
+	cache := []string{protocol.EnvCacheDir + "=" + testkit.ChildCacheDir(t.TempDir())}
+	run, err := testkit.RunCLIWithEnv(t.Context(), ".", cache, "bench", pkg, "-bench", "^$")
+	gotest.NoError(t, err)
+	gotest.Zero(t, run.Exit, "warm-up stderr: %s", run.Stderr)
+	return cache
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -72,10 +73,13 @@ type Sample struct {
 // walk above. FromPackages recovers them in a second pass: it scans each
 // package's Output for lines matching the bench-line shape and matches
 // them by their full benchmark name (e.g. "BenchmarkSuite/BenchmarkParse")
-// to the Result a tree leaf already produced, appending one Sample per
-// matched line. A `-count=4` run therefore produces `len(Samples)==4` per
-// benchmark. Lines that don't match any known Result (e.g. stray output)
-// are ignored.
+// to the Result of a tree leaf, appending one Sample per matched line. A
+// `-count=4` run therefore produces `len(Samples)==4` per benchmark. Lines
+// that don't match any known leaf (e.g. stray output) are ignored.
+//
+// Every leaf is known by name, also one whose first line the stream filed
+// elsewhere (at the package or under the benchmark above it): its samples
+// are gathered by name too, and a leaf left without any is dropped.
 func FromPackages(pkgs []*gotestspec.Package) Baseline {
 	results := make([]Result, 0)
 	index := make(map[string]int)
@@ -89,11 +93,15 @@ func FromPackages(pkgs []*gotestspec.Package) Baseline {
 	}
 
 	for _, pkg := range pkgs {
+		for _, top := range pkg.Nodes {
+			harvestBranchSamples(pkg.Path, top, &results, index)
+		}
 		harvestPackageOutputSamples(pkg.Path, pkg.Output, &results, index)
 		if cpu == "" {
 			cpu = cpuLine(pkg.Output)
 		}
 	}
+	results = slices.DeleteFunc(results, func(r Result) bool { return len(r.Samples) == 0 })
 
 	sort.Slice(results, func(i, j int) bool {
 		a, b := results[i], results[j]
@@ -141,19 +149,20 @@ func collectBenchLeaves(pkgPath string, top, n *gotestspec.Node, below string, r
 		name = below + "/" + n.Name
 	}
 	if n.Kind == gotestspec.KindBenchmark && len(n.Children) == 0 {
-		// Defense in depth: a leaf can reach here with Iterations==0 if its
-		// bench output line was never successfully parsed (e.g. split
-		// across output events in a way even the joined scan in tree.go
-		// missed, or a malformed line). Recording it would poison Welch
-		// mean/variance comparisons downstream with a zero sample, so skip
-		// it rather than sampling a benchmark that never actually ran.
-		if n.Iterations == 0 {
-			return
-		}
-
 		suite := ""
 		if n != top {
 			suite = strings.TrimPrefix(top.Name, "Benchmark")
+		}
+		key := pkgPath + "\x00" + suite + "\x00" + name
+		if _, ok := index[key]; !ok {
+			index[key] = len(*results)
+			*results = append(*results, Result{Package: pkgPath, Suite: suite, Name: name})
+		}
+		// A leaf whose own output held no result line has no sample of its
+		// own: a zero sample would poison the comparisons. Its lines, if the
+		// stream filed them elsewhere, are gathered by name afterwards.
+		if n.Iterations == 0 {
+			return
 		}
 		if *procs == 0 {
 			*procs = n.Procs
@@ -167,18 +176,8 @@ func collectBenchLeaves(pkgPath string, top, n *gotestspec.Node, below string, r
 			Metrics:     n.Metrics,
 		}
 
-		key := pkgPath + "\x00" + suite + "\x00" + name
-		if idx, ok := index[key]; ok {
-			(*results)[idx].Samples = append((*results)[idx].Samples, sample)
-			return
-		}
-		index[key] = len(*results)
-		*results = append(*results, Result{
-			Package: pkgPath,
-			Suite:   suite,
-			Name:    name,
-			Samples: []Sample{sample},
-		})
+		idx := index[key]
+		(*results)[idx].Samples = append((*results)[idx].Samples, sample)
 		return
 	}
 
@@ -188,6 +187,21 @@ func collectBenchLeaves(pkgPath string, top, n *gotestspec.Node, below string, r
 	}
 	for _, c := range n.Children {
 		collectBenchLeaves(pkgPath, top, c, childBelow, results, index, procs)
+	}
+}
+
+// harvestBranchSamples gathers the result lines the stream filed under a
+// benchmark that has sub-benchmarks: such a node is never a leaf, so a line
+// there belongs to the leaf it names.
+func harvestBranchSamples(pkgPath string, n *gotestspec.Node, results *[]Result, index map[string]int) {
+	if len(n.Children) == 0 {
+		return
+	}
+	if n.Kind == gotestspec.KindBenchmark {
+		harvestPackageOutputSamples(pkgPath, n.Output, results, index)
+	}
+	for _, c := range n.Children {
+		harvestBranchSamples(pkgPath, c, results, index)
 	}
 }
 
