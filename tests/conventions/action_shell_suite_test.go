@@ -1,6 +1,7 @@
 package conventions_test
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -84,7 +85,13 @@ func (s *ActionShellTestSuite) TestCompositeRunStepsPassShellcheck(t *gotest.T) 
 	for _, step := range steps {
 		cmd := exec.CommandContext(t.Context(), "shellcheck", "--shell=bash", "--severity=warning", "--format=gcc", "-")
 		cmd.Stdin = strings.NewReader(step.run)
-		out, _ := cmd.CombinedOutput()
+		out, err := cmd.CombinedOutput()
+		// Exit 1 is findings; anything else means shellcheck did not judge the step.
+		var exitErr *exec.ExitError
+		if err != nil && (!errors.As(err, &exitErr) || exitErr.ExitCode() != 1) {
+			t.Errorf("shellcheck did not run on %s: %s: %v\n%s", step.file, step.name, err, out)
+			continue
+		}
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			if line != "" {
 				findings = append(findings, step.file+": "+step.name+": "+strings.TrimPrefix(line, "-:"))
