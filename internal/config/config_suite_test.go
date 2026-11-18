@@ -201,3 +201,73 @@ func (s *ConfigTestSuite) TestLoad_EmptyFile(t *gotest.T, ctx *configCtx) {
 		gotest.Equal(sub, config.ProjectConfig{}, cfg)
 	}
 }
+
+func (s *ConfigTestSuite) TestLoad_NolintAllow(t *gotest.T, ctx *configCtx) {
+	writeFile(t, ctx.dir, "go.mod", "module test\n")
+
+	t.It("reads a list of names", func(it *gotest.T) {
+		writeFile(it, ctx.dir, config.FileName, "lint:\n  nolint-allow: [gocritic, \"errcheck\"]\n")
+		cfg, err := config.Load(ctx.dir)
+		gotest.NoError(it, err)
+		gotest.Equal(it, []string{"gocritic", "errcheck"}, cfg.Lint.NolintAllow)
+	})
+
+	for sub, tc := range gotest.Each(t, []struct{ Desc, yaml, want string }{
+		{"a single name, not a list", "lint:\n  nolint-allow: gocritic\n", "line 2: cannot unmarshal"},
+		{"a number", "lint:\n  nolint-allow:\n    - gocritic\n    - 12\n", `line 4: lint.nolint-allow: "12" is not a string`},
+		{"a boolean", "lint:\n  nolint-allow: [true]\n", `line 2: lint.nolint-allow: "true" is not a string`},
+		{"an empty element", "lint:\n  nolint-allow: [~]\n", `line 2: lint.nolint-allow: "~" is not a string`},
+		{"a mapping", "lint:\n  nolint-allow: [{a: b}]\n", "line 2: cannot unmarshal !!map"},
+	}) {
+		writeFile(sub, ctx.dir, config.FileName, tc.yaml)
+		_, err := config.Load(ctx.dir)
+		gotest.ErrorContains(sub, err, tc.want)
+		gotest.ErrorContains(sub, err, config.FileName)
+	}
+}
+
+func (s *ConfigTestSuite) TestLoad_ValuesAFlagWouldRefuse(t *gotest.T, _ *configCtx) {
+	for sub, tc := range gotest.Each(t, []struct{ Desc, yaml, want string }{
+		{"a negative parallel", "parallel: -3\n", "parallel: -3 is not a positive integer (omit the key for the default)"},
+		{"a negative compile-parallel", "compile-parallel: -1\n", "compile-parallel: -1 is not a positive integer (omit the key for the default)"},
+		{"a negative min-coverage", "min-coverage: -5\n", "min-coverage: -5 is not a percentage from 0 to 100"},
+		{"a min-coverage above 100", "min-coverage: 150\n", "min-coverage: 150 is not a percentage from 0 to 100"},
+		{"a second document", "parallel: 4\n---\nparallel: 8\n", "line 3: holds more than one YAML document; gotest reads one"},
+		{"a second document after an empty one", "parallel: 4\n---\n---\n# set\nparallel: 8\n", "line 5: holds more than one YAML document; gotest reads one"},
+	}) {
+		dir := sub.TempDir()
+		writeFile(sub, dir, "go.mod", "module test\n")
+		writeFile(sub, dir, config.FileName, tc.yaml)
+		_, err := config.Load(dir)
+		gotest.ErrorContains(sub, err, tc.want)
+		gotest.ErrorContains(sub, err, config.FileName)
+	}
+}
+
+func (s *ConfigTestSuite) TestLoad_AnEmptyTrailingDocument(t *gotest.T, _ *configCtx) {
+	for sub, content := range gotest.Each(t, []struct{ Desc, yaml string }{
+		{"a trailing ---", "parallel: 4\n---\n"},
+		{"a trailing --- with blank lines and comments", "parallel: 4\n---\n\n# nothing more\n\n"},
+		{"a trailing --- holding only null", "parallel: 4\n---\n~\n"},
+	}) {
+		dir := sub.TempDir()
+		writeFile(sub, dir, "go.mod", "module test\n")
+		writeFile(sub, dir, config.FileName, content.yaml)
+		cfg, err := config.Load(dir)
+		gotest.NoError(sub, err)
+		gotest.Equal(sub, 4, cfg.Parallel)
+	}
+}
+
+func (s *ConfigTestSuite) TestLoad_ValuesAtTheirBounds(t *gotest.T, _ *configCtx) {
+	for sub, content := range gotest.Each(t, []string{
+		"parallel: 12\ncompile-parallel: 1\nmin-coverage: 100\ntimeout: 0s\n",
+		"min-coverage: 0\n",
+	}) {
+		dir := sub.TempDir()
+		writeFile(sub, dir, "go.mod", "module test\n")
+		writeFile(sub, dir, config.FileName, content)
+		_, err := config.Load(dir)
+		gotest.NoError(sub, err)
+	}
+}

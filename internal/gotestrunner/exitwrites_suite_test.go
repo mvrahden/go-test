@@ -2,6 +2,7 @@ package gotestrunner_test
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,6 +154,44 @@ func (s *ExitWritesTestSuite) TestEndWrites(t *gotest.T) {
 			wait()
 			gotest.Equal(it, interruptedEvents, stdout.String())
 			gotest.Equal(it, stdout.String(), file.String())
+		})
+	})
+}
+
+// exitAtAFurtherStop writes pre to a fresh -json stream and exits as a
+// further stop does, returning the stream and the exit code.
+func exitAtAFurtherStop(pre string) (stream string, code int) {
+	var stdout bytes.Buffer
+	c := gotestrunner.NewOutputCollector(gotestrunner.RunStreamJSON, false, gotestrunner.WithWriters(&stdout, &bytes.Buffer{}))
+	gotestrunner.WriteEvents(c, []byte(pre))
+	restore := gotestrunner.ExportObserveExit(func(c int) { code = c })
+	hurry := make(chan struct{})
+	close(hurry)
+	gotestrunner.Exit(130, hurry)
+	restore()
+	gotestrunner.ResumeWrites(gotestrunner.ExportExitGate)
+	return stdout.String(), code
+}
+
+func (s *ExitWritesTestSuite) TestAnExitGotestMakesItself(t *gotest.T) {
+	stream, code := exitAtAFurtherStop(`{"Action":"run","Package":"example.com/p","Test":"TestS"}` + "\n")
+	t.When("gotest exits at a further stop before the run booked itself", func(w *gotest.T) {
+		w.It("ends the stream with the run booked as interrupted, then exits 130", func(it *gotest.T) {
+			gotest.Equal(it, 130, code)
+			lines := strings.Split(strings.TrimSpace(stream), "\n")
+			gotest.Len(it, lines, 5)
+			gotest.JSONEq(it, `{"Action":"start","Package":"interrupted","RunLevel":true}`, lines[2])
+			gotest.JSONEq(it, `{"Action":"output","Package":"interrupted","Output":"FAIL: run interrupted: ended by a further stop before its suites reported\n","RunLevel":true}`, lines[3])
+			gotest.JSONEq(it, `{"Action":"fail","Package":"interrupted","RunLevel":true}`, lines[4])
+		})
+	})
+}
+
+func (s *ExitWritesTestSuite) TestAnExitAfterTheRunBookedItself(t *gotest.T) {
+	stream, _ := exitAtAFurtherStop(interruptedEvents)
+	t.When("gotest exits at a further stop after the run booked itself", func(w *gotest.T) {
+		w.It("books the interruption once", func(it *gotest.T) {
+			gotest.Equal(it, 1, strings.Count(stream, `"Action":"fail","Package":"interrupted"`))
 		})
 	})
 }

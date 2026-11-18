@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / fails the package and the run with exit 1, on the text and -json pipelines \(
+Clause: when --timeout expires while a method waits for its context to end, and the method then returns → fails the package and the run with exit 1, on the text and -json pipelines
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -333,7 +333,7 @@
+ 
+ 	// A method the stop ended may still return and pass: the suite did not
+ 	// finish.
+-	deadlineCut := cutShort.Load() && errors.Is(ctx.Err(), context.DeadlineExceeded)
++	deadlineCut := false
+ 	return SuiteResult{
+ 		Target:      target,
+ 		Stdout:      stdout.Bytes(),

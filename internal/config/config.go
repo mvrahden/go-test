@@ -50,6 +50,9 @@ type ProjectConfig struct {
 type LintConfig struct {
 	// Skip lists lint rule names to disable (e.g. "stdlib-test", "testify").
 	Skip []string `yaml:"skip"`
+	// NolintAllow lists the names a //nolint directive may carry without
+	// lint reporting them as unknown.
+	NolintAllow []string `yaml:"nolint-allow"`
 }
 
 // BenchConfig controls default baseline comparison settings for
@@ -165,5 +168,94 @@ func parse(path string) (ProjectConfig, error) {
 		}
 		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
+	// A later document that holds nothing, such as a trailing "---", is
+	// read past; one with content is refused at its line.
+	for {
+		var doc yaml.Node
+		err := dec.Decode(&doc)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if line, ok := documentContent(&doc); ok {
+			return ProjectConfig{}, fmt.Errorf("%s: line %d: holds more than one YAML document; gotest reads one", path, line)
+		}
+	}
+	if err := checkStringLists(data); err != nil {
+		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+	}
+	if err := cfg.validate(); err != nil {
+		return ProjectConfig{}, fmt.Errorf("%s: %w", path, err)
+	}
 	return cfg, nil
+}
+
+// documentContent reports the line of a document's content; a document
+// that is empty or holds only null has none.
+func documentContent(doc *yaml.Node) (int, bool) {
+	for _, n := range doc.Content {
+		if n.Kind == yaml.ScalarNode && n.Tag == "!!null" {
+			continue
+		}
+		return n.Line, true
+	}
+	return 0, false
+}
+
+// validate refuses a value the key's flag would refuse. Zero stays legal for
+// the counts, as an int cannot tell it from an omitted key.
+func (c *ProjectConfig) validate() error {
+	for _, kv := range []struct {
+		key string
+		n   int
+	}{{"parallel", c.Parallel}, {"compile-parallel", c.CompileParallel}} {
+		if kv.n < 0 {
+			return fmt.Errorf("%s: %d is not a positive integer (omit the key for the default)", kv.key, kv.n)
+		}
+	}
+	if c.MinCoverage < 0 || c.MinCoverage > 100 {
+		return fmt.Errorf("min-coverage: %d is not a percentage from 0 to 100", c.MinCoverage)
+	}
+	return nil
+}
+
+// checkStringLists refuses a list element that is not a string: YAML
+// decodes a number or a boolean into a string field without a word.
+func checkStringLists(data []byte) error {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil || len(root.Content) == 0 {
+		return err
+	}
+	list := lookup(root.Content[0], "lint", "nolint-allow")
+	if list == nil || list.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for _, el := range list.Content {
+		if el.Kind != yaml.ScalarNode || el.Tag != "!!str" {
+			return fmt.Errorf("line %d: lint.nolint-allow: %q is not a string", el.Line, el.Value)
+		}
+	}
+	return nil
+}
+
+// lookup follows keys through nested mappings; nil when one is missing.
+func lookup(n *yaml.Node, keys ...string) *yaml.Node {
+	for _, key := range keys {
+		if n.Kind != yaml.MappingNode {
+			return nil
+		}
+		var next *yaml.Node
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == key {
+				next = n.Content[i+1]
+			}
+		}
+		if next == nil {
+			return nil
+		}
+		n = next
+	}
+	return n
 }

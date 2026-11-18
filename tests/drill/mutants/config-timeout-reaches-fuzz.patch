@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / starts the session as without them \(
+Clause: when .gotest.yml sets timeout and setup-timeout and gotest fuzz runs → starts the session as without them
+--- a/cmd/gotest/fuzz.go
++++ b/cmd/gotest/fuzz.go
+@@ -42,7 +42,7 @@
+ 		fmt.Fprintln(os.Stderr, "FAIL: --timeout is not a fuzz flag: --for is the session's clock and the deadline follows it (--for=0 fuzzes until interrupted)")
+ 		return 2
+ 	}
+-	own, goTestArgs, err := SplitArgs(inv.DefaultArgsFor(fuzzAllowed), fuzzAllowed)
++	own, goTestArgs, err := SplitArgs(inv.DefaultArgs(), fuzzAllowed)
+ 	if err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return 2

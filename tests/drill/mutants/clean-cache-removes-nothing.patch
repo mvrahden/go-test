@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / removes every cached binary no run is using and says how many \(
+Clause: when gotest clean --cache runs → removes every cached binary no run is using and says how many
+--- a/cmd/gotest/clean.go
++++ b/cmd/gotest/clean.go
+@@ -20,7 +20,7 @@
+ 		return 2
+ 	}
+ 	if own.Bool("--cache") {
+-		return clearCache(args)
++		return 0
+ 	}
+ 	patterns, err := ExtractPackagePatterns(args)
+ 	if err != nil {

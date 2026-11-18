@@ -205,6 +205,11 @@ func applyDeadlineFailure(c *OutputCollector, result *PipelineResult, cfg Pipeli
 		msg = fmt.Sprintf("global --timeout exceeded after %v", cfg.GlobalTimeout)
 	}
 	if len(running) == 0 {
+		// No method was left running: name the suites the deadline stopped.
+		if cut := c.cutShortUnits(); len(cut) > 0 {
+			failRun(c, result, globalTimeoutPkg, msg+" while running: "+unitNames(cut))
+			return
+		}
 		failRun(c, result, globalTimeoutPkg, msg)
 		return
 	}
@@ -312,8 +317,16 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 
 	// A bench run compiles everything before it dispatches, so no build
 	// competes with a running benchmark. Every other run overlaps the two.
+	if !cfg.Bench && extractFlag(pf.RunFlags, "-list") != "" {
+		return runList(ctx, cfg, overlay, pf)
+	}
 	if cfg.Bench {
 		return runBench(ctx, cfg, overlay, pf)
+	}
+	if name := sharedProfileFlag(pf.RunFlags); name != "" {
+		if n := plannedSuiteCount(planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)); n > 1 {
+			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
+		}
 	}
 	return runStreaming(ctx, cfg, overlay, pf)
 }
@@ -761,6 +774,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	collector.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, pf.RunFlags)
 	// The flush order holds every package the collector will report on.
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
 	order := flushOrder(cfg, overlay, noSuite)

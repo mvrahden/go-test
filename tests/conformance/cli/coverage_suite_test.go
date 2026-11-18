@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -40,6 +41,22 @@ func (s *CLICoverageProfileTestSuite) TestProfileSpellings(t *gotest.T) {
 					gotest.Contains(sub, run.Stdout, row.stdoutHas)
 				}
 			}
+		})
+	})
+}
+
+func (s *CLICoverageProfileTestSuite) TestABlockTwoSuitesRun(t *gotest.T) {
+	profile := filepath.Join(t.TempDir(), "c.out")
+	run, err := testkit.RunCLI(t.Context(), ".", "-covermode=count", "-coverprofile="+profile, "../testdata/clicovercount/")
+	gotest.NoError(t, err)
+	data, readErr := os.ReadFile(profile)
+	t.When("two suites of a package each run a block once under -covermode=count", func(w *gotest.T) {
+		w.It("the profile counts the block twice", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.NoError(it, readErr)
+			gotest.Regexp(it, `(?m)clicovercount\.go:\d+\.\d+,\d+\.\d+ 1 2$`, string(data))
+			// Each suite process initialises the package: go test's one process would read 1.
+			gotest.Regexp(it, `(?m)clicovercount_init\.go:4\.\d+,\d+\.\d+ 1 2$`, string(data))
 		})
 	})
 }

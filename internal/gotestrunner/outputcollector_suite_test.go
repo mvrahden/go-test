@@ -1059,3 +1059,44 @@ func (s *OutputCollectorTestSuite) TestAPackageNamedLikeARunLevelOneIsNotMarked(
 		})
 	})
 }
+
+func (s *OutputCollectorTestSuite) TestASuiteThatRanNoTests(t *gotest.T) {
+	record := func(hold bool, stdout, stderr string) (code int, out, errw string) {
+		var o, e bytes.Buffer
+		c := gotestrunner.NewOutputCollector(gotestrunner.RunBatchText, false, gotestrunner.WithWriters(&o, &e))
+		if hold {
+			gotestrunner.ExportHoldToTests(c)
+		}
+		c.Register("example.com/p", 1)
+		c.RecordResult("example.com/p", 0, gotestrunner.SuiteResult{
+			Target: gotestrunner.SuiteTarget{SuiteSpec: gotestrunner.SuiteSpec{Package: "example.com/p", SuiteName: "TestFooTestSuite"}},
+			Stdout: []byte(stdout), Stderr: []byte(stderr),
+		})
+		return c.WorstExitCode(), o.String(), e.String()
+	}
+	const warning = "testing: warning: no tests to run\n"
+	t.When("a held suite's stderr carries the testing package's warning as a line", func(w *gotest.T) {
+		code, out, errw := record(true, "PASS\n", warning)
+		w.It("fails the package with exit 2 and names the suite", func(it *gotest.T) {
+			gotest.Equal(it, 2, code)
+			gotest.Contains(it, out, "FAIL\texample.com/p\t")
+			gotest.Contains(it, errw, "gotest: TestFooTestSuite ran no tests: the test binary holds no such function, so the generated harness was not part of the build; rerun with --debug to inspect it\n")
+		})
+	})
+	t.When("the run is not held to its tests", func(w *gotest.T) {
+		code, out, _ := record(false, "PASS\n", warning)
+		w.It("passes with go test's note", func(it *gotest.T) {
+			gotest.Equal(it, 0, code)
+			gotest.Contains(it, out, "ok  \texample.com/p\t0.000s [no tests to run]\n")
+		})
+	})
+	t.When("the warning is part of a longer line, or on stdout", func(w *gotest.T) {
+		for sub, r := range gotest.Each(w, []struct{ Desc, stdout, stderr string }{
+			{"inside a line of stderr", "PASS\n", "child said: testing: warning: no tests to run\n"},
+			{"a test's own log", "    x_test.go:3: testing: warning: no tests to run\nPASS\n", ""},
+		}) {
+			code, _, _ := record(true, r.stdout, r.stderr)
+			gotest.Equal(sub, 0, code)
+		}
+	})
+}

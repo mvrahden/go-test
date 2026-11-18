@@ -3,6 +3,7 @@ package main_test
 import (
 	"context"
 	"io"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -181,6 +182,20 @@ func (s *ControlInputTestSuite) TestAFurtherForceLine(t *gotest.T) {
 			case <-time.After(time.Second):
 				gotest.Fail(it, "a further force line did not exit")
 			}
+		})
+	})
+}
+
+func (s *ControlInputTestSuite) TestALineLongerThanAnyCommand(t *gotest.T) {
+	r := s.start(t)
+	// Both writes go aside, on the method's t: a reader that gives up leaves
+	// them blocked until AfterEach closes the input.
+	gotest.Go(t, func() { _, _ = io.WriteString(r.input, strings.Repeat("x", 300_000)+"\n") })
+	t.When("a 300 KB line comes and a stop line follows", func(w *gotest.T) {
+		w.It("ignores the long line", func(it *gotest.T) { notStopped(it, r, 200*time.Millisecond) })
+		w.It("stops at the stop line", func(it *gotest.T) {
+			gotest.Go(t, func() { _, _ = io.WriteString(r.input, "stop\n") })
+			stopped(it, r)
 		})
 	})
 }

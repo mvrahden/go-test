@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/cli .* / runs each suite's hooks and the method once, each suite in its own process \(
+Expect: ^FAIL .*conformance/cli .* / passes, the fixture's suite running only in the process given its state \(
+Clause: when -run names a method under a first level that matches two suites of a package → runs each suite's hooks and the method once, each suite in its own process
+Clause: when -run /TestState runs a package holding a suite that binds a shared fixture beside one that binds none → passes, the fixture's suite running only in the process given its state
+--- a/internal/gotestrunner/suiterun.go
++++ b/internal/gotestrunner/suiterun.go
+@@ -534,6 +534,9 @@
+ 	if userFilter == "" {
+ 		return ""
+ 	}
++	if userFilter != "" {
++		return userFilter
++	}
+ 	if _, err := parseNameFilter(userFilter, "-run"); err != nil {
+ 		return userFilter
+ 	}

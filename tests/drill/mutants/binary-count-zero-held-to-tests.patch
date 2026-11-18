@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / passes each, never naming a suite as one that ran no tests / -test.count=0 \(
+Clause: when a text run gives the binary -test.count=0, -test.run, -test.skip, -test.list or -test.bench after -args → passes each, never naming a suite as one that ran no tests
+--- a/internal/gotestrunner/census.go
++++ b/internal/gotestrunner/census.go
+@@ -65,7 +65,7 @@
+ 		return false
+ 	}
+ 	binary := goTestArgs[at+1:]
+-	return hasSelectionFlag(binary, []string{"-test.bench"}) || extractFlag(binary, "-test.count") == "0"
++	return hasSelectionFlag(binary, []string{"-test.bench"})
+ }
+
+ // NoteBenchmarksNotRun says how many declared benchmarks a test run leaves

@@ -10,7 +10,7 @@ import (
 
 func containsHelpFlag(args []string) bool {
 	for _, a := range args {
-		if a == "--" {
+		if a == "--" || a == "-args" {
 			return false
 		}
 		if a == "--help" || a == "-h" || a == "-help" {
@@ -128,6 +128,7 @@ Flags (go test — use -single-dash, forwarded automatically):
 
 Use a bare "--" to separate gotest flags from go test flags,
 or to pass unrecognized flags to go test without validation.
+Everything after "-args" goes to the test binary as written.
 
 Environment:
   CI=true                 Auto-enables --ci when GOTEST_CI is unset
@@ -186,7 +187,8 @@ Flags:
 
 All standard go test flags (-single-dash) are forwarded automatically; -run also
 takes a Fuzz<Suite>_<Method> wrapper name, -p caps the suite processes, -exec wraps
-every suite binary, and -o is refused (gotest builds the binaries itself).
+every suite binary, and -o and -overlay are refused (gotest builds the binaries
+itself, through an overlay of its own).
 Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
@@ -1007,6 +1009,7 @@ func printCleanHelp() {
 
 Usage:
   gotest clean [packages...]
+  gotest clean --cache
 
 Removes generated overlay files (gotest_p(x)suite_test.go) from the
 source tree. A run never writes them there; "gotest generate" does, for
@@ -1017,14 +1020,15 @@ package only, as generate does; before v1.33 it walked the directory
 tree. Above several modules, or for a module pulled in by a replace
 directive, use a go.work that lists them, or run clean inside each.
 
-The test binary cache (used for faster repeated runs) is managed
-separately: each run's start evicts the binaries of a checkout that no
-longer exists, those unused for 7 days, then the least recently used
-above 5 GiB. Set GOTEST_CACHE_DIR to
-control the cache location; use --no-cache to bypass it.
+gotest clean --cache removes every cached test binary no run is using.
+Otherwise the cache keeps itself: each run's start evicts the binaries of
+a checkout that no longer exists, those unused for 7 days, then the least
+recently used above 5 GiB. Set GOTEST_CACHE_DIR to control the cache
+location; use --no-cache to bypass it.
 
 Examples:
   gotest clean ./...                         Clean all packages
+  gotest clean --cache                       Clear the test binary cache
 `)
 }
 
@@ -1039,6 +1043,7 @@ Fields:
   tags: <string>            Build tags, comma-separated (e.g., "integration,e2e")
   setup-timeout: <duration> Total budget for all shared fixture setup (default: the fixtures' declared budgets, 30s until the first reports; 0 to disable)
   timeout: <duration>       Global pipeline deadline (default: 15m, 0 to disable)
+                            gotest fuzz ignores timeout and setup-timeout: --for is its clock.
   min-coverage: <int>       Minimum coverage percentage, 0-100
   parallel: <int>           Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan)
   compile-parallel: <int>   Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan)

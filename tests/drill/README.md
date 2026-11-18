@@ -457,6 +457,34 @@ shards of one run do not add up to every mutant exactly once.
 | `render-unexported-skipped` | the rendering leaves unexported fields out, so a change to one is not marked | ring-0 equal suite |
 | `run-cut-at-its-first-slash` | `-run` is matched by its text up to the first `/`, so a later alternative's suite is dropped | fixtures conformance: the suite the second alternative names does not run |
 | `run-of-a-missing-test-function-replays-seeds` | a `-run` naming the Test function of a suite without test methods replays its seeds | fuzz conformance: the seeds replay and the shared fixture starts |
+| `run-pattern-reaches-every-suite-process` | a `-run` pattern reaches every suite process whole, so a first level that matches two suites runs both in each | CLI conformance: the hooks and the method run twice, and the shared-fixture suite runs in a process without its state |
+| `run-pattern-keeps-unnamed-fuzz-seeds` | a `-run` without a subtest level reaches the suite process unnarrowed, so naming the Test function also replays the fuzz seeds | CLI conformance: the fuzz wrapper has a verdict |
+| `args-words-read-by-gotest` | `-json` after `-args` is stripped and read as gotest's own | CLI conformance: the run streams JSON and the binary never sees `-json` |
+| `user-overlay-accepted` | a user `-overlay` reaches the build and replaces the generated harness | CLI conformance: the run exits 0 with no tests to run |
+| `goflags-overlay-refused` | an `-overlay` in `GOFLAGS` is refused as if given on the command line | CLI conformance: the run exits 2 instead of running the suite |
+| `profile-file-shared-by-suite-processes` | a profile flag reaches every suite process of a run, each writing the one file | CLI conformance: the two-package run exits 0 |
+| `profile-flag-refused-for-one-suite` | a profile flag is refused even when the run starts one suite process | CLI conformance: the one-suite run exits 2 |
+| `list-runs-the-suites` | `-list` dispatches the suites, their fixtures and the testing package's list per suite process | CLI conformance: the shared fixture is started and the run exits 1 |
+| `config-timeout-reaches-fuzz` | `gotest fuzz` takes the config's timeout and setup-timeout as flags it refuses | CLI conformance: the session exits 2 naming `--timeout` |
+| `fuzz-timeout-flag-accepted` | `gotest fuzz` no longer refuses `--timeout` given as a flag | CLI conformance: the flagged session does not exit 2 |
+| `config-values-unchecked` | `.gotest.yml` values out of their flag's range load without a word | CLI conformance: the run does not exit 2 naming the key |
+| `focus-narrows-in-silence` | a run narrowed by `F_` outside CI mode says nothing | CLI conformance: stderr holds no note |
+| `focus-note-fails-the-run` | the focus note outside CI mode ends the run with exit 1 | CLI conformance: the focused run exits 1 |
+| `suite-that-ran-nothing-passes` | a text run never holds a suite to the tests it runs | CLI conformance: the wrapped binary that ran nothing passes |
+| `ran-nothing-rule-matches-substrings` | the no-tests rule matches the testing package's warning inside a longer line | runner unit: a child's line that quotes the warning fails the suite |
+| `binary-count-zero-held-to-tests` | the no-tests rule ignores `-test.count=0` after `-args` | CLI conformance: the run exits 2 naming the suite |
+| `merged-coverage-keeps-the-maximum` | a merged count or atomic cover profile keeps each block's largest count | CLI conformance: the block two suites ran reads 1 |
+| `vendored-module-gets-no-advice` | a vendored module's build failure for the missing runtime names no fix | CLI conformance: stderr lacks the blank import |
+| `cover-profile-outlives-its-run` | the cover profile a `--min` run makes for itself is left behind | CLI conformance: a `gotest-work-*` dir stays in the temp directory |
+| `forced-exit-books-nothing` | an exit at a further stop leaves a stream that never books the run as interrupted | runner unit: the stream ends without the `interrupted` package |
+| `deadline-cut-suite-passes` | a suite whose method returned when `--timeout` stopped it keeps its passing verdict | CLI conformance: the package verdict is `pass` |
+| `deadline-names-no-suite` | an expired `--timeout` with no method left running fails the run without naming the suite it stopped | CLI conformance: the FAIL line names nothing |
+| `stop-ended-method-reads-passed` | a method the runtime says the stop ended keeps its passing verdict at an expired `--timeout` | runner unit: the deadline names no method and books nothing for it |
+| `damaged-cached-binary-reused` | a cached binary the go command left alone is reused without comparing it with its record | CLI conformance: the truncated binary's run exits 1 |
+| `unrecorded-cached-binary-trusted` | a cached binary without a record is reused as if it matched one | CLI conformance: the second run links nothing |
+| `clean-cache-removes-nothing` | `gotest clean --cache` exits 0 and leaves the cache as it was | CLI conformance: a cached binary is left |
+| `clean-cache-takes-packages` | `gotest clean --cache` with a package beside it clears the cache instead of refusing | CLI conformance: the run exits 0 |
+| `build-only-modes-accepted` | `-c`, `-n` and `-fuzz` reach the go command or the binaries unrefused | CLI conformance: `-c` exits with the raw `go list` usage |
 | `setup-waits-not-deferred` | the waits BeforeAll registered run last first without defer, so a failing one skips the rest | canary: setupwaits' fixtures are released before the first goroutine ended |
 | `short-values-diffed` | values that each fit one short line are diffed instead of shown side by side | ring-0 equal suite |
 | `skip-filter-ignored` | -skip plays no part in which suites a fixture starts for | fixtures conformance: the fixture of a suite -skip names whole still starts |

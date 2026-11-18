@@ -62,6 +62,8 @@ var gotestFlags = map[string]FlagKind{
 	"--skip-group": ListFlag,
 
 	"--control": ValueFlag,
+
+	"--cache": BoolFlag,
 }
 
 var testAllowed = flagSet(
@@ -109,6 +111,8 @@ var scaffoldAllowed = flagSet("--fuzz")
 var noOwnFlags = flagSet()
 
 var migrateAllowed = flagSet("--dry-run")
+
+var cleanAllowed = flagSet("--cache")
 
 var skillAllowed = flagSet("--dir")
 

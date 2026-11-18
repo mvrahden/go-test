@@ -163,6 +163,16 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 			gotest.Equal(sub, tc.expect, got)
 		}
 	})
+
+	t.When("the command takes neither --timeout nor --setup-timeout", func(w *gotest.T) {
+		inv := Invocation{Args: []string{"./..."}, Config: config.ProjectConfig{Tags: "x", Timeout: config.Dur(10 * time.Minute), SetupTimeout: config.Dur(time.Minute)}}
+		w.It("adds the tags and neither duration", func(it *gotest.T) {
+			gotest.Equal(it, []string{"-tags=x", "./..."}, inv.DefaultArgsFor(ExportFuzzAllowed))
+		})
+		w.It("adds both for a command that takes them", func(it *gotest.T) {
+			gotest.Equal(it, []string{"--timeout=10m0s", "--setup-timeout=1m0s", "-tags=x", "./..."}, inv.DefaultArgsFor(ExportTestAllowed))
+		})
+	})
 }
 
 func (s *FlagParsingTestSuite) TestSplitArgs(t *gotest.T) {
@@ -425,6 +435,7 @@ func (s *FlagParsingTestSuite) TestParseParallelFlag(t *gotest.T) {
 		{Desc: "invalid value", args: []string{"--parallel=abc"}, expectErr: true},
 		{Desc: "zero value", args: []string{"--parallel=0"}, expectErr: true},
 		{Desc: "negative value", args: []string{"--parallel=-4"}, expectErr: true},
+		{Desc: "empty value", args: []string{"--parallel="}, expectErr: true},
 	}) {
 		got, err := ExportParseParallelFlag(tc.args)
 		if tc.expectErr {
@@ -450,6 +461,7 @@ func (s *FlagParsingTestSuite) TestParseCompileParallelFlag(t *gotest.T) {
 		{Desc: "invalid value", args: []string{"--compile-parallel=abc"}, expectErr: true},
 		{Desc: "zero value", args: []string{"--compile-parallel=0"}, expectErr: true},
 		{Desc: "negative value", args: []string{"--compile-parallel=-1"}, expectErr: true},
+		{Desc: "empty value", args: []string{"--compile-parallel="}, expectErr: true},
 	}) {
 		got, err := ExportParseCompileParallelFlag(tc.args)
 		if tc.expectErr {
@@ -698,4 +710,107 @@ func (s *FlagParsingTestSuite) TestScaffoldUsageErrorsExit2(t *gotest.T) {
 	}) {
 		gotest.Equal(t, 2, ExportRunScaffold(Invocation{Args: tc.args}))
 	}
+}
+
+func (s *FlagParsingTestSuite) TestTheBinarysWordsAreNotRead(t *gotest.T) {
+	t.When("a word gotest knows follows -args", func(w *gotest.T) {
+		w.It("is not read as --spec", func(it *gotest.T) { gotest.False(it, ExportSpecRequested([]string{"./p", "-args", "--spec"})) })
+		w.It("is not stripped as -json", func(it *gotest.T) {
+			on, rest := ExportStripJSONFlag([]string{"./p", "-args", "-json"})
+			gotest.False(it, on)
+			gotest.Equal(it, []string{"./p", "-args", "-json"}, rest)
+		})
+		w.It("is not a flag the run was given", func(it *gotest.T) { gotest.False(it, ExportHasFlag([]string{"./p", "-args", "-o", "x"}, "-o")) })
+		w.It("is not a request for help", func(it *gotest.T) { gotest.False(it, ExportContainsHelpFlag([]string{"./p", "-args", "-h"})) })
+	})
+	t.When("the same word comes before -args", func(w *gotest.T) {
+		w.It("is read", func(it *gotest.T) {
+			gotest.True(it, ExportSpecRequested([]string{"--spec", "./p", "-args", "x"}))
+			on, rest := ExportStripJSONFlag([]string{"-json", "./p", "-args", "-json"})
+			gotest.True(it, on)
+			gotest.Equal(it, []string{"./p", "-args", "-json"}, rest)
+			gotest.True(it, ExportHasFlag([]string{"-o", "x", "-args", "y"}, "-o"))
+		})
+	})
+	t.When("a go test flag follows a bare --", func(w *gotest.T) {
+		w.It("still counts, as the editor's watch -- -json relies on", func(it *gotest.T) {
+			gotest.True(it, ExportHasFlag([]string{"--", "-tags=x"}, "-tags"))
+			gotest.False(it, ExportHasFlag([]string{"--", "--timeout=1m"}, "--timeout"))
+		})
+	})
+}
+
+func (s *FlagParsingTestSuite) TestAUserOverlay(t *gotest.T) {
+	cfg := &config.ProjectConfig{}
+	t.When("-overlay is among the go test flags", func(w *gotest.T) {
+		for sub, args := range gotest.Each(w, [][]string{{"-overlay=o.json", "./..."}, {"-overlay", "o.json", "./..."}}) {
+			_, err := ExportParseExecFlags(nil, args, cfg)
+			gotest.ErrorContains(sub, err, "-overlay is not supported: gotest compiles its generated harness through an overlay of its own, and the go command reads only one")
+		}
+	})
+	t.When("-overlay follows -args", func(w *gotest.T) {
+		w.It("is the test binary's", func(it *gotest.T) {
+			_, err := ExportParseExecFlags(nil, []string{"./...", "-args", "-overlay=o.json"}, cfg)
+			gotest.NoError(it, err)
+		})
+	})
+}
+
+func (s *FlagParsingTestSuite) TestModesARunDoesNotHave(t *gotest.T) {
+	cfg := &config.ProjectConfig{}
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		err  string
+	}{
+		{Desc: "-c", args: []string{"-c", "./p"}, err: "-c is not supported: gotest builds and runs each suite's binary itself; gotest generate writes the harness for a go test -c of your own"},
+		{Desc: "-n", args: []string{"-n", "./p"}, err: "-n is not supported: gotest has no dry run; --debug keeps the generated sources and the work dir of a real one"},
+		{Desc: "-fuzz", args: []string{"-fuzz=FuzzX", "./p"}, err: "-fuzz is not a run flag: gotest fuzz --target=<FuzzSuite_Method> fuzzes a target, and a run replays its seeds"},
+		{Desc: "-c after -args", args: []string{"./p", "-args", "-c"}, err: ""},
+		{Desc: "-count is no -c", args: []string{"-count=2", "./p"}, err: ""},
+	}) {
+		_, err := ExportParseExecFlags(nil, tc.args, cfg)
+		if tc.err != "" {
+			gotest.ErrorContains(sub, err, tc.err)
+		} else {
+			gotest.NoError(sub, err)
+		}
+	}
+}
+
+func (s *FlagParsingTestSuite) TestCommandHint(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc string
+		args []string
+		want string
+	}{
+		{"a word that is almost a command and no package", []string{"sumary", "./p"}, `unknown command "sumary"; did you mean "summary"?`},
+		{"a standard-library package two edits from a command", []string{"sync"}, ""},
+		{"another", []string{"math"}, ""},
+		{"the word test", []string{"test", "./p"}, `"test" is not a subcommand`},
+	}) {
+		got := ExportCommandHint(tc.args)
+		if tc.want == "" {
+			gotest.Empty(sub, got)
+		} else {
+			gotest.Contains(sub, got, tc.want)
+		}
+	}
+}
+
+func (s *FlagParsingTestSuite) TestATemporaryCoverProfile(t *gotest.T) {
+	args, profile, cleanup, err := ExportEnsureCoverProfile([]string{"./p"}, true)
+	gotest.NoError(t, err)
+	t.It("lies in a stamped work dir, under the name cover.out", func(it *gotest.T) {
+		gotest.Regexp(it, `gotest-work-[^/\\]+[/\\]cover\.out$`, profile)
+		gotest.Equal(it, []string{"./p", "-coverprofile=" + profile}, args)
+		entries, readErr := os.ReadDir(filepath.Dir(profile))
+		gotest.NoError(it, readErr)
+		gotest.NotEmpty(it, entries)
+	})
+	t.It("is removed with its dir by the cleanup", func(it *gotest.T) {
+		cleanup()
+		_, statErr := os.Stat(filepath.Dir(profile))
+		gotest.True(it, os.IsNotExist(statErr))
+	})
 }

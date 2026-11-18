@@ -64,6 +64,21 @@ func (s *CLIOverlayTestSuite) TestARunsGeneratedFilesEndWithIt(t *gotest.T) {
 	})
 }
 
+func (s *CLIOverlayTestSuite) TestARunWithACoverageMinimumEnds(t *gotest.T) {
+	tmp := t.TempDir()
+	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), tempEnv(tmp), "../testdata/covered/", "--min=1")
+	gotest.NoError(t, err)
+	left, globErr := filepath.Glob(filepath.Join(tmp, "gotest-*"))
+
+	t.When("a run given --min and no -coverprofile ends", func(w *gotest.T) {
+		w.It("leaves no coverage profile in the temp directory", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stderr: %s", run.Stderr)
+			gotest.NoError(it, globErr)
+			gotest.Empty(it, left)
+		})
+	})
+}
+
 func (s *CLIOverlayTestSuite) TestADebugRunKeepsItsGeneratedFiles(t *gotest.T) {
 	tmp := t.TempDir()
 	run, err := testkit.RunPackageWithEnv(t.Context(), t.TempDir(), tempEnv(tmp), "--debug", "../testdata/passing/")

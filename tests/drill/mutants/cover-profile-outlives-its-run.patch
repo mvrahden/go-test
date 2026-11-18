@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / leaves no coverage profile in the temp directory \(
+Clause: when a run given --min and no -coverprofile ends → leaves no coverage profile in the temp directory
+--- a/cmd/gotest/cli.go
++++ b/cmd/gotest/cli.go
+@@ -375,7 +375,7 @@
+ 		return goTestArgs, "", noop, err
+ 	}
+ 	profile := filepath.Join(dir, "cover.out")
+-	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { _ = os.RemoveAll(dir) }, nil
++	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() {}, nil
+ }
+ 
+ func enforceCoverage(coverProfile string, minCoverage, code int) int {

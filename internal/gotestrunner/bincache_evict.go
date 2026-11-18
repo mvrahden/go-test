@@ -158,6 +158,7 @@ func evictBinary(b cachedBinary) bool {
 		unlock()
 		return false
 	}
+	_ = os.Remove(b.path + sumSuffix)
 	releaseEvicted(lock, unlock)
 	return true
 }
@@ -176,9 +177,9 @@ func evictLock(l cachedBinary) {
 }
 
 // removeEmptyKey removes a key dir that holds no binary and no lock file:
-// its .cwd and any temp file a run that died left writing it first, then
-// the dir itself, which fails if a run created a lock meanwhile. That run's
-// next use writes .cwd again.
+// its .cwd, the records of binaries gone and any temp file a run that died
+// left writing them first, then the dir itself, which fails if a run created
+// a lock meanwhile. That run's next use writes .cwd again.
 func removeEmptyKey(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -190,11 +191,41 @@ func removeEmptyKey(dir string) {
 		}
 	}
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), checkoutFile+".tmp-") {
-			_ = os.Remove(filepath.Join(dir, e.Name()))
+		name := e.Name()
+		if strings.HasPrefix(name, checkoutFile+".tmp-") || strings.HasSuffix(name, ".test"+sumSuffix) || strings.Contains(name, ".test"+sumSuffix+".tmp-") {
+			_ = os.Remove(filepath.Join(dir, name))
 		}
 	}
 	_ = os.Remove(filepath.Join(dir, checkoutFile))
 	keyEmptied(dir)
 	_ = os.Remove(dir)
+}
+
+// ClearBinaryCache removes every cached test binary no run is linking or
+// copying, with its lock and record, and the key dirs left empty. It returns
+// how many it removed, how many it left to a run using them, and the dir.
+func ClearBinaryCache() (removed, inUse int, dir string, err error) {
+	root, err := cacheRoot()
+	if err != nil {
+		return 0, 0, "", err
+	}
+	removed, inUse = clearBinaryCache(root)
+	return removed, inUse, filepath.Join(root, "bin"), nil
+}
+
+func clearBinaryCache(root string) (removed, inUse int) {
+	for _, k := range scanKeys(filepath.Join(root, "bin")) {
+		for _, b := range k.binaries {
+			if evictBinary(b) {
+				removed++
+			} else {
+				inUse++
+			}
+		}
+		for _, l := range k.locks {
+			evictLock(l)
+		}
+		removeEmptyKey(k.dir)
+	}
+	return removed, inUse
 }

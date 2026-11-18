@@ -34,3 +34,29 @@ func (s *CLIPassthroughTestSuite) TestUnknownFlagsReachTheBinary(t *gotest.T) {
 		})
 	})
 }
+
+func (s *CLIPassthroughTestSuite) TestWordsAfterArgsThatGotestAlsoKnows(t *gotest.T) {
+	t.When("-json, --spec, -o or -h follows -args", func(w *gotest.T) {
+		w.It("each reaches the test binary, which refuses it as a flag it does not define, and gotest keeps its text mode", func(it *gotest.T) {
+			// The testing package answers -h with its usage and exit 0, as
+			// under go test.
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "-json", args: []string{"../testdata/customflag/", "-args", "-customflag=yes", "-json"}, exit: 1, stderrHas: "flag provided but not defined: -json"},
+				{Desc: "--spec", args: []string{"../testdata/customflag/", "-args", "-customflag=yes", "--spec"}, exit: 1, stderrHas: "flag provided but not defined: -spec"},
+				{Desc: "-o", args: []string{"../testdata/customflag/", "-args", "-customflag=yes", "-o", "x"}, exit: 1, stderrHas: "flag provided but not defined: -o"},
+				{Desc: "-h", args: []string{"../testdata/customflag/", "-args", "-customflag=yes", "-h"}, exit: 0, stdoutNot: "Usage:\n  gotest"},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.NotContains(sub, run.Stdout, `{"Action"`)
+				if row.stderrHas != "" {
+					gotest.Contains(sub, run.Stderr, row.stderrHas)
+				}
+				if row.stdoutNot != "" {
+					gotest.NotContains(sub, run.Stdout, row.stdoutNot)
+				}
+			}
+		})
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -115,10 +116,16 @@ func commandHint(args []string) string {
 			best, bestDist = name, d
 		}
 	}
-	if best == "" {
+	if best == "" || packageKnown(word) {
 		return ""
 	}
 	return fmt.Sprintf("unknown command %q; did you mean %q? (gotest help lists the subcommands)", word, best)
+}
+
+// packageKnown reports whether the go command resolves word to a package,
+// such as a standard-library one; asked only for a word near a subcommand.
+var packageKnown = func(word string) bool {
+	return exec.Command("go", "list", "--", word).Run() == nil //nolint:gosec // G204: a word the user typed, as a package
 }
 
 // editDistance is the Levenshtein distance between a and b.
@@ -241,12 +248,12 @@ func parseParallelFlag(own OwnFlags) (int, error) {
 }
 
 // parsePositiveIntFlag reads an integer flag that must be positive; an
-// absent or empty flag is 0, the default.
+// absent flag is 0, the default, and an empty one is refused.
 func parsePositiveIntFlag(own OwnFlags, name string) (int, error) {
-	raw := own.Value(name)
-	if raw == "" {
+	if !own.Given(name) {
 		return 0, nil
 	}
+	raw := own.Value(name)
 	v, err := strconv.Atoi(raw)
 	if err != nil {
 		return 0, fmt.Errorf("invalid %s value %q: must be a positive integer", name, raw)
@@ -318,6 +325,18 @@ func parseExecFlags(own OwnFlags, goTestArgs []string, projCfg *config.ProjectCo
 	if hasFlag(goTestArgs, "-o") {
 		return ExecConfig{}, fmt.Errorf("-o is not supported: gotest builds each suite's binary itself; use `gotest generate` to see the sources, or -exec to run the binaries under a command")
 	}
+	if hasFlag(goTestArgs, "-overlay") {
+		return ExecConfig{}, fmt.Errorf("-overlay is not supported: gotest compiles its generated harness through an overlay of its own, and the go command reads only one; put the replacement files in the tree, or run with --debug to inspect the overlay gotest writes")
+	}
+	if hasFlag(goTestArgs, "-c") {
+		return ExecConfig{}, fmt.Errorf("-c is not supported: gotest builds and runs each suite's binary itself; gotest generate writes the harness for a go test -c of your own")
+	}
+	if hasFlag(goTestArgs, "-n") {
+		return ExecConfig{}, fmt.Errorf("-n is not supported: gotest has no dry run; --debug keeps the generated sources and the work dir of a real one")
+	}
+	if hasFlag(goTestArgs, "-fuzz") {
+		return ExecConfig{}, fmt.Errorf("-fuzz is not a run flag: gotest fuzz --target=<FuzzSuite_Method> fuzzes a target, and a run replays its seeds")
+	}
 	patterns, err := ExtractPackagePatterns(goTestArgs)
 	if err != nil {
 		return ExecConfig{}, err
@@ -351,13 +370,12 @@ func ensureCoverProfile(goTestArgs []string, needed bool) ([]string, string, fun
 	if v := gotestrunner.ExtractCoverProfile(goTestArgs); v != "" {
 		return goTestArgs, v, noop, nil
 	}
-	f, err := os.CreateTemp("", "gotest-cover-*.out")
+	dir, err := gotestrunner.NewStampedWorkDir()
 	if err != nil {
 		return goTestArgs, "", noop, err
 	}
-	profile := f.Name()
-	f.Close()
-	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { os.Remove(profile) }, nil
+	profile := filepath.Join(dir, "cover.out")
+	return gotestrunner.InsertBeforeArgs(goTestArgs, "-coverprofile="+profile), profile, func() { _ = os.RemoveAll(dir) }, nil
 }
 
 func enforceCoverage(coverProfile string, minCoverage, code int) int {
@@ -416,7 +434,7 @@ func parseGlobalTimeoutFlag(own OwnFlags) (time.Duration, error) {
 func specRequested(args []string) bool {
 	on := false
 	for _, a := range args {
-		if a == "--" {
+		if a == "--" || a == "-args" {
 			break
 		}
 		name, value, hasEquals := strings.Cut(a, "=")
@@ -439,7 +457,11 @@ func specRequested(args []string) bool {
 func stripJSONFlag(args []string) (bool, []string) {
 	found := false
 	var out []string
-	for _, arg := range args {
+	for i, arg := range args {
+		if arg == "-args" {
+			// The test binary's words, as written.
+			return found, append(out, args[i:]...)
+		}
 		if arg == "-json" {
 			found = true
 			continue

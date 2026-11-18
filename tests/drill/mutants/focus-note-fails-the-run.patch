@@ -1,0 +1,12 @@
+Expect: ^FAIL .*conformance/cli .* / exits 0 when what ran passed \(
+Clause: when a run outside CI mode holds a focused method → exits 0 when what ran passed
+--- a/cmd/gotest/focusguard.go
++++ b/cmd/gotest/focusguard.go
+@@ -85,6 +85,7 @@
+ 		return 0, nil
+ 	}
+ 	if violations := CheckFocusViolations(suites); len(violations) > 0 {
++		defer os.Exit(1)
+ 		fmt.Fprintf(os.Stderr, "note: F_ narrows this run to the focused suites and methods (%d, first %s) — the rest is skipped; remove F_ to run everything, --ci refuses it\n", len(violations), strings.Join(strings.Fields(violations[0].String()), " "))
+ 	}
+ 	return 0, nil

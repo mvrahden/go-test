@@ -29,7 +29,7 @@ var ExportBookBuildFailures = bookBuildFailures
 var ExportBrokenPackageMessage = brokenPackageMessage
 var ExportApplyTeardownFailure = applyTeardownFailure
 var ExportSplitTopLevelOr = splitTopLevelOr
-var ExportSuiteRunFilter = suiteRunFilter
+var ExportProcessRunFilter = processRunFilter
 var ExportAssignCoverProfiles = assignCoverProfiles
 var ExportResolveSetupTimeout = resolveSetupTimeout
 var ExportStampBlock = stampBlock
@@ -48,6 +48,17 @@ var ExportBinaryCacheKey = binaryCacheKey
 var ExportBinaryCacheDir = binaryCacheDir
 var ExportLockFile = lockFile
 var ExportCopyFile = copyFile
+
+type ExportBinarySum = binarySum
+
+var (
+	ExportSumFile     = sumFile
+	ExportCopyFileSum = copyFileSum
+	ExportReadSum     = readSum
+	ExportWriteSum    = writeSum
+)
+
+var ExportClearBinaryCache = clearBinaryCache
 var ExportFilterPackageLevelEvents = filterPackageLevelEvents
 var ExportIsPackageSummaryLine = protocol.IsPackageSummaryLine
 var ExportComputeDispatchConcurrency = computeDispatchConcurrency
@@ -394,3 +405,27 @@ func ExportOnConverterStart(seen func(*os.Process)) (restore func()) {
 	converterStarted = seen
 	return func() { converterStarted = prev }
 }
+
+// profileflags.go
+var ExportSharedProfileFlag = sharedProfileFlag
+
+// ExportHoldToTests holds the collector's text run to the tests it runs.
+func ExportHoldToTests(c *OutputCollector) { c.holdToTests = true }
+
+// compile.go
+var ExportCompileError = compileError
+
+// ExportBookDeadlineCut writes stream through a -json collector as the output
+// of one suite process, cut short by the run's context or not, books the
+// deadline over it and returns the named units and the booked events.
+func ExportBookDeadlineCut(stream string, cutShort bool) (running []CensusCase, booked string) {
+	var stdout, errw bytes.Buffer
+	c := NewOutputCollector(RunStreamJSON, false, WithWriters(&stdout, &errw))
+	_, _ = io.WriteString(c.jsonWriter(), stream)
+	c.verdicts.endSuite(cutShort)
+	before := stdout.Len()
+	running = c.bookDeadline(context.DeadlineExceeded)
+	return running, stdout.String()[before:]
+}
+
+var ExportMayRunNothing = mayRunNothing

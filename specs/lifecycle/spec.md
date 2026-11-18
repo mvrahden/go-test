@@ -438,14 +438,14 @@ A second SIGINT reaching gotest while its suites stop SHALL, on every OS, force 
 - **THEN** exits 130 once the shared fixture's AfterAll ran, leaving no shared fixture process behind
 
 ### Requirement: The run after a second Ctrl-C
-Its processes gone, the run SHALL end on its own path, its stream complete and the run booked as interrupted; gotest SHALL exit by itself only when the run has not ended two seconds after that, or at a further SIGINT, and then between two events of the stream.
+Its processes gone, the run SHALL end on its own path, its stream complete and the run booked as interrupted; gotest SHALL exit by itself only when the run has not ended two seconds after that, or at a further SIGINT, and then between two events of the stream. An exit gotest makes itself SHALL first book the run as interrupted on a stream that does not hold that booking yet.
 
 #### Scenario: A -json run whose method ignores the stop
 - **WHEN** a second SIGINT reaches a -json run while a stopped method body ignores its context
 - **THEN** books the run as interrupted on its stream
 
 ### Requirement: Stopping gotest through its standard input
-With --control=stdin, gotest SHALL read its standard input by line: a stop line SHALL stop the run as a first SIGINT does; a force line SHALL act as a second SIGINT, never a repeat of the first, starting the stop when none is under way; the input's end SHALL stop a run no stop is under way in. Lines and signals SHALL count as one source: a SIGINT within 300ms of a stop line is that stop, a later one the second. Without --control, gotest SHALL NOT read its standard input.
+With --control=stdin, gotest SHALL read its standard input by line: a stop line SHALL stop the run as a first SIGINT does; a force line SHALL act as a second SIGINT, never a repeat of the first, starting the stop if none is; the input's end SHALL stop a run not yet stopping. Lines and signals SHALL be one source: a SIGINT within 300ms of a stop line is that stop, a later one the second. Any other line SHALL be ignored, however long. Without --control, gotest SHALL NOT read its standard input.
 
 #### Scenario: A stop line
 - **WHEN** a stop line reaches gotest's standard input while a method holds

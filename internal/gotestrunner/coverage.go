@@ -10,7 +10,8 @@ import (
 )
 
 // MergeCoverProfiles merges multiple Go coverage profile files into a single
-// output file. For overlapping statements, the maximum count is kept.
+// output file. A block several profiles hold gets the sum of their counts
+// under count and atomic, as one go test process counts it, and 1 under set.
 func MergeCoverProfiles(profiles []string, output string) error {
 	var mode string
 	type stmtKey struct{ file, block string }
@@ -39,8 +40,10 @@ func MergeCoverProfiles(profiles []string, output string) error {
 			if err != nil {
 				continue
 			}
-			if existing, ok := merged[key]; !ok || count > existing {
-				merged[key] = count
+			if mode == "set" {
+				merged[key] = max(merged[key], count)
+			} else {
+				merged[key] += count
 			}
 		}
 		f.Close()

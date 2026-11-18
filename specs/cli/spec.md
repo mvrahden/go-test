@@ -19,6 +19,13 @@ gotest SHALL name the go get -tool command to run when a suite imports gotest in
 - **WHEN** a suite imports gotest in a module that does not require it
 - **THEN** names the go get -tool command to run
 
+### Requirement: A vendored module
+When a module's vendor directory lacks pkg/gotestruntime, which the generated harness imports and no file of a user module does, the build failure of each suite package SHALL name the blank import that makes go mod vendor copy it, and -mod=mod.
+
+#### Scenario: A module vendored without the runtime
+- **WHEN** a suite runs in a module whose vendor directory lacks pkg/gotestruntime
+- **THEN** fails to build with exit 2, naming the blank import to add and -mod=mod
+
 ### Requirement: A module that only requires gotest
 gotest SHALL run the suites of a module that requires gotest and declares no tool directive, with the go.mod and go.sum go mod tidy leaves it.
 
@@ -27,14 +34,26 @@ gotest SHALL run the suites of a module that requires gotest and declares no too
 - **THEN** runs its suites and exits 0
 
 ### Requirement: A broken config
-When .gotest.yml does not parse, version and help SHALL still print, and a run SHALL report the config error with exit 2. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+When .gotest.yml does not parse, version and help SHALL still print, and a run SHALL report the config error with exit 2. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`. A value its flag would refuse, or a second YAML document that holds content, SHALL be reported the same way, naming the key and the value or the document's line; an empty one, such as a trailing ---, SHALL be read past.
 
 #### Scenario: A config that does not parse
 - **WHEN** .gotest.yml does not parse
 - **THEN** still prints version and help, and a run reports the config error with exit 2
 
+#### Scenario: A value its flag would refuse
+- **WHEN** .gotest.yml sets parallel, compile-parallel or min-coverage to a value its flag refuses, or holds a second document
+- **THEN** a run reports the key and the value with exit 2
+
+### Requirement: Config defaults a command cannot take
+A timeout or setup-timeout in .gotest.yml SHALL apply only to the commands that take --timeout or --setup-timeout. gotest fuzz, whose clock is --for, SHALL ignore both and SHALL still refuse --timeout given as a flag.
+
+#### Scenario: A config timeout under gotest fuzz
+- **WHEN** .gotest.yml sets timeout and setup-timeout and gotest fuzz runs
+- **THEN** starts the session as without them
+- **AND** still refuses --timeout given as a flag, with exit 2
+
 ### Requirement: Mistyped subcommands
-gotest SHALL suggest the command meant when the first word is almost a subcommand or is the word test, and SHALL run any other word as a package pattern. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+gotest SHALL suggest the command meant when the first word is almost a subcommand or is the word test, and SHALL run any other word as a package pattern, a word the go command resolves to a package included. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
 
 #### Scenario: A first word that is almost a command
 - **WHEN** the first word is almost a subcommand or is a help topic
@@ -46,6 +65,21 @@ gotest SHALL note on stderr, in every mode, that a package has only stdlib tests
 #### Scenario: A package without suites
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
+
+### Requirement: A suite that ran no tests
+In a text run given no -run, -skip, -list or -count=0, nor -test.run, -test.skip, -test.list, -test.bench or -test.count=0 after -args, a suite process whose binary reports that it ran no tests SHALL fail its package and the run with exit 2, naming the suite: the function gotest generated for it was not in the binary. A suite that is guarded, whose methods are all excluded, that focus leaves out or that the user's pattern does not match SHALL NOT fail this way.
+
+#### Scenario: A suite whose binary runs none of its tests
+- **WHEN** a suite's binary runs none of its tests in a text run without a pattern
+- **THEN** fails the package and exits 2, naming the suite as one that ran no tests
+
+#### Scenario: Suites that legitimately run nothing
+- **WHEN** a text run covers a guarded suite, a suite whose methods are all excluded, a run narrowed by focus and a -run that matches nothing
+- **THEN** passes each, the last noted as no tests to run
+
+#### Scenario: The binary's own selection flags
+- **WHEN** a text run gives the binary -test.count=0, -test.run, -test.skip, -test.list or -test.bench after -args
+- **THEN** passes each, never naming a suite as one that ran no tests
 
 ### Requirement: Benchmarks a test run leaves out
 A test run SHALL note on stderr, in every mode, how many benchmarks its packages declare that it did not run, and that gotest bench runs them. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
@@ -78,6 +112,14 @@ With --ci, a run SHALL fail with exit 1 before anything runs when a suite or any
 #### Scenario: A focused fuzz method
 - **WHEN** --ci runs a package whose only focused method is a fuzz target
 - **THEN** fails with exit 1, naming the fuzz target where it is declared
+
+### Requirement: A focused run outside CI mode
+Outside CI mode, a run that holds a focused suite or method SHALL say on stderr, before anything runs, that F_ narrows it, how many items carry the prefix and where the first is declared, and SHALL exit by what ran.
+
+#### Scenario: A focused method outside CI mode
+- **WHEN** a run outside CI mode holds a focused method
+- **THEN** notes on stderr that F_ narrows the run, naming the method where it is declared, in the plain and -json modes
+- **AND** exits 0 when what ran passed
 
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
@@ -112,6 +154,21 @@ A -run, -skip, -bench or -list pattern the testing package would reject SHALL be
 - **WHEN** a -list pattern does not compile
 - **THEN** is refused with exit 2 before anything runs, naming the pattern as go test does
 
+### Requirement: A -run pattern in each suite process
+Each suite process SHALL run only its own suite under a -run pattern: for every alternative whose first level matches the suite's Test function or one of its fuzz wrappers, the process SHALL get that alternative with its first level replaced by the function's exact name, the later levels as written. A suite SHALL so run once however many suites the first level matches, an Exclusive suite only in its own slot, a suite binding a shared fixture only where its state is.
+
+#### Scenario: A subtest pattern whose first level matches two suites
+- **WHEN** -run names a method under a first level that matches two suites of a package
+- **THEN** runs each suite's hooks and the method once, each suite in its own process
+
+#### Scenario: A subtest pattern beside a suite that binds a shared fixture
+- **WHEN** -run /TestState runs a package holding a suite that binds a shared fixture beside one that binds none
+- **THEN** passes, the fixture's suite running only in the process given its state
+
+#### Scenario: A pattern naming only a suite's Test function
+- **WHEN** -run names only the Test function of a suite that also has a fuzz method
+- **THEN** runs the test methods and replays no fuzz seed, as go test does
+
 ### Requirement: Go test flags gotest implements
 A go test flag gotest implements itself SHALL keep the meaning go test gives it, or SHALL be refused with a reason. The cases are the table in `tests/conformance/cli/goflags_suite_test.go`.
 
@@ -119,12 +176,35 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **WHEN** a go test flag gotest implements itself is given
 - **THEN** keeps the meaning go test gives the flag, or refuses it with a reason
 
+#### Scenario: A user overlay
+- **WHEN** -overlay is given to a run
+- **THEN** refuses it with exit 2 before anything is built, saying gotest compiles its harness through an overlay of its own
+- **AND** still compiles its harness when GOFLAGS carries an -overlay
+
+#### Scenario: A build-only mode or the fuzz engine
+- **WHEN** -c, -n or -fuzz is given to a run
+- **THEN** refuses each with exit 2, naming what does that job instead
+
+#### Scenario: A profile flag over several suite processes
+- **WHEN** -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes
+- **THEN** refuses it with exit 2, naming the flag and how many processes would write its file
+- **AND** a run of one suite writes the profile
+
+#### Scenario: Listing a package's tests
+- **WHEN** -list is given a pattern over a package with two suites, one binding a shared fixture
+- **THEN** prints each matching name once and exits 0
+- **AND** starts no suite and no shared fixture
+
 ### Requirement: Flags for the test binary
-A flag only the test binary declares SHALL reach the binary after -- or -args, as under go test. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
+A flag only the test binary declares SHALL reach the binary after -- or -args. Every word after -args SHALL reach the binary as written: gotest reads none of them as a flag of its own, as a go test flag or as a package. After a bare -- gotest SHALL read no flag of its own, while go test flags and packages still count. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
 
 #### Scenario: A flag gotest does not know
 - **WHEN** a flag only the test binary declares is passed
 - **THEN** reaches the test binary after -- or -args, and the binary fails its check without it
+
+#### Scenario: Words after -args that gotest also knows
+- **WHEN** -json, --spec, -o or -h follows -args
+- **THEN** each reaches the test binary, which refuses it as a flag it does not define, and gotest keeps its text mode
 
 ### Requirement: Coverage profile spellings
 gotest SHALL find a coverage profile in every spelling go test accepts, for the run's --min gate and for summary. The cases are the table in `tests/conformance/cli/coverage_suite_test.go`.
@@ -132,6 +212,13 @@ gotest SHALL find a coverage profile in every spelling go test accepts, for the 
 #### Scenario: A profile in each spelling
 - **WHEN** a fully covered package runs with a minimum and a profile
 - **THEN** finds the profile in every spelling go test accepts, for the --min gate and for summary
+
+### Requirement: Merged coverage counts
+A -coverprofile under -covermode=count or atomic SHALL hold, for each block, the sum of the counts of the package's suite processes that ran it: a block a test runs is counted as go test's one process counts it, but code that runs at package initialisation is counted once per suite process. Under set a block any process ran SHALL read 1.
+
+#### Scenario: A block two suites run
+- **WHEN** two suites of a package each run a block once under -covermode=count
+- **THEN** the profile counts the block twice
 
 ### Requirement: Scaffold paths
 The scaffold subcommand SHALL write the scaffold beside the source file it is given, or into the directory of the package a type or function target names, by a relative or an absolute path, even when the path runs through a symlinked directory and when the working directory is outside the module. The relative and absolute cases are the tables in `tests/conformance/cli/scaffold_suite_test.go`.
@@ -303,7 +390,7 @@ gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper
 - **THEN** runs the suite
 
 ### Requirement: Generated files are the run's own
-The files a run generates for its packages SHALL be the run's own: runs that share a cache SHALL never share or remove each other's, and a --debug run SHALL keep its own for inspection.
+The files a run generates for its packages SHALL be the run's own: runs that share a cache SHALL never share or remove each other's, and a --debug run SHALL keep its own for inspection. A coverage profile the run needs and the user did not name SHALL lie in a work directory stamped as the run's own, so a later run removes it if this one is killed.
 
 #### Scenario: Runs sharing a cache
 - **WHEN** 16 runs of one package start at once and share one cache
@@ -317,8 +404,12 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 - **WHEN** a --debug run ends
 - **THEN** names its overlay on stderr and keeps it
 
+#### Scenario: A run with a coverage minimum ends
+- **WHEN** a run given --min and no -coverprofile ends
+- **THEN** leaves no coverage profile in the temp directory
+
 ### Requirement: The test binary cache
-A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most 5 GiB, and an eviction SHALL never fail a run or take a binary a run is linking or copying.
+A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most 5 GiB, and an eviction SHALL never fail a run or take a binary a run is linking or copying. A run SHALL reuse a cached binary only when it still has the size and checksum recorded when it was last linked; one that does not, or has no record, SHALL be linked again.
 
 #### Scenario: A checkout that no longer exists
 - **WHEN** a cache key records a checkout that no longer exists
@@ -327,6 +418,22 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 #### Scenario: A binary unused for 7 days
 - **WHEN** a cached binary has not been used for 7 days
 - **THEN** a run removes it and keeps the binaries used since
+
+#### Scenario: A cached binary damaged since it was linked
+- **WHEN** a cached test binary is truncated, or zero-filled at its end, after a run linked it
+- **THEN** the next run links it again, says so on stderr, and passes
+
+#### Scenario: A cached binary no run recorded
+- **WHEN** a cached test binary has no record beside it
+- **THEN** the next run links it again without a word and records it
+
+### Requirement: Clearing the test binary cache
+gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
+
+#### Scenario: Clearing the cache
+- **WHEN** gotest clean --cache runs
+- **THEN** removes every cached binary no run is using and says how many
+- **AND** refuses a package beside the flag with exit 2
 
 ### Requirement: Saving the event stream
 A run given --events-file SHALL write to that file byte for byte the go test -json stream it prints, and SHALL change none of its other output, coverage or exit code. Each event SHALL reach the file when it reaches stdout, a suite's events when its process ends, so a run stopped or killed leaves every event written before, each line whole. summary --input SHALL render the file as the run's summary and exit code, a --min limit excepted: the live run judges it.
@@ -360,3 +467,11 @@ A run given --events-file SHALL write to that file byte for byte the go test -js
 #### Scenario: A killed run
 - **WHEN** a -json run with --events-file is killed while a suite holds
 - **THEN** keeps the events of the suites that ended before the kill, each line whole
+
+### Requirement: A suite cut short by --timeout
+A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method the stop ended while it ran SHALL be booked failed in the stream with the line that names the deadline.
+
+#### Scenario: A method that returns when its context ends
+- **WHEN** --timeout expires while a method waits for its context to end, and the method then returns
+- **THEN** fails the package and the run with exit 1, on the text and -json pipelines
+- **AND** names the suite in the run's FAIL line, on stderr and in the stream

@@ -38,9 +38,14 @@ type OutputCollector struct {
 	StdlibTestsByPkg map[string]int
 	// bench marks a bench run, whose packages that run nothing pass as go
 	// test -bench passes them: without a note.
-	bench  bool
-	stdout io.Writer
-	stderr io.Writer
+	bench bool
+	// list marks a -list run, whose passing output is the answer.
+	list bool
+	// holdToTests fails a suite whose binary ran no test: a text run with no
+	// pattern and no -count=0 dispatches only functions gotest generated.
+	holdToTests bool
+	stdout      io.Writer
+	stderr      io.Writer
 	// starts writes the JSON stream, opening each package as go test does.
 	starts *startWriter
 	// gate is held by every write of the stream; the exit takes it whole.
@@ -158,6 +163,13 @@ func (c *OutputCollector) recordResultLocked(pkg string, idx int, r SuiteResult)
 	} else if how != "" {
 		r.ExitCode = code
 		note = fmt.Sprintf("gotest: suite binary terminated %s\n", how)
+	} else if r.DeadlineCut {
+		r.ExitCode = max(r.ExitCode, 1)
+		note = fmt.Sprintf("gotest: --timeout expired while %s %s was running\n", pkg, r.Target.SuiteName)
+	}
+	if c.holdToTests && r.ExitCode == 0 && r.Target.SuiteName != "" && !r.Target.Bench && warnsNoTests(r.Stderr) {
+		r.ExitCode = 2
+		r.Stderr = append(r.Stderr, fmt.Sprintf("gotest: %s ran no tests: the test binary holds no such function, so the generated harness was not part of the build; rerun with --debug to inspect it\n", r.Target.SuiteName)...)
 	}
 	if note != "" {
 		r.Stderr = append(r.Stderr, note...)
@@ -288,6 +300,17 @@ const noTestsToRun = "[no tests to run]"
 // noTestsWarning is what a test binary prints on stderr when it ran no
 // test; go test notes the package with noTestsToRun when it sees it.
 var noTestsWarning = []byte("testing: warning: no tests to run")
+
+// warnsNoTests reports whether a line of stderr is the testing package's
+// warning, whole: a test's own words that merely contain it do not count.
+func warnsNoTests(stderr []byte) bool {
+	for line := range bytes.SplitSeq(stderr, []byte("\n")) {
+		if bytes.Equal(bytes.TrimRight(line, "\r"), noTestsWarning) {
+			return true
+		}
+	}
+	return false
+}
 
 // ranNoTests reports whether every suite binary of a package ran no test.
 func ranNoTests(results []SuiteResult) bool {
@@ -492,7 +515,7 @@ func (c *OutputCollector) flushTextPkg(s *pkgState, pkg string) {
 			failed = true
 		}
 	}
-	if c.verbose || failed {
+	if c.verbose || failed || c.list {
 		for i := range s.results {
 			r := &s.results[i]
 			_, _ = c.stdout.Write(StripTrailingStatus(r.Stdout))
@@ -565,6 +588,9 @@ func (c *OutputCollector) jsonTarget() io.Writer {
 			w = io.MultiWriter(w, c.events)
 		}
 		c.starts = &startWriter{w: w, started: map[string]bool{}, gate: c.gate, runLevel: c.runLevel}
+		if c.gate == &exitGate {
+			liveStream.Store(c.starts)
+		}
 	}
 	return c.starts
 }
@@ -596,6 +622,17 @@ func (s *startWriter) Write(p []byte) (int, error) {
 	}
 	s.buf = append([]byte(nil), s.buf...)
 	return len(p), nil
+}
+
+// bookExit books the run as interrupted unless the stream already holds
+// that booking; the caller holds the gate, so it writes line by line.
+func (s *startWriter) bookExit() {
+	if s.started[interruptedPkg] {
+		return
+	}
+	for line := range bytes.Lines(runFailureEvents(interruptedPkg, "run interrupted: ended by a further stop before its suites reported")) {
+		s.writeLine(line)
+	}
 }
 
 func (s *startWriter) writeLine(line []byte) {

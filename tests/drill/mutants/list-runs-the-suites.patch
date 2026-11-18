@@ -1,0 +1,16 @@
+Expect: ^FAIL .*conformance/cli .* / prints each matching name once and exits 0 \(
+Expect: ^FAIL .*conformance/cli .* / starts no suite and no shared fixture \(
+Clause: when -list is given a pattern over a package with two suites, one binding a shared fixture → prints each matching name once and exits 0
+Clause: when -list is given a pattern over a package with two suites, one binding a shared fixture → starts no suite and no shared fixture
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -312,9 +312,6 @@
+ 
+ 	// A bench run compiles everything before it dispatches, so no build
+ 	// competes with a running benchmark. Every other run overlaps the two.
+-	if !cfg.Bench && extractFlag(pf.RunFlags, "-list") != "" {
+-		return runList(ctx, cfg, overlay, pf)
+-	}
+ 	if cfg.Bench {
+ 		return runBench(ctx, cfg, overlay, pf)
+ 	}

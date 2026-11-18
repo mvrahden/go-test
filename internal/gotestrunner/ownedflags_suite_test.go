@@ -29,7 +29,7 @@ func (s *OwnedGoTestFlagsTestSuite) TestRunFilterSelectsAFuzzWrapper(t *gotest.T
 			gotest.Equal(it, "TestFuzzyTestSuite", targets[0].SuiteName)
 		})
 		w.It("runs the binary with the user's filter", func(it *gotest.T) {
-			gotest.Equal(it, "FuzzFuzzyTestSuite_FuzzUpper", targets[0].RunFilter)
+			gotest.Equal(it, "^FuzzFuzzyTestSuite_FuzzUpper$", targets[0].RunFilter)
 		})
 		bulk, _ := gotestrunner.ExportPlanSuitePhases(suites, nil, fuzz, nil, "FuzzFuzzyTestSuite_FuzzUpper", "")
 		w.It("plans the suite's fixtures for the run", func(it *gotest.T) {
@@ -81,4 +81,19 @@ func (s *OwnedGoTestFlagsTestSuite) TestUserParallelKeepsTheBudget(t *gotest.T) 
 			gotest.Equal(it, min(64, procs, 3), got)
 		})
 	})
+}
+
+func (s *OwnedGoTestFlagsTestSuite) TestAProfileFlagNamesOneFile(t *gotest.T) {
+	for sub, tc := range gotest.Each(t, []struct {
+		Desc  string
+		flags []string
+		want  string
+	}{
+		{"joined", []string{"-v", "-cpuprofile=cpu.out"}, "-cpuprofile"},
+		{"separate", []string{"-trace", "t.out"}, "-trace"},
+		{"a coverage profile is merged, not shared", []string{"-coverprofile=c.out"}, ""},
+		{"after -args it is the binary's", []string{"-args", "-cpuprofile=x"}, ""},
+	}) {
+		gotest.Equal(sub, tc.want, gotestrunner.ExportSharedProfileFlag(tc.flags))
+	}
 }

@@ -87,3 +87,34 @@ func (s *BinaryCacheKeyTestSuite) TestEviction(t *gotest.T) {
 		gotest.NoError(it, err)
 	})
 }
+
+func (s *BinaryCacheKeyTestSuite) TestSums(t *gotest.T) {
+	t.It("sums a file to its size and CRC-32C", func(it *gotest.T) {
+		path := filepath.Join(it.TempDir(), "a.test")
+		gotest.NoError(it, os.WriteFile(path, []byte("abc"), 0o600))
+		gotest.Equal(it, gotestrunner.ExportBinarySum{Size: 3, CRC: 0x364b3fb7}, gotest.Must(gotestrunner.ExportSumFile(path)))
+	})
+	t.It("returns that sum while copying, and an identical copy", func(it *gotest.T) {
+		dir := it.TempDir()
+		src, dst := filepath.Join(dir, "a.test"), filepath.Join(dir, "b.test")
+		gotest.NoError(it, os.WriteFile(src, []byte("abc"), 0o600))
+		gotest.Equal(it, gotestrunner.ExportBinarySum{Size: 3, CRC: 0x364b3fb7}, gotest.Must(gotestrunner.ExportCopyFileSum(src, dst)))
+		gotest.Equal(it, "abc", string(gotest.Must(os.ReadFile(dst))))
+	})
+	t.It("reads back the record it wrote", func(it *gotest.T) {
+		bin := filepath.Join(it.TempDir(), "a.test")
+		want := gotestrunner.ExportBinarySum{Size: 1 << 20, CRC: 0xdeadbeef}
+		gotest.NoError(it, gotestrunner.ExportWriteSum(bin, want))
+		got, ok := gotestrunner.ExportReadSum(bin)
+		gotest.True(it, ok)
+		gotest.Equal(it, want, got)
+	})
+	t.It("reads no record from a malformed or missing file", func(it *gotest.T) {
+		bin := filepath.Join(it.TempDir(), "a.test")
+		_, ok := gotestrunner.ExportReadSum(bin)
+		gotest.False(it, ok)
+		gotest.NoError(it, os.WriteFile(bin+".sum", []byte("garbage"), 0o600))
+		_, ok = gotestrunner.ExportReadSum(bin)
+		gotest.False(it, ok)
+	})
+}

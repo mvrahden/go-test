@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / the next run links it again without a word and records it \(
+Clause: when a cached test binary has no record beside it → the next run links it again without a word and records it
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -101,7 +101,7 @@
+ 		return CompileResult{}, compileError(pkgPath, err, nil)
+ 	}
+ 	record, recorded := readSum(outputPath)
+-	if beforeErr == nil && before == after && (!recorded || record != after) {
++	if beforeErr == nil && before == after && recorded && record != after {
+ 		_ = os.Remove(outputPath)
+ 		if err := link(); err != nil {
+ 			return CompileResult{}, err

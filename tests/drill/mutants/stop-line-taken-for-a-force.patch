@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/lifecycle ControlInput .* / is the same stop within 
 Clause: when a SIGINT follows a stop line → is the same stop within 300ms, finishing the fixture teardown, and later the second, abandoning the teardown saying so
 --- a/cmd/gotest/signals.go
 +++ b/cmd/gotest/signals.go
-@@ -117,7 +117,7 @@
- 	for lines.Scan() {
- 		switch strings.TrimSuffix(lines.Text(), "\r") {
+@@ -135,7 +135,7 @@
+ 		}
+ 		switch string(line) {
  		case "stop":
 -			events <- aStop
 +			events <- aForce

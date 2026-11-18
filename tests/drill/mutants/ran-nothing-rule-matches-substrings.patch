@@ -1,0 +1,13 @@
+Expect: ^FAIL .*internal/gotestrunner .*OutputCollector
+Judge: ./internal/gotestrunner OutputCollectorTestSuite/TestASuiteThatRanNoTests
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -302,7 +302,7 @@
+ // warning, whole: a test's own words that merely contain it do not count.
+ func warnsNoTests(stderr []byte) bool {
+ 	for line := range bytes.SplitSeq(stderr, []byte("\n")) {
+-		if bytes.Equal(bytes.TrimRight(line, "\r"), noTestsWarning) {
++		if bytes.Contains(line, noTestsWarning) {
+ 			return true
+ 		}
+ 	}

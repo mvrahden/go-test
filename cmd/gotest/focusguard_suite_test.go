@@ -1,7 +1,11 @@
 package main_test
 
 import (
+	"path/filepath"
+
 	. "github.com/mvrahden/go-test/cmd/gotest"
+
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
@@ -48,4 +52,23 @@ func (s *FocusGuardTestSuite) TestFocusViolation_String(t *gotest.T) {
 	}) {
 		gotest.Equal(sub, tc.expected, tc.v.String())
 	}
+}
+
+func (s *FocusGuardTestSuite) TestFocusGate(t *gotest.T) {
+	dir, err := filepath.Abs(filepath.Join("..", "..", "tests", "conformance", "testdata", "focused"))
+	gotest.NoError(t, err)
+	loaded, _, err := gotestgen.LoadPackages([]string{dir}, nil)
+	gotest.NoError(t, err)
+	t.When("a load holds a focused method", func(w *gotest.T) {
+		w.It("fails the run in CI mode", func(it *gotest.T) {
+			code, err := ExportFocusGate(loaded, true)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 1, code)
+		})
+		w.It("lets it run outside CI mode", func(it *gotest.T) {
+			code, err := ExportFocusGate(loaded, false)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 0, code)
+		})
+	})
 }

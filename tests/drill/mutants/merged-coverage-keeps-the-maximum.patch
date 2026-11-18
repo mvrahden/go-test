@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / the profile counts the block twice \(
+Clause: when two suites of a package each run a block once under -covermode=count → the profile counts the block twice
+--- a/internal/gotestrunner/coverage.go
++++ b/internal/gotestrunner/coverage.go
+@@ -40,7 +40,7 @@
+ 			if err != nil {
+ 				continue
+ 			}
+-			if mode == "set" {
++			if true {
+ 				merged[key] = max(merged[key], count)
+ 			} else {
+ 				merged[key] += count

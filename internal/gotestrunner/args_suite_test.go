@@ -180,6 +180,27 @@ func (s *ArgsTestSuite) TestCoverProfile(t *gotest.T) {
 	})
 
 	t.When("merging profiles", func(w *gotest.T) {
+		w.When("the profiles count", func(w2 *gotest.T) {
+			for sub, tc := range gotest.Each(w2, []struct{ Desc, mode, want string }{
+				{"count sums", "count", "foo/bar.go:1.2,3.4 1 4"},
+				{"atomic sums", "atomic", "foo/bar.go:1.2,3.4 1 4"},
+				{"set keeps 1", "set", "foo/bar.go:1.2,3.4 1 1"},
+			}) {
+				a, b := "3", "1"
+				if tc.mode == "set" {
+					a = "1"
+				}
+				dir := sub.TempDir()
+				p1, p2 := filepath.Join(dir, "a.out"), filepath.Join(dir, "b.out")
+				gotest.NoError(sub, os.WriteFile(p1, []byte("mode: "+tc.mode+"\nfoo/bar.go:1.2,3.4 1 "+a+"\n"), 0o600))
+				gotest.NoError(sub, os.WriteFile(p2, []byte("mode: "+tc.mode+"\nfoo/bar.go:1.2,3.4 1 "+b+"\n"), 0o600))
+				out := filepath.Join(dir, "m.out")
+				gotest.NoError(sub, gotestrunner.MergeCoverProfiles([]string{p1, p2}, out))
+				data, err := os.ReadFile(out)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, "mode: "+tc.mode+"\n"+tc.want+"\n", string(data))
+			}
+		})
 		w.When("two profiles with overlapping blocks", func(w2 *gotest.T) {
 			w2.It("merges and sorts with max-count aggregation", func(it *gotest.T) {
 				dir := it.TempDir()
@@ -303,58 +324,36 @@ func (s *ArgsTestSuite) TestHasVerboseFlag(t *gotest.T) {
 	}
 }
 
-func (s *ArgsTestSuite) TestSuiteRunFilter(t *gotest.T) {
+func (s *ArgsTestSuite) TestProcessRunFilter(t *gotest.T) {
+	alpha := []string{"TestAlphaTestSuite", "FuzzAlphaTestSuite_FuzzX"}
+	beta := []string{"TestBetaTestSuite"}
 	for sub, tc := range gotest.Each(t, []struct {
-		Name         string
-		userFilter   string
-		testFuncName string
-		expect       string
+		Name       string
+		userFilter string
+		funcs      []string
+		expect     string
 	}{
-		{
-			Name:         "empty filter",
-			userFilter:   "",
-			testFuncName: "TestFooSuite",
-			expect:       "",
-		},
-		{
-			Name:         "suite only (no subtest)",
-			userFilter:   "^TestFooSuite$",
-			testFuncName: "TestFooSuite",
-			expect:       "",
-		},
-		{
-			Name:         "single method filter",
-			userFilter:   "^TestFooSuite$/^TestBar$",
-			testFuncName: "TestFooSuite",
-			expect:       "^TestFooSuite$/^TestBar$",
-		},
-		{
-			Name:         "multi-method same suite",
-			userFilter:   "^TestFooSuite$/^(TestBar|TestBaz)$",
-			testFuncName: "TestFooSuite",
-			expect:       "^TestFooSuite$/^(TestBar|TestBaz)$",
-		},
-		{
-			Name:         "multi-suite picks matching",
-			userFilter:   "^TestSuiteA$/^TestX$|^TestSuiteB$/^TestY$",
-			testFuncName: "TestSuiteA",
-			expect:       "^TestSuiteA$/^TestX$",
-		},
-		{
-			Name:         "multi-suite picks other",
-			userFilter:   "^TestSuiteA$/^TestX$|^TestSuiteB$/^TestY$",
-			testFuncName: "TestSuiteB",
-			expect:       "^TestSuiteB$/^TestY$",
-		},
-		{
-			Name:         "multi-suite no match",
-			userFilter:   "^TestSuiteA$/^TestX$|^TestSuiteB$/^TestY$",
-			testFuncName: "TestSuiteC",
-			expect:       "",
-		},
+		{Name: "no pattern", userFilter: "", funcs: []string{"TestFooSuite"}, expect: ""},
+		{Name: "a suite-level pattern, the fuzz suite", userFilter: "TestSuite", funcs: alpha, expect: "^TestAlphaTestSuite$|^FuzzAlphaTestSuite_FuzzX$"},
+		{Name: "a suite-level pattern, the plain suite", userFilter: "TestSuite", funcs: beta, expect: "^TestBetaTestSuite$"},
+		{Name: "only the Test function", userFilter: "^TestAlphaTestSuite$", funcs: alpha, expect: "^TestAlphaTestSuite$"},
+		{Name: "an empty first level, the fuzz suite", userFilter: "/TestOne", funcs: alpha, expect: "^TestAlphaTestSuite$/TestOne|^FuzzAlphaTestSuite_FuzzX$/TestOne"},
+		{Name: "an empty first level, the plain suite", userFilter: "/TestOne", funcs: beta, expect: "^TestBetaTestSuite$/TestOne"},
+		{Name: "a first level matching both, the fuzz suite", userFilter: "TestSuite/TestOne", funcs: alpha, expect: "^TestAlphaTestSuite$/TestOne|^FuzzAlphaTestSuite_FuzzX$/TestOne"},
+		{Name: "a first level matching both, the plain suite", userFilter: "TestSuite/TestOne", funcs: beta, expect: "^TestBetaTestSuite$/TestOne"},
+		{Name: "anchored levels", userFilter: "^TestAlphaTestSuite$/^TestOne$", funcs: alpha, expect: "^TestAlphaTestSuite$/^TestOne$"},
+		{Name: "a group in the first level, alpha", userFilter: "Test(Alpha|Beta)TestSuite/Test(One|Two)$", funcs: alpha, expect: "^TestAlphaTestSuite$/Test(One|Two)$"},
+		{Name: "a group in the first level, beta", userFilter: "Test(Alpha|Beta)TestSuite/Test(One|Two)$", funcs: beta, expect: "^TestBetaTestSuite$/Test(One|Two)$"},
+		{Name: "an alternative per suite, alpha", userFilter: "TestAlpha.*/TestOne|TestBetaTestSuite", funcs: alpha, expect: "^TestAlphaTestSuite$/TestOne"},
+		{Name: "an alternative per suite, beta", userFilter: "TestAlpha.*/TestOne|TestBetaTestSuite", funcs: beta, expect: "^TestBetaTestSuite$"},
+		{Name: "the suite whole and one method", userFilter: "TestAlphaTestSuite|TestAlphaTestSuite/TestOne", funcs: alpha, expect: "^TestAlphaTestSuite$|^TestAlphaTestSuite$/TestOne"},
+		{Name: "a fuzz wrapper", userFilter: "FuzzAlphaTestSuite_FuzzX", funcs: alpha, expect: "^FuzzAlphaTestSuite_FuzzX$"},
+		{Name: "a level with a space is matched as testing rewrites it", userFilter: "Foo Suite/a b", funcs: []string{"TestFoo_Suite"}, expect: "^TestFoo_Suite$/a b"},
+		{Name: "an alternative inside brackets is one level", userFilter: "Test[|]Suite|TestFooSuite", funcs: []string{"TestFooSuite"}, expect: "^TestFooSuite$"},
+		{Name: "two alternatives entering one function are both kept, once each", userFilter: "Foo|Foo", funcs: []string{"TestFooSuite"}, expect: "^TestFooSuite$"},
+		{Name: "does not compile", userFilter: "Test(", funcs: []string{"TestFooSuite"}, expect: "Test("},
 	}) {
-		got := gotestrunner.ExportSuiteRunFilter(tc.userFilter, tc.testFuncName)
-		gotest.Equal(sub, tc.expect, got)
+		gotest.Equal(sub, tc.expect, gotestrunner.ExportProcessRunFilter(tc.userFilter, tc.funcs))
 	}
 }
 

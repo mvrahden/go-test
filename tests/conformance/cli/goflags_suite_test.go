@@ -1,6 +1,9 @@
 package cli_test
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/testkit"
@@ -40,6 +43,77 @@ func (s *CLIGoTestFlagsTestSuite) TestOwnedGoTestFlags(t *gotest.T) {
 					gotest.Contains(sub, run.Stderr, row.stderrHas)
 				}
 			}
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestAUserOverlay(t *gotest.T) {
+	empty := filepath.Join(t.TempDir(), "o.json")
+	gotest.NoError(t, os.WriteFile(empty, []byte(`{"Replace":{}}`), 0o600))
+	refused, err := testkit.RunCLI(t.Context(), ".", "-overlay", empty, "../testdata/failing/")
+	gotest.NoError(t, err)
+	viaEnv, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{"GOFLAGS=-overlay=" + empty}, "../testdata/failing/")
+	gotest.NoError(t, err)
+	t.When("-overlay is given to a run", func(w *gotest.T) {
+		w.It("refuses it with exit 2 before anything is built, saying gotest compiles its harness through an overlay of its own", func(it *gotest.T) {
+			gotest.Equal(it, 2, refused.Exit, "stdout: %s\nstderr: %s", refused.Stdout, refused.Stderr)
+			gotest.Contains(it, refused.Stderr, "FAIL: -overlay is not supported: gotest compiles its generated harness through an overlay of its own")
+			gotest.Empty(it, refused.Stdout)
+		})
+		w.It("still compiles its harness when GOFLAGS carries an -overlay", func(it *gotest.T) {
+			gotest.Equal(it, 1, viaEnv.Exit, "stdout: %s\nstderr: %s", viaEnv.Stdout, viaEnv.Stderr)
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestABuildOnlyModeOrTheFuzzEngine(t *gotest.T) {
+	t.When("-c, -n or -fuzz is given to a run", func(w *gotest.T) {
+		w.It("refuses each with exit 2, naming what does that job instead", func(it *gotest.T) {
+			for sub, row := range gotest.Each(it, []flagRow{
+				{Desc: "-c is refused with what builds a binary", args: []string{"-c", "../testdata/passing/"}, exit: 2, stderrHas: "-c is not supported"},
+				{Desc: "-n is refused with what keeps the work dir", args: []string{"-n", "../testdata/passing/"}, exit: 2, stderrHas: "-n is not supported"},
+				{Desc: "-fuzz is refused with the command that fuzzes", args: []string{"-fuzz=FuzzX", "../testdata/passing/"}, exit: 2, stderrHas: "-fuzz is not a run flag"},
+			}) {
+				run, err := testkit.RunCLI(sub.Context(), ".", row.args...)
+				gotest.NoError(sub, err)
+				gotest.Equal(sub, row.exit, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+				gotest.Contains(sub, run.Stderr, row.stderrHas)
+			}
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestAProfileFlagOverSeveralSuiteProcesses(t *gotest.T) {
+	dir := t.TempDir()
+	two, err := testkit.RunCLI(t.Context(), ".", "-cpuprofile", filepath.Join(dir, "two.out"), "../testdata/passing/", "../testdata/covered/")
+	gotest.NoError(t, err)
+	one, err := testkit.RunCLI(t.Context(), ".", "-cpuprofile", filepath.Join(dir, "one.out"), "../testdata/passing/")
+	gotest.NoError(t, err)
+	t.When("-cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes", func(w *gotest.T) {
+		w.It("refuses it with exit 2, naming the flag and how many processes would write its file", func(it *gotest.T) {
+			gotest.Equal(it, 2, two.Exit, "stdout: %s\nstderr: %s", two.Stdout, two.Stderr)
+			gotest.Contains(it, two.Stderr, "FAIL: -cpuprofile writes one file, and this run starts 2 suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'")
+		})
+		w.It("a run of one suite writes the profile", func(it *gotest.T) {
+			gotest.Equal(it, 0, one.Exit, "stdout: %s\nstderr: %s", one.Stdout, one.Stderr)
+			_, statErr := os.Stat(filepath.Join(dir, "one.out"))
+			gotest.NoError(it, statErr)
+		})
+	})
+}
+
+func (s *CLIGoTestFlagsTestSuite) TestListingAPackagesTests(t *gotest.T) {
+	run, err := testkit.RunCLI(t.Context(), ".", "-list", "TestSuite$", "../testdata/guardedshared/")
+	gotest.NoError(t, err)
+	t.When("-list is given a pattern over a package with two suites, one binding a shared fixture", func(w *gotest.T) {
+		w.It("prints each matching name once and exits 0", func(it *gotest.T) {
+			gotest.Equal(it, 0, run.Exit, "stdout: %s\nstderr: %s", run.Stdout, run.Stderr)
+			gotest.Equal(it, 1, strings.Count(run.Stdout, "TestGuardedTestSuite\n"))
+			gotest.Equal(it, 1, strings.Count(run.Stdout, "TestFreeTestSuite\n"))
+		})
+		w.It("starts no suite and no shared fixture", func(it *gotest.T) {
+			gotest.NotContains(it, run.Stdout+run.Stderr, "shared fixture")
+			gotest.NotContains(it, run.Stdout, "--- ")
 		})
 	})
 }

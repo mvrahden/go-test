@@ -55,6 +55,9 @@ type SuiteResult struct {
 	Duration time.Duration
 	// CutShort reports that the run's context ended while the process ran.
 	CutShort bool
+	// DeadlineCut reports that the process was cut short and the run's
+	// context ended by its deadline: the suite did not finish.
+	DeadlineCut bool
 	// StoppedBy is the reason the suite process gave for a stop the runner
 	// did not send, such as "signal:SIGTERM"; empty when there was none.
 	StoppedBy string
@@ -154,11 +157,9 @@ func buildSuiteCmd(ctx context.Context, target SuiteTarget, env []string, test2j
 			testArgs = append(testArgs, "-test.benchmem")
 		}
 	case target.RunFilter != "":
-		// A user-supplied -run filter already becomes the entire -test.run
-		// value, so it is left untouched: fuzz seeds replay only when a
-		// generated Fuzz<Suite>_<Method> name happens to match the user's
-		// filter on its own merit. We do not widen an explicit user filter
-		// to also include fuzz funcs — user filter wins (controller ruling).
+		// The user's -run narrowed to this process's own functions (see
+		// processRunFilter): another suite's Test function never runs here,
+		// and fuzz seeds replay only for a wrapper the pattern names.
 		testArgs = append(testArgs, "-test.run="+target.RunFilter)
 	case len(target.FuzzFuncs) > 0:
 		// No user filter: widen the run to an alternation of the suite's
@@ -330,15 +331,19 @@ func RunSingleSuite(ctx context.Context, target SuiteTarget, env []string, test2
 		exitCode = 1
 	}
 
+	// A method the stop ended may still return and pass: the suite did not
+	// finish.
+	deadlineCut := cutShort.Load() && errors.Is(ctx.Err(), context.DeadlineExceeded)
 	return SuiteResult{
-		Target:    target,
-		Stdout:    stdout.Bytes(),
-		Stderr:    stderr.Bytes(),
-		ExitCode:  exitCode,
-		Started:   start,
-		Duration:  duration,
-		CutShort:  cutShort.Load(),
-		StoppedBy: mp.StoppedBy(),
+		Target:      target,
+		Stdout:      stdout.Bytes(),
+		Stderr:      stderr.Bytes(),
+		ExitCode:    exitCode,
+		Started:     start,
+		Duration:    duration,
+		CutShort:    cutShort.Load(),
+		DeadlineCut: deadlineCut,
+		StoppedBy:   mp.StoppedBy(),
 	}
 }
 
@@ -424,13 +429,7 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 				FuzzFuncs:  fuzzFuncsByPkg[pkg][suiteName],
 				Exclusive:  exclusiveByPkg[pkg][suiteName],
 			}
-			if rf := suiteRunFilter(userRunFilter, testFuncName); rf != "" {
-				target.RunFilter = rf
-			} else if userRunFilter != "" && (testless || !selectsFunc(userRunFilter, testFuncName)) {
-				// Selected through a fuzz wrapper's name alone: the user's
-				// filter is the whole -test.run, so only that wrapper runs.
-				target.RunFilter = userRunFilter
-			}
+			target.RunFilter = processRunFilter(userRunFilter, funcs)
 			targets = append(targets, target)
 		}
 	}
@@ -481,7 +480,7 @@ func skipsSuite(userSkipFilter string, funcs []string) bool {
 //
 // A userBenchFilter with sub-benchmark segments additionally scopes what
 // runs inside the wrapper: the per-suite portion of the pattern (extracted
-// with suiteRunFilter, the same helper -run uses for subtest scoping) is
+// with processRunFilter, the same helper -run uses) is
 // carried on the target as BenchFilter and becomes the binary's -test.bench
 // value, where go test's slash matching selects the b.Run sub-benchmarks.
 func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter, userSkipFilter string) []SuiteTarget {
@@ -515,7 +514,7 @@ func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]strin
 				BinaryPath:  bin,
 				RunFlags:    translatedFlags,
 				Bench:       true,
-				BenchFilter: suiteRunFilter(userBenchFilter, benchFuncName),
+				BenchFilter: processRunFilter(userBenchFilter, []string{benchFuncName}),
 			}
 			targets = append(targets, target)
 		}
@@ -532,29 +531,34 @@ func quoteAll(names []string) []string {
 	return out
 }
 
-// suiteRunFilter extracts the portion of userRunFilter that applies to
-// testFuncName and includes a subtest component. Returns empty string when
-// the filter has no subtest part (suite-name-only matching suffices).
-func suiteRunFilter(userRunFilter, testFuncName string) string {
-	if userRunFilter == "" || !strings.Contains(userRunFilter, "/") {
+// processRunFilter narrows a user -run (or -bench) pattern to one suite
+// process's own top-level functions: every alternative whose first level
+// matches one of funcs is kept, its first level replaced by that function's
+// exact name and its later levels as written, so no other suite's function
+// runs in the process. Empty for no pattern; a pattern that does not compile
+// is passed whole for the binary to report.
+func processRunFilter(userFilter string, funcs []string) string {
+	if userFilter == "" {
 		return ""
 	}
-
-	alts := splitTopLevelOr(userRunFilter)
-	if len(alts) == 1 {
-		return userRunFilter
+	if _, err := parseNameFilter(userFilter, "-run"); err != nil {
+		return userFilter
 	}
-
-	var matching []string
-	for _, alt := range alts {
-		if selectsFunc(alt, testFuncName) {
-			matching = append(matching, alt)
+	alts, _ := splitNameFilter(userFilter)
+	var out []string
+	for _, elems := range alts {
+		re := regexp.MustCompile(rewriteName(elems[0]))
+		for _, f := range funcs {
+			if !re.MatchString(f) {
+				continue
+			}
+			alt := strings.Join(append([]string{"^" + regexp.QuoteMeta(f) + "$"}, elems[1:]...), "/")
+			if !slices.Contains(out, alt) {
+				out = append(out, alt)
+			}
 		}
 	}
-	if len(matching) == 0 {
-		return ""
-	}
-	return strings.Join(matching, "|")
+	return strings.Join(out, "|")
 }
 
 // splitTopLevelOr splits a pattern into its alternatives as the testing

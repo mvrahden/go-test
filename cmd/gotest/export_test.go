@@ -279,3 +279,16 @@ var (
 	ExportReadProvenance = readProvenance
 	ExportModulePath     = modulePath
 )
+
+// the words after -args
+var (
+	ExportSpecRequested    = specRequested
+	ExportStripJSONFlag    = stripJSONFlag
+	ExportContainsHelpFlag = containsHelpFlag
+)
+
+// cli.go
+var ExportCommandHint = commandHint
+
+// focusguard.go
+var ExportFocusGate = focusGate
