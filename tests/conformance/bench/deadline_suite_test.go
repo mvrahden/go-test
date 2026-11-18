@@ -23,7 +23,7 @@ func (s *BenchDeadlineTestSuite) TestAHungBenchmark(t *gotest.T) {
 	cache := protocol.EnvCacheDir + "=" + filepath.Join(t.TempDir(), "cache")
 	_, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{cache, "LCB_WARM=1"}, "bench", "../testdata/benchhang/", "-benchtime=1x")
 	gotest.NoError(t, err)
-	run, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{cache}, "bench", "--timeout=10s", "../testdata/benchhang/", "-benchtime=1x")
+	run, err := testkit.RunCLIWithEnv(t.Context(), ".", []string{cache}, "bench", "--timeout="+testkit.Scaled(10*time.Second).String(), "../testdata/benchhang/", "-benchtime=1x")
 	gotest.NoError(t, err)
 
 	t.When("a benchmark hangs until --timeout in a text bench run", func(w *gotest.T) {
