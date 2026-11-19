@@ -84,6 +84,46 @@ func Rewrite(doc []byte, sections map[string]Renderer) ([]byte, error) {
 	return []byte(out.String()), nil
 }
 
+// formats is the renderer of one section from its renderings by format.
+func formats(byFormat map[string]func() string) Renderer {
+	return func(format string) (string, error) {
+		render, ok := byFormat[format]
+		if !ok {
+			return "", fmt.Errorf("has no format %q; formats: %s", format, strings.Join(slices.Sorted(maps.Keys(byFormat)), ", "))
+		}
+		return render(), nil
+	}
+}
+
+// codeCell escapes a code span for a Markdown table cell.
+func codeCell(code string) string {
+	return strings.ReplaceAll(code, "|", `\|`)
+}
+
+// textEscapes keep prose in a Markdown table cell literal: a table's pipe, a
+// tag-like <Name>, and emphasis by * or _.
+var textEscapes = strings.NewReplacer("|", `\|`, "<", "&lt;", "*", `\*`, "_", `\_`)
+
+// textCell escapes prose for a Markdown table cell; `code` spans stay as written.
+func textCell(text string) string {
+	parts := strings.Split(text, "`")
+	for i := 0; i < len(parts); i += 2 {
+		parts[i] = textEscapes.Replace(parts[i])
+	}
+	for i := 1; i < len(parts); i += 2 {
+		parts[i] = codeCell(parts[i])
+	}
+	return strings.Join(parts, "`")
+}
+
+// sentence starts text with a capital letter.
+func sentence(text string) string {
+	if text == "" {
+		return ""
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
 // lines splits doc after each line end, keeping the ends.
 func lines(doc []byte) []string {
 	return strings.SplitAfter(string(doc), "\n")
