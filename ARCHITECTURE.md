@@ -247,7 +247,11 @@ the floor: v1.34.0 is one, so the floor skipped to v1.35.0.
 `make runtime-compat` holds both: `apidiff` fails a runtime that drops or
 changes a symbol of the last release, and a corpus under
 `tests/runtimecompat` runs this tree's generated code against the floor
-release, reaching every runtime symbol the templates call.
+release, reaching every runtime symbol the templates and the fuzz fan call.
+`make runtime-api` holds `pkg/gotest` against the last release too, since an
+older harness and the user's own tests call it: an incompatible change fails
+unless `tests/runtimecompat/accepted-breaks.txt` lists its `apidiff` line,
+and each listed line needs a release note that tells users what to change.
 
 For **suites with fixtures**, every generated top-level function — the
 `TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`
@@ -328,7 +332,7 @@ func BenchmarkFooTestSuite(b *testing.B) {
         s.BeforeEach(eachT)                // outside timing
         b.StartTimer()
         b.ResetTimer()
-        s.BenchmarkParse(gotest.NewB(b))   // user's b.Loop() bounds measurement
+        s.BenchmarkParse(gotestruntime.BenchB(b))   // user's b.Loop() bounds measurement
     })
 }
 ```
@@ -360,14 +364,14 @@ function independently repeats fixture setup and `BeforeAll`:
 func FuzzFooTestSuite_FuzzParse(f *testing.F) {
     s := &ƒƒ_GOTEST_FooTestSuite{}
     gotestruntime.OpenSuite(f, gotestruntime.Suite{...})  // Fixtures only with fixtures
-    ƒf := gotest.NewF(f, s.BeforeEach, s.AfterEach, <target>)   // the method's FuzzTarget, nil for a native f.Fuzz
+    ƒf := gotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, <target>)   // the method's FuzzTarget, nil for a native f.Fuzz
     s.FuzzParse(ƒf)
 }
 ```
 
 Naming: `Fuzz<SuiteIdentifier>_<MethodName>`, full method name kept (e.g.
 `FuzzParserTestSuite_FuzzParse`, not `FuzzParserTestSuite_Parse`) — the
-`gotest.NewF(f, s.BeforeEach, s.AfterEach, <target>)` call is what wires
+`gotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, <target>)` call is what wires
 per-execution lifecycle interposition into `(*gotest.F).Fuzz`
 (`pkg/gotest/f.go`): `BeforeEach` runs immediately before each
 execution's body, `AfterEach` is deferred to run immediately after,
@@ -375,7 +379,7 @@ for every seed replay and every generated input — not once for the whole
 target.
 
 `f.Fuzz` takes `any`, like its stdlib counterpart; the type checking moved
-into generation. The `<target>` above is a generated `gotest.FuzzTarget`
+into generation. The `<target>` above is a generated `gotestruntime.FuzzTarget`
 (`internal/gotestgen/fuzzfan.go`, one per fuzz method): its `Register`
 asserts the callback to the exact `func(*gotest.T, ...)` type read from the
 `f.Fuzz` call at generation time and registers the real `(*testing.F).Fuzz`
@@ -500,6 +504,16 @@ SharedFixtures live in a **separate subprocess** that outlives all test
 binaries. They form a DAG via pointer fields to other SharedFixture types.
 State is transferred via JSON serialization, streamed as each fixture completes.
 
+The setup subprocess is a generated `main` that only describes the
+fixtures: per fixture its name, state key, dependencies, whether it waits
+for a start command, and closures for its config, its parent fields, its
+hooks and its transfer fields. It hands that description to
+`pkg/gotestruntime`'s `RunSharedFixtures`, which is the program: setup in
+dependency order, the commands, the budgets and the release. What the runner
+and the program say to each other is defined once, for both ends, in
+`internal/protocol/sharedwire`: the commands on the program's stdin, the
+lines on its protocol stream, and the state files.
+
 ```
 ┌── SETUP SUBPROCESS ──────────────────────────────────────────────────┐
 │                                                                       │
@@ -521,9 +535,9 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │  SupervisorBudget(Timeout) over the fixtures whose setup was reached  │
 │  (a fixture's share plus the longest chain of those depending on it:  │
 │  teardown below runs concurrently, each after its dependents; a share │
-│  leaves once its teardown ran; the budget rides both _done forms — a  │
-│  failed setup still has succeeded siblings to release under it — and  │
-│  the _cmd acknowledging a start or release)                           │
+│  leaves once its teardown ran; the budget is a teardownBudget field   │
+│  on both _done forms — a failed setup still has succeeded siblings to │
+│  release under it — and on the _cmd acknowledging a start or release) │
 │                                                                       │
 │  ═══════ block on `stop` (stdin) or SIGTERM/SIGINT ═══════            │
 │                                                                       │
@@ -1335,9 +1349,9 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | Package | Role | Imports of this module |
 |---|---|---|
 | `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestbench,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
-| `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass,x/slices}`; third-party: `regexp2`, `x/tools` |
-| `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgpattern,protocol,x/slices}`; third-party: `x/mod`, `x/tools` |
-| `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,schedinfo}` |
+| `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass}`; third-party: `x/tools` |
+| `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgpattern,protocol}`; third-party: `x/mod`, `x/tools` |
+| `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,protocol/sharedwire,schedinfo}` |
 | `internal/gotestspec` | Event stream → tree → terminal, Markdown and JSON renderers; the census | `internal/{about,protocol}` |
 | `internal/gotestbench` | Benchmark baselines, deltas and the gate | `internal/gotestspec` |
 | `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |
@@ -1350,9 +1364,9 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | `internal/filewrite` | Rewrites a set of files all or none | third-party: `x/sys` |
 | `internal/control` | The channel between the runner and a suite process | — |
 | `internal/proctree` | A command as the root of its own process tree | — |
-| `internal/{about,callsite,carry,pkgpattern,protocol,runstate,schedinfo,setupwaits,typeclass,unidiff,x/slices}` | Leaves: constants, small mechanisms shared by two sides | — (`typeclass` imports `internal/about`) |
+| `internal/{about,callsite,carry,pkgpattern,protocol,protocol/sharedwire,runstate,schedinfo,setupwaits,typeclass,unidiff}` | Leaves: constants, small mechanisms shared by two sides | — (`typeclass` imports `internal/about`) |
 | `pkg/gotest` | The user's API: `T`, `B`, `F`, `R`, assertions, `Each`, polls, snapshots | `internal/{callsite,carry,protocol,runstate,setupwaits}`, its own `internal/{assert,snapfile}` (`assert` imports `internal/{callsite,unidiff}`) |
-| `pkg/gotestruntime` | The library every generated harness calls: suite frame, method loop, fixtures, budgets, stop | `pkg/gotest`, `internal/{callsite,carry,control,protocol,runstate,schedinfo,setupwaits}` |
+| `pkg/gotestruntime` | The library every generated harness calls: suite frame, method loop, fixtures, budgets, stop, the shared fixture setup program | `pkg/gotest`, `internal/{callsite,carry,control,protocol,protocol/sharedwire,runstate,schedinfo,setupwaits}` |
 | `pkg/gotestfuzz` | Leaf codecs for fanned fuzz arguments | — |
 | `pkg/lint` | The analyzer, exported for other `go/analysis` drivers; `pkg/lint/golangci`, a module of its own, is its golangci-lint plugin | `internal/lint` |
 | `skills` | The agent skill, embedded for `gotest skill install` | — |
