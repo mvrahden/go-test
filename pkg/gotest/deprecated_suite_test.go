@@ -11,12 +11,31 @@ import (
 // DeprecatedNamesTestSuite holds the constructors only generated code
 // called: a harness an earlier gotest wrote still builds and runs against
 // this tree, and the names are marked deprecated.
-type DeprecatedNamesTestSuite struct{}
+type DeprecatedNamesTestSuite struct {
+	root string // the repository
+	dir  string // the old harness's module, at a fixed path so the build cache keeps one entry
+}
 
 func (s *DeprecatedNamesTestSuite) SuiteConfig() gotest.SuiteConfig {
 	cfg := gotest.IntegrationSuiteConfig()
 	cfg.Parallel = true
 	return cfg
+}
+
+// BeforeAll clears what an interrupted run left in the module directory.
+func (s *DeprecatedNamesTestSuite) BeforeAll(t *gotest.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	gotest.NoError(t, err)
+	s.root = root
+	s.dir = filepath.Join(root, ".scratch", "oldharness")
+	gotest.NoError(t, os.RemoveAll(s.dir))
+	gotest.NoError(t, os.MkdirAll(s.dir, 0o750))
+}
+
+func (s *DeprecatedNamesTestSuite) AfterAll(t *gotest.T) {
+	if s.dir != "" {
+		gotest.NoError(t, os.RemoveAll(s.dir))
+	}
 }
 
 // goIn runs the go command in dir, outside any workspace, and returns its
@@ -33,10 +52,8 @@ func goIn(t *gotest.T, dir string, args ...string) (string, int) {
 }
 
 func (s *DeprecatedNamesTestSuite) TestOldHarness(t *gotest.T) {
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	gotest.NoError(t, err)
+	root, dir := s.root, s.dir
 	src := filepath.Join("testdata", "oldharness")
-	dir := t.TempDir()
 
 	suite, err := os.ReadFile(filepath.Join(src, "old_test.go"))
 	gotest.NoError(t, err)
@@ -70,10 +87,8 @@ func (s *DeprecatedNamesTestSuite) TestOldHarness(t *gotest.T) {
 }
 
 func (s *DeprecatedNamesTestSuite) TestDocComments(t *gotest.T) {
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	gotest.NoError(t, err)
 	doc := func(t *gotest.T, name string) string {
-		out, code := goIn(t, root, "doc", "./pkg/gotest", name)
+		out, code := goIn(t, s.root, "doc", "./pkg/gotest", name)
 		gotest.Equal(t, 0, code, "go doc %s: %s", name, out)
 		return out
 	}
