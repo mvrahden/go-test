@@ -1,15 +1,15 @@
 Expect: failingshared: markers
 Judge: ./tests/canary CanaryTestSuite/TestAFailedSharedSetupIsReleased
 Clause: when a shared fixture's setup fails on its last attempt → runs AfterAll after each of its 2 attempts, releasing what each reached before the next
---- a/internal/gotestgen/static/sharedfixture.go.tpl
-+++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -363,6 +363,9 @@
- 			if ƒskip {
- 				return
- 			}
-+			if ƒerrs[{{ $f.Index }}] != nil {
-+				return
-+			}
- 			ƒtornFailed_{{ $f.VarName }} = gotestruntime.RunFixtureTeardown(ƒreleaseCtx, gotestruntime.FixtureTeardown{
- 				Name:     "{{ $f.Identifier }}",
- 				Timeout:  ƒcfg_{{ $f.VarName }}.Timeout,
+--- a/pkg/gotestruntime/sharedprogram.go
++++ b/pkg/gotestruntime/sharedprogram.go
+@@ -503,6 +503,9 @@
+ 		if skip {
+ 			return
+ 		}
++		if r.errs[i] != nil {
++			return
++		}
+ 		r.tornFailed[i] = RunFixtureTeardown(r.releaseCtx, FixtureTeardown{
+ 			Name:     r.fx[i].Name,
+ 			Timeout:  r.cfg[i].Timeout,
