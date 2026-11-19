@@ -238,8 +238,8 @@ func hungBenchmark(stdout []byte, wrapper string) string {
 	return hung
 }
 
-// RecordNothingToRun books a package that built but none of whose suites
-// run (-run deselected them, or it declares only benchmarks): it passes as
+// RecordNothingToRun books a suite package none of whose suites run (-run
+// deselected them, or it declares only benchmarks), built or not: it passes as
 // go test passes a package that ran no tests. No binary ran, so no time
 // passed; the line keeps go test's shape for every parser that reads it.
 func (c *OutputCollector) RecordNothingToRun(pkg string) {

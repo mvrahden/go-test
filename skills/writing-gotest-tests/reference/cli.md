@@ -14,6 +14,9 @@ invocation runs tests — there is NO `test` subcommand:
   A filtered run builds only the packages it runs, so a build or vet
   failure in a package the filter leaves out goes unreported by that run
   (`go test` builds every matched package).
+  Test binaries are stripped of symbols and debug information, as `go test`
+  strips them; `-ldflags` (an argument or in `GOFLAGS`), a profile flag
+  such as `-cpuprofile`, or `--debug` keeps them in.
   gotest has no result cache. Every run executes every suite it selects;
   it never prints `(cached)`.
   Outside CI mode a focused run notes on stderr that `F_` narrows it
@@ -114,7 +117,10 @@ halved under `-race`). `--github` emits annotations and the step summary
 in `summary`, also writes the event stream to that file. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` a flat shared-fixture
 setup budget (default: what the fixtures declare, v1.34+) — `0` disables either; `--min <pct>` gates
-coverage, `--no-cache` skips the test binary cache and forces a fresh link (`gotest clean --cache`, **v1.38+**, empties it), `--debug` keeps the run's work dir and overlay.
+coverage, `--no-cache` skips the test binary cache and forces a fresh link (`gotest clean --cache`, **v1.38+**, empties it), `--debug` keeps the run's work dir and overlay, and a test run then ends
+with one stderr line, `DEBUG: phases: discover=… generate=… compile=… run=…
+report=… total=…`; compile overlaps run, so it is part of `run`'s span, not
+added to the total.
 `--control=stdin` (**v1.37+**, every command that stops on Ctrl-C) reads
 `stop` and `force` lines on stdin, a first and a second Ctrl-C; the input's
 end is a stop. For a program driving gotest that cannot signal it (Windows);

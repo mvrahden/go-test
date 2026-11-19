@@ -14,7 +14,7 @@ type FlagDoc struct {
 
 // FlagDocs describes each of gotest's own flags, in the reference's order.
 var FlagDocs = []FlagDoc{
-	{"--debug", "", "Keep the run's overlay and work dir for inspection; a later run removes them after 7 days"},
+	{"--debug", "", "Keep the run's work dir, overlay included, and print where it is; a later run removes it after 7 days. The test binaries keep their debug information, and a test run ends with one stderr line of the time each phase took (discover, generate, compile, run, report, total); compile overlaps run, so its span is counted inside run's"},
 	{"--ci", "", "CI mode: fail on `F_` prefixes, snapshot read-only; on by itself where `CI` is set, opt out with `GOTEST_CI=0`"},
 	{"--no-cache", "", "Bypass the test binary cache and link afresh (generation is not cached)"},
 	{"--spec", "", "Render the spec view instead of the default output (default and watch modes)"},
