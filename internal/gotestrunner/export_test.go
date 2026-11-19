@@ -547,3 +547,24 @@ func ExportBenchSlotPlan(targets []SuiteTarget, reqKeys map[string]map[string][]
 	}
 	return benchSlotPlan(slots, fixtures)
 }
+
+var ExportSuiteTargets = suiteTargets
+
+// BuildSuiteTargets builds the targets of the suites the maps declare that
+// -run selects and -skip does not drop whole, for each compiled package.
+func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {
+	plan := planFromMaps(&OverlayResult{SuitesByPkg: suitesByPkg, DirsByPkg: dirsByPkg, FuzzFuncsByPkg: fuzzFuncsByPkg, TestlessSuitesByPkg: testlessByPkg, ExclusiveSuitesByPkg: exclusiveByPkg})
+	selected := byPackage(plan.testRun(selection{Run: userRunFilter, Skip: userSkipFilter}))
+	var targets []SuiteTarget
+	for _, cr := range compiled {
+		targets = append(targets, suiteTargets(cr, selected[cr.Package], runFlags, userRunFilter)...)
+	}
+	return targets
+}
+
+// BuildBenchTargets builds the bench targets of the suites benchesByPkg
+// declares that -run, -bench and -skip select, for each compiled package.
+func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter, userSkipFilter string) []SuiteTarget {
+	plan := planFromMaps(&OverlayResult{BenchesByPkg: benchesByPkg, DirsByPkg: dirsByPkg})
+	return benchTargets(compiled, plan.benchRun(selection{Run: userRunFilter, Bench: userBenchFilter, Skip: userSkipFilter}), runFlags, userBenchFilter)
+}

@@ -63,23 +63,6 @@ func newGroupSelection(only, skip []string) groupSelection {
 	return sel
 }
 
-// inSelectedGroups gives each target its group and drops those of a group
-// the selection leaves out.
-func inSelectedGroups(targets []SuiteTarget, o *OverlayResult) []SuiteTarget {
-	plan := o.plan()
-	kept := targets[:0]
-	for i := range targets {
-		t := targets[i]
-		if s := plan.Suite(t.Package, strings.TrimPrefix(t.SuiteName, "Test")); s != nil {
-			t.Group = s.Group
-		}
-		if o.groups.selects(t.Group) {
-			kept = append(kept, t)
-		}
-	}
-	return kept
-}
-
 // GroupRun is what a named group took in a run: its suites, and the wall
 // time from its first suite's start to its last suite's end.
 type GroupRun struct {

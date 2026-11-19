@@ -92,6 +92,26 @@ func (s *RunPlanTestSuite) TestOnePredicateSelectsATestRun(t *gotest.T, _ *planC
 	}
 }
 
+func (s *RunPlanTestSuite) TestTargetsCarryThePlansFacts(t *gotest.T, _ *planCtx) {
+	suites := []*gotestrunner.PlannedSuite{
+		{Package: "example.com/a", Dir: "/src/a", Name: "AlphaTestSuite", Tests: true, Exclusive: true, Group: "e2e",
+			FuzzFuncs: []gotestrunner.PlannedFuzz{{Func: "FuzzAlphaTestSuite_FuzzX"}}},
+		{Package: "example.com/a", Dir: "/src/a", Name: "SeedsTestSuite", Tests: true, Testless: true,
+			FuzzFuncs: []gotestrunner.PlannedFuzz{{Func: "FuzzSeedsTestSuite_FuzzY"}}},
+	}
+	bin := gotestrunner.CompileResult{Package: "example.com/a", BinaryPath: "/bin/a.test"}
+	got := gotestrunner.ExportSuiteTargets(bin, suites, []string{"-count=1"}, "FuzzSeedsTestSuite_FuzzY")
+	gotest.Len(t, got, 2)
+	// The filter enters none of Alpha's functions: its process gets none of it.
+	gotest.Equal(t, gotestrunner.SuiteTarget{
+		SuiteSpec:  gotestrunner.SuiteSpec{Package: "example.com/a", Dir: "/src/a", SuiteName: "TestAlphaTestSuite"},
+		BinaryPath: "/bin/a.test", RunFlags: []string{"-test.count=1"},
+		FuzzFuncs: []string{"FuzzAlphaTestSuite_FuzzX"}, Exclusive: true, Group: "e2e",
+	}, got[0])
+	gotest.Equal(t, "^FuzzSeedsTestSuite_FuzzY$", got[1].RunFilter)
+	gotest.Equal(t, "TestSeedsTestSuite", got[1].SuiteName)
+}
+
 func (s *RunPlanTestSuite) TestThePlanSaysWhatTheMapsSay(t *gotest.T, c *planCtx) {
 	for _, dir := range []string{"groups", "groupfixtures", "fuzzing", "benching", "fixataildep"} {
 		t.When("the package is "+dir, func(w *gotest.T) {
