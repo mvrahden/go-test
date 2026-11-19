@@ -179,7 +179,7 @@ A generated file left on disk by an earlier generate SHALL neither break nor be 
 - **THEN** --tags= selects the files built with that tag
 
 ### Requirement: Discovery builds no test package
-Reading the suites of a package SHALL NOT make the go command build its test variants or its test main: after a change to a test file, discover, lint and the discovery step of a run add nothing for that package to the build cache.
+Reading the suites of a package SHALL NOT make the go command build its test variants or its test main: after a change to a test file, discover, lint and the discovery step of a run add nothing for that package to the build cache. The one exception is a package whose type-checked files import "C": cgo's generated files come only from a compiled listing, which adds a small record to the build cache for each test variant and test main, though it still compiles none of them.
 
 #### Scenario: A test file changes
 - **WHEN** a test file of a discovered package is changed and the package is discovered again
