@@ -28,6 +28,7 @@ const (
 	envLinkSlow  = "GOTESTRUNTIME_LINK_SLOW"  // how long its AfterAll takes
 	envLinkGate  = "GOTESTRUNTIME_LINK_GATE"  // the file TestMain waits for before m.Run
 	envLinkAfter = "GOTESTRUNTIME_LINK_AFTER" // what TestMain does once m.Run returned
+	envLinkEnd   = "GOTESTRUNTIME_LINK_END"   // TestMain also waits for the runner's end to be gone
 )
 
 // What the holding method does.
@@ -71,11 +72,38 @@ func awaitLinkGate() {
 	if gate == "" {
 		return
 	}
-	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	deadline := time.Now().Add(30 * time.Second)
+	for ; time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		if _, err := os.Stat(gate); err == nil {
+			break
+		}
+	}
+	if os.Getenv(envLinkEnd) == "" {
+		return
+	}
+	// The runner's end closing reaches this process only once no process
+	// holds a copy of it, such as one the runner is forking.
+	for ; time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if channelEnded() {
 			return
 		}
 	}
+}
+
+// channelEnded reports whether a socket of this process, the runner's
+// channel, reads its end. The peek leaves what it reads in place.
+func channelEnded() bool {
+	buf := make([]byte, 1)
+	for fd := 3; fd < 1100; fd++ {
+		var st syscall.Stat_t
+		if syscall.Fstat(fd, &st) != nil || st.Mode&syscall.S_IFMT != syscall.S_IFSOCK {
+			continue
+		}
+		if n, _, err := syscall.Recvfrom(fd, buf, syscall.MSG_PEEK|syscall.MSG_DONTWAIT); n == 0 && err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // afterLinkRun is a suite process's TestMain once its run ended, as a
@@ -156,7 +184,9 @@ type child struct {
 	slow  time.Duration // how long AfterAll takes
 	after string        // what TestMain does after m.Run
 	gated bool          // TestMain waits for the gate before m.Run
-	env   []string
+	// awaitEnd: a gated TestMain also waits for the runner's end to be gone.
+	awaitEnd bool
+	env      []string
 }
 
 // linkRun is one suite process of a scenario: this test binary, started as
@@ -180,6 +210,9 @@ func (r *linkRun) start(t *gotest.T, suite, method string, c child) {
 	env := []string{envLinkMode + "=" + c.mode, envLinkDir + "=" + r.dir, envLinkSlow + "=" + c.slow.String(), envLinkAfter + "=" + c.after}
 	if c.gated {
 		env = append(env, envLinkGate+"="+filepath.Join(r.dir, "gate"))
+	}
+	if c.awaitEnd {
+		env = append(env, envLinkEnd+"=1")
 	}
 	link, end, err := control.New()
 	gotest.NoError(t, err)
@@ -360,9 +393,10 @@ func (s *ControlLinkTestSuite) TestHelloComesBeforeTheFirstSuiteOpens(t *gotest.
 }
 
 // beforeTheFirstOpen runs a gated suite process whose channel gets what
-// send does while TestMain holds it, then lets it run.
-func beforeTheFirstOpen(t *gotest.T, r *linkRun, method string, send func()) (ended string) {
-	r.start(t, linkSuite, method, child{mode: holdQuick, gated: true})
+// send does while TestMain holds it, then lets it run; with closes, once
+// it sees the runner's end gone too.
+func beforeTheFirstOpen(t *gotest.T, r *linkRun, method string, closes bool, send func()) (ended string) {
+	r.start(t, linkSuite, method, child{mode: holdQuick, gated: true, awaitEnd: closes})
 	r.awaitLine(t, control.Hello)
 	send()
 	r.openGate(t)
@@ -373,7 +407,7 @@ func (s *ControlLinkTestSuite) TestAStopBeforeTheFirstOpenSkipsTheSuite(t *gotes
 	if suiteProcess(t) {
 		return
 	}
-	ended := beforeTheFirstOpen(t, r, "TestAStopBeforeTheFirstOpenSkipsTheSuite", func() {
+	ended := beforeTheFirstOpen(t, r, "TestAStopBeforeTheFirstOpenSkipsTheSuite", false, func() {
 		gotest.NoError(t, r.link.Stop())
 	})
 
@@ -393,7 +427,7 @@ func (s *ControlLinkTestSuite) TestTheChannelsEndBeforeTheFirstOpenSkipsTheSuite
 	if suiteProcess(t) {
 		return
 	}
-	ended := beforeTheFirstOpen(t, r, "TestTheChannelsEndBeforeTheFirstOpenSkipsTheSuite", func() { r.link.Close() })
+	ended := beforeTheFirstOpen(t, r, "TestTheChannelsEndBeforeTheFirstOpenSkipsTheSuite", true, func() { r.link.Close() })
 
 	t.When("the runner's end of the channel closes while TestMain runs, before any suite opened", func(w *gotest.T) {
 		w.It("skips the suite with the reason run stopping before it sets anything up", func(it *gotest.T) {
