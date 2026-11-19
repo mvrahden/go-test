@@ -88,8 +88,9 @@ golangci-version:
 	@echo $(GOLANGCI_VERSION)
 
 # Generated code and the runtime may come from different releases: an older
-# harness must compile against this runtime, and this tree's generated code
-# against the oldest runtime it accepts. Both read the release tags.
+# harness must compile against this runtime and this user package, and this
+# tree's generated code against the oldest runtime it accepts. Both read the
+# release tags.
 runtime-compat: runtime-api runtime-floor
 
 runtime-api:
