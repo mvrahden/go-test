@@ -41,16 +41,6 @@ func (r *Result) PrintJSON(w io.Writer) error {
 	return r.graph.PrintJSON(w)
 }
 
-// Run executes the analyzer over the packages matched by patterns, test
-// files included. See Analyze.
-func Run(dir string, patterns []string) ([]Finding, error) {
-	res, err := Analyze(context.Background(), &Targets{Dir: dir, Patterns: patterns, Tests: true})
-	if err != nil {
-		return nil, err
-	}
-	return res.Findings, nil
-}
-
 // Targets are the packages a run lints and how they load.
 type Targets struct {
 	// Dir is the module directory to load from; "" means the current
