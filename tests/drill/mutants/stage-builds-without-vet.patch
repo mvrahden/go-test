@@ -1,0 +1,13 @@
+Clause: when a package with a vet finding is run with -vet=off and then without → the second run reports the finding
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / the second run reports the finding \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -40,7 +40,7 @@
+ 		return nil
+ 	}
+ 	args := append([]string{"test", "-c", "-json", overlayFlag, "-o", stageDir + string(os.PathSeparator)}, buildFlags...)
+-	args = append(args, group...)
++	args = append(append(args, "-vet=off"), group...)
+ 	env := append(os.Environ(), "GOTMPDIR="+goTmp)
+ 	what := "test binary for " + group[0]
+ 	if len(group) > 1 {

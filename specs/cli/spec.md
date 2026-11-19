@@ -533,6 +533,37 @@ A run SHALL link its test binaries without the symbol table and debug informatio
 - **WHEN** GOFLAGS sets -ldflags=-X for a variable the test prints
 - **THEN** the test prints the value and the binary carries debug information
 
+### Requirement: A run never executes a stale binary
+A run SHALL execute a test binary built from the sources, build tags and link flags it was given, whatever an earlier run left in the cache.
+
+#### Scenario: A dependency changes and changes back
+- **WHEN** a dependency's source is changed, run, and restored
+- **THEN** each run prints the value its sources hold
+
+#### Scenario: A test file changes and changes back
+- **WHEN** a test file is changed, run, and restored
+- **THEN** each run prints the value its sources hold
+
+#### Scenario: Build tags as an argument and in GOFLAGS
+- **WHEN** a run is given a build tag by -tags, then by GOFLAGS, then none
+- **THEN** each run executes the binary built for its tags
+
+#### Scenario: Link flags as an argument and in GOFLAGS
+- **WHEN** a run is given -ldflags=-X as an argument, then in GOFLAGS, then none
+- **THEN** each run prints the value it was given
+
+#### Scenario: Vet after a run without it
+- **WHEN** a package with a vet finding is run with -vet=off and then without
+- **THEN** the second run reports the finding
+
+#### Scenario: Runs at once over one cache
+- **WHEN** three runs of one package start at once on an empty cache
+- **THEN** all pass and leave no temporary file in the cache
+
+#### Scenario: A filtered run before a full one
+- **WHEN** a run that -run narrows to one package is followed by an unfiltered run
+- **THEN** the second run builds and runs the other package
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 
