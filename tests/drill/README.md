@@ -641,6 +641,9 @@ shards of one run do not add up to every mutant exactly once.
 | `refused-link-fails-the-build` | a hard link the filesystem refuses fails the placement instead of falling back to a copy | runner: a refused link returns its error |
 | `build-failure-booked-under-every-package` | a failed package of a batched build is given the reports of other packages of its group | cli conformance: one vet finding is reported under the other package too |
 | `same-named-packages-share-a-stage-dir` | every compile group builds into one stage dir, so a later group's binary replaces an earlier one's of the same name | cli conformance: one of two `util` packages does not run its suite |
+| `strip-overrides-goflags-ldflags` | the strip flag is added though GOFLAGS carries `-ldflags`, which it then overrides | cli conformance: a GOFLAGS `-X` value is not printed and the binary has no DWARF |
+| `test-binaries-never-stripped` | test binaries keep their symbol table and DWARF on a plain run | cli conformance: a plain run's binary carries debug information |
+| `profiled-binary-stripped` | a run with a profile flag strips its binary all the same | cli conformance: a `-cpuprofile` run's binary has no DWARF |
 | `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
 | `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
 | `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |

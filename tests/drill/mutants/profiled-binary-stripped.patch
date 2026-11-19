@@ -1,0 +1,13 @@
+Clause: when the package is run with -cpuprofile → its test binary carries debug information
+Expect: ^FAIL .*conformance/cli CLILinkFlags .* / its test binary carries debug information \(
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -273,7 +273,7 @@
+ // later -ldflags would override), a profile flag (go test's own list), or
+ // binaries kept for inspection.
+ func linkFlags(buildFlags, runFlags []string, goflags string, kept bool) []string {
+-	if kept || hasLinkFlags(buildFlags) || hasLinkFlags(strings.Fields(goflags)) || hasProfileFlag(runFlags) {
++	if kept || hasLinkFlags(buildFlags) || hasLinkFlags(strings.Fields(goflags)) {
+ 		return buildFlags
+ 	}
+ 	return append(slices.Clone(buildFlags), stripLinkFlag)

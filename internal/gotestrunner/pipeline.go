@@ -361,13 +361,14 @@ type benchPrep struct {
 // build or a setup could compete with a measurement. fixtures is the run's
 // residency plan (see planBenchFixtureWindows), not the full overlay set: a
 // fixture no scheduled target requires never starts.
-func prepareBenchRun(ctx context.Context, overlay *OverlayResult, packages []string, fixtures []gotestgen.SharedFixtureInfo, buildFlags []string, setupTimeout time.Duration, compileParallel int) benchPrep {
+func prepareBenchRun(ctx context.Context, overlay *OverlayResult, packages []string, fixtures []gotestgen.SharedFixtureInfo, buildFlags, runFlags []string, setupTimeout time.Duration, compileParallel int) benchPrep {
 	var p benchPrep
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ch, span := spanOf(CompilePackagesStream(ctx, packages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel), time.Now)
+		link := stageFlags(buildFlags, runFlags, overlay.WorkDir)
+		ch, span := spanOf(CompilePackagesStream(ctx, packages, overlay.OverlayFlag, link, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, link), compileParallel), time.Now)
 		p.compiled, p.compileFailures = collectOutcomes(ch)
 		p.compileSpan = span()
 	}()
@@ -444,7 +445,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	// A package no selected benchmark belongs to is not built.
 	benchBuild := buildSet(overlay.SuitePackages, dispatchedPackages(plan.benchRun(sel)))
-	prep := prepareBenchRun(ctx, overlay, benchBuild, win.Fixtures, pf.BuildFlags, resolvedSetupTimeout, cfg.CompileParallel)
+	prep := prepareBenchRun(ctx, overlay, benchBuild, win.Fixtures, pf.BuildFlags, pf.RunFlags, resolvedSetupTimeout, cfg.CompileParallel)
 	setupProc, setupErr := prep.proc, prep.setupErr
 
 	// finish tears the fixture process down — the one owner of its
@@ -668,7 +669,8 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	r := newStreamRun(ctx, cfg, overlay, pf)
 	defer r.cancel()
 	defer r.releaseCancel()
-	compiled, span := spanOf(CompilePackagesStream(r.ctx, r.bookUnbuilt(), overlay.OverlayFlag, r.pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, r.pf.BuildFlags), cfg.CompileParallel), time.Now)
+	link := stageFlags(r.pf.BuildFlags, r.pf.RunFlags, overlay.WorkDir)
+	compiled, span := spanOf(CompilePackagesStream(r.ctx, r.bookUnbuilt(), overlay.OverlayFlag, link, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, link), cfg.CompileParallel), time.Now)
 	held := r.intake(compiled)
 	r.runScopes(held)
 	result := r.finish()
