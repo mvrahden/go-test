@@ -68,11 +68,12 @@ func (s *DeprecatedNamesTestSuite) TestOldHarness(t *gotest.T) {
 
 	tidy, code := goIn(t, dir, "mod", "tidy")
 	gotest.Equal(t, 0, code, "go mod tidy: %s", tidy)
-	out, exit := goIn(t, dir, "test", "-count=1", "-run", "^Fuzz", "-bench", ".", "-benchtime", "1x", ".")
+	out, exit := goIn(t, dir, "test", "-v", "-count=1", "-run", "^Fuzz", "-bench", ".", "-benchtime", "1x", ".")
 
 	t.When("a harness written by the last release is compiled against this runtime", func(w *gotest.T) {
 		w.It("builds, replays its fuzz seed and runs its benchmark", func(it *gotest.T) {
 			gotest.Equal(it, 0, exit, "output: %s", out)
+			gotest.Regexp(it, `(?m)^\s+--- PASS: FuzzOldTestSuite_FuzzPair/seed#0\s`, out)
 			gotest.Regexp(it, `(?m)^BenchmarkOldTestSuite/BenchmarkAdd\S*\s+1\s`, out)
 			gotest.Regexp(it, `(?m)^ok\s`, out)
 		})
