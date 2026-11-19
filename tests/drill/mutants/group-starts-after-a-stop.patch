@@ -12,9 +12,9 @@ Clause: when a run is stopped while a suite of the e2e group runs → starts non
  		}
  		phase := map[string][]string{}
 @@ -982,7 +982,7 @@
- 		for _, key := range start {
  			started[key] = true
  		}
+ 		traceDispatch(dispatchEvent{Kind: "start", Keys: start, For: what})
 -		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
 +		if err := setupProc.StartKeys(context.WithoutCancel(streamCtx), start, resolvedSetupTimeout); err != nil {
  			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for %s: %w", what, err))

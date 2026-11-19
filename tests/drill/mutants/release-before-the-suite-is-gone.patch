@@ -5,8 +5,8 @@ Clause: when the last suite reading a shared fixture returns while a process it 
 @@ -929,6 +929,7 @@
  				}
  				defer func() { <-sem }()
- 
-+				releaser.Release(ledger.Done(t.Package, t.SuiteName))
- 				clock.run(t.Group, func() { runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON()) })
- 				recorded = true
- 			}(target, i)
+
++				release(ledger.Done(t.Package, t.SuiteName))
+ 				clock.run(t.Group, func() {
+ 					traceSuite("suite-start", &t, requiredKeys)
+ 					runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())

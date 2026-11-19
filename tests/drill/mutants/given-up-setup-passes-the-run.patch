@@ -12,11 +12,11 @@ Clause: when a shared fixture's setup is given up while a sibling that came up i
  	}
  
 @@ -869,7 +867,7 @@
- 					switch {
  					case recorded:
  					case missing != "":
+ 						traceSuite("given-up", &t, requiredKeys)
 -						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
 +						collector.RecordResult(t.Package, idx, SuiteResult{})
  					case streamCtx.Err() != nil:
+ 						traceSuite("stopped", &t, requiredKeys)
  						collector.RecordStopped(t.Package, idx, t.SuiteName)
- 					default:

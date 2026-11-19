@@ -1,0 +1,53 @@
+=== SNAP TestADefaultRun ===
+intake github.com/mvrahden/go-test/tests/conformance/testdata/passing
+up-front []
+scope ""
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/passing.TestPassingTestSuite [] ran
+
+=== SNAP TestAGroupedRun ===
+intake github.com/mvrahden/go-test/tests/conformance/testdata/groups
+up-front []
+scope ""
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groups.TestADefaultTestSuite [] ran
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groups.TestBDefaultTestSuite [] ran
+scope "e2e"
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groups.TestE2EOneTestSuite [] ran
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groups.TestE2ETwoTestSuite [] ran
+  tail github.com/mvrahden/go-test/tests/conformance/testdata/groups.TestE2EAloneTestSuite [] ran
+scope "load"
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groups.TestLoadTestSuite [] ran
+
+=== SNAP TestASharedFixtureReleasedAtItsLastUse ===
+intake github.com/mvrahden/go-test/tests/conformance/testdata/fixalastuse
+up-front [github.com/mvrahden/go-test/tests/conformance/testdata/fixalastuse.ASharedFixture]
+scope ""
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/fixalastuse.TestFastTestSuite [github.com/mvrahden/go-test/tests/conformance/testdata/fixalastuse.ASharedFixture] ran
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/fixalastuse.TestSlowTestSuite [] ran
+free [github.com/mvrahden/go-test/tests/conformance/testdata/fixalastuse.ASharedFixture]
+teardown
+
+=== SNAP TestAnExclusiveTail ===
+intake github.com/mvrahden/go-test/tests/conformance/testdata/fixaslots
+up-front []
+scope ""
+  tail github.com/mvrahden/go-test/tests/conformance/testdata/fixaslots.TestAFirstTestSuite [] ran
+  start [github.com/mvrahden/go-test/tests/conformance/testdata/fixaslots.LateSharedFixture] for exclusive tail
+  tail github.com/mvrahden/go-test/tests/conformance/testdata/fixaslots.TestBSecondTestSuite [github.com/mvrahden/go-test/tests/conformance/testdata/fixaslots.LateSharedFixture] ran
+free [github.com/mvrahden/go-test/tests/conformance/testdata/fixaslots.LateSharedFixture]
+teardown
+
+=== SNAP TestGroupsWithFixturesOfTheirOwn ===
+intake github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures
+up-front []
+scope ""
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.TestADefaultTestSuite [] ran
+scope "e2e"
+  start [github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.StackSharedFixture] for group e2e
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.TestE2ESlowTestSuite [] ran
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.TestE2EStackTestSuite [github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.StackSharedFixture] ran
+scope "load"
+  start [github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.LoadSharedFixture] for group load
+  bulk github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.TestLoadTestSuite [github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.LoadSharedFixture] ran
+free [github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.LoadSharedFixture github.com/mvrahden/go-test/tests/conformance/testdata/groupfixtures.StackSharedFixture]
+teardown
+

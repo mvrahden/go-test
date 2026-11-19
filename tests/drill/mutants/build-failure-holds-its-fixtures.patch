@@ -3,10 +3,10 @@ Clause: when a shared fixture's reader is in a package that never links, while a
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
 @@ -808,7 +808,6 @@ loop:
- 			}
+ 			traceDispatch(dispatchEvent{Kind: "intake", Package: outcome.Package, For: "failed"})
  			buildFailed = true
  			bookBuildFailures(collector, nil, []BuildFailure{{Package: outcome.Package, Err: outcome.Err}})
--			releaser.Release(ledger.DoneExcept(outcome.Package, nil))
+-			release(ledger.DoneExcept(outcome.Package, nil))
  			continue
  		}
  		cr := outcome.Result
