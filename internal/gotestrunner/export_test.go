@@ -803,6 +803,17 @@ var ExportBuildSet = buildSet
 var ExportTestBinaryName = testBinaryName
 var ExportCompileGroups = compileGroups
 
+var ExportEventPackage = eventPackage
+
+// BuildLog is what one go test -c -json call said, by package.
+type BuildLog = buildLog
+
+var ExportNewBuildLog = newBuildLog
+
+func (l *buildLog) ExportFailed(pkg string) bool        { return l.failed(pkg) }
+func (l *buildLog) ExportDiagnostics(pkg string) []byte { return l.diagnostics(pkg) }
+func (l *buildLog) ExportShared() []byte                { return l.shared() }
+
 // ExportDispatchedPackages is the packages a test run of o dispatches
 // under -run, -skip and --skip-group.
 func ExportDispatchedPackages(o *OverlayResult, run, skip string, skipGroups []string) map[string]bool {
