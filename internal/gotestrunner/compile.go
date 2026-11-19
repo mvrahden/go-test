@@ -144,7 +144,12 @@ func vendorAdvice(diagnostics []byte) string {
 }
 
 func CompilePackages(ctx context.Context, packages []string, overlayFlag string, buildFlags []string, outputDir, cacheDir string, compileParallel int) ([]CompileResult, []BuildFailure) {
-	ch := CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir, cacheDir, compileParallel)
+	return collectOutcomes(CompilePackagesStream(ctx, packages, overlayFlag, buildFlags, outputDir, cacheDir, compileParallel))
+}
+
+// collectOutcomes reads ch to its close: the binaries that built, and the
+// failures by package.
+func collectOutcomes(ch <-chan CompileOutcome) ([]CompileResult, []BuildFailure) {
 	var results []CompileResult
 	var failures []BuildFailure
 	for outcome := range ch {
@@ -228,6 +233,30 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 	}()
 
 	return ch
+}
+
+// spanOf passes ch's outcomes on and measures the compile stage: span is
+// the time from this call to ch's close, zero until then.
+func spanOf(ch <-chan CompileOutcome, now func() time.Time) (<-chan CompileOutcome, func() time.Duration) {
+	out := make(chan CompileOutcome)
+	var mu sync.Mutex
+	var d time.Duration
+	start := now()
+	go func() {
+		defer close(out)
+		for o := range ch {
+			out <- o
+		}
+		end := now()
+		mu.Lock()
+		d = end.Sub(start)
+		mu.Unlock()
+	}()
+	return out, func() time.Duration {
+		mu.Lock()
+		defer mu.Unlock()
+		return d
+	}
 }
 
 func sanitizePkgName(pkgPath string) string {

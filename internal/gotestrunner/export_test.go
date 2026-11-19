@@ -795,3 +795,5 @@ func ExportBooked(c *OutputCollector, pkg string) int {
 	defer c.mu.Unlock()
 	return c.pkgs[pkg].completed
 }
+
+var ExportSpanOf = spanOf
