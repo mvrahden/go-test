@@ -2,7 +2,9 @@ package gotestrunner
 
 import (
 	"context"
+	"maps"
 	"os/exec"
+	"slices"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -30,6 +32,13 @@ func ExportProtocolErr(p *SharedFixtureProcess) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.protoErr
+}
+
+// ExportStateKeys is the sorted keys of the state the process reported.
+func ExportStateKeys(p *SharedFixtureProcess) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Sorted(maps.Keys(p.state))
 }
 
 // ExportPid is the shared fixture process's pid.

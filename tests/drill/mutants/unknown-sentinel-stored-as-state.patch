@@ -1,0 +1,15 @@
+Judge: ./internal/gotestrunner SharedFixtureProtocolTestSuite/TestAnUnknownSentinelIsIgnored
+Expect: ^FAIL .*internal/gotestrunner SharedFixtureProtocol .* / keeps it out of the fixtures' state \(
+--- a/internal/gotestrunner/sharedfixture.go
++++ b/internal/gotestrunner/sharedfixture.go
+@@ -1020,10 +1020,6 @@
+ 			p.cmdMu.Unlock()
+ 			continue
+ 		}
+-		// A sentinel from a newer program: lines are only ever added.
+-		if entry.Sentinel() {
+-			continue
+-		}
+ 		p.mu.Lock()
+ 		p.state[entry.Key] = entry.State
+ 		p.mu.Unlock()
