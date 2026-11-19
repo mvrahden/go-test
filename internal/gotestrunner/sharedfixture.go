@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,22 +18,8 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/protocol/sharedwire"
 )
-
-// sharedTeardownFailedExit is the status the generated setup program exits with
-// when one or more shared fixtures failed to tear down. It must stay in step
-// with the value used by internal/gotestgen/static/sharedfixture.go.tpl.
-const sharedTeardownFailedExit = 1
-
-// fixtureStateEntry represents a single JSON line emitted by the shared fixture subprocess.
-type fixtureStateEntry struct {
-	Key            string          `json:"key"`
-	State          json.RawMessage `json:"state,omitempty"`
-	TeardownBudget string          `json:"teardownBudget,omitempty"`
-	Budget         string          `json:"budget,omitempty"` // _setup: what the fixture's setup may take
-	Error          string          `json:"error,omitempty"`
-	ID             uint64          `json:"id,omitempty"` // _cmd: the command it acknowledges
-}
 
 // SetupTimeoutError is the wait for shared fixtures giving up. After is the
 // budget the wait was held to, not the wall clock it read.
@@ -69,8 +54,8 @@ type SharedFixtureProcess struct {
 	teardownTimeout time.Duration
 
 	ready    map[string]chan struct{}
-	state    map[string]json.RawMessage
-	mu       sync.Mutex
+	state    sharedwire.State
+	mu      sync.Mutex
 	allDone  chan struct{}
 	setupErr error
 	protoErr error // under mu: a stream the process got wrong after its setup was read
@@ -298,7 +283,7 @@ func (p *SharedFixtureProcess) WaitAllReady(ctx context.Context, timeout time.Du
 	}
 
 	p.mu.Lock()
-	stateBytes, err := json.Marshal(p.state)
+	stateBytes, err := p.state.Encode()
 	p.mu.Unlock()
 	if err != nil {
 		p.shutdown()
@@ -330,9 +315,9 @@ func (p *SharedFixtureProcess) shutdown() {
 }
 
 // The lines that stop the process and end its releases' contexts.
-const (
-	stopLine  = `{"verb":"stop"}` + "\n"
-	forceLine = `{"verb":"force"}` + "\n"
+var (
+	stopLine  = string(sharedwire.Command{Verb: sharedwire.VerbStop}.Line()) + "\n"
+	forceLine = string(sharedwire.Command{Verb: sharedwire.VerbForce}.Line()) + "\n"
 )
 
 // send writes line on the process's stdin, beside the window commands.
@@ -445,7 +430,7 @@ func (p *SharedFixtureProcess) WriteSuiteStateFile(pkg, suite string, keys []str
 // hydrate a zero value and fail somewhere far from the cause.
 func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string) (string, error) {
 	p.mu.Lock()
-	subset := make(map[string]json.RawMessage, len(keys))
+	subset := make(sharedwire.State, len(keys))
 	for _, k := range keys {
 		v, ok := p.state[k]
 		if !ok {
@@ -456,7 +441,7 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 	}
 	p.mu.Unlock()
 
-	data, err := json.Marshal(subset)
+	data, err := subset.Encode()
 	if err != nil {
 		return "", fmt.Errorf("marshal state for %s: %w", name, err)
 	}
@@ -475,7 +460,7 @@ func (p *SharedFixtureProcess) WriteStateFileForKeys(name string, keys []string)
 // acknowledgement, ctx ending, or the deadline flat sets as for [WaitSetup]:
 // at zero, the budgets the started fixtures declare.
 func (p *SharedFixtureProcess) StartKeys(ctx context.Context, keys []string, flat time.Duration) error {
-	return p.command(ctx, "start", keys, flat)
+	return p.command(ctx, sharedwire.VerbStart, keys, flat)
 }
 
 // TeardownKeys asks the setup subprocess to tear down the given fixtures now,
@@ -497,7 +482,7 @@ func (p *SharedFixtureProcess) TeardownKeys(ctx context.Context, keys []string, 
 	if gaveUp {
 		return nil
 	}
-	return p.command(ctx, "teardown", keys, timeout)
+	return p.command(ctx, sharedwire.VerbTeardown, keys, timeout)
 }
 
 // overdueRelease is a release given up once its budget had passed.
@@ -508,7 +493,7 @@ type overdueRelease struct {
 
 // gaveUp notes the keys of a start given up before its ack. Under cmdMu.
 func (p *SharedFixtureProcess) gaveUp(verb string, keys []string) {
-	if verb != "start" {
+	if verb != sharedwire.VerbStart {
 		return
 	}
 	if p.unstarted == nil {
@@ -532,7 +517,7 @@ func (p *SharedFixtureProcess) expire(id uint64, resp chan string, verb string, 
 	default:
 	}
 	p.gaveUp(verb, keys)
-	if verb == "teardown" {
+	if verb == sharedwire.VerbTeardown {
 		if p.overdue == nil {
 			p.overdue = map[uint64]overdueRelease{}
 		}
@@ -546,7 +531,7 @@ func (p *SharedFixtureProcess) expire(id uint64, resp chan string, verb string, 
 // setup program's refusal of a release names a dependent still up). Under
 // cmdMu.
 func (p *SharedFixtureProcess) acked(verb string, keys []string, ack string) {
-	if verb != "teardown" || strings.Contains(ack, "is up and not released with it") {
+	if verb != sharedwire.VerbTeardown || strings.Contains(ack, sharedwire.ReleaseRefused) {
 		return
 	}
 	for _, k := range keys {
@@ -562,7 +547,7 @@ func (p *SharedFixtureProcess) lateAck(id uint64, ack string) {
 		return
 	}
 	delete(p.overdue, id)
-	p.acked("teardown", r.keys, ack)
+	p.acked(sharedwire.VerbTeardown, r.keys, ack)
 }
 
 // onlyOverdue says whether every key the process holds is in a release given
@@ -608,7 +593,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		p.cmdWaiters = map[uint64]chan string{}
 	}
 	p.cmdWaiters[id] = resp
-	if verb == "start" {
+	if verb == sharedwire.VerbStart {
 		if p.held == nil {
 			p.held = map[string]bool{}
 		}
@@ -623,15 +608,8 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		p.cmdMu.Unlock()
 	}()
 
-	line, err := json.Marshal(struct {
-		Verb string   `json:"verb"`
-		Keys []string `json:"keys"`
-		ID   uint64   `json:"id"`
-	}{Verb: verb, Keys: keys, ID: id})
-	if err != nil {
-		return err
-	}
-	if verb == "start" {
+	line := sharedwire.Command{Verb: verb, Keys: keys, ID: id}.Line()
+	if verb == sharedwire.VerbStart {
 		p.mu.Lock()
 		p.setupBegan, p.setupDeadline, p.setupBudget, p.setupUnbounded = time.Now(), time.Time{}, 0, false
 		p.mu.Unlock()
@@ -640,7 +618,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	if p.tap != nil {
 		p.tap('>', line)
 	}
-	_, err = p.stdin.Write(append(line, '\n'))
+	_, err := p.stdin.Write(append(line, '\n'))
 	p.cmdMu.Unlock()
 	if err != nil {
 		return fmt.Errorf("send %s to shared fixture process: %w", verb, err)
@@ -651,7 +629,7 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 	// Only a start follows the setup budgets the process reports: a release
 	// beside it taking a report would leave the start at the floor.
 	budgets := p.budgetSeen
-	if verb != "start" {
+	if verb != sharedwire.VerbStart {
 		budgets = nil
 	}
 	for {
@@ -734,7 +712,7 @@ func (p *SharedFixtureProcess) Teardown() error {
 	}
 
 	// A force-killed process was cut off mid-AfterAll. Its exit status says
-	// nothing — a signalled process reports -1, never sharedTeardownFailedExit —
+	// nothing — a signalled process reports -1, never ExitLifecycleFailed —
 	// so without reporting it here the run would end green while the containers
 	// the fixture was still stopping stay up. A setup failure earlier in the
 	// run changes nothing about that.
@@ -770,7 +748,7 @@ func exitVerdict(setupErr, tornErr, waitErr error, diedEarly bool) error {
 		return nil
 	}
 	var exitErr *exec.ExitError
-	if errors.As(waitErr, &exitErr) && exitErr.ExitCode() == sharedTeardownFailedExit {
+	if errors.As(waitErr, &exitErr) && exitErr.ExitCode() == sharedwire.ExitLifecycleFailed {
 		if tornErr != nil {
 			return tornErr
 		}
@@ -924,7 +902,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 	}
 
 	allDone := make(chan struct{})
-	state := make(map[string]json.RawMessage)
+	state := make(sharedwire.State)
 	waitDone := make(chan struct{})
 
 	proc := &SharedFixtureProcess{
@@ -988,11 +966,11 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 		if p.tap != nil {
 			p.tap('<', bytes.TrimSuffix(line, []byte("\n")))
 		}
-		var entry fixtureStateEntry
-		if json.Unmarshal(line, &entry) != nil {
+		entry, ok := sharedwire.ParseLine(line)
+		if !ok {
 			continue
 		}
-		if entry.Key == "_done" {
+		if entry.Key == sharedwire.KeyDone {
 			if doneSeen {
 				// The stream is the process's alone now; a second sentinel is
 				// its error, not the runner's to trip over.
@@ -1007,19 +985,19 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 			close(p.allDone)
 			continue
 		}
-		if entry.Key == "_teardown" {
+		if entry.Key == sharedwire.KeyTeardown {
 			p.mu.Lock()
 			p.tornErr = fmt.Errorf("shared fixture teardown failed: %s", entry.Error)
 			p.mu.Unlock()
 			continue
 		}
-		if entry.Key == "_setup" {
+		if entry.Key == sharedwire.KeySetup {
 			if d, err := time.ParseDuration(entry.Budget); err == nil {
 				p.noteSetupBudget(d)
 			}
 			continue
 		}
-		if entry.Key == "_cmd" {
+		if entry.Key == sharedwire.KeyCmd {
 			// Before the ack: the command's waiter reads the budget next.
 			if p.noteTeardownBudget(entry.TeardownBudget) {
 				select {

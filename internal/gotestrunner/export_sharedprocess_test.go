@@ -6,7 +6,12 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
+	"github.com/mvrahden/go-test/internal/protocol/sharedwire"
 )
+
+// fixtureStateEntry is the protocol line as the runner decodes it, for the
+// ExportFixtureStateEntry door.
+type fixtureStateEntry = sharedwire.Line
 
 // ExportLaunchSharedProcess starts name with args as a shared fixture process
 // that serves no fixtures, so a test can speak the protocol itself.
