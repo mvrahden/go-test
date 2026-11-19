@@ -9218,6 +9218,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the second run executes its tests again and marks nothing cached",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rerun_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 37,
+                      "name": "the_second_run_executes_its_tests_again_and_marks_nothing_cached",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package is run twice with nothing changed in between",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rerun_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 36,
+                  "name": "a_package_is_run_twice_with_nothing_changed_in_between",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "EveryRunExecutesItsTests",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "rerun_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 29,
+              "name": "TestEveryRunExecutesItsTests",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIRerun",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "rerun_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestCLIRerunTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "runs each suite's hooks and the method once, each suite in its own process",
                       "duration": 0,
                       "excluded": false,
@@ -33453,13 +33514,13 @@
     }
   ],
   "stats": {
-    "behaviors": 966,
+    "behaviors": 967,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 142,
+    "suites": 143,
     "tests": 0
   }
 }

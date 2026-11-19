@@ -642,6 +642,7 @@ percentage = covered / total</div>
     <section class="ref-section" id="cli">
       <h2>CLI Reference</h2>
       <p class="lead">One command, multiple modes. The <code>go test</code> flags keep their meaning; the few that would break what gotest does are refused with the reason.</p>
+      <p>gotest has no result cache. Every run executes every suite it selects; it never prints <code>(cached)</code>.</p>
 
       <h3>Commands</h3>
       <table class="ref-table">
