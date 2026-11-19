@@ -645,6 +645,7 @@ shards of one run do not add up to every mutant exactly once.
 | `suite-processes-ignore-gomaxprocs` | without `-p` a run starts a process per suite, whatever GOMAXPROCS is | cli conformance: the suites that wait for each other pass under GOMAXPROCS=1 |
 | `refused-link-fails-the-build` | a hard link the filesystem refuses fails the placement instead of falling back to a copy | runner: a refused link returns its error |
 | `build-failure-booked-under-every-package` | a failed package of a batched build is given the reports of other packages of its group | cli conformance: one vet finding is reported under the other package too |
+| `go-command-per-package` | every package gets a compile group of its own, so a run starts one `go test -c` per package | perf: twelve staged packages start twelve `go test -c` instead of one |
 | `same-named-packages-share-a-stage-dir` | every compile group builds into one stage dir, so a later group's binary replaces an earlier one's of the same name | cli conformance: one of two `util` packages does not run its suite |
 | `strip-overrides-goflags-ldflags` | the strip flag is added though GOFLAGS carries `-ldflags`, which it then overrides | cli conformance: a GOFLAGS `-X` value is not printed and the binary has no DWARF |
 | `test-binaries-never-stripped` | test binaries keep their symbol table and DWARF on a plain run | cli conformance: a plain run's binary carries debug information |

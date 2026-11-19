@@ -1,0 +1,13 @@
+Expect: ^FAIL .*tests/perf Counts .* / starts one go test -c per group of binary names \(
+Judge: ./tests/perf CountsTestSuite/TestGoInvocations
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -252,7 +252,7 @@
+ 	var names []map[string]bool
+ 	for _, pkg := range pkgs {
+ 		name := strings.ToLower(testBinaryName(pkg, goos))
+-		i := slices.IndexFunc(names, func(held map[string]bool) bool { return !held[name] })
++		i := -1
+ 		if i < 0 {
+ 			i = len(groups)
+ 			groups = append(groups, nil)
