@@ -95,7 +95,7 @@ func ParseLine(line []byte) (Line, bool) {
 }
 
 // Sentinel reports whether l is not a fixture's state: its key starts with "_".
-func (l Line) Sentinel() bool { return strings.HasPrefix(l.Key, "_") }
+func (l Line) Sentinel() bool { return strings.HasPrefix(l.Key, "_") } //nolint:gocritic // hugeParam: a decoded line
 
 // quote is s as a JSON string; <, > and & are escaped.
 func quote(s string) string {
