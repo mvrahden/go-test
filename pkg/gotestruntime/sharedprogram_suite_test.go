@@ -72,9 +72,7 @@ func (w *wire) send(line string) {
 func (w *wire) next() string {
 	select {
 	case line, ok := <-w.lines:
-		if !ok {
-			gotest.Fail(w.t, "the protocol stream ended")
-		}
+		gotest.True(w.t, ok, "the protocol stream ended")
 		return line
 	case <-time.After(10 * time.Second):
 		gotest.Fail(w.t, "no protocol line within 10s")
@@ -312,7 +310,7 @@ func (s *SharedProgramTestSuite) TestDeclaredBudgets(t *gotest.T) {
 			gotest.Equal(it, `{"key":"_done","teardownBudget":"`+(30*time.Second+sc(10*time.Second)).String()+`"}`, done[len(done)-1])
 		})
 		wh.It("reports 30s plus the longest chain still resident once the 10s one is released", func(it *gotest.T) {
-			gotest.Equal(it, "", ack.Error)
+			gotest.Empty(it, ack.Error)
 			gotest.Equal(it, (30*time.Second + sc(2*time.Second) + sc(3*time.Second)).String(), ack.TeardownBudget)
 		})
 	})
@@ -378,7 +376,7 @@ func (s *SharedProgramTestSuite) TestCommandsRefusedWhole(t *gotest.T) {
 		})
 		wh.It("starts a dependency and its dependent together", func(it *gotest.T) {
 			gotest.Equal(it, uint64(2), startBoth.ID)
-			gotest.Equal(it, "", startBoth.Error)
+			gotest.Empty(it, startBoth.Error)
 		})
 		wh.It("refuses a release ahead of a dependent that is up, releasing nothing", func(it *gotest.T) {
 			gotest.Equal(it, uint64(3), releaseA.ID)
@@ -388,7 +386,7 @@ func (s *SharedProgramTestSuite) TestCommandsRefusedWhole(t *gotest.T) {
 		})
 		wh.It("releases the dependent alone", func(it *gotest.T) {
 			gotest.Equal(it, uint64(4), releaseB.ID)
-			gotest.Equal(it, "", releaseB.Error)
+			gotest.Empty(it, releaseB.Error)
 		})
 		wh.It("refuses to start a fixture released earlier", func(it *gotest.T) {
 			gotest.Equal(it, uint64(5), restart.ID)
@@ -405,7 +403,7 @@ func (s *SharedProgramTestSuite) TestTwoFailuresAreJoinedInTheProgramsOrder(t *g
 	log := &hookLog{}
 	a, b := fx(log, "A"), fx(log, "B")
 	for _, f := range []*gotestruntime.SharedFixture{&a, &b} {
-		f.Deferred = true
+		f.Deferred = true //nolint:shared-fixture-undeclared // the runtime's SharedFixture description, not a suite fixture
 		f.BeforeAll = func(context.Context) error { return errors.New("no") }
 		f.AfterAll = func(context.Context) error { return errors.New("still no") }
 	}
@@ -445,8 +443,8 @@ func (s *SharedProgramTestSuite) TestAStartIsServedOnce(t *gotest.T) {
 	t.When("a fixture is started twice", func(wh *gotest.T) {
 		wh.It("runs its BeforeAll once and acknowledges both", func(it *gotest.T) {
 			gotest.Equal(it, []string{"A.BeforeAll", "A.AfterAll"}, log.all())
-			gotest.Equal(it, "", first.Error)
-			gotest.Equal(it, "", second.Error)
+			gotest.Empty(it, first.Error)
+			gotest.Empty(it, second.Error)
 			gotest.Equal(it, uint64(2), second.ID)
 		})
 	})
@@ -597,7 +595,7 @@ func (s *SharedProgramTestSuite) TestALongCommand(t *gotest.T) {
 	t.When("a command line is longer than 64 KiB", func(wh *gotest.T) {
 		wh.It("is read whole and served", func(it *gotest.T) {
 			gotest.Equal(it, uint64(1), ack.ID)
-			gotest.Equal(it, "", ack.Error)
+			gotest.Empty(it, ack.Error)
 			gotest.Equal(it, []string{"A.BeforeAll", "A.AfterAll"}, log.all())
 			gotest.False(it, failed)
 		})

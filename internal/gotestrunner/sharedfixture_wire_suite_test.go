@@ -199,7 +199,7 @@ func (s *SharedFixtureWireTestSuite) TestForce(t *gotest.T) {
 	rec.note("teardown", proc.Teardown())
 
 	t.When("the runner gives up on a shared fixture process that is up", func(w *gotest.T) {
-		w.It("it sends one force line and the process ends clean", func(it *gotest.T) {
+		w.It("sends one force line and the process ends clean", func(it *gotest.T) {
 			gotest.Equal(it, []string{
 				`< {"key":"_setup","fixture":"github.com/mvrahden/go-test/tests/sharedfixture/fixtures.DagASharedFixture","budget":"2s"}`,
 				`< {"key":"github.com/mvrahden/go-test/tests/sharedfixture/fixtures.DagASharedFixture","state":{}}`,
