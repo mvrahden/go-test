@@ -18869,6 +18869,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "counts at most 10 more in a window one second longer than in a short one",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "atrest_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 26,
+                      "name": "counts_at_most_10_more_in_a_window_one_second_longer_than_in_a_short_one",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "gets 0 from testing.AllocsPerRun of a function that only sleeps",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "atrest_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 31,
+                      "name": "gets_0_from_testing.AllocsPerRun_of_a_function_that_only_sleeps",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a method of a suite under the runner only sleeps while it counts the process's heap allocations",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "atrest_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 25,
+                  "name": "a_method_of_a_suite_under_the_runner_only_sleeps_while_it_counts_the_process's_heap_allocations",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodThatOnlyWaits",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "atrest_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestAMethodThatOnlyWaits",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "AtRest",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "atrest_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestAtRestTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails the run",
                       "duration": 0,
                       "excluded": false,
@@ -32289,13 +32365,13 @@
     }
   ],
   "stats": {
-    "behaviors": 940,
+    "behaviors": 942,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 133,
+    "suites": 134,
     "tests": 0
   }
 }

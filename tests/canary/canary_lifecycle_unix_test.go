@@ -197,15 +197,3 @@ func (s *CanaryLifecycleTestSuite) TestTheChannelStaysWithTheSuite(t *gotest.T) 
 		t.Errorf("channel: markers %v, want no reader left: a reader of the channel outlived the last suite", markers)
 	}
 }
-
-// markerNumber reads the number a marker with prefix carries, -1 without one.
-func markerNumber(markers []string, prefix string) int {
-	for _, m := range markers {
-		if strings.HasPrefix(m, prefix) {
-			if n, err := strconv.Atoi(strings.TrimPrefix(m, prefix)); err == nil {
-				return n
-			}
-		}
-	}
-	return -1
-}

@@ -937,6 +937,7 @@ shards of one run do not add up to every mutant exactly once.
 | `runner-gone-leaves-the-group` | a suite process whose runner is gone does not end its process group | canary: the process the runnergone holding method started outlives the suite |
 | `drain-at-open-skipped` | a stop that reached the channel before the first suite opened is not read at the open | canary: the stopatopen suites are not skipped with the reason run stopping |
 | `reader-outlives-the-suite` | the channel's reader is neither stopped nor waited for when the last suite ends | canary: the channel fixture's TestMain finds the reader still running |
+| `suite-process-polls-at-rest` | the watcher polls for a stop file every 25ms beside its channel reader, allocating on the heap while the tests wait | canary: the atrest fixture counts more allocations in its long window than in its short one, and `testing.AllocsPerRun` of a sleep reports more than 0 |
 | `budget-line-ignored` | a suite process never sends its teardown budget, so the runner waits the default | canary: the stopbudget suite outlives its 32s budget |
 | `budget-line-leaves-out-the-fixtures` | the teardown budget a suite process sends is its setup timeout alone | canary: the stopbudget suite whose budget outlasts its linger is killed first |
 | `channel-cloexec-dropped` | the channel is moved without close-on-exec, so a process a test starts inherits it | canary: the channel fixture's child finds a socket among its descriptors |
