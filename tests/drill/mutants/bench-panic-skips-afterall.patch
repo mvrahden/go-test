@@ -12,4 +12,4 @@ Clause: when a benchmark panics → runs AfterAll before the fixture is released
 -    defer ƒgotestruntime.ReleaseOnPanic(b)
      ƒgotestruntime.SkipIfStopped(b)
      b.StopTimer()
-     ƒeachT := ƒgotest.NewTFromTB(b)
+     ƒeachT := ƒgotestruntime.EachT(b)

@@ -124,12 +124,12 @@ func (s *FuzzFanCompileTestSuite) TestCrossPackageLiteral(t *gotest.T, ctx *fanC
 	})
 }
 
-// fanExprsDecl renders every target expression the wrapper hands to NewF as
+// fanExprsDecl renders every target expression the wrapper hands to FuzzF as
 // a package-level declaration, so the scratch module type-checks them
 // against the generated functions the way the real generated file does.
 func fanExprsDecl(set *gotestgen.FuzzTargetSet) string {
 	var b strings.Builder
-	b.WriteString("\nvar _ = []*ƒgotest.FuzzTarget{\n")
+	b.WriteString("\nvar _ = []*ƒgotestruntime.FuzzTarget{\n")
 	for _, f := range set.Targets {
 		b.WriteString("\t")
 		b.WriteString(f.Expr)
