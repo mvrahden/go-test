@@ -800,6 +800,9 @@ var ExportSpanOf = spanOf
 
 var ExportBuildSet = buildSet
 
+var ExportTestBinaryName = testBinaryName
+var ExportCompileGroups = compileGroups
+
 // ExportDispatchedPackages is the packages a test run of o dispatches
 // under -run, -skip and --skip-group.
 func ExportDispatchedPackages(o *OverlayResult, run, skip string, skipGroups []string) map[string]bool {
