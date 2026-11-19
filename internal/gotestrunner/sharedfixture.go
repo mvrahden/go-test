@@ -55,7 +55,7 @@ type SharedFixtureProcess struct {
 
 	ready    map[string]chan struct{}
 	state    sharedwire.State
-	mu      sync.Mutex
+	mu       sync.Mutex
 	allDone  chan struct{}
 	setupErr error
 	protoErr error // under mu: a stream the process got wrong after its setup was read
