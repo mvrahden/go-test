@@ -11,6 +11,9 @@ import (
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
+// dur is a config duration, as a config file gives one.
+func dur(d time.Duration) *config.Duration { v := config.Duration(d); return &v }
+
 // FlagParsingTestSuite covers how the CLI reads its command line: subcommands, flags, their defaults and the package patterns.
 type FlagParsingTestSuite struct{}
 
@@ -36,7 +39,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config positive: config prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
-					Config: config.ProjectConfig{SetupTimeout: config.Dur(2 * time.Minute)},
+					Config: config.ProjectConfig{SetupTimeout: dur(2 * time.Minute)},
 				},
 				expect: []string{"--setup-timeout=2m0s", "-v"},
 			},
@@ -44,7 +47,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config negative: config prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
-					Config: config.ProjectConfig{SetupTimeout: config.Dur(-1 * time.Second)},
+					Config: config.ProjectConfig{SetupTimeout: dur(-1 * time.Second)},
 				},
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
@@ -52,7 +55,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "tags and setup-timeout both prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
-					Config: config.ProjectConfig{Tags: "integration", SetupTimeout: config.Dur(3 * time.Minute)},
+					Config: config.ProjectConfig{Tags: "integration", SetupTimeout: dur(3 * time.Minute)},
 				},
 				expect: []string{"--setup-timeout=3m0s", "-tags=integration", "-v"},
 			},
@@ -60,7 +63,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config timeout prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
-					Config: config.ProjectConfig{Timeout: config.Dur(15 * time.Minute)},
+					Config: config.ProjectConfig{Timeout: dur(15 * time.Minute)},
 				},
 				expect: []string{"--timeout=15m0s", "-v"},
 			},
@@ -68,7 +71,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config timeout zero: disables default",
 				inv: Invocation{
 					Args:   []string{"-v"},
-					Config: config.ProjectConfig{Timeout: config.Dur(0)},
+					Config: config.ProjectConfig{Timeout: dur(0)},
 				},
 				expect: []string{"--timeout=0s", "-v"},
 			},
@@ -76,7 +79,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config timeout negative: opt-out prepended",
 				inv: Invocation{
 					Args:   []string{"-v"},
-					Config: config.ProjectConfig{Timeout: config.Dur(-1 * time.Second)},
+					Config: config.ProjectConfig{Timeout: dur(-1 * time.Second)},
 				},
 				expect: []string{"--timeout=-1s", "-v"},
 			},
@@ -103,7 +106,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config positive: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=5m", "-v"},
-					Config: config.ProjectConfig{SetupTimeout: config.Dur(2 * time.Minute)},
+					Config: config.ProjectConfig{SetupTimeout: dur(2 * time.Minute)},
 				},
 				expect: []string{"--setup-timeout=5m", "-v"},
 			},
@@ -111,7 +114,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config negative: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=5m", "-v"},
-					Config: config.ProjectConfig{SetupTimeout: config.Dur(-1 * time.Second)},
+					Config: config.ProjectConfig{SetupTimeout: dur(-1 * time.Second)},
 				},
 				expect: []string{"--setup-timeout=5m", "-v"},
 			},
@@ -119,7 +122,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "CLI timeout wins over config timeout",
 				inv: Invocation{
 					Args:   []string{"--timeout=20m", "-v"},
-					Config: config.ProjectConfig{Timeout: config.Dur(15 * time.Minute)},
+					Config: config.ProjectConfig{Timeout: dur(15 * time.Minute)},
 				},
 				expect: []string{"--timeout=20m", "-v"},
 			},
@@ -146,7 +149,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config positive: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=-1s", "-v"},
-					Config: config.ProjectConfig{SetupTimeout: config.Dur(2 * time.Minute)},
+					Config: config.ProjectConfig{SetupTimeout: dur(2 * time.Minute)},
 				},
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
@@ -154,7 +157,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 				Desc: "config negative: CLI wins",
 				inv: Invocation{
 					Args:   []string{"--setup-timeout=-1s", "-v"},
-					Config: config.ProjectConfig{SetupTimeout: config.Dur(-1 * time.Second)},
+					Config: config.ProjectConfig{SetupTimeout: dur(-1 * time.Second)},
 				},
 				expect: []string{"--setup-timeout=-1s", "-v"},
 			},
@@ -165,7 +168,7 @@ func (s *FlagParsingTestSuite) TestDefaultArgs(t *gotest.T) {
 	})
 
 	t.When("the command takes neither --timeout nor --setup-timeout", func(w *gotest.T) {
-		inv := Invocation{Args: []string{"./..."}, Config: config.ProjectConfig{Tags: "x", Timeout: config.Dur(10 * time.Minute), SetupTimeout: config.Dur(time.Minute)}}
+		inv := Invocation{Args: []string{"./..."}, Config: config.ProjectConfig{Tags: "x", Timeout: dur(10 * time.Minute), SetupTimeout: dur(time.Minute)}}
 		w.It("adds the tags and neither duration", func(it *gotest.T) {
 			gotest.Equal(it, []string{"-tags=x", "./..."}, inv.DefaultArgsFor(ExportFuzzAllowed))
 		})
