@@ -1,13 +1,13 @@
 Expect: exclusive: ExclusiveTestSuite started before the bulk drained
 Judge: ./tests/canary CanaryTestSuite/TestAnExclusiveSuiteRunsAfterTheBulk
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -843,7 +843,7 @@
- 
- 		for i := range targets { //nolint:gocritic // hugeParam: stable API
- 			target := targets[i]
--			if target.Exclusive || target.Group != streamedGroup {
-+			if target.Group != streamedGroup {
- 				// Deferred past the stream: exclusive suites run strictly
- 				// alone, after every concurrent suite of their group has
- 				// drained, and a later group after the one before it. Their
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -294,7 +294,7 @@
+
+ 	for i := range targets { //nolint:gocritic // hugeParam: stable API
+ 		target := targets[i]
+-		if target.Exclusive || target.Group != r.streamedGroup {
++		if target.Group != r.streamedGroup {
+ 			// Deferred past the stream: exclusive suites run strictly
+ 			// alone, after every concurrent suite of their group has
+ 			// drained, and a later group after the one before it. Their

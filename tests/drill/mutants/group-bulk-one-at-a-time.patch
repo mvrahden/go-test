@@ -1,8 +1,8 @@
 Expect: ^FAIL .*conformance/lifecycle .* / runs the suites of e2e beside each other, two 1s suites within 1.8s \(
 Clause: when suites of the default group, of a group e2e and of a later group run → runs the suites of e2e beside each other, two 1s suites within 1.8s
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -856,6 +856,7 @@
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -379,6 +379,7 @@
  					defer r.done(&t)
  					r.runSuite(t, idx, deferred)
  				}(d.t, d.idx)

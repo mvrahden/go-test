@@ -74,13 +74,13 @@ Clause: when a shared fixture's release still runs as the run ends and another f
  // Err is every release that failed, once the releaser has stopped.
  func (r *fixtureReleaser) Err() error {
  	<-r.stopped
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -1003,6 +1003,7 @@
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -412,6 +412,7 @@
  	// still queued or in flight go to the terminal teardown, which releases
  	// everything at once: sending them one after another would end the run
  	// later.
-+	releaser.Drain()
- 	releaseCancel()
- 	setupErr, teardownErr := fixtures.close(releaser.Err())
- 	streamCancel()
++	r.releaser.Drain()
+ 	r.releaseCancel()
+ 	setupErr, teardownErr := r.fixtures.close(r.releaser.Err())
+ 	r.cancel()

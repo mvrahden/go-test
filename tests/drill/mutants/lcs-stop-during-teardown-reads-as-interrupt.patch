@@ -1,13 +1,13 @@
 Expect: ^FAIL .*conformance/lifecycle .* / exits 0 and lets the AfterAll finish \(
 Clause: when a passing run is interrupted while its shared fixture's AfterAll runs → exits 0 and lets the AfterAll finish
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -1096,7 +1096,7 @@
- 
- 	collector.Finalize()
- 
--	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
-+	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), ctx.Err())
- 	if fixtures.failedSetup() && exitCode == 0 {
- 		exitCode = 1
- 	}
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -439,7 +439,7 @@
+ 		applyDeadlineFailure(c, &result, r.cfg, dispatchErr, nil)
+ 	} else {
+ 		c.Finalize()
+-		exitCode := exitCodeAfterDispatch(c.WorstExitCode(), dispatchErr)
++		exitCode := exitCodeAfterDispatch(c.WorstExitCode(), r.cfgCtx.Err())
+ 		if r.fixtures.failedSetup() && exitCode == 0 {
+ 			exitCode = 1
+ 		}
