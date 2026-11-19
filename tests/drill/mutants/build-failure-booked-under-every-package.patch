@@ -1,0 +1,13 @@
+Clause: when two packages each fail vet and a third passes → exits 2, reports each finding under its own package and runs the third
+Expect: ^FAIL .*conformance/cli CLIBatch .* / exits 2, reports each finding under its own package and runs the third \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -68,7 +68,7 @@
+ 			}
+ 			if log.failed(b.Package) {
+ 				reported[i] = true
+-				emit(CompileOutcome{Package: b.Package, Err: compileError(b.Package, errBuildFailed, log.diagnostics(b.Package))})
++				emit(CompileOutcome{Package: b.Package, Err: compileError(b.Package, errBuildFailed, slices.Concat(log.shared(), log.diagnostics(group[0]), log.diagnostics(group[len(group)-1])))})
+ 				continue
+ 			}
+ 			now, _ := os.Stat(b.Path)

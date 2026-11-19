@@ -23,7 +23,6 @@ type ExportOverlayJSON = overlayJSON
 type ExportFixtureStateEntry = fixtureStateEntry
 
 var ExportCompileConcurrency = compileConcurrency
-var ExportCompilePackage = compilePackage
 var ExportBuildSuiteCmd = buildSuiteCmd
 var ExportTest2JSONPath = test2jsonPath
 var ExportResolveTest2JSON = resolveTest2JSON
@@ -837,6 +836,22 @@ var (
 
 // ExportPlaced reports whether a cached binary was placed in b's slot.
 func ExportPlaced(b *StagedBinary) bool { return b.placed != nil }
+
+// ExportSetGoTestC replaces the go command the compile stage runs until
+// restore.
+func ExportSetGoTestC(fn func(ctx context.Context, args, env []string, stdout, stderr io.Writer) error) (restore func()) {
+	prev := goTestC
+	goTestC = fn
+	return func() { goTestC = prev }
+}
+
+// ExportSetGoCacheDir makes dir the GOCACHE the compile stage reads until
+// restore.
+func ExportSetGoCacheDir(dir string) (restore func()) {
+	prev := goCacheDir
+	goCacheDir = func() string { return dir }
+	return func() { goCacheDir = prev }
+}
 
 // ExportSetHardLink replaces the hard link a placement makes until restore.
 func ExportSetHardLink(fn func(oldname, newname string) error) (restore func()) {

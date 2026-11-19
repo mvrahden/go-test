@@ -4074,6 +4074,98 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "exits 2, reports each finding under its own package and runs the third",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "batch_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 39,
+                      "name": "exits_2,_reports_each_finding_under_its_own_package_and_runs_the_third",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two packages each fail vet and a third passes",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "batch_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 38,
+                  "name": "two_packages_each_fail_vet_and_a_third_passes",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "both run and pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "batch_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 56,
+                      "name": "both_run_and_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two packages named util are run together",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "batch_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 55,
+                  "name": "two_packages_named_util_are_run_together",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "BuildingSeveralPackages",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "batch_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 34,
+              "name": "TestBuildingSeveralPackages",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIBatch",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "batch_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 14,
+          "name": "TestCLIBatchTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a run removes its binaries",
                       "duration": 0,
                       "excluded": false,
@@ -32641,13 +32733,13 @@
     }
   ],
   "stats": {
-    "behaviors": 948,
+    "behaviors": 950,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 137,
+    "suites": 138,
     "tests": 0
   }
 }
