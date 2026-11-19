@@ -51,4 +51,3 @@ func (s *SynthTestSuite) TestTheStagedModuleRuns(t *gotest.T) {
 		gotest.NotEqual(it, string(before), string(after))
 	})
 }
-

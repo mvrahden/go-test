@@ -38,6 +38,7 @@ func Run(program string, args []string) int {
 	}
 	// Exec returns only when it failed or is not supported (Windows).
 	_ = syscall.Exec(path, append([]string{program}, args...), os.Environ()) //nolint:gosec // G204: the program the caller names
+
 	cmd := exec.Command(path, args...) //nolint:gosec // G204: the program the caller names
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
