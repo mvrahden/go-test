@@ -1,7 +1,6 @@
 package gotestrunner_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -20,43 +19,46 @@ func (s *BinaryCacheLockCheckTestSuite) TestALockEvictedWhileWaitingIsNotTheCach
 	if runtime.GOOS == "windows" {
 		t.Skipf("Windows cannot delete a lock file another handle holds open, so an eviction cannot replace it")
 	}
-	const pkg = "github.com/mvrahden/go-test/internal/about"
-	cache, work := t.TempDir(), t.TempDir()
+	const pkg = "m/a"
+	cache, stage := t.TempDir(), filepath.Join(t.TempDir(), "stage")
 	cached := filepath.Join(cache, gotestrunner.ExportSanitizePkgName(pkg)+".test")
-	overlay := filepath.Join(t.TempDir(), "overlay.json")
-	gotest.NoError(t, os.WriteFile(overlay, []byte(`{"Replace":{}}`), 0o600))
+	record := func() {
+		gotest.NoError(t, gotestrunner.ExportWriteSum(cached, gotest.Must(gotestrunner.ExportSumFile(cached))))
+	}
 
 	// An eviction holds the lock and has the binary there.
 	release := gotest.Must(gotestrunner.ExportLockFile(cached + ".lock"))
 	gotest.NoError(t, os.WriteFile(cached, []byte("old"), 0o600))
+	record()
 	opened := make(chan struct{})
 	restore := gotestrunner.ExportLockOpened(func(string) { close(opened) })
 	type outcome struct {
-		res gotestrunner.CompileResult
-		err error
+		staged []gotestrunner.StagedBinary
+		err    error
 	}
 	done := make(chan outcome, 1)
 	gotest.Go(t, func() {
-		res, err := gotestrunner.ExportCompilePackage(context.Background(), pkg, "-overlay="+overlay, nil, work, cache)
-		done <- outcome{res, err}
+		staged, err := gotestrunner.ExportStageGroup([]string{pkg}, stage, cache)
+		done <- outcome{staged, err}
 	})
 	// The run has opened the lock file and waits on it; the eviction removes
-	// the binary and the lock file, then releases.
+	// the binary and the lock file, then releases. A run that did not wait
+	// linked the binary again meanwhile, under a lock file of its own.
 	<-opened
 	restore()
 	gotest.NoError(t, os.Remove(cached))
 	gotest.NoError(t, os.Remove(cached+".lock"))
+	gotest.NoError(t, os.WriteFile(cached, []byte("new"), 0o600))
+	record()
 	release()
 	got := <-done
 
 	t.When("an eviction removes a binary and its lock file while a run waits on that lock", func(w *gotest.T) {
-		w.It("links the run's binary into its work dir and leaves none in the cache", func(it *gotest.T) {
+		w.It("places nothing from the cache, so go links the run's binary itself", func(it *gotest.T) {
 			gotest.NoError(it, got.err)
-			gotest.Equal(it, filepath.Join(work, filepath.Base(cached)), got.res.BinaryPath)
-			_, err := os.Stat(got.res.BinaryPath)
-			gotest.NoError(it, err)
-			_, err = os.Stat(cached)
-			gotest.True(it, os.IsNotExist(err), "a binary was linked into the cache at %s", cached)
+			gotest.False(it, gotestrunner.ExportPlaced(&got.staged[0]))
+			_, err := os.Stat(got.staged[0].Path)
+			gotest.True(it, os.IsNotExist(err), "a binary was placed at %s", got.staged[0].Path)
 		})
 	})
 }
