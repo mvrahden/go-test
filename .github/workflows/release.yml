@@ -28,6 +28,36 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: bash .github/scripts/release-preflight.sh --tagged "$TAG" "$GITHUB_SHA"
 
+  tag-lint-plugin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: preflight
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Tag the golangci plugin module
+        id: plugin-tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          tag="pkg/lint/golangci/$TAG"
+          if ! git cat-file -e "$GITHUB_SHA:pkg/lint/golangci/go.mod" 2>/dev/null; then
+            echo "no golangci plugin module at $GITHUB_SHA"
+            exit 0
+          fi
+          at=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | awk '{ sha = $1 } END { print sha }')
+          if [ -n "$at" ]; then
+            if [ "$at" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag points at $at, not at the release commit $GITHUB_SHA"
+              exit 1
+            fi
+            echo "$tag already points at $GITHUB_SHA"
+            exit 0
+          fi
+          git -c tag.gpgSign=false tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+
   test:
     runs-on: ubuntu-latest
     needs: preflight
