@@ -1,0 +1,21 @@
+Expect: ^FAIL .*conformance/lint LinterDrivers / GoVet / when go vet runs a unitchecker main around the exported analyzer as its vettool / go vet prints lint's findings for the package \(
+Clause: when go vet runs a unitchecker main around the exported analyzer as its vettool → go vet prints lint's findings for the package
+--- a/pkg/lint/analyzer.go
++++ b/pkg/lint/analyzer.go
+@@ -1,7 +1,14 @@
+ package lint
+ 
+-import "github.com/mvrahden/go-test/internal/lint"
++import (
++	"github.com/mvrahden/go-test/internal/lint"
++	"golang.org/x/tools/go/analysis"
++)
+ 
+ // Analyzer is the gotestlint analyzer, exported for go/analysis drivers
+ // other than gotest lint; the package documentation names them.
+-var Analyzer = lint.Analyzer
++var Analyzer = func() *analysis.Analyzer {
++	a := *lint.Analyzer
++	a.Run = func(*analysis.Pass) (any, error) { return nil, nil }
++	return &a
++}()

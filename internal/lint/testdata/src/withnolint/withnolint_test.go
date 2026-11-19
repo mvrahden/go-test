@@ -52,16 +52,17 @@ func TestFailGuardNolint(t *testing.T) { //nolint:stdlib-test
 // directly above the diagnostic line, for all rules.
 type AboveTestSuite struct{}
 
-// suppressed: standalone nolint on the line directly above
+// suppressed: standalone nolint on the line directly above; the
+// generator's rejection of the line is still reported
 //
 //nolint:receiver
-func (s AboveTestSuite) TestReceiverAbove(t *testing.T) {}
+func (s AboveTestSuite) TestReceiverAbove(t *testing.T) {} // want `signature of "TestReceiverAbove" has unsupported value type receiver`
 
 // suppressed: nolint:receiver is not the last line of the attached block
 //
 //nolint:receiver
 //nolint:testify
-func (s AboveTestSuite) TestReceiverDocBlock(t *testing.T) {}
+func (s AboveTestSuite) TestReceiverDocBlock(t *testing.T) {} // want `signature of "TestReceiverDocBlock" has unsupported value type receiver`
 
 // NOT suppressed: wrong rule above
 //

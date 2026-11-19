@@ -1,7 +1,10 @@
 package withpollscope //nolint:stdlib-test
 
 import (
+	"bytes"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,5 +160,24 @@ func TestHelperInsideCallback(t *testing.T) {
 func pollWithGotestT(t *gotest.T) {
 	gotest.Consistently(t, time.Second, time.Millisecond, func(poll *gotest.R) {
 		checkReadyG(t) // want `t passed to checkReadyG in poll callback bypasses assertion recording — use poll`
+	})
+}
+
+// Calls that only share an assertion's name and take plain values stay
+// silent.
+func TestNamesakesInsideCallback(t *testing.T) {
+	out, a, b, xs := "ready", []byte("a"), []byte("a"), []int{1}
+	gotest.Eventually(t, time.Second, time.Millisecond, func(poll *gotest.R) {
+		_ = strings.Contains(out, "ready")
+		_ = bytes.Equal(a, b)
+		_ = slices.Contains(xs, 1)
+	})
+}
+
+func TestOuterRecorderInsideNestedPoll(t *testing.T) {
+	gotest.Eventually(t, time.Second, time.Millisecond, func(outer *gotest.R) {
+		gotest.Consistently(outer, time.Second, time.Millisecond, func(inner *gotest.R) {
+			gotest.True(outer, true) // want `use inner instead of outer in poll callback passed to Consistently`
+		})
 	})
 }

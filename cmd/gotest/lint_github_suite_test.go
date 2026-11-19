@@ -33,6 +33,14 @@ func (s *LintGitHubTestSuite) TestArming(t *gotest.T) {
 		w.It("arms with --github", func(it *gotest.T) {
 			gotest.True(it, ExportLintGitHubArmed([]string{"--github", "./..."}))
 		})
+
+		w.It("arms with --github=true", func(it *gotest.T) {
+			gotest.True(it, ExportLintGitHubArmed([]string{"--github=true", "./..."}))
+		})
+
+		w.It("stays off with --github=false", func(it *gotest.T) {
+			gotest.False(it, ExportLintGitHubArmed([]string{"--github=false", "./..."}))
+		})
 	})
 
 	t.When("inside GitHub Actions", func(w *gotest.T) {
@@ -40,6 +48,14 @@ func (s *LintGitHubTestSuite) TestArming(t *gotest.T) {
 
 		w.It("auto-arms without the flag", func(it *gotest.T) {
 			gotest.True(it, ExportLintGitHubArmed([]string{"./..."}))
+		})
+
+		w.It("stays off with --github=false", func(it *gotest.T) {
+			gotest.False(it, ExportLintGitHubArmed([]string{"--github=false", "./..."}))
+		})
+
+		w.It("lets the last flag decide", func(it *gotest.T) {
+			gotest.True(it, ExportLintGitHubArmed([]string{"--github=false", "--github", "./..."}))
 		})
 	})
 }

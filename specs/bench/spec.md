@@ -85,3 +85,10 @@ A benchmark whose name ends in a dash and a number SHALL keep that name when the
 #### Scenario: A run over two processor counts
 - **WHEN** gotest bench --json runs sub-benchmarks named plain and size-1024 with -cpu=8,1 and -count=2
 - **THEN** the report keeps four samples of each, two at 8 processors and two at 1
+
+### Requirement: A sample that measured no time
+A sample whose time the clock could not resolve, which go test prints without ns/op, SHALL be one of its benchmark's samples, at 0 ns/op.
+
+#### Scenario: Samples that measured no time
+- **WHEN** gotest bench --json runs a benchmark whose samples measured no time with -count=2
+- **THEN** the report keeps both samples at 0 ns/op

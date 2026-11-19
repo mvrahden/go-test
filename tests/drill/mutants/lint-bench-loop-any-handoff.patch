@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules / BenchHelpers / when a benchmark hands its b to a helper of its package that holds the loop / bench-loop still reports a benchmark whose helper only asserts on b \(
+Clause: when a benchmark hands its b to a helper of its package that holds the loop → bench-loop still reports a benchmark whose helper only asserts on b
+--- a/internal/lint/bench.go
++++ b/internal/lint/bench.go
+@@ -457,7 +457,7 @@
+ 			if !recv.matches(arg) {
+ 				continue
+ 			}
+-			if r.callLoops(call, i, unread) {
++			if unread || r.callLoops(call, i, unread) {
+ 				found = true
+ 				return false
+ 			}

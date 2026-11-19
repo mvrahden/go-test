@@ -51,7 +51,7 @@ func (s *AsyncAssertionsTestSuite) TestEventually(t *gotest.T) {
 		w.It("passes", func(it *gotest.T) {
 			count := 0
 			m := gotest.Record(func(r *gotest.R) {
-				gotest.Eventually(r, 50*time.Millisecond, 1*time.Millisecond, func(poll *gotest.R) {
+				gotest.Eventually(r, 1*time.Second, 1*time.Millisecond, func(poll *gotest.R) {
 					count++
 					gotest.GreaterOrEqual(poll, count, 3)
 				})

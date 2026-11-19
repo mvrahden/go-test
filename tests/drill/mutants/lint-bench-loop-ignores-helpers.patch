@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules / BenchHelpers / when a benchmark hands its b to a helper of its package that holds the loop / bench-loop stays silent on it, through a second helper too \(
+Clause: when a benchmark hands its b to a helper of its package that holds the loop → bench-loop stays silent on it, through a second helper too
+--- a/internal/lint/bench.go
++++ b/internal/lint/bench.go
+@@ -437,7 +437,7 @@
+ // handsOff reports whether body passes what recv matches to a call that
+ // loops on it, or to one lint cannot read.
+ func (r *loopReach) handsOff(body *ast.BlockStmt, recv wrapperRecv) bool {
+-	return r.handOff(body, recv, true)
++	return false
+ }
+ 
+ // handOff is handsOff; unread counts a callee lint cannot read as a

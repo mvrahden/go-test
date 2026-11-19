@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -25,6 +26,10 @@ import (
 )
 
 func runLint(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
+	if err := lintGitHubFlagError(inv.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+		return 2
+	}
 	github := lintGitHubArmed(inv.Args)
 	args := stripFlag(inv.Args, "--github")
 
@@ -90,6 +95,7 @@ type lintArgs struct {
 // lintValueFlags take a value, as -name=value or as the next argument.
 var lintValueFlags = map[string]bool{
 	"c": true, "tags": true, "debug": true, "cpuprofile": true, "memprofile": true, "trace": true,
+	"nolint-allow": true,
 }
 
 func parseLintArgs(args []string) (lintArgs, error) {
@@ -422,10 +428,42 @@ func lintChangedSource(changes []lint.Change) func(string) ([]byte, error) {
 }
 
 // lintGitHubArmed reports whether lint should render GitHub annotations:
-// explicitly via --github, or implicitly inside a GitHub Actions runner,
-// mirroring the summary subcommand's arming.
+// as the last --github flag says (bare is true), or else inside a GitHub
+// Actions runner, mirroring the summary subcommand's arming. A value that
+// is no boolean does not arm.
 func lintGitHubArmed(args []string) bool {
-	return hasFlag(args, "--github") || os.Getenv("GITHUB_ACTIONS") == "true"
+	if v, ok := lintGitHubFlag(args); ok {
+		on, err := strconv.ParseBool(v)
+		return err == nil && on
+	}
+	return os.Getenv("GITHUB_ACTIONS") == "true"
+}
+
+// lintGitHubFlag returns the value of the last --github flag in args,
+// "true" for a bare one, and whether there is one.
+func lintGitHubFlag(args []string) (string, bool) {
+	v, ok := "", false
+	for _, a := range args {
+		switch {
+		case a == "--github":
+			v, ok = "true", true
+		case strings.HasPrefix(a, "--github="):
+			v, ok = strings.TrimPrefix(a, "--github="), true
+		}
+	}
+	return v, ok
+}
+
+// lintGitHubFlagError refuses the first --github value that is no boolean.
+func lintGitHubFlagError(args []string) error {
+	for _, a := range args {
+		if v, ok := strings.CutPrefix(a, "--github="); ok {
+			if _, err := strconv.ParseBool(v); err != nil {
+				return fmt.Errorf("invalid value %q for flag --github", v)
+			}
+		}
+	}
+	return nil
 }
 
 // stripFlag returns args without any occurrence of name or name=value.
@@ -483,7 +521,11 @@ func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, sou
 		// As token.Position prints it: a //line directive without a
 		// column leaves none.
 		pos := token.Position{Filename: f.File, Line: f.Line, Column: f.Col}
-		fmt.Fprintf(stderr, "%s: %s\n", pos, f.Message)
+		if f.Rule == "" {
+			fmt.Fprintf(stderr, "%s: %s\n", pos, f.Message)
+		} else {
+			fmt.Fprintf(stderr, "%s: %s (%s)\n", pos, f.Message, f.Rule)
+		}
 		if context < 0 {
 			continue
 		}
@@ -502,7 +544,7 @@ func reportLintPlain(stderr io.Writer, findings []lint.Finding, context int, sou
 // lintAnalyzerFlag reports whether name (without dashes) is one of the
 // analyzer's own flags.
 func lintAnalyzerFlag(name string) bool {
-	if name == "disable-nolint" {
+	if name == "disable-nolint" || name == "nolint-allow" {
 		return true
 	}
 	rule, isSkip := strings.CutPrefix(name, "skip-")
@@ -572,7 +614,32 @@ func lintSkipFlags(args []string, cfg config.ProjectConfig) ([]string, error) { 
 			flags = append(flags, flag)
 		}
 	}
+	for _, name := range cfg.Lint.NolintAllow {
+		if !linterNameRe.MatchString(name) {
+			return nil, fmt.Errorf("invalid linter name in %s lint.nolint-allow: %q", config.FileName, name)
+		}
+	}
+	if len(cfg.Lint.NolintAllow) > 0 && !hasLintFlag(args, "nolint-allow") {
+		flags = append(flags, "-nolint-allow="+strings.Join(cfg.Lint.NolintAllow, ","))
+	}
 	return flags, nil
+}
+
+// linterNameRe is what a linter name a nolint comment may carry looks like.
+var linterNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
+
+// hasLintFlag reports whether args hold -name or --name, bare or with a value.
+func hasLintFlag(args []string, name string) bool {
+	for _, a := range args {
+		if a == "--" {
+			return false
+		}
+		a = strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
+		if a == name || strings.HasPrefix(a, name+"=") {
+			return true
+		}
+	}
+	return false
 }
 
 // lintTempBound is how long a lint's end waits for the compiles of a go

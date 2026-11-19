@@ -68,6 +68,7 @@ const (
 	groupErrorsIs  = "errorsis"
 	groupGuards    = "guards"
 	groupRedundant = "redundant"
+	groupImpure    = "impure"
 )
 
 const (
@@ -205,6 +206,26 @@ var rewriteRows = []rewriteRow{
 		body: "s := []int{1}\n\tgotest.NotNil(t, s)\n\tgotest.Contains(t, s, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, s)", verdict: "pass"},
 	{Desc: "NotEmpty of a string before Contains of a non-empty needle", group: groupRedundant,
 		body: "s := \"abc\"\n\tgotest.NotEmpty(t, s)\n\tgotest.Contains(t, s, \"b\")", rules: []string{redundant}, gone: "gotest.NotEmpty(t, s)", verdict: "pass"},
+	{Desc: "NotNil of a field before Contains", group: groupRedundant, decls: "type box struct{ items []int }\n",
+		body: "b := box{items: []int{1}}\n\tgotest.NotNil(t, b.items)\n\tgotest.Contains(t, b.items, 1)", rules: []string{redundant}, gone: "gotest.NotNil(t, b.items)", verdict: "pass"},
+	{Desc: "NotEmpty of a map element before Len", group: groupRedundant,
+		body: "m := map[string][]int{\"k\": {1}}\n\tgotest.NotEmpty(t, m[\"k\"])\n\tgotest.Len(t, m[\"k\"], 1)", rules: []string{redundant}, gone: "gotest.NotEmpty(t, m[\"k\"])", verdict: "pass"},
+
+	// Each assertion evaluates its own operand: a call or a receive is no repeat.
+	{Desc: "NotEmpty of a call before Len of the same call", group: groupImpure,
+		body: "q := []string{\"a\"}\n\tpop := func() []string {\n\t\tout := q\n\t\tq = nil\n\t\treturn out\n\t}\n\tgotest.NotEmpty(t, pop())\n\tgotest.Len(t, pop(), 1)", verdict: "fail"},
+	{Desc: "Error of a call before ErrorIs of the same call", group: groupImpure, imports: []string{"errors"}, decls: "var errBoom = errors.New(\"boom\")\n",
+		body: "errs := []error{errBoom, nil}\n\tnext := func() error {\n\t\terr := errs[0]\n\t\terrs = errs[1:]\n\t\treturn err\n\t}\n\tgotest.Error(t, next())\n\tgotest.ErrorIs(t, next(), errBoom)", verdict: "fail"},
+	{Desc: "NotEmpty of a receive before Len of a receive", group: groupImpure,
+		body: "ch := make(chan []int, 2)\n\tch <- []int{1}\n\tch <- nil\n\tgotest.NotEmpty(t, <-ch)\n\tgotest.Len(t, <-ch, 1)", verdict: "fail"},
+	{Desc: "NotNil of an element at a called index before Contains", group: groupImpure,
+		body: "xs := [][]int{{1}, nil}\n\ti := -1\n\tnext := func() int {\n\t\ti++\n\t\treturn i\n\t}\n\tgotest.NotNil(t, xs[next()])\n\tgotest.Contains(t, xs[next()], 1)", verdict: "fail"},
+	// A call among the second assertion's other arguments runs before it
+	// reads the operand, and may write it.
+	{Desc: "Error before ErrorIs whose target call sets the error", group: groupImpure, imports: []string{"errors"}, decls: "var errBoom = errors.New(\"boom\")\n",
+		body: "var err error\n\ttarget := func() error {\n\t\terr = errBoom\n\t\treturn errBoom\n\t}\n\tgotest.Error(t, err)\n\tgotest.ErrorIs(t, err, target())", verdict: "fail"},
+	{Desc: "NotEmpty before Contains whose needle call appends", group: groupImpure,
+		body: "var xs []int\n\tadd := func() int {\n\t\txs = append(xs, 1)\n\t\treturn 1\n\t}\n\tgotest.NotEmpty(t, xs)\n\tgotest.Contains(t, xs, add())", verdict: "fail"},
 }
 
 // rowPkg names the package row i is staged in.
@@ -354,6 +375,9 @@ func (s *LinterRewritesTestSuite) TestRedundancies(t *gotest.T) {
 	t.When("an assertion is followed by one that checks the same operand", func(w *gotest.T) {
 		w.It("the first is removed only where the second fails on every input the first fails", func(it *gotest.T) {
 			s.checkRows(it, groupRedundant)
+		})
+		w.It("operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own", func(it *gotest.T) {
+			s.checkRows(it, groupImpure)
 		})
 	})
 }

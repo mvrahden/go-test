@@ -272,6 +272,7 @@ func reanalyze(ctx context.Context, t *Targets, prev *Result, changed []string, 
 	if err != nil {
 		return nil, err
 	}
+	defer registerDirCases(pkgs)()
 	graph, err := checker.Analyze([]*analysis.Analyzer{Analyzer}, pkgs, nil)
 	if err != nil {
 		return nil, fmt.Errorf("analyze: %w", err)

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics / ProjectNolintAllow / when a nolint comment names a linter that lint\.nolint-allow of \.gotest\.yml lists / lint leaves the comment unreported \(
+Clause: when a nolint comment names a linter that lint.nolint-allow of .gotest.yml lists → lint leaves the comment unreported
+--- a/cmd/gotest/lint.go
++++ b/cmd/gotest/lint.go
+@@ -619,7 +619,7 @@
+ 			return nil, fmt.Errorf("invalid linter name in %s lint.nolint-allow: %q", config.FileName, name)
+ 		}
+ 	}
+-	if len(cfg.Lint.NolintAllow) > 0 && !hasLintFlag(args, "nolint-allow") {
++	if false && len(cfg.Lint.NolintAllow) > 0 && !hasLintFlag(args, "nolint-allow") {
+ 		flags = append(flags, "-nolint-allow="+strings.Join(cfg.Lint.NolintAllow, ","))
+ 	}
+ 	return flags, nil

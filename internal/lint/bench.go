@@ -18,6 +18,7 @@ import (
 // considered; a non-pointer-receiver suite method is already flagged by
 // the Receiver rule and would never be dispatched as a benchmark anyway.
 func checkBenchLoop(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
+	reach := buildLoopReach(pass, insp, 5)
 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
 		fd := n.(*ast.FuncDecl)
 		if fd.Body == nil || !isPointerReceiver(fd.Recv) {
@@ -35,7 +36,7 @@ func checkBenchLoop(pass *analysis.Pass, insp *inspector.Inspector, suites map[s
 		}
 
 		param := benchParamName(fd)
-		if param == "" || benchBodyUsesLoopOrN(fd.Body, param) {
+		if param == "" || benchBodyUsesLoopOrN(fd.Body, param) || reach.handsOff(fd.Body, newWrapperRecv(fd.Body, param, "B")) {
 			return
 		}
 
@@ -368,6 +369,168 @@ func benchBodyUsesLoopOrN(body *ast.BlockStmt, param string) bool {
 		return true
 	})
 	return found
+}
+
+// loopReach marks the package's functions that loop on a parameter: they
+// name Loop or N on it, or hand it to one that does.
+type loopReach struct {
+	pass  *analysis.Pass
+	loops map[*types.Func]map[int]bool // parameter index → loops
+	known map[*types.Func]bool         // declared with a body in this package
+}
+
+// buildLoopReach reads every function of the package once, then follows
+// hand-offs between them for at most maxDepth rounds.
+func buildLoopReach(pass *analysis.Pass, insp *inspector.Inspector, maxDepth int) *loopReach {
+	r := &loopReach{pass: pass, loops: map[*types.Func]map[int]bool{}, known: map[*types.Func]bool{}}
+	type benchParam struct {
+		fn   *types.Func
+		body *ast.BlockStmt
+		name string
+		idx  int
+	}
+	var pending []benchParam
+	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil)}, func(n ast.Node) {
+		fd := n.(*ast.FuncDecl)
+		fn, ok := pass.TypesInfo.Defs[fd.Name].(*types.Func)
+		if !ok || fd.Body == nil {
+			return
+		}
+		r.known[fn] = true
+		for name, idx := range flattenParams(fd.Type.Params) {
+			if name == "_" || !isBenchHandle(pass.TypesInfo.TypeOf(paramIdent(fd, name))) {
+				continue
+			}
+			if benchBodyUsesLoopOrN(fd.Body, name) {
+				r.mark(fn, idx)
+				continue
+			}
+			pending = append(pending, benchParam{fn, fd.Body, name, idx})
+		}
+	})
+	for range maxDepth {
+		marked := false
+		rest := pending[:0]
+		for _, p := range pending {
+			if r.handOff(p.body, newWrapperRecv(p.body, p.name, "B"), false) {
+				r.mark(p.fn, p.idx)
+				marked = true
+				continue
+			}
+			rest = append(rest, p)
+		}
+		pending = rest
+		if !marked {
+			break
+		}
+	}
+	return r
+}
+
+func (r *loopReach) mark(fn *types.Func, idx int) {
+	if r.loops[fn] == nil {
+		r.loops[fn] = map[int]bool{}
+	}
+	r.loops[fn][idx] = true
+}
+
+// handsOff reports whether body passes what recv matches to a call that
+// loops on it, or to one lint cannot read.
+func (r *loopReach) handsOff(body *ast.BlockStmt, recv wrapperRecv) bool {
+	return r.handOff(body, recv, true)
+}
+
+// handOff is handsOff; unread counts a callee lint cannot read as a
+// hand-off. gotest's own functions are never one: they assert, they do not
+// loop.
+func (r *loopReach) handOff(body *ast.BlockStmt, recv wrapperRecv, unread bool) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		for i, arg := range call.Args {
+			if !recv.matches(arg) {
+				continue
+			}
+			if r.callLoops(call, i, unread) {
+				found = true
+				return false
+			}
+		}
+		return true
+	})
+	return found
+}
+
+// callLoops reports whether call's argument i reaches a loop.
+func (r *loopReach) callLoops(call *ast.CallExpr, i int, unread bool) bool {
+	var id *ast.Ident
+	switch fun := ast.Unparen(call.Fun).(type) {
+	case *ast.Ident:
+		id = fun
+	case *ast.SelectorExpr:
+		id = fun.Sel
+	case *ast.IndexExpr: // an instantiated generic function
+		id = calleeIdent(fun.X)
+	case *ast.IndexListExpr:
+		id = calleeIdent(fun.X)
+	}
+	var obj types.Object
+	if id != nil {
+		obj = r.pass.TypesInfo.Uses[id]
+	}
+	switch obj := obj.(type) {
+	case *types.Func:
+		fn := obj.Origin()
+		switch {
+		case fn.Pkg() == r.pass.Pkg:
+			if !r.known[fn] {
+				return unread // an interface method
+			}
+			if sig, ok := fn.Type().(*types.Signature); ok && sig.Variadic() && i >= sig.Params().Len()-1 {
+				i = sig.Params().Len() - 1
+			}
+			return r.loops[fn][i]
+		case fn.Pkg() != nil && fn.Pkg().Path() == gotestImportPath:
+			return false
+		}
+		return unread
+	case *types.Builtin, *types.TypeName:
+		return false // append, a conversion
+	}
+	return unread // a function value
+}
+
+func calleeIdent(e ast.Expr) *ast.Ident {
+	switch e := ast.Unparen(e).(type) {
+	case *ast.Ident:
+		return e
+	case *ast.SelectorExpr:
+		return e.Sel
+	}
+	return nil
+}
+
+// paramIdent is the identifier that declares parameter name of fd.
+func paramIdent(fd *ast.FuncDecl, name string) *ast.Ident {
+	for _, field := range fd.Type.Params.List {
+		for _, id := range field.Names {
+			if id.Name == name {
+				return id
+			}
+		}
+	}
+	return nil
+}
+
+// isBenchHandle reports whether t is *gotest.B or *testing.B.
+func isBenchHandle(t types.Type) bool {
+	return namedPtrType(t, gotestImportPath, "B") || namedPtrType(t, "testing", "B")
 }
 
 // Fixture-typed field discovery lives in fixturefields.go, shared with the

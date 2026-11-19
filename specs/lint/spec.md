@@ -26,7 +26,7 @@ Lint SHALL report a suite declared inside a type block, a suite that embeds a fi
 - **THEN** lint leaves the call unreported, since the process that owns the fixture runs neither
 
 ### Requirement: Nolint comments
-A nolint comment with no rule or with all SHALL suppress every rule on its line; one naming a rule lint does not have SHALL be reported, and SHALL not suppress that report; one naming only another linter's rule SHALL suppress none of lint's own.
+A nolint comment with no rule or with all SHALL suppress every rule on its line; one naming a rule lint does not have SHALL be reported, and SHALL not suppress that report; one naming only another linter's rule SHALL suppress none of lint's own. A name -nolint-allow lists SHALL count as another linter's. lint.nolint-allow of .gotest.yml SHALL list such names for a project, the command line's flag taking precedence, and an entry that is no linter name SHALL be refused with exit 2.
 
 #### Scenario: A bare nolint
 - **WHEN** a nolint comment names no rule
@@ -44,6 +44,15 @@ A nolint comment with no rule or with all SHALL suppress every rule on its line;
 #### Scenario: Another linter's rule
 - **WHEN** a nolint comment names another linter's rule
 - **THEN** lint leaves the rule to that linter and suppresses none of its own
+
+#### Scenario: A linter lint was told about
+- **WHEN** a nolint comment names a linter that -nolint-allow lists
+- **THEN** lint leaves the comment unreported and suppresses none of its own rules
+
+#### Scenario: A linter the project lists
+- **WHEN** a nolint comment names a linter that lint.nolint-allow of .gotest.yml lists
+- **THEN** lint leaves the comment unreported
+- **AND** an entry that is no linter name is refused with exit 2, naming it
 
 ### Requirement: Generated files
 Lint SHALL report a generated file only when git tracks it or when it lies outside a git repository, and SHALL say so where git cannot tell.
@@ -109,15 +118,20 @@ Lint SHALL report each compile error of a target package once, with its path rel
 - **THEN** a package that does not compile is reported once, with its path relative to the module
 
 ### Requirement: Shapes the generator rejects
-Lint SHALL report each shape the generator rejects at the position the generator rejects it, and discover SHALL mark such a package broken and name each rejection at its position.
+Lint SHALL report each shape the generator rejects at the position the generator rejects it, and discover SHALL mark such a package broken and name each rejection at its position. Lint SHALL leave a rejection to another rule only on a line where an integrity rule's finding is shown.
 
 #### Scenario: Rejected shapes
 - **WHEN** a package holds shapes the generator rejects
 - **THEN** lint reports each shape the generator rejects at the position it rejects it
 - **AND** discover marks the package broken and names each rejection at its position
 
+#### Scenario: Another finding on the rejected line
+- **WHEN** a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment
+- **THEN** lint still reports the generator's rejection on that line
+- **AND** lint leaves the rejection to an integrity rule whose finding is shown on that line
+
 ### Requirement: GitHub annotations
-Lint --github SHALL escape each annotation's message and properties as a workflow command needs, SHALL cut a long annotation on a rune boundary, and SHALL name each file relative to the workspace.
+Lint --github SHALL escape each annotation's message and properties as a workflow command needs, SHALL cut a long annotation on a rune boundary, and SHALL name each file relative to the workspace. --github=false SHALL print the plain report, inside GitHub Actions too, and a value that is no boolean SHALL be refused with exit 2.
 
 #### Scenario: Characters a workflow command escapes
 - **WHEN** a finding's message and file carry characters a workflow command escapes
@@ -128,8 +142,16 @@ Lint --github SHALL escape each annotation's message and properties as a workflo
 - **WHEN** lint --github runs in a subdirectory of the workspace
 - **THEN** annotation paths are relative to the workspace
 
+#### Scenario: Annotations switched off
+- **WHEN** lint runs with --github=false inside GitHub Actions
+- **THEN** lint prints the plain report and no annotation
+
+#### Scenario: A value that is no boolean
+- **WHEN** --github is given a value that is no boolean
+- **THEN** lint refuses it with exit 2, naming the value
+
 ### Requirement: Assertion rewrites keep the verdict
-An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go.
+An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL offer no fix where the operand's type would change the verdict; the operand types and assertions are the table in tests/conformance/lint/rewrites_suite_test.go. Lint SHALL report an assertion as redundant only where both check the same operand and every argument of both is a name, field, element or literal, which evaluating cannot change.
 
 #### Scenario: Nil checks
 - **WHEN** an assertion checks an operand against nil
@@ -172,6 +194,7 @@ An assertion rewrite SHALL leave the test's verdict as it was, and lint SHALL of
 #### Scenario: Redundant assertions
 - **WHEN** an assertion is followed by one that checks the same operand
 - **THEN** the first is removed only where the second fails on every input the first fails
+- **AND** operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own
 
 ### Requirement: Rules skip what is not gotest's
 Lint's gotest rules, generation-rejects among them, SHALL leave a testify suite to the testify rule, SHALL leave calls through a user type's own T method unreported, SHALL leave a failure guard unreported where a local variable shadows the gotest import, and SHALL leave calls through a user type's own B or F method unreported.
@@ -251,3 +274,60 @@ In the findings `gotest lint -json` prints, each finding's `end` SHALL lie past 
 #### Scenario: A finding's extent
 - **WHEN** lint -json reports a finding on a call and one on a function
 - **THEN** ends each past its posn, at the end of the call and of the function's signature
+
+### Requirement: A finding names its rule
+Lint's plain report SHALL end each finding's line with its rule in parentheses, the id a nolint comment takes. Lint -json SHALL carry the rule as the finding's `category` and leave its `message` without it.
+
+#### Scenario: The rule a finding is reported under
+- **WHEN** lint reports a finding
+- **THEN** the plain line ends with the rule in parentheses
+- **AND** the -json finding carries the rule as its category and a message without it
+
+### Requirement: Assertions of another library inside a poll
+Inside a polling callback lint SHALL report a gotest assertion whose first argument is not the poll parameter, and a call that only bears an assertion's name where its first argument is a test handle: a testing.T, B, F or TB, or a gotest.T, B, F or R other than the poll parameter. A call that shares the name and takes anything else SHALL be left unreported.
+
+#### Scenario: A call named like an assertion
+- **WHEN** a polling callback calls functions that only share an assertion's name
+- **THEN** lint reports the one handed the test's t and leaves those on plain values unreported
+
+### Requirement: A benchmark's loop in a helper
+bench-loop SHALL read a loop as the benchmark's own when the benchmark hands its b, the escape of it or an alias of that escape to a function or method of its package that names Loop or N on that parameter, itself or through at most five further such calls. It SHALL stay silent when the benchmark hands b to a function whose body it cannot read, gotest's own apart, and SHALL report a benchmark whose helpers never loop.
+
+#### Scenario: A loop held by a helper
+- **WHEN** a benchmark hands its b to a helper of its package that holds the loop
+- **THEN** bench-loop stays silent on it, through a second helper too
+- **AND** bench-loop still reports a benchmark whose helper only asserts on b
+
+### Requirement: Cases that never run
+Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a gotest.T, B or F no suite runs: on a test file's type without the TestSuite suffix, named just Test, Benchmark or Fuzz on a suite, or on a test file's generic suite no alias instantiates. It SHALL leave unreported a method either test package of the directory refers to, a type either aliases as a suite, and a non-test file's declarations; a driver seeing one test package SHALL report only where there is no other.
+
+#### Scenario: A case on a type that is no suite
+- **WHEN** a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix
+- **THEN** lint reports that the method never runs and names the suffix the type lacks
+- **AND** lint leaves such a method unreported where the package calls it
+
+#### Scenario: A method named exactly Test
+- **WHEN** a suite declares methods named exactly Test, Benchmark and Fuzz
+- **THEN** lint reports each as a case that never runs
+
+#### Scenario: A generic suite without an alias
+- **WHEN** a test file declares a generic suite with a case
+- **THEN** lint reports the suite no alias instantiates at its declaration
+- **AND** lint leaves the suite an alias instantiates unreported
+
+#### Scenario: A case only the external test package reaches
+- **WHEN** the external test package takes a case of a type that is no suite as a value, a method expression or an interface method, calls it, or aliases the type as a suite
+- **THEN** lint leaves each unreported, as the generator runs it
+- **AND** lint reports a case the external package reaches from nowhere, a comment naming it included
+
+#### Scenario: A driver that sees one test package
+- **WHEN** go vet runs the exported analyzer on directories with cases no suite runs
+- **THEN** dropped-case reports nothing in a directory with an external test package, leaving it to the generator
+- **AND** dropped-case reports the cases of a directory with no external test package
+
+### Requirement: Other drivers
+The analyzer pkg/lint exports SHALL report under go vet -vettool what gotest lint reports.
+
+#### Scenario: go vet with a vettool
+- **WHEN** go vet runs a unitchecker main around the exported analyzer as its vettool
+- **THEN** go vet prints lint's findings for the package

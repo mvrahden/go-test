@@ -69,6 +69,8 @@ const (
 	// GenerationRejects is integrity: a package the generator rejects does
 	// not run at all.
 	GenerationRejects Rule = "generation-rejects"
+	// DroppedCase is integrity: a case no suite runs passes by never running.
+	DroppedCase Rule = "dropped-case"
 	// NolintUnknown is integrity: a nolint comment naming a rule that does
 	// not exist suppresses nothing, whatever it was meant to.
 	NolintUnknown Rule = "nolint-unknown"
@@ -130,6 +132,10 @@ var registry = []struct {
 		"field (only declared fixtures are started)",
 	}}},
 	{GenerationRejects, ruleInfo{TierIntegrity, ScopeSuites, false, []string{"Shapes the generator rejects, where and as it rejects them"}}},
+	{DroppedCase, ruleInfo{TierIntegrity, ScopeGotestFiles, false, []string{
+		"Test/Benchmark/Fuzz methods no suite runs: a type that is",
+		"no suite, a bare name, a generic suite without an alias",
+	}}},
 	{NolintUnknown, ruleInfo{TierIntegrity, ScopeEverywhere, false, []string{"//nolint ids that name no gotest rule or golangci-lint linter"}}},
 	{SuiteDeclaration, ruleInfo{TierIntegrity, ScopeSuites, true, []string{"Suites/fixtures declared inside a type ( … ) block"}}},
 	{NoEmbedding, ruleInfo{TierIntegrity, ScopeSuites, false, []string{
@@ -235,6 +241,7 @@ var SkippableRules = func() map[Rule]bool {
 var cfg struct {
 	skip          map[Rule]*bool
 	disableNolint bool
+	nolintAllow   string // linter names a nolint comment may name, comma-separated
 }
 
 var Analyzer = &analysis.Analyzer{
@@ -255,6 +262,7 @@ func init() {
 		cfg.skip[Rule(r)] = Analyzer.Flags.Bool("skip-"+r, false, "disable the "+r+" rule")
 	}
 	Analyzer.Flags.BoolVar(&cfg.disableNolint, "disable-nolint", false, "report all diagnostics and let the analysis driver handle suppression")
+	Analyzer.Flags.StringVar(&cfg.nolintAllow, "nolint-allow", "", "linter names a nolint comment may name beside golangci-lint's, comma-separated")
 }
 
 func skipped(rule Rule) bool {
@@ -277,6 +285,7 @@ func run(pass *analysis.Pass) (any, error) {
 	checkSuiteDeclaration(pass, insp, reached)
 	checkNoEmbedding(pass, insp, reached)
 	checkFixtureHookCall(pass, insp)
+	checkDroppedCase(pass, insp, suites)
 
 	checkOrphanedFiles(pass)
 	checkNolintIDs(pass)
@@ -339,13 +348,13 @@ func report(pass *analysis.Pass, rule Rule, rng analysis.Range, format string, a
 }
 
 func reportWithFix(pass *analysis.Pass, rule Rule, rng analysis.Range, fixes []analysis.SuggestedFix, format string, args ...any) {
-	reportedLine(pass, rule, rng.Pos())
 	if skipped(rule) {
 		return
 	}
 	if !cfg.disableNolint && isSuppressed(pass, rng.Pos(), rule) {
 		return
 	}
+	reportedLine(pass, rule, rng.Pos())
 	pass.Report(analysis.Diagnostic{
 		Pos:            rng.Pos(),
 		End:            rng.End(),
@@ -1449,9 +1458,17 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 			// Case 1: assertion with wrong first arg — gotest.Equal(t, ...) or a
 			// foreign library's Equal(t, ...): integrity coverage is deliberately
 			// package-agnostic for assertion-shaped names.
+			// A namesake of another package counts only when it is handed a
+			// test handle: strings.Contains(out, …) is no assertion.
 			name := assertionFuncName(pass, innerCall.Fun)
+			foreign := false
 			if name == "" && foreignAssertionNames[calleeName(innerCall.Fun)] {
-				name = calleeName(innerCall.Fun)
+				name, foreign = calleeName(innerCall.Fun), true
+			}
+			if foreign && len(innerCall.Args) > 0 {
+				if ident, ok := innerCall.Args[0].(*ast.Ident); !ok || !isTestHandle(pass, ident) {
+					name = ""
+				}
 			}
 			if name != "" && len(innerCall.Args) > 0 {
 				if ident, ok := innerCall.Args[0].(*ast.Ident); ok && ident.Name != pollParam {
@@ -1497,6 +1514,21 @@ func checkPollScope(pass *analysis.Pass, insp *inspector.Inspector, cl *claims) 
 func isTestT(pass *analysis.Pass, ident *ast.Ident) bool {
 	t := pass.TypesInfo.TypeOf(ident)
 	return namedPtrType(t, "testing", "T") || namedPtrType(t, gotestImportPath, "T")
+}
+
+// isTestHandle reports whether ident is a test handle: a *testing.T, B or
+// F, a testing.TB, or a *gotest.T, B, F or R.
+func isTestHandle(pass *analysis.Pass, ident *ast.Ident) bool {
+	t := pass.TypesInfo.TypeOf(ident)
+	if namedType(t, "testing", "TB") {
+		return true
+	}
+	for _, name := range []string{"T", "B", "F"} {
+		if namedPtrType(t, "testing", name) || namedPtrType(t, gotestImportPath, name) {
+			return true
+		}
+	}
+	return namedPtrType(t, gotestImportPath, "R")
 }
 
 func hasTypedRParam(pass *analysis.Pass, lit *ast.FuncLit) bool {

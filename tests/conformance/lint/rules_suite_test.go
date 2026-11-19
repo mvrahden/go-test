@@ -205,7 +205,18 @@ func ruleFindings(t *gotest.T, dir, pkg string) []string {
 
 // lintFindings is ruleFindings, and of those the ones that carry a fix.
 func lintFindings(t *gotest.T, dir, pkg string) (got, fixable []string) {
-	run, err := testkit.RunCLI(t.Context(), dir, "lint", "-json", pkg)
+	return lintFindingsWith(t, dir, pkg)
+}
+
+// ruleFindingsWith is ruleFindings with args in place of the package.
+func ruleFindingsWith(t *gotest.T, dir string, args ...string) []string {
+	got, _ := lintFindingsWith(t, dir, args...)
+	return got
+}
+
+// lintFindingsWith is lintFindings with args in place of the package.
+func lintFindingsWith(t *gotest.T, dir string, args ...string) (got, fixable []string) {
+	run, err := testkit.RunCLI(t.Context(), dir, append([]string{"lint", "-json"}, args...)...)
 	gotest.NoError(t, err)
 	var byPkg map[string]map[string][]struct {
 		Posn     string            `json:"posn"`
@@ -308,6 +319,97 @@ func (s *LintRulesTestSuite) TestTheRules(t *gotest.T) {
 			slices.Sort(skippable)
 			slices.Sort(skippableIDs)
 			gotest.Equal(it, skippable, skippableIDs)
+		})
+	})
+}
+
+const pollNamesPkg = "../testdata/lintpollnames/"
+
+func (s *LinterRulesTestSuite) TestPollNames(t *gotest.T) {
+	t.When("a polling callback calls functions that only share an assertion's name", func(w *gotest.T) {
+		w.It("lint reports the one handed the test's t and leaves those on plain values unreported", func(it *gotest.T) {
+			gotest.Equal(it, []string{"poll-scope pollnames_test.go:26:11: use poll instead of t in poll callback passed to Eventually"},
+				findingsOf(ruleFindings(it, ".", pollNamesPkg), "poll-scope "))
+		})
+	})
+}
+
+const benchHelperPkg = "../testdata/lintbenchhelper/"
+
+func (s *LinterRulesTestSuite) TestBenchHelpers(t *gotest.T) {
+	t.When("a benchmark hands its b to a helper of its package that holds the loop", func(w *gotest.T) {
+		w.It("bench-loop stays silent on it, through a second helper too", func(it *gotest.T) {
+			got := findingsOf(ruleFindings(it, ".", benchHelperPkg), "bench-loop ")
+			gotest.Empty(it, findingsAt(got, "helper_suite_test.go:20:"))
+			gotest.Empty(it, findingsAt(got, "helper_suite_test.go:22:"))
+		})
+		w.It("bench-loop still reports a benchmark whose helper only asserts on b", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", benchHelperPkg),
+				"bench-loop helper_suite_test.go:24:1: benchmark HelperTestSuite.BenchmarkAsserted never calls b.Loop() — nothing is measured")
+		})
+	})
+}
+
+const droppedPkg = "../testdata/lintdropped/"
+
+func (s *LinterRulesTestSuite) TestDroppedCases(t *gotest.T) {
+	const f = "dropped-case dropped_suite_test.go:"
+	t.When("a test file declares a Test method taking a gotest.T on a type named without the TestSuite suffix", func(w *gotest.T) {
+		w.It("lint reports that the method never runs and names the suffix the type lacks", func(it *gotest.T) {
+			got := ruleFindings(it, ".", droppedPkg)
+			gotest.Contains(it, got, f+"8:1: TestCreate on UserSuite never runs: UserSuite is no suite; end its name in TestSuite, or give the helper a name that does not begin with Test")
+			// Each case of a type, a marked-off one, one on a generic type and
+			// one a test file adds to a type of a non-test file.
+			for _, at := range []string{"62:1: TestOne on Pair", "64:1: X_TestTwo on Pair", "69:1: TestBoxed on Box", "72:1: TestAdded on Shared"} {
+				gotest.Contains(it, got, f+at+" never runs: "+strings.Fields(at)[3]+" is no suite; end its name in TestSuite, or give the helper a name that does not begin with Test")
+			}
+		})
+		w.It("lint leaves such a method unreported where the package calls it", func(it *gotest.T) {
+			got := ruleFindings(it, ".", droppedPkg)
+			// Called directly, through an interface, as a method value.
+			for _, line := range []string{"13", "43", "45"} {
+				gotest.Empty(it, findingsAt(got, "dropped_suite_test.go:"+line+":"), "line %s", line)
+			}
+			gotest.Empty(it, findingsAt(got, "shared.go:"))
+		})
+	})
+	t.When("a suite declares methods named exactly Test, Benchmark and Fuzz", func(w *gotest.T) {
+		w.It("lint reports each as a case that never runs", func(it *gotest.T) {
+			got := ruleFindings(it, ".", droppedPkg)
+			gotest.Contains(it, got, f+"19:1: Test on PayTestSuite never runs: a case needs a name after Test; rename it, or give the helper a name that does not begin with Test")
+			gotest.Contains(it, got, f+"21:1: Benchmark on PayTestSuite never runs: a case needs a name after Benchmark; rename it, or give the helper a name that does not begin with Benchmark")
+			gotest.Contains(it, got, f+"26:1: Fuzz on PayTestSuite never runs: a case needs a name after Fuzz; rename it, or give the helper a name that does not begin with Fuzz")
+		})
+	})
+	t.When("a test file declares a generic suite with a case", func(w *gotest.T) {
+		w.It("lint reports the suite no alias instantiates at its declaration", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", droppedPkg), f+"29:6: generic suite OrphanContractTestSuite never runs: no alias instantiates it; declare one (type …TestSuite = OrphanContractTestSuite[…]), or delete it")
+		})
+		w.It("lint leaves the suite an alias instantiates unreported", func(it *gotest.T) {
+			gotest.Empty(it, findingsAt(ruleFindings(it, ".", droppedPkg), "dropped_suite_test.go:34:"))
+		})
+	})
+}
+
+const (
+	droppedExtPkg     = "../testdata/lintdroppedext/"
+	droppedCommentPkg = "../testdata/lintdroppedcomment/"
+)
+
+func (s *LinterRulesTestSuite) TestDroppedCasesOfTheExternalPackage(t *gotest.T) {
+	t.When("the external test package takes a case of a type that is no suite as a value, a method expression or an interface method, calls it, or aliases the type as a suite", func(w *gotest.T) {
+		w.It("lint leaves each unreported, as the generator runs it", func(it *gotest.T) {
+			got := findingsOf(ruleFindings(it, ".", droppedExtPkg), "dropped-case ")
+			for _, line := range []string{"8", "12", "16", "20", "25", "28", "30"} {
+				gotest.Empty(it, findingsAt(got, "a_test.go:"+line+":"), "line %s", line)
+			}
+		})
+		w.It("lint reports a case the external package reaches from nowhere, a comment naming it included", func(it *gotest.T) {
+			got := findingsOf(ruleFindings(it, ".", droppedExtPkg), "dropped-case ")
+			gotest.Contains(it, got, "dropped-case a_test.go:35:1: TestAlone on Lonely never runs: Lonely is no suite; end its name in TestSuite, or give the helper a name that does not begin with Test")
+			gotest.Contains(it, got, "dropped-case b_test.go:39:1: TestNobody on ExtHelper never runs: ExtHelper is no suite; end its name in TestSuite, or give the helper a name that does not begin with Test")
+			gotest.Contains(it, ruleFindings(it, ".", droppedCommentPkg),
+				"dropped-case a_test.go:7:1: TestConnection on Harness never runs: Harness is no suite; end its name in TestSuite, or give the helper a name that does not begin with Test")
 		})
 	})
 }

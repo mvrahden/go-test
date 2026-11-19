@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lint LinterDrivers / DroppedCasesUnderVet / when go vet runs the exported analyzer on directories with cases no suite runs / dropped-case reports nothing in a directory with an external test package, leaving it to the generator \(
+Clause: when go vet runs the exported analyzer on directories with cases no suite runs → dropped-case reports nothing in a directory with an external test package, leaving it to the generator
+--- a/internal/lint/casevariants.go
++++ b/internal/lint/casevariants.go
+@@ -176,8 +176,8 @@
+ 			dir = filepath.Dir(name)
+ 		}
+ 	}
+-	if dir == "" {
+-		return true // no test file: nothing to report
++	if true {
++		return true
+ 	}
+ 	entries, err := os.ReadDir(dir)
+ 	if err != nil {

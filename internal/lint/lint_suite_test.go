@@ -43,6 +43,7 @@ var diagnosticFixtures = []string{
 	"withsharedfixture",
 	"withalias",
 	"bench",
+	"benchhelper",
 	"fuzz",
 }
 
@@ -155,6 +156,7 @@ func (s *LintTestSuite) TestTierPolicy(t *gotest.T) {
 			for _, rule := range []lint.Rule{
 				lint.Focus, lint.PollScope, lint.TestSignature, lint.SuiteLifecycle,
 				lint.BenchLoop, lint.FuzzDeterminism, lint.FuzzStructCorpus, lint.SharedFixtureUndeclared,
+				lint.DroppedCase,
 			} {
 				gotest.Zero(it, lint.Analyzer.Flags.Lookup("skip-"+string(rule)), "unexpected skip flag for %s", rule)
 				gotest.False(it, lint.SkippableRules[rule], "integrity rule %s must not be skippable", rule)
@@ -256,6 +258,21 @@ func (s *DisableNolintTestSuite) TestNolintDirectivesIgnored(t *gotest.T) {
 	t.When("disable-nolint is set", func(w *gotest.T) {
 		w.It("reports all diagnostics regardless of nolint directives", func(it *gotest.T) {
 			analysistest.Run(it.T(), testdata, lint.Analyzer, "withdisablednolint")
+		})
+	})
+}
+
+// NolintAllowTestSuite runs separately and non-parallel because it
+// temporarily mutates the shared analyzer flags.
+type NolintAllowTestSuite struct{}
+
+func (s *NolintAllowTestSuite) BeforeEach(_ *gotest.T) { lint.ExportSetNolintAllow("nilaway") }
+func (s *NolintAllowTestSuite) AfterEach(_ *gotest.T)  { lint.ExportSetNolintAllow("") }
+
+func (s *NolintAllowTestSuite) TestListedLinters(t *gotest.T) {
+	t.When("nolint-allow lists a linter", func(w *gotest.T) {
+		w.It("a nolint comment naming it is no finding, and one naming another still is", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withnolintallow")
 		})
 	})
 }

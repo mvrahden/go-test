@@ -21,7 +21,7 @@ func checkRedundantAssertion(pass *analysis.Pass, insp *inspector.Inspector, cl 
 			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {
 				continue
 			}
-			if !sameExprText(pass, first.guardedArg, second.guardedArg) {
+			if !allPure(first.call.Args[1:]) || !allPure(second.call.Args[1:]) || !sameExprText(pass, first.guardedArg, second.guardedArg) {
 				continue
 			}
 			reason := isRedundantBefore(pass, first, second)
@@ -146,4 +146,34 @@ func isNonZeroIntLit(lenCall *ast.CallExpr) bool {
 	}
 	lit, ok := lenCall.Args[2].(*ast.BasicLit)
 	return ok && lit.Kind == token.INT && lit.Value != "0"
+}
+
+// isPureOperand reports whether reading e twice yields the same value: a
+// name, a literal, or a field, element or dereference of one. Calls
+// (conversions and len included), receives and other operators are not.
+func isPureOperand(e ast.Expr) bool {
+	switch e := e.(type) {
+	case *ast.Ident, *ast.BasicLit:
+		return true
+	case *ast.SelectorExpr:
+		return isPureOperand(e.X)
+	case *ast.IndexExpr:
+		return isPureOperand(e.X) && isPureOperand(e.Index)
+	case *ast.StarExpr:
+		return isPureOperand(e.X)
+	case *ast.ParenExpr:
+		return isPureOperand(e.X)
+	}
+	return false
+}
+
+// allPure reports whether every argument is a pure operand: removing the
+// first assertion then moves no evaluation that could write the operand.
+func allPure(args []ast.Expr) bool {
+	for _, a := range args {
+		if !isPureOperand(a) {
+			return false
+		}
+	}
+	return true
 }

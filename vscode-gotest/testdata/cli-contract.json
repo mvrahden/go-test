@@ -2320,6 +2320,14 @@
             "description": "Shapes the generator rejects, where and as it rejects them"
           },
           {
+            "id": "dropped-case",
+            "tier": "integrity",
+            "scope": "gotest-files",
+            "skippable": false,
+            "fixable": false,
+            "description": "Test/Benchmark/Fuzz methods no suite runs: a type that is no suite, a bare name, a generic suite without an alias"
+          },
+          {
             "id": "nolint-unknown",
             "tier": "integrity",
             "scope": "everywhere",

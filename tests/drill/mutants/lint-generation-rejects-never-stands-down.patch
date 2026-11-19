@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/lint LinterGeneration / AnotherFindingOnTheLine / when a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment / lint leaves the rejection to an integrity rule whose finding is shown on that line \(
+Clause: when a skippable rule reports on a line the generator rejects, shown or suppressed by a nolint comment → lint leaves the rejection to an integrity rule whose finding is shown on that line
+--- a/internal/lint/generation.go
++++ b/internal/lint/generation.go
+@@ -69,9 +69,7 @@
+ 		if !pos.IsValid() {
+ 			pos = pass.Files[0].Name.Pos()
+ 		}
+-		if claimed[lineOf(pass.Fset, pos)] {
+-			continue
+-		}
++		_ = claimed
+ 		report(pass, GenerationRejects, span{pos, pos}, "%s", ce.Err.Error())
+ 	}
+ }

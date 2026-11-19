@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRules / PollNames / when a polling callback calls functions that only share an assertion's name / lint reports the one handed the test's t and leaves those on plain values unreported \(
+Clause: when a polling callback calls functions that only share an assertion's name → lint reports the one handed the test's t and leaves those on plain values unreported
+--- a/internal/lint/lint.go
++++ b/internal/lint/lint.go
+@@ -1456,7 +1456,7 @@
+ 			if name == "" && foreignAssertionNames[calleeName(innerCall.Fun)] {
+ 				name, foreign = calleeName(innerCall.Fun), true
+ 			}
+-			if foreign && len(innerCall.Args) > 0 {
++			if false && foreign && len(innerCall.Args) > 0 {
+ 				if ident, ok := innerCall.Args[0].(*ast.Ident); !ok || !isTestHandle(pass, ident) {
+ 					name = ""
+ 				}

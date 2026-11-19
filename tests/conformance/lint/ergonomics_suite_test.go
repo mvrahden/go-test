@@ -93,6 +93,55 @@ func (s *LinterErgonomicsTestSuite) TestSkipFlags(t *gotest.T) {
 	})
 }
 
+func (s *LinterErgonomicsTestSuite) TestNolintAllow(t *gotest.T) {
+	t.When("a nolint comment names a linter that -nolint-allow lists", func(w *gotest.T) {
+		w.It("lint leaves the comment unreported and suppresses none of its own rules", func(it *gotest.T) {
+			got := ruleFindingsWith(it, ".", "-nolint-allow=nilaway, not-a-rule", nolintPkg)
+			gotest.Empty(it, findingsOf(got, "nolint-unknown "))
+			gotest.Contains(it, got, "stdlib-test nolint_test.go:9:1: stdlib test TestUnknown — consider using a gotest suite")
+		})
+	})
+}
+
+func (s *LinterErgonomicsTestSuite) TestProjectNolintAllow(t *gotest.T) {
+	stage := func(t *gotest.T, yml string) string {
+		root, err := testkit.RepoRoot()
+		gotest.NoError(t, err)
+		pkg, err := testkit.StagePackage(root, filepath.Join("..", "testdata", "lintergnolint"), t.TempDir(), "nolintallowmod")
+		gotest.NoError(t, err)
+		gotest.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(pkg), ".gotest.yml"), []byte(yml), 0o600))
+		return pkg
+	}
+	t.When("a nolint comment names a linter that lint.nolint-allow of .gotest.yml lists", func(w *gotest.T) {
+		w.It("lint leaves the comment unreported", func(it *gotest.T) {
+			pkg := stage(it, "lint:\n  nolint-allow: [not-a-rule]\n")
+			gotest.Empty(it, findingsOf(ruleFindings(it, pkg, "."), "nolint-unknown "))
+		})
+		w.It("an entry that is no linter name is refused with exit 2, naming it", func(it *gotest.T) {
+			pkg := stage(it, "lint:\n  nolint-allow: [\"a b\"]\n")
+			run, err := testkit.RunCLI(it.Context(), pkg, "lint", ".")
+			gotest.NoError(it, err)
+			gotest.Equal(it, 2, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Equal(it, "FAIL: invalid linter name in .gotest.yml lint.nolint-allow: \"a b\"\n", run.Stderr)
+		})
+	})
+}
+
+func (s *LinterErgonomicsTestSuite) TestRuleNames(t *gotest.T) {
+	t.When("lint reports a finding", func(w *gotest.T) {
+		w.It("the plain line ends with the rule in parentheses", func(it *gotest.T) {
+			run, err := testkit.RunCLI(it.Context(), ".", "lint", nolintPkg)
+			gotest.NoError(it, err)
+			gotest.Equal(it, 3, run.Exit, "stderr: %s", run.Stderr)
+			gotest.Regexp(it, `(?m)nolint_test\.go:13:1: stdlib test TestForeign — consider using a gotest suite \(stdlib-test\)$`, run.Stderr)
+			gotest.Regexp(it, `(?m)nolint_test\.go:9:35: unknown rule not-a-rule in nolint comment \(nolint-unknown\)$`, run.Stderr)
+		})
+		w.It("the -json finding carries the rule as its category and a message without it", func(it *gotest.T) {
+			gotest.Contains(it, ruleFindings(it, ".", nolintPkg), "stdlib-test nolint_test.go:13:1: stdlib test TestForeign — consider using a gotest suite")
+		})
+	})
+}
+
 // onLine is the findings whose position starts with fileLine.
 func onLine(findings []string, fileLine string) []string {
 	var got []string

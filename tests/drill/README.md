@@ -758,6 +758,8 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-errors-is-fixed` | `True(errors.Is(err, target))` gets an `ErrorIs` fix | conformance: the lint It for `errors.Is` finds the nil-target row's verdict changed |
 | `lint-guard-fixed` | `ErrorIs` with a nil target is rewritten into `NoError` | conformance: the lint It for guards finds the row's verdict changed |
 | `lint-redundant-notnil-unguarded` | a `NotNil` that fails its type guard is removed as redundant | conformance: the lint It for redundant assertions finds the string row's verdict changed |
+| `lint-redundant-impure-operand` | an assertion before one on the same call or receive is removed as redundant | conformance: the lint It for impure operands finds the call rows' verdicts changed |
+| `lint-redundant-impure-argument` | only the checked operand must be pure; a call among the other arguments may write it | conformance: the lint It for impure operands finds the target-call row's verdict changed |
 | `lint-bool-rewrite-any-operand` | `Equal(t, true, v)` becomes `True(t, v)` whatever `v`'s type | conformance: the lint It for bool literals sees the fix for a named bool and an `any` fail to compile |
 | `lint-error-contains-any-receiver` | `Contains(t, v.Error(), s)` becomes `ErrorContains` on a receiver that does not implement error | conformance: the lint It for Error searches sees the fix fail to compile |
 | `lint-float-ordering-rewritten` | float orderings are rewritten into the ordering assertions | conformance: the lint It for float comparisons sees NaN rows flip their verdict |
@@ -786,9 +788,29 @@ shards of one run do not add up to every mutant exactly once.
 | `lint-erg-generated-tracked-dropped` | `generated-file` treats every file in a git repository as untracked | conformance: the lint It for a staged generated file finds no finding |
 | `lint-erg-generated-no-git-dropped` | `generated-file` reads a failed `git ls-files` as untracked | conformance: the lint It outside a git repository finds no finding |
 | `lint-erg-integrity-skip-usage` | `-skip-<integrity rule>` falls through to the driver's usage text | conformance: the lint It for `-skip-focus` finds the usage text instead of the refusal |
+| `lint-erg-nolint-allow-ignored` | a linter `-nolint-allow` lists is still an unknown rule in a nolint comment | conformance: the lint It for `-nolint-allow` finds two `nolint-unknown` findings |
+| `lint-erg-config-nolint-allow-ignored` | `lint.nolint-allow` of `.gotest.yml` never reaches the analyzer | conformance: the lint It for a linter the project lists finds `nolint-unknown` findings |
+| `lint-erg-config-nolint-allow-unchecked` | an entry of `lint.nolint-allow` that is no linter name is accepted | conformance: the lint It for such an entry sees exit 3, not 2 |
+| `lint-plain-line-without-rule` | a plain finding line ends without its rule | conformance: the lint It for rule names finds no `(stdlib-test)` at the line end |
+| `lint-json-message-carries-rule` | the rule is appended to the diagnostic's message, so `-json` carries it twice | conformance: the lint It for rule names finds the `-json` message changed |
+| `lint-poll-scope-names-untyped` | inside a poll callback, a call that only shares an assertion's name is reported whatever its first argument | conformance: the lint It for namesakes finds `strings.Contains` and three more reported |
+| `lint-generation-rejects-hidden-by-any-finding` | a skippable rule's finding, shown or suppressed, hides the generator's rejection of its line | conformance: the lint It for another finding on the rejected line finds the two fuzz rejections gone |
+| `lint-generation-rejects-never-stands-down` | the generator's rejection is reported beside an integrity finding shown on its line | conformance: the lint It for an integrity finding on the line finds two findings on line 9 |
+| `lint-bench-loop-ignores-helpers` | bench-loop reads only the benchmark's own body, not the helper it hands `b` to | conformance: the lint It for helpers finds `BenchmarkDelegated` reported |
+| `lint-bench-loop-any-handoff` | any call the benchmark hands `b` to counts as its loop | conformance: the lint It for a helper that only asserts finds `BenchmarkAsserted` unreported |
+| `lint-dropped-case-silent` | `dropped-case` never runs | conformance: the lint Its for cases that never run find no `dropped-case` finding |
+| `lint-dropped-case-called-helper-reported` | `dropped-case` reports a helper's case the package calls | conformance: the lint It for a called helper finds `Harness.TestConnection` reported |
+| `lint-dropped-case-aliased-generic-reported` | `dropped-case` reports a generic suite an alias instantiates | conformance: the lint It for an aliased generic finds `StoreContractTestSuite` reported |
+| `lint-dropped-case-own-package-uses` | gotest lint reads the uses of the internal test package only | conformance: the lint It for cases the external package reaches finds them reported |
+| `lint-dropped-case-silenced-by-other-files` | any other test file in the directory silences the rule, a comment included | conformance: the lint It for a case reached from nowhere finds none reported |
+| `lint-dropped-case-one-package-unproven` | a driver seeing one test package reports as if it saw all | conformance: the go vet It finds `never runs` in a directory with an external test package |
+| `lint-dropped-case-one-package-silent` | a driver seeing one test package never reports | conformance: the go vet It finds no finding in a directory with one test package |
+| `lint-exported-analyzer-reports-nothing` | the analyzer `pkg/lint` exports reports nothing | conformance: the lint It for `go vet -vettool` sees go vet pass |
 | `lint-gh-properties-unescaped` | an annotation's properties keep their `:` and `,` unescaped | conformance: the lint `--github` It finds the comma of the file name unescaped |
 | `lint-gh-paths-from-working-directory` | annotation paths are relative to the working directory, not `$GITHUB_WORKSPACE` | conformance: the lint `--github` It for a step in a subdirectory finds a `../` path |
 | `lint-gh-cut-splits-rune` | a long annotation is cut at its byte cap, inside a multibyte character | conformance: the lint `--github` It finds the output is not valid UTF-8 |
+| `lint-gh-false-still-arms` | `--github=false` arms the annotations like a bare `--github` | conformance: the lint It for `--github=false` finds `::error` on stdout |
+| `lint-gh-bad-value-accepted` | a `--github` value that is no boolean is accepted | conformance: the lint It for a value that is no boolean sees exit 3, not 2 |
 | `toggle-focus-declaring-file-only` | `refactor toggle-focus` renames only the references in the file that declares the suite | conformance: the discovery It for a suite spread over several files finds receivers left unrenamed |
 | `rename-skips-instantiations` | the rename engine does not look inside a type instantiation, so `X[T]` receivers, literals and aliases keep the old name | conformance: the discovery It for a generic suite finds them unrenamed |
 | `toggle-focus-external-package-skipped` | `refactor toggle-focus` leaves the external test package out | conformance: the discovery It for the external test package finds its reference unrenamed |
@@ -921,6 +943,7 @@ shards of one run do not add up to every mutant exactly once.
 | `summary-failure-path-without-run` | the summary's failure path leaves out the run a failure happened in | spec conformance: the summary of three runs names the failing run |
 | `spec-twin-marked-in-the-first-run-only` | under -count only the first run's external twin is marked | spec conformance: twins run twice show the external suite marked in each run |
 | `bench-numbered-name-sets-gomaxprocs` | a benchmark name's trailing number is read as its GOMAXPROCS | bench conformance: a run of size-1024 on one processor records no GOMAXPROCS of 1024 |
+| `bench-zero-sample-dropped` | a result line without ns/op, a sample that measured no time, is dropped | bench conformance: samples that measured no time are kept at 0 ns/op |
 | `annotation-test-path-unprefixed` | a failed test is annotated at its file's base name, without its package directory | cli conformance: a failed test's annotation names the file in its package's directory |
 | `summary-markdown-all-dropped` | the Markdown headline of a run in which every test passed does not say All | cli conformance: the Markdown headline of an all-pass run says All |
 | `summary-headline-no-pass-unsaid` | the headline of a run in which nothing passed does not say so | cli conformance: an all-skipped run's headline says no tests passed |

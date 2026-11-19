@@ -45,11 +45,23 @@ func (s *BenchLineTestSuite) TestResultLine(t *gotest.T) {
 		mustEq(it, "reported", line.Reported, "BenchmarkCopy/size-1024")
 	})
 
-	t.It("rejects a line without ns/op or without an iteration count", func(it *gotest.T) {
-		_, ok := gotestspec.ParseBenchLine("BenchmarkFoo-8 \t 1201 \t 24 B/op")
-		mustEq(it, "no ns/op", ok, false)
-		_, ok = gotestspec.ParseBenchLine("BenchmarkFoo-8 \t 985.2 ns/op")
+	t.It("reads a line without ns/op, as go test prints a sample that measured no time, at 0 ns/op", func(it *gotest.T) {
+		line, ok := gotestspec.ParseBenchLine("BenchmarkFoo-8 \t 1")
+		mustEq(it, "ok", ok, true)
+		mustEq(it, "procs", line.Procs, 8)
+		mustEq(it, "iterations", line.Iterations, 1)
+		mustEq(it, "ns/op", line.NsPerOp, 0.0)
+		line, ok = gotestspec.ParseBenchLine("BenchmarkFoo-8 \t 1201 \t 24 B/op \t 3 allocs/op")
+		mustEq(it, "ok with memory", ok, true)
+		mustEq(it, "B/op", line.BytesPerOp, int64(24))
+		mustEq(it, "allocs/op", line.AllocsPerOp, int64(3))
+	})
+
+	t.It("rejects a line without an iteration count", func(it *gotest.T) {
+		_, ok := gotestspec.ParseBenchLine("BenchmarkFoo-8 \t 985.2 ns/op")
 		mustEq(it, "no count", ok, false)
+		_, ok = gotestspec.ParseBenchLine("BenchmarkFoo/sub")
+		mustEq(it, "a name line", ok, false)
 		_, ok = gotestspec.ParseBenchLine("goos: linux")
 		mustEq(it, "not a result", ok, false)
 	})

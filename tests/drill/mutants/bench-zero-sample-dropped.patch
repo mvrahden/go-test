@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/bench BenchZero / ASampleThatMeasuredNoTime / when gotest bench --json runs a benchmark whose samples measured no time with -count=2 / the report keeps both samples at 0 ns/op \(
+Clause: when gotest bench --json runs a benchmark whose samples measured no time with -count=2 → the report keeps both samples at 0 ns/op
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -768,6 +768,9 @@
+ 			out.Metrics[unit] = value
+ 		}
+ 	}
++	if out.NsPerOp == 0 {
++		return BenchLine{}, false
++	}
+ 	return out, true
+ }
+ 

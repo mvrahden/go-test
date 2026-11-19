@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterRewrites .* / operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own( / .*)? \(
+Clause: when an assertion is followed by one that checks the same operand → operands that call a function or receive from a channel are left unreported, since each assertion evaluates its own
+--- a/internal/lint/redundant.go
++++ b/internal/lint/redundant.go
+@@ -21,7 +21,7 @@
+ 			if cl.anyWithin(first.call.Pos(), first.call.End()) || cl.anyWithin(second.call.Pos(), second.call.End()) {
+ 				continue
+ 			}
+-			if !allPure(first.call.Args[1:]) || !allPure(second.call.Args[1:]) || !sameExprText(pass, first.guardedArg, second.guardedArg) {
++			if !sameExprText(pass, first.guardedArg, second.guardedArg) {
+ 				continue
+ 			}
+ 			reason := isRedundantBefore(pass, first, second)

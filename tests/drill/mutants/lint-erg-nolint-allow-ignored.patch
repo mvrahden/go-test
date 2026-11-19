@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint LinterErgonomics / NolintAllow / when a nolint comment names a linter that -nolint-allow lists / lint leaves the comment unreported and suppresses none of its own rules \(
+Clause: when a nolint comment names a linter that -nolint-allow lists → lint leaves the comment unreported and suppresses none of its own rules
+--- a/internal/lint/nolint.go
++++ b/internal/lint/nolint.go
+@@ -23,7 +23,7 @@
+ 			for _, c := range cg.List {
+ 				ids, _ := nolintIDs(c.Text)
+ 				for _, id := range ids {
+-					if id == "all" || Known(Rule(id)) || foreignLinters[id] || allowed[id] {
++					if id == "all" || Known(Rule(id)) || foreignLinters[id] || allowed[""] {
+ 						continue
+ 					}
+ 					pass.Report(analysis.Diagnostic{

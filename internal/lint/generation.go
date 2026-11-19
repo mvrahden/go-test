@@ -19,12 +19,15 @@ type genCollector interface {
 	Rejections(*packages.Package, gotestgen.CollectorResult) []gotestgen.CollectorError
 }
 
-// reportedLines holds, per pass, the lines another rule found something on,
-// suppressed or not.
+// reportedLines holds, per pass, the lines an integrity rule's finding is
+// shown on.
 var reportedLines sync.Map // *analysis.Pass → map[token.Position]bool
 
+// reportedLine records pos's line for a shown finding of an integrity rule;
+// a skippable rule's finding, shown or not, leaves the line to the
+// generator's rejection.
 func reportedLine(pass *analysis.Pass, rule Rule, pos token.Pos) {
-	if rule == GenerationRejects || (ruleMeta[rule].Tier != TierIntegrity && skipped(rule)) {
+	if rule == GenerationRejects || ruleMeta[rule].Tier != TierIntegrity {
 		return
 	}
 	lines, _ := reportedLines.LoadOrStore(pass, map[token.Position]bool{})
@@ -37,8 +40,8 @@ func lineOf(fset *token.FileSet, pos token.Pos) token.Position {
 }
 
 // checkGenerationRejects reports what the generator rejects in this package,
-// at the position it rejects it, with its message. A line another rule
-// reported on is left to that rule.
+// at the position it rejects it, with its message. A line an integrity
+// rule's finding is shown on is left to that rule.
 func checkGenerationRejects(pass *analysis.Pass) {
 	lines, _ := reportedLines.LoadAndDelete(pass)
 	claimed, _ := lines.(map[token.Position]bool)
