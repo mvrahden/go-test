@@ -1,0 +1,24 @@
+Clause: when two runs of one package start together over one cache, one with a build tag in GOFLAGS → each executes the binary built for its own tags
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / each executes the binary built for its own tags \(
+--- a/internal/gotestrunner/bincache.go
++++ b/internal/gotestrunner/bincache.go
+@@ -69,7 +69,7 @@
+ 	if err != nil {
+ 		return ""
+ 	}
+-	dir := filepath.Join(root, "bin", binaryCacheKey(cwd, append(slices.Clone(buildFlags), envKeyFlags(os.Getenv)...)))
++	dir := filepath.Join(root, "bin", binaryCacheKey(cwd, buildFlags))
+ 	if err := os.MkdirAll(dir, 0o755); err != nil {
+ 		return ""
+ 	}
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -227,7 +227,7 @@
+ 	case now == nil:
+ 		return notReady
+ 	case placed != nil && os.SameFile(placed, now):
+-		if exited == 0 {
++		if now.ModTime().After(placed.ModTime()) || exited == 0 {
+ 			return confirmed
+ 		}
+ 		return notReady

@@ -56,8 +56,10 @@ func (s *CompileStageTestSuite) TestReadiness(t *gotest.T, ctx *stageCtx) {
 	for t, r := range gotest.Each(t, []row{
 		{Desc: "no file, go running", Placed: placed, Exited: running, Want: gotestrunner.ExportNotReady},
 		{Desc: "no file, go done", Placed: placed, Exited: 0, Want: gotestrunner.ExportNotReady},
-		{Desc: "same file, newer, go running", Placed: placed, Now: touched, Exited: running, Want: gotestrunner.ExportConfirmed},
-		{Desc: "same file, newer, exit 1", Placed: placed, Now: touched, Exited: 1, Want: gotestrunner.ExportConfirmed},
+		// Another run's go touches the entry every slot links: no sign.
+		{Desc: "same file, newer, go running", Placed: placed, Now: touched, Exited: running, Want: gotestrunner.ExportNotReady},
+		{Desc: "same file, newer, exit 1", Placed: placed, Now: touched, Exited: 1, Want: gotestrunner.ExportNotReady},
+		{Desc: "same file, newer, exit 0", Placed: placed, Now: touched, Exited: 0, Want: gotestrunner.ExportConfirmed},
 		{Desc: "same file, not newer, go running", Placed: placed, Now: placed, Exited: running, Want: gotestrunner.ExportNotReady},
 		{Desc: "same file, not newer, exit 1", Placed: placed, Now: placed, Exited: 1, Want: gotestrunner.ExportNotReady},
 		{Desc: "same file, not newer, exit 0", Placed: placed, Now: placed, Exited: 0, Want: gotestrunner.ExportConfirmed},

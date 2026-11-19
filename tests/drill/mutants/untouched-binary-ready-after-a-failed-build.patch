@@ -1,13 +1,13 @@
 Judge: ./internal/gotestrunner CompileStageTestSuite/TestReadiness
-Expect: ^FAIL .*internal/gotestrunner CompileStage .* / same file, not newer, exit 1 \(
+Expect: ^FAIL .*internal/gotestrunner CompileStage .* / same file, newer, exit 1 \(
 --- a/internal/gotestrunner/compilestage.go
 +++ b/internal/gotestrunner/compilestage.go
-@@ -86,7 +86,7 @@
+@@ -227,7 +227,7 @@
  	case now == nil:
  		return notReady
  	case placed != nil && os.SameFile(placed, now):
--		if now.ModTime().After(placed.ModTime()) || exited == 0 {
-+		if now.ModTime().After(placed.ModTime()) || exited >= 0 {
+-		if exited == 0 {
++		if exited >= 0 {
  			return confirmed
  		}
  		return notReady

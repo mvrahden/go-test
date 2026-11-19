@@ -10245,6 +10245,52 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "each executes the binary built for its own tags",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "stalebinary_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 203,
+                      "name": "each_executes_the_binary_built_for_its_own_tags",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when two runs of one package start together over one cache, one with a build tag in GOFLAGS",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "stalebinary_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 202,
+                  "name": "two_runs_of_one_package_start_together_over_one_cache,_one_with_a_build_tag_in_GOFLAGS",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "RunsAtOnceWithGOFLAGSTags",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "stalebinary_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 175,
+              "name": "TestRunsAtOnceWithGOFLAGSTags",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "the second run builds and runs the other package",
                       "duration": 0,
                       "excluded": false,
@@ -10252,7 +10298,7 @@
                       "file": "stalebinary_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 182,
+                      "line": 217,
                       "name": "the_second_run_builds_and_runs_the_other_package",
                       "output": [],
                       "status": "none",
@@ -10266,7 +10312,7 @@
                   "file": "stalebinary_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 181,
+                  "line": 216,
                   "name": "a_run_that_-run_narrows_to_one_package_is_followed_by_an_unfiltered_run",
                   "output": [],
                   "status": "none",
@@ -10280,7 +10326,7 @@
               "file": "stalebinary_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 175,
+              "line": 210,
               "name": "TestAFilteredRunBeforeAFullOne",
               "output": [],
               "status": "none"
@@ -33193,7 +33239,7 @@
     }
   ],
   "stats": {
-    "behaviors": 960,
+    "behaviors": 961,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
