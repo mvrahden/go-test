@@ -1,17 +1,19 @@
 Expect: ^FAIL .*conformance/fixtures .*ASetupGivenUp.* / fails the run \(
 Clause: when a shared fixture's setup is given up while a sibling that came up is still to be released → fails the run
+--- a/internal/gotestrunner/fixturesession.go
++++ b/internal/gotestrunner/fixturesession.go
+@@ -109,8 +109,6 @@
+ }
+
+ func (f *fixtureSession) fail(err error) {
+-	f.setupErr = err
+-	f.failed.Store(true)
+ 	close(f.gaveUp)
+ }
+
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -690,8 +690,6 @@
- 	var setupErr error
- 	var setupTimedOut bool
- 	failSetup := func(err error) {
--		setupErr = err
--		sharedSetupFailed.Store(true)
- 		close(setupGaveUp)
- 	}
- 
-@@ -869,7 +867,7 @@
+@@ -807,7 +807,7 @@
  					case recorded:
  					case missing != "":
  						traceSuite("given-up", &t, requiredKeys)

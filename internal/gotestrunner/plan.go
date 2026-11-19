@@ -309,6 +309,15 @@ func (p *RunPlan) Groups() []string {
 	return slices.Sorted(maps.Keys(set))
 }
 
+// plannedKeys is the shared fixture keys the suite of t reads; a test
+// target names its suite by its test function.
+func plannedKeys(p *RunPlan, t *SuiteTarget) []string {
+	if s := p.Suite(t.Package, strings.TrimPrefix(t.SuiteName, "Test")); s != nil {
+		return s.SharedKeys
+	}
+	return nil
+}
+
 // byPackage groups suites by package, each package's in the given order.
 func byPackage(suites []*PlannedSuite) map[string][]*PlannedSuite {
 	out := map[string][]*PlannedSuite{}

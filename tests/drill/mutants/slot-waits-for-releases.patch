@@ -76,11 +76,11 @@ Clause: when a shared fixture's release takes its time while an exclusive suite 
  	<-r.stopped
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -967,6 +967,7 @@
- 	var slotErr error
- 	started := maps.Clone(win.Bulk)
+@@ -873,6 +873,7 @@
+ 		allIn()
+ 	}
  	startFor := func(ds []deferredTarget, what string) {
 +		releaser.Drain()
- 		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
- 			return
- 		}
+ 		suites := make([]*PlannedSuite, 0, len(ds))
+ 		for i := range ds {
+ 			suites = append(suites, plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))

@@ -550,6 +550,19 @@ func ExportBenchSlotPlan(targets []SuiteTarget, reqKeys map[string]map[string][]
 
 var ExportSuiteTargets = suiteTargets
 
+// fixturesession.go
+
+// ExportNewFixtureSession is a session whose up-front phase is over.
+var ExportNewFixtureSession = settledFixtureSession
+
+// ExportSessionEnv is the environment f hands a suite reading keys.
+func ExportSessionEnv(f *fixtureSession, base []string, pkg, suite string, keys []string) ([]string, error) {
+	return f.env(base, pkg, suite, keys)
+}
+
+// ExportSessionMissing names the first of keys f has not up.
+func ExportSessionMissing(f *fixtureSession, keys []string) string { return f.missing(keys) }
+
 // BuildSuiteTargets builds the targets of the suites the maps declare that
 // -run selects and -skip does not drop whole, for each compiled package.
 func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {

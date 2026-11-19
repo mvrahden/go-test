@@ -1,22 +1,22 @@
 Expect: ^FAIL .*conformance/lifecycle .* / starts none of the later group's fixtures, releases the group's and leaves no fixture process behind \(
 Clause: when a run is stopped while a suite of the e2e group runs → starts none of the later group's fixtures, releases the group's and leaves no fixture process behind
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -967,7 +967,7 @@
- 	var slotErr error
- 	started := maps.Clone(win.Bulk)
- 	startFor := func(ds []deferredTarget, what string) {
--		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
-+		if setupProc == nil || setupTimedOut {
- 			return
- 		}
- 		phase := make([]*PlannedSuite, 0, len(ds))
-@@ -982,7 +982,7 @@
- 			started[key] = true
- 		}
- 		traceDispatch(dispatchEvent{Kind: "start", Keys: start, For: what})
--		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
-+		if err := setupProc.StartKeys(context.WithoutCancel(streamCtx), start, resolvedSetupTimeout); err != nil {
- 			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for %s: %w", what, err))
- 		}
+--- a/internal/gotestrunner/fixturesession.go
++++ b/internal/gotestrunner/fixturesession.go
+@@ -161,7 +161,7 @@
+ // leaves the process serving commands, so these still start; one that timed
+ // out is still busy with the up-front phase and would answer no command.
+ func (f *fixtureSession) startFor(ctx context.Context, suites []*PlannedSuite, fixtures []gotestgen.SharedFixtureInfo, what string) {
+-	if f.proc == nil || f.timedOut || ctx.Err() != nil {
++	if f.proc == nil || f.timedOut {
+ 		return
  	}
+ 	need := aliveFixtureKeys(suites, fixtures)
+@@ -173,7 +173,7 @@
+ 		f.up[key] = true
+ 	}
+ 	traceDispatch(dispatchEvent{Kind: "start", Keys: start, For: what})
+-	if err := f.proc.StartKeys(ctx, start, f.timeout); err != nil {
++	if err := f.proc.StartKeys(context.WithoutCancel(ctx), start, f.timeout); err != nil {
+ 		f.lateErr = errors.Join(f.lateErr, fmt.Errorf("shared fixture start for %s: %w", what, err))
+ 	}
+ }

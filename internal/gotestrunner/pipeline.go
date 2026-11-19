@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,7 +13,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
@@ -587,24 +585,21 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// exactly the keys it declares; one whose fixture never came up is given
 	// up, naming that fixture, while the fixtures that did come up serve the
 	// targets that read only them.
+	fixtures := settledFixtureSession(setupProc, setupErr, prep.setupTimedOut)
 	envFor := func(i int) ([]string, string) {
 		t := &targets[i]
-		// Bench targets carry the bare suite identifier; required keys are
-		// keyed by test function name, as benchSlotPlan reads them.
-		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package]["Test"+t.SuiteName]
-		if len(requiredKeys) == 0 {
-			return baseEnv, ""
+		var requiredKeys []string
+		if slots[i] != nil {
+			requiredKeys = slots[i].SharedKeys
 		}
-		if missing := missingFixture(setupProc, requiredKeys); missing != "" {
+		if missing := fixtures.missing(requiredKeys); missing != "" {
 			return nil, neverRan(t.SuiteName, missing)
 		}
-		stateFile, err := setupProc.WriteSuiteStateFile(t.Package, t.SuiteName, requiredKeys)
+		env, err := fixtures.env(baseEnv, t.Package, t.SuiteName, requiredKeys)
 		if err != nil {
 			return nil, fmt.Sprintf("%s never ran: shared fixture state: %s", t.SuiteName, err)
 		}
-		env := make([]string, len(baseEnv), len(baseEnv)+1)
-		copy(env, baseEnv)
-		return append(env, protocol.EnvSharedStateFile+"="+stateFile), ""
+		return env, ""
 	}
 	RunBenchSuites(ctx, targets, collector, beforeSlot, afterSlot, envFor)
 	setupErr = errors.Join(append([]error{setupErr}, openErrs...)...)
@@ -686,84 +681,12 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
 
-	fixtureStarted := make(chan struct{})
-	// setupOver closes once the up-front phase has ended, however it ended.
-	setupOver := make(chan struct{})
-	var setupProc *SharedFixtureProcess
-	var fixtureStartErr error
-	var fixtureWg sync.WaitGroup
-	var sharedSetupFailed atomic.Bool
-	// A setup that failed or timed out ends the wait for the fixtures that
-	// did not come up, and nothing else: those that did stay up, the suites
-	// that read only them run, and so does every suite that reads none.
-	// setupErr and setupTimedOut are written by the fixture goroutine and
-	// read after fixtureWg has drained.
-	setupGaveUp := make(chan struct{})
-	var setupErr error
-	var setupTimedOut bool
-	failSetup := func(err error) {
-		setupErr = err
-		sharedSetupFailed.Store(true)
-		close(setupGaveUp)
-	}
+	fixtures := startFixtureSession(ctx, streamCtx, streamCancel, overlay.WorkDir, win, resolvedSetupTimeout, pf.BuildFlags)
 
-	if len(win.Fixtures) > 0 {
-		fixtureWg.Add(1)
-		go func() {
-			defer fixtureWg.Done()
-			defer close(setupOver)
-			var err error
-			// The subprocess is bound to the pipeline ctx, not streamCtx:
-			// Teardown below is the one owner of shutdown, and it runs only
-			// after every suite has stopped. The pipeline ctx stays attached
-			// as the safety net so an abnormal runner death still releases
-			// the process group.
-			traceDispatch(dispatchEvent{Kind: "up-front", Keys: sortedKeys(win.Bulk)})
-			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, win.Fixtures, resolvedSetupTimeout, pf.BuildFlags...)
-			if err != nil {
-				fixtureStartErr = err
-				if ctx.Err() == nil {
-					failSetup(fmt.Errorf("shared fixture setup failed: %w", err))
-				} else {
-					sharedSetupFailed.Store(true)
-					streamCancel()
-				}
-			}
-			close(fixtureStarted)
-			if err != nil {
-				return
-			}
-			var timedOut *SetupTimeoutError
-			switch err := setupProc.WaitSetup(streamCtx, resolvedSetupTimeout); {
-			case err == nil, streamCtx.Err() != nil:
-			case errors.As(err, &timedOut):
-				setupTimedOut = true
-				failSetup(fmt.Errorf("%w %s", err, schedinfo.Summary()))
-			default:
-				failSetup(err)
-			}
-		}()
-	} else {
-		close(fixtureStarted)
-		close(setupOver)
-	}
-
-	// Releases go to a process whose up-front phase ended; one still busy
-	// with it after a timeout would answer no command, and the terminal
-	// teardown owns its fixtures.
+	// Releases go to a process whose up-front phase ended.
 	releaseCtx, releaseCancel := context.WithCancel(streamCtx)
 	defer releaseCancel()
-	releaser := startFixtureReleaser(releaseCtx, func() *SharedFixtureProcess {
-		select {
-		case <-setupOver:
-		case <-releaseCtx.Done():
-			return nil
-		}
-		if setupProc == nil || setupTimedOut {
-			return nil
-		}
-		return setupProc
-	})
+	releaser := startFixtureReleaser(releaseCtx, func() *SharedFixtureProcess { return fixtures.releasable(releaseCtx) })
 	release := func(keys []string) {
 		if len(keys) > 0 {
 			traceDispatch(dispatchEvent{Kind: "free", Keys: sortedCopy(keys)})
@@ -875,7 +798,7 @@ loop:
 				defer wg.Done()
 				// Last of all, once the suite's process is gone.
 				defer func() { release(ledger.Done(t.Package, t.SuiteName)) }()
-				requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
+				requiredKeys := plannedKeys(plan, &t)
 				recorded := false
 				// missing names the shared fixture the suite is given up for.
 				missing := ""
@@ -893,48 +816,14 @@ loop:
 					}
 				}()
 
-				var env []string
-				if len(requiredKeys) > 0 {
-					select {
-					case <-fixtureStarted:
-					case <-streamCtx.Done():
-						return
-					}
-					if fixtureStartErr != nil {
-						missing = requiredKeys[0]
-						return
-					}
-
-					for _, key := range requiredKeys {
-						// A fixture the process does not know has no channel,
-						// and a nil channel never delivers.
-						select {
-						case <-setupProc.Ready(key):
-						case <-setupProc.AllDone():
-						case <-setupGaveUp:
-						case <-streamCtx.Done():
-							return
-						}
-						// A select picks at random among ready cases; by the
-						// time setup is over, every fixture that came up has
-						// had its channel closed.
-						if !setupProc.Came(key) {
-							missing = key
-							return
-						}
-					}
-
-					stateFile, err := setupProc.WriteSuiteStateFile(t.Package, t.SuiteName, requiredKeys)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
-						return
-					}
-
-					env = make([]string, len(baseEnv), len(baseEnv)+1)
-					copy(env, baseEnv)
-					env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
-				} else {
-					env = baseEnv
+				var up bool
+				if missing, up = fixtures.await(streamCtx, requiredKeys); !up || missing != "" {
+					return
+				}
+				env, err := fixtures.env(baseEnv, t.Package, t.SuiteName, requiredKeys)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
+					return
 				}
 
 				select {
@@ -972,7 +861,7 @@ loop:
 	// A failed setup leaves the process serving commands, so these fixtures
 	// still start; one that timed out is still busy with the up-front phase
 	// and would answer no command.
-	fixtureWg.Wait()
+	fixtures.settle()
 	left := 0
 	for _, ds := range deferredBulk {
 		left += len(ds)
@@ -983,53 +872,31 @@ loop:
 	if left == 0 {
 		allIn()
 	}
-	var slotErr error
-	started := maps.Clone(win.Bulk)
 	startFor := func(ds []deferredTarget, what string) {
-		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
-			return
-		}
-		phase := make([]*PlannedSuite, 0, len(ds))
+		suites := make([]*PlannedSuite, 0, len(ds))
 		for i := range ds {
-			phase = append(phase, plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))
+			suites = append(suites, plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))
 		}
-		need := aliveFixtureKeys(phase, win.Fixtures)
-		start := diffKeys(need, started)
-		if len(start) == 0 {
-			return
-		}
-		for _, key := range start {
-			started[key] = true
-		}
-		traceDispatch(dispatchEvent{Kind: "start", Keys: start, For: what})
-		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
-			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for %s: %w", what, err))
-		}
+		fixtures.startFor(streamCtx, suites, win.Fixtures, what)
 	}
 
 	runDeferred := func(t SuiteTarget, idx int) { //nolint:gocritic // hugeParam: a copy per suite is nothing beside the process it starts
-		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
+		requiredKeys := plannedKeys(plan, &t)
 		if streamCtx.Err() != nil {
 			traceSuite("stopped", &t, requiredKeys)
 			collector.RecordStopped(t.Package, idx, t.SuiteName)
 			return
 		}
-		if missing := missingFixture(setupProc, requiredKeys); missing != "" {
+		if missing := fixtures.missing(requiredKeys); missing != "" {
 			traceSuite("given-up", &t, requiredKeys)
 			collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
 			return
 		}
-		env := baseEnv
-		if len(requiredKeys) > 0 {
-			stateFile, err := setupProc.WriteSuiteStateFile(t.Package, t.SuiteName, requiredKeys)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
-				collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
-				return
-			}
-			env = make([]string, len(baseEnv), len(baseEnv)+1)
-			copy(env, baseEnv)
-			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
+		env, err := fixtures.env(baseEnv, t.Package, t.SuiteName, requiredKeys)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
+			collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
+			return
 		}
 		clock.run(t.Group, func() {
 			traceSuite("suite-start", &t, requiredKeys)
@@ -1057,7 +924,7 @@ loop:
 					select {
 					case sem <- struct{}{}:
 					case <-streamCtx.Done():
-						traceSuite("stopped", &t, overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName])
+						traceSuite("stopped", &t, plannedKeys(plan, &t))
 						collector.RecordStopped(t.Package, idx, t.SuiteName)
 						return
 					}
@@ -1094,15 +961,7 @@ loop:
 	// everything at once: sending them one after another would end the run
 	// later.
 	releaseCancel()
-	releaseErr := releaser.Err()
-	var teardownErr error
-	if setupProc != nil {
-		traceDispatch(dispatchEvent{Kind: "teardown"})
-		teardownErr = errors.Join(slotErr, releaseErr, setupProc.Teardown())
-		reports := setupProc.TakeFailures()
-		setupErr = withReports(setupErr, reports, false)
-		teardownErr = teardownVerdict(teardownErr, reports)
-	}
+	setupErr, teardownErr := fixtures.close(releaser.Err())
 	streamCancel()
 
 	if pf.UserCoverProfile != "" {
@@ -1115,11 +974,11 @@ loop:
 	// count.
 	if !anyTargets && !nothingToRun && len(noSuite) == 0 && !buildFailed {
 		// A run cut short while compiling reaches here too; it is not empty.
-		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !sharedSetupFailed.Load() {
+		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !fixtures.failedSetup() {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
 		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr), Groups: clock.runs()}
-		if sharedSetupFailed.Load() && result.ExitCode == 0 {
+		if fixtures.failedSetup() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
 		applyDeadlineFailure(collector, &result, cfg, dispatchErr, nil)
@@ -1134,7 +993,7 @@ loop:
 	collector.Finalize()
 
 	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
-	if sharedSetupFailed.Load() && exitCode == 0 {
+	if fixtures.failedSetup() && exitCode == 0 {
 		exitCode = 1
 	}
 	exitCode = collector.takeCensus(cfg, overlay.Declared, exitCode, dispatchErr)
