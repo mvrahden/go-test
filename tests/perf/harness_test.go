@@ -128,6 +128,17 @@ func readGoLog(path string) ([][]string, error) {
 	return calls, nil
 }
 
+// countGo counts the go invocations among calls whose argv match.
+func countGo(calls [][]string, match func(argv []string) bool) int {
+	n := 0
+	for _, argv := range calls {
+		if len(argv) > 0 && match(argv) {
+			n++
+		}
+	}
+	return n
+}
+
 // staging is what every perf suite shares: the staged modules at a fixed
 // path, so Go's build cache sees the same directories on every run, the
 // harness, the CLI and the environment its runs get.
@@ -174,4 +185,16 @@ func (st *staging) tearDown(t *gotest.T) {
 	if st.root != "" {
 		gotest.NoError(t, os.RemoveAll(st.root))
 	}
+}
+
+// warm runs the CLI over args in dir once to fill the caches, then measures
+// the same run.
+func (st *staging) warm(t *gotest.T, dir string, args ...string) measured {
+	first, err := st.h.measure(t.Context(), dir, st.cli, st.env, args...)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, first.Exit, "stderr: %s", first.Stderr)
+	m, err := st.h.measure(t.Context(), dir, st.cli, st.env, args...)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, m.Exit, "stderr: %s", m.Stderr)
+	return m
 }
