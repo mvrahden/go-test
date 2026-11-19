@@ -27,6 +27,25 @@ var testFlags = sync.OnceValue(func() map[string]reflect.Type {
 	return types
 })
 
+// testBinaryOnly are the flags the testing package declares for the go
+// command alone; go test does not take them from its user.
+var testBinaryOnly = map[string]bool{
+	"fuzzcachedir": true, "fuzzworker": true, "gocoverdir": true, "paniconexit0": true, "testlogfile": true,
+}
+
+// runFlags are go test's flags for the test binary, by name with its
+// dash: every flag the testing package declares, less testBinaryOnly. The
+// value reports whether the flag takes one.
+var runFlags = sync.OnceValue(func() map[string]bool {
+	flags := map[string]bool{}
+	testFlagSet().VisitAll(func(f *flag.Flag) {
+		if !testBinaryOnly[f.Name] {
+			flags["-"+f.Name] = !isBoolFlag(f)
+		}
+	})
+	return flags
+})
+
 // testFlagSet holds those flags on fresh values of their own types: the
 // process's own flags stay untouched, and each caller parses its own.
 func testFlagSet() *flag.FlagSet {

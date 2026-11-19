@@ -206,6 +206,17 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **THEN** prints each matching name once and exits 0
 - **AND** starts no suite and no shared fixture
 
+### Requirement: Test binary flags follow the testing package
+gotest SHALL take as a go test flag every flag the testing package it was built with gives a test binary for its user to set, with the value the testing package gives it, and SHALL refuse a single-dash flag ahead of -- and -args that is neither such a flag nor a build flag of go test, with exit 2 before anything is built. A gotest built with a newer Go than the one that builds the test binary can take a flag that binary does not declare.
+
+#### Scenario: A flag the testing package declares
+- **WHEN** -artifacts and -mutexprofilefraction=5 are given to a run
+- **THEN** takes both, and the run passes with exit 0
+
+#### Scenario: A flag the testing package does not declare
+- **WHEN** -mutexprofilerate=5 is given to a run
+- **THEN** refuses it with exit 2 as an unknown flag, before anything is built
+
 ### Requirement: Flags for the test binary
 A flag only the test binary declares SHALL reach the binary after -- or -args. Every word after -args SHALL reach the binary as written: gotest reads none of them as a flag of its own, as a go test flag or as a package. After a bare -- gotest SHALL read no flag of its own, while go test flags and packages still count. The cases are the table in `tests/conformance/cli/passthrough_suite_test.go`.
 

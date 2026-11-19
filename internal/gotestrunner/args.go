@@ -50,48 +50,10 @@ func classifyGoFlag(name string) (side goFlagSide, takesValue bool) {
 	if v, ok := goTestBuildFlags[name]; ok {
 		return buildSide, v
 	}
-	if runOnlyFlags[name] {
-		return runSide, false
-	}
-	if runValueFlags[name] {
-		return runSide, true
+	if v, ok := runFlags()[name]; ok {
+		return runSide, v
 	}
 	return notGoFlag, false
-}
-
-// runOnlyFlags are flags consumed exclusively by the test binary at runtime.
-var runOnlyFlags = map[string]bool{
-	"-v":        true,
-	"-failfast": true,
-	"-short":    true,
-	"-benchmem": true,
-	"-fullpath": true,
-}
-
-var runValueFlags = map[string]bool{
-	"-count":            true,
-	"-timeout":          true,
-	"-run":              true,
-	"-skip":             true,
-	"-parallel":         true,
-	"-shuffle":          true,
-	"-bench":            true,
-	"-benchtime":        true,
-	"-coverprofile":     true,
-	"-cpuprofile":       true,
-	"-memprofile":       true,
-	"-blockprofile":     true,
-	"-mutexprofile":     true,
-	"-trace":            true,
-	"-outputdir":        true,
-	"-list":             true,
-	"-fuzz":             true,
-	"-fuzztime":         true,
-	"-fuzzminimizetime": true,
-	"-cpu":              true,
-	"-blockprofilerate": true,
-	"-memprofilerate":   true,
-	"-mutexprofilerate": true,
 }
 
 // ClassifiedArgs holds the result of splitting go test arguments.

@@ -2,6 +2,7 @@ package conventions_test
 
 import (
 	"bytes"
+	"flag"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -14,11 +15,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // GoFlagsTestSuite holds the go test flags gotest takes to the toolchain
-// in use: the build flags to `go help build`.
+// in use: the build flags to `go help build`, the test binary's to
+// `go help testflag` and the testing package's own flag set.
 type GoFlagsTestSuite struct{}
 
 func (s *GoFlagsTestSuite) SuiteConfig() gotest.SuiteConfig {
@@ -123,4 +126,50 @@ func (s *GoFlagsTestSuite) TestBuildFlagsAreTheToolchains(t *gotest.T) {
 	gotest.Empty(t, unlisted, "go help build lists these and internal/gotestrunner/args.go does not: add each to buildFlags, or to buildFlagsNotTaken with the reason")
 	gotest.Empty(t, gone, "internal/gotestrunner/args.go lists these and go help build of %s does not: remove them", runtime.Version())
 	gotest.Empty(t, arity, "these take a value in one of go help build and buildFlags and not in the other")
+}
+
+// goLevelTestFlags are in `go help testflag` and act before the binary runs.
+var goLevelTestFlags = []string{"-cover", "-covermode", "-coverpkg", "-json", "-vet"}
+
+func (s *GoFlagsTestSuite) TestRunFlagsAreTheToolchains(t *gotest.T) {
+	help := helpFlags(t, "testflag")
+	internalOnly := tableLiteral(t, "testBinaryOnly", "internal/gotestrunner/testflags.go")
+
+	t.When("go help testflag lists a flag", func(w *gotest.T) {
+		w.It("is a go test flag here, taking a value where go test's does", func(it *gotest.T) {
+			var wrong []string
+			for name, value := range help {
+				if slices.Contains(goLevelTestFlags, name) {
+					continue
+				}
+				if isValue, known := gotestrunner.IsGoTestFlag(name); !known || isValue != value {
+					wrong = append(wrong, name)
+				}
+			}
+			slices.Sort(wrong)
+			gotest.Empty(it, wrong)
+		})
+	})
+	t.When("the testing package declares a flag", func(w *gotest.T) {
+		w.It("is in go help testflag, or in testBinaryOnly", func(it *gotest.T) {
+			var unexplained []string
+			flag.CommandLine.VisitAll(func(f *flag.Flag) {
+				name, ok := strings.CutPrefix(f.Name, "test.")
+				if ok && !hasKey(help, "-"+name) && !hasKey(internalOnly, name) {
+					unexplained = append(unexplained, name)
+				}
+			})
+			gotest.Empty(it, unexplained, "the testing package of %s declares these: a flag for its user is taken already; one for the go command alone goes into testBinaryOnly in internal/gotestrunner/testflags.go", runtime.Version())
+		})
+		w.It("testBinaryOnly names only flags the testing package still declares", func(it *gotest.T) {
+			var stale []string
+			for name := range internalOnly {
+				if flag.Lookup("test."+name) == nil {
+					stale = append(stale, name)
+				}
+			}
+			slices.Sort(stale)
+			gotest.Empty(it, stale)
+		})
+	})
 }
