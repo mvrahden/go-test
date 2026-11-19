@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	if err := passthrough.Log(os.Getenv("GOTEST_PERF_GOLOG"),strings.Join(os.Args[1:], "\x1f")+"\n"); err != nil {
+	if err := passthrough.Log(os.Getenv("GOTEST_PERF_GOLOG"), strings.Join(os.Args[1:], "\x1f")+"\n"); err != nil {
 		fmt.Fprintln(os.Stderr, "goshim:", err)
 		os.Exit(2)
 	}
