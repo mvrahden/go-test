@@ -1,7 +1,14 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { buildCliCommand, formatCliCommand, offerCliUpgrade } from "./cli.js";
+import {
+  buildCliCommand,
+  formatCliCommand,
+  GotestNotRequiredError,
+  offerCliUpgrade,
+  runGoInModule,
+} from "./cli.js";
 import { captureStdout } from "./capture.js";
+import { moduleRootFor, readModuleRoots } from "./gomod.js";
 
 export class ScaffoldCodeActionProvider
   implements vscode.CodeActionProvider, vscode.Disposable
@@ -14,11 +21,19 @@ export class ScaffoldCodeActionProvider
     /^\s*type\s+([A-Z]\w*)\s+(struct|interface)\b/;
   private static readonly exportedFuncPattern = /^func\s+([A-Z]\w*)\s*\(/;
 
+  // isActive says whether a workspace folder uses gotest: elsewhere no
+  // action is offered.
+  constructor(private readonly isActive: (folder: string) => boolean) {}
+
   provideCodeActions(
     document: vscode.TextDocument,
     range: vscode.Range | vscode.Selection,
   ): vscode.CodeAction[] | undefined {
     if (document.fileName.endsWith("_test.go")) {
+      return undefined;
+    }
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (!folder || !this.isActive(folder.uri.fsPath)) {
       return undefined;
     }
 
@@ -127,6 +142,15 @@ export async function runScaffoldCommand(
   await executeScaffold(target, outputChannel, discoverCallback, workspaceDir);
 }
 
+// scaffoldTargetDir is the directory a scaffold target names: a file's
+// directory, or the package path before .TypeName.
+export function scaffoldTargetDir(target: string): string {
+  if (target.endsWith(".go")) return path.posix.dirname(target);
+  const slash = target.lastIndexOf("/");
+  const dot = target.indexOf(".", slash + 1);
+  return dot > 0 ? target.slice(0, dot) : target;
+}
+
 export async function executeScaffold(
   target: string,
   outputChannel: vscode.LogOutputChannel,
@@ -140,24 +164,73 @@ export async function executeScaffold(
   }
 
   try {
-    const cmd = await buildCliCommand(["scaffold", target], effectiveDir);
-    outputChannel.info(`[scaffold] ${formatCliCommand(cmd)}`);
-    const stdout = await captureStdout(cmd.bin, cmd.args, {
-      cwd: effectiveDir,
-    });
-    const match = /^Generated:\s*(.+)$/m.exec(stdout);
-    if (match) {
-      const generatedPath = match[1];
-      const fullPath = generatedPath.startsWith("/")
-        ? generatedPath
-        : `${effectiveDir}/${generatedPath}`;
-      const doc = await vscode.workspace.openTextDocument(fullPath);
-      await vscode.window.showTextDocument(doc);
-    }
-    discoverCallback();
+    await scaffoldOnce(target, outputChannel, discoverCallback, effectiveDir);
   } catch (err: unknown) {
-    if (offerCliUpgrade(err)) return;
-    const message = err instanceof Error ? err.message : String(err);
-    vscode.window.showErrorMessage(`gotest scaffold failed: ${message}`);
+    if (!(err instanceof GotestNotRequiredError)) {
+      reportScaffoldError(err);
+      return;
+    }
+    // No module requires gotest: offer to add it, then scaffold once more.
+    const roots = await readModuleRoots(effectiveDir);
+    const root =
+      moduleRootFor(
+        path.resolve(effectiveDir, scaffoldTargetDir(target)),
+        roots,
+      ) ?? roots[0];
+    if (!root) {
+      vscode.window.showErrorMessage(
+        `gotest scaffold failed: no go.mod in ${effectiveDir}`,
+      );
+      return;
+    }
+    const add = `${err.modulePath}@latest`;
+    const choice = await vscode.window.showWarningMessage(
+      `gotest: no go.mod here requires gotest. Add it to scaffold a suite? This runs: go get -tool ${add}`,
+      "Add to go.mod",
+    );
+    if (choice !== "Add to go.mod") return;
+    try {
+      await runGoInModule(root.dir, ["get", "-tool", add], outputChannel);
+    } catch (getErr: unknown) {
+      const message = getErr instanceof Error ? getErr.message : String(getErr);
+      vscode.window.showErrorMessage(
+        `gotest: adding gotest failed. ${message}`,
+      );
+      return;
+    }
+    try {
+      await scaffoldOnce(target, outputChannel, discoverCallback, effectiveDir);
+    } catch (again: unknown) {
+      reportScaffoldError(again);
+    }
   }
+}
+
+function reportScaffoldError(err: unknown): void {
+  if (offerCliUpgrade(err)) return;
+  const message = err instanceof Error ? err.message : String(err);
+  vscode.window.showErrorMessage(`gotest scaffold failed: ${message}`);
+}
+
+async function scaffoldOnce(
+  target: string,
+  outputChannel: vscode.LogOutputChannel,
+  discoverCallback: () => void,
+  effectiveDir: string,
+): Promise<void> {
+  const cmd = await buildCliCommand(["scaffold", target], effectiveDir);
+  outputChannel.info(`[scaffold] ${formatCliCommand(cmd)}`);
+  const stdout = await captureStdout(cmd.bin, cmd.args, {
+    cwd: effectiveDir,
+  });
+  const match = /^Generated:\s*(.+)$/m.exec(stdout);
+  if (match) {
+    const generatedPath = match[1];
+    const fullPath = path.isAbsolute(generatedPath)
+      ? generatedPath
+      : path.join(effectiveDir, generatedPath);
+    const doc = await vscode.workspace.openTextDocument(fullPath);
+    await vscode.window.showTextDocument(doc);
+  }
+  discoverCallback();
 }

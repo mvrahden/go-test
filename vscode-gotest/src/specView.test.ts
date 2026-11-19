@@ -26,7 +26,11 @@ import {
   nearestItemId,
   linkSources,
   SpecViewPanel,
+  renderErrorHtml,
+  declaredTests,
+  formatRanAt,
 } from "./specView.js";
+import type { DiscoverPackage } from "./types.js";
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -633,5 +637,192 @@ describe("the kept runs on disk", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("renderErrorHtml", () => {
+  it("is empty when the last render worked", () => {
+    expect(renderErrorHtml(undefined)).toBe("");
+  });
+  it("says the view is out of date, with the reason's first line escaped and a retry button", () => {
+    const html = renderErrorHtml("spec render timed out after 30s\n<stack>");
+    expect(html).toContain("This view is out of date: the last render failed.");
+    expect(html).toContain("spec render timed out after 30s");
+    expect(html).not.toContain("<stack>");
+    expect(html).toContain('id="retry-render-btn"');
+    expect(renderErrorHtml("a <b> c")).toContain("a &lt;b&gt; c");
+  });
+});
+
+describe("declaredTests", () => {
+  const method = (name: string, testName?: string) => ({
+    name,
+    ...(testName ? { testName } : {}),
+    parallel: false,
+    focused: false,
+    excluded: false,
+    file: "cart_test.go",
+    line: 1,
+    col: 1,
+  });
+  const suite = (
+    name: string,
+    methods: ReturnType<typeof method>[],
+    fuzzers: ReturnType<typeof method>[] = [],
+    external = false,
+  ) => ({
+    name,
+    ...(external ? { external: true } : {}),
+    parallel: false,
+    focused: false,
+    excluded: false,
+    guarded: false,
+    file: "cart_test.go",
+    line: 1,
+    col: 1,
+    lifecycle: [],
+    fixtures: [],
+    methods,
+    benchmarks: [],
+    fuzzers,
+  });
+  const pkg: DiscoverPackage = {
+    importPath: "example.com/cart",
+    dir: "/ws/cart",
+    suites: [
+      suite(
+        "CartTestSuite",
+        [method("TestAdd"), method("TestTotal")],
+        [method("FuzzParse")],
+      ),
+      suite("CartTestSuite", [method("TestAdd", "TestAdd#01")], [], true),
+      suite("Order_FuzzyTestSuite", [], [method("FuzzIds")]),
+    ],
+  };
+  const declared = declaredTests(pkg)!;
+
+  it.each([
+    ["a suite's own line", 1, "TestCartTestSuite", true],
+    ["a declared method", 1, "TestCartTestSuite/TestAdd", true],
+    [
+      "a behavior under a declared method",
+      1,
+      "TestCartTestSuite/TestAdd/when_empty/it_adds",
+      true,
+    ],
+    [
+      "an external twin's method by its reported name",
+      2,
+      "TestCartTestSuite/TestAdd#01",
+      true,
+    ],
+    [
+      "a repeat's method under -count (the internal twin's second run)",
+      3,
+      "TestCartTestSuite/TestTotal#01",
+      true,
+    ],
+    ["a method that is gone", 1, "TestCartTestSuite/TestRemoved", false],
+    [
+      "a repeat of a method that is gone (the internal twin's second run)",
+      3,
+      "TestCartTestSuite/TestRemoved#01",
+      false,
+    ],
+    [
+      "a behavior under a method that is gone",
+      1,
+      "TestCartTestSuite/TestRemoved/when_x",
+      false,
+    ],
+    ["a suite that is gone", 1, "TestOldTestSuite/TestX", false],
+    ["a plain test function", 1, "TestParseFlags", true],
+    ["a plain test function's subtest", 1, "TestParseFlags/empty", true],
+    ["a declared fuzz target", 1, "FuzzCartTestSuite_FuzzParse", true],
+    ["a fuzz target's seed row", 1, "FuzzCartTestSuite_FuzzParse/seed#0", true],
+    [
+      "a fuzz target of a suite whose name holds _Fuzz",
+      1,
+      "FuzzOrder_FuzzyTestSuite_FuzzIds",
+      true,
+    ],
+    ["a fuzz target that is gone", 1, "FuzzCartTestSuite_FuzzGone", false],
+    ["a plain fuzz function", 1, "FuzzDecode", true],
+    ["a benchmark", 1, "BenchmarkCartTestSuite/BenchmarkAdd", true],
+  ])("%s", (_name, instance, testPath, want) => {
+    expect(declared(instance as number, testPath as string)).toBe(want);
+  });
+
+  it("says nothing about a package that does not load", () => {
+    expect(declaredTests({ ...pkg, broken: true })).toBeUndefined();
+  });
+
+  it("matches a twin's row against its own twin's methods", () => {
+    // The external twin's TestAdd is deleted; the internal twin keeps its own.
+    const gone = declaredTests({
+      ...pkg,
+      suites: [
+        suite("CartTestSuite", [method("TestAdd"), method("TestTotal")]),
+        suite("CartTestSuite", [method("TestTotal", "TestTotal#01")], [], true),
+      ],
+    })!;
+    expect(gone(2, "TestCartTestSuite/TestAdd#01")).toBe(false);
+    expect(gone(1, "TestCartTestSuite/TestAdd")).toBe(true);
+    expect(gone(2, "TestCartTestSuite/TestTotal#01")).toBe(true);
+  });
+});
+
+describe("formatRanAt", () => {
+  const now = new Date(2026, 10, 11, 16, 5).getTime();
+  it("gives the time of a run of today", () => {
+    expect(formatRanAt(new Date(2026, 10, 11, 9, 7).getTime(), now)).toBe(
+      "09:07",
+    );
+  });
+  it("adds the date to a run of another day", () => {
+    expect(formatRanAt(new Date(2026, 10, 10, 23, 59).getTime(), now)).toBe(
+      "2026-11-10 23:59",
+    );
+  });
+});
+
+describe("when each package last ran", () => {
+  const pkgOf = (p: string): SpecPackage => ({
+    path: p,
+    status: "pass",
+    duration: 0.1,
+    nodes: [node("TestCartTestSuite", "pass", [node("adds", "pass")])],
+  });
+  const twoPackages = {
+    packages: [pkgOf("example.com/cart"), pkgOf("example.com/order")],
+    stats: stats(),
+  };
+  const onePackage = { packages: [pkgOf("example.com/cart")], stats: stats() };
+
+  it("shows on each package when it last ran, and nothing where it is not known", () => {
+    const now = new Date(2026, 10, 11, 16, 5).getTime();
+    const at = new Date(2026, 10, 11, 14, 32).getTime();
+    const html = buildSpecBody(twoPackages, [], {
+      dirOf: () => undefined,
+      ranAtOf: (p) => (p === "example.com/cart" ? at : undefined),
+      now,
+    });
+    expect(html.match(/class="ran-at"/g)).toHaveLength(1);
+    expect(html).toContain(">last run 14:32</span>");
+  });
+
+  it("shows it above the rows when one package is all there is", () => {
+    const at = new Date(2026, 10, 11, 14, 32).getTime();
+    const html = buildSpecBody(onePackage, [], {
+      dirOf: () => undefined,
+      ranAtOf: () => at,
+      now: new Date(2026, 10, 11, 16, 5).getTime(),
+    });
+    expect(html).toContain('<div class="ran-at-line">last run 14:32</div>');
+  });
+
+  it("shows no time when none is known", () => {
+    const html = buildSpecBody(twoPackages, [], { dirOf: () => undefined });
+    expect(html).not.toContain("last run");
   });
 });

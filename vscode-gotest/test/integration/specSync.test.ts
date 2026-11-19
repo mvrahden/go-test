@@ -350,6 +350,31 @@ describe("a CLI that produced no spec is reported, not swallowed", () => {
       expect(renderedHtml()).not.toContain("totals the basket");
     },
   );
+
+  it.skipIf(process.platform === "win32")(
+    "keeps the last picture under a notice, and drops the notice when a render works again",
+    async () => {
+      const { panel } = newPanel();
+      await panel.show();
+      await panel.refresh(run("mixed"));
+      expect(renderedHtml()).toContain("totals the basket");
+      expect(renderedHtml()).not.toContain("This view is out of date");
+
+      state.cliPath = brokenBinary;
+      clearBinaryCache();
+      await panel.refresh(run("all-fail"));
+      expect(renderedHtml()).toContain(
+        "This view is out of date: the last render failed.",
+      );
+      expect(renderedHtml()).toContain("simulated toolchain failure");
+      expect(renderedHtml()).toContain("totals the basket");
+
+      state.cliPath = "";
+      clearBinaryCache();
+      await panel.refresh(run("mixed"));
+      expect(renderedHtml()).not.toContain("This view is out of date");
+    },
+  );
 });
 
 // Tier 2 — refresh() is stateful. The panel keeps the newest lines of every
@@ -749,13 +774,22 @@ describe("failure output", () => {
 describe("packages discovery no longer reports", () => {
   it("leave the panel when their folder's discovery comes back without them", async () => {
     const cache = new DiscoveryCache();
-    const pkg = (importPath: string) =>
-      ({ importPath, dir: `/src/${importPath}`, suites: [] }) as never;
-    cache.update(
-      [pkg("example.com/cart"), pkg("example.com/checkout")],
-      true,
-      state.workspaceDir,
-    );
+    // Each package declares the suite and the methods its recorded stream
+    // reports, so only the package prune decides what leaves.
+    const pkg = (importPath: string, suite: string, methods: string[]) =>
+      ({
+        importPath,
+        dir: `/src/${importPath}`,
+        suites: [{ name: suite, methods: methods.map((name) => ({ name })) }],
+      }) as never;
+    const cart = pkg("example.com/cart", "CartTestSuite", [
+      "adds_an_item",
+      "totals_the_basket",
+    ]);
+    const checkout = pkg("example.com/checkout", "CheckoutTestSuite", [
+      "rejects_an_expired_card",
+    ]);
+    cache.update([cart, checkout], true, state.workspaceDir);
     const recorder = createRecordingChannel();
     const panel = new SpecViewPanel(recorder.channel as never, cache);
     await panel.show();
@@ -764,7 +798,7 @@ describe("packages discovery no longer reports", () => {
     expect(renderedHtml()).toContain("adds an item");
 
     // cart was renamed: the next discovery of the folder no longer has it.
-    cache.update([pkg("example.com/checkout")], true, state.workspaceDir);
+    cache.update([checkout], true, state.workspaceDir);
     await panel.show();
 
     const html = renderedHtml();

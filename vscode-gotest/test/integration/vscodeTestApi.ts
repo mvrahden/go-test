@@ -67,8 +67,14 @@ export class FakeTestItem {
 export type Verdict =
   "enqueued" | "started" | "passed" | "failed" | "errored" | "skipped";
 
-// Records what a run reported, keyed by test item id. Later verdicts overwrite
-// earlier ones, which mirrors how the Test Explorer displays an item.
+const TERMINAL: Partial<Record<Verdict, number>> = {
+  passed: 0,
+  skipped: 1,
+  failed: 2,
+  errored: 3,
+};
+
+// Records what a run reported, keyed by test item id, as the Test Explorer keeps it: a terminal verdict is not replaced by a lower one.
 export class FakeTestRun {
   readonly verdicts = new Map<string, Verdict>();
   readonly messages = new Map<string, string[]>();
@@ -80,6 +86,12 @@ export class FakeTestRun {
   name: string | undefined;
 
   private record(item: FakeTestItem, verdict: Verdict): void {
+    const held = this.verdicts.get(item.id);
+    const heldRank = held === undefined ? undefined : TERMINAL[held];
+    if (heldRank !== undefined) {
+      const rank = TERMINAL[verdict];
+      if (rank === undefined || rank < heldRank) return;
+    }
     this.verdicts.set(item.id, verdict);
   }
 

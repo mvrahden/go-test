@@ -113,6 +113,7 @@ import {
   clearBinaryCache,
   CliBelowFloorError,
   CliUnavailableError,
+  GotestNotRequiredError,
   offerCliUpgrade,
   planUpgrade,
   compareGoVersions,
@@ -126,7 +127,9 @@ import {
 import {
   ABOVE_FLOOR,
   BELOW_FLOOR,
-  PSEUDO_AT_FLOOR,
+  PSEUDO_ABOVE_FLOOR,
+  PSEUDO_BELOW_FLOOR,
+  RC_OF_FLOOR,
 } from "./floor.test-support.js";
 
 function setGoMod(dir: string, content: string) {
@@ -275,6 +278,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when version is below minimum", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
@@ -289,6 +294,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when cliPath file does not exist", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/nonexistent/gotest");
       mockFileExists.mockResolvedValue(false);
 
@@ -299,6 +306,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when version output is unparseable", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockResolvedValue({
@@ -313,6 +322,8 @@ describe("buildCliCommand", () => {
     });
 
     it("falls back when version check throws", async () => {
+      // A pin to fall back to: without one there is no CLI to run.
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("cliPath", "/usr/local/bin/gotest");
       mockFileExists.mockResolvedValue(true);
       mockExecFileAsync.mockRejectedValue(new Error("EACCES"));
@@ -575,31 +586,33 @@ describe("buildCliCommand", () => {
     });
   });
 
-  describe("step 5: fallback", () => {
-    it("uses go run module@latest when no go.mod exists", async () => {
-      const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
-
-      expect(cmd).toEqual({
-        bin: "/usr/local/go/bin/go",
-        args: ["run", `${GOTEST_MODULE}@latest`, "spec", "./..."],
-      });
+  describe("step 7: no pin", () => {
+    it("refuses to run when no go.mod exists, naming the fix", async () => {
+      await expect(
+        buildCliCommand(["spec", "./..."], "/workspace"),
+      ).rejects.toThrow(
+        `no go.mod here requires gotest. Add it with: go get -tool ${GOTEST_MODULE}@latest`,
+      );
+      await expect(
+        buildCliCommand(["spec", "./..."], "/workspace"),
+      ).rejects.toBeInstanceOf(GotestNotRequiredError);
     });
 
-    it("does not include -- separator", async () => {
-      const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
-
-      expect(cmd.args).not.toContain("--");
-    });
-
-    it("uses go run module@latest when version not found in go.mod", async () => {
+    it("refuses to run when go.mod does not require gotest", async () => {
       setGoMod(
         "/workspace",
         ["module github.com/myapp", "go 1.24.0"].join("\n"),
       );
 
-      const cmd = await buildCliCommand(["spec"], "/workspace");
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        GotestNotRequiredError,
+      );
+    });
 
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@latest`);
+    it("still runs a module path that carries its own version", async () => {
+      mockConfigValues.set("modulePath", `${GOTEST_MODULE}@v1.99.0`);
+      const cmd = await buildCliCommand(["spec"], "/workspace");
+      expect(cmd.args.slice(0, 2)).toEqual(["run", `${GOTEST_MODULE}@v1.99.0`]);
     });
 
     it("respects modulePath containing @ as-is", async () => {
@@ -925,6 +938,7 @@ describe("buildCliCommand", () => {
 
   describe("buildTags", () => {
     it("appends -tags flag to subcommand args", async () => {
+      setGoMod("/workspace", PINNED(MIN_CLI_VERSION));
       mockConfigValues.set("buildTags", "integration,e2e");
 
       const cmd = await buildCliCommand(["spec", "./..."], "/workspace");
@@ -1128,16 +1142,16 @@ describe("buildCliCommand", () => {
       );
     });
 
-    it("keeps the bootstrap fallback when no use module requires gotest", async () => {
+    it("refuses to run when no use module requires gotest", async () => {
       setFiles({
         "/workspace/go.work": work,
         "/workspace/a/go.mod": "module github.com/a\n\ngo 1.25.0\n",
         "/workspace/b/go.mod": "module github.com/b\n\ngo 1.25.0\n",
       });
 
-      const cmd = await buildCliCommand(["spec"], "/workspace");
-
-      expect(cmd.args[1]).toBe(`${GOTEST_MODULE}@latest`);
+      await expect(buildCliCommand(["spec"], "/workspace")).rejects.toThrow(
+        GotestNotRequiredError,
+      );
     });
 
     it("Upgrade runs in every use module that pins gotest", async () => {
@@ -1289,13 +1303,13 @@ describe("checkProducerVersion", () => {
     mockConfigValues.clear();
   });
 
-  it("accepts the floor, anything above it, a pseudo-version at the floor and a dev build", async () => {
+  it("accepts the floor, anything above it, a commit after the floor and a dev build", async () => {
     const { checkProducerVersion } = await import("./cli.js");
     for (const v of [
       MIN_CLI_VERSION,
       ABOVE_FLOOR,
       "v2.0.0",
-      PSEUDO_AT_FLOOR,
+      PSEUDO_ABOVE_FLOOR,
       "dev (source checkout)",
       "dev (replace directive)",
       "dev",
@@ -1313,6 +1327,17 @@ describe("checkProducerVersion", () => {
     expect(() => checkProducerVersion("v1.29.0")).toThrow(
       `the CLI is v1.29.0, but >= ${MIN_CLI_VERSION} is required. Run: go get -tool github.com/mvrahden/go-test/cmd/gotest@${MIN_CLI_VERSION}`,
     );
+  });
+
+  it("refuses a release candidate of the floor and a commit before it", async () => {
+    const { checkProducerVersion, CliUnavailableError } =
+      await import("./cli.js");
+    for (const v of [RC_OF_FLOOR, PSEUDO_BELOW_FLOOR]) {
+      expect(() => checkProducerVersion(v)).toThrow(CliUnavailableError);
+      expect(() => checkProducerVersion(v)).toThrow(
+        `the CLI is ${v}, but >= ${MIN_CLI_VERSION} is required`,
+      );
+    }
   });
 
   it("refuses a document without a version as one that predates the floor", async () => {

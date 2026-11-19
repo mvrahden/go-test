@@ -43,7 +43,12 @@ import { ProcessRegistry } from "./processRegistry.js";
 import { setChildObserver } from "./managedChild.js";
 import { forceKillTimeoutSeconds } from "./config.js";
 import { setStoreErrorLogger } from "./jsonStore.js";
-import { validateGoBinary, scopedConfig } from "./cli.js";
+import {
+  validateGoBinary,
+  scopedConfig,
+  cliPackagePath,
+  clearBinaryCache,
+} from "./cli.js";
 import {
   buildRunFilter,
   getPackageDir,
@@ -57,8 +62,11 @@ import {
 } from "./lint.js";
 import type { LintFinding } from "./lintFindings.js";
 import { openEventsFile } from "./importEvents.js";
-import { execFile } from "node:child_process";
-import { ensureGitExclude } from "./gitExclude.js";
+import {
+  ActiveFolders,
+  moduleFileChanged,
+  writeGitSettings,
+} from "./activeFolders.js";
 
 let flushOnDeactivate: (() => Promise<void>) | undefined;
 
@@ -67,7 +75,6 @@ export function activate(context: vscode.ExtensionContext): void {
     log: true,
   });
   outputChannel.info("[activate] extension activated");
-  vscode.commands.executeCommand("setContext", "gotest.active", true);
 
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -77,6 +84,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   setStoreErrorLogger((message) => outputChannel.error(message));
 
+  const active = new ActiveFolders();
   const cache = new DiscoveryCache();
   const snapshotStore = new DiscoverySnapshotStore(context.storageUri);
   const discoveryService = new DiscoveryService(
@@ -246,7 +254,11 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     outputChannel,
     (jsonOutput, _scope, cwd) => {
-      void specView.refresh({ stream: jsonOutput, folder: cwd });
+      void specView.refresh({
+        stream: jsonOutput,
+        folder: cwd,
+        at: Date.now(),
+      });
     },
     runRegistry,
   );
@@ -266,7 +278,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   debugLauncher.registerCleanupOnSessionEnd(context);
 
-  const providerDisposables = registerProviders(cache, benchResultStore);
+  const providerDisposables = registerProviders(
+    cache,
+    active,
+    benchResultStore,
+  );
   const commandDisposables = registerCommands({
     controller,
     runner,
@@ -281,6 +297,7 @@ export function activate(context: vscode.ExtensionContext): void {
     cache,
     outputChannel,
     lint,
+    active,
   });
   const watcherDisposables = setupFileWatchers(
     cache,
@@ -288,6 +305,8 @@ export function activate(context: vscode.ExtensionContext): void {
     coverageStore,
     coverOnSave,
     outputChannel,
+    active,
+    controller,
   );
 
   context.subscriptions.push(
@@ -343,6 +362,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context,
     snapshotStore,
     specView,
+    active,
   }).catch((err) => {
     outputChannel.error(`[activate] async initialization failed: ${err}`);
   });
@@ -363,6 +383,7 @@ function resolveActiveWorkspaceDir(): string | undefined {
 
 function registerProviders(
   cache: DiscoveryCache,
+  active: ActiveFolders,
   benchResultStore?: BenchResultStore,
 ): vscode.Disposable[] {
   const codeLensProvider = new GoTestCodeLensProvider(cache, benchResultStore);
@@ -388,7 +409,9 @@ function registerProviders(
     { providedCodeActionKinds: FocusExcludeProvider.providedCodeActionKinds },
   );
 
-  const scaffoldProvider = new ScaffoldCodeActionProvider();
+  const scaffoldProvider = new ScaffoldCodeActionProvider((folder) =>
+    active.has(folder),
+  );
   const scaffoldCodeActionsDisposable =
     vscode.languages.registerCodeActionsProvider(
       { language: "go", pattern: "**/*.go" },
@@ -424,6 +447,7 @@ export function registerCommands(deps: {
   cache: DiscoveryCache;
   outputChannel: vscode.LogOutputChannel;
   lint: LintService;
+  active: ActiveFolders;
 }): vscode.Disposable[] {
   const {
     controller,
@@ -439,6 +463,7 @@ export function registerCommands(deps: {
     cache,
     outputChannel,
     lint,
+    active,
   } = deps;
 
   // Promote edits user source (typed f.Add seeds), so the fuzz surfaces
@@ -653,7 +678,25 @@ export function registerCommands(deps: {
     ),
 
     vscode.commands.registerCommand("gotest.refreshTests", async () => {
-      for (const folder of vscode.workspace.workspaceFolders ?? []) {
+      const folders = vscode.workspace.workspaceFolders ?? [];
+      for (const folder of folders) {
+        if ((await active.refresh(folder.uri.fsPath)) === "activated") {
+          writeGitSettings(folder.uri.fsPath, outputChannel);
+        }
+      }
+      void vscode.commands.executeCommand(
+        "setContext",
+        "gotest.active",
+        active.size > 0,
+      );
+      if (active.size === 0) {
+        const where = folders[0]?.uri.fsPath;
+        vscode.window.showInformationMessage(
+          `gotest: no go.mod in this workspace requires or declares gotest. Add it with: go get -tool ${cliPackagePath(where)}@latest`,
+        );
+        return;
+      }
+      for (const folder of folders) {
         await discoveryService.discover(folder.uri.fsPath);
       }
     }),
@@ -852,12 +895,25 @@ function registerLintCommands(
   ];
 }
 
-function setupFileWatchers(
+// staleOnChange marks the verdicts of a changed file's package outdated.
+// Packages that import it are not marked: the import graph is not known here.
+export function staleOnChange(
+  filePath: string,
+  cache: Pick<DiscoveryCache, "resolveFileToPackage">,
+  controller: Pick<GoTestController, "invalidateResults">,
+): void {
+  const importPath = cache.resolveFileToPackage(filePath);
+  if (importPath) controller.invalidateResults(importPath);
+}
+
+export function setupFileWatchers(
   cache: DiscoveryCache,
   discoveryService: DiscoveryService,
   coverageStore: CoverageStore,
   coverOnSave: CoverOnSave,
   outputChannel: vscode.LogOutputChannel,
+  active: ActiveFolders,
+  controller: GoTestController,
 ): vscode.Disposable[] {
   const coverOnSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const triggerCoverOnSave = (importPath: string, uri: vscode.Uri) => {
@@ -879,6 +935,7 @@ function setupFileWatchers(
 
   const testWatcher = vscode.workspace.createFileSystemWatcher("**/*_test.go");
   const onFileChange = (uri: vscode.Uri) => {
+    staleOnChange(uri.fsPath, cache, controller);
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     if (!folder) return;
     const wsDir = folder.uri.fsPath;
@@ -899,6 +956,7 @@ function setupFileWatchers(
     if (importPath) triggerCoverOnSave(importPath, uri);
   };
   const onFileDelete = (uri: vscode.Uri) => {
+    staleOnChange(uri.fsPath, cache, controller);
     const discoverOnSave =
       vscode.workspace
         .getConfiguration("gotest")
@@ -915,6 +973,7 @@ function setupFileWatchers(
   const sourceWatcher = vscode.workspace.createFileSystemWatcher("**/*.go");
   const onSourceChange = (uri: vscode.Uri) => {
     if (uri.fsPath.endsWith("_test.go")) return;
+    staleOnChange(uri.fsPath, cache, controller);
     const importPath = cache.resolveFileToPackage(uri.fsPath);
     if (!importPath) return;
 
@@ -926,7 +985,45 @@ function setupFileWatchers(
     triggerCoverOnSave(importPath, uri);
   };
 
+  // A go.mod or go.work change can add, upgrade or remove gotest: the CLI
+  // is resolved afresh and the folder rediscovered, once per burst.
+  const moduleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const moduleWatcher = vscode.workspace.createFileSystemWatcher(
+    "**/{go.mod,go.work}",
+  );
+  const onModuleFile = (uri: vscode.Uri) => {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (!folder) return;
+    const dir = folder.uri.fsPath;
+    const existing = moduleTimers.get(dir);
+    if (existing) clearTimeout(existing);
+    moduleTimers.set(
+      dir,
+      setTimeout(() => {
+        moduleTimers.delete(dir);
+        void moduleFileChanged(dir, {
+          active,
+          discover: (f) => discoveryService.discover(f),
+          resetCli: clearBinaryCache,
+          setActiveContext: (on) =>
+            void vscode.commands.executeCommand(
+              "setContext",
+              "gotest.active",
+              on,
+            ),
+          writeGitSettings: (f) => writeGitSettings(f, outputChannel),
+        }).catch((err) =>
+          outputChannel.error(`[activate] go.mod change in ${dir}: ${err}`),
+        );
+      }, 500),
+    );
+  };
+
   return [
+    moduleWatcher,
+    moduleWatcher.onDidChange(onModuleFile),
+    moduleWatcher.onDidCreate(onModuleFile),
+    moduleWatcher.onDidDelete(onModuleFile),
     testWatcher,
     testWatcher.onDidChange(onFileChange),
     testWatcher.onDidCreate(onFileChange),
@@ -938,12 +1035,13 @@ function setupFileWatchers(
     {
       dispose() {
         for (const t of coverOnSaveTimers.values()) clearTimeout(t);
+        for (const t of moduleTimers.values()) clearTimeout(t);
       },
     },
   ];
 }
 
-async function initializeAsync(deps: {
+export async function initializeAsync(deps: {
   workspaceFolders: readonly vscode.WorkspaceFolder[];
   outputChannel: vscode.LogOutputChannel;
   discoveryService: DiscoveryService;
@@ -956,6 +1054,7 @@ async function initializeAsync(deps: {
   context: vscode.ExtensionContext;
   snapshotStore: DiscoverySnapshotStore;
   specView: SpecViewPanel;
+  active: ActiveFolders;
 }): Promise<void> {
   const {
     workspaceFolders,
@@ -970,6 +1069,7 @@ async function initializeAsync(deps: {
     context,
     snapshotStore,
     specView,
+    active,
   } = deps;
 
   const firstDir = workspaceFolders[0].uri.fsPath;
@@ -984,21 +1084,18 @@ async function initializeAsync(deps: {
     return;
   }
 
+  // Only a folder whose go.mod uses gotest gets the git settings and the
+  // Spec View button; the rest of the workspace is left alone.
   for (const folder of workspaceFolders) {
-    execFile(
-      "git",
-      ["config", "diff.snapshot.xfuncname", "^=== SNAP .+ ===$"],
-      { cwd: folder.uri.fsPath },
-      (err) => {
-        if (err) {
-          outputChannel.debug(
-            `[activate] git config diff.snapshot.xfuncname failed: ${err.message}`,
-          );
-        }
-      },
-    );
-    ensureGitExclude(folder.uri.fsPath, outputChannel);
+    if ((await active.refresh(folder.uri.fsPath)) === "activated") {
+      writeGitSettings(folder.uri.fsPath, outputChannel);
+    }
   }
+  void vscode.commands.executeCommand(
+    "setContext",
+    "gotest.active",
+    active.size > 0,
+  );
 
   // End what a previous session left running. A detached child survives the
   // extension host that started it, and until now nothing ever went back for

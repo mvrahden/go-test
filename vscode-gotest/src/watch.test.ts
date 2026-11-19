@@ -68,6 +68,7 @@ function fixture() {
     started: vi.fn(),
     passed: vi.fn(),
     skipped: vi.fn(),
+    errored: vi.fn(),
     appendOutput: vi.fn(),
     end: vi.fn(),
     failed: vi.fn((_item: unknown, messages: { message: string }[]) => {
@@ -169,6 +170,99 @@ describe("WatchCycle", () => {
 
     expect(run.appendOutput).toHaveBeenCalledWith(
       expect.stringContaining("exit code 2"),
+    );
+  });
+
+  const teardownFailed =
+    ev({
+      Action: "run",
+      Test: "TestMySuite",
+      Gotest: { Subtest: "TestMySuite" },
+    }) +
+    ev({ Action: "pass", Test: "TestMySuite", Elapsed: 0.01 }) +
+    ev({ Action: "pass", Elapsed: 0.02 }) +
+    JSON.stringify({
+      Action: "output",
+      Package: "shared fixtures",
+      RunLevel: true,
+      Output: "FAIL: shared fixture teardown failed\n",
+    }) +
+    "\n" +
+    JSON.stringify({
+      Action: "fail",
+      Package: "shared fixtures",
+      RunLevel: true,
+    }) +
+    "\n";
+
+  it("errors the packages a failed cycle reported when no verdict failed", () => {
+    const { controller, run, cache } = fixture();
+    const cycle = new WatchCycle(
+      run as never,
+      controller as never,
+      cache as never,
+      "/ws",
+    );
+    cycle.apply(teardownFailed);
+    cycle.end(1);
+
+    expect(run.errored).toHaveBeenCalledTimes(1);
+    expect(run.errored.mock.calls[0][0].id).toBe("example.com/pkg");
+    expect(run.errored.mock.calls[0][1].message).toBe(
+      "FAIL: shared fixture teardown failed\n\nexit code 1",
+    );
+    expect(controller.getResult("example.com/pkg")?.status).toBe("errored");
+    expect(run.appendOutput).toHaveBeenCalledWith(
+      "[shared fixtures] FAIL: shared fixture teardown failed\r\n",
+    );
+  });
+
+  it("leaves the tree alone when the failed cycle carried a failing verdict", () => {
+    const { controller, run, cache } = fixture();
+    const cycle = new WatchCycle(
+      run as never,
+      controller as never,
+      cache as never,
+      "/ws",
+    );
+    cycle.apply(
+      ev({
+        Action: "run",
+        Test: "TestMySuite",
+        Gotest: { Subtest: "TestMySuite" },
+      }) +
+        ev({ Action: "fail", Test: "TestMySuite", Elapsed: 0.01 }) +
+        ev({ Action: "fail", Elapsed: 0.02 }),
+    );
+    cycle.end(1);
+    expect(run.errored).not.toHaveBeenCalled();
+  });
+
+  it("leaves a cycle that succeeded alone", () => {
+    const { controller, run, cache } = fixture();
+    const cycle = new WatchCycle(
+      run as never,
+      controller as never,
+      cache as never,
+      "/ws",
+    );
+    cycle.apply(teardownFailed.split("\n").slice(0, 3).join("\n") + "\n");
+    cycle.end(0);
+    expect(run.errored).not.toHaveBeenCalled();
+  });
+
+  it("says in the log when a failed cycle reported no package", () => {
+    const { controller, run, cache } = fixture();
+    const log = vi.fn();
+    new WatchCycle(
+      run as never,
+      controller as never,
+      cache as never,
+      "/ws",
+      log,
+    ).end(2);
+    expect(log).toHaveBeenCalledWith(
+      "[watch] cycle failed with exit code 2 and reported no package",
     );
   });
 });

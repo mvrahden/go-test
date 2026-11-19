@@ -11,6 +11,7 @@ import {
   type CliCommand,
 } from "./cli.js";
 import {
+  markFailedRun,
   resolveAncestorItems,
   skipUnresolved,
   OnceLog,
@@ -47,7 +48,7 @@ class WatchProcess implements vscode.Disposable {
     private readonly outputChannel: vscode.LogOutputChannel,
     private readonly onCycleStart: () => void,
     private readonly onEvents: (jsonLines: string) => void,
-    private readonly onCycleEnd: (exitCode: number) => void,
+    private readonly onCycleEnd: (exitCode: number, ended?: string) => void,
     private readonly onError: (msg: string) => void,
     private readonly onExit: () => void,
   ) {
@@ -80,8 +81,18 @@ class WatchProcess implements vscode.Disposable {
       this.outputChannel.warn(`[watch] stderr: ${chunk.trimEnd()}`);
     });
 
-    this.child.on("close", () => {
+    this.child.on("close", (code: number | null, signal: string | null) => {
       if (!this.disposed) {
+        // A process that dies during a cycle ends it as a failed one, said
+        // with the code or signal it ended by; with no cycle open this is a
+        // no-op.
+        const ended =
+          code === null
+            ? `the watch process was ended by ${signal ?? "a signal"} during the cycle`
+            : code === 0
+              ? "the watch process exited with exit code 0 during the cycle"
+              : undefined;
+        this.onCycleEnd(code ?? 1, ended);
         this.maybeRestart();
       }
     });
@@ -248,7 +259,7 @@ export class WatchCycle {
     private readonly controller: GoTestController,
     cache: DiscoveryCache,
     cwd: string,
-    log?: (message: string) => void,
+    private readonly log?: (message: string) => void,
   ) {
     this.applier = new StreamApplier(
       controller,
@@ -265,16 +276,38 @@ export class WatchCycle {
     resolveAncestorItems(this.run, this.controller);
   }
 
-  // end closes the run and returns the cycle's stream.
-  end(exitCode?: number): string {
+  // end closes the run and returns the cycle's stream. ended says how a
+  // process that died during the cycle ended, when its exit code does not.
+  end(exitCode?: number, ended?: string): string {
     this.controller.testController.items.forEach((root) => {
       skipUnresolved(this.run, root, this.controller);
     });
-    resolveAncestorItems(this.run, this.controller);
-    if (exitCode !== undefined && exitCode !== 0) {
-      this.run.appendOutput(
-        `\r\n[watch] cycle ended with exit code ${exitCode}\r\n`,
+    const failed =
+      exitCode !== undefined && (exitCode !== 0 || ended !== undefined);
+    const how = ended ?? `exit code ${exitCode}`;
+    if (exitCode !== undefined && failed) {
+      const items = [...this.applier.reported]
+        .map((p) => this.controller.findItem(p))
+        .filter((i): i is vscode.TestItem => i !== undefined);
+      const marked = markFailedRun(
+        this.run,
+        items,
+        {
+          exitCode,
+          cancelled: false,
+          failed: this.applier.failed,
+          reason: this.applier.runLevel.join("\n"),
+          ended,
+        },
+        this.controller,
       );
+      if (!marked && !this.applier.failed) {
+        this.log?.(`[watch] cycle failed with ${how} and reported no package`);
+      }
+    }
+    resolveAncestorItems(this.run, this.controller);
+    if (failed) {
+      this.run.appendOutput(`\r\n[watch] cycle ended with ${how}\r\n`);
     }
     this.run.end();
     return this.stream;
@@ -331,11 +364,11 @@ export class WatchManager implements vscode.Disposable {
     }
 
     // finishCycle ends the open cycle, if any, and hands its stream on.
-    const finishCycle = (exitCode?: number) => {
+    const finishCycle = (exitCode?: number, ended?: string) => {
       const cycle = this.activeCycles.get(pkgScope);
       if (!cycle) return;
       this.activeCycles.delete(pkgScope);
-      const stream = cycle.end(exitCode);
+      const stream = cycle.end(exitCode, ended);
       this.controller.saveResults();
       if (stream) this.onCycleComplete(stream, pkgScope, cwd);
     };
@@ -366,7 +399,7 @@ export class WatchManager implements vscode.Disposable {
         this.activeCycles.get(pkgScope)?.apply(jsonLines);
       },
       // onCycleEnd
-      (exitCode: number) => finishCycle(exitCode),
+      (exitCode: number, ended?: string) => finishCycle(exitCode, ended),
       // onError
       (msg: string) => {
         this.outputChannel.error(`[watch] ${msg}`);

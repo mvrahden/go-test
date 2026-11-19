@@ -14,7 +14,7 @@ This extension brings that into VS Code: run, debug, watch, and verify your suit
 Test Explorer shows your suites as **Package > Suite > Method > Subtest** — not a flat list of functions.
 Run or debug at any level. Coverage gutters track implementation progress. Watch mode streams results as you code.
 
-The **Spec View** renders your test structure as a behavioral specification — a readable tree with pass/fail indicators, go-to-source navigation, and clipboard export. Your tests become documentation that's always in sync.
+The **Spec View** renders your test structure as a behavioral specification — a readable tree with pass/fail indicators, go-to-source navigation, and clipboard export. Your tests become documentation regenerated from every run.
 
 **AI-assisted workflows** — Paste specs into AI conversations as context. The clean exports feed well into LLM toolchains. You define what the system should do — the tests verify.
 
@@ -36,7 +36,7 @@ The **Spec View** renders your test structure as a behavioral specification — 
 
 The extension invokes the gotest CLI automatically — no separate install needed.
 It runs the CLI your `go.mod` selects: `go tool` when the tool directive is declared, otherwise `go run` at the pinned version.
-The CLI must be **v1.38.0 or newer**. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
+The CLI must be **v1.38.0 or newer**. A release candidate or a commit before that release (`v1.38.0-rc.1`, `v1.37.1-0.<time>-<commit>`) is older than it; a commit after it (`v1.38.1-0.<time>-<commit>`) is newer. A binary or a `go.mod` pin is checked at activation; a CLI reached through `go run` or `go tool` is checked from the `version` that opens every document it writes, so an older one is refused at discovery rather than trusted.
 
 ### Install
 
@@ -55,6 +55,9 @@ Also available on [Open VSX](https://open-vsx.org/extension/mvrahden/gotest) for
 3. Open the **Testing** sidebar to see your suites organized by package.
 4. Click the **Run** or **Debug** button next to any suite or method.
 
+The extension works in a workspace folder only when a go.mod there uses gotest: the module is gotest itself, or it declares the CLI as a tool, replaces the module, or requires it directly (a require marked `// indirect` alone does not count). With a go.work in the folder, its use modules are read instead of the folder's go.mod, and one such module is enough. Elsewhere the extension discovers nothing, runs no CLI, writes no git setting and shows no Spec View button.
+A change to go.mod or go.work is followed within a second: the CLI is resolved again and the folder rediscovered, so an upgrade, a new tool directive or a first require shows without a reload.
+
 ## Features
 
 ### Test Explorer
@@ -64,6 +67,9 @@ Run or debug at any level — a single method, an entire suite, or all tests in 
 Multi-select is fully supported.
 Test results persist across sessions, so you see pass/fail state immediately after reopening the editor.
 The tree itself is restored from disk on startup, so suites are browsable straight away instead of waiting for the Go toolchain to finish discovery.
+A run the CLI failed is never green: when it exits non-zero and no test or package carries a failing verdict, the packages (for a fuzz or bench run, the selected targets) are marked errored with what the CLI said and its exit code.
+A test that started and got no verdict because its process died — a test timeout, a panic on a goroutine — is marked errored with what it printed, and its package's message names it. The Spec View shows such a test as NOT RUN until the CLI reports it otherwise.
+When a Go file of a package changes, the verdicts shown for that package are marked outdated (VS Code dims them) until it runs again. Packages that import the changed one are not marked: the extension does not know the import graph.
 
 ### CodeLens
 
@@ -91,6 +97,7 @@ Copy a tabular coverage summary to the clipboard via the **Go Test: Copy Coverag
 Start continuous testing with **Go Test: Start Watch**.
 The extension spawns a `gotest watch` process that re-runs tests on file changes.
 Results stream into Test Explorer in real-time; each cycle's run ends, and the Spec View refreshes, when the CLI reports the cycle over.
+A watch cycle the CLI failed for a reason no test carries (a shared fixture that did not tear down) marks the packages the cycle reported as errored and says why in the run's output; a watch process that dies during a cycle ends that cycle the same way.
 A status bar item shows active watcher count and lets you stop all watchers with a click.
 
 ### Spec View
@@ -99,6 +106,8 @@ After each test run, the **Spec View** panel renders BDD-formatted output with c
 Open it with **Go Test: Show Spec View**.
 
 - **The newest verdict of everything that ran** — every package the panel has seen stays, each test with the verdict of the newest run that reported it, whichever of a run, a coverage run or a watch cycle that was; rerunning one method leaves its siblings as they were
+- **When each package last ran** — each package shows when it last ran (last run 14:32, with the date when it was not today): the time the newest run that reported the package finished. A rerun of one method moves the package's time; the other rows keep the verdicts of their own, older runs. An imported events file shows no time
+- **Rows that are gone** — a suite or method that was deleted or renamed leaves the panel at the next discovery of its package; before, its last verdict stayed until the whole package ran again. Rows below a method (behaviors, table rows) follow their method's next run
 - **The specification under the runs** — the CLI lays a folder's runs over what the folder's source declares (`gotest spec --declared`), so a behavior no run reported is listed as *not run*, and every package and module row carries the CLI's counts
 - **A branch's own verdict** — a suite whose hooks failed is red, and what it printed (a failed `AfterAll`, a panic booked on the suite) is shown on it
 - **Go-to-source** — click any suite, method, fuzz target, When or It the source declares to navigate to the line the CLI names; `file:line` in failure output opens that line
@@ -106,6 +115,7 @@ Open it with **Go Test: Show Spec View**.
 - **Toolbar** — expand/collapse all, show or hide passed, failed, skipped and not run rows (the CLI's `--hide`; the counts stay the run's), search behaviors by name
 - **Copy / Clear** — copy what the panel shows as the CLI's Markdown, or clear results
 - **Persistence** — the panel survives editor reload and restores what it kept
+- **A render that failed** — when a render fails the panel keeps the last picture and says so at its top, with the reason and a Retry button; the next successful render removes the notice
 - **Live updates** — refreshes from test runs, coverage runs and watch mode, rendered when the panel is visible; with `gotest.specView.autoRefresh` off, runs are kept and shown on **Refresh**
 - **Saved runs** — **Go Test: Open Events File…** opens a `--events-file` stream (or any `go test -json` capture) as a source of its own beside the workspace's runs, and replays it into the Test Explorer as a run named `Imported: <file>`; packages the workspace does not hold are listed once
 
@@ -156,12 +166,19 @@ by the CLI, never re-derived in the extension:
 
 Benchmarks are deliberate acts: there is no bench-on-save and watch mode
 never benchmarks.
+Cancelling a bench run stops the CLI through its stdin, as a test run is
+stopped; a cancelled run records no numbers.
+A benchmark that fails is failed on its item with what it printed. A bench
+run that exits non-zero for another reason — a suite's teardown, a gate with
+nothing to compare — marks the selected benchmarks errored with the CLI's
+words; a breached gate is shown by its diagnostics and leaves the benchmarks
+passed.
 
 ### Fuzzing
 
 Fuzz methods on suites get their own surfaces, built on the `gotest fuzz` CLI and its exit contract:
 
-- **Fuzz run profile** in the Test Explorer's run dropdown, beside Bench — offered where fuzz targets are selected, it searches every selected target for the `gotest.fuzz.for` budget (the CLI's minute by default): one session per package when all of its targets are selected, one per target otherwise. A target passes with the session line, fails with its new crasher files named, and a cancelled search is skipped, not failed.
+- **Fuzz run profile** in the Test Explorer's run dropdown, beside Bench — offered where fuzz targets are selected, it searches every selected target for the `gotest.fuzz.for` budget (the CLI's minute by default): one session per package when all of its targets are selected, one per target otherwise. A target passes with the session line, fails with its new crasher files named, and a cancelled search is skipped, not failed; a session that ends non-zero without a crasher or a failing seed (the CLI could not be built, was killed, refused its arguments) marks its targets errored with the CLI's words. Targets a cancel never reached are skipped.
 - **▶ Run** CodeLens on every `Fuzz*` method replays its seeds as an ordinary test run, like a test method's Run.
 - **▶ Fuzz** CodeLens on every `Fuzz*` method — pick a budget (30s, 5m, 30m, until stopped, or any Go duration) and the target fuzzes in a cancellable background session with live `execs/sec` progress. Nothing found ends quietly; time exhaustion is not a failure.
 - **Crasher notifications** — when the session finds a new crasher, choose **Show Decoded Input** (triage prints the typed Go literal, not corpus bytes), **Promote to Seed** (splices a typed `f.Add(...)` into the fuzz method and reveals the edit), or **Debug Crasher** (replays exactly that corpus entry under the debugger, suite lifecycle included).
@@ -181,6 +198,7 @@ Generate test suite skeletons from existing code:
 - **Command palette** — "Go Test: Scaffold Suite" for manual target entry
 
 The generated file opens automatically and discovery refreshes.
+The "Generate test suite for …" code actions are offered only in a folder that uses gotest; the palette command works everywhere.
 
 ### Copilot Chat skill
 
@@ -197,11 +215,10 @@ Projects using `go.work` are also supported.
 
 ## Commands
 
+The palette offers these. Commands that act on one test, benchmark or fuzz target (Run, Debug, Run File, Fuzz Target, …) need that target and are reached through CodeLens, the Test Explorer and code actions.
+
 | Command | Description |
 |---------|-------------|
-| Go Test: Run | Run a specific test by ID |
-| Go Test: Run File | Run all suites in the current file |
-| Go Test: Debug | Debug a specific test by ID |
 | Go Test: Refresh | Re-run test discovery for all workspace folders |
 | Go Test: Show Focused Tests | List all focused tests and navigate to them |
 | Go Test: Show Spec View | Open the BDD spec output panel |
@@ -210,17 +227,10 @@ Projects using `go.work` are also supported.
 | Go Test: Lint Workspace | Run `gotest lint` on every workspace folder |
 | Go Test: Start Watch | Start continuous testing for a package scope |
 | Go Test: Stop Watch | Stop all active watch processes |
-| Go Test: Run Benchmark | Run a suite's or method's benchmarks via `gotest bench` |
-| Go Test: Bench (stable, 5×) | Run a benchmark with `-count=5` for mean ± spread |
 | Go Test: Save Bench Baseline | Save the workspace's benchmark results as a baseline |
 | Go Test: Compare vs Baseline | Compare current numbers against a saved baseline |
 | Go Test: Profile Benchmark (CPU/Mem) | Profile one benchmark and open `go tool pprof` |
-| Go Test: Fuzz Target | Start a budgeted fuzz session for one target |
-| Go Test: Debug Fuzz Seeds | Replay a fuzz target's seeds under the debugger |
-| Go Test: Triage Fuzz Crashers | Show decoded inputs for a package's crashers |
-| Go Test: Promote Fuzz Crashers | Turn crashers into typed `f.Add` seeds |
 | Go Test: Scaffold Suite | Generate a test suite from a target |
-| Go Test: Scaffold Target | Generate a test suite for a specific target |
 | Go Test: Update Snapshots | Re-run tests with `--update-snapshots` to rewrite `MatchSnapshot` baselines (also a run profile and a CodeLens on snapshot tests) |
 | Go Test: Copy Coverage Summary | Copy coverage table to clipboard |
 | Go Test: Copy Test Results | Copy test results to clipboard (also available as context menu on test items) |
@@ -293,7 +303,7 @@ The extension runs whatever `go.mod` selects, in this order:
 4. **`go.mod` + replace directive** — If `go.mod` has a `replace` directive for the gotest module, uses `go run modulePath` (no version, respects replace resolution).
 5. **`go.mod` pinned version** — If `go.mod` requires gotest at v1.38.0 or newer, uses `go run modulePath@version`, and offers once to declare the tool at that version (`gotest.suggestToolDirective`; never in a vendored module).
 6. **Pinned below v1.38.0** — Refused with an **Upgrade** action; a newer CLI generates code the pinned runtime cannot compile. **Upgrade** moves each pinning module to the newest release whose `go` line does not exceed the module's, so the module's Go version stays put. A `go 1.N` line takes a release that needs `go 1.N.0`: the same language version, which `go get` only spells out. When even v1.38.0 needs a newer Go, it changes nothing and names the `go` line required; raising it is your call. The release lookup runs in a private temporary module, so your `go.mod`, a `go.work` and `-mod`/`-modfile` in `GOFLAGS` do not affect it, while proxy settings do; it shows progress and can be cancelled, and releases the proxy cannot serve are skipped. A floor hit while an upgrade runs does not start a second one.
-7. **`go run @latest`** — Only when no module requires gotest yet, so `scaffold` can run before a pin exists.
+7. **No pin** — When no module requires gotest the extension runs no CLI: there is no version to run, and it never substitutes `@latest`. **Scaffold Suite** then offers to add gotest first (`go get -tool <module>@latest` in the module of the target) and scaffolds once go.mod pins it. A `gotest.modulePath` that carries its own `@version` is run as written.
 
 In a `go.work` root every `use` module is read: a tool declared by any of them counts, and the pin is the highest across modules, which is what the workspace builds.
 

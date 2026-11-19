@@ -119,19 +119,11 @@ export async function openEventsFile(
   applier.apply(events);
   resolveAncestorItems(run, controller);
 
-  // What the CLI booked for the run itself, marked RunLevel, has no item; it
-  // is said in the run's output. A real package the workspace lacks is
-  // listed, not dropped.
-  const runLevel = new Set<string>();
-  for (const ev of events) {
-    if (ev.RunLevel !== true) continue;
-    runLevel.add(ev.Package);
-    if (ev.Action === "output" && ev.Output) {
-      run.appendOutput(`[${ev.Package}] ${ev.Output.replace(/\n$/, "")}\r\n`);
-    }
-  }
+  // What the CLI booked for the run itself, marked RunLevel, the applier said
+  // in the run's output. A real package the workspace lacks is listed, not
+  // dropped.
   const missing = Array.from(applier.unknownPackages)
-    .filter((p) => p && !runLevel.has(p))
+    .filter((p) => p)
     .sort();
   if (missing.length > 0) {
     run.appendOutput(

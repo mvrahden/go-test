@@ -69,9 +69,15 @@ vi.mock("./cli.js", async (importOriginal) => ({
   stripGoRunExitEcho: (stderr: string) => stderr.trim(),
 }));
 
+vi.mock("./gomod.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./gomod.js")>()),
+  folderUsesGotest: vi.fn(async () => true),
+}));
+
 import { DiscoveryCache, DiscoveryService } from "./discovery.js";
+import { folderUsesGotest } from "./gomod.js";
 import { CliBelowFloorError, MIN_CLI_VERSION } from "./cli.js";
-import { BELOW_FLOOR, PSEUDO_AT_FLOOR } from "./floor.test-support.js";
+import { BELOW_FLOOR, PSEUDO_ABOVE_FLOOR } from "./floor.test-support.js";
 
 function makeOutputChannel() {
   return {
@@ -154,6 +160,34 @@ describe("DiscoveryService", () => {
       outputChannel as unknown as import("vscode").LogOutputChannel,
       snapshot as never,
     );
+  });
+
+  describe("in a folder that does not use gotest", () => {
+    it("starts no CLI, says why, and shows no toast", async () => {
+      // What a CLI would answer, were one started.
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/workspace/pkg" }]);
+      vi.mocked(folderUsesGotest).mockResolvedValueOnce(false);
+      await service.discover("/workspace", ["./..."]);
+      expect(script.calls).toHaveLength(0);
+      expect(outputChannel.info).toHaveBeenCalledWith(
+        "[discovery] skipping /workspace: no go.mod here requires or declares gotest",
+      );
+      expect(mockShowWarningMessage).not.toHaveBeenCalled();
+    });
+
+    it("empties a tree it had for the folder", async () => {
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/workspace/pkg" }]);
+      await service.discover("/workspace", ["./..."]);
+      expect(cache.packagesForWorkspace("/workspace")).toHaveLength(1);
+      succeedsOnce([{ importPath: "example.com/pkg", dir: "/workspace/pkg" }]);
+      vi.mocked(folderUsesGotest).mockResolvedValueOnce(false);
+      await service.discover("/workspace", ["./..."]);
+      expect(cache.packagesForWorkspace("/workspace")).toEqual([]);
+      expect(snapshot.updated.at(-1)).toEqual({
+        workspaceDir: "/workspace",
+        importPaths: [],
+      });
+    });
   });
 
   describe("when discovery succeeds immediately", () => {
@@ -294,14 +328,14 @@ describe("DiscoveryService", () => {
       );
     });
 
-    it("accepts a dev build and a pseudo-version at the floor", async () => {
+    it("accepts a dev build and a commit after the floor", async () => {
       script.once.push({
         stdout: [discoverJson(pkgs, "dev (source checkout)")],
       });
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);
       script.once.push({
-        stdout: [discoverJson(pkgs, PSEUDO_AT_FLOOR)],
+        stdout: [discoverJson(pkgs, PSEUDO_ABOVE_FLOOR)],
       });
       await service.discover("/ws", ["./..."]);
       expect(cache.packages).toHaveLength(1);

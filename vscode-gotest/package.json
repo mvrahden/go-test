@@ -161,7 +161,51 @@
     "menus": {
       "commandPalette": [
         {
+          "command": "gotest.applyLintFix",
+          "when": "false"
+        },
+        {
+          "command": "gotest.debugFuzz",
+          "when": "false"
+        },
+        {
+          "command": "gotest.debugTest",
+          "when": "false"
+        },
+        {
+          "command": "gotest.promoteCrashers",
+          "when": "false"
+        },
+        {
+          "command": "gotest.runBench",
+          "when": "false"
+        },
+        {
+          "command": "gotest.runBenchStable",
+          "when": "false"
+        },
+        {
+          "command": "gotest.runFile",
+          "when": "false"
+        },
+        {
+          "command": "gotest.runFuzz",
+          "when": "false"
+        },
+        {
+          "command": "gotest.runTest",
+          "when": "false"
+        },
+        {
+          "command": "gotest.scaffoldTarget",
+          "when": "false"
+        },
+        {
           "command": "gotest.toggleFocus",
+          "when": "false"
+        },
+        {
+          "command": "gotest.triageCrashers",
           "when": "false"
         }
       ],
@@ -194,12 +238,6 @@
           "command": "gotest.copyTestResults",
           "when": "controllerId == gotest",
           "group": "inline"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "gotest.applyLintFix",
-          "when": "false"
         }
       ]
     },

@@ -61,6 +61,8 @@ import {
   restoreStoredResults,
   TestItemRouter,
   OnceLog,
+  markFailedRun,
+  type RunEnd,
 } from "./runnerUtils.js";
 import { buildPathTrie, collapsePathTrie, type PathNode } from "./pathTrie.js";
 
@@ -1334,7 +1336,11 @@ describe("applyEvent", () => {
   });
 
   it("accumulates package-level output and attaches as message on fail", () => {
-    const { controller, run, pkgItem, opts } = makeApplyEventFixture();
+    const { controller, run, pkgItem } = makeApplyEventFixture();
+    // No test is open: the package fails on its own.
+    const opts = {
+      router: new TestItemRouter(controller as any, "example.com/pkg"),
+    };
     const outputMap = new Map<string, string>();
 
     const outputLines = [
@@ -1385,7 +1391,11 @@ describe("applyEvent", () => {
   });
 
   it("shows fallback message on package fail with no output", () => {
-    const { controller, run, pkgItem, opts } = makeApplyEventFixture();
+    const { controller, run, pkgItem } = makeApplyEventFixture();
+    // No test is open: the package fails on its own.
+    const opts = {
+      router: new TestItemRouter(controller as any, "example.com/pkg"),
+    };
     const outputMap = new Map<string, string>();
 
     applyEvent(
@@ -1478,7 +1488,11 @@ describe("applyEvent", () => {
   });
 
   it("leaves a package that failed on its own tests without a build's diagnostics", () => {
-    const { controller, run, opts } = makeApplyEventFixture();
+    const { controller, run } = makeApplyEventFixture();
+    // No test is open: the package fails on its own.
+    const opts = {
+      router: new TestItemRouter(controller as any, "example.com/pkg"),
+    };
     const builds = new BuildOutputs();
     builds.absorb({
       Action: "build-output",
@@ -1649,6 +1663,28 @@ describe("resolveAncestorItems", () => {
     expect(run.failed).toHaveBeenCalledTimes(2);
     expect(run.failed).toHaveBeenCalledWith(pkg, []);
     expect(run.failed).toHaveBeenCalledWith(dir, []);
+  });
+
+  it("leaves a package the run failed as it is, and fails its folder", () => {
+    const { dir, pkg, run, controller } = makeAncestorFixture();
+    controller.getResult.mockImplementation((id: string) => {
+      if (id === "example.com/internal/auth")
+        return { status: "fail" as const };
+      if (id === "example.com/internal/auth/AuthSuite")
+        return { status: "pass" as const };
+      return undefined;
+    });
+
+    resolveAncestorItems(run as any, controller as any);
+
+    expect(run.passed).not.toHaveBeenCalledWith(pkg);
+    expect(run.failed).not.toHaveBeenCalledWith(pkg, []);
+    expect(run.failed).toHaveBeenCalledWith(dir, []);
+    expect(controller.recordResult).toHaveBeenCalledWith(
+      "dir:internal",
+      "fail",
+      undefined,
+    );
   });
 
   it("leaves a package the run errored errored, and its folder failed", () => {
@@ -2746,5 +2782,183 @@ describe("TestItemRouter", () => {
     expect(
       router.route(ev("run", "FuzzySuite", { Subtest: "FuzzySuite" })),
     ).toBe(suite);
+  });
+});
+
+describe("markFailedRun", () => {
+  const pkg = createItem("example.com/a", "a", undefined, [{ id: "package" }]);
+  const run = () => ({ errored: vi.fn() });
+  const end = (over: Partial<RunEnd> = {}): RunEnd => ({
+    exitCode: 1,
+    cancelled: false,
+    failed: false,
+    reason: "FAIL: shared fixture teardown failed\n",
+    ...over,
+  });
+
+  it("errors each item once, with the reason and the exit code, and records it", () => {
+    const r = run();
+    const store = { recordResult: vi.fn() };
+    expect(
+      markFailedRun(r as any, [pkg, pkg] as any, end(), store as any),
+    ).toBe(true);
+    expect(r.errored).toHaveBeenCalledTimes(1);
+    expect(r.errored.mock.calls[0][0]).toBe(pkg);
+    expect(r.errored.mock.calls[0][1].message).toBe(
+      "FAIL: shared fixture teardown failed\n\nexit code 1",
+    );
+    expect(store.recordResult).toHaveBeenCalledWith("example.com/a", "errored");
+  });
+  it("says only the exit code when the CLI gave no reason", () => {
+    const r = run();
+    markFailedRun(r as any, [pkg] as any, end({ reason: "", exitCode: 137 }));
+    expect(r.errored.mock.calls[0][1].message).toBe("exit code 137");
+  });
+  it.each([
+    ["the run succeeded", { exitCode: 0 }],
+    ["the run was cancelled", { cancelled: true, exitCode: 130 }],
+    ["a failing verdict is already shown", { failed: true }],
+  ])("marks nothing when %s", (_name, over) => {
+    const r = run();
+    expect(markFailedRun(r as any, [pkg] as any, end(over))).toBe(false);
+    expect(r.errored).not.toHaveBeenCalled();
+  });
+});
+
+describe("a test cut short under a failed package", () => {
+  function fixture() {
+    const pkg = createItem("example.com/pkg", "example.com/pkg", undefined, [
+      { id: "package" },
+    ]);
+    const suite = createItem("example.com/pkg/SlowMix", "SlowMix", pkg);
+    const fast = createItem(
+      "example.com/pkg/SlowMix/TestAFast",
+      "TestAFast",
+      suite,
+    );
+    const slow = createItem(
+      "example.com/pkg/SlowMix/TestBSlow",
+      "TestBSlow",
+      suite,
+    );
+    const items = new Map([pkg, suite, fast, slow].map((i) => [i.id, i]));
+    const results = new Map<string, { status: string }>();
+    const controller = {
+      findItem: vi.fn((id: string) => items.get(id)),
+      recordResult: vi.fn((id: string, status: string) =>
+        results.set(id, { status }),
+      ),
+      getResult: vi.fn((id: string) => results.get(id)),
+      noteStart: vi.fn(),
+      notePaused: vi.fn(),
+      createDynamicSubtest: vi.fn(),
+    };
+    const run = {
+      passed: vi.fn(),
+      failed: vi.fn(),
+      skipped: vi.fn(),
+      started: vi.fn(),
+      errored: vi.fn(),
+      appendOutput: vi.fn(),
+    };
+    return { controller, run };
+  }
+
+  const E = (e: object) => ({
+    Package: "example.com/pkg",
+    Time: "2026-11-11T10:00:00Z",
+    ...e,
+  });
+  const cutShort = [
+    E({
+      Action: "run",
+      Test: "TestSlowMix",
+      Gotest: { Subtest: "TestSlowMix" },
+    }),
+    E({
+      Action: "run",
+      Test: "TestSlowMix/TestAFast",
+      Gotest: { Subtest: "TestAFast" },
+    }),
+    E({ Action: "pass", Test: "TestSlowMix/TestAFast", Elapsed: 0 }),
+    E({
+      Action: "run",
+      Test: "TestSlowMix/TestBSlow",
+      Gotest: { Subtest: "TestBSlow" },
+    }),
+    E({
+      Action: "output",
+      Test: "TestSlowMix/TestBSlow",
+      Output: "panic: test timed out after 4s\n",
+    }),
+    E({ Action: "output", Output: "FAIL\texample.com/pkg\t4.012s\n" }),
+    E({ Action: "fail", Elapsed: 4.012 }),
+  ];
+
+  it("errors a test the package failed under, with its output", () => {
+    const { controller, run } = fixture();
+    applyResults(
+      controller as any,
+      run as any,
+      cutShort as any,
+      "example.com/pkg",
+      "/ws/pkg",
+    );
+    const [item, message] = run.errored.mock.calls[0];
+    expect(item.id).toBe("example.com/pkg/SlowMix/TestBSlow");
+    expect(message.message).toBe(
+      "No verdict: the package failed while this test was running.\n\npanic: test timed out after 4s",
+    );
+    expect(
+      controller.getResult("example.com/pkg/SlowMix/TestBSlow")?.status,
+    ).toBe("errored");
+    expect(controller.getResult("example.com/pkg/SlowMix")?.status).toBe(
+      "fail",
+    );
+    expect(run.passed).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "example.com/pkg/SlowMix/TestAFast" }),
+      0,
+    );
+    const pkgMessage = run.failed.mock.calls.find(
+      ([i]: any) => i.id === "example.com/pkg",
+    )![1][0];
+    expect(pkgMessage.message).toBe(
+      "Package failed: no verdict for TestSlowMix/TestBSlow",
+    );
+  });
+
+  it("leaves a failed package's finished tests alone", () => {
+    const { controller, run } = fixture();
+    const events = [
+      ...cutShort.slice(0, 5),
+      E({ Action: "fail", Test: "TestSlowMix/TestBSlow", Elapsed: 4 }),
+      E({ Action: "fail", Test: "TestSlowMix", Elapsed: 4 }),
+      E({ Action: "fail", Elapsed: 4.012 }),
+    ];
+    applyResults(
+      controller as any,
+      run as any,
+      events as any,
+      "example.com/pkg",
+      "/ws/pkg",
+    );
+    expect(run.errored).not.toHaveBeenCalled();
+  });
+
+  it("errors nothing when the package failed to build", () => {
+    const { controller, run } = fixture();
+    applyResults(
+      controller as any,
+      run as any,
+      [
+        E({
+          Action: "fail",
+          FailedBuild: "example.com/pkg [example.com/pkg.test]",
+        }),
+      ] as any,
+      "example.com/pkg",
+      "/ws/pkg",
+    );
+    expect(run.errored).not.toHaveBeenCalled();
   });
 });

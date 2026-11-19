@@ -8,7 +8,7 @@ import { readModulePath } from "./gomod.js";
 import { JsonStore } from "./jsonStore.js";
 import { SpecStore, type RunPiece } from "./specStore.js";
 import type { DiscoveryCache } from "./discovery.js";
-import { EXTERNAL_ID, methodItemId } from "./types.js";
+import { EXTERNAL_ID, methodItemId, type DiscoverPackage } from "./types.js";
 
 // The kept runs on disk, so a reload does not forget the packages that ran
 // before it.
@@ -41,6 +41,8 @@ export class SpecViewPanel implements vscode.Disposable {
   private modulePaths: string[] = [];
   // Runs merged since the panel last rendered them.
   private stale = false;
+  // Why the last render failed; cleared by the next one that works.
+  private renderError: string | undefined;
   private rendering: Promise<void> = Promise.resolve();
   private actions: SpecViewActions | undefined;
   // The statuses the toolbar hides, as the CLI's --hide names them.
@@ -81,6 +83,11 @@ export class SpecViewPanel implements vscode.Disposable {
         folder,
         new Set(known.map((p) => p.importPath)),
       ).length;
+      // Within a package, rows of a suite or method no longer declared.
+      for (const pkg of known) {
+        const declared = declaredTests(pkg);
+        if (declared) removed += this.runs.pruneTests(pkg.importPath, declared);
+      }
     }
     if (removed === 0) return;
     this.persist();
@@ -92,6 +99,7 @@ export class SpecViewPanel implements vscode.Disposable {
 
   // load restores the runs a previous session kept. A run merged before the
   // file was read wins: the store refuses to load over newer memory.
+  // Loaded after the snapshot restore: only a live discovery prunes kept rows.
   async load(): Promise<void> {
     const stored = await this.persisted.read();
     if (!stored) return;
@@ -314,6 +322,7 @@ export class SpecViewPanel implements vscode.Disposable {
     this.imports.clear();
     this.selected = undefined;
     this.stale = false;
+    this.renderError = undefined;
     this.persist();
     if (this.panel) {
       this.panel.webview.html = this.buildHtml({ type: "empty" });
@@ -400,12 +409,20 @@ export class SpecViewPanel implements vscode.Disposable {
     try {
       const data = await this.renderRuns();
       this.lastSpecData = data;
+      this.renderError = undefined;
       await this.resolveModulePaths();
       if (!this.panel) return;
       this.panel.webview.html = this.buildHtml({ type: "specData", data });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.outputChannel.error(`[specView] ${message}`);
+      // The last picture stays, under a notice; the next reveal retries.
+      this.renderError = message;
+      this.stale = true;
+      if (!this.panel) return;
+      this.panel.webview.html = this.lastSpecData
+        ? this.buildHtml({ type: "specData", data: this.lastSpecData })
+        : this.buildHtml({ type: "empty" });
     }
   }
 
@@ -564,7 +581,11 @@ export class SpecViewPanel implements vscode.Disposable {
         : buildSpecBody(
             msg.data,
             this.modulePaths,
-            { dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir },
+            {
+              dirOf: (pkgPath) => this.cache?.getPackage(pkgPath)?.dir,
+              ranAtOf: (pkgPath) => this.currentRuns().ranAtOf(pkgPath),
+              now: Date.now(),
+            },
             this.sourcesForToolbar(),
             this.hidden,
           );
@@ -581,6 +602,7 @@ ${CSS}
 </style>
 </head>
 <body>
+${renderErrorHtml(this.renderError)}
 ${body}
 <script nonce="${nonce}">
 const SPEC_STATE = ${stateJson};
@@ -810,6 +832,39 @@ function buildEmptyBody(gopherUri: string): string {
 // for the file:line tokens of output a stream without positions holds.
 interface RenderEnv {
   dirOf: (pkgPath: string) => string | undefined;
+  // When a package last ran, and the clock that is read against.
+  ranAtOf?: (pkgPath: string) => number | undefined;
+  now?: number;
+}
+
+// formatRanAt is a run's local time: HH:MM on the day of now, with the date
+// on any other day.
+export function formatRanAt(at: number, now: number): string {
+  const d = new Date(at);
+  const n = new Date(now);
+  const two = (v: number) => String(v).padStart(2, "0");
+  const time = `${two(d.getHours())}:${two(d.getMinutes())}`;
+  const sameDay =
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate();
+  return sameDay
+    ? time
+    : `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${time}`;
+}
+
+// ranAtText is a package's "last run" text, when the time is known.
+function ranAtText(pkgPath: string, env: RenderEnv): string | undefined {
+  const at = env.ranAtOf?.(pkgPath);
+  if (at === undefined) return undefined;
+  return `last run ${formatRanAt(at, env.now ?? Date.now())}`;
+}
+
+function ranAtHtml(pkgPath: string, env: RenderEnv): string {
+  const at = env.ranAtOf?.(pkgPath);
+  if (at === undefined) return "";
+  const text = `last run ${formatRanAt(at, env.now ?? Date.now())}`;
+  return ` <span class="ran-at" title="${escapeAttr(new Date(at).toISOString())}">${escapeHtml(text)}</span>`;
 }
 
 interface SourceOption {
@@ -834,7 +889,9 @@ export function buildSpecBody(
   let tree: string;
   if (groups.length === 1 && groups[0].entries.length === 1) {
     const pkg = groups[0].entries[0].pkg;
+    const ranAt = ranAtText(pkg.path, env);
     tree =
+      (ranAt ? `<div class="ran-at-line">${escapeHtml(ranAt)}</div>` : "") +
       buildPackageFailureHtml(pkg, env) +
       pkg.nodes
         .map((n, i) =>
@@ -994,7 +1051,7 @@ function buildPackageSectionHtml(
     .map((n, i) => buildNodeHtml(n, null, nodeCtx(env, pkg), [i], [pkg.path]))
     .join("");
   return `<details class="pkg-section" open>
-  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}</summary>
+  <summary class="pkg-header">${escapeHtml(displayPath)}${statsHtml(pkg.stats)}${ranAtHtml(pkg.path, env)}</summary>
   ${failure}${nodes}
 </details>`;
 }
@@ -1334,6 +1391,82 @@ function fuzzTagHtml(node: SpecNode): string {
   return ` <span class="tag fuzz">FUZZ · ${n} seed${n === 1 ? "" : "s"}</span>`;
 }
 
+// renderErrorHtml is the notice over a picture the last render could not
+// replace: empty when that render worked.
+export function renderErrorHtml(message: string | undefined): string {
+  if (message === undefined) return "";
+  const reason = escapeHtml(message.split("\n")[0]);
+  return `<div class="render-error" role="alert">This view is out of date: the last render failed. <span class="render-error-reason">${reason}</span> <button class="tool-btn" id="retry-render-btn">Retry</button></div>`;
+}
+
+// declaredTests says whether a kept test path is still declared in pkg: a
+// suite's own line and its methods' rows by the suite and method names, a
+// fuzz target by its wrapper's name. Paths discovery does not list (plain
+// test functions, benchmarks) are kept. A twin's row is matched against
+// its own twin's methods. Undefined for a package that does not load: its
+// suites are unknown.
+export function declaredTests(
+  pkg: DiscoverPackage,
+): ((instance: number, testPath: string) => boolean) | undefined {
+  if (pkg.broken) return undefined;
+  const suites = pkg.suites ?? [];
+  const hasSuite = (name: string) => suites.some((s) => s.name === name);
+  // The suites a row of this instance belongs to: with both twins declared,
+  // go alternates their runs (internal, external, ...), as the router reads
+  // them; a lone suite takes every instance.
+  const suitesOf = (name: string, instance: number) => {
+    const named = suites.filter((s) => s.name === name);
+    const twins =
+      named.some((s) => s.external) && named.some((s) => !s.external);
+    return twins
+      ? named.filter((s) => !!s.external === (instance % 2 === 0))
+      : named;
+  };
+  const hasMethod = (name: string, instance: number, method: string) =>
+    suitesOf(name, instance).some((s) =>
+      [...(s.methods ?? []), ...(s.fuzzers ?? [])].some(
+        (m) => (m.testName ?? m.name) === method,
+      ),
+    );
+  const hasFuzzer = (name: string, fuzzer: string) =>
+    suites.some(
+      (s) =>
+        s.name === name && (s.fuzzers ?? []).some((f) => f.name === fuzzer),
+    );
+  return (instance, testPath) => {
+    const slash = testPath.indexOf("/");
+    const top = slash < 0 ? testPath : testPath.slice(0, slash);
+    if (top.startsWith("Test")) {
+      const name = top.slice(4);
+      if (!hasSuite(name)) return !name.endsWith("TestSuite");
+      if (slash < 0) return true;
+      const rest = testPath.slice(slash + 1);
+      const next = rest.indexOf("/");
+      const method = next < 0 ? rest : rest.slice(0, next);
+      // Under -count a repeat's method carries testing's #NN suffix.
+      return (
+        hasMethod(name, instance, method) ||
+        hasMethod(name, instance, method.replace(/#\d+$/, ""))
+      );
+    }
+    if (top.startsWith("Fuzz")) {
+      const body = top.slice(4);
+      let suiteLike = false;
+      for (
+        let idx = body.indexOf("_Fuzz");
+        idx >= 0;
+        idx = body.indexOf("_Fuzz", idx + 1)
+      ) {
+        const name = body.slice(0, idx);
+        if (hasFuzzer(name, body.slice(idx + 1))) return true;
+        if (name.endsWith("TestSuite")) suiteLike = true;
+      }
+      return !suiteLike;
+    }
+    return true;
+  };
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -1593,6 +1726,9 @@ summary.node:hover > .node-actions,
 
 /* Error output */
 .error-details { margin: 2px 0 4px 20px; }
+.ran-at, .ran-at-line { opacity: 0.7; font-size: 0.9em; }
+.ran-at-line { margin: 0 0 4px 4px; }
+.render-error { margin: 8px 12px; padding: 6px 10px; border: 1px solid var(--vscode-inputValidation-warningBorder); background: var(--vscode-inputValidation-warningBackground); }
 .error-summary {
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
@@ -1701,7 +1837,7 @@ document.addEventListener('click', (e) => {
     vscode.postMessage({ type: 'copySpec', search: box ? box.value.trim() : '' });
     return;
   }
-  if (t.id === 'refresh-btn') {
+  if (t.id === 'refresh-btn' || t.id === 'retry-render-btn') {
     vscode.postMessage({ type: 'refresh' });
     return;
   }

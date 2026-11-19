@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import type {
   DiscoverOutput,
   DiscoverPackage,
@@ -12,8 +12,10 @@ import {
   clearBinaryCache,
   CliBelowFloorError,
   CliUnavailableError,
+  cliPackagePath,
   formatCliCommand,
 } from "./cli.js";
+import { folderUsesGotest } from "./gomod.js";
 import { captureStdout, CaptureTimeoutError } from "./capture.js";
 import { discoveryTimeoutSeconds } from "./config.js";
 import type { DiscoverySnapshotStore } from "./discoverySnapshotStore.js";
@@ -222,16 +224,6 @@ export class DiscoveryService {
     return this.discover(workspaceDir, [pkgPattern]);
   }
 
-  private async isGoWorkspace(dir: string): Promise<boolean> {
-    for (const name of ["go.mod", "go.work"]) {
-      try {
-        await access(path.join(dir, name));
-        return true;
-      } catch {}
-    }
-    return false;
-  }
-
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAYS_MS = [2_000, 4_000];
 
@@ -239,10 +231,18 @@ export class DiscoveryService {
     workspaceDir: string,
     patterns?: string[],
   ): Promise<void> {
-    if (!(await this.isGoWorkspace(workspaceDir))) {
+    // Asked here, not by the caller, so discovery and the folders the
+    // extension treats as active cannot disagree.
+    if (!(await folderUsesGotest(workspaceDir, cliPackagePath(workspaceDir)))) {
       this.outputChannel.info(
-        `[discovery] skipping non-Go workspace: ${workspaceDir}`,
+        `[discovery] skipping ${workspaceDir}: no go.mod here requires or declares gotest`,
       );
+      // A folder that stopped using gotest keeps no tree.
+      if (this.cache.packagesForWorkspace(workspaceDir).length > 0) {
+        this.cache.update([], true, workspaceDir, []);
+        this.snapshots?.update(workspaceDir, [], []);
+        this.snapshots?.save();
+      }
       return;
     }
 

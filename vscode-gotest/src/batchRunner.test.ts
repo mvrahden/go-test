@@ -57,4 +57,13 @@ describe("runPiece", () => {
     });
     expect(piece.partial).toBeUndefined();
   });
+
+  it("says when the run finished", () => {
+    const config = {
+      pkgInfos: [],
+      filter: undefined,
+      workspaceDir: "/ws",
+    };
+    expect(runPiece("stream", config, 1234).at).toBe(1234);
+  });
 });

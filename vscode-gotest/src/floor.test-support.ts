@@ -16,5 +16,14 @@ export const BELOW_FLOOR =
 // The patch release after the floor.
 export const ABOVE_FLOOR = `v${major}.${minor}.${patch + 1}`;
 
-// A commit pin built on the floor: ordered by its base, so accepted.
-export const PSEUDO_AT_FLOOR = `${MIN_CLI_VERSION}-0.20261011200000-3588ff09a1b2`;
+// A commit after the floor, as Go writes it: the next patch's pseudo-version.
+export const PSEUDO_ABOVE_FLOOR = `v${major}.${minor}.${patch + 1}-0.20261011200000-3588ff09a1b2`;
+
+// A commit after the release below the floor, so still before the floor.
+export const PSEUDO_BELOW_FLOOR = `${BELOW_FLOOR.replace(
+  /\.(\d+)$/,
+  (_, p: string) => `.${Number(p) + 1}`,
+)}-0.20261011200000-3588ff09a1b2`;
+
+// A release candidate of the floor: before the floor.
+export const RC_OF_FLOOR = `${MIN_CLI_VERSION}-rc.1`;

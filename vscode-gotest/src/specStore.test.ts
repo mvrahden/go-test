@@ -503,3 +503,94 @@ describe("a suite in both test packages", () => {
     ]);
   });
 });
+
+describe("SpecStore.pruneTests", () => {
+  const cart = "example.com/cart";
+  const whole = () =>
+    stream(
+      ...test(cart, "TestCartTestSuite/TestAdd", "pass"),
+      ...test(cart, "TestCartTestSuite/TestRemoved", "pass"),
+      verdict(cart, "pass"),
+    );
+
+  it("drops the kept tests the predicate refuses and keeps the rest", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole(), folder: "/ws" });
+    const dropped = store.pruneTests(
+      cart,
+      (_i, p) => !p.includes("TestRemoved"),
+    );
+    expect(dropped).toBe(1);
+    const composed = store.compose("/ws");
+    expect(composed).toContain("TestCartTestSuite/TestAdd");
+    expect(composed).not.toContain("TestRemoved");
+  });
+
+  it("hands the predicate each kept test's instance and path", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole(), folder: "/ws" });
+    const seen: string[] = [];
+    store.pruneTests(cart, (i, p) => {
+      seen.push(`${i} ${p}`);
+      return true;
+    });
+    expect(seen.sort()).toEqual([
+      "1 TestCartTestSuite/TestAdd",
+      "1 TestCartTestSuite/TestRemoved",
+    ]);
+  });
+
+  it("reports nothing for a package it does not hold", () => {
+    const store = new SpecStore();
+    expect(store.pruneTests("example.com/absent", () => false)).toBe(0);
+  });
+});
+
+describe("when a package last ran", () => {
+  const cart = "example.com/cart";
+  const whole = stream(
+    ...test(cart, "TestCartTestSuite/TestAdd", "pass"),
+    ...test(cart, "TestCartTestSuite/TestTotal", "pass"),
+    verdict(cart, "pass"),
+  );
+  const oneMethod = stream(
+    ...test(cart, "TestCartTestSuite/TestAdd", "fail"),
+    verdict(cart, "fail"),
+  );
+
+  it("keeps when a package's newest run finished, across a partial rerun and a reload", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws", at: 1000 });
+    expect(store.ranAtOf(cart)).toBe(1000);
+    store.merge({
+      stream: oneMethod,
+      folder: "/ws",
+      at: 2000,
+      partial: new Map([[cart, coverOf(["TestCartTestSuite/TestAdd"])]]),
+    });
+    expect(store.ranAtOf(cart)).toBe(2000);
+    const again = new SpecStore();
+    again.restore(JSON.parse(JSON.stringify(store.serialize())));
+    expect(again.ranAtOf(cart)).toBe(2000);
+  });
+
+  it("keeps no time for a stream that carries none", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws" });
+    expect(store.ranAtOf(cart)).toBeUndefined();
+  });
+
+  it("restores a file written before the time was kept, and refuses a time that is not a number", () => {
+    const store = new SpecStore();
+    store.merge({ stream: whole, folder: "/ws", at: 1000 });
+    const stored = JSON.parse(JSON.stringify(store.serialize()));
+    for (const r of stored) delete r.ranAt;
+    const old = new SpecStore();
+    old.restore(stored);
+    expect(old.size).toBe(store.size);
+    stored[0].ranAt = "yesterday";
+    const bad = new SpecStore();
+    bad.restore(stored);
+    expect(bad.size).toBe(0);
+  });
+});

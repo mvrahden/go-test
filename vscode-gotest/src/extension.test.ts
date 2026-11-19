@@ -27,7 +27,7 @@ vi.mock("vscode", () => {
   };
 });
 
-import { registerCommands } from "./extension.js";
+import { registerCommands, staleOnChange } from "./extension.js";
 
 const srcDir = __dirname;
 const manifest = JSON.parse(
@@ -79,5 +79,64 @@ describe("the command table", () => {
       "utf-8",
     ).match(/\bcommands\.register\w*\(/g);
     expect(calls).toHaveLength(registeredIds().length);
+  });
+});
+
+// Read as text: the parsed object cannot show a duplicate key.
+const manifestText = readFileSync(
+  path.join(srcDir, "..", "package.json"),
+  "utf-8",
+);
+const NEEDS_ARGUMENTS = [
+  "gotest.applyLintFix",
+  "gotest.debugFuzz",
+  "gotest.debugTest",
+  "gotest.promoteCrashers",
+  "gotest.runBench",
+  "gotest.runBenchStable",
+  "gotest.runFile",
+  "gotest.runFuzz",
+  "gotest.runTest",
+  "gotest.scaffoldTarget",
+  "gotest.toggleFocus",
+  "gotest.triageCrashers",
+];
+
+describe("the command palette", () => {
+  it("is one array in the manifest", () => {
+    expect(manifestText.match(/"commandPalette"\s*:/g)).toHaveLength(1);
+  });
+  it("hides exactly the commands that need arguments", () => {
+    const menus = JSON.parse(manifestText).contributes.menus as {
+      commandPalette: { command: string; when: string }[];
+    };
+    const hidden = menus.commandPalette
+      .filter((e) => e.when === "false")
+      .map((e) => e.command)
+      .sort();
+    expect(hidden).toEqual(NEEDS_ARGUMENTS);
+  });
+});
+
+describe("staleOnChange", () => {
+  const controller = { invalidateResults: vi.fn() };
+  it("invalidates the package of a changed file", () => {
+    staleOnChange(
+      "/ws/cart/cart.go",
+      { resolveFileToPackage: () => "example.com/cart" },
+      controller,
+    );
+    expect(controller.invalidateResults).toHaveBeenCalledWith(
+      "example.com/cart",
+    );
+  });
+  it("ignores a file outside every discovered package", () => {
+    controller.invalidateResults.mockClear();
+    staleOnChange(
+      "/ws/README.go",
+      { resolveFileToPackage: () => undefined },
+      controller,
+    );
+    expect(controller.invalidateResults).not.toHaveBeenCalled();
   });
 });

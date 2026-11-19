@@ -39,6 +39,27 @@ export async function readModuleRoots(dir: string): Promise<ModuleRoot[]> {
   return roots;
 }
 
+// moduleRootFor is the root whose directory is dir or its nearest ancestor;
+// the deepest wins. Undefined when no root contains dir.
+export function moduleRootFor(
+  dir: string,
+  roots: ModuleRoot[],
+): ModuleRoot | undefined {
+  let best: ModuleRoot | undefined;
+  for (const root of roots) {
+    const rel = path.relative(root.dir, dir);
+    if (
+      rel === ".." ||
+      rel.startsWith(".." + path.sep) ||
+      path.isAbsolute(rel)
+    ) {
+      continue;
+    }
+    if (!best || root.dir.length > best.dir.length) best = root;
+  }
+  return best;
+}
+
 // parseUseDirectives lists a go.work's `use` entries as written.
 export function parseUseDirectives(content: string): string[] {
   return parseDirective(content, "use");
@@ -92,6 +113,41 @@ export function requiredModule(
     }
   }
   return undefined;
+}
+
+// moduleUsesGotest reports whether a go.mod uses the module providing
+// packagePath: it is that module, declares the package as a tool, replaces
+// the module, or requires it directly. A require marked // indirect alone
+// does not count.
+export function moduleUsesGotest(goMod: string, packagePath: string): boolean {
+  const own = /^\s*module\s+(\S+)/m.exec(goMod)?.[1];
+  if (own && (packagePath === own || packagePath.startsWith(own + "/"))) {
+    return true;
+  }
+  if (parseToolDirectives(goMod).includes(packagePath)) return true;
+  if (hasReplaceDirective(goMod, packagePath)) return true;
+  const required = requiredModule(goMod, packagePath);
+  if (!required) return false;
+  const escaped = escapeRegExp(required.path);
+  const line = new RegExp(
+    `^[ \\t]*(?:require[ \\t]+)?${escaped}[ \\t]+v\\S+(.*)$`,
+    "gm",
+  );
+  for (const m of goMod.matchAll(line)) {
+    if (!/\/\/\s*indirect\b/.test(m[1])) return true;
+  }
+  return false;
+}
+
+// folderUsesGotest reports whether a workspace folder uses gotest: any of
+// its module roots (the go.work use modules, else its own go.mod) does.
+// Only files are read: not GOWORK, not a go.work above the folder.
+export async function folderUsesGotest(
+  dir: string,
+  packagePath: string,
+): Promise<boolean> {
+  const roots = await readModuleRoots(dir);
+  return roots.some((r) => moduleUsesGotest(r.goMod, packagePath));
 }
 
 // goLine returns a go.mod's go directive. Without one Go assumes 1.16.

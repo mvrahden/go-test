@@ -175,6 +175,11 @@ export const UNSTAMPED_LIVE =
 // a test are looked up by the item its run placed.
 export class TestItemRouter {
   private readonly placed = new Map<string, vscode.TestItem | undefined>();
+  // Tests a run event placed that no verdict has closed, in start order.
+  private readonly open = new Map<
+    string,
+    { test: string; instance: number; item: vscode.TestItem }
+  >();
   // Per parent item and written level: the run that first reached it, the
   // own levels it reported in order, and how many each run has placed.
   private readonly occurrences = new Map<
@@ -198,13 +203,27 @@ export class TestItemRouter {
     const instance = event.Gotest?.Instance ?? 1;
     const key = `${instance}\u0000${test}`;
     if (event.Action !== "run") {
+      if (
+        event.Action === "pass" ||
+        event.Action === "fail" ||
+        event.Action === "skip"
+      ) {
+        this.open.delete(key);
+      }
       if (this.placed.has(key)) return this.placed.get(key);
       // A top-level name holds no slash; its item needs no run to find.
       return test.includes("/") ? undefined : this.topLevel(test, instance);
     }
     const item = this.place(test, event.Gotest, instance);
     this.placed.set(key, item);
+    if (item) this.open.set(key, { test, instance, item });
     return item;
+  }
+
+  // unfinished is the tests that started and have no verdict yet, in the
+  // order they started.
+  unfinished(): { test: string; instance: number; item: vscode.TestItem }[] {
+    return [...this.open.values()];
   }
 
   private place(
@@ -307,6 +326,45 @@ export function erroredItem(
   controller.recordResult(item.id, "errored");
 }
 
+// How one CLI invocation ended.
+export interface RunEnd {
+  exitCode: number;
+  cancelled: boolean;
+  // A failing verdict of this invocation is on an item.
+  failed: boolean;
+  // What the CLI said the run failed for: its stderr or run-level output,
+  // without go run's "exit status N" echo.
+  reason: string;
+  // How the CLI ended when its exit code does not say it failed: a watch
+  // process that died during a cycle. Said in place of the exit code.
+  ended?: string;
+}
+
+// markFailedRun holds the one rule for a run the CLI failed: a non-zero exit
+// that was not a cancel, with no failing verdict to show for it, marks items
+// errored with the reason and the exit code. It reports whether it marked
+// any. store records the verdict, for surfaces that keep verdicts.
+export function markFailedRun(
+  run: vscode.TestRun,
+  items: readonly vscode.TestItem[],
+  end: RunEnd,
+  store?: Pick<GoTestController, "recordResult">,
+): boolean {
+  if (end.exitCode === 0 && end.ended === undefined) return false;
+  if (end.cancelled || end.failed) return false;
+  const message = [end.reason.trim(), end.ended ?? `exit code ${end.exitCode}`]
+    .filter(Boolean)
+    .join("\n\n");
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    run.errored(item, new vscode.TestMessage(message));
+    store?.recordResult(item.id, "errored");
+  }
+  return seen.size > 0;
+}
+
 export interface AppliedResult {
   itemId: string;
   status: "pass" | "fail" | "skip";
@@ -390,6 +448,12 @@ export function applyEvent(
         event.Elapsed !== undefined ? event.Elapsed * 1000 : undefined;
       controller.recordResult(importPath, event.Action, duration);
 
+      // Tests still running when the package failed were cut short: the
+      // process died under them, so they carry no verdict of their own.
+      const cutShort =
+        event.Action === "fail" && !event.FailedBuild
+          ? markCutShort(run, controller, options.router, outputMap)
+          : [];
       const pkgItem = controller.findItem(importPath);
       if (pkgItem) {
         if (event.Action === "fail") {
@@ -399,7 +463,12 @@ export function applyEvent(
             output = (options.builds?.get(event.FailedBuild) ?? "") + output;
             diagnosticsDir = options.buildDir ?? pkgDir;
           }
-          const message = new vscode.TestMessage(output || "Package failed");
+          const message = new vscode.TestMessage(
+            output ||
+              (cutShort.length > 0
+                ? `Package failed: no verdict for ${cutShort.join(", ")}`
+                : "Package failed"),
+          );
           const loc = extractDiagnosticLocation(output, diagnosticsDir);
           if (loc) {
             message.location = new vscode.Location(
@@ -493,6 +562,41 @@ export function applyEvent(
   return undefined;
 }
 
+// markCutShort errors the innermost tests the router holds open, with what
+// they printed, and fails the suites and methods above them. It returns the
+// innermost test paths, in start order.
+function markCutShort(
+  run: vscode.TestRun,
+  controller: GoTestController,
+  router: TestItemRouter,
+  outputMap: Map<string, string>,
+): string[] {
+  const open = router.unfinished();
+  const innermost: string[] = [];
+  for (const t of open) {
+    const hasOpenChild = open.some(
+      (other) =>
+        other.instance === t.instance && other.test.startsWith(t.test + "/"),
+    );
+    if (hasOpenChild) {
+      run.failed(t.item, []);
+      controller.recordResult(t.item.id, "fail");
+      continue;
+    }
+    const key = t.instance > 1 ? `${t.instance}\u0000${t.test}` : t.test;
+    const output = (outputMap.get(key) ?? "").trimEnd();
+    erroredItem(
+      run,
+      controller,
+      t.item,
+      "No verdict: the package failed while this test was running." +
+        (output ? "\n\n" + output : ""),
+    );
+    innermost.push(t.test);
+  }
+  return innermost;
+}
+
 export function applyResults(
   controller: GoTestController,
   run: vscode.TestRun,
@@ -529,6 +633,12 @@ export class StreamApplier {
   private readonly routers = new Map<string, TestItemRouter>();
   // Packages the events named that have no directory here.
   readonly unknownPackages = new Set<string>();
+  // Packages whose own verdict the events carried.
+  readonly reported = new Set<string>();
+  // A fail event of a known package was applied.
+  failed = false;
+  // What the CLI said about the run itself (RunLevel output), line by line.
+  readonly runLevel: string[] = [];
 
   constructor(
     private readonly controller: GoTestController,
@@ -546,6 +656,16 @@ export class StreamApplier {
     for (const event of events) {
       if (this.builds.absorb(event)) continue;
       if (typeof event.Package !== "string") continue;
+      // The CLI books the run's own failure (shared fixtures, an interrupt,
+      // the global deadline) under a package of its own. No item holds it.
+      if (event.RunLevel === true) {
+        if (event.Action === "output" && event.Output) {
+          const line = event.Output.replace(/\n$/, "");
+          this.runLevel.push(line);
+          this.run.appendOutput(`[${event.Package}] ${line}\r\n`);
+        }
+        continue;
+      }
       const dir = this.packageDir(event.Package);
       if (!dir) {
         this.unknownPackages.add(event.Package);
@@ -575,6 +695,15 @@ export class StreamApplier {
         dir,
         { builds: this.builds, buildDir: this.buildDir, router },
       );
+      if (event.Action === "fail") this.failed = true;
+      if (
+        !event.Test &&
+        (event.Action === "pass" ||
+          event.Action === "fail" ||
+          event.Action === "skip")
+      ) {
+        this.reported.add(event.Package);
+      }
       if (result) applied.push(result);
     }
     return applied;
@@ -1121,9 +1250,12 @@ function resolveItemRecursive(
     if (r.anyFailed) anyFailed = true;
   });
 
-  // A package the run errored keeps that verdict: its passing children do
-  // not make the run that failed it green.
-  if (isPackage && directResult?.status === "errored") {
+  // A package the run failed or errored keeps that verdict: its passing
+  // children do not make it green.
+  if (
+    isPackage &&
+    (directResult?.status === "errored" || directResult?.status === "fail")
+  ) {
     return { anyFailed: true, anyResolved: true };
   }
 
