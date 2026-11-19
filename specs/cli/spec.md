@@ -120,12 +120,17 @@ With --ci, a run SHALL fail with exit 1 before anything runs when a suite or any
 - **THEN** fails with exit 1, naming the fuzz target where it is declared
 
 ### Requirement: A focused run outside CI mode
-Outside CI mode, a run that holds a focused suite or method SHALL say on stderr, before anything runs, that F_ narrows it, how many items carry the prefix and where the first is declared, and SHALL exit by what ran.
+Outside CI mode, a run, gotest spec or gotest summary that holds a focused suite or method SHALL say on stderr, before anything runs, that F_ narrows it, how many items carry the prefix and where the first is declared, and SHALL exit by what ran.
 
 #### Scenario: A focused method outside CI mode
 - **WHEN** a run outside CI mode holds a focused method
 - **THEN** notes on stderr that F_ narrows the run, naming the method where it is declared, in the plain and -json modes
 - **AND** exits 0 when what ran passed
+
+#### Scenario: A focused method under spec and summary
+- **WHEN** spec or summary runs, outside CI mode, a package holding a focused method
+- **THEN** spec notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
+- **AND** summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
 
 ### Requirement: Value flags and unknown flags
 Every command SHALL refuse with exit 2 a value flag given no value, a flag it does not know and a flag another command owns. The cases are the table in `tests/conformance/cli/flags_suite_test.go`.
@@ -511,7 +516,7 @@ A run given --events-file SHALL write to that file byte for byte the go test -js
 - **THEN** keeps the events of the suites that ended before the kill, each line whole
 
 ### Requirement: A suite cut short by --timeout
-A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method the stop ended while it ran SHALL be booked failed in the stream with the line that names the deadline.
+A suite process an expired --timeout stopped SHALL fail its package on the text, -json and spec pipelines, whatever its tests reported: a method that returned when its context ended did not finish. The FAIL line of the run SHALL name the suite when no method was still running. An interrupt SHALL keep the tests' own verdicts, as the lifecycle spec states. A method running when the stop came SHALL be booked failed in the stream with the line that names the deadline.
 
 #### Scenario: A method that returns when its context ends
 - **WHEN** --timeout expires while a method waits for its context to end, and the method then returns

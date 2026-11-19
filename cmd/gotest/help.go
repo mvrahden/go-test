@@ -228,6 +228,7 @@ func printSpecHelp() {
 Usage:
   gotest spec [flags] [--] [go-test-flags] [packages...]
   gotest spec --input=<file> [--format=<fmt>] [--output=<file>]
+  gotest spec --declared [flags] [packages...]
   gotest spec --input=<file> --declared [flags] [packages...]
 
 Runs test suites and renders a BDD-style specification tree showing
@@ -263,12 +264,13 @@ Flags:
                           the suites; nodes carry no verdict. In JSON each
                           package carries its dir and each node its file and
                           line
-  --declared              With --input, lay the stream's verdicts over the
-                          specification the packages' source declares (./...
-                          when none are named): a declared node the stream did
-                          not report has no verdict and counts as not run, and
-                          what only the stream holds is kept. The exit code is
-                          that of --input
+  --declared              Lay the run's verdicts, or with --input a saved
+                          stream's, over the specification the packages'
+                          source declares (./... when none are named): a
+                          declared node that was not reported has no verdict
+                          and counts as not run, and what only the run holds
+                          is kept. The exit code is the run's, or that of
+                          --input
   --hide=<statuses>       Leave out the rows whose own status is one of pass,
                           fail, skip or none (comma-separated) and beneath which
                           no row is shown; counts and the exit code stay the
@@ -309,6 +311,8 @@ Examples:
   gotest spec --format=md --output=spec.md ./...   Markdown report to file
   gotest spec --no-color --output=spec.txt ./...   Plain text for CI artifacts
   gotest spec --input=- < events.json              Render from piped JSON input
+  gotest spec --declared ./...                     Every declared behavior, those
+                                                   not run included
   gotest spec --input=events.json --declared ./... The source's spec, with the
                                                    run's verdicts laid over it
   gotest spec --input=events.json --hide=pass      Only what did not pass
@@ -695,9 +699,11 @@ without behaviors.
 
 "warnings" names, with its position, what a run would refuse (a package
 that does not load, an unsupported hook signature, a fuzz argument that
-cannot be fuzzed) and what it would pass over in silence: a lifecycle hook
-that is misspelled or carries X_, and a Benchmark or Fuzz method on a type
-that is no test suite.
+cannot be fuzzed, a case on a type that is no suite and that no test file
+calls, a generic suite no alias instantiates) and what it would pass over
+in silence: a lifecycle hook that is misspelled or carries X_, and a
+Benchmark or Fuzz method on a type that is no test suite and that the run
+does not refuse.
 
 Exit codes: 0 when the document was written, including for patterns that
 match no package ("packages": [], a warning on stderr: an editor's
@@ -814,6 +820,10 @@ Flags:
                           fail-guard, t-escape, stdlib-test, testify,
                           fuzz-no-oracle, fuzz-seed, fuzz-hook-io, fuzz-raw-seed)
   -disable-nolint         Ignore //nolint comments
+  -nolint-allow list      Linter names a //nolint comment may name beside
+                          golangci-lint's own, comma-separated (a module
+                          plugin, a linter newer than this gotest; mirrored
+                          by .gotest.yml lint.nolint-allow)
   -tags list              Build tags, a comma-separated list as for go build
                           (GOFLAGS=-tags=… works too)
   -fix                    Apply suggested fixes, overlapping ones included,
@@ -838,6 +848,10 @@ Flags:
                           table to $GITHUB_STEP_SUMMARY. Implied when
                           GITHUB_ACTIONS=true; ignored alongside -json, -diff
                           and flags only the go/analysis driver has.
+                          --github=false keeps the plain report inside
+                          GitHub Actions.
+
+Each finding line ends with its rule: file:line:col: message (rule).
 
 Suppress individual diagnostics with //nolint comments:
   //nolint:stdlib-test             Same line, or a comment block of its own
@@ -898,6 +912,11 @@ Exit codes:
   2  a pattern names nothing, a package does not compile before the
      migration (it is left alone), or the migrated files cannot be
      written (none is: they are written all or none)
+
+After a migration the summary lists what was not kept: soft assertions
+that now stop the test, stdlib tests left (gotest does not run them), go
+test ids that changed, and base tests removed because testify never ran
+them.
 
 The module must require github.com/mvrahden/go-test (go get -tool does).
 
@@ -1050,6 +1069,7 @@ Fields:
   debounce: <duration>      Watch mode re-run delay (e.g., "500ms", default: 200ms)
   lint:
     skip: [<rule>, ...]     Lint rules to disable globally
+    nolint-allow: [<linter>, ...]  Linter names a //nolint may name beside golangci-lint's
   bench:
     baseline: <path>        Default --against baseline path for "gotest bench"
     gate: <float>           Default --gate regression percentage (0 disables)

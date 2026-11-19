@@ -316,10 +316,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 		icon, clr := statusIcon(s, c)
 		return clr + icon + c.reset + " ", 2
 	}
-	// A duration shows from one second up, and only beside a verdict.
 	duration := func() []tailPart {
-		if d := EffectiveDuration(n); d >= time.Second {
-			return []tailPart{{" (" + formatDuration(d) + ")", c.dim}}
+		if showsDuration(n) {
+			return []tailPart{{" (" + formatDuration(EffectiveDuration(n)) + ")", c.dim}}
 		}
 		return nil
 	}
@@ -415,10 +414,10 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 		row.tail = append(row.tail, tailPart{" " + icon, clr})
 	}
 	if n.Kind == KindSuite {
-		// A suite line states its counts; its clock is the rows' to show.
 		if counts := countsPhrase(nodeStats(n)); counts != "" {
 			row.tail = append(row.tail, tailPart{" — " + counts, ""})
 		}
+		row.tail = append(row.tail, duration()...)
 	} else if !unrun {
 		row.tail = append(row.tail, duration()...)
 	}
@@ -463,6 +462,20 @@ func formatNs(ns float64) string {
 		return fmt.Sprintf("%.0f", ns)
 	}
 	return fmt.Sprintf("%.1f", ns)
+}
+
+// showsDuration reports whether a row with a verdict carries its duration: a
+// suite, a method, a test or a fuzz target however short, any other row from
+// one second up.
+func showsDuration(n *Node) bool {
+	if noVerdict(n) {
+		return false
+	}
+	switch n.Kind {
+	case KindSuite, KindMethod, KindTest, KindFuzz:
+		return true
+	}
+	return EffectiveDuration(n) >= time.Second
 }
 
 func formatDuration(d time.Duration) string {

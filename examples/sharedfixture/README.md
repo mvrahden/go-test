@@ -21,24 +21,22 @@ go run ./cmd/gotest spec ./examples/sharedfixture/...
 ```
 === examples/sharedfixture/accounts — 2 passed ===
 
-Accounts — 2 passed
-  Open
+Accounts — 2 passed (2ms)
+  Open (1ms)
     when an account is opened with a deposit
       ✓ holds the deposit
-  TheLedgerIsShared
+  TheLedgerIsShared (<1ms)
     ✓ runs in the fixture process, not in this suite's
 
 === examples/sharedfixture/transfers — 3 passed ===
 
-Transfers — 3 passed
-  Move
+Transfers — 3 passed (3ms)
+  Move (2ms)
     when the source holds enough
       ✓ takes the amount from the source
       ✓ gives it to the target
     when the source holds too little
       ✓ returns ErrInsufficient
-
-Runs from 2026-11-12 14:31 to 14:31 UTC · main @ 26af182b
 
 2 suites, 5 behaviors: 5 passed
 ```

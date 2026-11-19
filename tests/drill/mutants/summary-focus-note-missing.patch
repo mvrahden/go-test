@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0 \(
+Clause: when spec or summary runs, outside CI mode, a package holding a focused method → summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0
+--- a/cmd/gotest/summary.go
++++ b/cmd/gotest/summary.go
+@@ -96,7 +96,7 @@
+ 		return 2
+ 	}
+
+-	if code, err := focusGate(loaded, cfg.CI); err != nil {
++	if code, err := focusGate(nil, cfg.CI); err != nil {
+ 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
+ 		return 2
+ 	} else if code != 0 {

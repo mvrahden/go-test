@@ -133,12 +133,12 @@ func (s *MarkdownSafetyTestSuite) TestRenderMarkdown_HostileLabels(t *gotest.T) 
 			w.It("shows each label as written", func(it *gotest.T) {
 				for _, want := range []string{
 					"#### S&lt;i&gt;\\|",
-					"- **M\\`x**\n",
+					"- **M\\`x**",
 					"  - when a \\| b\\*\n",
 					"links \\[l\\](http://x) &amp;#124; \\_x\\_\n",
 					"keeps &lt;b&gt;bold&lt;/b&gt;\n",
 					"row line \\| \\`c\\`\n",
-					"**leaf\\|&lt;x&gt;**\n",
+					"**leaf\\|&lt;x&gt;**",
 					"| bench\\|&lt;y&gt; |",
 					"item &lt;z&gt; next\n",
 				} {

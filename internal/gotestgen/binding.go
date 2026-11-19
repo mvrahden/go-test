@@ -40,6 +40,10 @@ type BoundFixture struct {
 	// is reported.
 	BeforeEachAt string
 	AfterEachAt  string
+	// BeforeAllAt and AfterAllAt locate a package fixture's BeforeAll and
+	// AfterAll the same way.
+	BeforeAllAt string
+	AfterAllAt  string
 	// EachHooksUsingFixture names the per-method hooks whose body uses the
 	// fixture: "BeforeEach", "AfterEach".
 	EachHooksUsingFixture []string
@@ -482,6 +486,8 @@ func (r *binder) resolveFixture(named *types.Named) (_ *BoundFixture, err error)
 		AfterEach:    declaredMethod(named, "AfterEach") != nil,
 		BeforeEachAt: hookAt(r.targetPkg, declaredMethod(named, "BeforeEach")),
 		AfterEachAt:  hookAt(r.targetPkg, declaredMethod(named, "AfterEach")),
+		BeforeAllAt:  hookAt(r.targetPkg, declaredMethod(named, "BeforeAll")),
+		AfterAllAt:   hookAt(r.targetPkg, declaredMethod(named, "AfterAll")),
 		HasHydrate:   declaredMethod(named, "Hydrate") != nil,
 		HasDehydrate: declaredMethod(named, "Dehydrate") != nil,
 		HasConfig:    detectConfigMethod(named, kind),
@@ -720,6 +726,8 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 	hasDehydrate := declaredMethod(named, "Dehydrate") != nil
 	hasConfig := detectConfigMethod(named, gotestast.SharedFixture)
 	hasAfterAll := declaredMethod(named, "AfterAll") != nil
+	hydrateAt := hookAt(r.targetPkg, declaredMethod(named, "Hydrate"))
+	dehydrateAt := hookAt(r.targetPkg, declaredMethod(named, "Dehydrate"))
 
 	// Validate here (not only in the collector) so cross-package shared fixtures,
 	// which are resolved by method-set lookup alone, get clean errors instead of
@@ -768,6 +776,8 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 			HasAfterAll:   hasAfterAll,
 			HasHydrate:    hasHydrate,
 			HasDehydrate:  hasDehydrate,
+			HydrateAt:     hydrateAt,
+			DehydrateAt:   dehydrateAt,
 		}
 		return nil
 	}
@@ -875,6 +885,8 @@ func (r *binder) registerSharedFixture(named *types.Named) (err error) {
 		HasAfterAll:      hasAfterAll,
 		HasHydrate:       hasHydrate,
 		HasDehydrate:     hasDehydrate,
+		HydrateAt:        hydrateAt,
+		DehydrateAt:      dehydrateAt,
 		TransferFields:   transfer,
 		LocalFields:      local,
 		Dependencies:     deps,

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 )
 
 // RenderMarkdown writes the spec as an outline: a header with the counts and
@@ -194,6 +193,9 @@ func renderMarkdownSuite(doc *mdDoc, n *Node, cfg *renderConfig) {
 			heading += " — " + c
 		}
 	}
+	if !bare && showsDuration(n) {
+		heading += " (" + formatDuration(EffectiveDuration(n)) + ")"
+	}
 	doc.block(heading)
 	if own {
 		doc.block(fenced(diagnostic(n.Output), "")...)
@@ -279,10 +281,8 @@ func markdownItem(list []string, n *Node, depth int, cfg *renderConfig) []string
 			line += " — " + EscapeLabel(reason)
 		}
 	}
-	if word != "" && (leaf || n.Kind == KindFuzz) && !n.NotRun && n.Status != StatusNone {
-		if d := EffectiveDuration(n); d >= time.Second {
-			line += " (" + formatDuration(d) + ")"
-		}
+	if !bare && showsDuration(n) {
+		line += " (" + formatDuration(EffectiveDuration(n)) + ")"
 	}
 	list = append(list, line)
 	list = append(list, fenced(output, indent+"  ")...)

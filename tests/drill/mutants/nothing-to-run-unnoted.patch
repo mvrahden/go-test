@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / passes each, the last noted as no tests to run / a -run that matches nothing \(
+Clause: when a text run covers a guarded suite, a suite whose methods are all excluded, a run narrowed by focus and a -run that matches nothing → passes each, the last noted as no tests to run
+--- a/internal/gotestrunner/output_collector.go
++++ b/internal/gotestrunner/output_collector.go
+@@ -250,7 +250,7 @@
+ // go test passes a package that ran no tests. No binary ran, so no time
+ // passed; the line keeps go test's shape for every parser that reads it.
+ func (c *OutputCollector) RecordNothingToRun(pkg string) {
+-	line := fmt.Sprintf("ok  \t%s\t0.000s %s\n", pkg, noTestsToRun)
++	line := fmt.Sprintf("ok  \t%s\t0.000s\n", pkg)
+ 	if c.bench {
+ 		line = fmt.Sprintf("ok  \t%s\t0.000s\n", pkg)
+ 	}

@@ -1,5 +1,3 @@
-| `migrate-workspace-dir-resolved` | migrate loads a directory by its resolved path, which the go command judges outside a go.work reached through a symlink | conformance: the migrate It for a workspace through a symlinked directory sees the file left unchecked |
-| `scaffold-working-directory-resolved` | `scaffold` loads a type's package from its directory as the go command resolves it, not as the working directory names it | conformance: the CLI scaffold It for a symlinked working directory sees the generated file named by a path through the real directory |
 # Mutation drill
 
 The drill is a test of the tests. gotest runs its own test suites, so a bug
@@ -85,6 +83,7 @@ four shards, retains each shard's logs and phase timings even on failure, and
 then checks with `--check-shards` that the shards split the mutants exactly.
 
 `bash tests/drill/drill.sh <name> ...` selects named mutants; no names selects all.
+`bash tests/drill/drill.sh --check-patches` (`make drill-check`) applies no patch and judges none: it names every patch that no longer applies exactly.
 
 | Variable | Meaning |
 |---|---|
@@ -93,6 +92,7 @@ then checks with `--check-shards` that the shards split the mutants exactly.
 | `DRILL_TIMEOUT` | Independent deadline per mutant in seconds, default 600. |
 | `DRILL_LOGS` | Parent for a unique log directory per invocation; the actual path is printed. |
 | `DRILL_TIMINGS` | Optional JSON file mapping mutant names to previous elapsed seconds. All shards must read the same file. |
+| `DRILL_CHANGED` | A file listing changed paths, one per line, relative to the checkout root. Set, the drill judges only the mutants that change can touch: its own patch, a file it patches, a file in a package that judges it, or the spec file stating a clause it names; a change to the driver, the planner, the testkit or the module's requirements selects all. All shards must read the same list. It cannot be combined with named mutants. |
 
 Historical durations schedule long mutants first and greedily balance projected
 shard wall time, accounting for the serial timing-sensitive tail: a shared
@@ -108,7 +108,7 @@ observations; merge their objects to supply the next run's input.
 CI reads the committed `tests/drill/timings.json` (a path relative to the
 checkout root). `bash tests/drill/timings.sh [run-id ...]` rewrites it from
 those files in the given runs' drill artifacts, by default the last three
-successful `quality.yml` runs on main: each mutant's longest observation,
+successful `nightly.yml` runs on main: each mutant's longest observation,
 rounded to 0.1s, and only mutants that have a patch.
 Every result also records copy, patch, build, judge and render durations. A
 `*.phase.json` file identifies the active phase if a worker times out.
@@ -297,6 +297,8 @@ shards of one run do not add up to every mutant exactly once.
 | `fixture-beforeeach-context-unbounded` | a fixture's `BeforeEach` gets a context the `Timeout` never ends | canary: the waiting fixture gives up instead of seeing its context end |
 | `fixture-hook-elsewhere-joined-onto-the-suite` | a hook declared in another directory is recorded by its base name, so `-fullpath` joins it onto the suite's directory | canary: the fixtureelsewhere `-fullpath` failure names a file that does not exist |
 | `fixture-hook-elsewhere-unlocated` | a hook of a fixture another package declares is left unlocated | canary: the fixtureelsewhere remote failure is unlocated |
+| `fixture-beforeall-unlocated` | the generator leaves a package fixture's `BeforeAll` unlocated | gotestgen: the hook locations test misses where `LocalFixture.BeforeAll` is declared |
+| `fixture-afterall-unlocated` | the generator leaves a package fixture's `AfterAll` unlocated | gotestgen: the hook locations test misses where `LocalFixture.AfterAll` is declared |
 | `fixture-report-in-runtime` | an error a fixture's `BeforeEach` returns is located in the runtime's `methods.go` | canary: the fixturehookfail failure names a runtime file, not the hook's |
 | `focus-ci-guard-tests-only` | `--ci` checks only test methods for the `F_` prefix, so a focused benchmark or fuzz method passes | cli conformance: `--ci` fails a run whose only focused method is a benchmark or a fuzz target |
 | `fuzz-panic-discarded-by-aftereach` | a fuzz execution's AfterEach runs in the panic's unwinding, so its fatal assertion discards the panic | canary: the hookpanics fuzz execution's panic is never reported |
@@ -471,6 +473,9 @@ shards of one run do not add up to every mutant exactly once.
 | `focus-narrows-in-silence` | a run narrowed by `F_` outside CI mode says nothing | CLI conformance: stderr holds no note |
 | `focus-note-fails-the-run` | the focus note outside CI mode ends the run with exit 1 | CLI conformance: the focused run exits 1 |
 | `suite-that-ran-nothing-passes` | a text run never holds a suite to the tests it runs | CLI conformance: the wrapped binary that ran nothing passes |
+| `dropped-case-gated-alias-reported` | lint reports a generic suite whose only alias sits in a test file the build constraints leave out | lint conformance: the gated generic suite is reported |
+| `dropped-case-generator-verdict-silences-all` | wherever the generator's verdict is known, lint reports no case of a type that is no suite | lint conformance: the case reached from nowhere beside the gated ones is not reported |
+| `nothing-to-run-unnoted` | a package whose suites a `-run` deselected passes without `[no tests to run]` | CLI conformance: the `-run` that matches nothing is not noted as no tests to run |
 | `ran-nothing-rule-matches-substrings` | the no-tests rule matches the testing package's warning inside a longer line | runner unit: a child's line that quotes the warning fails the suite |
 | `binary-count-zero-held-to-tests` | the no-tests rule ignores `-test.count=0` after `-args` | CLI conformance: the run exits 2 naming the suite |
 | `merged-coverage-keeps-the-maximum` | a merged count or atomic cover profile keeps each block's largest count | CLI conformance: the block two suites ran reads 1 |
@@ -479,7 +484,8 @@ shards of one run do not add up to every mutant exactly once.
 | `forced-exit-books-nothing` | an exit at a further stop leaves a stream that never books the run as interrupted | runner unit: the stream ends without the `interrupted` package |
 | `deadline-cut-suite-passes` | a suite whose method returned when `--timeout` stopped it keeps its passing verdict | CLI conformance: the package verdict is `pass` |
 | `deadline-names-no-suite` | an expired `--timeout` with no method left running fails the run without naming the suite it stopped | CLI conformance: the FAIL line names nothing |
-| `stop-ended-method-reads-passed` | a method the runtime says the stop ended keeps its passing verdict at an expired `--timeout` | runner unit: the deadline names no method and books nothing for it |
+| `stop-ended-method-reads-passed` | a method the runtime says the stop ended keeps its passing verdict at an expired `--timeout` | runner unit: the deadline books nothing for the method |
+| `stop-ended-method-named-running` | a method the runtime says the stop ended counts as still running at an expired `--timeout`, so the run's FAIL line names it, on stderr only, not its suite | runner unit: the FAIL line names the method and the stream lacks it |
 | `damaged-cached-binary-reused` | a cached binary the go command left alone is reused without comparing it with its record | CLI conformance: the truncated binary's run exits 1 |
 | `unrecorded-cached-binary-trusted` | a cached binary without a record is reused as if it matched one | CLI conformance: the second run links nothing |
 | `clean-cache-removes-nothing` | `gotest clean --cache` exits 0 and leaves the cache as it was | CLI conformance: a cached binary is left |
@@ -546,6 +552,7 @@ shards of one run do not add up to every mutant exactly once.
 | `fuzz-without-shared-fixtures` | `gotest fuzz` and its triage start no shared fixture for the targets that bind one | fuzz conformance: the fuzz workers and the triage re-run are refused for want of the fixture's state |
 | `fuzz-target-runs-without-its-fixture` | a fuzz target whose shared fixture did not come up runs anyway, without its state | fuzz conformance: the target is refused by its own hold instead of never running |
 | `stop-keeps-running-methods` | a stopped run still starts the methods that have not started | canary: the stopping fixture's later methods are not skipped, and they run after the runner is gone |
+| `stop-ended-line-read-too-deep` | the runner reads the stop line only on a subtest's output, so a method `--timeout` ended reads passed | lifecycle conformance: the `clitimeoutctx` method is booked pass in `-json` |
 | `stop-ended-method-unsaid` | a method body running when the stop came returns without saying so | lifecycle: the held method's output under plain go test lacks `run stopping: the stop came while this method ran` |
 | `stop-ended-said-of-every-method` | every method body says the stop came while it ran, the one that returned before the stop too | lifecycle: the method done before the stop says the stop came while it ran |
 | `stop-leaves-the-method-context` | a stop does not end a running method's context | canary: the stopped fixture's holding method never marks its context ended |
@@ -663,7 +670,11 @@ shards of one run do not add up to every mutant exactly once.
 | `report-checkout-on-the-wrong-render` | the spec names the checkout when rendered from a saved stream and not for a live run | spec conformance: a live run in a fresh checkout names no commit, a saved stream rendered there names it |
 | `report-suite-counts-dropped` | the Markdown spec's suite headings lose their counts | spec conformance: `#### UserRepository` carries no counts |
 | `report-external-unmarked` | the Markdown spec heads an external suite like the internal one | spec conformance: no heading carries EXTERNAL |
-| `report-short-durations-shown` | the Markdown spec shows durations under a second | spec conformance: the 300ms method reads `(300ms)` |
+| `report-short-durations-shown` | a When or an It shows a duration under a second | spec conformance: the 128ms When and It read `(128ms)` in the Markdown and terminal spec |
+| `spec-method-durations-under-a-second-hidden` | suite and method rows show their duration only from one second up | spec conformance: the 128ms suite and method carry no duration |
+| `spec-long-behavior-durations-hidden` | a When or an It never shows its duration | spec conformance: the 1.2s When and It carry none |
+| `spec-unrun-method-duration-shown` | a Markdown method row without a verdict carries a duration | spec conformance: the method that never reported reads `(<1ms)` |
+| `spec-terminal-unrun-row-timed` | a terminal row without a verdict carries a duration | spec conformance: the method that never reported reads `NOT RUN (<1ms)` |
 | `shapes-grouped-suite-accepted` | a suite declared inside a type block is not refused | canary: the `shapes/grouped` package exits 0 instead of 2 |
 | `shapes-grouped-fixture-accepted` | a fixture declared inside a type block is not refused | canary: the `shapes/groupedfixture` package exits 0 instead of 2 |
 | `shapes-embedding-accepted` | an embedded field of a suite or fixture is never checked | canary: the embedding `shapes` packages are not refused with exit 2 |
@@ -732,6 +743,8 @@ shards of one run do not add up to every mutant exactly once.
 | `scaffold-suite-name-read-from-non-test-files` | the suite-name check reads only the package's non-test files | conformance: the CLI scaffold It for a suite name a test file declares sees exit 0 and a duplicate written |
 | `scaffold-subject-self-qualified` | the type scaffold names its subject through its own package | conformance: the CLI scaffold It for a type with methods sees go vet fail |
 | `scaffold-ignores-symlinks` | `scaffold` loads a file's package by its directory as a pattern, not from the directory itself | conformance: the CLI scaffold It for a file named through a symlinked directory fails with exit 1 |
+| `scaffold-working-directory-resolved` | `scaffold` loads a type's package from its directory as the go command resolves it, not as the working directory names it | conformance: the CLI scaffold It for a symlinked working directory sees the generated file named by a path through the real directory |
+| `migrate-workspace-dir-resolved` | migrate loads a directory by its resolved path, which the go command judges outside a go.work reached through a symlink | conformance: the migrate It for a workspace through a symlinked directory sees the file left unchecked |
 | `focus-decided-per-package` | the generator decides focus for each package on its own, not for the whole run | canary: the `shapes/focusacross` unfocused suite is not skipped and its fixtures start |
 | `focus-decided-per-variant` | the external test package decides its focus on its own | canary: the `shapes/focusvariants` external suite is not skipped |
 | `focus-ci-guard-dropped` | the `--ci` focus guard lets a focused run through | conformance: the discovery It for `--ci` sees exit 0 instead of 1 |
@@ -878,6 +891,13 @@ shards of one run do not add up to every mutant exactly once.
 | `e2e-connective-doubled` | a label that opens with a connective gets a second when | conformance: the spec It for a connective of its own sees "when with …" |
 | `discover-splits-slash-labels` | discover keeps only the text after a label's last slash | conformance: the spec and discovery Its for discover see the label cut short |
 | `discover-external-flag-inverted` | discover marks the internal test package's suites external and the external one's not | conformance: the spec and discovery Its for discover see the external flag on the wrong suites |
+| `discover-orphans-unreported` | discover reports neither a case no run reaches nor an uninstantiated generic suite | conformance: the discovery Its for discover on `orphantype` and `orphangeneric` see the package not broken |
+| `discover-orphan-warning-duplicated` | discover warns again of a method the refusal of its type covers | conformance: the discovery It for discover on `orphantype` sees two warnings |
+| `discover-unrefused-warning-dropped` | discover drops every warning of a Benchmark or Fuzz method on a type that is no suite | conformance: the discovery It for discover on `orphanwarned` sees no warning |
+| `spec-focus-note-missing` | `gotest spec` outside CI mode never says that F_ narrows the run | conformance: the CLI It for spec on `focused` sees no note on stderr |
+| `summary-focus-note-missing` | `gotest summary` outside CI mode never says that F_ narrows the run | conformance: the CLI It for summary on `focused` sees no note on stderr |
+| `nested-suite-label-read-as-suite` | a nested subtest whose name ends in `TestSuite` becomes a suite node, its label cut at the suffix | conformance: the spec Its on `suitelabel` see the label cut short and three suites counted |
+| `nested-fixture-label-read-as-fixture` | a nested subtest whose name ends in `Fixture` becomes a fixture node, its label cut at the suffix | conformance: the spec It on `suitelabel` sees `is told to bind a DB` |
 | `spec-run-twin-unmarked` | a suite's second run in one process is not marked external | conformance: the spec It for a suite of both test packages sees neither suite marked |
 | `stamp-instance-on-runs-only` | the runner stamps `Gotest.Instance` on run events only, not on the other events of a later instance | cli conformance: the external twin suite's output and verdict events carry no Instance 2 |
 | `stamp-remarshals-the-event` | the runner re-marshals a stamped event instead of splicing the object in, reordering go test's fields | cli conformance: a stamped line minus its `Gotest` object is not the line go test wrote |

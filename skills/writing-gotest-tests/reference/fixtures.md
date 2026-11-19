@@ -31,12 +31,21 @@ same signatures as the All hooks. They wrap the suite's: fixture
 `BeforeEach` up to its own in dependency order returned without an error
 (v1.34+; see `versions.md`), so a `BeforeEach` that returns an error must
 release what it acquired before returning. A suite with `Fuzz*` methods
-refuses fixtures that have them.
+refuses fixtures that have them, and so does a `Parallel: true` suite
+with two or more test methods when the hook uses the fixture (v1.38+): the
+methods share the one fixture. A fixture's `AfterEach` gets a context a
+stop does not end, ended at a `Timeout` the suite declares (v1.38+). A
+failed `BeforeAll` or `AfterAll` is reported at the hook's declaration,
+naming the fixture, the hook and the error (v1.38+).
 
 Shared fixtures (`*SharedFixture`) span packages: gotest sets them up once
 and transfers state by JSON-serializing the fixture's EXPORTED FIELDS into
 a state file each test process reads, so those fields must survive
-`encoding/json`. A shared fixture has no `BeforeEach`/`AfterEach`: the
+`encoding/json`. Only named fields are transferred, so the generator
+refuses (v1.38+) an embedded type whose fields would cross unless
+`Hydrate` assigns it, and an exported field of an interface type with
+methods (a container handle, a logger) unless `Hydrate` assigns it —
+unexport it when only the setup process uses it. A shared fixture has no `BeforeEach`/`AfterEach`: the
 generator refuses one that declares them; put per-test work in a package
 fixture that binds the shared one, or in the suite's hooks. Inside
 a shared fixture, one pointer field per parent shared fixture TYPE: only

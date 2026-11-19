@@ -120,8 +120,8 @@ func (s *SpecReportTestSuite) TestAReportAPersonReads(t *gotest.T) {
 		w.It("every package and suite heading carries its counts", func(it *gotest.T) {
 			for _, heading := range []string{
 				"\n### example.com/report — 3 passed, 1 failed, 1 not run\n",
-				"\n#### UserRepository — 2 passed\n",
-				"\n#### UserRepository — EXTERNAL — 1 passed, 1 failed, 1 not run\n",
+				"\n#### UserRepository — 2 passed (313ms)\n",
+				"\n#### UserRepository — EXTERNAL — 1 passed, 1 failed, 1 not run (330.0s)\n",
 			} {
 				gotest.Contains(it, md, heading)
 			}
@@ -129,11 +129,6 @@ func (s *SpecReportTestSuite) TestAReportAPersonReads(t *gotest.T) {
 		w.It("an external suite's heading is marked EXTERNAL", func(it *gotest.T) {
 			gotest.Equal(it, 1, strings.Count(md, " — EXTERNAL"))
 			gotest.Contains(it, md, "\n#### UserRepository — EXTERNAL — ")
-		})
-		w.It("no duration under a second is shown", func(it *gotest.T) {
-			gotest.Contains(it, md, "\n- PASS **Quick**\n")
-			gotest.Contains(it, md, "\n- PASS **Ping** (1.2s)\n")
-			gotest.NotContains(it, md, "ms)")
 		})
 	})
 
@@ -161,8 +156,8 @@ func (s *SpecReportTestSuite) TestATerminalReportAPersonReads(t *gotest.T) {
 		w.It("every package and suite line carries its counts", func(it *gotest.T) {
 			for _, line := range []string{
 				"=== example.com/report — 3 passed, 1 failed, 1 not run ===\n",
-				"\nUserRepository — 2 passed\n",
-				"\nUserRepository — EXTERNAL — 1 passed, 1 failed, 1 not run\n",
+				"\nUserRepository — 2 passed (313ms)\n",
+				"\nUserRepository — EXTERNAL — 1 passed, 1 failed, 1 not run (330.0s)\n",
 			} {
 				gotest.Contains(it, out, line)
 			}

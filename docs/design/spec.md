@@ -156,7 +156,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--render-only` | With `--input`, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed (requires `--input`) |
 | `--stamp` | With `--input`, write the stream back with each test event placed as `gotest -json` places it, instead of rendering it (`spec`; [Stamping a saved stream](../../specs/cli/spec.md#requirement-stamping-a-saved-stream)) |
 | `--static` | Render the specification from source without running the suites (`spec`); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr |
-| `--declared` | With `--input`, lay the stream's verdicts over the specification the packages' source declares (`spec`; [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)) |
+| `--declared` | Lay the run's verdicts, or with `--input` a saved stream's, over the specification the packages' source declares (`spec`; [The declared specification under a run's verdicts](../../specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)) |
 | `--hide=<statuses>` | Leave out of the `spec` rendering the rows whose status is one of `pass`, `fail`, `skip`, `none`, without changing what is counted ([Hiding rows by status](../../specs/spec/spec.md#requirement-hiding-rows-by-status)) |
 | `--match=<text>` | Keep of the `spec` rendering the behaviors whose label holds the text, and their groups; counts are those of what is kept ([Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows)) |
 | `--only=<import path>[:<i>.<j>…]` | Keep of the `spec` rendering one package, or the node at that position among the shown children, with what is under it; counts are those of what is kept ([Searching and picking rows](../../specs/spec/spec.md#requirement-searching-and-picking-rows)) |
@@ -253,6 +253,8 @@ Requirements:
 - A suite binds each fixture once, through a pointer field ([Fixture fields and case names](../../specs/discovery/spec.md#requirement-fixture-fields-and-case-names)); a fixture from another package is held to the same signature rules ([Declarations from other packages](../../specs/discovery/spec.md#requirement-declarations-from-other-packages))
 - Type names must be exported when the suite has test cases — otherwise a generation error (`go test` would never run its generated `Test` function).
 - A suite declares at least one `Test*`, `Benchmark*` or `Fuzz*` method, an excluded one included; a `*TestSuite` type with none, exported or not, is refused at its declaration, so a helper type takes a name that does not end in `TestSuite` ([Suites without a case](../../specs/discovery/spec.md#requirement-suites-without-a-case))
+- The other way round, a type in a test file that is no suite and carries case-named methods taking `*gotest.T`, `*gotest.B` or `*gotest.F` is refused unless a test file calls them, and so is a generic suite no alias instantiates: nothing would run them ([Cases no run reaches](../../specs/discovery/spec.md#requirement-cases-no-run-reaches))
+- A case method needs a name after its prefix: one named just `Test`, `Benchmark` or `Fuzz` that takes the case's `T`, `B` or `F` is refused ([A case prefix alone](../../specs/discovery/spec.md#requirement-a-case-prefix-alone))
 
 ### Lifecycle Hooks
 
@@ -389,6 +391,7 @@ The generated `func Test*` does **not** call `t.Parallel()` — parallelism is a
 `testing` itself only returns from the parent `t.Run` — and therefore only runs
 `t.Cleanup` — after every parallel child has finished.
 Under method-level parallelism, per-test state lives in the context a returning `BeforeEach` provides, not on the shared suite struct; the generator rejects a `BeforeEach` that returns nothing in a parallel suite, and a suite without per-test state needs none.
+It also rejects what the parallel methods would do to one another: a bound package fixture whose `BeforeEach` or `AfterEach` uses the fixture, when the suite has two or more test methods ([Fixture per-method hooks under a parallel suite](../../specs/discovery/spec.md#requirement-fixture-per-method-hooks-under-a-parallel-suite)), and `Setenv` in a test method, `BeforeEach` or `AfterEach`, which `testing` refuses in a parallel test; set the environment in `BeforeAll` ([Setenv under a parallel suite](../../specs/discovery/spec.md#requirement-setenv-under-a-parallel-suite)).
 
 ```go
 // Default: methods run sequentially within the suite
@@ -1168,19 +1171,21 @@ $ gotest spec ./pkg/user
 
 === pkg/user — 4 passed, 1 skipped ===
 
-UserService — 4 passed, 1 skipped
-  Create
+UserService — 4 passed, 1 skipped (<1ms)
+  Create (<1ms)
     when email is valid
       ✓ creates the user
       ✓ sends a welcome email
     when email already exists
       ✓ returns ErrDuplicate
-  Delete
+  Delete (<1ms)
     ✓ soft-deletes the user
-    – hard-deletes after 30 days — SKIPPED
+    – hard-deletes after 30 days — SKIPPED: needs a clock
 
 1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
+
+Suite and method lines carry their duration however short, behaviors and groups from a second up, rows without a verdict none ([A terminal report a person reads](../../specs/spec/spec.md#requirement-a-terminal-report-a-person-reads)); a skipped row carries its skip's reason ([Why a row was skipped](../../specs/spec/spec.md#requirement-why-a-row-was-skipped)). Above the counts the report prints a provenance line, left out here: the runs' time range and, in a git checkout, the branch and commit ([The checkout a report was made in](../../specs/spec/spec.md#requirement-the-checkout-a-report-was-made-in)).
 
 Internally runs `go test -json`, parses the event stream, reconstructs the suite→method→When/It hierarchy from where each test sits ([Where a test event's test sits](../../specs/cli/spec.md#requirement-where-a-test-events-test-sits), [A slash in a label](../../specs/spec/spec.md#requirement-a-slash-in-a-label)), and strips Go naming conventions for display.
 
@@ -1221,6 +1226,7 @@ gotest spec ./... --format=md --output=behavior.md   # markdown
 gotest spec ./... --format=json                      # machine-readable tree
 gotest spec --input=events.json                      # replay a saved go test -json stream (no test run)
 gotest spec ./... --static                           # read the spec from source (nothing runs)
+gotest spec --declared ./...                         # the source's spec under this run's verdicts
 gotest ./... -v --spec                               # spec view instead of default output
 ```
 
@@ -1308,8 +1314,8 @@ File paths are basenames; positions are 1-based.
 `external` is present, and true, on each suite of the external test package ([Behaviors in discover](../../specs/discovery/spec.md#requirement-behaviors-in-discover)); `testName` is present on a method of such a suite when go test names it otherwise, as `TestCreate#01` for a method its internal twin also declares.
 `warnings` carries what a run would refuse and what it would pass over in silence, each with its position:
 
-- a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed;
-- a method that reads like part of the harness and does not run as one: a lifecycle hook that is misspelled or carries `X_` (what `lifecycle-typo` and `x-lifecycle` report, and a `//nolint` for the rule silences the warning as well), and a `Benchmark*`/`Fuzz*` method taking `*gotest.B`/`*gotest.F` on a type that is no test suite.
+- a package that fails to load (`"broken": true`) and a suite the generator refuses — an unsupported hook signature, a method out of step with the suite's context, a fuzz argument that cannot be fuzzed. A refused suite is left out of `suites`, except for a fuzz refusal, which keeps the suite listed. A case on a type that is no suite and that no test file calls, and a generic suite no alias instantiates, mark the package broken, the refusal at the type's first such method ([Cases no run reaches, in discover](../../specs/discovery/spec.md#requirement-cases-no-run-reaches-in-discover));
+- a method that reads like part of the harness and does not run as one: a lifecycle hook that is misspelled or carries `X_` (what `lifecycle-typo` and `x-lifecycle` report, and a `//nolint` for the rule silences the warning as well), and a `Benchmark*`/`Fuzz*` method taking `*gotest.B`/`*gotest.F` on a type that is no test suite and that the run does not refuse.
 
 A run names the same position in front of a generation error (`path/suite_test.go:13:24: …`), relative to the working directory.
 `methods[].parallel` is reserved and `false` (parallelism is a suite-level property).
@@ -1439,7 +1445,7 @@ Method-parallel suites pass `Parallel: true`; `RunMethods` then coordinates `Fai
 
 ## Linter
 
-Available as the `gotest lint` subcommand, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers; there is no golangci-lint plugin — the linter runs as its own step alongside a project's existing linter:
+Available as the `gotest lint` subcommand, built on `go/analysis`. `pkg/lint` exports the analyzer for external `go/analysis` drivers: golangci-lint loads it as the module plugin `github.com/mvrahden/go-test/pkg/lint/golangci` (named in `.custom-gcl.yml`, enabled as `gotestlint` with the settings `skip` and `nolint-allow`), and `go vet -vettool` runs it through a `main` around `unitchecker`; the package documentation of `pkg/lint` shows both. `gotest lint` is the reference driver, the one that renders GitHub annotations, reads `lint.skip` and refuses a `-skip` of an integrity rule:
 
 ```bash
 gotest lint ./...                                        # installed
@@ -1465,7 +1471,7 @@ Rules are grouped into three tiers by what breaks when a finding is ignored; the
 | `assertion-type-guard` | `Nil`/`Empty` on types their runtime guards would reject |
 | `generated-file` | `gotest_p(x)suite_test.go` files present in source control ([Generated files](../../specs/lint/spec.md#requirement-generated-files)) |
 | `shared-fixture-undeclared` | Suite-method reads of a `*SharedFixture` value the suite never declared as a pointer field (directly or through the fixture DAG) — window scheduling starts only declared fixtures, so the value may be absent; locally-constructed fixtures (fixture self-tests) are exempt |
-| `bench-loop` | `Benchmark*` suite methods that never touch `b.Loop()`/`b.N` — nothing iterates, so the numbers lie |
+| `bench-loop` | `Benchmark*` suite methods that neither touch `b.Loop()`/`b.N` nor hand `b` to a helper that does — nothing iterates, so the numbers lie; a hand-off to another package is not judged |
 | `fuzz-determinism` | Fuzz targets (one hop into same-package callees) reading nondeterministic state — `time.Now`, `math/rand{,/v2}`, `os.Getenv` — corpus replay and coverage guidance degrade |
 | `generation-rejects` | Every shape the generator rejects (a suite in a type block, embedding, a nested suite, a fixture field by value, …), at the position and with the message the generator gives — such a package does not run at all ([Shapes the generator rejects](../../specs/lint/spec.md#requirement-shapes-the-generator-rejects)); a testify suite is left to `testify` and to `go test` ([Rules skip what is not gotest's](../../specs/lint/spec.md#requirement-rules-skip-what-is-not-gotests)) |
 | `dropped-case` | A `Test*`, `Benchmark*` or `Fuzz*` method taking `*gotest.T`, `*gotest.B` or `*gotest.F` that no suite runs: on a type whose name lacks `TestSuite`, named exactly `Test`, `Benchmark` or `Fuzz`, or on a generic suite no alias instantiates ([Cases that never run](../../specs/lint/spec.md#requirement-cases-that-never-run)) |

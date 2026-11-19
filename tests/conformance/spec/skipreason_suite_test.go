@@ -39,17 +39,17 @@ func (s *SpecSkipReasonTestSuite) TestARowThatLogsBeforeItSkips(t *gotest.T) {
 	t.When("a run's row logs a line and then skips", func(w *gotest.T) {
 		w.It("the spec shows the skip's reason, not the logged line", func(it *gotest.T) {
 			run := spec(it, 0, "../testdata/skiplog/")
-			gotest.Contains(it, run.Stdout, "LogsThenSkips — SKIPPED: no database here\n")
+			gotest.Regexp(it, `LogsThenSkips — SKIPPED: no database here \(\S+\)\n`, run.Stdout)
 			gotest.NotContains(it, run.Stdout, "SKIPPED: connecting to the database")
 			md := spec(it, 0, "--format=md", "../testdata/skiplog/")
-			gotest.Contains(it, md.Stdout, "**LogsThenSkips** — no database here\n")
+			gotest.Regexp(it, `\*\*LogsThenSkips\*\* — no database here \(\S+\)\n`, md.Stdout)
 		})
 		w.It("shows no reason when the skip gave none", func(it *gotest.T) {
 			run := spec(it, 0, "../testdata/skiplog/")
-			gotest.Contains(it, run.Stdout, "LogsThenSkipsNow — SKIPPED\n")
+			gotest.Regexp(it, `LogsThenSkipsNow — SKIPPED \(\S+\)\n`, run.Stdout)
 			gotest.NotContains(it, run.Stdout, "checked the flag")
 			md := spec(it, 0, "--format=md", "../testdata/skiplog/")
-			gotest.Contains(it, md.Stdout, "**LogsThenSkipsNow**\n")
+			gotest.Regexp(it, `\*\*LogsThenSkipsNow\*\* \(\S+\)\n`, md.Stdout)
 		})
 	})
 }

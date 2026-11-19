@@ -241,7 +241,10 @@ describe.each(MODES)("spec sync via $name", (mode) => {
     expect(html).toContain(
       'data-display="keeps &lt;b&gt;&amp;&quot; text" data-id=',
     );
-    expect(html).toContain(' keeps &lt;b&gt;&amp;" text <span class="dur">');
+    // A fast behavior shows no time, so its actions follow its text.
+    expect(html).toContain(
+      ' keeps &lt;b&gt;&amp;" text<span class="node-actions">',
+    );
     expect(html).not.toContain("&amp;lt;");
     expect(html).not.toContain("&amp;amp;");
     // A run skips an excluded suite, and the CLI's run spec says so.

@@ -320,6 +320,11 @@ Lint SHALL report, under dropped-case, a Test, Benchmark or Fuzz method taking a
 - **THEN** lint leaves each unreported, as the generator runs it
 - **AND** lint reports a case the external package reaches from nowhere, a comment naming it included
 
+#### Scenario: A case reached where the build leaves it out, or through an interface
+- **WHEN** a helper's only caller or a generic suite's only alias sits in a test file the build constraints leave out, or a helper is handed to an interface that holds its case
+- **THEN** lint leaves each unreported, as the generator runs it
+- **AND** lint reports beside them a case reached from nowhere
+
 #### Scenario: A driver that sees one test package
 - **WHEN** go vet runs the exported analyzer on directories with cases no suite runs
 - **THEN** dropped-case reports nothing in a directory with an external test package, leaving it to the generator

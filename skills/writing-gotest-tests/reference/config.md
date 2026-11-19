@@ -28,6 +28,10 @@ zero behave as if the marker were absent:
   `gotest.NoDeadline` where no deadline was the intent.
 - `SetupTimeout` bounds `BeforeAll`/`AfterAll` of benchmark and fuzz
   suites too from v1.32; before, their contexts had no deadline.
+- `BeforeAll`'s `t.Context()` carries the `SetupTimeout` only while
+  `BeforeAll` runs; once it returned the context has no deadline and
+  ends when the methods are done, before `AfterAll` (v1.38+), so a
+  server started on it serves every method.
 - `GOTEST_TIMEOUT_SCALE=2` doubles every suite and fixture budget, declared
   or default, deadline and verdict alike (v1.36+): set it on a slow CI
   runner instead of raising budgets in code.
@@ -64,7 +68,10 @@ Fixtures follow the same rule via `FixtureConfig()` /
 runner waits for shared fixture setup as long as the fixtures declare
 (v1.34+), and 30s until the setup process reports its first fixture's
 budget (v1.34+); the run's `--setup-timeout` (`setup-timeout:` in `.gotest.yml`)
-replaces that with a flat budget.
+replaces that with a flat budget. `gotest fuzz` ignores `timeout:` and
+`setup-timeout:` in `.gotest.yml`, since `--for` is its clock, and a
+`.gotest.yml` value its flag would refuse (a negative `parallel`, a
+`min-coverage` above 100) fails the run with exit 2 (v1.38+).
 
 ## Exclusive suites (v1.27+)
 

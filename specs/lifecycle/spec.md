@@ -191,7 +191,11 @@ GOTEST_TIMEOUT_SCALE set to a number above zero SHALL multiply every Timeout and
 - **THEN** fails every suite before its fixtures, naming the value
 
 ### Requirement: What an expired --timeout names
-An expired --timeout SHALL fail the run with exit 1 on the text, -json and spec pipelines alike, naming in one FAIL line what it cut short, the method where a stream exists and the suite in the text run, and SHALL still run the shared fixtures' AfterAll. It SHALL name as running only the tests whose process it cut short, not a test whose suite process ended on its own before it.
+An expired --timeout SHALL fail the run with exit 1 on the text, -json and spec pipelines alike, naming in one FAIL line what it cut short, the method where a stream exists and the suite in the text run, and SHALL still run the shared fixtures' AfterAll. It SHALL name as running only the tests whose process it cut short, not a test whose suite process ended on its own before it. A method that returned because the stop ended its context SHALL be booked failed, on -json and spec alike.
+
+#### Scenario: A method that honours its context
+- **WHEN** a run's --timeout ends a method that honours its context
+- **THEN** the method is booked failed in -json, and spec shows it failed
 
 #### Scenario: A crash before the timeout
 - **WHEN** one suite's process crashed on its own and another suite hangs until --timeout

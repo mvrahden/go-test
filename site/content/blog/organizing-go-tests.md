@@ -264,15 +264,16 @@ There's a useful consequence of this structure. Because test methods, `When` blo
 {{< terminal title="gotest spec ./..." >}}
 <span class="t-prompt">$</span> <span class="t-cmd">gotest spec ./...</span>
 
-<span class="t-suite">UserService</span> <span class="t-time">(9ms)</span>
+<span class="t-suite">UserService</span> — 3 passed <span class="t-time">(9ms)</span>
   <span class="t-test">CreateUser</span> <span class="t-time">(6ms)</span>
-    <span class="t-when">when the input is valid</span> <span class="t-time">(5ms)</span>
-      <span class="t-pass">✓</span> succeeds without error <span class="t-time">(5ms)</span>
-    <span class="t-when">when the email already exists</span> <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns an error <span class="t-time">(<1ms)</span>
+    <span class="t-when">when the input is valid</span>
+      <span class="t-pass">✓</span> succeeds without error
+    <span class="t-when">when the email already exists</span>
+      <span class="t-pass">✓</span> returns an error
   <span class="t-test">DeleteUser</span> <span class="t-time">(3ms)</span>
-    <span class="t-when">when the user exists</span> <span class="t-time">(3ms)</span>
-      <span class="t-pass">✓</span> succeeds without error <span class="t-time">(3ms)</span>
+    <span class="t-when">when the user exists</span>
+      <span class="t-pass">✓</span> succeeds without error
+
 <span class="t-summary">1 suite, 3 behaviors: <span class="t-pass">3 passed</span></span>
 {{< /terminal >}}
 

@@ -135,8 +135,9 @@ func runDiscover(inv Invocation) int { //nolint:gocritic // hugeParam: stable AP
 }
 
 // discover reads the suites the patterns match from source. What would stop
-// a run (a broken package, a generation error) and what a run passes over in
-// silence (see gotestast.HarnessWarnings) are both warnings here.
+// a run (a broken package, a generation error, a case no run reaches) and
+// what a run passes over in silence (see gotestast.HarnessWarnings) are both
+// warnings here.
 func discover(patterns, buildFlags []string) (discoverOutput, error) {
 	out := newDiscoverOutput()
 
@@ -191,6 +192,17 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 			out.Warnings = append(out.Warnings, w)
 		}
 		pkgs := []*packages.Package{lr.Ptest, lr.Pxtest}
+		// what no run reaches is refused for the package as a whole; its
+		// types are not warned of again below
+		refusedTypes := map[types.Object]bool{}
+		for _, ce := range lr.Orphans() {
+			pkg := variantOf(pkgs, ce.Pos)
+			warn(pkg, ce.Pos, ce.Err.Error())
+			if recv := receiverAt(pkg, ce.Pos); recv != nil {
+				refusedTypes[recv] = true
+			}
+			pkgEntry.Broken = true
+		}
 		for _, pkg := range pkgs {
 			if pkg == nil {
 				continue
@@ -220,6 +232,9 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 				if w.Rule != "" && lint.Suppressed(pkg.Fset, pkg.Syntax, w.Pos, lint.Rule(w.Rule)) {
 					continue
 				}
+				if w.Rule == "" && refusedTypes[receiverAt(pkg, w.Pos)] {
+					continue
+				}
 				warn(pkg, w.Pos, w.Msg)
 			}
 			for _, ce := range gotestgen.FuzzRejections(pkg, result.Suites) {
@@ -235,6 +250,51 @@ func discover(patterns, buildFlags []string) (discoverOutput, error) {
 		}
 	}
 	return out, nil
+}
+
+// variantOf returns the variant whose files hold pos, else the first loaded.
+func variantOf(variants []*packages.Package, pos token.Pos) *packages.Package {
+	var first *packages.Package
+	for _, pkg := range variants {
+		if pkg == nil {
+			continue
+		}
+		if first == nil {
+			first = pkg
+		}
+		for _, f := range pkg.Syntax {
+			if f.FileStart <= pos && pos <= f.FileEnd {
+				return pkg
+			}
+		}
+	}
+	return first
+}
+
+// receiverAt returns the type whose method is declared at pos, nil when no
+// method is.
+func receiverAt(pkg *packages.Package, pos token.Pos) types.Object {
+	if pkg == nil || pkg.TypesInfo == nil {
+		return nil
+	}
+	for id, obj := range pkg.TypesInfo.Defs {
+		if id.Pos() != pos {
+			continue
+		}
+		fn, ok := obj.(*types.Func)
+		if !ok || fn.Signature().Recv() == nil {
+			return nil
+		}
+		t := fn.Signature().Recv().Type()
+		if p, ok := t.(*types.Pointer); ok {
+			t = p.Elem()
+		}
+		if n, ok := t.(*types.Named); ok {
+			return n.Origin().Obj()
+		}
+		return nil
+	}
+	return nil
 }
 
 // nameTwinMethods gives the methods of an external suite that an internal

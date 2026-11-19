@@ -31,9 +31,11 @@ func ƒ_node_{{ $sf.Identifier }}() *ƒgotestruntime.FixtureNode {
             Target: ƒ_sf_{{ $sf.Identifier }},
 {{- if $sf.HasHydrate }}
             Hydrate: func(ctx ƒcontext.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Hydrate(ctx) },
+            HydrateAt: {{ printf "%q" $sf.HydrateAt }},
 {{- end }}
 {{- if $sf.HasDehydrate }}
             Dehydrate: func(ctx ƒcontext.Context) error { return ƒ_sf_{{ $sf.Identifier }}.Dehydrate(ctx) },
+            DehydrateAt: {{ printf "%q" $sf.DehydrateAt }},
 {{- end }}
         },
 {{- if $sf.ParentFields }}
@@ -84,10 +86,12 @@ func ƒ_node_{{ $f.Identifier }}() *ƒgotestruntime.FixtureNode {
         BeforeAll: func(ctx ƒcontext.Context) error {
             return ƒ_{{ $f.Identifier }}.BeforeAll(ctx)
         },
+        BeforeAllAt: {{ printf "%q" $f.BeforeAllAt }},
 {{- if $f.AfterAll }}
         AfterAll: func(ctx ƒcontext.Context) error {
             return ƒ_{{ $f.Identifier }}.AfterAll(ctx)
         },
+        AfterAllAt: {{ printf "%q" $f.AfterAllAt }},
 {{- end }}
 {{- if $f.DependsOn }}
         DependsOn: []string{

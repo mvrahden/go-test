@@ -215,7 +215,7 @@ The migration tool covers the common cases that make up the bulk of a typical mi
 
 ### What needs manual review
 
-The tool handles the 90% case. For the remaining edge cases, it leaves `// TODO(gotest-migrate)` comments so you can find and address them:
+The tool handles the 90% case. Its closing summary says what it did not keep: the soft assertions that now stop the test, the stdlib tests left in the migrated files (gotest does not run them), each go test id that changed, and each base test it removed because testify never ran it ([The closing summary](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-the-closing-summary)). For the remaining edge cases, it leaves `// TODO(gotest-migrate)` comments so you can find and address them:
 
 - **Lines that no longer compile.** Anything the rewrite leaves broken — a test method taken as a method value, the suite passed to a helper that takes a `suite.TestingSuite` — carries a TODO quoting the compiler.
 - **Assertions gotest would judge differently.** `s.NotNil(id)` on an array always passed in testify and would always fail in gotest, so it's marked rather than mapped. The same holds wherever a mechanical translation would pass or fail where testify did not, or change what runs when; the marker names the reason and the gotest way ([Kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)).
@@ -247,7 +247,7 @@ The good news: it's a mechanical transformation. The assertion names are almost 
 
 `Nil` and `NotNil` deserve a note: gotest's versions are type-guarded. They accept only nilable types — pointers, interfaces, slices, maps, channels, functions — and fail with a guard error on anything else, pointing you to `Zero`/`NotZero` for comparable value types. testify's `Nil` accepts any value and reports a plain assertion failure. If your code calls `s.Nil` on non-nilable values, switch those call sites to `gotest.Zero`.
 
-One difference worth noting: testify distinguishes between `s.Assert()` (continues on failure) and `s.Require()` (stops on failure). Calling assertions directly on the suite (`s.Equal(...)`, `s.Contains(...)`) also continues on failure, because the suite embeds `*assert.Assertions`. Only `s.Require().Equal(...)` stops. All gotest assertions stop on failure, like `Require`. This is a deliberate choice: a test that continues after a failed precondition typically produces confusing follow-on errors. If you need soft assertions, you can use `t.Errorf` directly.
+One difference worth noting: testify distinguishes between `s.Assert()` (continues on failure) and `s.Require()` (stops on failure). Calling assertions directly on the suite (`s.Equal(...)`, `s.Contains(...)`) also continues on failure, because the suite embeds `*assert.Assertions`. Only `s.Require().Equal(...)` stops. All gotest assertions stop on failure, like `Require`. This is a deliberate choice: a test that continues after a failed precondition typically produces confusing follow-on errors. If you need soft assertions, you can use `t.Errorf` directly. The migration's closing summary counts the soft assertions that became hard stops, so you know how many tests now end earlier than they did.
 
 Another difference: gotest assertions are generic. `gotest.Equal[V any](t, expected, actual V)` catches type mismatches at compile time. In testify, `s.Equal(42, "42")` compiles and fails at runtime. In gotest, `gotest.Equal(t, 42, "42")` is a compile error.
 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec .* / when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s / a method with no verdict carries none \(
+Clause: when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s → a method with no verdict carries none
+--- a/internal/gotestspec/terminal.go
++++ b/internal/gotestspec/terminal.go
+@@ -329,7 +329,7 @@
+ 	if unrun && isLeaf {
+ 		lead, lw := mark(StatusNone)
+ 		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display,
+-			tail: []tailPart{{" — NOT RUN", c.dim}}}, c, cfg)
++			tail: []tailPart{{" — NOT RUN (" + formatDuration(EffectiveDuration(n)) + ")", c.dim}}}, c, cfg)
+ 		return
+ 	}
+

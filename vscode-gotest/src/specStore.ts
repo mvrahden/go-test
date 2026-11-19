@@ -50,7 +50,8 @@ export interface StoredRecord {
 }
 
 // testKey names a test path within one instance of its top-level name: a
-// suite in both test packages runs twice under one name.
+// suite in both test packages runs twice under one name, and -count runs
+// each again. Which instance is a twin or a later run the CLI reads.
 export function testKey(instance: number, test: string): string {
   return `${instance}\u0000${test}`;
 }

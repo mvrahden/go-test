@@ -15,10 +15,10 @@ The whole post in one command:
 
 {{< terminal title="gotest watch ./... --spec" >}}
 $ gotest watch ./... --spec
-UserService <span class="t-time">(4ms)</span>
+UserService — 1 passed <span class="t-time">(4ms)</span>
   Create <span class="t-time">(4ms)</span>
-    email is valid <span class="t-time">(3ms)</span>
-      <span class="t-pass">✓</span> persists the user <span class="t-time">(3ms)</span>
+    when email is valid
+      <span class="t-pass">✓</span> persists the user
 {{< /terminal >}}
 
 ## The default Go inner loop
@@ -120,7 +120,7 @@ This changes how you work. With a 1-second loop, you write smaller increments. Y
 
 ## The CI guard
 
-The `F_` prefix is a development tool. It is not meant to be committed. If it reaches your main branch, it silently skips every other test of the run. This is the kind of mistake that passes code review because the tests are green, they just are not running.
+The `F_` prefix is a development tool. It is not meant to be committed. If it reaches your main branch, it skips every other test of the run, and outside CI mode only a note on stderr says so. This is the kind of mistake that passes code review because the tests are green, they just are not running.
 
 gotest's CI mode catches this. When running with the `--ci` flag (or when the `CI` environment variable is set, which most CI providers do automatically), gotest checks for focus prefixes before running any tests. If it finds any, the build fails immediately with an explicit error:
 
@@ -158,13 +158,13 @@ Every line repeats the full path. The hierarchy is encoded in the names, but the
 The `gotest spec` command renders the same information as a tree:
 
 {{< spec title="gotest spec output" >}}
-UserService <span class="t-time">(7ms)</span>
+UserService — 3 passed <span class="t-time">(7ms)</span>
   Create <span class="t-time">(7ms)</span>
-    email is valid <span class="t-time">(5ms)</span>
-      <span class="t-pass">✓</span> persists the user <span class="t-time">(3ms)</span>
-      <span class="t-pass">✓</span> returns no error <span class="t-time">(2ms)</span>
-    email is duplicate <span class="t-time">(1ms)</span>
-      <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(1ms)</span>
+    when email is valid
+      <span class="t-pass">✓</span> persists the user
+      <span class="t-pass">✓</span> returns no error
+    when email is duplicate
+      <span class="t-pass">✓</span> returns ErrDuplicate
 {{< /spec >}}
 
 The structure is immediately visible. Suite names become headings, methods become groups, `When`/`It` calls become nested branches. Passing tests get a checkmark. Failing tests get a clear marker with the failure message indented beneath them. You see the shape of your test coverage at a glance.

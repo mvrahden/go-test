@@ -274,6 +274,16 @@ func (s *RendererTestSuite) TestSharedFixture(t *gotest.T) {
 		})
 	})
 
+	t.When("a shared fixture declares Hydrate and Dehydrate", func(w *gotest.T) {
+		w.It("renders where each is declared beside it", func(it *gotest.T) {
+			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestResolve_HookLocations")
+			output, _ := renderTestPkg(it.T(), pkg, true)
+			gotest.Regexp(it, `\sHydrateAt:\s+"test\.go:32",`, output)
+			gotest.Regexp(it, `\sDehydrateAt:\s+"test\.go:33",`, output)
+			gotest.Regexp(it, `\sAfterAllAt:\s+"test\.go:15",`, output)
+		})
+	})
+
 	t.When("empty struct", func(w *gotest.T) {
 		w.It("renders shared fixture as DAG node and struct literal wiring", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestRenderer_SharedFixtureEmptyStruct")

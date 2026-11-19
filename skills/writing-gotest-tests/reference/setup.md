@@ -64,7 +64,8 @@ build until `go mod vendor` reruns. gotest runs vendored only when a file
 of the module imports `github.com/mvrahden/go-test/pkg/gotestruntime` (and
 `pkg/gotestfuzz` for struct fuzz targets), because only generated code
 imports them; where that file is missing, report it and do not add it
-unasked.
+unasked. From v1.38 the build failure of each suite package says so
+itself: it names the blank import to add to a test file, and `-mod=mod`.
 
 ## Running the CLI
 

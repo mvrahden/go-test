@@ -891,8 +891,9 @@ A suite process is stopped on its control channel (`internal/control`), not
 by Interrupt. The runner creates one channel per suite process, a socket
 pair on Unix whose child end is descriptor 3 and a duplex named pipe on
 Windows whose client handle is inherited, and names it in `GOTEST_CONTROL`.
-The runtime's init moves the descriptor to 1000 or above, close-on-exec (on
-Windows it clears the handle's inheritance), unsets the variable and writes
+The runtime's init moves the descriptor to 1000 or above, close-on-exec (it
+stays where it is, close-on-exec, under a descriptor limit at or below 1000
+and on OpenBSD; on Windows it clears the handle's inheritance), unsets the variable and writes
 `hello`, so nothing a test starts holds the channel. The runner writes
 `stop` for the first stop and `force` for the second; the suite writes
 `budget` once its fixtures are set up and `stopped <reason>` when a stop the
@@ -975,18 +976,19 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testlessByPk
     for each suite struct name (e.g., "FooTestSuite"):
       │
       ├─ testFuncName = "Test" + "FooTestSuite" = "TestFooTestSuite"
+      ├─ funcs = suiteFuncs: testFuncName (unless the suite has no Test*) and its Fuzz wrappers
       │
-      ├─ If userRunFilter set:
-      │   ├─ Split filter on first "/" → topLevel / subtest
-      │   ├─ Match topLevel regex against testFuncName
-      │   └─ Skip suite if no match
+      ├─ Skip suite unless userRunFilter selects one of funcs (selectsSuite)
+      ├─ Skip suite if userSkipFilter skips every one of funcs (skipsSuite)
       │
       └─ SuiteTarget {
            Package:    "github.com/example/auth"
            Dir:        "/path/to/auth"
            BinaryPath: "/tmp/gotest/bin/auth_a1b2c3d4.test"
            SuiteName:  "TestFooTestSuite"
-           RunFilter:  "" or the alternatives of the user's -run that select this suite
+           RunFilter:  processRunFilter(userRunFilter, funcs): "" without -run, else each
+                       alternative whose first level matches one of funcs, that level
+                       replaced by the function's exact name
            RunFlags:   ["-test.v", "-test.timeout=30s", ...]
            CoverProfile: "/tmp/gotest/cover/0.out" (if -coverprofile)
          }
@@ -1076,16 +1078,18 @@ order:
 
 ```
 target.Bench            → "-test.run=^$" -test.bench=^Benchmark<Suite>$"
-target.RunFilter != ""   → "-test.run=" + RunFilter            (user wins, untouched)
+target.RunFilter != ""   → "-test.run=" + RunFilter            (the user's, narrowed to this suite)
 len(target.FuzzFuncs)>0  → "-test.run=^(?:<Suite>|<Fuzz1>|<Fuzz2>|...)$"  (widened)
 default                  → "-test.run=^<Suite>$"
 ```
 
 A user-supplied `-run` filter is never widened to also include the suite's
-fuzz funcs — it becomes the entire `-test.run` value as-is, so a fuzz
-target's seed corpus only replays under a user filter if the generated
-`Fuzz<Suite>_<Method>` name happens to match that filter on its own merit
-(controller ruling: user filter wins over replay widening). With no user
+fuzz funcs: `processRunFilter` keeps only the alternatives that select one of
+this suite's functions, so a fuzz target's seed corpus only replays under a
+user filter if the generated `Fuzz<Suite>_<Method>` name matches that filter
+on its own merit — `-run '^TestFooTestSuite$'` replays none — and no other
+suite's function runs in the process
+([A -run pattern in each suite process](specs/cli/spec.md#requirement-a--run-pattern-in-each-suite-process)). With no user
 filter, the alternation runs the suite's `Test<Suite>` function and every
 one of its fuzz funcs' seed corpora as ordinary subtests
 (`Fuzz<Suite>_<Method>/seed#0`) in the same subprocess — this is what makes
@@ -1174,7 +1178,8 @@ helpers in a `ring0_suite_test.go`. The rule is an allowlist, not a ban on
 the `gotest` import: a ring-0 suite may call `gotest.DefaultSuiteConfig`,
 `DefaultFixtureConfig`, `Each`, `Must`, the `Export*` shims and, in the
 suite that tests it, `gotest.MatchSnapshot`. Any other exported `gotest`
-function is an assertion and must not appear. Ring-0 suites live in
+function is an assertion and must not appear; `tests/conventions` fails the
+run for a ring-0 file that calls one. Ring-0 suites live in
 external test packages (`assert_test`, `gotestruntime_test`, …) so that the
 harness can import `gotest`; internals reach them through `export_test.go`
 shims. `package gotest` itself cannot host a suite, because the harness
@@ -1252,8 +1257,16 @@ guard:
    compile, names a clause no spec states, or is caught by any
    check but the one its row names fails the drill, so mutants cannot
    silently stop testing anything. The clauses no mutant names are held to
-   the budget in `tests/drill/unmutated-allow.txt`, raised only on purpose. The
-   drill runs in CI, split into four shards, on every push and pull request.
+   the budget in `tests/drill/unmutated-allow.txt`, raised only on purpose. On
+   a push or a pull request CI dry-runs every patch and judges, in four
+   shards, the mutants the change touches; the nightly run and a release
+   judge all of them.
+
+A nightly workflow (`.github/workflows/nightly.yml`) re-runs the whole gate on
+main three times and lists every test whose verdict differed, measures coverage
+with the CLI's own subprocess runs counted, judges every mutant, fuzzes the
+repository's own targets for fifteen minutes and builds against Go tip, which
+may fail without failing the run.
 
 **Adding a test.** Four questions decide where a new test goes and what
 protects it:
@@ -1322,7 +1335,7 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | Package | Role | Imports of this module |
 |---|---|---|
 | `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestbench,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
-| `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,x/slices}`; third-party: `regexp2`, `x/tools` |
+| `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass,x/slices}`; third-party: `regexp2`, `x/tools` |
 | `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgpattern,protocol,x/slices}`; third-party: `x/mod`, `x/tools` |
 | `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,schedinfo}` |
 | `internal/gotestspec` | Event stream → tree → terminal, Markdown and JSON renderers; the census | `internal/{about,protocol}` |
@@ -1337,11 +1350,11 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | `internal/filewrite` | Rewrites a set of files all or none | third-party: `x/sys` |
 | `internal/control` | The channel between the runner and a suite process | — |
 | `internal/proctree` | A command as the root of its own process tree | — |
-| `internal/{about,callsite,carry,pkgpattern,protocol,runstate,schedinfo,setupwaits,typeclass,unidiff,x/slices}` | Leaves: constants, small mechanisms shared by two sides | — |
+| `internal/{about,callsite,carry,pkgpattern,protocol,runstate,schedinfo,setupwaits,typeclass,unidiff,x/slices}` | Leaves: constants, small mechanisms shared by two sides | — (`typeclass` imports `internal/about`) |
 | `pkg/gotest` | The user's API: `T`, `B`, `F`, `R`, assertions, `Each`, polls, snapshots | `internal/{callsite,carry,protocol,runstate,setupwaits}`, its own `internal/{assert,snapfile}` (`assert` imports `internal/{callsite,unidiff}`) |
 | `pkg/gotestruntime` | The library every generated harness calls: suite frame, method loop, fixtures, budgets, stop | `pkg/gotest`, `internal/{callsite,carry,control,protocol,runstate,schedinfo,setupwaits}` |
 | `pkg/gotestfuzz` | Leaf codecs for fanned fuzz arguments | — |
-| `pkg/lint` | The analyzer, exported for other `go/analysis` drivers | `internal/lint` |
+| `pkg/lint` | The analyzer, exported for other `go/analysis` drivers; `pkg/lint/golangci`, a module of its own, is its golangci-lint plugin | `internal/lint` |
 | `skills` | The agent skill, embedded for `gotest skill install` | — |
 | `internal/{testkit,speccatalog/...,drill}` | Test support: staging and running the CLI, the spec catalog, the drill | `internal/{gotestspec,proctree,protocol,testkit}`, `pkg/{gotest,gotestruntime}`; third-party: `x/sys` (`drill`) |
 

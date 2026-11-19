@@ -49,13 +49,18 @@ func (s *DeclarationRulesTestSuite) TestFixtureHookCall(t *gotest.T) {
 
 func (s *DeclarationRulesTestSuite) TestDroppedCase(t *gotest.T) {
 	t.When("a test file declares a case no suite runs", func(w *gotest.T) {
-		w.It("reports it, and no helper the package calls, an external test spells, or a non-test file declares", func(it *gotest.T) {
+		w.It("reports it, and no helper the package calls or hands to an interface holding the case, an external test spells, or a non-test file declares", func(it *gotest.T) {
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcase")
 		})
 	})
 	t.When("the driver hands the analyzer one test package of a directory that has two", func(w *gotest.T) {
 		w.It("reports none of its cases, leaving them to the generator", func(it *gotest.T) {
 			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcaseext")
+		})
+	})
+	t.When("the driver hands the analyzer a package whose only caller or alias sits in a file the build constraints leave out", func(w *gotest.T) {
+		w.It("reports neither the helper nor the generic suite, as the generator runs them", func(it *gotest.T) {
+			analysistest.Run(it.T(), analysistest.TestData(), lint.Analyzer, "withdroppedcasegated")
 		})
 	})
 }

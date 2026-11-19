@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/lint LinterRules / DroppedCasesOfTheExternalPackage 
 Clause: when the external test package takes a case of a type that is no suite as a value, a method expression or an interface method, calls it, or aliases the type as a suite → lint reports a case the external package reaches from nowhere, a comment naming it included
 --- a/internal/lint/droppedcase.go
 +++ b/internal/lint/droppedcase.go
-@@ -37,10 +37,10 @@
+@@ -38,10 +38,10 @@
  // refuses such a package when it runs it.
  func checkDroppedCase(pass *analysis.Pass, insp *inspector.Inspector, suites map[string]*suiteInfo) {
  	v := casesOfDir(pass.Pkg)
@@ -14,5 +14,5 @@ Clause: when the external test package takes a case of a type that is no suite a
 -			return
 -		}
  		v = newCaseUses(variant{pass.TypesInfo, pass.Files})
+ 		v.orphans = passOrphans(pass)
  	}
- 	insp.Preorder([]ast.Node{(*ast.FuncDecl)(nil), (*ast.TypeSpec)(nil)}, func(n ast.Node) {

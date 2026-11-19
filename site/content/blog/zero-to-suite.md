@@ -232,22 +232,20 @@ Output:
 {{< spec title="gotest spec ./..." >}}
 === . — 5 passed ===
 
-Counter — 5 passed
-  Inc
+Counter — 5 passed <span class="t-time">(<1ms)</span>
+  Inc <span class="t-time">(<1ms)</span>
     when incrementing once
       <span class="t-pass">✓</span> has value 1
     when incrementing twice more
       <span class="t-pass">✓</span> has value 3
-  Dec
+  Dec <span class="t-time">(<1ms)</span>
     when decrementing from 2
       <span class="t-pass">✓</span> has value 1
     when decrementing past zero
       <span class="t-pass">✓</span> goes negative
-  Reset
+  Reset <span class="t-time">(<1ms)</span>
     when resetting after increments
       <span class="t-pass">✓</span> returns to zero
-
-Runs from 2026-11-12 14:16 to 14:16 UTC
 
 1 suite, 5 behaviors: 5 passed
 {{< /spec >}}
@@ -295,28 +293,26 @@ Run `gotest spec ./...` again and both suites appear in the output:
 {{< spec title="gotest spec ./..." >}}
 === . — 7 passed ===
 
-Boundary — 2 passed
-  NewCounter
+Boundary — 2 passed <span class="t-time">(<1ms)</span>
+  NewCounter <span class="t-time">(<1ms)</span>
     <span class="t-pass">✓</span> starts at zero
-  ResetIdempotent
+  ResetIdempotent <span class="t-time">(<1ms)</span>
     when resetting a counter that is already zero
       <span class="t-pass">✓</span> stays at zero
-Counter — 5 passed
-  Inc
+Counter — 5 passed <span class="t-time">(<1ms)</span>
+  Inc <span class="t-time">(<1ms)</span>
     when incrementing once
       <span class="t-pass">✓</span> has value 1
     when incrementing twice more
       <span class="t-pass">✓</span> has value 3
-  Dec
+  Dec <span class="t-time">(<1ms)</span>
     when decrementing from 2
       <span class="t-pass">✓</span> has value 1
     when decrementing past zero
       <span class="t-pass">✓</span> goes negative
-  Reset
+  Reset <span class="t-time">(<1ms)</span>
     when resetting after increments
       <span class="t-pass">✓</span> returns to zero
-
-Runs from 2026-11-12 14:16 to 14:16 UTC
 
 2 suites, 7 behaviors: 7 passed
 {{< /spec >}}

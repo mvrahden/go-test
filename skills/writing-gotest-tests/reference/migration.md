@@ -35,6 +35,13 @@ the gotest way instead
 read each marker, it names what to write. v1.37+ never writes
 `go.mod`/`go.sum`
 ([module files](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-module-files)).
+From v1.38 its closing summary lists what was not kept: the soft
+assertions that now stop the test, the stdlib tests left (gotest does not
+run them), each go test id that changed, and each base test removed
+because testify never ran it
+([the closing summary](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-the-closing-summary));
+read it before the markers. `Fail`, `FailNow`, `WithinDuration` and
+integer `Positive`/`Negative` translate from v1.38.
 It does NOT convert bare
 `require`/`assert` usage in plain `TestXxx(*testing.T)` functions — those
 are manual:

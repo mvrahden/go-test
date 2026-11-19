@@ -146,27 +146,27 @@ type SQLStorageTestSuite = StorageContractTestSuite[*SQLStorage]
 Each alias is a full, independent test suite. The code generator picks up each alias and generates the test wiring for it. The spec output shows each implementation separately:
 
 {{< spec title="gotest spec ./..." >}}
-MemoryStorage <span class="t-time">(2ms)</span>
+MemoryStorage — 6 passed <span class="t-time">(2ms)</span>
   Put <span class="t-time">(1ms)</span>
-    key is new <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> stores the value without error <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> makes the value retrievable <span class="t-time">(<1ms)</span>
-    key already exists <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> overwrites the value <span class="t-time">(<1ms)</span>
+    when key is new
+      <span class="t-pass">✓</span> stores the value without error
+      <span class="t-pass">✓</span> makes the value retrievable
+    when key already exists
+      <span class="t-pass">✓</span> overwrites the value
   Get <span class="t-time">(<1ms)</span>
-    key does not exist <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns ErrNotFound <span class="t-time">(<1ms)</span>
+    when key does not exist
+      <span class="t-pass">✓</span> returns ErrNotFound
   Delete <span class="t-time">(<1ms)</span>
-    key exists <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> removes the value <span class="t-time">(<1ms)</span>
-    key does not exist <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns no error <span class="t-time">(<1ms)</span>
+    when key exists
+      <span class="t-pass">✓</span> removes the value
+    when key does not exist
+      <span class="t-pass">✓</span> returns no error
 
-RedisStorage <span class="t-time">(48ms)</span>
+RedisStorage — 6 passed <span class="t-time">(48ms)</span>
   Put <span class="t-time">(23ms)</span>
-    key is new <span class="t-time">(14ms)</span>
-      <span class="t-pass">✓</span> stores the value without error <span class="t-time">(8ms)</span>
-      <span class="t-pass">✓</span> makes the value retrievable <span class="t-time">(6ms)</span>
+    when key is new
+      <span class="t-pass">✓</span> stores the value without error
+      <span class="t-pass">✓</span> makes the value retrievable
     ...
 {{< /spec >}}
 

@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/lint .* / lint reports beside them a case reached from nowhere \(
+Clause: when a helper's only caller or a generic suite's only alias sits in a test file the build constraints leave out, or a helper is handed to an interface that holds its case → lint reports beside them a case reached from nowhere
+--- a/internal/lint/droppedcase.go
++++ b/internal/lint/droppedcase.go
+@@ -118,7 +118,7 @@
+ 	case isSuite || stdlib || gotestast.IS_TEST_SUITE.MatchString(typ) || isTestifySuite(pass, typ):
+ 	case !bare && !isCaseMethodName(name):
+ 	case !inTestFile(pass, fd.Pos()):
+-	case v.orphans != nil && !v.orphans[named.Obj()]:
++	case v.orphans != nil:
+ 		// The generator's own verdict over the test packages seen runs it.
+ 	default:
+ 		report(pass, DroppedCase, funcHeader(fd),

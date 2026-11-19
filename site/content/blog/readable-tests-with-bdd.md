@@ -135,15 +135,15 @@ A few things to notice:
 The structure in the code is only half the value. The other half is what you see when the tests run. `gotest spec` transforms the test output into an indented tree:
 
 {{< spec title="gotest spec ./..." >}}
-<span class="t-suite">UserService</span> <span class="t-time">(136ms)</span>
+<span class="t-suite">UserService</span> — 4 passed <span class="t-time">(136ms)</span>
   <span class="t-test">Create</span> <span class="t-time">(130ms)</span>
-    <span class="t-when">email is valid</span> <span class="t-time">(129ms)</span>
-      <span class="t-pass">✓</span> creates the user <span class="t-time">(8ms)</span>
-      <span class="t-pass">✓</span> sends a welcome email <span class="t-time">(120ms)</span>
-    <span class="t-when">email already exists</span> <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(<1ms)</span>
+    <span class="t-when">when email is valid</span>
+      <span class="t-pass">✓</span> creates the user
+      <span class="t-pass">✓</span> sends a welcome email
+    <span class="t-when">when email already exists</span>
+      <span class="t-pass">✓</span> returns ErrDuplicate
   <span class="t-test">Delete</span> <span class="t-time">(5ms)</span>
-    <span class="t-pass">✓</span> soft-deletes the user <span class="t-time">(5ms)</span>
+    <span class="t-pass">✓</span> soft-deletes the user
 
 <span class="t-summary">1 suite, 4 behaviors: 4 passed</span>
 {{< /spec >}}
@@ -157,15 +157,15 @@ Compare this with the `gotest ./... -v` output for the same tests — the standa
 When a test fails, the tree structure tells you exactly where:
 
 {{< spec title="gotest spec ./..." >}}
-<span class="t-suite">UserService</span> <span class="t-time">(136ms)</span>
+<span class="t-suite">UserService</span> — 3 passed, <span class="t-fail">1 failed</span> <span class="t-time">(136ms)</span>
   <span class="t-test">Create</span> <span class="t-time">(130ms)</span>
-    <span class="t-when">email is valid</span> <span class="t-time">(129ms)</span>
-      <span class="t-pass">✓</span> creates the user <span class="t-time">(8ms)</span>
-      <span class="t-fail">✗</span> sends a welcome email <span class="t-time">(120ms)</span>
-    <span class="t-when">email already exists</span> <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> returns ErrDuplicate <span class="t-time">(<1ms)</span>
+    <span class="t-when">when email is valid</span>
+      <span class="t-pass">✓</span> creates the user
+      <span class="t-fail">✗</span> sends a welcome email
+    <span class="t-when">when email already exists</span>
+      <span class="t-pass">✓</span> returns ErrDuplicate
   <span class="t-test">Delete</span> <span class="t-time">(5ms)</span>
-    <span class="t-pass">✓</span> soft-deletes the user <span class="t-time">(5ms)</span>
+    <span class="t-pass">✓</span> soft-deletes the user
 
 <span class="t-summary">1 suite, 4 behaviors: 3 passed, <span class="t-fail">1 failed</span></span>
 {{< /spec >}}
@@ -199,14 +199,14 @@ func (s *OrderServiceTestSuite) TestCheckout(t *gotest.T) {
 The spec output reflects the nesting:
 
 {{< spec title="gotest spec ./..." >}}
-<span class="t-suite">OrderService</span> <span class="t-time">(19ms)</span>
+<span class="t-suite">OrderService</span> — 3 passed <span class="t-time">(19ms)</span>
   <span class="t-test">Checkout</span> <span class="t-time">(18ms)</span>
-    <span class="t-when">the cart is not empty</span> <span class="t-time">(17ms)</span>
-      <span class="t-when">payment succeeds</span> <span class="t-time">(15ms)</span>
-        <span class="t-pass">✓</span> creates an order <span class="t-time">(12ms)</span>
-        <span class="t-pass">✓</span> clears the cart <span class="t-time">(3ms)</span>
-      <span class="t-when">payment fails</span> <span class="t-time">(2ms)</span>
-        <span class="t-pass">✓</span> does not create an order <span class="t-time">(2ms)</span>
+    <span class="t-when">when the cart is not empty</span>
+      <span class="t-when">when payment succeeds</span>
+        <span class="t-pass">✓</span> creates an order
+        <span class="t-pass">✓</span> clears the cart
+      <span class="t-when">when payment fails</span>
+        <span class="t-pass">✓</span> does not create an order
 
 <span class="t-summary">1 suite, 3 behaviors: 3 passed</span>
 {{< /spec >}}

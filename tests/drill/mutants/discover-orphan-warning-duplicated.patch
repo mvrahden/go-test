@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/discovery NeverRunDiscover .* / warns of no other method of that type \(
+Clause: when discover reads a package declaring cases no run reaches → warns of no other method of that type
+--- a/cmd/gotest/discover.go
++++ b/cmd/gotest/discover.go
+@@ -232,7 +232,7 @@
+ 				if w.Rule != "" && lint.Suppressed(pkg.Fset, pkg.Syntax, w.Pos, lint.Rule(w.Rule)) {
+ 					continue
+ 				}
+-				if w.Rule == "" && refusedTypes[receiverAt(pkg, w.Pos)] {
++				if w.Rule == "" && refusedTypes[receiverAt(pkg, w.Pos)] && false {
+ 					continue
+ 				}
+ 				warn(pkg, w.Pos, w.Msg)

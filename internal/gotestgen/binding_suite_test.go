@@ -610,6 +610,18 @@ func (s *BindingTestSuite) TestHookLocations(t *gotest.T) {
 		// extfixtures/test.go:16 declares RemoteFixture.BeforeEach.
 		gotest.Equal(it, "../extfixtures/test.go:16", byName["RemoteFixture"].BeforeEachAt)
 	})
+	t.It("locates a package fixture's BeforeAll and AfterAll, and leaves an AfterAll it lacks unlocated", func(it *gotest.T) {
+		gotest.Equal(it, "test.go:13", byName["LocalFixture"].BeforeAllAt, "where LocalFixture.BeforeAll is declared")
+		gotest.Equal(it, "test.go:15", byName["LocalFixture"].AfterAllAt, "where LocalFixture.AfterAll is declared")
+		gotest.Equal(it, "../extfixtures/test.go:15", byName["RemoteFixture"].BeforeAllAt, "where RemoteFixture.BeforeAll is declared")
+		gotest.Zero(it, byName["RemoteFixture"].AfterAllAt)
+	})
+	t.It("locates a shared fixture's Hydrate and Dehydrate", func(it *gotest.T) {
+		gotest.Len(it, resolved.RequiredSharedFixtures, 1)
+		sf := resolved.RequiredSharedFixtures[0]
+		gotest.Equal(it, "test.go:32", sf.HydrateAt)
+		gotest.Equal(it, "test.go:33", sf.DehydrateAt)
+	})
 }
 
 func (s *BindingTestSuite) TestUnreferencedFixtureNotInOutput(t *gotest.T) {

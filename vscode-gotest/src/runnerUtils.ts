@@ -13,7 +13,7 @@ import {
   parseExpectedActual,
   type TestEvent,
 } from "./outputParser.js";
-import { EXTERNAL_ID, withoutExternalId } from "./types.js";
+import { EXTERNAL_ID, externalInstance, withoutExternalId } from "./types.js";
 
 export { killProcessTree };
 
@@ -279,8 +279,8 @@ export class TestItemRouter {
     return seen.owns[n] ?? own;
   }
 
-  // topLevel is a suite's item, or a generated fuzz wrapper's. Instance 2 is
-  // an external twin's run; a lone external suite runs once, as instance 1.
+  // topLevel is a suite's item, or a generated fuzz wrapper's. A lone suite,
+  // external or not, takes every instance: under -count each is a later run.
   private topLevel(
     name: string,
     instance: number,
@@ -304,12 +304,9 @@ export class TestItemRouter {
     }
     const suite = name.startsWith("Test") ? name.slice(4) : name;
     const plain = `${this.importPath}/${suite}`;
-    if (instance % 2 === 0) {
-      // Under -count go alternates a twin's runs: internal, external, ...
-      // Without a twin every run is the plain suite's.
-      const twin = this.controller.findItem(`${plain}${EXTERNAL_ID}`);
-      if (twin) return twin;
-    }
+    // The twin's item exists only when both test packages declare the suite.
+    const twin = this.controller.findItem(`${plain}${EXTERNAL_ID}`);
+    if (twin && externalInstance(instance, true)) return twin;
     return this.controller.findItem(plain);
   }
 }
@@ -414,7 +411,8 @@ export function applyEvent(
   pkgDir: string,
   options: ApplyOptions,
 ): AppliedResult | undefined {
-  // A twin's second run reuses the top-level name: its output is its own.
+  // A twin's or a repeat's later instance reuses the top-level name: its
+  // output is its own.
   const outputKey =
     event.Test && (event.Gotest?.Instance ?? 1) > 1
       ? `${event.Gotest?.Instance}\u0000${event.Test}`

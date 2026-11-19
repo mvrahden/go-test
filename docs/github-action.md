@@ -11,9 +11,9 @@ Use the official action for CI pipelines with failure summaries, inline PR annot
     min-coverage: 80
 ```
 
-By default (`version: gomod`), the action runs the `gotest` your `go.mod` selects (`go tool` when declared, else `go run -mod=mod`) — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
+By default (`version: gomod`), the action builds the `gotest` your `go.mod` selects once per job and runs that binary — no version drift between CI and local development. Without a declared tool it resolves the CLI's dependencies in a copy of `go.mod`, so the checkout's `go.sum` stays as committed, and it notes the `go get -tool` line that declares it. Set `version: latest` or a specific tag to install a standalone binary instead.
 
-The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
+The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel; the summary also notes the stdlib tests beside your suites that gotest did not run.
 
 With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` step in the same job (promote takes only the crashers the latest session in that job's gotest cache wrote). Seed replay needs no such step, since every ordinary run already replays seeds. The step also carries Go's fuzz cache between runs: it restores the latest corpus of the branch or its base and saves this run's under its own key, so a short budget compounds into a deeper search over time, main's corpus feeds every pull request, and no pull request pollutes main. `fuzz-cache: false` runs from the seeds alone. (The build cache `actions/setup-go` keeps is not enough for this: it is keyed on go.sum and never re-saved on a hit, so a corpus would only survive a dependency bump.)
 
@@ -49,7 +49,7 @@ The tables below are the canonical action surface — a drift guard test keeps t
 
 | Output | Description |
 |---|---|
-| `exit-code` | Test process exit code |
+| `exit-code` | The gotest exit code: 0, 1 (tests failed or coverage below the minimum), 2 (the suites did not run to completion), 130 (interrupted) |
 | `coverage` | Coverage percentage (empty if coverage not enabled) |
 | `badge` | Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran) |
 | `events-file` | Absolute path of the saved event stream (empty unless `events-file` is set and the file was written) |

@@ -93,6 +93,31 @@ func (s *TreeTestSuite) TestBuildTree_FixtureHierarchy(t *gotest.T, _ *treeCtx) 
 	mustEq(t, "method display", method.Display, "Dispatch")
 }
 
+func (s *TreeTestSuite) TestBuildTree_NestedNamesLikeSuitesStayBlocks(t *gotest.T, _ *treeCtx) {
+	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestNamesTestSuite"}
+{"Action":"run","Package":"p","Test":"TestNamesTestSuite/TestLabels"}
+{"Action":"run","Package":"p","Test":"TestNamesTestSuite/TestLabels/ends_in_TestSuite"}
+{"Action":"pass","Package":"p","Test":"TestNamesTestSuite/TestLabels/ends_in_TestSuite","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestNamesTestSuite/TestLabels/binds_a_DBFixture"}
+{"Action":"pass","Package":"p","Test":"TestNamesTestSuite/TestLabels/binds_a_DBFixture","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestNamesTestSuite/TestLabels","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestNamesTestSuite/UserTestSuite"}
+{"Action":"pass","Package":"p","Test":"TestNamesTestSuite/UserTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Test":"TestNamesTestSuite","Elapsed":0}
+{"Action":"pass","Package":"p","Elapsed":0.1}`)
+	suite := tree[0].Nodes[0]
+	mustLen(t, "suite children", suite.Children, 2)
+	method := suite.Children[0]
+	mustLen(t, "method children", method.Children, 2)
+	for i, want := range []string{"ends in TestSuite", "binds a DBFixture"} {
+		mustEq(t, "label kind", method.Children[i].Kind, gotestspec.KindBlock)
+		mustEq(t, "label display", method.Children[i].Display, want)
+	}
+	// directly under a suite too: only a fixture's test runs suites
+	mustEq(t, "row kind", suite.Children[1].Kind, gotestspec.KindBlock)
+	mustEq(t, "row display", suite.Children[1].Display, "UserTestSuite")
+}
+
 func (s *TreeTestSuite) TestBuildTree_FocusedSuite(t *gotest.T, _ *treeCtx) {
 	tree := treeOf(t, `{"Action":"run","Package":"p","Test":"TestF_PaymentServiceTestSuite"}
 {"Action":"run","Package":"p","Test":"TestF_PaymentServiceTestSuite/TestCharge"}

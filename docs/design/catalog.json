@@ -5701,6 +5701,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "spec notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "focusreport_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "spec_notes_on_stderr_that_F__narrows_the_run,_naming_the_method_where_it_is_declared,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "summary notes on stderr that F_ narrows the run, naming the method where it is declared, and exits 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "focusreport_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 29,
+                      "name": "summary_notes_on_stderr_that_F__narrows_the_run,_naming_the_method_where_it_is_declared,_and_exits_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when spec or summary runs, outside CI mode, a package holding a focused method",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "focusreport_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "spec_or_summary_runs,_outside_CI_mode,_a_package_holding_a_focused_method",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AFocusedMethodUnderSpecAndSummary",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "focusreport_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestAFocusedMethodUnderSpecAndSummary",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIFocusReport",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "focusreport_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLIFocusReportTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "fails with exit 1, naming the benchmark where it is declared",
                       "duration": 0,
                       "excluded": false,
@@ -12824,6 +12900,112 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "reports the package broken with the refusal at the type's first such method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 45,
+                      "name": "reports_the_package_broken_with_the_refusal_at_the_type's_first_such_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "warns of no other method of that type",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 55,
+                      "name": "warns_of_no_other_method_of_that_type",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "reports a generic suite no alias instantiates broken with the refusal at its declaration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "reports_a_generic_suite_no_alias_instantiates_broken_with_the_refusal_at_its_declaration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a Benchmark or Fuzz method on a helper a suite calls, or on a type a non-test file declares, is still warned of as never running",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "neverrun_discover_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 66,
+                      "name": "a_Benchmark_or_Fuzz_method_on_a_helper_a_suite_calls,_or_on_a_type_a_non-test_file_declares,_is_still_warned_of_as_never_running",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when discover reads a package declaring cases no run reaches",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "neverrun_discover_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 44,
+                  "name": "discover_reads_a_package_declaring_cases_no_run_reaches",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Discover",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "neverrun_discover_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 43,
+              "name": "TestDiscover",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "NeverRunDiscover",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "neverrun_discover_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestNeverRunDiscoverTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a type nothing calls them on is refused at its first such method, told which suffix makes it a suite",
                       "duration": 0,
                       "excluded": false,
@@ -14359,6 +14541,98 @@
           "kind": "suite",
           "line": 12,
           "name": "TestFixtureDependencyTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, not in the runtime's file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hooks_declared_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 20,
+                      "name": "is_reported_at_the_hook's_declaration,_not_in_the_runtime's_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's BeforeAll returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_declared_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 18,
+                  "name": "a_package_fixture's_BeforeAll_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "is reported at the hook's declaration, not in the runtime's file",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "hooks_declared_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "is_reported_at_the_hook's_declaration,_not_in_the_runtime's_file",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package fixture's AfterAll returns an error",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "hooks_declared_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 25,
+                  "name": "a_package_fixture's_AfterAll_returns_an_error",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatAFailedFixtureBeforeAllOrAfterAllSays",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "hooks_declared_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestWhatAFailedFixtureBeforeAllOrAfterAllSays",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "FixtureHookDeclarations",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "hooks_declared_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestFixtureHookDeclarationsTestSuite",
           "output": [],
           "status": "none"
         },
@@ -19420,6 +19694,67 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the method is booked failed in -json, and spec shows it failed",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "lcb_stopended_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 32,
+                      "name": "the_method_is_booked_failed_in_-json,_and_spec_shows_it_failed",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a run's --timeout ends a method that honours its context",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "lcb_stopended_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 21,
+                  "name": "a_run's_--timeout_ends_a_method_that_honours_its_context",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "AMethodThatHonoursItsContext",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "lcb_stopended_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestAMethodThatHonoursItsContext",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "DeadlineStopEnded",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "lcb_stopended_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestDeadlineStopEndedTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "prints one line naming the method and the default deadline",
                       "duration": 0,
                       "excluded": false,
@@ -24315,6 +24650,82 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "lint leaves each unreported, as the generator runs it",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "droppedgated_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 21,
+                      "name": "lint_leaves_each_unreported,_as_the_generator_runs_it",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "lint reports beside them a case reached from nowhere",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "droppedgated_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "lint_reports_beside_them_a_case_reached_from_nowhere",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a helper's only caller or a generic suite's only alias sits in a test file the build constraints leave out, or a helper is handed to an interface that holds its case",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "droppedgated_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 20,
+                  "name": "a_helper's_only_caller_or_a_generic_suite's_only_alias_sits_in_a_test_file_the_build_constraints_leave_out,_or_a_helper_is_handed_to_an_interface_that_holds_its_case",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "CasesReachedWhereTheBuildLeavesThemOut",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "droppedgated_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestCasesReachedWhereTheBuildLeavesThemOut",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "LinterDroppedGated",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "droppedgated_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestLinterDroppedGatedTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "a bare nolint comment suppresses every rule on its line",
                       "duration": 0,
                       "excluded": false,
@@ -29135,6 +29546,203 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "each suite heading and each method item carries its duration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 24,
+                      "name": "each_suite_heading_and_each_method_item_carries_its_duration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a When and an It of 1.2s carry theirs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 30,
+                      "name": "a_When_and_an_It_of_1.2s_carry_theirs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a When and an It of 128ms carry none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "a_When_and_an_It_of_128ms_carry_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a method with no verdict carries none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 36,
+                      "name": "a_method_with_no_verdict_carries_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the Markdown spec of suites, methods, Whens and Its that took 128ms and 1.2s",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "durations_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 23,
+                  "name": "the_Markdown_spec_of_suites,_methods,_Whens_and_Its_that_took_128ms_and_1.2s",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Markdown",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "durations_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestMarkdown",
+              "output": [],
+              "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each suite line and each method line carries its duration",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 45,
+                      "name": "each_suite_line_and_each_method_line_carries_its_duration",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a When and an It of 1.2s carry theirs",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 51,
+                      "name": "a_When_and_an_It_of_1.2s_carry_theirs",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a When and an It of 128ms carry none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 54,
+                      "name": "a_When_and_an_It_of_128ms_carry_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "a method with no verdict carries none",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "durations_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 57,
+                      "name": "a_method_with_no_verdict_carries_none",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the terminal spec of suites, methods, Whens and Its that took 128ms and 1.2s",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "durations_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 44,
+                  "name": "the_terminal_spec_of_suites,_methods,_Whens_and_Its_that_took_128ms_and_1.2s",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "Terminal",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "durations_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 42,
+              "name": "TestTerminal",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecDurations",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "durations_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestSpecDurationsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "keeps the failing branch, its failing leaf and a suite that failed in its own hooks, and leaves out the rows that passed",
                       "duration": 0,
                       "excluded": false,
@@ -30626,21 +31234,6 @@
                       "output": [],
                       "status": "none",
                       "vocab": "it"
-                    },
-                    {
-                      "children": [],
-                      "display": "no duration under a second is shown",
-                      "duration": 0,
-                      "excluded": false,
-                      "external": false,
-                      "file": "report_suite_test.go",
-                      "focused": false,
-                      "kind": "block",
-                      "line": 133,
-                      "name": "no_duration_under_a_second_is_shown",
-                      "output": [],
-                      "status": "none",
-                      "vocab": "it"
                     }
                   ],
                   "display": "when the Markdown spec of a run with failures and rows not run",
@@ -30667,7 +31260,7 @@
                       "file": "report_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 141,
+                      "line": 136,
                       "name": "the_header_names_what_is_hidden",
                       "output": [],
                       "status": "none",
@@ -30681,7 +31274,7 @@
                   "file": "report_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 140,
+                  "line": 135,
                   "name": "the_Markdown_spec_hides_rows",
                   "output": [],
                   "status": "none",
@@ -30713,7 +31306,7 @@
                       "file": "report_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 152,
+                      "line": 147,
                       "name": "lists_every_failure_with_its_path_and_message_after_the_packages",
                       "output": [],
                       "status": "none",
@@ -30728,7 +31321,7 @@
                       "file": "report_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 161,
+                      "line": 156,
                       "name": "every_package_and_suite_line_carries_its_counts",
                       "output": [],
                       "status": "none",
@@ -30742,7 +31335,7 @@
                   "file": "report_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 150,
+                  "line": 145,
                   "name": "the_terminal_spec_of_a_run_with_failures",
                   "output": [],
                   "status": "none",
@@ -30759,7 +31352,7 @@
                       "file": "report_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 178,
+                      "line": 173,
                       "name": "long_labels_wrap_at_its_width",
                       "output": [],
                       "status": "none",
@@ -30773,7 +31366,7 @@
                   "file": "report_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 172,
+                  "line": 167,
                   "name": "the_terminal_spec_is_written_to_a_terminal",
                   "output": [],
                   "status": "none",
@@ -30790,7 +31383,7 @@
                       "file": "report_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 188,
+                      "line": 183,
                       "name": "every_behavior_stays_on_one_line",
                       "output": [],
                       "status": "none",
@@ -30804,7 +31397,7 @@
                   "file": "report_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 186,
+                  "line": 181,
                   "name": "the_terminal_spec_is_redirected",
                   "output": [],
                   "status": "none",
@@ -30818,7 +31411,7 @@
               "file": "report_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 149,
+              "line": 144,
               "name": "TestATerminalReportAPersonReads",
               "output": [],
               "status": "none"
@@ -31498,6 +32091,97 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "a run's spec shows each It whole under its When and the row whole under its method",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelabel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "a_run's_spec_shows_each_It_whole_under_its_When_and_the_row_whole_under_its_method",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "the summary names the failing It whole",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelabel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 32,
+                      "name": "the_summary_names_the_failing_It_whole",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "neither counts them as suites",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "suitelabel_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 35,
+                      "name": "neither_counts_them_as_suites",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when an It's label or a table row's name ends in TestSuite or Fixture",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "suitelabel_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 26,
+                  "name": "an_It's_label_or_a_table_row's_name_ends_in_TestSuite_or_Fixture",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LabelsThatEndLikeASuite",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "suitelabel_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestLabelsThatEndLikeASuite",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "SpecSuiteLabel",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "suitelabel_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestSpecSuiteLabelTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -31605,13 +32289,13 @@
     }
   ],
   "stats": {
-    "behaviors": 919,
+    "behaviors": 940,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 126,
+    "suites": 133,
     "tests": 0
   }
 }

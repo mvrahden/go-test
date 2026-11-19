@@ -87,7 +87,7 @@ gotest puts a generator and a runner in front of `go test`. That buys the lifecy
 - **Editors see suites through the extension only.** The [VS Code extension](#vs-code-extension) lists, runs and debugs suites. gopls and other editors show suite methods as plain methods. To debug elsewhere, write the generated code to disk first: `gotest generate ./...`, then `dlv test`, then `gotest clean ./...`.
 - **Go 1.26 or newer.** The Go version follows gotest's own `go.mod`, so upgrading gotest can raise your module's `go` line; Install shows how to keep it.
 - **The tool directive adds indirect requirements.** `go get -tool` records the CLI's dependencies in your `go.mod` as `// indirect`. Your test binaries link none of them: the runtime imports only the standard library.
-- **A vendored module needs one extra file**, shown under [Install](#install).
+- **A vendored module needs one extra import**, shown under [Install](#install).
 - **Leaving means rewriting the entry points.** Assertions, `When`/`It` and `Each` are a library and keep working under plain `go test`. Suites need one hand-written `func Test*` each, and shared fixtures have no standard-library equivalent.
 
 ## Install
@@ -103,13 +103,10 @@ go tool gotest ./...
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
 
-**Vendored modules.** `go mod vendor` copies the packages your module imports. Nothing in your tree imports gotest's runtime: the generated code does, and it never reaches the disk. Give the module one file that imports it, then vendor again; without it `gotest` refuses to run in a vendored module and names the import:
+**Vendored modules.** `go mod vendor` copies the packages your module imports. Nothing in your tree imports gotest's runtime: the generated code does, and it never reaches the disk. Import it blank in one test file of the module, then vendor again. Without it each suite package fails to build, and gotest names the import to add and the alternative, running with `-mod=mod` ([A vendored module](specs/cli/spec.md#requirement-a-vendored-module)):
 
 ```go
-// internal/gotestdeps/deps.go
-
-// Package gotestdeps keeps the packages gotest's generated code imports in vendor/.
-package gotestdeps
+// gotestdeps_test.go, in any package of the module
 
 import (
     _ "github.com/mvrahden/go-test/pkg/gotestfuzz"    // fuzz targets that take a struct
@@ -164,7 +161,7 @@ go get github.com/mvrahden/go-test
 go test ./...
 ```
 
-Assertions take the `*testing.T` directly as well (`gotest.Equal(t, want, got)`), and a failure inside a helper names the helper's line and the test's without `t.Helper()`. The same tests render as a specification from their event stream: `go test -json ./... | go tool gotest spec --input=-`.
+Assertions take the `*testing.T` directly as well (`gotest.Equal(t, want, got)`), and a failure inside a helper names the helper's line and the test's without `t.Helper()`. The same tests render as a specification from their event stream, once the CLI is declared as a tool ([Install](#install)): `go test -json ./... | go tool gotest spec --input=-`.
 
 This step changes nothing about how your tests run. Take the next one when you want lifecycle hooks, fixtures or a process per suite.
 
@@ -260,8 +257,8 @@ gotest spec ./pkg/user
 ```
 === pkg/user — 2 passed ===
 
-UserService — 2 passed
-  Create
+UserService — 2 passed (1ms)
+  Create (<1ms)
     ✓ creates a user with valid input
     when email already exists
       ✓ returns ErrDuplicate
@@ -309,21 +306,23 @@ gotest spec ./pkg/user -v
 ```
 === pkg/user — 4 passed, 1 skipped ===
 
-UserService — 4 passed, 1 skipped
-  Create
+UserService — 4 passed, 1 skipped (<1ms)
+  Create (<1ms)
     when email is valid
       ✓ creates the user
       ✓ sends a welcome email
     when email already exists
       ✓ returns ErrDuplicate
-  Delete
+  Delete (<1ms)
     ✓ soft-deletes the user
-    – hard-deletes after 30 days — SKIPPED
+    – hard-deletes after 30 days — SKIPPED: needs a clock
 
 1 suite, 5 behaviors: 4 passed, 1 skipped
 ```
 
-A row shows the wall clock it occupied once it reaches a second, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
+A skipped row carries the reason its skip gave ([Why a row was skipped](specs/spec/spec.md#requirement-why-a-row-was-skipped)).
+Suite and method lines show their duration however short; a behavior or a group shows its own once it reaches a second, and a row without a verdict shows none ([A terminal report a person reads](specs/spec/spec.md#requirement-a-terminal-report-a-person-reads)). A duration is the wall clock the row occupied, never the sum of the rows beneath it — so a row that exceeds its children is time it held itself, and one that falls short of their total is children that overlapped.
+Under `-count` each run of a suite is listed as a suite of its own, marked with its run ([A suite run more than once](specs/spec/spec.md#requirement-a-suite-run-more-than-once)).
 
 Generate a markdown specification document ([A report a person reads](specs/spec/spec.md#requirement-a-report-a-person-reads)):
 
@@ -344,9 +343,10 @@ gotest spec ./... --static
 gotest spec ./... --static --format=md --output=docs/behavior-spec.md
 ```
 
-Lay a saved run's verdicts over that specification with `--declared`: every behavior the source declares is listed, and what the run did not report shows without a verdict and is counted as not run ([The declared specification under a run's verdicts](specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)). `--hide=pass` (or `fail`, `skip`, `none`, comma-separated) leaves rows out of the rendering and none out of the counts ([Hiding rows by status](specs/spec/spec.md#requirement-hiding-rows-by-status)):
+Lay a run's verdicts over that specification with `--declared`, the run's own or, with `--input`, a saved one's: every behavior the source declares is listed, and what the run did not report shows without a verdict and is counted as not run ([The declared specification under a run's verdicts](specs/spec/spec.md#requirement-the-declared-specification-under-a-runs-verdicts)). `--hide=pass` (or `fail`, `skip`, `none`, comma-separated) leaves rows out of the rendering and none out of the counts ([Hiding rows by status](specs/spec/spec.md#requirement-hiding-rows-by-status)):
 
 ```bash
+gotest spec --declared ./...
 gotest spec --input=events.json --declared ./...
 gotest spec --input=events.json --hide=pass
 ```
@@ -453,10 +453,10 @@ func (f *E2ESetupFixture) AfterAll(ctx context.Context) error {
 }
 ```
 
-Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution (e.g., `E2ESetupFixture.BeforeAll failed: start postgres: connection refused`).
+Fixture hooks receive `context.Context` and return `error` — the generated wrapper reports failures with automatic attribution (e.g., `E2ESetupFixture.BeforeAll: start postgres: connection refused`).
 
 `BeforeAll`/`AfterAll` receive `context.Background()` bounded by the fixture's configured timeout.
-`BeforeEach` receives the test's `t.Context()`; `AfterEach` receives `context.Background()` — cleanup must proceed even after the test context is cancelled.
+`BeforeEach` receives the test's `t.Context()`; `AfterEach` receives a context that a stop does not end and that ends only at a `Timeout` the suite declares, so cleanup still runs after the test's own context is cancelled ([The context a fixture's AfterEach gets](specs/fixtures/spec.md#requirement-the-context-a-fixtures-aftereach-gets)).
 
 Test suites reference fixtures via named pointer fields — one or more:
 
@@ -521,9 +521,12 @@ Fixture hook failures are reported with automatic attribution.
 A fixture's `AfterEach` runs only when every fixture `BeforeEach` up to its own in dependency order returned without an error.
 A `BeforeEach` that returns an error gets no `AfterEach`, so it releases what it acquired before returning.
 
-`BeforeAll`/`AfterAll` failures are fatal — they fail all fixture-bound tests with automatic attribution:
+`BeforeAll`/`AfterAll` failures are fatal — they fail all fixture-bound tests, located at the hook's declaration as well:
 
 ```
+--- FAIL: TestBatchTestSuite (0.01s)
+    fixture.go:12: fixture setup: E2ESetupFixture.BeforeAll: start postgres: connection refused
+E2ESetupFixture.BeforeAll attempt 1/2 failed: start postgres: connection refused
 FAIL: E2ESetupFixture.BeforeAll failed after 2 attempt(s): start postgres: connection refused
 ```
 
@@ -710,7 +713,7 @@ func (s *Suite) TestParsing(t *gotest.T) {
 }
 ```
 
-Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`.
+Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`. Over a literal table, `gotest spec --declared` lists the rows a failing row left unrun, as not run.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Testing a Callback
@@ -803,7 +806,7 @@ func (s *ParserTestSuite) BenchmarkParse(b *gotest.B) {
 `BeforeEach`/`AfterEach` run once per benchmark method, outside the timing window — the generated wrapper stops the timer before `BeforeEach`, starts and resets it right before your method runs, and stops it again before `AfterEach`, which runs even when the benchmark fails or panics.
 Use `b.Loop()` (Go 1.24+) rather than `b.N` — it excludes setup before the loop from timing automatically.
 
-The suite must be named `*TestSuite`, even if it only has benchmarks — a struct without that suffix is never discovered, so its `Benchmark*` methods are silently dropped.
+The suite must be named `*TestSuite`, even if it only has benchmarks — a struct without that suffix is no suite, and gotest refuses the run when a test file declares `Benchmark*` methods taking `*gotest.B` on it that no test file calls ([Cases no run reaches](specs/discovery/spec.md#requirement-cases-no-run-reaches)).
 Benchmarks can't coexist with a returning `BeforeEach` (its context type can't thread through `*gotest.B`), and every lifecycle hook on a benchmark suite must take `*gotest.T`, not `*testing.T`.
 Fixture-bound suites work — fixtures hydrate before benchmarks run — but a fixture with `BeforeEach`/`AfterEach` bound to a suite that has `Benchmark*` methods is rejected at generation time: per-method fixture hooks aren't supported for benchmarks.
 
@@ -840,10 +843,8 @@ gotest bench --spec ./examples/notification -benchtime=10x
 ```
 === examples/notification ===
 
-BenchmarkNotificationDispatchBench
-  ✓ Dispatch  810.6 ns/op · 596 B/op · 2 allocs/op
-
-Runs from 2026-11-12 14:14 to 14:14 UTC · main @ 380769e1
+BenchmarkNotificationDispatchBench (<1ms)
+  ✓ Dispatch  1103 ns/op · 569 B/op · 2 allocs/op
 
 1 suite, 1 benchmark
 ```
@@ -957,7 +958,7 @@ Preset constructors for common scenarios:
 ### Project Configuration
 
 Project-level defaults live in `.gotest.yml` at the repository root (or nearest parent with a `go.mod`).
-CLI flags always take precedence over config values; omitted keys fall back to defaults (an explicit `0` on a duration key disables the deadline — a flag or a key can be absent, so `0` is free to mean off; a `SuiteConfig` field cannot, so there `0` means the default and `gotest.NoDeadline` means off).
+CLI flags always take precedence over config values, and a value its flag would refuse fails the run with exit 2, naming the key ([A broken config](specs/cli/spec.md#requirement-a-broken-config)); omitted keys fall back to defaults (an explicit `0` on a duration key disables the deadline — a flag or a key can be absent, so `0` is free to mean off; a `SuiteConfig` field cannot, so there `0` means the default and `gotest.NoDeadline` means off).
 
 ```yaml
 # .gotest.yml
@@ -976,13 +977,14 @@ lint:
 | Field | Type | CLI flag | Description |
 |-------|------|----------|-------------|
 | `tags` | string | `-tags` | Comma-separated build tags |
-| `timeout` | duration | `--timeout` | Global pipeline deadline (default: 15m, 0 to disable) |
+| `timeout` | duration | `--timeout` | Global pipeline deadline (default: 15m, 0 to disable); `gotest fuzz` ignores it and `setup-timeout`, since `--for` is its clock ([Config defaults a command cannot take](specs/cli/spec.md#requirement-config-defaults-a-command-cannot-take)) |
 | `setup-timeout` | duration | `--setup-timeout` | Flat budget for shared fixture setup (default: what the fixtures declare — each one's `Timeout × (Retries+1) + RetryDelay × Retries`, plus `Timeout × Retries` for the releases between attempts when it has an `AfterAll`, 30s until the first reports; 0 to disable; see [the setup-budget requirement](specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)) |
 | `min-coverage` | int | `--min` | Minimum coverage percentage (0–100) |
 | `parallel` | int | `--parallel` | Total concurrent test method budget |
 | `compile-parallel` | int | `--compile-parallel` | Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan) |
 | `debounce` | duration | `--debounce` | Watch mode re-run delay |
 | `lint.skip` | list | — | Non-integrity lint rules to disable project-wide |
+| `lint.nolint-allow` | list | `-nolint-allow` | Linter names a `//nolint` may name beside golangci-lint's |
 | `bench.baseline` | path | `--against`, `--save=` | Baseline `gotest bench` compares against and a bare `--save=` writes |
 | `bench.gate` | float | `--gate` | Regression percentage that fails a bench run (0 disables) |
 | `fuzz.harvest` | bool | `--no-harvest` | Seed harvesting from table tests (default: true) |
@@ -1000,6 +1002,7 @@ func (s *MySuite) X_TestFlaky(t *gotest.T)  {} // exclude a single test
 ```
 
 Focus spans the whole run: a focused suite or method in any package skips every unfocused suite in every package of the run ([Focus across a run](specs/discovery/spec.md#requirement-focus-across-a-run)).
+Outside CI mode a focused run, `gotest spec` and `gotest summary` say so on stderr before anything runs, with how many items carry `F_` and where the first is declared ([A focused run outside CI mode](specs/cli/spec.md#requirement-a-focused-run-outside-ci-mode)).
 
 Use `--ci` in CI to fail the build if any `F_` prefix slipped through and to enable snapshot read-only mode (missing baselines fail instead of being generated):
 
@@ -1070,16 +1073,19 @@ Catch common mistakes in test suites with static analysis:
 gotest lint ./...
 ```
 
-Thirty-three rules in three tiers:
+Thirty-four rules in three tiers:
 
-- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`) and via `b.B()` or `f.F()` (`Cleanup`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), suites and fixtures declared inside a `type ( … )` block (the fix gives each its own declaration), embedded suites, fixtures or hook-carrying types and suite-typed fields, direct calls of a lifecycle hook the harness already calls, every other shape the generator rejects, `//nolint` comments naming no rule a linter knows, and generated files checked into version control.
-- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()`, `b.B()` and `f.F()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites in one run, overlapping ones included, then reports what it could not fix (exit 3 while findings remain); `-diff` prints exactly what `-fix` would write, as a unified diff with paths relative to the current directory, and writes nothing — `gotest lint -diff ./... | git apply` applies it (a file outside that directory needs `git apply --unsafe-paths`; a symlink is named by the file it leads to, which `-fix` writes).
+- **Integrity** — violations can make test outcomes unreliable or leak resources: committed `F_` prefixes, value receivers on suite methods, lifecycle hook typos, `BeforeAll` without `AfterAll`, `X_` prefixes on lifecycle hooks, wrong test signatures, suite-lifecycle bypasses via `t.T()` (`Cleanup`/`Parallel`/`Run`) and via `b.B()` or `f.F()` (`Cleanup`), outer `t` inside `Eventually`/`Consistently` callbacks, `Nil`/`Empty` assertions on types their runtime guards reject, reads of shared fixtures a suite never declared (window scheduling only starts what is declared), suites and fixtures declared inside a `type ( … )` block (the fix gives each its own declaration), embedded suites, fixtures or hook-carrying types and suite-typed fields, direct calls of a lifecycle hook the harness already calls, `Test`, `Benchmark` and `Fuzz` methods no suite runs (on a type without the `TestSuite` suffix, named just `Test`, or on a generic suite without an alias; [Cases that never run](specs/lint/spec.md#requirement-cases-that-never-run)), every other shape the generator rejects, `//nolint` comments naming no rule a linter knows, and generated files checked into version control.
+- **Expressiveness** — the test is correct but its syntax can be improved: simplifiable assertions (`True(t, a == b)` → `Equal`, `Len(t, x, 0)` → `Empty`, …), redundant assertions, `if cond { Fail(...) }` guards that an assertion expresses directly, unnecessary `t.T()`, `b.B()` and `f.F()` escapes, `When("when …")`/`It("it …")` descriptions that spell the word the spec already supplies, and a literal negative `SuiteConfig`/`FixtureConfig` timeout (every negative disables the deadline; the fix writes `gotest.NoDeadline`, keeping the old meaning). `-fix` applies the safe rewrites in one run, overlapping ones included (an assertion counts as redundant only when the arguments of both are plain names, fields, elements or literals, so removing it cannot skip a call), then reports what it could not fix (exit 3 while findings remain); `-diff` prints exactly what `-fix` would write, as a unified diff with paths relative to the current directory, and writes nothing — `gotest lint -diff ./... | git apply` applies it (a file outside that directory needs `git apply --unsafe-paths`; a symlink is named by the file it leads to, which `-fix` writes).
 - **Migration** — adoption aids for codebases moving to gotest: stdlib test functions and testify imports; coexistence is legitimate.
 
 `gotest lint -rules` lists them, and `gotest lint -rules -json` gives each rule's tier, scope, whether it can be skipped or fixed, and its description as a document an editor or a script reads ([The rules](specs/lint/spec.md#requirement-the-rules)).
 
+Each finding line ends with its rule in parentheses, `file:line:col: message (rule)`, the id `//nolint:<rule>` takes.
 Suppress per line with `//nolint:<rule>` (on the same line, or in a comment block of its own ending on the line directly above — a comment trailing other code does not reach the next line); expressiveness and migration rules can also be disabled project-wide via `.gotest.yml` (`lint.skip`). See the [design spec](docs/design/spec.md#linter) for the full rule table.
-There is no golangci-lint plugin — run `gotest lint` as its own CI step alongside your existing linter. Inside GitHub Actions (or with `--github`), the plain-text report is replaced: findings are printed as `::error` annotations, which GitHub shows inline on the PR, and appended as a table to the step summary. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags, and `pkg/lint` exports the analyzer for external `go/analysis` drivers.)
+Inside GitHub Actions (or with `--github`), the plain-text report is replaced: findings are printed as `::error` annotations, which GitHub shows inline on the PR, and appended as a table to the step summary; `--github=false` keeps the plain report inside GitHub Actions. (The standalone `gotest-lint` binary was retired; `gotest lint` accepts the same targets and driver flags.)
+
+`gotest lint` is the reference driver, and `pkg/lint` exports the analyzer for two others. golangci-lint runs it as a module plugin, `github.com/mvrahden/go-test/pkg/lint/golangci`, named in `.custom-gcl.yml` at the gotest version your `go.mod` requires and enabled as `gotestlint` with the settings `skip` and `nolint-allow`; `go vet -vettool` runs it through a small `main` around `unitchecker`. The [`pkg/lint` package documentation](https://pkg.go.dev/github.com/mvrahden/go-test/pkg/lint) shows both setups and what each driver leaves out.
 
 ## GitHub Actions
 
@@ -1094,9 +1100,9 @@ Use the official action for CI pipelines with failure summaries, inline PR annot
     min-coverage: 80
 ```
 
-By default (`version: gomod`), the action runs the `gotest` your `go.mod` selects (`go tool` when declared, else `go run -mod=mod`) — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
+By default (`version: gomod`), the action builds the `gotest` your `go.mod` selects once per job and runs it, leaving the checkout's `go.sum` as committed — no version drift between CI and local development. Set `version: latest` or a specific tag to install a standalone binary instead.
 
-The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
+The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel; the summary also notes the stdlib tests beside your suites that gotest did not run.
 
 Inputs, outputs, the event stream, the fuzz and bench steps and the coverage badge are in [docs/github-action.md](docs/github-action.md). How a cancelled job, a container and a closed terminal stop a run is in [docs/stopping-a-run.md](docs/stopping-a-run.md).
 
@@ -1116,15 +1122,17 @@ gotest skill install           # install the agent skill matching this version
 gotest migrate ./...           # convert testify/suite to go-test
 gotest generate ./...          # run code generation only (no tests)
 gotest clean ./...             # remove orphaned generated files
+gotest clean --cache           # empty the test binary cache
 gotest discover ./...          # suite metadata as JSON (editor/AI surface)
 gotest prepare ./tests/e2e     # start shared fixtures for debugging
 gotest version                 # print version
 gotest help                    # show help
 ```
 
-All `go test` flags work unchanged: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-json`, `-short`, `-timeout`, `-v`.
+The `go test` flags keep their meaning: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-list`, `-json`, `-short`, `-timeout`, `-v`, `-p`, `-exec` and the build flags. A few would break what gotest does and are refused with the reason, exit 2 ([Go test flags gotest implements](specs/cli/spec.md#requirement-go-test-flags-gotest-implements)): `-o`, `-c` and `-n`, since gotest builds the binaries itself; `-overlay`, since gotest builds through an overlay of its own; `-fuzz`, which `gotest fuzz` replaces; and `-cpuprofile`, `-memprofile`, `-blockprofile`, `-mutexprofile` and `-trace` on a run that starts more than one suite process, which would each write the one file. Every word after `-args` goes to the test binary as written.
+`-run` reaches each suite process as a pattern for that suite alone ([A -run pattern in each suite process](specs/cli/spec.md#requirement-a--run-pattern-in-each-suite-process)). `-run '^TestMySuite$'` names the suite's test function only, so its fuzz seeds do not replay; name the fuzz wrapper as well, or drop the anchors, to replay them.
 
-A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout`, `2` on a usage, generation or build error, on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
+A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout` (a suite it stopped fails its package even when its methods passed: [A suite cut short by --timeout](specs/cli/spec.md#requirement-a-suite-cut-short-by---timeout)), `2` on a usage, generation or build error, on a text run in which a suite reports that it ran no tests ([A suite that ran no tests](specs/cli/spec.md#requirement-a-suite-that-ran-no-tests)), on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
 To feed a JUnit consumer, run the tests through a converter that reads the events: `gotestsum --junitfile report.xml --raw-command -- go tool gotest -json ./...`. The report is red whenever the run is — a package that does not build or a shared fixture that fails included — and gotest's exit code passes through. A converter that parses the printed text instead of the events, such as `go-junit-report`, reports those failures as plain output or not at all.
 

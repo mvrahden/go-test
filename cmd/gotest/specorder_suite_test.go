@@ -37,14 +37,18 @@ func (s *SpecOrderTestSuite) TestMarkdownIsStableAcrossRuns(t *gotest.T) {
 	gotest.Equal(t, withoutDurations(first), withoutDurations(second))
 }
 
-// A table row ends in a wall-clock duration, which two runs never share
-// exactly (Windows rounds a short one to 1ms as easily as to <1ms); the
-// order of suites and rows is what the spec must hold stable.
-var durationCell = regexp.MustCompile(`(?m)^(\|.*\|) [^|]+ \|$`)
+// A table row, a suite heading and a method item end in a wall-clock
+// duration, which two runs never share exactly (Windows rounds a short one to
+// 1ms as easily as to <1ms); the order of suites and rows is what the spec
+// must hold stable.
+var (
+	durationCell   = regexp.MustCompile(`(?m)^(\|.*\|) [^|]+ \|$`)
+	durationSuffix = regexp.MustCompile(`(?m) \((<1ms|\d+(\.\d+)?(ms|s))\)$`)
+)
 
 // The header names the minutes the runs took, which two renders need not share.
 var runsFrom = regexp.MustCompile(`(?m)^Runs from .+ UTC`)
 
 func withoutDurations(markdown string) string {
-	return runsFrom.ReplaceAllString(durationCell.ReplaceAllString(markdown, "$1"), "Runs from")
+	return runsFrom.ReplaceAllString(durationSuffix.ReplaceAllString(durationCell.ReplaceAllString(markdown, "$1"), ""), "Runs from")
 }

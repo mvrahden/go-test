@@ -33,13 +33,13 @@ The same tests, two views. First, the standard verbose stream from `gotest ./...
 Now the same results through `gotest spec`:
 
 {{< spec title="gotest spec ./..." >}}
-Cart <span class="t-time">(2ms)</span>
+Cart — 3 passed <span class="t-time">(2ms)</span>
   AddItem <span class="t-time">(2ms)</span>
-    the cart is empty <span class="t-time">(1ms)</span>
-      <span class="t-pass">✓</span> adds the item <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> sets quantity to 1 <span class="t-time">(<1ms)</span>
-    the item already exists <span class="t-time">(<1ms)</span>
-      <span class="t-pass">✓</span> increments the quantity <span class="t-time">(<1ms)</span>
+    when the cart is empty
+      <span class="t-pass">✓</span> adds the item
+      <span class="t-pass">✓</span> sets quantity to 1
+    when the item already exists
+      <span class="t-pass">✓</span> increments the quantity
 {{< /spec >}}
 
 The second version is something a product manager can read. It describes what the Cart does, under what conditions, with what outcomes. It is not a test report. It is a behavioral specification, generated from tests that the build enforces. To be fair, tools like gotestsum and Ginkgo's reporters already improve the formatting of `go test` output; the spec view differs in that it renders the behavioral hierarchy itself — suite, method, `When`, `It` — rather than a better-formatted stream of test names.
@@ -79,9 +79,9 @@ Runs from 2026-11-09 18:02 to 18:03 UTC · main @ c94f5cd5
 
 ### cart — 28 passed
 
-#### Cart — 3 passed
+#### Cart — 3 passed (2ms)
 
-- **AddItem**
+- **AddItem** (2ms)
   - when the cart is empty
     - PASS adds the item
     - PASS sets quantity to 1
@@ -188,7 +188,7 @@ The JSON format from `gotest spec --format=json` contains the full behavioral tr
 Not all tests are good documentation. A test named `TestFoo` with no `When`/`It` blocks produces a spec line that says nothing:
 
 {{< spec title="gotest spec" >}}
-Foo <span class="t-time">(<1ms)</span>
+Foo — 1 passed <span class="t-time">(<1ms)</span>
   <span class="t-pass">✓</span> Foo <span class="t-time">(<1ms)</span>
 {{< /spec >}}
 
