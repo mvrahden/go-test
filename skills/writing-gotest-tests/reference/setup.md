@@ -60,9 +60,11 @@ go tool gotest version
 ## Vendored modules
 
 In a vendored module (`vendor/modules.txt`) any go.mod edit breaks every
-build until `go mod vendor` reruns, and gotest cannot run vendored at all
-(the overlay's `pkg/gotestruntime` import is never vendored) — report, do
-not work around.
+build until `go mod vendor` reruns. gotest runs vendored only when a file
+of the module imports `github.com/mvrahden/go-test/pkg/gotestruntime` (and
+`pkg/gotestfuzz` for struct fuzz targets), because only generated code
+imports them; where that file is missing, report it and do not add it
+unasked.
 
 ## Running the CLI
 
@@ -70,8 +72,9 @@ Every command is `go tool gotest <args>`; if Go reports the short name
 ambiguous, use `go tool github.com/mvrahden/go-test/cmd/gotest`. Never a
 global `go install` binary: it drifts from the pin and from the module's Go.
 From v1.29 the CLI refuses to run (`FAIL:`, exit 2; 1 from `lint`) when it
-was built with an older Go than the module's go line, or when the pin
-resolves below the oldest runtime it generates for; a binary drifted the
+was built with an older Go than the module's go line, and a run refuses
+(`FAIL:`, exit 2) when the pin resolves below the oldest runtime it
+generates for; `lint` does not check that floor. A binary drifted the
 other way still runs. That refusal is never a fault in the tests: switch to
 `go tool gotest`, which builds the CLI at the pinned version with a Go at
 least as new as the module's go line. From v1.33 a refusal about the

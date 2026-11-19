@@ -19,8 +19,17 @@ invocation runs tests — there is NO `test` subcommand:
   unreadable one). From v1.33 a stream with no test events, or one cut
   off before every package reported, exits 2 too. `--static` renders the
   spec from source without running anything — nodes carry no verdict, and
-  incompletely enumerable methods are reported on stderr.
-- `go tool gotest watch ./...` — rerun on change; supports `--spec`.
+  incompletely enumerable methods are reported on stderr. `--declared`
+  (with `--input`) lays the stream's verdicts over the specification the
+  source declares, so a behavior that never ran shows as not run;
+  `--hide=pass` (or `fail`, `skip`, `none`, comma-separated) leaves rows
+  out of the rendering and none out of the counts; `--match=<text>` and
+  `--only=<import path>` keep part of the rendering, with the counts of
+  what is kept; `--stamp` (with `--input`) writes the stream back instead
+  of rendering it.
+- `go tool gotest watch ./...` — rerun on change; supports `--spec`,
+  `--bench` (re-run the benchmarks, with ns/op deltas) and
+  `--debounce=<dur>` (default 200ms).
 - `go tool gotest lint ./...` — the linter; exit 3 on findings (`-json`
   exits 0 and carries them in the document). `-fix` applies suggested
   fixes and formats the files it rewrites. From v1.33 it applies composed
@@ -33,6 +42,8 @@ invocation runs tests — there is NO `test` subcommand:
   `lint` exits 0 (`-fix` stops after one pass and never shows what it
   cannot fix), and `-diff` is no preview: alone it only lists findings,
   and `-fix -diff` prints one pass with headers `git apply` rejects.
+  `-rules` lists the rules (`-rules -json` as a document);
+  `-disable-nolint` ignores `//nolint` comments.
   Integrity rules yield only to `//nolint:<rule>` (on the line, directly
   above it, or file-wide trailing the `package` line); others
   also to `.gotest.yml` `lint.skip` / `-skip-<rule>`.
@@ -47,27 +58,38 @@ invocation runs tests — there is NO `test` subcommand:
   description or table) is missing and `behaviorsComplete: false` says
   so — never present an incomplete list as the whole specification.
 - `go tool gotest scaffold ./pkg/path.TypeName` — generate a suite; an
-  interface target generates a generic contract suite. Own-module targets
+  interface target generates a generic contract suite. `--fuzz` adds fuzz
+  round-trip skeletons. Own-module targets
   only (it writes into the target package's directory).
 - `go tool gotest migrate ./...` — testify/suite conversion (see
-  `migration.md` for its scope).
+  `migration.md` for its scope); `--dry-run` prints the diff of every edit
+  instead of writing it.
 - `go tool gotest refactor toggle-focus <file> <Suite[.Method]>` — toggles
   the `F_` focus prefix only (`X_` is a manual edit).
 - `go tool gotest skill install [--dir=<skills-dir>]` (**v1.34+**) —
   rewrites this skill as shipped with the pinned version (default
   `.agents/skills`; Claude Code reads `.claude/skills`). Rerun after
   upgrading the pin.
-- Also: `prepare`, `generate`, `clean`, `summary`, `version`, `help <cmd>`.
+- `go tool gotest summary ./...` — run and print a failure-first summary
+  for CI; `--input <file|->` renders a saved stream, `--coverage=<path>`
+  names the coverage profile, `--badge=<path>` writes a coverage badge SVG.
+- Also: `prepare`, `generate`, `clean`, `version`, `help <cmd>`.
 
 Flags shared by run modes: `--ci` (or env `GOTEST_CI`/`CI`; `0`, `f`, `F`,
 `false`, `FALSE` and `False` are falsy, v1.34+; below, `0` and `false`) — enables the focus guard (committed `F_` prefixes fail
 the run) AND makes a missing `MatchSnapshot` baseline fail instead of
 being created. `--update-snapshots` rewrites baselines — in CI too, so
 never pass it there. `--spec` renders the spec view
-instead of default output. `--timeout <dur>` is the global pipeline
+instead of default output; `--no-color` strips ANSI codes from it.
+`--group=<name>` runs only the suites of that `ExclusiveGroup` and
+`--skip-group=<name>` leaves them out (both repeatable).
+`--compile-parallel=<n>` bounds concurrent compilations (default NumCPU,
+halved under `-race`). `--github` emits annotations and the step summary
+(on by default in GitHub Actions). `--events-file=<path>`, with `-json` or
+in `summary`, also writes the event stream to that file. `--timeout <dur>` is the global pipeline
 deadline (default 15m) and `--setup-timeout <dur>` a flat shared-fixture
 setup budget (default: what the fixtures declare, v1.34+) — `0` disables either; `--min <pct>` gates
-coverage, `--no-cache` skips the test binary cache and forces a fresh link, `--debug` keeps the run's work dir and overlay.
+coverage, `--no-cache` skips the test binary cache and forces a fresh link (`gotest clean --cache`, **v1.38+**, empties it), `--debug` keeps the run's work dir and overlay.
 `--control=stdin` (**v1.37+**, every command that stops on Ctrl-C) reads
 `stop` and `force` lines on stdin, a first and a second Ctrl-C; the input's
 end is a stop. For a program driving gotest that cannot signal it (Windows);

@@ -52,9 +52,9 @@ gotest watch ./...
 
 That is the entire setup. After this command, your tests run once. Every time you save a `.go` file, it clears the terminal and re-runs. Add `--spec` to render the spec tree after each run instead of the default output. You never switch to the terminal to type a command again.
 
-Under the hood, watch mode uses fsnotify to monitor your source tree for `.go` file changes. When a file changes, it waits 200 milliseconds for the save to settle (this debounce is configurable via `--debounce`), then converts the changed file's directory into a package pattern and re-runs only that package.
+Under the hood, watch mode uses fsnotify to monitor your source tree for `.go` file changes. When a file changes, it waits 200 milliseconds for the save to settle (this debounce is configurable via `--debounce`), then re-runs the changed file's package and the packages that depend on it.
 
-That last point matters. If you have 20 packages and change a file in `pkg/user`, only `pkg/user` re-runs. The other 19 packages are not recompiled or re-executed. In a large project, this is the difference between a 1-second feedback cycle and a 15-second one.
+That last point matters. If you have 20 packages and change a file in `pkg/user`, `pkg/user` and the packages that import it re-run. The rest are not recompiled or re-executed. In a large project, this is the difference between a 1-second feedback cycle and a 15-second one.
 
 The workflow becomes: edit code, save, glance at the terminal. The results are already there. There is no command to type, no package path to remember, no compilation wait for unrelated code.
 
@@ -80,8 +80,8 @@ Rename `TestCreate` to `F_TestCreate` and save. Watch mode picks up the change, 
 
 Focus works at multiple levels:
 
-- **Focus a method:** Rename `TestCreate` to `F_TestCreate`. Only this method runs in its suite; all other methods are skipped.
-- **Focus a suite:** Rename `UserServiceTestSuite` to `F_UserServiceTestSuite`. Only this suite runs in the package; all other suites are skipped.
+- **Focus a method:** Rename `TestCreate` to `F_TestCreate`. Only this method runs; every other method and suite of the run is skipped.
+- **Focus a suite:** Rename `UserServiceTestSuite` to `F_UserServiceTestSuite`. Only this suite runs; every other suite of the run, in any package, is skipped.
 - **Back to normal:** Remove the `F_` prefix and save. Everything runs again.
 
 The inverse also exists. The `X_` prefix excludes:
@@ -96,7 +96,7 @@ func (s *UserServiceTestSuite) X_TestSlowIntegration(t *gotest.T) {
 The rules are simple:
 
 - `F_` works on both suite types and test methods.
-- A focused suite skips the other suites in its package; a focused method skips the other methods in its suite.
+- Focus is run-wide: one focused suite or method skips every unfocused suite in every package of the run.
 - `X_` always skips, regardless of whether focus is active.
 - `X_` takes precedence over `F_`.
 
@@ -120,7 +120,7 @@ This changes how you work. With a 1-second loop, you write smaller increments. Y
 
 ## The CI guard
 
-The `F_` prefix is a development tool. It is not meant to be committed. If it reaches your main branch, it silently skips every other test in the package. This is the kind of mistake that passes code review because the tests are green, they just are not running.
+The `F_` prefix is a development tool. It is not meant to be committed. If it reaches your main branch, it silently skips every other test of the run. This is the kind of mistake that passes code review because the tests are green, they just are not running.
 
 gotest's CI mode catches this. When running with the `--ci` flag (or when the `CI` environment variable is set, which most CI providers do automatically), gotest checks for focus prefixes before running any tests. If it finds any, the build fails immediately with an explicit error:
 

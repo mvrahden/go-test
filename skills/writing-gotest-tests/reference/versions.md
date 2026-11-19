@@ -4,6 +4,7 @@ SKILL.md and the other references describe the newest release. Find the
 installed version first (SKILL.md's version check), then read what differs
 on it below. After an upgrade, the entries newer than the old pin are the
 upgrade notes: each names the behavior it replaced.
+What a release changed inside the runner is in the repository's `docs/CHANGELOG.md`, not here.
 
 ## v1.25.x
 
@@ -201,8 +202,6 @@ Rules and sections tagged **v1.32+** need v1.32.0 or newer. What v1.32 changes:
 4. **Teardown runs when a run is stopped** — on Ctrl-C or an expired
    `--timeout`, `AfterAll` and fixture teardown still release what setup
    built.
-5. **The runtime floor is v1.32.0** — a v1.32 CLI refuses a pin below it,
-   which only a CLI not run through `go tool gotest` can meet.
 
 ## v1.33
 
@@ -222,21 +221,18 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    that result as a patch; below v1.33 `-fix` stops after one pass and
    exits 0 silently, so re-run it and plain `lint` there, and `-diff`
    previews nothing usable.
-4. **The runtime floor is v1.33.0** — a v1.33 CLI refuses a pin below
-   v1.33.0, which only a CLI not run through `go tool gotest` can meet.
-   Drift refusals name the version to pin instead of `@latest`.
-5. **`os.Exit(0)` in a test fails the run**, as under `go test`; below
+4. **`os.Exit(0)` in a test fails the run**, as under `go test`; below
    v1.33 the plain run reported it as passed. A panicking or exiting test
    exits 1 in every mode; below v1.33 the plain run passed the binary's
    own status through (2 for a panic).
-6. **Every matched package ends in a verdict**, in text and `-json`
+5. **Every matched package ends in a verdict**, in text and `-json`
    (`[no test files]`, `[no suites]`, `[no tests to run]`), and
    `spec`/`summary --input` exit 2 on a stream with no events, one cut
    short, or a build failure (unless `--render-only`); below v1.33 the
    first two exited 0 and a replayed build failure 1. A green pre-v1.33
    run over packages without suites wrote an empty stream, so replay
    those with `--render-only`.
-7. **`migrate` type-checks its result** — exit 0 means every migrated
+6. **`migrate` type-checks its result** — exit 0 means every migrated
    package compiles; every line that does not, and every construct it
    cannot convert, carries a marker (exit 1, on every run until none is
    left); a pattern matching nothing or a package that did not compile
@@ -247,41 +243,32 @@ Rules and sections tagged **v1.33+** need v1.33.0 or newer. What v1.33 changes:
    builds. Below v1.33 hooks declared in another file than the suite
    silently never ran and a clean exit could leave code that does not
    compile.
-8. **A shared fixture may omit `AfterAll`**; below v1.33 one without it
+7. **A shared fixture may omit `AfterAll`**; below v1.33 one without it
    passes generation and then fails to start.
-9. **A Timeout or SetupTimeout overrun names the test's file and line**;
+8. **A Timeout or SetupTimeout overrun names the test's file and line**;
    below v1.33 it pointed at `asm_amd64.s`.
-10. **`scaffold` on an interface** writes a contract suite whose
-    `BeforeEach` picks the constructor per instantiated type (add a
-    `case`; an alias without one fails with "no constructor for <type>");
-    below v1.33 its `factory` field could not be set through a type alias
-    and the suite nil-panicked.
-11. **Patterns that match no package fail** — a run (any mode, bench and
+9. **`scaffold` on an interface** writes a contract suite whose
+   `BeforeEach` picks the constructor per instantiated type (add a
+   `case`; an alias without one fails with "no constructor for <type>");
+   below v1.33 its `factory` field could not be set through a type alias
+   and the suite nil-panicked.
+10. **Patterns that match no package fail** — a run (any mode, bench and
     fuzz included) exits 2 and `lint` exits 1 when no package matched; a
     wildcard pattern that matches nothing beside others that match only
     warns (a path that does not exist still fails the run). Below v1.33
     such a run passed green having tested nothing.
-13. **Assertion locations name the user's line everywhere** — in generic
+11. **Assertion locations name the user's line everywhere** — in generic
     suite code inlined into the harness, on a plain `*testing.T`, in
     benchmarks and fuzz bodies, helpers included, and for `Skipf`;
     `go test -fullpath` is honoured. Below v1.33 these could point into
     gotest, reflect or `gotest_psuite_test.go`.
-14. **Run output takes `go test`'s shape** — bare import paths and meta
-    patterns (`fmt`, `std`, `all`) run instead of being dropped, standard
-    library packages get `[no suites]`/`[no test files]`, a package whose
-    suites are all `X_` or deselected reads `[no tests to run]`, and every
-    package's `-json` events open with a `start` event.
-15. **`-skip` passes through like `-run`**; v1.32 rejected it as an
+12. **`-skip` passes through like `-run`**; v1.32 rejected it as an
     unknown flag. An empty pattern (`gotest "$PKG"` with `$PKG` unset) is
     the current directory, as for `go test`; `.go` file arguments exit 2
     (gotest takes packages, not files), and so does a bad test flag value
     or `-run`/`-skip` regexp — below v1.33 those ran and failed as a test.
     `gotest fuzz` refuses `-run`, `-skip` and `-bench`; pick the target
     with `--target`.
-16. **`generate` and `clean` touch only the main module's packages**
-    (go.work modules count) — `generate all` no longer writes harness
-    files into dependencies. Bare `gotest clean` cleans the current
-    package, like `generate`; use `gotest clean ./...` for the tree.
 
 ## v1.34
 
@@ -412,16 +399,11 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     `gotest fuzz triage` start the suite's shared fixtures and every fuzz
     worker hydrates them
     ([fuzz](https://github.com/mvrahden/go-test/blob/main/specs/fuzz/spec.md#requirement-fuzzing-with-shared-fixtures)).
-16. **The release between setup attempts runs like the final teardown**
-    ([stop](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-stop-during-the-release-between-attempts)):
-    under the fixture's `Timeout`, failing the run when it overruns a
-    declared one, and not cut short by a stop, after which no further
-    attempt starts and `AfterAll` does not run again.
-17. **A failed `Hydrate` is dehydrated**
+16. **A failed `Hydrate` is dehydrated**
     ([hydrate](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-failed-hydrate-is-dehydrated)):
     `Dehydrate` runs after a `Hydrate` that failed or panicked. To migrate,
     guard in `Dehydrate` what `Hydrate` may not have set.
-18. **A stop lets the suite finish**
+17. **A stop lets the suite finish**
     ([stop](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-a-run)):
     on Ctrl-C or `--timeout` the methods not yet started are skipped with
     the reason `run stopping`, `AfterAll` runs, then the fixtures are
@@ -445,24 +427,14 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     held. To migrate a `goleak.VerifyNone` inside a suite method, which now
     sees the stop watcher, pass it
     `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).loop")`.
-20. **Shared fixture setup waits for the declared budget** — without
+18. **Shared fixture setup waits for the declared budget** — without
     `--setup-timeout`, the runner waits as long as the fixtures'
     `SharedFixtureConfig()` declares, every attempt and every release
     between them counted, and 30s until the first reports
     ([the setup-budget requirement](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixtures-declared-setup-budget)).
     Below v1.34 the wait is a flat 2m whatever the marker says, so a
     slower fixture needs `--setup-timeout` raised.
-21. **A shared fixture started late comes up after its dependencies** —
-    one started for the exclusive tail or a bench slot comes up after a
-    dependency only that phase needs, is torn down before it, and is
-    released under the teardown budget its declared `Timeout` gives
-    ([dependencies](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-late-fixtures-dependencies),
-    [teardown](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-late-fixtures-teardown-budget)).
-    Below v1.34 one whose name sorted before that dependency's waited for
-    a dependency not yet started, and its release got the default's
-    budget whatever it declared. A stop or `--timeout` ends the wait for a
-    late fixture.
-22. **Shared fixtures can print freely** — the state travels on a
+19. **Shared fixtures can print freely** — the state travels on a
     descriptor of its own (on Windows, the process's own stdout, taken
     from fixture code before any of it runs), so what a setup prints to stdout, a line
     without a newline or a JSON-shaped log line included, never reaches
@@ -473,23 +445,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     ([started processes](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-process-a-shared-fixtures-setup-starts)).
     Below v1.34 the state shared the fixture process's stdout, so such
     output could break it, and a state line past 1 MiB failed the setup.
-23. **A suite or shared fixture whose CLI died tears down by itself**
-    ([suites](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone),
-    [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-whose-cli-is-killed)):
-    after `kill -9`, an OOM kill or a crash of the CLI, a suite ends the
-    holding method's context, starts no further method and runs
-    `AfterAll`; a shared fixture process runs the `AfterAll` of every
-    fixture whose `BeforeAll` ran, and on Linux exits with status 1 once
-    its budgets have passed if a hook never returns. Below v1.34 nothing
-    told them the CLI was gone: a suite could die without teardown, and
-    the shared fixture process ran on, holding what its fixtures built.
-    So does a suite whose stdout nobody reads any more under an `-exec`
-    wrapper.
-24. **No process a test started outlives the run**, even one it never
-    waits for
-    ([processes](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-no-process-outlives-the-run)).
-    Below v1.34 such a process kept running after the run ended on Unix.
-25. **`Eventually` and `Consistently` poll on a goroutine of their own** —
+20. **`Eventually` and `Consistently` poll on a goroutine of their own** —
     a poll that started before `waitFor` is judged by its result, one
     still running `waitFor` past the deadline fails as still running
     ([polls](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-polls-and-their-deadline)),
@@ -498,7 +454,7 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     ([arguments](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-polling-arguments)).
     Below v1.34 a poll that never returned hung the test, and a `tick`
     that is not positive panicked.
-26. **Numbers compare by value** — `InDelta` fails on a NaN delta, holds
+21. **Numbers compare by value** — `InDelta` fails on a NaN delta, holds
     equal infinities within any delta and measures integers exactly
     ([edges](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-at-the-edges-of-float64),
     [integers](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-indelta-on-integers)),
@@ -510,81 +466,45 @@ Upgrade a v1.34.0 pin as SKILL.md's version check says. What v1.34 changes:
     pointer type
     ([nil needle](https://github.com/mvrahden/go-test/blob/main/specs/assertions/spec.md#requirement-a-nil-needle));
     below v1.34 a nil key was never found.
-27. **A hook that calls `t.T()` where it is nil is refused** — every hook
+22. **A hook that calls `t.T()` where it is nil is refused** — every hook
     of a suite with a benchmark method, `BeforeAll` and `AfterAll` of one
     with a fuzz method; one error names every such hook in source order
     ([refusal](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-hooks-that-call-tt-where-it-is-nil)).
     Below v1.34 it passed generation and nil-panicked at run time; a call
     whose result is checked for nil is still accepted.
-28. **The runtime floor is v1.34.0** — a v1.34 CLI refuses a pin below
-    v1.34.0, which only a CLI not run through `go tool gotest` can meet.
-    The v1.34 harness calls runtime functions v1.33.0 lacks, and the
-    extension needs a v1.34 CLI.
-29. **Flags read one way everywhere** — a boolean takes `--x`, `--x=true` or
+23. **Flags read one way everywhere** — a boolean takes `--x`, `--x=true` or
     `--x=false`, the last one wins, and any other value exits 2; a value
     flag with no value, or one another command owns (`clean --debug`),
     exits 2. Below v1.34 `--ci=true` was silently ignored.
-30. **go test flags keep go test's meaning** — `-p P` caps the suite
+24. **go test flags keep go test's meaning** — `-p P` caps the suite
     processes and compiles, `-exec` wraps every suite binary, `-o` exits 2,
     `-run` takes a `Fuzz<Suite>_<Method>` name, `-parallel M` divides the
     budget instead of multiplying it (below v1.34: 2×GOMAXPROCS processes
     of M each), words after `-args` reach the binary, and `--min` and
     `summary` find `-coverprofile <file>` given as two words.
-31. **Output follows its reader** — no color into a pipe whatever
-    `--no-color` says, JSON documents carry no color or `::error` lines,
-    and two output modes (`--spec -json`, `summary -json`) or an unknown
-    `--format` exit 2. `version` and `help` print despite a broken
-    `.gotest.yml`; `gotest sumary` and `gotest test` suggest the command
-    meant (exit 2); every mode notes stdlib-only packages on stderr.
-32. **A bench gate needs `-count=4`** (exit 2 below it) and fails when the
+25. **A bench gate needs `-count=4`** (exit 2 below it) and fails when the
     baseline and the run share no benchmark; `--save` naming the
     `--against` file exits 2. Below v1.34 a gate judged any count and
     could compare a run against itself. Sub-benchmarks are keyed by path.
-33. **An expired `--timeout` names only what was running** — not a test
-    whose process had ended, nor one waiting for a `-parallel` slot; a hang
-    in `BeforeAll` names the suite.
-34. **`Equal` diffs field by field** — under `diff (-expected +actual):`,
+26. **`Equal` diffs field by field** — under `diff (-expected +actual):`,
     each hunk led by the path of its first change, with no addresses.
     `Regexp` and `Contains` take named string types (below v1.34 `Regexp`
     nil-panicked on one); a first message argument that is not a string
     keeps every argument in the message; helper lines are named under
     `-trimpath` in a module whose path has no dot.
-35. **Snapshot names that span lines or spell a section header are
+27. **Snapshot names that span lines or spell a section header are
     refused**; a value with a trailing `\r\n` matches its baseline again;
     a panic in an abandoned poll goes to stderr.
-36. **An `Each` row that skips ends the method as skipped** — below v1.34
+28. **An `Each` row that skips ends the method as skipped** — below v1.34
     it failed it; a loop that breaks leaves the method running. A fuzz
     `BeforeEach` that fails or panics gets its `AfterEach`, and a panic is
     reported even when `AfterEach` then fails.
-37. **A run sweeps what crashed runs left** — the `gotest-work-*` dirs of a
-    dead owner in this boot and pid namespace go; unstamped ones after 7
-    days, `--debug` ones are kept 7 days. A test binary briefly "text file
-    busy" is retried.
-38. **Each run writes its overlay into its own work dir** — nothing
-    generated is cached, so concurrent runs sharing a cache never break
-    each other's build
-    ([generated files](https://github.com/mvrahden/go-test/blob/main/specs/cli/spec.md#requirement-generated-files-are-the-runs-own));
-    `--no-cache` turns off only the test binary cache, and `--debug`
-    prints the overlay inside the work dir. Below v1.34 overlays were
-    shared under `~/.cache/gotest/overlays`; entries left there drain
-    after 7 days unused.
-39. **The binary cache is capped** — each run's start evicts the binaries
-    of a checkout that no longer exists, those unused for 7 days, then the
-    least recently used until the cache is under 5 GiB. A binary a run is linking or
-    copying is never evicted, and a run whose lock was evicted while it
-    waited links without the cache. Below v1.34 a key any run touched kept
-    every binary.
-40. **A context the default deadline ended is named** — one stderr line
+29. **A context the default deadline ended is named** — one stderr line
     (with its test under `-json`) when the 30s default ends a method's,
     `BeforeAll`'s or `AfterAll`'s context in a suite that declares no
     `Timeout` or `SetupTimeout`
     ([default deadline](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended));
     it fails nothing.
-41. **The GitHub action splits `packages`, `flags` and `go-test-flags` on
-    every line** and exits 2 on quotes; below v1.34 only the first line
-    counted.
-42. **`GOTEST_SLOW_BUILD_THRESHOLD`** sets when a build is reported as
-    still running (a Go duration, default `15s`).
 
 ## v1.35
 
@@ -610,33 +530,17 @@ Rules and sections tagged **v1.35+** need v1.35.0 or newer. What v1.35 changes:
    method panics with the fix, which ends the suite's run, until
    `gotest generate` runs again.
 
-2. **The runtime floor is v1.35.0 from v1.35.1** — a v1.35.1 CLI refuses
-   a pin below v1.35.0, skipping the retracted v1.34.0; v1.35.0 still
-   accepts a v1.34.0 pin. The extension from 1.35.1 needs a v1.35.0 CLI.
-
 ## v1.36
 
 Rules and sections tagged **v1.36+** need v1.36.0 or newer. What v1.36 changes:
 
-1. **Shared fixtures are released concurrently** — each after the fixtures
-   holding a pointer field to it, as package fixtures already were. Two
-   shared fixtures that share something without such a field (a Docker
-   network, a port) used to be released one after another by accident; give
-   the one that must go last a pointer field to the other.
-
-2. **A shared fixture is released at its last use** — once no remaining
-   planned suite declares it, not at the end of the run, and one only an
-   exclusive suite needs starts just before that suite. A suite that reads
-   a shared fixture it does not declare can find it gone; declare a pointer
-   field for every fixture a suite touches.
-
-3. **`SuiteConfig.ExclusiveGroup`** — a named group of suites run apart
+1. **`SuiteConfig.ExclusiveGroup`** — a named group of suites run apart
    from every other suite and in parallel among themselves, the default
    group first, then each group by name; `--group` and `--skip-group`
    select groups (`config.md`). An unknown field before v1.36, so a suite
    setting it does not compile against an older runtime.
 
-4. **`GOTEST_TIMEOUT_SCALE`** — set to a number above zero, it multiplies
+2. **`GOTEST_TIMEOUT_SCALE`** — set to a number above zero, it multiplies
    every suite and fixture budget, declared or default, deadline and verdict
    alike; set it on a CI runner slower than the machine the budgets were
    written on instead of raising them in code. Earlier versions ignore it.
@@ -658,12 +562,6 @@ Rules and sections tagged **v1.36.1+** need v1.36.1 or newer. What v1.36.1 chang
    on an interface, float orderings and `True(errors.Is(err, target))` are
    reported without a fix, and a concrete error pointer becomes `Zero`/
    `NotZero`, not `NoError`/`Error`.
-
-4. **A shared fixture's teardown is judged on its protocol** — a fixture
-   that logs `X.AfterAll failed:` no longer fails a passing run.
-
-5. **`bench --json` carries `failures`** — what a failed benchmark printed,
-   a panic's message and stack included.
 
 ## v1.37
 
@@ -702,20 +600,14 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
    and its hooks never ran, and `discover` listed it as a suite without
    methods; name a helper type so it does not end in `TestSuite`.
 
-5. **The harness imports under its own names** and every load reads past a
-   generated file left on disk, so a package declaring `context` or
-   `testing`, or a suite renamed since the last `gotest generate`, still
-   runs
-   ([generated harness](https://github.com/mvrahden/go-test/blob/main/specs/discovery/spec.md#requirement-the-generated-harness)).
-
-6. **`migrate` converts base suites** — a testify suite embedding a base
+5. **`migrate` converts base suites** — a testify suite embedding a base
    suite of the same test files migrates with it: the base becomes a helper
    held in a named field, `BaseTestSuite` renamed `BaseSuiteHelper`, and the
    child declares the hooks and tests it had through the base
    ([base suites](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-base-suites)).
    Before v1.37 the files declaring both were left under a marker.
 
-7. **`migrate` keeps testify's verdicts or marks why not** — a translation
+6. **`migrate` keeps testify's verdicts or marks why not** — a translation
    that would pass or fail where testify did not, or change what runs when,
    is left under a marker naming the reason and the gotest way
    ([kept verdicts](https://github.com/mvrahden/go-test/blob/main/specs/migrate/spec.md#requirement-kept-verdicts)),
@@ -725,46 +617,14 @@ Rules and sections tagged **v1.37+** need v1.37.0 or newer. What v1.37 changes:
    Before v1.37 such a translation could turn a passing testify suite red,
    or a failing one green, with exit 0.
 
-8. **`lint -fix` unfocuses files behind a build constraint** — the `focus`
-   fix renames a suite in the files a build constraint leaves out too, and
-   names, unapplied, a fix such a file would break
-   ([the focus fix](https://github.com/mvrahden/go-test/blob/main/specs/lint/spec.md#requirement-the-focus-fix)).
-
-9. **A stop reaches gotest from CI and from a closed terminal** — on Linux
-   and macOS runners the action passes a cancelled or timed-out job's
-   signal on to gotest, and SIGHUP (a closed terminal, a dropped ssh
-   session; not under `nohup`) and, on Windows, the console closing stop a
-   run as Ctrl-C does: the suites tear down and the summary and events
-   file are written
-   ([every launcher](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-every-launcher-stops-cleanly)).
-   Before v1.37 the action's shell kept the signal and the run was killed
-   without teardown, and a hangup or a closed console ended gotest at once,
-   without a summary. Outside the action, `exec` gotest so no shell holds
-   the signal back (`ci.md`).
-
-10. **On Windows a gotest that dies leaves its suites to finish** — they run
-    to their end and tear down. Before v1.37 they were killed with it,
-    mid-method, without teardown.
-
-11. **A full or `noexec` temp dir no longer breaks or stalls a run** — the
-    work directory goes under `GOTMPDIR` when it is set, as Go's own does, so a
-    run works where `/tmp` is mounted `noexec` (`docker run --tmpfs /tmp`);
-    a stop that cannot write a suite's stop file kills that suite at once
-    and says so on stderr; and the files kept beside each suite are named
-    by its index in the run, so two suites whose names differ only in case
-    no longer share them on macOS or Windows. Before v1.37 the work
-    directory ignored `GOTMPDIR`, and such a stop waited out the suite's
-    shutdown budget, minutes, before the run ended.
-
-12. **`--control=stdin` stops gotest through its standard input** — every
-    command that stops on Ctrl-C takes it and then reads `stop` (a first
-    Ctrl-C) and `force` (a second) lines, counted with the signals; the
-    input's end is a stop
-    ([standard input](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input)).
-    The VS Code extension cancels runs, watches and debug sessions this
-    way, which gives it a graceful cancel on Windows. Below v1.37 the flag
-    is unknown (exit 2), and on Windows the extension's cancel killed the run
-    without teardown.
+7. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
+   like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
+   the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
+   loop and seed they are. Below v1.37 `t-escape`/`suite-lifecycle` saw
+   only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
+   benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
+   `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
+   gains `Name`, so `t-escape` fixes those through every escape too.
 
 ## v1.38
 
@@ -784,87 +644,10 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    that signals its own process must use another signal or a child
    process. Plain `go test` is unchanged.
 
-2. **Descriptor 3 is taken at start and released at init** — under gotest
-   a suite process starts with its control channel on descriptor 3 (on
-   Windows two inherited pipe handles), named by `GOTEST_CONTROL`; the runtime's
-   init moves it to descriptor 1000 or above and unsets the variable, so
-   the tests and the processes they start see neither
-   ([channel](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-reaches-the-suite-on-its-channel)).
-   Code that runs before that init, an `-exec` wrapper included, finds
-   descriptor 3 taken. Under a wrapper that does not pass it on (`sudo`,
-   `ssh`, `docker run`) a stop reaches the suite as one SIGINT to its
-   process group, and the stream still ends whole
-   ([wrapper](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-under-a-wrapper-that-drops-the-channel)).
-   Before v1.38 gotest passed a suite nothing on descriptor 3.
-
-3. **A crash fails the package by its exit status** — the suite runs as
-   the runner's own child, with `test2json` beside it as a filter, so a
-   suite process that ends by a signal, a panic or an `os.Exit` fails its
-   package by its real exit status, and the closing event no longer names
-   the test that was running
-   ([crash](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-crash-is-the-packages-failure)).
-   A converter that dies early costs no verdict: the runner converts the
-   output it kept again and says so on stderr
-   ([converter](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-converter-that-ends-early)).
-   Before v1.38 `test2json` ran the suite on the `-json`, `spec` and
-   `summary` pipelines, and its closing event named the test that was
-   running.
-
-4. **A second Ctrl-C releases the fixtures on Windows too** — gotest
-   sends each suite `force` on its channel, on every OS, which releases
-   its fixtures at once, and the shared fixture process `force` on its
-   standard input, which ends the contexts its releases run under; what
-   still runs two seconds later is killed
-   ([second Ctrl-C](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-second-ctrl-c-to-gotest),
-   [shared fixtures](https://github.com/mvrahden/go-test/blob/main/specs/fixtures/spec.md#requirement-a-shared-fixture-process-asked-to-stop)).
-   Before v1.38 a second Ctrl-C on Windows killed the suites at once,
-   without teardown, and the shared fixture process ignored a second
-   stop.
-
-5. **`goleak` ignores `(*watcher).read`** — the goroutine that waits for a
+2. **`goleak` ignores `(*watcher).read`** — the goroutine that waits for a
    stop while a suite runs is now
    `github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).read`, so a
    `goleak.VerifyNone` inside a suite method passes it
    `goleak.IgnoreAnyFunction("github.com/mvrahden/go-test/pkg/gotestruntime.(*watcher).read")`;
    `goleak.VerifyTestMain` still sees nothing. Before v1.38 it was
    `(*watcher).loop`, and an ignore line naming that now matches nothing.
-
-6. **`b.B()` and `f.F()` escapes are linted** — `t-escape` reports them
-   like `t.T()` ones, `suite-lifecycle` reports `Cleanup` through them, and
-   the bench and fuzz rules read `for b.B().Loop()` and `f.F().Add` as the
-   loop and seed they are. Below v1.38 `t-escape`/`suite-lifecycle` saw
-   only `t.T()`; `bench-loop` wrongly reported a `for b.B().Loop()`
-   benchmark and `bench-wait`/`fuzz-seed` did not see through the escape.
-   `gotest.B` and `gotest.F` gain `Setenv` and `TempDir`, and `gotest.T`
-   gains `Name`, so `t-escape` fixes those through every escape too.
-
-7. **The stop, pid and budget files are gone** — the runner sets neither
-   `GOTEST_STOP_FILE` nor `GOTEST_TEARDOWN_BUDGET_FILE`, and the work
-   directory holds no stop, pid or budget file beside a suite: the stop,
-   the force and the teardown budget travel as lines on its channel
-   ([channel](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-reaches-the-suite-on-its-channel)).
-   A stop raised while the process runs its `TestMain` is read when the
-   first suite opens, which skips every suite with the reason
-   `run stopping` and sets up no fixture
-   ([before the first suite](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-stop-before-the-first-suite-opens)).
-   A dead runner is the channel's end, on every OS: the suite stops by
-   itself and, on Unix, after its release ends what its tests started,
-   SIGTERM to its own process group and SIGKILL 2s later
-   ([runner gone](https://github.com/mvrahden/go-test/blob/main/specs/lifecycle/spec.md#requirement-a-suite-whose-runner-is-gone)).
-   Before v1.38 the suite polled the stop file and watched its parent
-   and, on Linux and macOS, the reader of its stdout, and on Unix what its
-   tests started outlived a dead runner. Nothing user-facing read the
-   files; tooling that listed the work directory sees them gone.
-
-8. **The runtime floor and the extension floor are v1.38.0** — a v1.38
-   CLI refuses a runtime below v1.38.0 before it generates anything, with
-   exit 2 and the `go get -tool` command that fixes it. A v1.38 runtime
-   under an older CLI fails at the first suite open, with exit 1 and one
-   line naming both versions and `go tool gotest`. Plain `go test` runs
-   either as before. Through `go tool gotest` the CLI and the runtime come
-   from one module version, so only a global binary or the extension's
-   `cliPath` meets these. The extension from 1.38.0 needs a v1.38.0 CLI.
-   The runtime now depends on `golang.org/x/sys`, so a module upgrading to
-   v1.38 runs `go mod tidy` once, or `go test` stops with "missing go.sum
-   entry" until it does.
-   Before v1.38 the runtime floor was v1.35.0 and the extension's v1.37.0.

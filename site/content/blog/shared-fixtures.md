@@ -313,7 +313,7 @@ If in doubt, start with package fixtures. Promote to shared fixtures when the pe
 
 Shared fixtures replace the external orchestration layer that most Go projects use today: the Makefile that starts containers, the docker-compose file that seeds databases, the CI script that waits for health checks. The fixture lifecycle moves into Go, where it is type-checked, version-controlled, and visible in the test code itself.
 
-The test code can now say "I need a Postgres instance with this schema" as a typed dependency, not as an assumption about what `make test` did before `go test` ran. If the fixture fails to start, the error appears in the test output with a file and line number. If the fixture is slow, `ContainerFixtureConfig` gives it retries and a timeout. If the fixture depends on another fixture, the dependency is a pointer field that the generator resolves automatically.
+The test code can now say "I need a Postgres instance with this schema" as a typed dependency, not as an assumption about what `make test` did before `go test` ran. If the fixture fails to start, the run fails and names the fixture, the hook and its error. If the fixture is slow, `ContainerFixtureConfig` gives it retries and a timeout. If the fixture depends on another fixture, the dependency is a pointer field that the generator resolves automatically.
 
 This is the kind of problem that, once you see the solution, feels obvious. But it requires crossing a conceptual boundary: the fixture lifecycle must span multiple OS processes, which means serialization, subprocesses, and careful lifecycle orchestration. That is what the `SharedFixture` model provides.
 

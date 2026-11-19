@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mvrahden/go-test/internal/speccatalog"
@@ -102,6 +103,56 @@ func (s *GuidesTestSuite) TestLinksIntoSpecsResolve(t *gotest.T) {
 	}
 	t.When("each link from a guide into specs/ is followed", func(w *gotest.T) {
 		w.It("names an existing spec file and a heading in it", func(it *gotest.T) {
+			gotest.Empty(it, broken, "fix the link:\n%s", strings.Join(broken, "\n"))
+		})
+	})
+}
+
+var (
+	// relativeLink finds inline links that are neither absolute nor a bare anchor.
+	relativeLink = regexp.MustCompile(`\]\(([^)\s#][^)\s]*)\)`)
+	// codeSpan is an inline code span, whose text is not a link.
+	codeSpan = regexp.MustCompile("`[^`]*`")
+)
+
+func (s *GuidesTestSuite) TestRelativeLinksResolve(t *gotest.T) {
+	root, guides := loadGuides(t)
+	var broken []string
+	for _, g := range guides {
+		if strings.HasPrefix(g.path, "tests/") {
+			continue
+		}
+		inFence := false
+		for i, line := range strings.Split(string(g.data), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "```") {
+				inFence = !inFence
+				continue
+			}
+			if inFence {
+				continue
+			}
+			for _, m := range relativeLink.FindAllStringSubmatch(codeSpan.ReplaceAllString(line, ""), -1) {
+				target := m[1]
+				if strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
+					continue
+				}
+				path, anchor, _ := strings.Cut(target, "#")
+				file := filepath.Join(root, filepath.FromSlash(filepath.Dir(g.path)), filepath.FromSlash(path))
+				info, err := os.Stat(file)
+				switch {
+				case err != nil:
+					broken = append(broken, fmt.Sprintf("%s:%d: %s: no such file", g.path, i+1, target))
+				case anchor != "" && !info.IsDir() && strings.HasSuffix(path, ".md"):
+					data, err := os.ReadFile(file) //nolint:gosec // G304: a document of this repository
+					if err != nil || !speccatalog.Anchors(data)[anchor] {
+						broken = append(broken, fmt.Sprintf("%s:%d: %s: the file has no such heading", g.path, i+1, target))
+					}
+				}
+			}
+		}
+	}
+	t.When("each relative link of a guide is followed", func(w *gotest.T) {
+		w.It("names an existing file and, with an anchor, a heading in it", func(it *gotest.T) {
 			gotest.Empty(it, broken, "fix the link:\n%s", strings.Join(broken, "\n"))
 		})
 	})

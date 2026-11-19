@@ -14,11 +14,81 @@
 Specification-driven test suites for Go with isolation and parallelism as first-class citizens.
 
 Write test suites as Go structs.
-`gotest` generates the lifecycle wiring, `t.Run` nesting, and process isolation that you'd write by hand.
-What runs is standard `go test`.
+`gotest` generates the test functions that hand them to its runtime, and runs each suite in a process of its own.
+The compiler, the `testing` package and the output are `go test`'s; the runner is `gotest`.
 What you read back is a behavioral specification.
 
-No third-party runtime dependencies. No reflection in discovery or registration. Pure code generation.
+The code your tests link imports only the standard library. Suites are found and registered by code generation, never by reflection.
+
+## Contents
+
+- [Why gotest?](#why-gotest)
+- [How It Works](#how-it-works)
+- [What It Costs](#what-it-costs)
+- [Install](#install)
+- [Getting Started](#getting-started)
+- [Specification](#specification)
+- [Isolation](#isolation)
+- [Parallelism](#parallelism)
+- [Testing Toolkit](#testing-toolkit)
+- [Benchmarking](#benchmarking)
+- [Fuzzing](#fuzzing)
+- [Configuration](#configuration)
+- [Test Selection](#test-selection)
+- [Tooling](#tooling)
+- [GitHub Actions](#github-actions)
+- [Commands](#commands)
+- [Naming Conventions](#naming-conventions)
+- [Coding Agents](#coding-agents)
+- [VS Code Extension](#vs-code-extension)
+- [License](#license)
+
+## Why gotest?
+
+Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more.
+Setup/teardown logic is copy-pasted or buried in `TestMain`.
+As test suites grow, organization becomes a discipline problem rather than a tooling one.
+
+**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file.
+Test output is standard — but the mechanism behind it isn't.
+
+**gotest** takes a different approach:
+
+- **Specification-driven.** BDD vocabulary (`When`/`It`) structures tests as readable behavioral contracts. `gotest spec` renders them as documentation — in the terminal, as markdown, or as structured JSON. Always in sync, never stale.
+- **Isolated by default.** Each suite runs in its own process, so suites share no memory, no package-level state and no `init` side effects. Within a suite the methods share one struct value: `BeforeEach` gives each method fresh state, and a field one method writes is there for the next unless a hook resets it.
+- **Parallel on two levels.** Suites run in parallel automatically, as separate processes. Methods run in parallel when the suite opts in, and each then gets its own state from a `BeforeEach` that returns it. The generator refuses a parallel suite whose `BeforeEach` returns nothing; it cannot see a method that writes a suite field, so run parallel suites under `-race`.
+
+Under the hood, `gotest` generates one `func Test<Suite>(t *testing.T)` per suite: a table of the suite's hooks and methods, handed to the `pkg/gotestruntime` library, which runs each method as a subtest, keeps setup and teardown in order and holds the timeouts.
+Generated files never touch your source tree: they reach the compiler through a build overlay and are removed after the run.
+
+gotest's own behavioral promises are stated once in [`specs/`](specs/README.md), each scenario bound to a test; this README explains them and links there.
+
+## How It Works
+
+```
+you write:          gotest generates:              gotest runs:
+                    (in a build overlay)
+
+MySuite struct      gotest_psuite_test.go          one process per suite:
+  BeforeAll()   →     func TestMySuite(t)      →     BeforeAll()
+  TestFoo()             OpenSuite(hooks)             t.Run("TestFoo", ...)
+  AfterAll()            RunMethods(methods)          AfterAll()
+```
+
+The generated file is short: a wrapper type and one call each to `gotestruntime.OpenSuite` and `gotestruntime.RunMethods`, with your hooks and methods passed as plain function values. `gotest generate ./...` writes it to disk when you want to read it.
+Suites are found by reading the source, and the generated code calls your methods directly: no reflection finds or dispatches a test. Assertions such as `Equal` use `reflect` to compare values.
+
+## What It Costs
+
+gotest puts a generator and a runner in front of `go test`. That buys the lifecycle, the fixtures and the specification view, and it has a price:
+
+- **Two commands for a complete run.** Plain `go test` does not see suites, and `gotest` does not run plain `func Test*` functions. A module with both kinds needs both commands, each with its own coverage profile. [Install](#install) says what each prints.
+- **`TestMain` runs once per suite.** Each suite is a process of its own, so a package's `TestMain`, its `init` functions and its package-level variables are set up once per suite, not once per package. Move resource setup from `TestMain` into a fixture.
+- **Editors see suites through the extension only.** The [VS Code extension](#vs-code-extension) lists, runs and debugs suites. gopls and other editors show suite methods as plain methods. To debug elsewhere, write the generated code to disk first: `gotest generate ./...`, then `dlv test`, then `gotest clean ./...`.
+- **Go 1.26 or newer.** The Go version follows gotest's own `go.mod`, so upgrading gotest can raise your module's `go` line; Install shows how to keep it.
+- **The tool directive adds indirect requirements.** `go get -tool` records the CLI's dependencies in your `go.mod` as `// indirect`. Your test binaries link none of them: the runtime imports only the standard library.
+- **A vendored module needs one extra file**, shown under [Install](#install).
+- **Leaving means rewriting the entry points.** Assertions, `When`/`It` and `Each` are a library and keep working under plain `go test`. Suites need one hand-written `func Test*` each, and shared fixtures have no standard-library equivalent.
 
 ## Install
 
@@ -29,13 +99,78 @@ go get -tool github.com/mvrahden/go-test/cmd/gotest@latest
 go tool gotest ./...
 ```
 
-`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes. A CLI built with an older Go than the module's go line, or pinned below the oldest runtime it generates for, refuses to run and names the version your module selects; one drifted the other way still runs, unless it predates v1.38 and the runtime does not: then each suite fails as it starts, naming both versions and the fix.
+`go get -tool` pins the CLI and the `pkg/gotest` runtime to the same release, and `go tool` rebuilds the CLI with your module's Go. Upgrading is the same command again. What each release changed is in [docs/CHANGELOG.md](docs/CHANGELOG.md). One caution for both: `@latest` raises your module's `go` line when the newest release needs a newer Go (`go get` prints `upgraded go …`). To keep your Go version, name the newest release whose go line fits instead; `go list -m -f '{{.GoVersion}}' github.com/mvrahden/go-test@<version>` prints a release's. In a module that already requires gotest, name that version in place of `@latest` to declare the tool without moving the pin. Avoid a global `go install` binary: it drifts from `go.mod` on both axes. A CLI built with an older Go than the module's go line, or pinned below the oldest runtime it generates for, refuses to run and names the version your module selects; one drifted the other way still runs, unless it predates v1.38 and the runtime does not: then each suite fails as it starts, naming both versions and the fix.
 
 The examples below write `gotest` for brevity; with the tool directive, read `go tool gotest`. The VS Code extension and the GitHub action run the same CLI your `go.mod` selects.
 
-## 30-Second Example
+**Vendored modules.** `go mod vendor` copies the packages your module imports. Nothing in your tree imports gotest's runtime: the generated code does, and it never reaches the disk. Give the module one file that imports it, then vendor again; without it `gotest` refuses to run in a vendored module and names the import:
 
-Write a test suite:
+```go
+// internal/gotestdeps/deps.go
+
+// Package gotestdeps keeps the packages gotest's generated code imports in vendor/.
+package gotestdeps
+
+import (
+    _ "github.com/mvrahden/go-test/pkg/gotestfuzz"    // fuzz targets that take a struct
+    _ "github.com/mvrahden/go-test/pkg/gotestruntime" // every suite
+)
+```
+
+**Two runners.** `go tool gotest` runs suites and nothing else; `go test` runs plain `func Test*` functions and nothing else. Under plain `go test` a package of suites prints `ok … [no tests to run]` and exits 0, and `gotest` passes over the `func Test*` functions beside a suite with one note on stderr (`note: N stdlib test(s) in … not run`). A complete run is both commands, so every place that calls `go test ./...` today — CI, a Makefile, a pre-commit hook, an editor task — needs `go tool gotest ./...` beside it for as long as the module holds both kinds of test.
+
+## Getting Started
+
+Three steps. Each is useful alone, and the first needs no new command.
+
+### Step 1: Use the Library in the Tests You Have
+
+`pkg/gotest` is an ordinary library. In a plain `func Test*`, under plain `go test`, it gives you the assertions, `When`/`It` nesting, table rows, polling and snapshots:
+
+```go
+// price_test.go
+package price
+
+import (
+    "testing"
+
+    "github.com/mvrahden/go-test/pkg/gotest"
+)
+
+func TestTotal(t *testing.T) {
+    gt := gotest.NewT(t)
+
+    gt.When("the cart is empty", func(w *gotest.T) {
+        w.It("totals zero", func(it *gotest.T) {
+            gotest.Equal(it, 0, Total(nil))
+        })
+    })
+
+    for it, tc := range gotest.Each(gt, []struct {
+        Desc  string
+        Items []int
+        Want  int
+    }{
+        {Desc: "one item", Items: []int{5}, Want: 5},
+        {Desc: "two items", Items: []int{5, 7}, Want: 12},
+    }) {
+        gotest.Equal(it, tc.Want, Total(tc.Items))
+    }
+}
+```
+
+```bash
+go get github.com/mvrahden/go-test
+go test ./...
+```
+
+Assertions take the `*testing.T` directly as well (`gotest.Equal(t, want, got)`), and a failure inside a helper names the helper's line and the test's without `t.Helper()`. The same tests render as a specification from their event stream: `go test -json ./... | go tool gotest spec --input=-`.
+
+This step changes nothing about how your tests run. Take the next one when you want lifecycle hooks, fixtures or a process per suite.
+
+### Step 2: Write a Suite
+
+A suite is a struct whose name ends in `TestSuite`. It runs under `go tool gotest` ([Install](#install)), not under `go test`.
 
 ```go
 // user_service_suite_test.go
@@ -66,6 +201,31 @@ func (s *UserServiceTestSuite) TestCreate(t *gotest.T) {
             gotest.ErrorIs(it, err, ErrDuplicate)
         })
     })
+}
+```
+
+```go
+// user.go
+package user
+
+import "errors"
+
+// ErrDuplicate reports an email that is already registered.
+var ErrDuplicate = errors.New("duplicate user")
+
+// UserService registers users by email.
+type UserService struct{ users map[string]bool }
+
+// NewUserService returns an empty service.
+func NewUserService() *UserService { return &UserService{users: map[string]bool{}} }
+
+// Create registers an email once.
+func (u *UserService) Create(email string) error {
+    if u.users[email] {
+        return ErrDuplicate
+    }
+    u.users[email] = true
+    return nil
 }
 ```
 
@@ -112,40 +272,9 @@ UserService — 2 passed
 No generated code leaks into your workflow.
 `gotest` creates it before tests run - invisible to the project's filetree.
 
-## Why gotest?
+### Step 3: Share Setup With a Fixture
 
-Go's `testing` package gives you `func TestX(t *testing.T)` and nothing more.
-Setup/teardown logic is copy-pasted or buried in `TestMain`.
-As test suites grow, organization becomes a discipline problem rather than a tooling one.
-
-**testify/suite** solves organization but adds runtime reflection, interface dispatch, and a `suite.Run(t, new(MySuite))` ceremony in every file.
-Test output is standard — but the mechanism behind it isn't.
-
-**gotest** takes a different approach:
-
-- **Specification-driven.** BDD vocabulary (`When`/`It`) structures tests as readable behavioral contracts. `gotest spec` renders them as documentation — in the terminal, as markdown, or as structured JSON. Always in sync, never stale.
-- **Isolated by default.** Each suite runs in its own process. Each test gets fresh state through lifecycle hooks. Shared mutable state between tests isn't a discipline problem — it's structurally impossible.
-- **Safely parallel.** Suite-level parallelism is automatic. Method-level is opt-in. Because isolation is built in, parallel tests can't interfere with each other.
-
-Under the hood, `gotest` generates the same `t.Run`, `t.Cleanup`, and `defer` code you'd write by hand.
-Generated files never touch your source tree — they're created hidden before tests run and cleaned up after.
-
-gotest's own behavioral promises are stated once in [`specs/`](specs/README.md), each scenario bound to a test; this README explains them and links there.
-
-## How It Works
-
-```
-you write:          gotest generates:         go test runs:
-                    (hidden, auto-cleaned)
-
-MySuite struct      gotest_psuite_test.go     func TestMySuite(t *testing.T)
-  BeforeAll()   →     lifecycle wiring    →     t.Cleanup(AfterAll)
-  TestFoo()           t.Run nesting              BeforeAll()
-  AfterAll()          process isolation          t.Run("TestFoo", ...)
-```
-
-The generated code is what a careful developer would write by hand: `t.Run`, `t.Cleanup`, `defer`, `t.Parallel`.
-No reflection or interface dispatch in the generated wiring.
+Setup that several suites need goes into a fixture: a struct ending in `Fixture` for one suite at a time, `SharedFixture` for one instance across packages. [Fixtures](#fixtures) describes both, and [`examples/sharedfixture`](examples/sharedfixture) is a shared fixture two packages bind, runnable as it stands.
 
 ## Specification
 
@@ -328,7 +457,6 @@ Fixture hooks receive `context.Context` and return `error` — the generated wra
 
 `BeforeAll`/`AfterAll` receive `context.Background()` bounded by the fixture's configured timeout.
 `BeforeEach` receives the test's `t.Context()`; `AfterEach` receives `context.Background()` — cleanup must proceed even after the test context is cancelled.
-Requires Go 1.26+.
 
 Test suites reference fixtures via named pointer fields — one or more:
 
@@ -344,7 +472,7 @@ func (s *BatchTestSuite) TestDispatch(t *gotest.T) {
 ```
 
 Fixtures support the same lifecycle hook names as suites — with `(ctx context.Context) error` signatures instead of `*gotest.T`.
-`BeforeAll`/`AfterAll` run once around all suites bound to the fixture.
+`BeforeAll`/`AfterAll` run once for each suite that binds the fixture, around that suite's own `BeforeAll` and `AfterAll`.
 `BeforeEach`/`AfterEach` wrap every individual test case, running outside the suite's own hooks:
 
 ```
@@ -582,7 +710,7 @@ func (s *Suite) TestParsing(t *gotest.T) {
 }
 ```
 
-Each entry becomes a subtest.
+Each entry becomes a subtest with its own verdict. A row that fails or skips ends the method there, so the rows after it do not run ([Each rows](specs/lifecycle/spec.md#requirement-each-rows)); a row to pass over uses `continue`.
 Uses `Desc` or `Name` field for the test name, falls back to `#0`, `#1`, etc.
 
 ### Testing a Callback
@@ -642,11 +770,13 @@ Update all snapshots with:
 gotest --update-snapshots ./...
 ```
 
-Or when running `go test` directly:
+For snapshots taken in plain `func Test*` tests, which run under `go test`:
 
 ```bash
 GOTEST_UPDATE_SNAPSHOTS=1 go test ./...
 ```
+
+Suites do not run under `go test`, so this command leaves their snapshots as they are.
 
 ## Benchmarking
 
@@ -708,10 +838,14 @@ gotest bench --spec ./examples/notification -benchtime=10x
 ```
 
 ```
+=== examples/notification ===
+
 BenchmarkNotificationDispatchBench
   ✓ Dispatch  810.6 ns/op · 596 B/op · 2 allocs/op
 
-1 suite, 1 benchmark: 
+Runs from 2026-11-12 14:14 to 14:14 UTC · main @ 380769e1
+
+1 suite, 1 benchmark
 ```
 
 Each line reports `ns/op`, `B/op`, and `allocs/op` — the same numbers `go test -bench` prints, rendered as a spec.
@@ -758,92 +892,6 @@ The suite-shape rules match benchmarks, with fuzz-specific messages: a returning
 
 Each `Fuzz*` method becomes one top-level function named `Fuzz<SuiteIdentifier>_<MethodName>`, e.g. `FuzzParserTestSuite_FuzzParse`, because Go's fuzzing engine targets one `FuzzX` symbol per run.
 
-### Struct arguments
-
-Go's fuzzing engine accepts exactly fifteen argument types — and the hand-written wire and message types you most want to fuzz are structs.
-`f.Fuzz` accepts a struct — or any named type over a native one, like `type Priority int` — and codegen fans it out: one engine argument per leaf field, reassembled into your type before every execution.
-The engine still sees only types it understands, but it sees the *fields*, so its mutator moves each one independently instead of chewing on one opaque blob.
-The supported set is deliberately strict: structs of exported fields with simple shapes.
-Maps, unexported fields (which excludes `time.Time` and protobuf-generated types), interfaces, and recursion are refused at generation time with a suggested alternative — the full table is below.
-
-```go
-func (s *UserServiceTestSuite) FuzzCreate(f *gotest.F) {
-    f.Add(CreateUserRequest{Email: "a@b.c", Age: 30})
-    f.Fuzz(func(t *gotest.T, req CreateUserRequest) {
-        gotest.NoError(t, req.Validate())
-    })
-}
-```
-
-What fans out:
-
-- `string`, `bool` and `[]byte` fields pass through unchanged.
-- Numbers ride as fixed-width bytes, which gives the mutator its richest operators: bit flips, interesting values, boundary values. Why that beats a native number is in ARCHITECTURE.md, "Code Generation". A bare number argument (`func(t *gotest.T, n int)`) rides the same way, so its corpus entries on disk are bytes, not a readable number.
-- Nested structs, pointers and small arrays flatten into the same tuple; a variable-length slice of non-bytes rides as one packed `[]byte`.
-- Every position of a multi-argument callback fans on its own: `f.Fuzz(func(t *gotest.T, h Header, n int))` fans `Header` into its leaves and `n` into one leaf. Two values as arguments and two values in a struct reach the engine identically; use a struct when the values form a concept.
-
-Seeds stay plain Go literals.
-`f.Add` buffers them and `f.Fuzz` explodes each one through the target's own fan; a seed of the wrong type is rejected with the position named (`seed #1: value 1: f.Add was given []byte, but this fuzz target takes CreateUserRequest`).
-
-Crashers stay readable.
-A failing execution prints the decoded value beside the failure, `CreateUserRequest{Email: "a@\x00", Age: -1}` rather than corpus bytes, and `gotest fuzz promote` splices that literal back into the method as a typed `f.Add(...)` seed.
-Every shape the fan accepts renders as a literal, pointers included (`&[]int{5}[0]`, since `&5` is not Go and `new(5)` needs Go 1.26).
-
-**A struct target's corpus files are bound to its field order.**
-Fields map to leaves in declaration order, so an entry on disk means whatever the current field list says:
-
-- Adding or removing a field changes the leaf count. Go's engine rejects every old entry, and gotest names the drift first: a pre-flight check on plain runs and on `gotest fuzz` prints which entry no longer fits, what it holds and what the target now takes.
-- Swapping two fields of the same kind is silent: the entry loads and quietly becomes a different test.
-
-The rule that follows: keep crashers of struct targets as `f.Add` seeds, never as committed corpus files. `gotest fuzz promote` writes the seed for each crasher the latest `gotest fuzz` session wrote; an older corpus file is deleted, or its input written as a typed `f.Add` seed by hand.
-A promoted seed is source and survives any change to the encoding.
-The `fuzz-struct-corpus` lint rule flags on-disk entries for a shape-bound target: delete them or write them as typed seeds.
-
-Refused at generation time, with the alternative named in the message, because generated code that cannot round-trip faithfully would lie:
-
-| Refused | Do this instead |
-|---|---|
-| structs with unexported fields | fuzz the constructor's input, or declare a local wrapper struct |
-| `map` fields | fuzz a slice of key/value pairs and build the map in the callback |
-| interfaces, channels, funcs | — |
-| recursive types | — |
-| `time.Time` and friends (unexported internals) | fuzz an `int64` and convert in the callback |
-
-Each rejection names the field path and its type, e.g. `fuzz target FuzzUserServiceTestSuite_FuzzCreate: CreateUserRequest.mu (sync.Mutex) is not fuzzable — unexported fields cannot be set — fuzz the constructor's input, or declare a local wrapper struct`.
-Generation is the only place this can be caught: `go vet` checks direct `(*testing.F).Fuzz` calls only, and `f.Fuzz` takes `any`.
-
-### Seed harvesting
-
-At generation time, gotest mines each `Fuzz*` method's package for literal primitive values that already flow into the function under fuzz — table-test rows (`gotest.Each`) and direct call-site literals in `_test.go` files — and injects them as additional `f.Add(...)` seeds in the generated wrapper, on top of whatever you added by hand.
-Your existing valid-input examples become a starting corpus for free — coverage-guided mutation from real inputs finds interesting states far faster than starting from `""`.
-
-Harvesting only scans test files, never production code, and only lifts literal shapes — basic literals, `true`/`false`, a unary-minus of one, or a single-arg conversion of one — never computed expressions.
-It's on by default; disable it for one run with `--no-harvest`, or persistently with `fuzz: harvest: false` in `.gotest.yml` (see [Project Configuration](#project-configuration)).
-
-### Seed replay
-
-```bash
-gotest ./...
-```
-
-```
-=== RUN   FuzzParserTestSuite_FuzzParse
-=== RUN   FuzzParserTestSuite_FuzzParse/seed#0
---- PASS: FuzzParserTestSuite_FuzzParse (0.00s)
-    --- PASS: FuzzParserTestSuite_FuzzParse/seed#0 (0.00s)
-```
-
-Every seed added via `f.Add`, plus any crasher corpus already discovered under `testdata/fuzz/`, replays as an ordinary subtest under a plain run — `gotest ./...`, `gotest spec`, `gotest watch`, and `gotest summary` all do this, at zero extra cost, with no `-fuzz` flag involved.
-For a **pass-through** target, committing a crasher's corpus file makes it a permanent regression test; for a **shape-bound** target, run `gotest fuzz promote` after the session that found it instead — its corpus files are bound to the type's field order (the `fuzz-struct-corpus` lint rule will remind you), while a promoted `f.Add` literal is ordinary Go source.
-A user-supplied `-run` filter wins over this widening — fuzz seeds only replay if a generated `Fuzz<Suite>_<Method>` name happens to match the filter on its own merit.
-
-In the spec view the target sits under its suite as a property beside the examples — `✓ Parse  2 seeds` — and opens up to name the entry when a seed or corpus file fails; the trailer counts it as a fuzz target, never as a stdlib test.
-`gotest spec --static` lists fuzz targets the same way, read from source, so the declared specification states the properties too; on the wire the node's `kind` is `fuzz`.
-
-One caveat to state plainly: suite fuzz methods exist only through gotest's generated wrappers.
-Plain `go test` (and external fuzzing infrastructure like OSS-Fuzz, which needs on-disk `FuzzXxx` functions) never sees them, and promoted seeds replay only under gotest runs.
-If a target must also run under stock tooling, write it as a top-level `func FuzzXxx(*testing.F)` — `gotest.NewF(f, nil, nil, nil)` and `f.Fuzz` work there too, as plain library calls bound by reflection, though with native argument types only: fans exist solely in generated suite wrappers.
-
 ### Running
 
 ```bash
@@ -853,78 +901,11 @@ gotest fuzz --for=1m --jobs=2 ./...   # two targets at a time
 gotest fuzz --target=FuzzParserTestSuite_FuzzParse ./pkg/parser
 ```
 
-`gotest fuzz` finds every generated `Fuzz<Suite>_<Method>` target and runs each as its own `go test -fuzz=...` process.
-This is the one gotest subcommand that does not reuse the compiled suite binary: `cmd/go` weaves fuzz instrumentation in only when `-fuzz` is present on that `go test` invocation, so a binary from `go test -c` would fuzz without coverage guidance.
-Each target pays its own compile and gets a real search in return.
-
-The budget:
-
-- `--for` is the session's wall clock, one minute by default. Each target's `-fuzztime` share is `--for × min(--jobs, targets) / targets`, so concurrent waves add back up to about `--for`. Shares never drop below 10s; a small `--for` on many targets stretches the session instead, and gotest says so. The resolved schedule and the deadline it implies print before the search starts.
-- `--for` is the only clock. The deadline follows it with headroom for builds, a `.gotest.yml` `timeout` never caps a search, and `gotest fuzz` refuses `--timeout` rather than let two clocks compete.
-- `--for=0` removes the budget: targets fuzz until interrupted. Only the first `--jobs` targets ever run then, since each holds its slot, and gotest says so up front.
-- `--jobs` caps concurrent targets (default `max(1, GOMAXPROCS/2)`). A target whose slot never opens before the deadline is reported as `[<Func>] skipped: session ended before this target started`, and the closing summary names the targets that did not get their full share.
-- `--target=<Fuzz...>` narrows a session to one wrapper; an unmatched name lists the available ones, and `-run`, `-skip` and `-bench` are refused in its favour. This is what the VS Code extension invokes: fuzz methods get **Fuzz** / **Debug Seeds** CodeLenses, budgeted cancellable sessions, crasher notifications wired to triage/promote/debug, and Test Explorer items whose runs replay seeds (see `vscode-gotest/README.md`).
-
-Ending by deadline or interrupt is the normal end of an open-ended search, not a failure.
-The session exits 0 unless something was found: a failing target, or a new crasher file, detected by comparing each target's `testdata/fuzz/<Func>/` directory before and after, so a crash counts even when the deadline killed the process mid-report.
-
-Output streams live, line by line, each line prefixed `[<Func>] `:
-
-```
-[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 0s, gathering baseline coverage: 0/76 completed
-[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 0s, gathering baseline coverage: 76/76 completed, now fuzzing with 6 workers
-[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 3s, execs: 393973 (131314/sec), new interesting: 0 (total: 76)
-[FuzzNotificationServiceTestSuite_FuzzTrim] fuzz: elapsed: 10s, execs: 1407280 (131111/sec), new interesting: 1 (total: 77)
-[FuzzNotificationServiceTestSuite_FuzzTrim] PASS
-[FuzzNotificationServiceTestSuite_FuzzTrim] ok  	github.com/mvrahden/go-test/examples/notification	10.115s
-```
-
-On a crashing input the session exits 1 and names each new corpus file, `[<Func>] new crasher: <dir>/testdata/fuzz/<Func>/<hash>`, followed by the two commands that handle it: `gotest fuzz triage` to see the decoded input and `gotest fuzz promote` to keep it as a typed seed that replays on every ordinary run.
-A target that fails without writing a new file (a failing seed or existing corpus entry) is called out as such; it reproduces on a regular `gotest` run.
-
-Every session closes with one line, `fuzzed 5 targets in 20.3s: 7,012,345 execs, 3 new interesting inputs, no crashers`.
-Under GitHub Actions the same session lands in the step summary as a table with one row per target.
-
-"Interesting" inputs are the ones that reached new coverage.
-Go keeps them in its build cache, under `fuzz/<package>/<Func>/` in `go env GOCACHE`, never beside your code.
-The next session resumes from them, which is why a second run starts with a larger baseline; `go clean -fuzzcache` starts over.
-They are the search's own memory, not something to commit: the seeds you write and the crashers you promote are the corpus that travels with the code.
-The engine's `To re-run: go test -run=...` advice is dropped from the stream, since plain `go test` cannot see a generated target; the hint after a crasher names the working commands.
-
-With no `Fuzz*` methods in the matched packages, `gotest fuzz` prints `no fuzz targets found` and exits 0 without invoking `go test`; patterns that match no package at all exit 2.
-
-### Triage and promote
-
-```bash
-gotest fuzz triage ./...     # re-run every discovered crasher, report pass/fail
-gotest fuzz promote ./...    # splice crashers into f.Add(...) seeds
-```
-
-`gotest fuzz triage` scans each target's `testdata/fuzz/<Func>/` directory (a plain filesystem scan — no `go test -fuzz` invoked) and re-runs every corpus entry found there via `go test -run='^<Func>/<hash>$'`, printing its decoded input and either the panic/failure cause or `status: no longer failing`. A re-run that produced no exit status of its own — it was terminated, or never started — reports `status: unverified` and fails the triage: nothing was proven about that crasher.
-Exits 1 if any crasher's re-run still fails, 0 otherwise.
-
-`gotest fuzz promote` does the same discovery, then splices each crasher the latest `gotest fuzz` session of its target wrote, with its exact values, into its originating `Fuzz*` method as a permanent `f.Add(...)` seed — an AST-level source edit via `internal/refactor`, inserted after the method's last existing `f.Add` call — and deletes the crasher file once the splice succeeds.
-The crasher is now a committed regression test that replays for free on every ordinary run, same as any seed under [Seed replay](#seed-replay).
-A crasher whose originating method can't be located with confidence is skipped with a warning and left in place; promote never partially edits source.
-Which files it takes and what it refuses is stated in [the promote requirements](specs/fuzz/spec.md#requirement-promote-takes-corpus-literals-only).
-
-Struct-typed targets work the same way: triage prints the decoded struct on the `input:` line, and promote splices it as a typed `f.Add(T{...})` seed rather than an opaque byte string.
-See [Struct arguments](#struct-arguments) for the shapes that carry a literal and the raw-bytes fallback for those that don't.
-
-### Known limitation
-
-Top-level stdlib fuzz functions — a bare `func FuzzXxx(f *testing.F)` not attached to any suite — are not discovered or run by the gotest runner at all.
-They only run via `go test -run`/`go test -fuzz` directly; `gotest ./...`, `gotest fuzz`, and every other gotest subcommand silently ignore them.
-Only `Fuzz*` methods on `*TestSuite` structs participate in seed replay and the `gotest fuzz` orchestrator.
-
-### Worked example
-
-[`examples/fuzzing`](examples/fuzzing) fuzzes a message broker's wire-frame codec: a struct-typed round-trip target, a `[]byte` target asserting the decoder never panics on adversarial input, a string idempotence target, and two two-argument targets — one over two strings, one mixing a struct with a string.
-Its README records a real crash-to-regression-test cycle — the fuzzer finding a framing bug, `triage` decoding it, `promote` splicing it back as a typed seed.
+`gotest ./...` replays every seed as an ordinary subtest; `gotest fuzz` searches for new inputs under a time budget and exits 1 when it finds a crasher. Struct arguments, seed harvesting, the session budget, triage and promote, and what plain `go test` does not see are in [docs/fuzzing.md](docs/fuzzing.md).
 
 ## Configuration
 
-Every fixture and suite runs with sensible defaults — 2-minute fixture timeout, 30-second per-test timeout.
+Every fixture and suite runs with defaults: a fixture's setup has two minutes, and a test's `t.Context()` ends after 30 seconds. A default only ends the context; a test is failed for overrunning only a `Timeout` its suite declares ([A context the default deadline ended](specs/lifecycle/spec.md#requirement-a-context-the-default-deadline-ended)).
 Override with optional marker methods:
 
 ```go
@@ -1057,7 +1038,7 @@ gotest watch ./... -v
 gotest watch ./... --spec     # watch + spec view
 ```
 
-Only the affected package is re-run.
+The changed package and the packages that depend on it are re-run.
 Combine with `F_` prefix for a tight feedback loop — only focused tests run on each save.
 
 ### Scaffold
@@ -1117,107 +1098,7 @@ By default (`version: gomod`), the action runs the `gotest` your `go.mod` select
 
 The action emits `::error` annotations that appear inline on PR diffs and writes a markdown summary to the GitHub step summary panel.
 
-With `fuzz: true`, a fuzz step runs after the tests (`gotest fuzz` over the same packages, for `fuzz-for` or the CLI's default minute): the session's per-target table lands in the step summary, a new crasher fails the step and its corpus file is left in the checkout, listed in the `fuzz-crashers` output for an `upload-artifact` step or a `gotest fuzz promote` step in the same job (promote takes only the crashers the latest session in that job's gotest cache wrote). Seed replay needs no such step, since every ordinary run already replays seeds. The step also carries Go's fuzz cache between runs: it restores the latest corpus of the branch or its base and saves this run's under its own key, so a short budget compounds into a deeper search over time, main's corpus feeds every pull request, and no pull request pollutes main. `fuzz-cache: false` runs from the seeds alone. (The build cache `actions/setup-go` keeps is not enough for this: it is keyed on go.sum and never re-saved on a hit, so a corpus would only survive a dependency bump.)
-
-With `bench: true`, a benchmark step runs after the tests (`gotest bench --spec --json`): the step summary gets the benchmark count, a per-package results table (ns/op, B/op, allocs/op), the delta table when a baseline was compared, and the gate verdict when one was set; the versioned JSON report lands in a temp file exposed as the `bench-report` output, and a breached gate fails the step with the offending keys in `bench-breached-keys`.
-
-### Inputs
-
-The tables below are the canonical action surface — a drift guard test keeps them in sync with `action.yml`.
-
-| Input | Description |
-|---|---|
-| `packages` | Package patterns to test (default `./...`) |
-| `race` | Enable the race detector (default `false`) |
-| `coverage` | Enable coverage profiling and reporting (default `false`) |
-| `min-coverage` | Minimum coverage percentage (0-100, fails if below) |
-| `flags` | Additional gotest flags (`--double-dash` style; also forwarded to the bench step) |
-| `go-test-flags` | Additional go test flags (`-single-dash` style) |
-| `badge` | Render a coverage badge and, on the default branch, publish it as `coverage.svg` to `badge-branch` (needs `contents: write`; turns coverage on; default `false`) |
-| `badge-branch` | Branch the coverage badge is published to; created on first use (default `ci/badges`) |
-| `bench` | Run benchmarks after tests via `gotest bench --spec --json` (default `false`) |
-| `bench-baseline` | Baseline JSON file to compare benchmarks against (`--against`) |
-| `bench-gate` | Fail if any benchmark regresses by more than this percent (`--gate`); needs `-count=4` or more in `flags`, or the step exits 2 |
-| `bench-save` | Save the run as a JSON baseline at this path (`--save`); an explicit empty string saves to `bench.baseline` from `.gotest.yml`; default `false` saves nothing |
-| `fuzz` | Run a budgeted fuzz session after tests via `gotest fuzz --for`; a new crasher fails the step (default `false`) |
-| `fuzz-for` | Approximate wall-clock budget for the whole fuzz session (default: the CLI's own, one minute) |
-| `fuzz-cache` | Carry Go's fuzz cache between runs so each session resumes where the last stopped; `false` for a from-seeds run (default `true`) |
-| `events-file` | Also save the run's go test `-json` event stream to this path (`--events-file`); prefer one under `runner.temp`; needs gotest v1.36.0 or newer, and the step fails naming it with an older CLI; default empty saves nothing |
-| `version` | `gomod` (default) runs the CLI from go.mod; a tag (e.g. `v1.0.0`, `latest`) installs globally |
-
-### Outputs
-
-| Output | Description |
-|---|---|
-| `exit-code` | Test process exit code |
-| `coverage` | Coverage percentage (empty if coverage not enabled) |
-| `badge` | Path of the rendered coverage badge SVG (empty unless badge is enabled and the tests ran) |
-| `events-file` | Absolute path of the saved event stream (empty unless `events-file` is set and the file was written) |
-| `bench-report` | Path to the `gotest bench --json` report file (empty if bench not enabled) |
-| `bench-breached-keys` | Comma-joined benchmark keys that breached the gate (empty if none or no gate) |
-| `fuzz-crashers` | Comma-joined workspace-relative paths of the corpus files the fuzz session added (empty if none or fuzz not enabled) |
-
-### Event Stream
-
-`events-file` keeps the run's go test `-json` event stream, per-test timings of passing tests included, without a second run. Upload it for later analysis, `gotestsum --raw-command -- cat events.json` for JUnit, or `gotest summary --input` to render it again:
-
-```yaml
-- uses: mvrahden/go-test@v1
-  id: test
-  with:
-    events-file: ${{ runner.temp }}/test-events.json
-- uses: actions/upload-artifact@v7
-  if: ${{ always() && steps.test.outputs.events-file != '' }}
-  with:
-    name: test-events-${{ matrix.os }}
-    path: ${{ steps.test.outputs.events-file }}
-    retention-days: 14
-```
-
-`always()` keeps the stream of a failed or timed-out job, the one most worth reading. GitHub masks secrets in job logs, not in artifacts: the stream holds every line a test printed, so a test that logs a token publishes it to everyone who can read the run's artifacts.
-
-### Cancelled Jobs and Containers
-
-On Linux and macOS runners a cancelled or timed-out job stops the action's run as Ctrl-C does: the suites tear down, and the summary and the event stream are written ([Stopping a run](specs/lifecycle/spec.md#requirement-stopping-a-run)). The runner's second signal follows 7.5 seconds after the first, and gotest takes it as a second Ctrl-C, so a teardown still running then is cut short ([A second Ctrl-C to gotest](specs/lifecycle/spec.md#requirement-a-second-ctrl-c-to-gotest)). Outside the action the stop reaches gotest only when no shell holds it back:
-
-- In a container entrypoint, `exec go tool gotest ./...`: a shell left as PID 1 receives `docker stop`'s signal and does not pass it on. With `docker run --init`, put no shell between the init and gotest.
-- In Kubernetes, give `command:` as a list of arguments, not a shell string.
-- In a CI step of your own, make gotest the step's process with `exec go tool gotest ...` in bash or sh (`go tool` passes a signal on, `go run` does not), set `--timeout` below the job's time limit so the run ends on its own before the runner cancels it, and upload the `--events-file` stream from a later step with `if: always()`.
-
-gotest also stops on SIGHUP, when its terminal closes or an ssh session drops, unless it was started under `nohup` ([Every launcher stops cleanly](specs/lifecycle/spec.md#requirement-every-launcher-stops-cleanly)), and on Windows when its console closes: the suites tear down and the summary is written.
-
-A program that drives gotest and cannot signal it, as on Windows, starts it with `--control=stdin` and writes lines to its standard input: `stop` is a first Ctrl-C and `force` a second, and the input's end, the program gone, is a stop as well ([Stopping gotest through its standard input](specs/lifecycle/spec.md#requirement-stopping-gotest-through-its-standard-input)). Every command that stops on Ctrl-C takes the flag; without it gotest never reads its standard input. The VS Code extension cancels a run this way.
-
-### Coverage Badge
-
-The action can add a coverage badge to your README. `gotest` draws the badge as an SVG file and the workflow commits it to a branch of your own repository using the built-in `GITHUB_TOKEN`. Nothing outside GitHub is involved and there is no account or secret to set up.
-
-```yaml
-permissions:
-  contents: write
-
-steps:
-  - uses: actions/checkout@v7
-  - uses: mvrahden/go-test@v1
-    with:
-      packages: ./...
-      min-coverage: 80
-      badge: true
-```
-
-`badge: true` turns coverage reporting on by itself. The badge lands on the `ci/badges` branch (change it with `badge-branch`); embed it from there:
-
-```markdown
-![Coverage](https://raw.githubusercontent.com/<owner>/<repo>/ci/badges/coverage.svg)
-```
-
-Three rules keep the badge trustworthy:
-
-- It is published from the default branch only. Pull requests and feature branches never change it.
-- It is published only when the suites ran to completion. A build failure publishes nothing, while a failed test run or a missed `min-coverage` still publishes the coverage that run measured.
-- It never affects test results. Several jobs publishing at once (a version matrix, for example) simply take turns, and a missing permission or a protected branch produces a warning, not a failed build.
-
-Outside GitHub Actions, `gotest summary --badge=coverage.svg ./...` renders the same file for you to publish however you like.
+Inputs, outputs, the event stream, the fuzz and bench steps and the coverage badge are in [docs/github-action.md](docs/github-action.md). How a cancelled job, a container and a closed terminal stop a run is in [docs/stopping-a-run.md](docs/stopping-a-run.md).
 
 ## Commands
 
@@ -1258,7 +1139,7 @@ To feed a JUnit consumer, run the tests through a converter that reads the event
 | `F_` prefix | Focus (run only this) |
 | `X_` prefix | Exclude (skip this) |
 | `SuiteGuard()` method | Runtime-conditional suite skipping |
-| `*Fixture` suffix | Package-scoped fixture |
+| `*Fixture` suffix | Package fixture: one instance for each suite that binds it |
 | `*SharedFixture` suffix | Cross-package shared fixture |
 | `FixtureConfig()` method | Fixture timeout/retry config |
 | `SharedFixtureConfig()` method | Shared fixture timeout/retry config |

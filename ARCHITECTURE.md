@@ -17,7 +17,7 @@
  │     Collector → Binder → Renderer → overlay.json            │
  │     (Renderer works directly with BoundFixture)             │
  └──────────────────────────┬──────────────────────────────────┘
-                            │  overlayResult (tmpDir, fixture info)
+                            │  OverlayResult (tmpDir, fixture info)
                             ▼
  ┌─────────────────────────────────────────────────────────────┐
  │  3. PREPARE (concurrent)                                    │
@@ -36,8 +36,8 @@
  ┌─────────────────────────────────────────────────────────────┐
  │  4. EXECUTION                                               │
  │     Per-suite subprocesses, at most GOMAXPROCS at a time    │
- │     Suites needing shared fixtures block on resolveFixture- │
- │     Env(); others start immediately with base env           │
+ │     Suites needing shared fixtures wait until theirs are    │
+ │     ready; others start immediately with base env           │
  └──────────────────────────┬──────────────────────────────────┘
                             │  exit code (worst of all suites)
                             ▼
@@ -52,7 +52,7 @@
 
 ## 1. Discovery
 
-Discovery is fully static -- AST-based, no reflection at runtime.
+Discovery is fully static: packages are loaded with syntax and types (`packageLoadMode`), suites are found in the AST and bound through `go/types`. Nothing is discovered by reflection at run time. Type-checking is where discovery spends its time.
 
 ### Package Loading
 
@@ -151,7 +151,7 @@ building a fixture tree and collecting shared fixture references.
 ### Fixture Resolution
 
 ```
-Resolve(targetPkg, suites, localFixtures)
+Bind(targetPkg, suites, localFixtures)
   │
   for each suite:
   │
@@ -285,7 +285,7 @@ func TestQueryTestSuite(t *testing.T) {
     s := &ƒƒ_GOTEST_QueryTestSuite{}
     ƒcfg, ƒbudget := gotestruntime.OpenSuite(t, gotestruntime.Suite{
         Fixtures: func(tb testing.TB) { // after the guard; torn down after AfterAll
-            ƒ_holdFixtures(tb, ƒsetupTimeout, ƒ_node_DBFixture)
+            ƒ_holdFixtures(tb, func() time.Duration { /* the suite's SetupTimeout */ }, ƒ_node_DBFixture)
             s.QueryTestSuite.DB = ƒ_DBFixture
         },
         // ... Guard, Config, BeforeAll, AfterAll (same as standalone) ...
@@ -401,7 +401,7 @@ declaration order:
 | `[N]byte` | one `[]byte` leaf |
 | `[N]T` | `T` fanned N times |
 | slice of non-bytes, any other fuzzable shape | one packed `[]byte` leaf |
-| unexported fields, maps, interfaces, channels, funcs, recursive types | refused at generation time with the alternative named (the README's "Struct arguments" table), because generated code that cannot round-trip faithfully would lie |
+| unexported fields, maps, interfaces, channels, funcs, recursive types | refused at generation time with the alternative named (the "Struct arguments" table of `docs/fuzzing.md`), because generated code that cannot round-trip faithfully would lie |
 
 Numbers ride as bytes on purpose. Go's mutator gives a native integer only
 bounded ±100 arithmetic and a native float only bounded add/sub/mul/div,
@@ -413,7 +413,8 @@ acceptable only because a failing execution echoes the decoded literal
 two decisions are coupled.
 
 The flatten rules, leaf widths and nil-flag placement are part of the
-versioned generated identifier family (`ƒ_fuzzfan_v1_…`): changing any of
+versioned generated identifier families (`ƒ_fuzzreg_v1_…`, `ƒ_fuzzin_v1_…`,
+`ƒ_fuzzout_v1_…` and their siblings): changing any of
 them re-means every corpus position, so it is a `v1 → v2` bump. Go's corpus
 format is positional, which has three consequences:
 
@@ -426,7 +427,7 @@ format is positional, which has three consequences:
   `Explode` re-derives positions from the current type on every run.
 
 When seed harvesting is enabled (`gotestast.HarvestSeeds`, on by default —
-see the README's "Seed harvesting" section), the renderer additionally
+see "Seed harvesting" in `docs/fuzzing.md`), the renderer additionally
 emits one `f.Add(...)` line per harvested literal directly in the wrapper,
 after `BeforeAll` and before the user method call, so harvested seeds
 replay through the exact same `f.Add` path as hand-written ones.
@@ -516,7 +517,7 @@ State is transferred via JSON serialization, streamed as each fixture completes.
 │             │ emit JSON state                                         │
 │                                                                       │
 │  State to the protocol fd after BeforeAll (stdout on Windows)         │
-│  Include _teardownBudget = 30s + the longest chain of                 │
+│  Include teardownBudget = 30s + the longest chain of                  │
 │  SupervisorBudget(Timeout) over the fixtures whose setup was reached  │
 │  (a fixture's share plus the longest chain of those depending on it:  │
 │  teardown below runs concurrently, each after its dependents; a share │
@@ -553,7 +554,7 @@ the N test processes that read the same snapshot.
 
 Which exported fields transfer and which are local is decided by
 `ClassifyLocalFieldsRaw()`, an AST walk of `Hydrate` and one level of the
-receiver methods it calls; the rule itself is spec.md's Field
+receiver methods it calls; the rule itself is `docs/design/spec.md`'s Field
 classification.
 
 ---
@@ -634,8 +635,9 @@ Level 3 is sized from a budget of concurrent test methods, `--parallel`,
 2×GOMAXPROCS by default: at most GOMAXPROCS suite processes run at a time,
 and each gets the budget divided by the process count as its
 `-test.parallel` (`ComputeConcurrency`). A user `-parallel=N` pins that
-in-process value instead; the process count is then 2×GOMAXPROCS, which
-makes it a different axis from `go test -p`. These defaults and Level 1's
+in-process value instead; the process count is then
+`min(suites, GOMAXPROCS, budget/N)` (`computeDispatchConcurrency`), and
+`go test`'s `-p` caps it outright. These defaults and Level 1's
 (`NumCPU`) apply to uninstrumented builds; under `-race`/`-msan`/`-asan`
 they halve, since instrumentation at least doubles the CPU cost per
 instruction stream. An explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
@@ -823,8 +825,8 @@ still run — never speculatively.
 ```
                      ┌─────────────────────────┐
                      │   CLI invocation         │
-                     │   signal.NotifyContext   │
-                     │   (SIGINT, SIGTERM)      │
+                     │   shutdownContext        │
+                     │   (signals, --control)   │
                      └───────────┬─────────────┘
                                  │ ctx
                     ┌────────────┼────────────┐
@@ -967,7 +969,7 @@ signalled. On Windows, `Release` also kills what the root left running.
 ## 7. Suite Target Construction
 
 ```
-BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByPkg, runFlags, userRunFilter)
+BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, testlessByPkg, exclusiveByPkg, runFlags, userRunFilter, userSkipFilter)
   │
   for each package:
     for each suite struct name (e.g., "FooTestSuite"):
@@ -984,7 +986,7 @@ BuildSuiteTargets(compiled, suitesByPkg, dirsByPkg, fuzzFuncsByPkg, exclusiveByP
            Dir:        "/path/to/auth"
            BinaryPath: "/tmp/gotest/bin/auth_a1b2c3d4.test"
            SuiteName:  "TestFooTestSuite"
-           RunFilter:  "" or user's -run value
+           RunFilter:  "" or the alternatives of the user's -run that select this suite
            RunFlags:   ["-test.v", "-test.timeout=30s", ...]
            CoverProfile: "/tmp/gotest/cover/0.out" (if -coverprofile)
          }
@@ -1100,7 +1102,7 @@ t=0s    CLI starts
         ├─ Parse flags, load config
         ├─ LoadPackages(./...)
         ├─ GenerateOverlay → overlay.json
-        ├─ signal.NotifyContext (SIGINT/SIGTERM → ctx cancel)
+        ├─ shutdownContext (SIGINT/SIGTERM, SIGHUP on Unix, --control=stdin → ctx cancel; a second signal forces the stop)
         │
 t=0.5s  RunPipeline begins (runStreaming)
         ├─ Start goroutine: CompilePackagesStream → compileCh
@@ -1212,7 +1214,7 @@ guard:
    run that cannot be believed, the same code an uncompilable package gets.
    Only green runs are censused: a red run is already not a false green.
    The user-facing rules, when the census stands down and how bench runs
-   are censused, are in spec.md under CI Integration.
+   are censused, are in `docs/design/spec.md` under CI Integration.
 2. **Ring-0 raw checks** catch a swallowed failure in the kernel: the tests
    of the assertion kernel never call it, so a kernel that always passes
    cannot pass them.
@@ -1225,7 +1227,7 @@ guard:
    fixtures torn down and shared fixtures failing to come up or to let go),
    and compares exit codes and the raw `-json`
    verdicts with a checked-in golden list (`testdata/expected.txt`), checking
-   with plain Go. Its four suites each run their methods one after another
+   with plain Go. Its suites each run their methods one after another
    and run side by side only as separate processes, so the canary does not
    rest on the in-suite parallelism it guards. The golden list is a third
    source of truth that shares no code with discovery or generation. That closes the census's one blind
@@ -1245,7 +1247,7 @@ guard:
    first drill showed the alternative: the mutant that zeroes the exit code
    graded the very run that was judging it. The orchestrator that applies the
    patches, bounds each worker and counts the verdicts (`internal/drill`) is
-   built pristine too and imports no gotest package. Which check catches which mutant is in
+   built pristine too and imports nothing of gotest but the environment names of `internal/protocol`. Which check catches which mutant is in
    `tests/drill/README.md`. A patch that no longer applies exactly, does not
    compile, names a clause no spec states, or is caught by any
    check but the one its row names fails the drill, so mutants cannot
@@ -1313,9 +1315,64 @@ not: called under the harness of a parallel suite, the call-site tracer
 reported `harness.go:38` as the user's frame. The tracer now treats
 `pkg/gotestruntime/` as gotest code.
 
+## Package Map
+
+Arrows read "imports". Third-party modules are named where a package needs one.
+
+| Package | Role | Imports of this module |
+|---|---|---|
+| `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestbench,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
+| `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,x/slices}`; third-party: `regexp2`, `x/tools` |
+| `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgpattern,protocol,x/slices}`; third-party: `x/mod`, `x/tools` |
+| `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,schedinfo}` |
+| `internal/gotestspec` | Event stream → tree → terminal, Markdown and JSON renderers; the census | `internal/{about,protocol}` |
+| `internal/gotestbench` | Benchmark baselines, deltas and the gate | `internal/gotestspec` |
+| `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |
+| `internal/migrate` | testify/suite conversion | `internal/{about,filewrite,gotestast,protocol,refactor,unidiff}`; third-party: `x/tools` |
+| `internal/refactor` | Source edits: focus toggles, seed splices | `internal/{gotestast,protocol}`; third-party: `x/tools` |
+| `internal/scaffold` | Suite skeletons from a type | `internal/{gotestgen,goversion}`; third-party: `x/tools` |
+| `internal/config` | `.gotest.yml` | third-party: `yaml/v3` |
+| `internal/genstub` | Stands a package clause in for generated files while packages load | `internal/{about,pkgpattern}` |
+| `internal/goversion` | Refuses a CLI built by an older Go than the module's | `internal/about`; third-party: `x/tools` |
+| `internal/filewrite` | Rewrites a set of files all or none | third-party: `x/sys` |
+| `internal/control` | The channel between the runner and a suite process | — |
+| `internal/proctree` | A command as the root of its own process tree | — |
+| `internal/{about,callsite,carry,pkgpattern,protocol,runstate,schedinfo,setupwaits,typeclass,unidiff,x/slices}` | Leaves: constants, small mechanisms shared by two sides | — |
+| `pkg/gotest` | The user's API: `T`, `B`, `F`, `R`, assertions, `Each`, polls, snapshots | `internal/{callsite,carry,protocol,runstate,setupwaits}`, its own `internal/{assert,snapfile}` (`assert` imports `internal/{callsite,unidiff}`) |
+| `pkg/gotestruntime` | The library every generated harness calls: suite frame, method loop, fixtures, budgets, stop | `pkg/gotest`, `internal/{callsite,carry,control,protocol,runstate,schedinfo,setupwaits}` |
+| `pkg/gotestfuzz` | Leaf codecs for fanned fuzz arguments | — |
+| `pkg/lint` | The analyzer, exported for other `go/analysis` drivers | `internal/lint` |
+| `skills` | The agent skill, embedded for `gotest skill install` | — |
+| `internal/{testkit,speccatalog/...,drill}` | Test support: staging and running the CLI, the spec catalog, the drill | `internal/{gotestspec,proctree,protocol,testkit}`, `pkg/{gotest,gotestruntime}`; third-party: `x/sys` (`drill`) |
+
+Rules that hold, and what holds them:
+
+1. `cmd/gotest` imports no `pkg/*` package. The CLI and the code it generates for meet only through the generated source, so a CLI and a runtime of different releases can be told apart (the runtime floor).
+2. `pkg/gotest`, `pkg/gotestruntime` and `pkg/gotestfuzz` import the standard library and this module, nothing else: they are linked into every user's test binary. A conventions suite fails on any other import.
+3. `pkg/gotestruntime` imports `pkg/gotest`, never the reverse. What both need lives in a leaf under `internal/` (`carry`, `runstate`, `setupwaits`, `callsite`).
+4. The generator chain is one way: `gotestast` ← `gotestgen` ← `gotestrunner` ← `cmd/gotest`. Lint, migrate, refactor and scaffold read `gotestast` and `gotestgen` and never the runner.
+5. `internal/gotestspec` reads the event stream and imports neither the generator nor the runner, so a saved stream renders without either.
+6. No production package imports `internal/testkit`, `internal/speccatalog` or `internal/drill`.
+
+What the overlay design asks of a consumer: the suites run only under `gotest`; nothing on disk imports `pkg/gotestruntime`, so `go mod vendor` leaves it out unless a file of the module imports it; and a `go get -tool` declaration brings the CLI's dependencies into the consumer's `go.mod` as indirect requirements.
+
+## Failure Locations Without t.Helper()
+
+Go's `testing` package prints the `file:line` of the first frame that is not marked as a helper. gotest marks its own frames, so a failure names the user's line with no `t.Helper()` in user code.
+
+`assert.SkipInternalFrames` (`pkg/gotest/internal/assert/helper.go`) does it on every failing assertion, `Errorf` and `Skipf` of `T`, `B` and `F`. It walks the call stack, collects the frames that belong to gotest or to the generated harness, finds the unexported fields `mu`, `helperPCs` and `helperNames` of `testing.common` by name through `reflect`, takes their addresses with `unsafe`, locks `mu`, adds the collected frames to `helperPCs` and clears the `helperNames` cache so `testing` rebuilds it.
+
+This is the one place gotest writes into another package's unexported state. Three things bound it:
+
+- Each field is checked for its exact type before it is touched. A Go release that renames or retypes one makes the call a no-op: failures are then located inside gotest, and nothing crashes.
+- The conformance scenarios of [Failure locations](specs/assertions/spec.md#requirement-failure-locations) run on every Go version of the CI matrix, so that degradation shows as red tests.
+- Only `*testing.T`, `*testing.B` and `*testing.F` are accepted; a poll's `*gotest.R` records its failure and never reaches the testing package.
+
+It is why the project's rule is "never call `t.T().Helper()` with gotest assertions": the frames are already marked, and a second marking hides the helper's own line.
+
 ## Key Design Decisions
 
-1. **AST over reflection**: Discovery is compile-time, not runtime. This
+1. **Static analysis over reflection**: Discovery reads syntax and types before anything is compiled, not at run time. This
    enables static analysis, IDE integration (`gotest discover` JSON), and
    code generation without running test code.
 
@@ -1359,8 +1416,10 @@ reported `harness.go:38` as the user's frame. The tracer now treats
    `TestMain` + `os.Exit(m.Run())`, so Go's coverage machinery works
    without interception. The test binary exits normally via `t.Cleanup`.
 
-8. **Unified pipeline entry point**: `cmd/gotest` is a thin CLI shell that
-   delegates to `internal/gotestrunner.RunPipeline`. The pipeline encapsulates
+8. **Unified pipeline entry point**: Every run mode enters through
+   `internal/gotestrunner.RunPipeline`. `cmd/gotest` reads the arguments,
+   owns the commands that are not runs (bench reporting, fuzz sessions and
+   triage, watch, lint, migrate) and hands the run to it. The pipeline encapsulates
    the compile -> fixture-setup -> execute -> teardown -> output flow; a
    bench run compiles before it dispatches, everything else streams.
 
@@ -1380,14 +1439,14 @@ Project-specific terms, one definition each; the section named elaborates.
 - **Harness** — the generated code that runs a suite: the `Test<Suite>` function, the `t.Run` nesting, lifecycle wiring and the `pkg/gotestruntime` calls it makes. Never committed. (Code Generation)
 - **Overlay** — Go's `-overlay` mechanism, through which the harness reaches the compiler without touching the source tree. (Code Generation)
 - **ptest / pxtest** — the two test-package variants `packages.Load` returns for one directory: the in-package tests (`package foo`) and the external ones (`package foo_test`). Each gets its own generated file. (Discovery)
-- **Bound / budget** — a *bound* is the deadline on a phase's context; a *budget* is the duration the phase is held to by verdict, which applies only when the suite or fixture declared a config of its own. (Timeout Architecture; spec.md, Generated Behavior)
+- **Bound / budget** — a *bound* is the deadline on a phase's context; a *budget* is the duration the phase is held to by verdict, which applies only when the suite or fixture declared a config of its own. (Timeout Architecture; `docs/design/spec.md`, Generated Behavior)
 - **Teardown budget** — the grace period a suite subprocess computes for itself and sends as a `budget` line on its control channel; the runner waits that long after the stop before SIGKILL. (Timeout Architecture)
 - **Bulk / tail** — the two dispatch phases: the parallel bulk of ordinary suites, then the serial tail of `Exclusive` suites, each slot starting the shared fixtures it needs. (Dispatch Phases)
 - **Exclusive** — a suite dispatched strictly alone in the tail, for verdicts that measure wall-clock behavior or contend for a resource. (Dispatch Phases)
 - **Fixture window** — the span during which a shared fixture is resident: from the first phase that needs it to the last, never speculatively. (Per-Suite Fixture Readiness; fixtures.md, Execution Model)
 - **Transfer field / local field / hydrate** — a shared fixture's exported, JSON-serialized fields cross the process boundary; fields assigned in `Hydrate` are local and rebuilt in each test process. (SharedFixture Lifecycle)
 - **Fan / leaf** — the generated decomposition of a fuzz argument into the native values Go's engine accepts, one per leaf field, reassembled before every execution. (Code Generation)
-- **Pass-through / shape-bound target** — a fuzz target whose arguments are all native passes them through unchanged; one with a fanned argument is shape-bound: its corpus positions mean whatever the type's current field order says. (Code Generation; README, Struct arguments)
-- **Seed / crasher / interesting input** — a seed is an `f.Add` value, replayed as an ordinary subtest on every run; a crasher is the corpus file the engine writes under `testdata/fuzz/<Func>/` for a failing input; interesting inputs reached new coverage and live in Go's build cache, never beside the code. (Fuzz mode; README, Fuzzing)
+- **Pass-through / shape-bound target** — a fuzz target whose arguments are all native passes them through unchanged; one with a fanned argument is shape-bound: its corpus positions mean whatever the type's current field order says. (Code Generation; docs/fuzzing.md, Struct arguments)
+- **Seed / crasher / interesting input** — a seed is an `f.Add` value, replayed as an ordinary subtest on every run; a crasher is the corpus file the engine writes under `testdata/fuzz/<Func>/` for a failing input; interesting inputs reached new coverage and live in Go's build cache, never beside the code. (Fuzz mode; docs/fuzzing.md)
 - **Capturing bench run** — a `gotest bench` run with `--spec`, `--json`, `--save` or `--against`, which captures the event stream and is therefore censused over the declared benchmarks. (Testing gotest)
-- **Subject / capability / behavior** — what a suite, a method and an `It` are in the rendered specification; the full vocabulary is spec.md's Conceptual Model.
+- **Subject / capability / behavior** — what a suite, a method and an `It` are in the rendered specification; the full vocabulary is `docs/design/spec.md`'s Conceptual Model.

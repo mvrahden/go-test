@@ -41,15 +41,17 @@ Coverage: 82.4%
 When tests fail, it shows only the failing tests with their assertion output — no `=== RUN`, no `=== CONT`, no `--- PASS` noise:
 
 {{< terminal title="failures show assertion output only" >}}
-3 of 147 tests failed
+2 of 41 tests failed
 
-FAIL  pkg/foo TestValidateInput / empty string (12ms)
-      foo_test.go:42: expected error, got nil
+FAIL  github.com/mvrahden/go-test/examples/auth TokenValidator / ValidateToken / when the token is valid / extracts the email claim (<1ms)
+      suite_test.go:29: Equal failed:
+            expected: "admin@example.com"
+            actual:   "user@example.com"
 
-FAIL  pkg/bar TestProcessOrder / concurrent writes (1.2s)
-      bar_test.go:88:
-        expected: []string{"a", "b", "c"}
-             got: []string{"a", "c", "b"}
+FAIL  github.com/mvrahden/go-test/examples/cart ShoppingCart / AddItem / when adding items to a fresh cart / stores the correct quantity (<1ms)
+      suite_ext_test.go:30: Equal failed:
+            expected: 3
+            actual:   2
 {{< /terminal >}}
 
 A developer reading this output sees exactly which tests failed, where, and why. No scrolling required.
@@ -87,7 +89,7 @@ jobs:
 
 That is the entire CI setup. The action does the following:
 
-1. **Installs gotest.** By default (`version: gomod`), it runs gotest through `go run`, resolving the version from your project's `go.mod`. This keeps the CI version in sync with local development — no version drift.
+1. **Installs gotest.** By default (`version: gomod`), it runs the gotest your `go.mod` selects (`go tool gotest` when the tool is declared). This keeps the CI version in sync with local development — no version drift.
 1. **Runs tests** with `gotest summary --github`. The `--github` flag is auto-detected in GitHub Actions via the `$GITHUB_ACTIONS` environment variable.
 1. **Reports failures** as GitHub `::error` annotations. These appear inline on the PR diff, pointing at the exact file and line of each failing assertion.
 1. **Writes a step summary** to the job summary panel with pass/fail counts and coverage.
@@ -111,7 +113,7 @@ The same action also runs benchmarks and fuzzing when you ask it to: `bench` wit
 
 ### Action outputs
 
-The action exposes two outputs for downstream steps:
+Two of the action's outputs serve most downstream steps; the action's page lists all of them:
 
 | Name | Description |
 |---|---|
@@ -134,7 +136,7 @@ You can use these in subsequent steps, for example to post a coverage comment or
 
 ## Version resolution
 
-The default `version: gomod` strategy runs gotest via `go run github.com/mvrahden/go-test/cmd/gotest`. This resolves the version pinned in your project's `go.mod`, which means CI runs the exact same version you use locally. No separate install step, no version drift.
+The default `version: gomod` strategy runs the gotest your `go.mod` pins, through `go tool gotest` when the tool is declared, which means CI runs the exact same version you use locally. No separate install step, no version drift.
 
 For this to work, gotest needs to be in your `go.mod`. The cleanest way is a `tool` directive (Go 1.24+):
 
@@ -146,13 +148,13 @@ go 1.26
 tool github.com/mvrahden/go-test/cmd/gotest
 ```
 
-If your project does not depend on gotest as a library, set `version: latest` or a specific tag (e.g. `v1.2.0`) to install a standalone binary via `go install` instead.
+A tag (`version: v1.2.0`) installs that release as a standalone binary instead; name the version your `go.mod` requires, because a binary that drifts from it is refused.
 
 ## CI mode and the focus-prefix guard
 
 gotest has a CI mode that activates two safety behaviors:
 
-1. **Focus-prefix guard.** If any suite or method has an `F_` prefix (`F_TestSomething`, `F_MyTestSuite`), the build fails immediately. The `F_` prefix means "run only this" — useful during development, dangerous in CI. Without the guard, a committed `F_` prefix silently skips every other test in the package.
+1. **Focus-prefix guard.** If any suite or method has an `F_` prefix (`F_TestSomething`, `F_MyTestSuite`), the build fails immediately. The `F_` prefix means "run only this" — useful during development, dangerous in CI. Without the guard, a committed `F_` prefix silently skips every other test of the run.
 1. **Snapshot read-only mode.** Snapshot baselines cannot be created in CI. Locally, a first run writes the missing baseline file; in CI mode, a missing baseline fails the test instead — so a brand-new snapshot can never slip in unreviewed. (Mismatches fail in any mode; updating a baseline always requires an explicit `--update-snapshots` run.)
 
 How focus prefixes fit into day-to-day development is covered in depth in [the inner loop post]({{< ref "/blog/the-inner-loop" >}}).

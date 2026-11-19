@@ -151,6 +151,9 @@ func (f *DatabaseFixture) BeforeAll(_ context.Context) error {
 }
 
 func (f *DatabaseFixture) AfterAll(_ context.Context) error {
+    if f.DB == nil { // AfterAll also runs after a BeforeAll that failed
+        return nil
+    }
     return f.DB.Close()
 }
 
@@ -166,6 +169,8 @@ A few things to notice:
 - **`BeforeAll`/`AfterAll`** run once per suite process. The database is opened once and closed once for each suite that uses the fixture.
 - **`BeforeEach`** runs before every test method in every suite that uses this fixture. Tables get truncated, so each test starts clean.
 - **`FixtureConfig`** controls timeout and retry behavior. `ContainerFixtureConfig()` gives a 5-minute timeout with one retry, appropriate for infrastructure that might need time to start.
+
+One thing to know when a package already has a `TestMain`: gotest runs each suite in a process of its own, so that `TestMain` runs once per suite, not once per package. Move its resource setup into a fixture before you convert the package's tests to suites.
 
 ## Suites consume fixtures by referencing them
 

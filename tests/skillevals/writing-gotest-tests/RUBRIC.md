@@ -240,3 +240,5 @@ Validity limits: maintainer-memory contamination; pre-bootstrapped
 fixture; instructed-read instead of installation; authored-task reuse in
 the skill arm; n=1. Superseded by this protocol — rerun everything under
 §2 before ship.
+
+**Round 2:** T− and T−2 under the protocol; fixtures in `trigger-fixtures/`, procedure and results in `ROUND-2.md`.

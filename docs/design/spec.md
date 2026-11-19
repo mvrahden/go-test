@@ -10,8 +10,8 @@ Go tests that write themselves, organize themselves, and explain themselves.
 Developers write structs, name them well, and the tool handles the rest.
 No third-party runtime dependencies.
 No reflection in suite discovery or registration.
-No lock-in.
-Just standard Go tests with lifecycle management and structured organization.
+Suites are plain structs and the assertions are a library; the suites themselves run only under `gotest` (see The Two Runners).
+The output is standard `go test` output, with lifecycle management and structured organization behind it.
 
 A Go developer should be able to declare this tool with `go get -tool` and immediately write better-organized tests without learning a framework.
 The naming conventions are the API.
@@ -28,7 +28,7 @@ Ranked. When they conflict, higher-ranked principles win.
 
 Every generated test is a `func Test*(t *testing.T)`.
 Every line of output is standard `go test` output.
-Every CI system, IDE, coverage tool, and profiler works unchanged.
+Every coverage tool, profiler and consumer of `go test -json` works unchanged. A CI job calls `gotest` where it called `go test`, and an editor shows suites as tests only through an integration that reads `gotest discover`, such as the VS Code extension.
 
 ### 2. The naming IS the API
 
@@ -39,12 +39,12 @@ No registration calls.
 A developer reads the naming conventions once and never opens documentation again.
 (The optional `.gotest.yml` holds only tool defaults — every key mirrors a CLI flag; deleting it changes no test's meaning.)
 
-### 3. Zero runtime magic
+### 3. No runtime discovery
 
 The tool generates code at build time and cleans it up after.
-No reflection, no interface dispatch, no type assertions, no registration.
-At test execution time the call stack holds the thin `gotest.T` wrapper, and — for fixture-bound suites only — the small `pkg/gotestruntime` package that orchestrates fixture DAG setup/teardown.
-Both are plain Go, visible in the generated code, which is what a careful developer would write by hand.
+No reflection finds, registers or calls a test: the generated code holds the suite's hooks and methods as plain function values.
+At test execution time the call stack holds the `gotest.T` wrapper and `pkg/gotestruntime`, the library every generated suite calls: it opens the suite, runs each method as a subtest in lifecycle order, sets up and releases fixtures, holds the timeouts and carries a stop to the suite.
+Both are plain Go, and the generated file shows every call into the runtime (see Generated Structure).
 
 ### 4. Invisible until needed
 
@@ -56,7 +56,7 @@ Running suites is exclusively `gotest`'s job (see The Two Runners).
 
 Existing `func Test*` tests coexist with suites in the same package.
 They keep running under `go test`; `gotest` reports them but does not execute them (see The Two Runners).
-Removing the tool means deleting suite structs and writing the equivalent `func Test*` functions — the generated code shows exactly what to write.
+Removing the tool means writing one `func Test*` per suite that calls its hooks and methods in order; assertions, `When`/`It` and `Each` keep working as a library under plain `go test`. The generated code lists the hooks and methods to call. Shared fixtures have no standard-library equivalent.
 
 ---
 
@@ -1390,7 +1390,7 @@ A generated file an earlier `generate` left on disk is read past, never compiled
 
 ### Generated Structure
 
-For each suite, the generated code creates a wrapper struct with no-op fallbacks for unimplemented hooks, then a `func Test*` that wires lifecycle and inline `t.Run` blocks:
+For each suite, the generated code creates a wrapper struct with no-op fallbacks for unimplemented hooks, then a `func Test*` that hands the hooks and the methods to `pkg/gotestruntime`:
 
 ```go
 type ƒƒ_GOTEST_MyTestSuite struct { MyTestSuite }
@@ -1748,34 +1748,7 @@ They never alter how the tests themselves are executed — the spec view is rend
 
 ### Package Graph
 
-```
-cmd/gotest/                  CLI entrypoint, subcommands, arg handling
-  ├── internal/lint/           go/analysis analyzer (lint subcommand)
-  └── internal/gotestrunner/   Suite generation I/O, go test execution, overlay
-        ├── internal/gotestgen/   Package loading, collection, fixture resolution, rendering
-        │     └── internal/gotestast/   AST analysis, spec model, regex classification
-        └── internal/proctree/    Subprocess trees stopped as a whole and alone (group, console, job)
-
-internal/config/             .gotest.yml project configuration loading
-internal/gotestspec/         Spec tree builder and renderers (terminal, markdown, json)
-internal/gotestbench/        Benchmark baseline format, deltas and the gate (bench subcommand)
-internal/goversion/          Refuses a gotest binary built by an older Go than the module declares
-internal/schedinfo/          Scheduling context appended to deadline failures
-internal/x/                  Small generic helper libraries (slices)
-internal/scaffold/           Type-to-suite skeleton generator
-internal/migrate/            testify/suite AST transformer
-internal/refactor/           AST refactoring tools (focus/exclude toggle)
-
-pkg/gotest/                  User-facing API (T, R, assertions, Each, Eventually, Consistently, MatchSnapshot)
-  └── internal/assert/         Core assertion implementation (pure stdlib)
-  └── internal/snapfile/       Snapshot file I/O and diffing
-
-pkg/gotestruntime/           Fixture DAG runtime imported by generated fixture code
-pkg/gotestfuzz/              Leaf codecs imported by generated fuzz fans
-pkg/lint/                    Exported analyzer for external go/analysis drivers
-internal/protocol/           CLI↔test-process env var and naming constants
-internal/about/              Build metadata, file naming constants
-```
+The package map and the dependency rules that hold between the packages are in [ARCHITECTURE.md](../../ARCHITECTURE.md#package-map).
 
 ### Code Generation Pipeline
 
@@ -1792,8 +1765,8 @@ Resolution is demand-driven: it starts from targeted suites and walks the Go typ
 
 ### Key Invariant
 
-The pipeline is always: **static analysis → code generation → standard `go test`**.
-The only runtime components are the thin `gotest.T` wrapper (with its assertion engine), for fixture-bound suites the `pkg/gotestruntime` DAG orchestrator, and for fanned fuzz arguments the `pkg/gotestfuzz` leaf codecs.
+The pipeline is always: **static analysis → code generation → `go test -c` → one process per suite**.
+The runtime components are the `gotest.T` wrapper with its assertion engine, `pkg/gotestruntime`, which every generated suite calls, and for fanned fuzz arguments the `pkg/gotestfuzz` leaf codecs.
 If a feature can't be implemented as (a) generated code, (b) a method on `gotest.T`, (c) runtime support in `pkg/gotestruntime` or `pkg/gotestfuzz`, or (d) post-processing of `go test -json`, it doesn't belong in this project.
 
 ---
