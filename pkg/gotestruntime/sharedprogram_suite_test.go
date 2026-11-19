@@ -575,6 +575,35 @@ func (s *SharedProgramTestSuite) TestAStateThatCannotBeMarshalled(t *gotest.T) {
 	})
 }
 
+func (s *SharedProgramTestSuite) TestALongCommand(t *gotest.T) {
+	log := &hookLog{}
+	a := fx(log, "A")
+	a.Deferred = true
+	w := startWire(t, a)
+	_ = w.until(sharedwire.KeyDone)
+	// A key list past 64 KiB: a start names every fixture it brings up.
+	keys := []string{"p.A"}
+	for i := range 4000 {
+		keys = append(keys, fmt.Sprintf("p.not-in-this-program-%04d", i))
+	}
+	// Sent beside the test: a reader that gave up would never take it.
+	long := string(sharedwire.Command{Verb: sharedwire.VerbStart, Keys: keys, ID: 1}.Line()) + "\n"
+	go func() { _, _ = io.WriteString(w.stdin, long) }()
+	lines := w.until(sharedwire.KeyCmd)
+	ack, _ := sharedwire.ParseLine([]byte(lines[len(lines)-1]))
+	w.send(`{"verb":"stop"}`)
+	failed := w.wait()
+
+	t.When("a command line is longer than 64 KiB", func(wh *gotest.T) {
+		wh.It("is read whole and served", func(it *gotest.T) {
+			gotest.Equal(it, uint64(1), ack.ID)
+			gotest.Equal(it, "", ack.Error)
+			gotest.Equal(it, []string{"A.BeforeAll", "A.AfterAll"}, log.all())
+			gotest.False(it, failed)
+		})
+	})
+}
+
 func (s *SharedProgramTestSuite) TestLinesAreWrittenWhole(t *gotest.T) {
 	big := strings.Repeat("x", 64<<10)
 	var fixtures []gotestruntime.SharedFixture
