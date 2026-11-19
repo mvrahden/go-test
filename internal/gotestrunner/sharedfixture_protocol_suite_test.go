@@ -65,3 +65,20 @@ func (s *SharedFixtureProtocolTestSuite) TestASecondDoneIsAProtocolError(t *gote
 		})
 	})
 }
+
+func (s *SharedFixtureProtocolTestSuite) TestAnUnknownSentinelIsIgnored(t *gotest.T) {
+	lines := `{"key":"_later","note":"from a newer runtime"}` + "\n" +
+		`{"key":"a/b.X","state":{"A":1}}` + "\n" +
+		`{"key":"a/b.my_X","state":{"B":2}}` + "\n" +
+		`{"key":"_done","teardownBudget":"1m"}` + "\n"
+	proc := gotestrunner.ExportReadProtocol(strings.NewReader(lines))
+	t.When("the protocol stream carries a sentinel the runner does not know", func(w *gotest.T) {
+		w.It("keeps it out of the fixtures' state", func(it *gotest.T) {
+			gotest.Equal(it, []string{"a/b.X", "a/b.my_X"}, gotestrunner.ExportStateKeys(proc))
+		})
+		w.It("reads the setup as done and good", func(it *gotest.T) {
+			gotest.NoError(it, proc.SetupErr())
+			gotest.NoError(it, gotestrunner.ExportProtocolErr(proc))
+		})
+	})
+}

@@ -1020,6 +1020,10 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 			p.cmdMu.Unlock()
 			continue
 		}
+		// A sentinel from a newer program: lines are only ever added.
+		if entry.Sentinel() {
+			continue
+		}
 		p.mu.Lock()
 		p.state[entry.Key] = entry.State
 		p.mu.Unlock()
