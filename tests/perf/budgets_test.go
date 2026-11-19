@@ -25,4 +25,8 @@ const (
 	// editLinks, editVets: the edited package's binary and its vet.
 	editLinks = 1
 	editVets  = 1
+
+	// cpuBand: gotest's CPU over go test -count=1's on the twin; a ratio, so
+	// the machine divides out.
+	cpuBand = 2.5 //nolint:unused // read by the CPU suite, which is Unix-only
 )
