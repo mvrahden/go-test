@@ -15,8 +15,9 @@ import (
 type DiscoveryLoadCostTestSuite struct{}
 
 func (s *DiscoveryLoadCostTestSuite) SuiteConfig() gotest.SuiteConfig {
-	// A private build cache compiles the dependencies' export data once.
-	return gotest.SuiteConfig{Parallel: true, Timeout: 3 * time.Minute}
+	// A private build cache compiles the dependencies' export data once:
+	// about 6s a method, 12s for both, on a 6-core Linux machine.
+	return gotest.SuiteConfig{Parallel: true, Timeout: 60 * time.Second}
 }
 
 // afterATestFileChanges runs args in a staged copy of the passing fixture
