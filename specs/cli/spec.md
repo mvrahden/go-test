@@ -507,6 +507,17 @@ A run SHALL start at most GOMAXPROCS suite processes at once, half of that under
 - **WHEN** the same suites are run with GOMAXPROCS=1 and no -p
 - **THEN** each fails waiting, since one process runs at a time
 
+### Requirement: Building several packages
+A run SHALL build its packages together and report each build failure under the package it belongs to, with the diagnostics go test prints for that package alone. A package that built SHALL run whether or not another failed, and SHALL start as soon as its binary is built or confirmed up to date where the platform lets gotest see that. Two packages whose import paths end in the same element SHALL both be built and run.
+
+#### Scenario: Two packages that fail vet beside one that passes
+- **WHEN** two packages each fail vet and a third passes
+- **THEN** exits 2, reports each finding under its own package and runs the third
+
+#### Scenario: Packages that share their last path element
+- **WHEN** two packages named util are run together
+- **THEN** both run and pass
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 

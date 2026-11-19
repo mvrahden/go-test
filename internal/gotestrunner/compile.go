@@ -12,8 +12,10 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
@@ -41,85 +43,27 @@ type BuildFailure struct {
 	Err     error
 }
 
-// compilePackage captures the compiler's stderr into the returned error
-// instead of streaming it: the diagnostics belong to the failing package's
-// verdict, and only the collector can place them there. On success any
-// captured stderr (toolchain notices, module downloads) is forwarded.
-//
-// With a cache dir the link targets the cached path, where go skips it when
-// the binary is up to date, and the result is copied to binDir for this run.
-// A cache that cannot be locked is treated as absent: it is an optimization.
-func compilePackage(ctx context.Context, pkgPath, overlayFlag string, buildFlags []string, binDir, cacheDir string) (CompileResult, error) {
-	binaryName := sanitizePkgName(pkgPath) + ".test"
-	binaryPath := filepath.Join(binDir, binaryName)
-	outputPath := binaryPath
-	if cacheDir != "" {
-		cached := filepath.Join(cacheDir, binaryName)
-		if unlock, err := lockFile(cached + ".lock"); err == nil {
-			defer unlock()
-			outputPath = cached
-		}
+// goTestC runs one go command for the compile stage; tests replace it.
+var goTestC = func(ctx context.Context, args, env []string, stdout, stderr io.Writer) error {
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Env = env
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
+	if err := mp.Start(); err != nil {
+		return err
 	}
-
-	args := []string{"test", "-c", overlayFlag, "-o", outputPath}
-	args = append(args, buildFlags...)
-	args = append(args, pkgPath)
-
-	defer logSlowBuild(os.Stderr, "test binary for "+pkgPath, slowBuildThreshold())()
-
-	link := func() error {
-		cmd := exec.CommandContext(ctx, "go", args...)
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		mp := NewManagedProcess(cmd, ProcessConfig{Grace: GraceKill})
-		if err := mp.Start(); err != nil {
-			return compileError(pkgPath, err, stderr.Bytes())
-		}
-		if err := mp.WaitWithGrace(ctx); err != nil {
-			return compileError(pkgPath, err, stderr.Bytes())
-		}
-		if stderr.Len() > 0 {
-			_, _ = os.Stderr.Write(stderr.Bytes())
-		}
-		return nil
-	}
-	if outputPath == binaryPath {
-		if err := link(); err != nil {
-			return CompileResult{}, err
-		}
-		return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
-	}
-
-	// The go command touches an up-to-date target and keeps its build id
-	// through truncation, so the bytes tell a skipped link from a new one:
-	// unchanged, they must match the record of the last link.
-	before, beforeErr := sumFile(outputPath)
-	if err := link(); err != nil {
-		return CompileResult{}, err
-	}
-	after, err := copyFileSum(outputPath, binaryPath)
-	if err != nil {
-		return CompileResult{}, compileError(pkgPath, err, nil)
-	}
-	record, recorded := readSum(outputPath)
-	if beforeErr == nil && before == after && (!recorded || record != after) {
-		_ = os.Remove(outputPath)
-		if err := link(); err != nil {
-			return CompileResult{}, err
-		}
-		if after, err = copyFileSum(outputPath, binaryPath); err != nil {
-			return CompileResult{}, compileError(pkgPath, err, nil)
-		}
-		if recorded {
-			fmt.Fprintf(os.Stderr, "gotest: the cached test binary of %s did not match its record and was linked again\n", pkgPath)
-		}
-	}
-	if !recorded || record != after {
-		_ = writeSum(outputPath, after) // the cache is an optimization
-	}
-
-	return CompileResult{Package: pkgPath, BinaryPath: binaryPath}, nil
+	return mp.WaitWithGrace(ctx)
 }
+
+// goCacheDir is `go env GOCACHE`, asked once per process; "" when it
+// cannot be read.
+var goCacheDir = sync.OnceValue(func() string {
+	out, err := exec.Command("go", "env", "GOCACHE").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+})
 
 func compileError(pkgPath string, err error, diagnostics []byte) error {
 	diagnostics = bytes.TrimRight(diagnostics, "\n")
@@ -207,29 +151,38 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 		return ch
 	}
 
+	emit := func(o CompileOutcome) {
+		select {
+		case ch <- o:
+		case <-ctx.Done():
+		}
+	}
+	goTmp := filepath.Join(outputDir, "gotmp")
 	go func() {
 		defer close(ch)
 		var wg sync.WaitGroup
+		var alone atomic.Int64
 		sem := make(chan struct{}, compileConcurrency(compileParallel, buildFlags))
-
-		for _, pkg := range packages {
+		// build runs one go command for group in stageDir, then builds each
+		// package it left without a verdict alone.
+		var build func(group []string, stageDir string)
+		build = func(group []string, stageDir string) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			left := compileGroup(ctx, group, overlayFlag, buildFlags, stageDir, goTmp, cacheDir, emit)
+			<-sem
+			for _, pkg := range left {
+				wg.Add(1)
+				go build([]string{pkg}, filepath.Join(binDir, fmt.Sprintf("s%d", alone.Add(1))))
+			}
+		}
+		for n, group := range compileGroups(packages, runtime.GOOS) {
 			wg.Add(1)
-			go func(pkgPath string) {
-				defer wg.Done()
-				select {
-				case sem <- struct{}{}:
-					defer func() { <-sem }()
-				case <-ctx.Done():
-					return
-				}
-
-				cr, err := compilePackage(ctx, pkgPath, overlayFlag, buildFlags, binDir, cacheDir)
-				outcome := CompileOutcome{Package: pkgPath, Result: cr, Err: err}
-				select {
-				case ch <- outcome:
-				case <-ctx.Done():
-				}
-			}(pkg)
+			go build(group, filepath.Join(binDir, strconv.Itoa(n)))
 		}
 		wg.Wait()
 	}()

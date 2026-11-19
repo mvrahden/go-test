@@ -1,15 +1,154 @@
 package gotestrunner
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// errBuildFailed is the error of a package go reported a failed build of:
+// the text one go process per package exited with.
+var errBuildFailed = errors.New("exit status 1")
+
+// pollInterval is how often a running build's stage dir is looked at.
+const pollInterval = 25 * time.Millisecond
+
+// compileGroup builds group in one go call and reports each package once:
+// its binary as soon as it is ready, or its failure as go attributed it.
+// It returns the packages of a group of several that go left without a
+// verdict of their own (a dependency failed), for the caller to build
+// alone, where whatever go says is theirs.
+func compileGroup(ctx context.Context, group []string, overlayFlag string, buildFlags []string, stageDir, goTmp, cacheDir string, emit func(CompileOutcome)) []string {
+	staged, err := stageGroup(group, stageDir, cacheDir)
+	if err == nil {
+		err = os.MkdirAll(goTmp, 0o755)
+	}
+	if err != nil {
+		for _, pkg := range group {
+			emit(CompileOutcome{Package: pkg, Err: compileError(pkg, err, nil)})
+		}
+		return nil
+	}
+	args := append([]string{"test", "-c", "-json", overlayFlag, "-o", stageDir + string(os.PathSeparator)}, buildFlags...)
+	args = append(args, group...)
+	env := append(os.Environ(), "GOTMPDIR="+goTmp)
+	what := "test binary for " + group[0]
+	if len(group) > 1 {
+		what = fmt.Sprintf("test binaries for %d packages", len(group))
+	}
+	log := newBuildLog(group)
+	var stderr bytes.Buffer
+	done := make(chan error, 1)
+	go func() {
+		defer logSlowBuild(os.Stderr, what, slowBuildThreshold())()
+		done <- goTestC(ctx, args, env, log, &stderr)
+	}()
+
+	var safe bool
+	if info, err := os.Stat(stageDir); err == nil {
+		safe = renameSafe(runtime.GOOS, info, goTmp, goCacheDir())
+	}
+	ready := make([]readiness, len(staged))
+	reported := make([]bool, len(staged))
+	pass := func(exited int) {
+		for i := range staged {
+			b := &staged[i]
+			if reported[i] || ctx.Err() != nil {
+				continue
+			}
+			if log.failed(b.Package) {
+				reported[i] = true
+				emit(CompileOutcome{Package: b.Package, Err: compileError(b.Package, errBuildFailed, log.diagnostics(b.Package))})
+				continue
+			}
+			now, _ := os.Stat(b.Path)
+			if r := binaryReady(b.placed, now, safe, exited); r != notReady {
+				reported[i], ready[i] = true, r
+				emit(CompileOutcome{Package: b.Package, Result: CompileResult{Package: b.Package, BinaryPath: b.Path}})
+			}
+		}
+	}
+	tick := time.NewTicker(pollInterval)
+	defer tick.Stop()
+	var runErr error
+wait:
+	for {
+		select {
+		case runErr = <-done:
+			break wait
+		case <-tick.C:
+			pass(-1)
+		}
+	}
+	pass(exitCode(runErr))
+	forwardBuildOutput(staged, reported, log, &stderr)
+
+	var left []string
+	for i := range staged {
+		b := &staged[i]
+		switch {
+		case reported[i]:
+			if ctx.Err() == nil {
+				publish(b, ready[i])
+			}
+		case ctx.Err() != nil:
+		case len(group) > 1:
+			left = append(left, b.Package)
+		default:
+			diags := slices.Concat(log.diagnostics(b.Package), log.shared(), stderr.Bytes())
+			if runErr == nil {
+				runErr = errors.New("go test -c wrote no test binary")
+			}
+			emit(CompileOutcome{Package: b.Package, Err: compileError(b.Package, runErr, diags)})
+		}
+	}
+	return left
+}
+
+// forwardBuildOutput writes to stderr what go said that no failure carries:
+// the output of the packages that built (-x traces, toolchain notices), and,
+// once every package has its verdict, the rest. A package left without one
+// gets the rest in its failure instead.
+func forwardBuildOutput(staged []stagedBinary, reported []bool, log *buildLog, stderr *bytes.Buffer) {
+	var out []byte
+	all := true
+	for i := range staged {
+		switch {
+		case !reported[i]:
+			all = false
+		case !log.failed(staged[i].Package):
+			out = append(out, log.diagnostics(staged[i].Package)...)
+		}
+	}
+	if all {
+		out = append(append(out, log.shared()...), stderr.Bytes()...)
+	}
+	if len(out) > 0 {
+		_, _ = os.Stderr.Write(out)
+	}
+}
+
+// exitCode is go's exit code: 0 for nil, the process's code, else 1.
+func exitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() > 0 {
+		return exit.ExitCode()
+	}
+	return 1
+}
 
 // stagedBinary is one package's slot in a group's stage dir.
 type stagedBinary struct {
