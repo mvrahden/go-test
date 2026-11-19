@@ -1371,6 +1371,7 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 | `pkg/lint` | The analyzer, exported for other `go/analysis` drivers; `pkg/lint/golangci`, a module of its own, is its golangci-lint plugin | `internal/lint` |
 | `skills` | The agent skill, embedded for `gotest skill install` | — |
 | `internal/{testkit,speccatalog/...,drill}` | Test support: staging and running the CLI, the spec catalog, the drill | `internal/{gotestspec,proctree,protocol,testkit}`, `pkg/{gotest,gotestruntime}`; third-party: `x/sys` (`drill`) |
+| `internal/docref/...` | Repository tooling: renders the parts of the documents that restate code | `internal/testkit` (`render`) |
 
 Rules that hold, and what holds them:
 
@@ -1379,7 +1380,9 @@ Rules that hold, and what holds them:
 3. `pkg/gotestruntime` imports `pkg/gotest`, never the reverse. What both need lives in a leaf under `internal/` (`carry`, `runstate`, `setupwaits`, `callsite`).
 4. The generator chain is one way: `gotestast` ← `gotestgen` ← `gotestrunner` ← `cmd/gotest`. Lint, migrate, refactor and scaffold read `gotestast` and `gotestgen` and never the runner.
 5. `internal/gotestspec` reads the event stream and imports neither the generator nor the runner, so a saved stream renders without either.
-6. No production package imports `internal/testkit`, `internal/speccatalog` or `internal/drill`.
+6. No production package imports `internal/testkit`, `internal/speccatalog`, `internal/docref` or `internal/drill`.
+
+**The generated reference.** The lists of the documents that restate code are rendered from it by `internal/docref`: the assertions and the config fields and presets, read from the source of `pkg/gotest`, and gotest's flags and environment variables, described once in tables of `internal/docref`. A document marks each list with a line `<!-- gotest:generated <section> <format> -->` before it and a line `<!-- gotest:end -->` after it; `make reference` replaces what a pair holds and leaves the rest of the document as it is. `ReferenceTestSuite` in `tests/conventions` fails on a section that differs from its rendering, and the suites of `internal/docref` fail on an assertion in no group, a flag of the registry or a `GOTEST_` variable of the code that `internal/docref` does not describe. Run `make reference` after changing an assertion, a config field, a flag or an environment variable.
 
 What the overlay design asks of a consumer: the suites run only under `gotest`; nothing on disk imports `pkg/gotestruntime`, so `go mod vendor` leaves it out unless a file of the module imports it; and a `go get -tool` declaration brings the CLI's dependencies into the consumer's `go.mod` as indirect requirements.
 

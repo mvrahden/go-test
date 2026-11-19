@@ -372,78 +372,57 @@ CacheFixture.AfterAll <span class="d">─┘</span></div>
         Assertion failures automatically trace back to the test call site. Helper functions don't need <code>t.Helper()</code> — the failure is located at the line that failed, a helper's included, and the message names the outermost caller from the test file.
       </div>
 
-      <h3>Equality &amp; identity</h3>
+      <h3>Every assertion</h3>
       <table class="ref-table">
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <thead><tr><th>Assertion</th><th>Checks</th></tr></thead>
         <tbody>
-          <tr><td><code>Equal(t, expected, actual)</code></td><td>Deep equality. Cross-type comparison is a compile error. Failures include a diff.</td></tr>
-          <tr><td><code>NotEqual(t, a, b)</code></td><td>Inverse of Equal.</td></tr>
-          <tr><td><code>Zero(t, value)</code></td><td>Value equals its zero value.</td></tr>
-          <tr><td><code>NotZero(t, value)</code></td><td>Value is not zero.</td></tr>
-          <tr><td><code>Nil(t, obj)</code></td><td>Nil check for non-comparable nilables (slices, maps, funcs). Type-guarded; comparable nilables use <code>Zero</code>.</td></tr>
-          <tr><td><code>NotNil(t, obj)</code></td><td>Inverse of Nil.</td></tr>
-          <tr><td><code>Empty(t, obj)</code></td><td>Slice, map, string, or channel is empty.</td></tr>
-          <tr><td><code>NotEmpty(t, obj)</code></td><td>Not empty.</td></tr>
+          <!-- gotest:generated assertions/all html -->
+          <tr><td><code>gotest.Fail(t)</code></td><td>Immediately fails the test.</td></tr>
+          <tr><td><code>gotest.Equal[V any](t, expected, actual V)</code></td><td>Asserts that expected and actual are deeply equal.</td></tr>
+          <tr><td><code>gotest.NotEqual[V any](t, expected, actual V)</code></td><td>Asserts that expected and actual are NOT deeply equal.</td></tr>
+          <tr><td><code>gotest.Same[V any](t, expected, actual *V)</code></td><td>Asserts that expected and actual are the same pointer.</td></tr>
+          <tr><td><code>gotest.NotSame[V any](t, expected, actual *V)</code></td><td>Asserts that expected and actual are distinct pointers.</td></tr>
+          <tr><td><code>gotest.True(t, value bool)</code></td><td>Asserts that value is true.</td></tr>
+          <tr><td><code>gotest.False(t, value bool)</code></td><td>Asserts that value is false.</td></tr>
+          <tr><td><code>gotest.Zero[V comparable](t, value V)</code></td><td>Asserts that value is the zero value for its type.</td></tr>
+          <tr><td><code>gotest.NotZero[V comparable](t, value V)</code></td><td>Asserts that value is NOT the zero value for its type.</td></tr>
+          <tr><td><code>gotest.Nil(t, object any)</code></td><td>Asserts that object is nil.</td></tr>
+          <tr><td><code>gotest.NotNil(t, object any)</code></td><td>Asserts that object is not nil.</td></tr>
+          <tr><td><code>gotest.Empty(t, object any)</code></td><td>Asserts that object is empty: nil, a nil pointer, or a zero-length slice, map, array, channel or string.</td></tr>
+          <tr><td><code>gotest.NotEmpty(t, object any)</code></td><td>Asserts that object is NOT empty: a slice, map, array, channel or string of non-zero length.</td></tr>
+          <tr><td><code>gotest.Len(t, object any, length int)</code></td><td>Asserts that object has the given length.</td></tr>
+          <tr><td><code>gotest.Contains(t, s, contains any)</code></td><td>Asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps).</td></tr>
+          <tr><td><code>gotest.NotContains(t, s, contains any)</code></td><td>Asserts that s does NOT contain the given element.</td></tr>
+          <tr><td><code>gotest.ElementsMatch[V comparable](t, listA, listB []V)</code></td><td>Asserts that listA and listB contain the same elements regardless of order.</td></tr>
+          <tr><td><code>gotest.Subset[V comparable](t, list, subset []V)</code></td><td>Asserts that every element of subset exists in list.</td></tr>
+          <tr><td><code>gotest.NoError(t, err error)</code></td><td>Asserts that err is nil.</td></tr>
+          <tr><td><code>gotest.Error(t, err error)</code></td><td>Asserts that err is not nil.</td></tr>
+          <tr><td><code>gotest.ErrorIs(t, err, target error)</code></td><td>Asserts that errors.Is(err, target) is true.</td></tr>
+          <tr><td><code>gotest.ErrorAs[E error](t, err error) E</code></td><td>Asserts that the error chain of err contains a value of type E and returns it.</td></tr>
+          <tr><td><code>gotest.ErrorContains(t, err error, contains string)</code></td><td>Asserts that err is not nil and its message contains the given substring.</td></tr>
+          <tr><td><code>gotest.Greater[V cmp.Ordered](t, a, b V)</code></td><td>Asserts that a &gt; b.</td></tr>
+          <tr><td><code>gotest.GreaterOrEqual[V cmp.Ordered](t, a, b V)</code></td><td>Asserts that a &gt;= b.</td></tr>
+          <tr><td><code>gotest.Less[V cmp.Ordered](t, a, b V)</code></td><td>Asserts that a &lt; b.</td></tr>
+          <tr><td><code>gotest.LessOrEqual[V cmp.Ordered](t, a, b V)</code></td><td>Asserts that a &lt;= b.</td></tr>
+          <tr><td><code>gotest.Regexp[P regexpPattern](t, rx P, str string)</code></td><td>Asserts that str matches the regular expression pattern rx (string or *regexp.Regexp).</td></tr>
+          <tr><td><code>gotest.InDelta[V numeric](t, expected, actual V, delta float64)</code></td><td>Asserts that expected and actual differ by at most delta.</td></tr>
+          <tr><td><code>gotest.JSONEq(t, expected, actual any)</code></td><td>Asserts that expected and actual represent the same JSON structure, ignoring key order.</td></tr>
+          <tr><td><code>gotest.TimeWithin(t, expected, actual time.Time, tolerance time.Duration)</code></td><td>Asserts that expected and actual are within tolerance of each other.</td></tr>
+          <tr><td><code>gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration)</code></td><td>Asserts that ts is within tolerance of time.Now().</td></tr>
+          <tr><td><code>gotest.Panics(t, f func()) any</code></td><td>Asserts that f panics and returns the recovered value.</td></tr>
+          <tr><td><code>gotest.MatchSnapshot(t, value any, name ...string)</code></td><td>Compares value, rendered as text, with the section of the test&#39;s baseline in testdata/__snapshots__/&lt;TestName&gt;.snap beside the calling file (&lt;TestName&gt;_ext.snap from an external test package).</td></tr>
+          <tr><td><code>gotest.Eventually(t, waitFor, tick time.Duration, fn func(poll *gotest.R))</code></td><td>Asserts that fn passes without assertion failures within waitFor, polling every tick.</td></tr>
+          <tr><td><code>gotest.Consistently(t, waitFor, tick time.Duration, fn func(poll *gotest.R))</code></td><td>Asserts that fn passes on every poll for the entire waitFor duration.</td></tr>
+          <!-- gotest:end -->
         </tbody>
       </table>
+      <p><code>Nil</code> and <code>NotNil</code> are for non-comparable nilables (slices, maps, funcs) and are type-guarded; comparable nilables use <code>Zero</code> and <code>NotZero</code>. <code>JSONEq</code> accepts a string, <code>[]byte</code>, <code>json.RawMessage</code>, <code>io.Reader</code> or any marshalable value.</p>
 
-      <h3>Errors</h3>
+      <h3>Beside the assertions</h3>
       <table class="ref-table">
         <thead><tr><th>Function</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>NoError(t, err)</code></td><td>Error is nil.</td></tr>
-          <tr><td><code>Error(t, err)</code></td><td>Error is not nil.</td></tr>
-          <tr><td><code>ErrorIs(t, err, target)</code></td><td>Wraps <code>errors.Is</code>.</td></tr>
-          <tr><td><code>ErrorAs[E](t, err)</code></td><td>Wraps <code>errors.As</code>. Returns the matched error.</td></tr>
-          <tr><td><code>ErrorContains(t, err, substr)</code></td><td>Error message contains substring.</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Collections</h3>
-      <table class="ref-table">
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>Contains(t, haystack, needle)</code></td><td>String, slice, or map contains value.</td></tr>
-          <tr><td><code>NotContains(t, s, v)</code></td><td>Inverse of Contains.</td></tr>
-          <tr><td><code>Len(t, obj, n)</code></td><td>Collection has exactly n elements.</td></tr>
-          <tr><td><code>ElementsMatch(t, a, b)</code></td><td>Same elements regardless of order.</td></tr>
-          <tr><td><code>Subset(t, list, sub)</code></td><td>All elements of sub exist in list.</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Comparison &amp; numeric</h3>
-      <table class="ref-table">
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>Greater(t, a, b)</code></td><td>a &gt; b. Constrained to <code>cmp.Ordered</code> — comparing incomparable types is a compile error.</td></tr>
-          <tr><td><code>GreaterOrEqual(t, a, b)</code></td><td>a &ge; b.</td></tr>
-          <tr><td><code>Less(t, a, b)</code></td><td>a &lt; b.</td></tr>
-          <tr><td><code>LessOrEqual(t, a, b)</code></td><td>a &le; b.</td></tr>
-          <tr><td><code>InDelta(t, expected, actual, delta)</code></td><td>Difference within delta. Works with any numeric type.</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Strings, time &amp; other</h3>
-      <table class="ref-table">
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>Regexp(t, pattern, str)</code></td><td>String matches regex pattern.</td></tr>
-          <tr><td><code>JSONEq(t, expected, actual)</code></td><td>JSON-equal. Accepts string, []byte, io.Reader, or any marshalable value.</td></tr>
-          <tr><td><code>TimeWithin(t, expected, actual, tol)</code></td><td>Times within tolerance.</td></tr>
-          <tr><td><code>TimeIsNow(t, ts, tolerance)</code></td><td>Timestamp is approximately now.</td></tr>
-          <tr><td><code>True(t, v)</code> / <code>False(t, v)</code></td><td>Boolean checks.</td></tr>
-          <tr><td><code>Panics(t, fn)</code></td><td>Function panics. Returns the recovered value.</td></tr>
-          <tr><td><code>Fail(t, msgAndArgs...)</code></td><td>Explicit immediate failure.</td></tr>
           <tr><td><code>Must(val, ok)</code></td><td>Unwraps <code>(T, error)</code> and <code>(T, bool)</code> pairs. Panics on error or false — for test setup, not assertions.</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Async</h3>
-      <table class="ref-table">
-        <thead><tr><th>Function</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>Eventually(t, timeout, tick, fn)</code></td><td>Poll <code>func(poll *R)</code> until assertions pass or timeout.</td></tr>
-          <tr><td><code>Consistently(t, duration, tick, fn)</code></td><td>Assert <code>func(poll *R)</code> holds for the full duration.</td></tr>
           <tr><td><code>Go(t, fn)</code></td><td>Run <code>fn</code> on a goroutine that captures panics and re-raises them on the test's goroutine. Returns a <code>wait</code> func; also registered as cleanup.</td></tr>
         </tbody>
       </table>
@@ -500,24 +479,29 @@ lint:
 
       <h3>Suite configuration</h3>
       <table class="ref-table">
-        <thead><tr><th>Field</th><th>Default</th><th>Effect</th></tr></thead>
+        <thead><tr><th>Field</th><th>Type</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td><code>Timeout</code></td><td>30s</td><td>Per-test-case deadline.</td></tr>
-          <tr><td><code>SetupTimeout</code></td><td>30s</td><td>BeforeAll / AfterAll deadline.</td></tr>
-          <tr><td><code>FailFast</code></td><td>false</td><td>Stop the suite on first failure.</td></tr>
-          <tr><td><code>Parallel</code></td><td>false</td><td>Run test methods concurrently.</td></tr>
-          <tr><td><code>Exclusive</code></td><td>false</td><td>Schedule the suite's process strictly alone — after every non-exclusive suite has finished, one exclusive suite at a time. For wall-clock-sensitive or resource-contended suites.</td></tr>
-          <tr><td><code>ExclusiveGroup</code></td><td>""</td><td>Run the suite in a named group: the default group first, then each named group by name, never two at once; a group's suites run in parallel, its <code>Exclusive</code> suites after them. A string literal or string constant.</td></tr>
+          <!-- gotest:generated suiteconfig/fields html -->
+          <tr><td><code>Timeout</code></td><td><code>time.Duration</code></td><td>Timeout is the per-test-method deadline.</td></tr>
+          <tr><td><code>SetupTimeout</code></td><td><code>time.Duration</code></td><td>SetupTimeout is the deadline for BeforeAll/AfterAll.</td></tr>
+          <tr><td><code>FailFast</code></td><td><code>bool</code></td><td>FailFast stops the suite after the first test failure.</td></tr>
+          <tr><td><code>Parallel</code></td><td><code>bool</code></td><td>Parallel runs test methods concurrently.</td></tr>
+          <tr><td><code>Exclusive</code></td><td><code>bool</code></td><td>Exclusive schedules the suite&#39;s process strictly alone: after every non-exclusive suite has finished, one exclusive suite at a time, in deterministic order.</td></tr>
+          <tr><td><code>ExclusiveGroup</code></td><td><code>string</code></td><td>ExclusiveGroup names the group the suite runs in: the suites of a group run in parallel with each other and never beside a suite outside it.</td></tr>
+          <!-- gotest:end -->
         </tbody>
       </table>
+      <p><code>Exclusive</code> is for wall-clock-sensitive or resource-contended suites. With <code>ExclusiveGroup</code> the default group runs first, then each named group by name, never two at once; a group's suites run in parallel, its <code>Exclusive</code> suites after them. Its value is a string literal or a string constant.</p>
 
       <h3>Fixture configuration</h3>
       <table class="ref-table">
-        <thead><tr><th>Field</th><th>Default</th><th>Effect</th></tr></thead>
+        <thead><tr><th>Field</th><th>Type</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td><code>Timeout</code></td><td>2 min</td><td>BeforeAll / AfterAll deadline.</td></tr>
-          <tr><td><code>Retries</code></td><td>0</td><td>BeforeAll retry attempts.</td></tr>
-          <tr><td><code>RetryDelay</code></td><td>0</td><td>Pause between retries.</td></tr>
+          <!-- gotest:generated fixtureconfig/fields html -->
+          <tr><td><code>Timeout</code></td><td><code>time.Duration</code></td><td>Timeout is the deadline for each lifecycle operation (BeforeAll/AfterAll).</td></tr>
+          <tr><td><code>Retries</code></td><td><code>int</code></td><td>Retries is how many times to retry BeforeAll on failure.</td></tr>
+          <tr><td><code>RetryDelay</code></td><td><code>time.Duration</code></td><td>RetryDelay is the pause between retry attempts.</td></tr>
+          <!-- gotest:end -->
         </tbody>
       </table>
 
@@ -660,6 +644,7 @@ percentage = covered / total</div>
     <section class="ref-section" id="cli">
       <h2>CLI Reference</h2>
       <p class="lead">One command, multiple modes. The <code>go test</code> flags keep their meaning; the few that would break what gotest does are refused with the reason.</p>
+      <p>gotest has no result cache. Every run executes every suite it selects; it never prints <code>(cached)</code>.</p>
 
       <h3>Commands</h3>
       <table class="ref-table">
@@ -689,37 +674,50 @@ percentage = covered / total</div>
       <table class="ref-table">
         <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
         <tbody>
-          <tr><td><code>--ci</code></td><td>CI mode: fail on focus prefixes, snapshot read-only. Auto-detected from <code>CI</code> env var; opt out with <code>GOTEST_CI=0</code>.</td></tr>
-          <tr><td><code>--spec</code></td><td>Render the spec view in place of the default output.</td></tr>
-          <tr><td><code>--update-snapshots</code></td><td>Regenerate all snapshot files.</td></tr>
-          <tr><td><code>--no-cache</code></td><td>Disable the test binary cache.</td></tr>
-          <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage falls below threshold.</td></tr>
-          <tr><td><code>--format=&lt;fmt&gt;</code></td><td>Output format for <code>spec</code> command: <code>md</code> (Markdown) or <code>json</code> (structured JSON).</td></tr>
+          <!-- gotest:generated flags/gotest html -->
+          <tr><td><code>--debug</code></td><td>Keep the run&#39;s overlay and work dir for inspection; a later run removes them after 7 days.</td></tr>
+          <tr><td><code>--ci</code></td><td>CI mode: fail on <code>F_</code> prefixes, snapshot read-only; on by itself where <code>CI</code> is set, opt out with <code>GOTEST_CI=0</code>.</td></tr>
+          <tr><td><code>--no-cache</code></td><td>Bypass the test binary cache and link afresh (generation is not cached).</td></tr>
+          <tr><td><code>--spec</code></td><td>Render the spec view instead of the default output (default and watch modes).</td></tr>
+          <tr><td><code>--update-snapshots</code></td><td>Regenerate snapshot files.</td></tr>
+          <tr><td><code>--format=&lt;fmt&gt;</code></td><td>Output format for <code>spec</code>/<code>summary</code> (terminal, md/markdown, json).</td></tr>
           <tr><td><code>--output=&lt;path&gt;</code></td><td>Write formatted output to file.</td></tr>
-          <tr><td><code>--no-color</code></td><td>Strip ANSI codes from output.</td></tr>
-          <tr><td><code>--debug</code></td><td>Keep the run's work dir and overlay for inspection; a later run removes them after 7 days.</td></tr>
-          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Total budget for all shared fixture setup (default: the fixtures' declared budgets, 30s until the first reports; <code>0</code> to disable).</td></tr>
-          <tr><td><code>--timeout=&lt;dur&gt;</code></td><td>Global pipeline deadline (default: 15m, <code>0</code> to disable).</td></tr>
-          <tr><td><code>--parallel=&lt;n&gt;</code></td><td>Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
-          <tr><td><code>--compile-parallel=&lt;n&gt;</code></td><td>Concurrent compilation processes (default: NumCPU, auto-halved for <code>-race</code>/<code>-msan</code>/<code>-asan</code>).</td></tr>
-          <tr><td><code>--group=&lt;name&gt;</code></td><td>Run only the suites of this <code>ExclusiveGroup</code>; repeatable. An unknown name exits 2 before any build.</td></tr>
-          <tr><td><code>--skip-group=&lt;name&gt;</code></td><td>Leave the suites of this <code>ExclusiveGroup</code> out; repeatable.</td></tr>
-          <tr><td><code>--save=&lt;path&gt;</code></td><td>Save a benchmark run as a JSON baseline (<code>bench</code>).</td></tr>
-          <tr><td><code>--against=&lt;path&gt;</code></td><td>Compare a benchmark run against a saved baseline and print the delta table (<code>bench</code>).</td></tr>
-          <tr><td><code>--gate=&lt;pct&gt;</code></td><td>Fail if the worst significant benchmark regression exceeds the threshold (<code>bench</code>).</td></tr>
-          <tr><td><code>--json</code></td><td>Emit one versioned JSON report instead of human output (<code>bench</code>).</td></tr>
-          <tr><td><code>--for=&lt;dur&gt;</code></td><td>Approximate wall-clock budget for the whole fuzz session, split across targets (<code>fuzz</code>; default 1m, <code>0</code> removes the budget).</td></tr>
-          <tr><td><code>--jobs=&lt;n&gt;</code></td><td>Maximum concurrent fuzz targets (<code>fuzz</code>; default max(1, GOMAXPROCS/2)).</td></tr>
-          <tr><td><code>--target=&lt;name&gt;</code></td><td>Fuzz exactly one generated target by its wrapper name (<code>fuzz</code>).</td></tr>
-          <tr><td><code>--no-harvest</code></td><td>Do not mine table-test literals into fuzz seeds for this run.</td></tr>
-          <tr><td><code>--static</code></td><td>Read the specification from source without running the suites; nodes carry no verdict (<code>spec</code> command).</td></tr>
-          <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing or incomplete stream: report whether rendering succeeded, not the test verdict.</td></tr>
-          <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Watch mode debounce interval (default 200ms).</td></tr>
-          <tr><td><code>--input=&lt;path&gt;</code></td><td>Read test output from file instead of running tests (<code>spec</code>, <code>summary</code>). Exits 2 when the input holds no test events, a package or failed build never reported its verdict, or a package failed to build.</td></tr>
-          <tr><td><code>--events-file=&lt;path&gt;</code></td><td>Also write the run's <code>go test -json</code> event stream to the file as <code>-json</code> prints it, a suite's events when its process ends, making its directories and replacing a file there; <code>summary --input</code> reads it back (<code>-json</code> runs and <code>summary</code>). An unwritable path exits 2 before anything is built.</td></tr>
-          <tr><td><code>--github</code></td><td>GitHub CI mode: emit <code>::error</code> annotations and write step summary (<code>summary</code> command). Auto-detected via <code>$GITHUB_ACTIONS</code>.</td></tr>
-          <tr><td><code>--coverage=&lt;file&gt;</code></td><td>Include coverage from profile in summary output (<code>summary</code> command).</td></tr>
-          <tr><td><code>--badge=&lt;file&gt;</code></td><td>Write a self-contained coverage badge SVG; enables <code>-coverprofile</code> when nothing else does (<code>summary</code> command).</td></tr>
+          <tr><td><code>--no-color</code></td><td>Strip ANSI codes from terminal output.</td></tr>
+          <tr><td><code>--min=&lt;pct&gt;</code></td><td>Fail if coverage is below threshold (enables <code>-coverprofile</code>).</td></tr>
+          <tr><td><code>--setup-timeout=&lt;dur&gt;</code></td><td>Flat budget for shared fixture setup (default: the fixtures&#39; declared budgets, 30s until the first reports; 0 disables).</td></tr>
+          <tr><td><code>--timeout=&lt;dur&gt;</code></td><td>Global pipeline deadline (default: 15m; 0 disables); refused by <code>fuzz</code>, whose deadline follows <code>--for</code>.</td></tr>
+          <tr><td><code>--debounce=&lt;dur&gt;</code></td><td>Debounce interval for watch mode (default 200ms).</td></tr>
+          <tr><td><code>--parallel=&lt;n&gt;</code></td><td>Total concurrent test method budget (default: 2×GOMAXPROCS, auto-halved for -race/-msan/-asan).</td></tr>
+          <tr><td><code>--compile-parallel=&lt;n&gt;</code></td><td>Concurrent compilation processes (default: NumCPU, auto-halved for -race/-msan/-asan).</td></tr>
+          <tr><td><code>--group=&lt;name&gt;</code></td><td>Run only the suites of this <code>ExclusiveGroup</code> (repeatable; default runs, <code>spec</code>, <code>summary</code>); a name no suite declares exits 2 before any build.</td></tr>
+          <tr><td><code>--skip-group=&lt;name&gt;</code></td><td>Leave the suites of this <code>ExclusiveGroup</code> out (repeatable).</td></tr>
+          <tr><td><code>--input=&lt;path&gt;</code></td><td>Replay a saved <code>go test -json</code> stream in <code>spec</code>/<code>summary</code> (<code>-</code> reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build.</td></tr>
+          <tr><td><code>--events-file=&lt;path&gt;</code></td><td>With <code>-json</code>, or in <code>summary</code>, also write the run&#39;s <code>go test -json</code> event stream to the file as <code>-json</code> prints it (a suite&#39;s events when its process ends), making its directories and replacing a file there; <code>summary --input</code> reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built.</td></tr>
+          <tr><td><code>--control=stdin</code></td><td>Read <code>stop</code> and <code>force</code> lines on standard input, a first and a second interrupt, counted with the signals, the input&#39;s end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read.</td></tr>
+          <tr><td><code>--github</code></td><td>Emit GitHub annotations and step summary (auto-enabled in GitHub Actions).</td></tr>
+          <tr><td><code>--coverage=&lt;path&gt;</code></td><td>Coverage profile path for the <code>summary</code> subcommand.</td></tr>
+          <tr><td><code>--badge=&lt;path&gt;</code></td><td>Write a self-contained coverage badge SVG (<code>summary</code>); adds <code>-coverprofile</code> when neither the caller nor <code>--min</code> did.</td></tr>
+          <tr><td><code>--render-only</code></td><td>With <code>--input</code>, exit 0 on a failing or incomplete stream: the code reports whether rendering succeeded, not whether the tests passed.</td></tr>
+          <tr><td><code>--stamp</code></td><td>With <code>--input</code>, write the stream back with each test event placed as <code>gotest -json</code> places it, instead of rendering it (<code>spec</code>).</td></tr>
+          <tr><td><code>--static</code></td><td>Render the specification from source without running the suites (<code>spec</code>); nodes carry no verdict, and methods whose behaviors depend on runtime values are reported as incomplete on stderr.</td></tr>
+          <tr><td><code>--declared</code></td><td>Lay the run&#39;s verdicts, or with <code>--input</code> a saved stream&#39;s, over the specification the packages&#39; source declares (<code>spec</code>).</td></tr>
+          <tr><td><code>--hide=&lt;statuses&gt;</code></td><td>Leave out of the <code>spec</code> rendering the rows whose status is one of <code>pass</code>, <code>fail</code>, <code>skip</code>, <code>none</code>, without changing what is counted.</td></tr>
+          <tr><td><code>--match=&lt;text&gt;</code></td><td>Keep of the <code>spec</code> rendering the behaviors whose label holds the text, and their groups; counts are those of what is kept.</td></tr>
+          <tr><td><code>--only=&lt;import path&gt;[:&lt;i&gt;.&lt;j&gt;…]</code></td><td>Keep of the <code>spec</code> rendering one package, or the node at that position among the shown children, with what is under it; counts are those of what is kept.</td></tr>
+          <tr><td><code>--bench</code></td><td>Benchmark mode for <code>watch</code>: re-run benchmarks on change with ns/op deltas.</td></tr>
+          <tr><td><code>--save=&lt;path&gt;</code></td><td>Save a benchmark run as a JSON baseline (<code>bench</code>; a bare <code>--save=</code> uses <code>bench.baseline</code> from <code>.gotest.yml</code>, and saving to the configured baseline promotes the run without comparing it).</td></tr>
+          <tr><td><code>--against=&lt;path&gt;</code></td><td>Compare a benchmark run against a saved baseline and print the delta table (<code>bench</code>; defaults to <code>bench.baseline</code>); a baseline from another machine or Go version warns and still compares.</td></tr>
+          <tr><td><code>--gate=&lt;pct&gt;</code></td><td>Fail (exit 1) if the worst significant benchmark regression exceeds the threshold (<code>bench</code>); needs <code>-count=4</code> or more.</td></tr>
+          <tr><td><code>--json</code></td><td>Emit one versioned JSON report to stdout instead of human output (<code>bench</code>; for tooling).</td></tr>
+          <tr><td><code>--for=&lt;dur&gt;</code></td><td>Approximate wall-clock fuzz budget for the session, split across targets (<code>fuzz</code>; default 1m or half of a shorter <code>--timeout</code>; <code>0</code> removes the budget).</td></tr>
+          <tr><td><code>--target=&lt;name&gt;</code></td><td>Fuzz exactly one generated wrapper by name; an unmatched name lists the available ones (<code>fuzz</code>).</td></tr>
+          <tr><td><code>--jobs=&lt;n&gt;</code></td><td>Max concurrent fuzz targets (<code>fuzz</code>; default: max(1, GOMAXPROCS/2)).</td></tr>
+          <tr><td><code>--no-harvest</code></td><td>Disable table-test seed harvesting for this run.</td></tr>
+          <tr><td><code>--fuzz</code></td><td>Generate fuzz round-trip skeletons (<code>scaffold</code>).</td></tr>
+          <tr><td><code>--dry-run</code></td><td>Print the unified diff of every edit instead of writing it (<code>migrate</code>).</td></tr>
+          <tr><td><code>--dir=&lt;skills-dir&gt;</code></td><td>Skills directory to install into, default <code>.agents/skills</code> (<code>skill install</code>).</td></tr>
+          <tr><td><code>--cache</code></td><td>Remove every cached test binary no run is using (<code>clean</code>).</td></tr>
+          <!-- gotest:end -->
         </tbody>
       </table>
 

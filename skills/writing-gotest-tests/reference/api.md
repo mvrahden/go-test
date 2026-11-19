@@ -9,37 +9,47 @@ All except `Eventually`, `Consistently` and `MatchSnapshot` (whose trailing argu
 
 ### Unconditional Failure
 
+<!-- gotest:generated assertions/unconditional go -->
 ```go
-gotest.Fail(t, msgAndArgs ...any)                    // immediately fails with message
+gotest.Fail(t)  // immediately fails the test
 ```
+<!-- gotest:end -->
 
 Use in unreachable branches (`default` in exhaustive switches, after calls that must not return).
 Prefer over `gotest.True(t, false, "msg")`.
 
 ### Equality
 
+<!-- gotest:generated assertions/equality go -->
 ```go
-gotest.Equal[V any](t, expected, actual V)          // deep equality (reflect.DeepEqual)
-gotest.NotEqual[V any](t, expected, actual V)        // deep inequality
-gotest.Same[V any](t, expected, actual *V)           // pointer identity (==), never structure
-gotest.NotSame[V any](t, expected, actual *V)        // distinct pointers
+gotest.Equal[V any](t, expected, actual V)     // asserts that expected and actual are deeply equal
+gotest.NotEqual[V any](t, expected, actual V)  // asserts that expected and actual are NOT deeply equal
+gotest.Same[V any](t, expected, actual *V)     // asserts that expected and actual are the same pointer
+gotest.NotSame[V any](t, expected, actual *V)  // asserts that expected and actual are distinct pointers
 ```
+<!-- gotest:end -->
 
 `True(t, p == q)` on pointers is identity; the `assertion-simplify` rule rewrites it to `Same`/`NotSame`, never to `Equal`, whose `reflect.DeepEqual` compares structure. A struct or array holding a pointer, or two interfaces, is left alone for the same reason; `err == target` on errors names `ErrorIs` without a fix, since `errors.Is` also matches wrapped errors.
 
 ### Boolean
 
+<!-- gotest:generated assertions/boolean go -->
 ```go
-gotest.True(t, value bool)
-gotest.False(t, value bool)
+gotest.True(t, value bool)   // asserts that value is true
+gotest.False(t, value bool)  // asserts that value is false
 ```
+<!-- gotest:end -->
 
 ### Zero Value (also covers nil)
 
+<!-- gotest:generated assertions/zero go -->
 ```go
-gotest.Zero[V comparable](t, value V)               // value == zero value for type
-gotest.NotZero[V comparable](t, value V)             // value != zero value for type
+gotest.Zero[V comparable](t, value V)     // asserts that value is the zero value for its type
+gotest.NotZero[V comparable](t, value V)  // asserts that value is NOT the zero value for its type
+gotest.Nil(t, object any)                 // asserts that object is nil
+gotest.NotNil(t, object any)              // asserts that object is not nil
 ```
+<!-- gotest:end -->
 
 `comparable` includes: pointers, interfaces, channels, numerics, strings, bools, structs of comparables, arrays of comparables.
 It excludes: slices, maps, functions.
@@ -48,77 +58,98 @@ For nil checks on slices, maps, or functions: `gotest.NotNil(t, x)` / `gotest.Ni
 
 ### Collections
 
+<!-- gotest:generated assertions/collections go -->
 ```go
-gotest.Empty(t, object any)                          // nil, or len == 0 (string, slice, map, chan, array; a pointer is followed and must reach one); any other type fails the type guard
-gotest.NotEmpty(t, object any)
-gotest.Len(t, object any, length int)                // exact length check
-gotest.Contains(t, haystack, needle any)             // substring (string), element (slice/array), key (map)
-gotest.NotContains(t, haystack, needle any)
-gotest.ElementsMatch[V comparable](t, a, b []V)     // same elements, any order
-gotest.Subset[V comparable](t, list, subset []V)     // every subset element exists in list
+gotest.Empty(t, object any)                              // asserts that object is empty: nil, a nil pointer, or a zero-length slice, map, array, channel or string
+gotest.NotEmpty(t, object any)                           // asserts that object is NOT empty: a slice, map, array, channel or string of non-zero length
+gotest.Len(t, object any, length int)                    // asserts that object has the given length
+gotest.Contains(t, s, contains any)                      // asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps)
+gotest.NotContains(t, s, contains any)                   // asserts that s does NOT contain the given element
+gotest.ElementsMatch[V comparable](t, listA, listB []V)  // asserts that listA and listB contain the same elements regardless of order
+gotest.Subset[V comparable](t, list, subset []V)         // asserts that every element of subset exists in list
 ```
+<!-- gotest:end -->
+
+A pointer given to `Empty` or `NotEmpty` is followed and must reach a string, slice, map, channel or array; any other type fails the type guard.
 
 ### Errors
 
+<!-- gotest:generated assertions/errors go -->
 ```go
-gotest.NoError(t, err error)                         // err == nil
-gotest.Error(t, err error)                           // err != nil
-gotest.ErrorIs(t, err, target error)                 // errors.Is(err, target)
-gotest.ErrorAs[E error](t, err error) E              // errors.As — returns matched error
-gotest.ErrorContains(t, err error, substr string)    // err != nil && strings.Contains(err.Error(), substr)
+gotest.NoError(t, err error)                         // asserts that err is nil
+gotest.Error(t, err error)                           // asserts that err is not nil
+gotest.ErrorIs(t, err, target error)                 // asserts that errors.Is(err, target) is true
+gotest.ErrorAs[E error](t, err error) E              // asserts that the error chain of err contains a value of type E and returns it
+gotest.ErrorContains(t, err error, contains string)  // asserts that err is not nil and its message contains the given substring
 ```
+<!-- gotest:end -->
 
 ### Comparison
 
+<!-- gotest:generated assertions/comparison go -->
 ```go
-gotest.Greater[V cmp.Ordered](t, a, b V)            // a > b
-gotest.GreaterOrEqual[V cmp.Ordered](t, a, b V)     // a >= b
-gotest.Less[V cmp.Ordered](t, a, b V)               // a < b
-gotest.LessOrEqual[V cmp.Ordered](t, a, b V)        // a <= b
+gotest.Greater[V cmp.Ordered](t, a, b V)         // asserts that a > b
+gotest.GreaterOrEqual[V cmp.Ordered](t, a, b V)  // asserts that a >= b
+gotest.Less[V cmp.Ordered](t, a, b V)            // asserts that a < b
+gotest.LessOrEqual[V cmp.Ordered](t, a, b V)     // asserts that a <= b
 ```
+<!-- gotest:end -->
 
 ### Strings & Patterns
 
+<!-- gotest:generated assertions/patterns go -->
 ```go
-gotest.Regexp[P regexpPattern](t, rx P, str string)  // accepts string pattern or *regexp.Regexp
+gotest.Regexp[P regexpPattern](t, rx P, str string)  // asserts that str matches the regular expression pattern rx (string or *regexp.Regexp)
 ```
+<!-- gotest:end -->
 
 Use `"^prefix"` for HasPrefix, `"suffix$"` for HasSuffix, `"^exact$"` for exact match.
 
 ### Numeric
 
+<!-- gotest:generated assertions/numeric go -->
 ```go
-gotest.InDelta[V numeric](t, expected, actual V, delta float64)
+gotest.InDelta[V numeric](t, expected, actual V, delta float64)  // asserts that expected and actual differ by at most delta
 ```
+<!-- gotest:end -->
 
 ### JSON
 
+<!-- gotest:generated assertions/json go -->
 ```go
-gotest.JSONEq(t, expected, actual any)  // structural JSON equality
-                                         // accepts: string, []byte, json.RawMessage, io.Reader, or any marshalable value
+gotest.JSONEq(t, expected, actual any)  // asserts that expected and actual represent the same JSON structure, ignoring key order
 ```
+<!-- gotest:end -->
 
+`JSONEq` accepts a string, `[]byte`, `json.RawMessage`, `io.Reader` or any marshalable value.
 A named string type is read as JSON text, unless it implements `json.Marshaler` or `encoding.TextMarshaler`: `Color("red")` is the text `red`, not the JSON string `"red"`, and JSON text must be valid UTF-8 (v1.38+).
 
 ### Time
 
+<!-- gotest:generated assertions/time go -->
 ```go
-gotest.TimeWithin(t, expected, actual time.Time, tolerance time.Duration)
-gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration)
+gotest.TimeWithin(t, expected, actual time.Time, tolerance time.Duration)  // asserts that expected and actual are within tolerance of each other
+gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration)                 // asserts that ts is within tolerance of time.Now()
 ```
+<!-- gotest:end -->
 
 ### Panics
 
+<!-- gotest:generated assertions/panics go -->
 ```go
-gotest.Panics(t, f func()) any  // asserts f panics, returns recovered value
+gotest.Panics(t, f func()) any  // asserts that f panics and returns the recovered value
 ```
+<!-- gotest:end -->
 
 ### Snapshots
 
+<!-- gotest:generated assertions/snapshots go -->
 ```go
-gotest.MatchSnapshot(t, value any, name ...string)   // value: string, []byte, encoding.TextMarshaler, fmt.Stringer, json.Marshaler, error or io.Reader
+gotest.MatchSnapshot(t, value any, name ...string)  // compares value, rendered as text, with the section of the test's baseline in testdata/__snapshots__/<TestName>.snap beside the calling file (<TestName>_ext.snap from an external test package)
 ```
+<!-- gotest:end -->
 
+`value` is a string, `[]byte`, `encoding.TextMarshaler`, `fmt.Stringer`, `json.Marshaler`, `error` or `io.Reader`.
 Snapshots are stored in `testdata/__snapshots__/<TestName>.snap` (e.g. `TestMyTestSuite.snap`; suffix `_ext` for external `_test` packages) next to the test file.
 On first run (or with `--update-snapshots`), the snapshot is created.
 On subsequent runs, the value is compared against the stored snapshot.
@@ -146,6 +177,13 @@ Assertions take the types they are given at face value and say what they cannot 
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.
+
+<!-- gotest:generated assertions/polling go -->
+```go
+gotest.Eventually(t, waitFor, tick time.Duration, fn func(poll *gotest.R))    // asserts that fn passes without assertion failures within waitFor, polling every tick
+gotest.Consistently(t, waitFor, tick time.Duration, fn func(poll *gotest.R))  // asserts that fn passes on every poll for the entire waitFor duration
+```
+<!-- gotest:end -->
 
 ```go
 gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) {
@@ -296,7 +334,18 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite of its group, for suites whose verdicts measure wall-clock behavior or contend for resources; go test's `-p N` separately caps how many suite processes run at once), `ExclusiveGroup` (a named group run apart from every other suite).
+<!-- gotest:generated suiteconfig/fields table -->
+| Field | Type | Meaning |
+|---|---|---|
+| `Timeout` | `time.Duration` | Timeout is the per-test-method deadline. |
+| `SetupTimeout` | `time.Duration` | SetupTimeout is the deadline for BeforeAll/AfterAll. |
+| `FailFast` | `bool` | FailFast stops the suite after the first test failure. |
+| `Parallel` | `bool` | Parallel runs test methods concurrently. |
+| `Exclusive` | `bool` | Exclusive schedules the suite's process strictly alone: after every non-exclusive suite has finished, one exclusive suite at a time, in deterministic order. |
+| `ExclusiveGroup` | `string` | ExclusiveGroup names the group the suite runs in: the suites of a group run in parallel with each other and never beside a suite outside it. |
+<!-- gotest:end -->
+
+`Exclusive` is for suites whose verdicts measure wall-clock behavior or contend for resources: such a suite is dispatched after every non-exclusive suite of its group; go test's `-p N` separately caps how many suite processes run at once.
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 `ExclusiveGroup: "e2e"` is for suites that must not share the machine with the rest of the run but may share it with each other, such as E2E suites against one stack.

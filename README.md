@@ -83,6 +83,7 @@ Suites are found by reading the source, and the generated code calls your method
 gotest puts a generator and a runner in front of `go test`. That buys the lifecycle, the fixtures and the specification view, and it has a price:
 
 - **Two commands for a complete run.** Plain `go test` does not see suites, and `gotest` does not run plain `func Test*` functions. A module with both kinds needs both commands, each with its own coverage profile. [Install](#install) says what each prints.
+- **No result cache.** gotest has no result cache. Every run executes every suite it selects; it never prints `(cached)`. Go's build cache and gotest's own cache of test binaries mean an unchanged package costs no compile and no link, but its tests run again, where `go test` would skip them. To rerun only what a change touches, use `gotest watch`: it reruns the changed package and the packages that import it ([Every run executes its tests](specs/cli/spec.md#requirement-every-run-executes-its-tests)).
 - **`TestMain` runs once per suite.** Each suite is a process of its own, so a package's `TestMain`, its `init` functions and its package-level variables are set up once per suite, not once per package. Move resource setup from `TestMain` into a fixture.
 - **Editors see suites through the extension only.** The [VS Code extension](#vs-code-extension) lists, runs and debugs suites. gopls and other editors show suite methods as plain methods. To debug elsewhere, write the generated code to disk first: `gotest generate ./...`, then `dlv test`, then `gotest clean ./...`.
 - **Go 1.26 or newer.** The Go version follows gotest's own `go.mod`, so upgrading gotest can raise your module's `go` line; Install shows how to keep it.
@@ -616,67 +617,61 @@ Under `-race`/`-msan`/`-asan` the default budget halves (as does compile concurr
 
 ### Type-Safe Assertions
 
-Functional API with compile-time type safety:
+Functional API with compile-time type safety: an assertion with a type parameter takes both values as one type, so comparing values of two types is a compile error.
+
+<!-- gotest:generated assertions/all table -->
+| Assertion | Checks |
+|---|---|
+| `gotest.Fail(t)` | Immediately fails the test. |
+| `gotest.Equal[V any](t, expected, actual V)` | Asserts that expected and actual are deeply equal. |
+| `gotest.NotEqual[V any](t, expected, actual V)` | Asserts that expected and actual are NOT deeply equal. |
+| `gotest.Same[V any](t, expected, actual *V)` | Asserts that expected and actual are the same pointer. |
+| `gotest.NotSame[V any](t, expected, actual *V)` | Asserts that expected and actual are distinct pointers. |
+| `gotest.True(t, value bool)` | Asserts that value is true. |
+| `gotest.False(t, value bool)` | Asserts that value is false. |
+| `gotest.Zero[V comparable](t, value V)` | Asserts that value is the zero value for its type. |
+| `gotest.NotZero[V comparable](t, value V)` | Asserts that value is NOT the zero value for its type. |
+| `gotest.Nil(t, object any)` | Asserts that object is nil. |
+| `gotest.NotNil(t, object any)` | Asserts that object is not nil. |
+| `gotest.Empty(t, object any)` | Asserts that object is empty: nil, a nil pointer, or a zero-length slice, map, array, channel or string. |
+| `gotest.NotEmpty(t, object any)` | Asserts that object is NOT empty: a slice, map, array, channel or string of non-zero length. |
+| `gotest.Len(t, object any, length int)` | Asserts that object has the given length. |
+| `gotest.Contains(t, s, contains any)` | Asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps). |
+| `gotest.NotContains(t, s, contains any)` | Asserts that s does NOT contain the given element. |
+| `gotest.ElementsMatch[V comparable](t, listA, listB []V)` | Asserts that listA and listB contain the same elements regardless of order. |
+| `gotest.Subset[V comparable](t, list, subset []V)` | Asserts that every element of subset exists in list. |
+| `gotest.NoError(t, err error)` | Asserts that err is nil. |
+| `gotest.Error(t, err error)` | Asserts that err is not nil. |
+| `gotest.ErrorIs(t, err, target error)` | Asserts that errors.Is(err, target) is true. |
+| `gotest.ErrorAs[E error](t, err error) E` | Asserts that the error chain of err contains a value of type E and returns it. |
+| `gotest.ErrorContains(t, err error, contains string)` | Asserts that err is not nil and its message contains the given substring. |
+| `gotest.Greater[V cmp.Ordered](t, a, b V)` | Asserts that a > b. |
+| `gotest.GreaterOrEqual[V cmp.Ordered](t, a, b V)` | Asserts that a >= b. |
+| `gotest.Less[V cmp.Ordered](t, a, b V)` | Asserts that a &lt; b. |
+| `gotest.LessOrEqual[V cmp.Ordered](t, a, b V)` | Asserts that a &lt;= b. |
+| `gotest.Regexp[P regexpPattern](t, rx P, str string)` | Asserts that str matches the regular expression pattern rx (string or \*regexp.Regexp). |
+| `gotest.InDelta[V numeric](t, expected, actual V, delta float64)` | Asserts that expected and actual differ by at most delta. |
+| `gotest.JSONEq(t, expected, actual any)` | Asserts that expected and actual represent the same JSON structure, ignoring key order. |
+| `gotest.TimeWithin(t, expected, actual time.Time, tolerance time.Duration)` | Asserts that expected and actual are within tolerance of each other. |
+| `gotest.TimeIsNow(t, ts time.Time, tolerance time.Duration)` | Asserts that ts is within tolerance of time.Now(). |
+| `gotest.Panics(t, f func()) any` | Asserts that f panics and returns the recovered value. |
+| `gotest.MatchSnapshot(t, value any, name ...string)` | Compares value, rendered as text, with the section of the test's baseline in testdata/\_\_snapshots\_\_/&lt;TestName>.snap beside the calling file (&lt;TestName>\_ext.snap from an external test package). |
+| `gotest.Eventually(t, waitFor, tick time.Duration, fn func(poll *gotest.R))` | Asserts that fn passes without assertion failures within waitFor, polling every tick. |
+| `gotest.Consistently(t, waitFor, tick time.Duration, fn func(poll *gotest.R))` | Asserts that fn passes on every poll for the entire waitFor duration. |
+<!-- gotest:end -->
+
+`Nil` and `NotNil` are for non-comparable nilables (slices, maps, funcs) and fail a type guard on any other type; `Zero` and `NotZero` cover comparable ones, a nil pointer or interface included.
+`JSONEq` accepts a string, `[]byte`, `json.RawMessage`, `io.Reader` or any marshalable value.
+Every assertion but `Eventually`, `Consistently` and `MatchSnapshot` also takes trailing message arguments:
 
 ```go
-// Equality
-gotest.Equal(t, expected, actual)            // [V any] — deep equality; cross-type = compile error
-gotest.NotEqual(t, expected, actual)         // [V any] — deep inequality
-gotest.Same(t, expected, actual)             // [V any] on *V — pointer identity
-gotest.NotSame(t, expected, actual)          // [V any] on *V — distinct pointers
-
-// Boolean
-gotest.True(t, condition)
-gotest.False(t, condition)
-
-// Zero / nil
-gotest.Zero(t, value)                        // [V comparable] — value == zero value for type
-gotest.NotZero(t, value)                     // [V comparable] — also covers pointer/interface nil
-gotest.Nil(t, object)                        // non-comparable nilables (slices, maps, funcs); type-guarded
-gotest.NotNil(t, object)
-
-// Errors
-gotest.NoError(t, err)
-gotest.Error(t, err)                         // err != nil
-gotest.ErrorIs(t, err, target)
-gotest.ErrorAs[*MyError](t, err)             // returns the matched error
-gotest.ErrorContains(t, err, "not found")
-
-// Collections
-gotest.Empty(t, object)                      // nil, or len == 0; a pointer is followed; any other type fails the type guard
-gotest.NotEmpty(t, object)
-gotest.Len(t, collection, 3)
-gotest.Contains(t, haystack, needle)         // substring, element, or map key
-gotest.NotContains(t, haystack, needle)
-gotest.ElementsMatch(t, a, b)               // [V comparable] — same elements, any order
-gotest.Subset(t, list, subset)              // [V comparable] — all subset elements in list
-
-// Ordering
-gotest.Greater(t, a, b)                      // [V cmp.Ordered]
-gotest.GreaterOrEqual(t, a, b)               // [V cmp.Ordered]
-gotest.Less(t, a, b)                         // [V cmp.Ordered]
-gotest.LessOrEqual(t, a, b)                  // [V cmp.Ordered]
-
-// Numeric
-gotest.InDelta(t, 3.14, pi, 0.01)
-
-// Strings & patterns
-gotest.Regexp(t, `^start`, str)
-
-// JSON
-gotest.JSONEq(t, expected, actual)           // string, []byte, io.Reader, or any marshalable value
-
-// Time
-gotest.TimeWithin(t, expected, actual, tol)  // times within tolerance
-gotest.TimeIsNow(t, ts, tolerance)           // timestamp ≈ now
-
-// Panics
-gotest.Panics(t, func() { ... })             // returns recovered value
-
-// Failure
 gotest.Fail(t, "unreachable")                // immediate unconditional failure
+gotest.ErrorAs[*MyError](t, err, "loading %s", path) // returns the matched error
+```
 
-// Async polling
+The polls take a callback instead, and `gotest.Go` is no assertion:
+
+```go
 gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) { ... })
 gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.R) { ... })
 
@@ -1131,6 +1126,7 @@ gotest help                    # show help
 
 The `go test` flags keep their meaning: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-list`, `-json`, `-short`, `-timeout`, `-v`, `-p`, `-exec` and the build flags. A few would break what gotest does and are refused with the reason, exit 2 ([Go test flags gotest implements](specs/cli/spec.md#requirement-go-test-flags-gotest-implements)): `-o`, `-c` and `-n`, since gotest builds the binaries itself; `-overlay`, since gotest builds through an overlay of its own; `-fuzz`, which `gotest fuzz` replaces; and `-cpuprofile`, `-memprofile`, `-blockprofile`, `-mutexprofile` and `-trace` on a run that starts more than one suite process, which would each write the one file. Every word after `-args` goes to the test binary as written.
 `-run` reaches each suite process as a pattern for that suite alone ([A -run pattern in each suite process](specs/cli/spec.md#requirement-a--run-pattern-in-each-suite-process)). `-run '^TestMySuite$'` names the suite's test function only, so its fuzz seeds do not replay; name the fuzz wrapper as well, or drop the anchors, to replay them.
+A filtered run builds only the packages it runs, so a build or vet failure in a package the filter leaves out is not reported by that run; `go test` builds every matched package.
 
 A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout` (a suite it stopped fails its package even when its methods passed: [A suite cut short by --timeout](specs/cli/spec.md#requirement-a-suite-cut-short-by---timeout)), `2` on a usage, generation or build error, on a text run in which a suite reports that it ran no tests ([A suite that ran no tests](specs/cli/spec.md#requirement-a-suite-that-ran-no-tests)), on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 

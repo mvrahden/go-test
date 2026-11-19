@@ -1,0 +1,13 @@
+Expect: ^FAIL .*tests/conventions Reference .* / match the committed documents \(
+Judge: ./tests/conventions ReferenceTestSuite/TestTheReferenceIsCurrent
+--- a/internal/docref/assertions.go
++++ b/internal/docref/assertions.go
+@@ -116,7 +116,7 @@
+ }
+
+ func isAssertion(fn *ast.FuncDecl) bool {
+-	if fn.Recv != nil || !fn.Name.IsExported() || len(fn.Type.Params.List) == 0 {
++	if fn.Recv != nil || !fn.Name.IsExported() || len(fn.Type.Params.List) == 0 || fn.Type.TypeParams != nil {
+ 		return false
+ 	}
+ 	id, ok := fn.Type.Params.List[0].Type.(*ast.Ident)
