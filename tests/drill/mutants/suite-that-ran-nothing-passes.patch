@@ -1,12 +1,12 @@
 Expect: ^FAIL .*conformance/cli .* / fails the package and exits 2, naming the suite as one that ran no tests \(
 Clause: when a suite's binary runs none of its tests in a text run without a pattern → fails the package and exits 2, naming the suite as one that ran no tests
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -716,7 +716,6 @@
- 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
- 	r.collector = collector
- 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
--	collector.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, pf.RunFlags)
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -218,7 +218,6 @@
+ 	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
+ 	r.collector = c
+ 	c.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+-	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags)
  	// The flush order holds every package the collector will report on.
- 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
- 	order := flushOrder(cfg, overlay, noSuite)
+ 	r.noSuite = slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
+ 	order := flushOrder(cfg, overlay, r.noSuite)

@@ -74,13 +74,13 @@ Clause: when a shared fixture's release takes its time while an exclusive suite 
  // Err is every release that failed, once the releaser has stopped.
  func (r *fixtureReleaser) Err() error {
  	<-r.stopped
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -873,6 +873,7 @@
- 		allIn()
- 	}
- 	startFor := func(ds []deferredTarget, what string) {
-+		releaser.Drain()
- 		suites := make([]*PlannedSuite, 0, len(ds))
- 		for i := range ds {
- 			suites = append(suites, plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -335,6 +335,7 @@
+ // startFor starts the fixtures the held-back suites ds read that are not up
+ // yet; what names them in a failure.
+ func (r *streamRun) startFor(ds []deferredTarget, what string) {
++	r.releaser.Drain()
+ 	suites := make([]*PlannedSuite, 0, len(ds))
+ 	for i := range ds {
+ 		suites = append(suites, r.plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))

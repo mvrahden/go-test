@@ -1,14 +1,14 @@
 Expect: ^FAIL .*conformance/lifecycle .* / skips the method after it and runs the shared fixture's AfterAll before gotest exits \(
 Clause: when the first method of a FailFast suite bound to a shared fixture fails → skips the method after it and runs the shared fixture's AfterAll before gotest exits
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -961,6 +961,9 @@
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -413,6 +413,9 @@
  	// everything at once: sending them one after another would end the run
  	// later.
- 	releaseCancel()
-+	if fixtures.proc != nil && collector.WorstExitCode() != 0 {
-+		_ = fixtures.proc.tree.Kill()
+ 	r.releaseCancel()
++	if r.fixtures.proc != nil && r.collector.WorstExitCode() != 0 {
++		_ = r.fixtures.proc.tree.Kill()
 +	}
- 	setupErr, teardownErr := fixtures.close(releaser.Err())
- 	streamCancel()
+ 	setupErr, teardownErr := r.fixtures.close(r.releaser.Err())
+ 	r.cancel()
 

@@ -144,6 +144,18 @@ func (s *DispatchTraceTestSuite) TestALateFixtureStartedOnce(t *gotest.T, c *tra
 	}, "\n"), trace)
 }
 
+func (s *DispatchTraceTestSuite) TestARunWithNothingToRunEndsClean(t *gotest.T, c *traceCtx) {
+	t.Setenv(protocol.EnvCacheDir, t.TempDir())
+	overlay, cleanup, err := gotestrunner.GenerateOverlay(nil, nil, false, true, false)
+	gotest.NoError(t, err)
+	c.cleanup = cleanup
+	result, err := gotestrunner.RunPipeline(t.Context(), gotestrunner.PipelineConfig{OutputMode: gotestrunner.RunCaptureJSON}, overlay)
+	gotest.NoError(t, err)
+	gotest.Equal(t, 0, result.ExitCode)
+	gotest.Empty(t, result.CapturedJSON) // a clean empty run captures nothing
+	gotest.Empty(t, result.Groups)
+}
+
 // traceScope is one scope of a canonical trace.
 type traceScope struct {
 	starts []string          // start lines for the group, in event order
