@@ -644,6 +644,7 @@ shards of one run do not add up to every mutant exactly once.
 | `suite-processes-ignore-gomaxprocs` | without `-p` a run starts a process per suite, whatever GOMAXPROCS is | cli conformance: the suites that wait for each other pass under GOMAXPROCS=1 |
 | `refused-link-fails-the-build` | a hard link the filesystem refuses fails the placement instead of falling back to a copy | runner: a refused link returns its error |
 | `build-failure-booked-under-every-package` | a failed package of a batched build is given the reports of other packages of its group | cli conformance: one vet finding is reported under the other package too |
+| `go-command-per-package` | every package gets a compile group of its own, so a run starts one `go test -c` per package | perf: twelve staged packages start twelve `go test -c` instead of one |
 | `same-named-packages-share-a-stage-dir` | every compile group builds into one stage dir, so a later group's binary replaces an earlier one's of the same name | cli conformance: one of two `util` packages does not run its suite |
 | `confirmed-binaries-reported-with-rebuilt` | the binaries go confirmed are reported in staged order beside those it rebuilt | runner: confirmed and rebuilt binaries ready together are reported in staged order |
 | `suites-race-for-slots` | each suite queues for a process slot from its own goroutine, in no set order | cli conformance: after an edit to the last of four packages, it does not run first |

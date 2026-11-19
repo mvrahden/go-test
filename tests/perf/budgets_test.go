@@ -4,13 +4,13 @@ package perf_test
 const (
 	// goTestCPerGroup: go test -c calls equal the groups of binary names
 	// (true) or the packages (false).
-	goTestCPerGroup = false
+	goTestCPerGroup = true
 	// goCallsPerExtraPackage: go invocations a warm run adds per package
 	// beyond the first six.
-	goCallsPerExtraPackage = 1
+	goCallsPerExtraPackage = 0
 	// testVariantExportLoads: go list calls carrying both -test=true and
 	// -export=true, which compile every test variant.
-	testVariantExportLoads = 1
+	testVariantExportLoads = 0
 	// execsPerSuite: test-binary starts per dispatched suite, text mode.
 	execsPerSuite = 1
 
@@ -28,5 +28,5 @@ const (
 
 	// cpuBand: gotest's CPU over go test -count=1's on the twin; a ratio, so
 	// the machine divides out.
-	cpuBand = 2.5 //nolint:unused // read by the CPU suite, which is Unix-only
+	cpuBand = 1.5 //nolint:unused // read by the CPU suite, which is Unix-only
 )
