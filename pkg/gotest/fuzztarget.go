@@ -16,8 +16,8 @@ type FuzzEach func(t *testing.T, literal func() string, body func(*T))
 // Register asserts the callback to the exact type the wrapper was generated
 // for and registers it with the engine under the fanned leaf signature;
 // Explode turns one typed f.Add tuple into those leaves. You never construct
-// one; the generated wrapper builds it for [NewF]. Generated code names it as
-// gotestruntime.FuzzTarget; a hand-written fuzz target passes nil.
+// one; the generated wrapper builds it as gotestruntime.FuzzTarget and hands
+// it to gotestruntime.FuzzF. A hand-written fuzz target passes nil to [NewF].
 type FuzzTarget struct {
 	Signature string
 	Register  func(tf *testing.F, fn any, each FuzzEach) bool
