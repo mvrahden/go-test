@@ -192,7 +192,7 @@ func removeEmptyKey(dir string) {
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if strings.HasPrefix(name, checkoutFile+".tmp-") || strings.HasSuffix(name, ".test"+sumSuffix) || strings.Contains(name, ".test"+sumSuffix+".tmp-") {
+		if strings.HasPrefix(name, checkoutFile+".tmp-") || strings.HasSuffix(name, ".test"+sumSuffix) || strings.Contains(name, ".test"+sumSuffix+".tmp-") || strings.Contains(name, ".test.tmp-") {
 			_ = os.Remove(filepath.Join(dir, name))
 		}
 	}

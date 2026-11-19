@@ -816,6 +816,28 @@ func (l *buildLog) ExportShared() []byte                { return l.shared() }
 
 var ExportLinkOrCopy = linkOrCopy
 
+// StagedBinary is one package's slot in a group's stage dir.
+type StagedBinary = stagedBinary
+
+// ExportReadiness is what a slot holds.
+type ExportReadiness = readiness
+
+const (
+	ExportNotReady  = notReady
+	ExportConfirmed = confirmed
+	ExportRebuilt   = rebuilt
+)
+
+var (
+	ExportStageGroup  = stageGroup
+	ExportBinaryReady = binaryReady
+	ExportRenameSafe  = renameSafe
+	ExportPublish     = publish
+)
+
+// ExportPlaced reports whether a cached binary was placed in b's slot.
+func ExportPlaced(b *StagedBinary) bool { return b.placed != nil }
+
 // ExportSetHardLink replaces the hard link a placement makes until restore.
 func ExportSetHardLink(fn func(oldname, newname string) error) (restore func()) {
 	prev := hardLink
