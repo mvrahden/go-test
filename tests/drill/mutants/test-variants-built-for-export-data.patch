@@ -10,4 +10,4 @@ Judge: ./internal/pkgload LoadTestSuite/TestNeverBuildsATestVariant
 +	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedTypes
  	// exportMode builds only plain packages, which the test build needs anyway.
  	exportMode = packages.NeedName | packages.NeedExportFile | packages.NeedImports | packages.NeedDeps | packages.NeedTypesSizes
- )
+ 	// reportMode is the load a package with errors is reported from.

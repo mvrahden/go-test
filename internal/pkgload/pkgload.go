@@ -39,6 +39,9 @@ const (
 	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule
 	// exportMode builds only plain packages, which the test build needs anyway.
 	exportMode = packages.NeedName | packages.NeedExportFile | packages.NeedImports | packages.NeedDeps | packages.NeedTypesSizes
+	// reportMode is the load a package with errors is reported from.
+	reportMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo |
+		packages.NeedImports | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedTypesSizes
 )
 
 // load is packages.Load; tests replace it to see every call.
@@ -50,7 +53,9 @@ var load = packages.Load
 // syntax, types and type information from source and Errors holding what failed.
 // It never asks the go command to build a test variant or a test main.
 //
-// A test main is not type-checked: its Types stays nil.
+// A test main is not type-checked: its Types stays nil. A matched package
+// with an error in any of its variants is loaded once more by packages.Load,
+// alone, so its errors are the go command's own report.
 func Load(cfg *Config, patterns ...string) ([]*packages.Package, error) {
 	l := &loader{cfg: cfg, fset: cfg.Fset, files: map[string]*parsed{}}
 	if l.fset == nil {
@@ -411,13 +416,46 @@ func (l *loader) importExport(dep *packages.Package) (*types.Package, error) {
 	return tpkg, nil
 }
 
-// report returns the roots.
+// report returns the roots, with each matched package that has an error
+// in any of its variants, or in anything they import, loaded once more:
+// the go command's build of it reports the compiler's own words.
 func (l *loader) report() ([]*packages.Package, error) {
 	memo := map[string]bool{}
+	seen := map[string]bool{}
+	var broken []string
+	for _, p := range l.roots {
+		if isTestMain(p) || len(p.GoFiles) == 0 || !l.failed(p, memo) {
+			continue // a pattern with no files builds nothing to report
+		}
+		if path := strings.TrimSuffix(p.PkgPath, "_test"); !seen[path] {
+			seen[path] = true
+			broken = append(broken, path)
+		}
+	}
 	for id, p := range l.source {
 		p.IllTyped = l.failed(l.nodes[id], memo)
 	}
-	return l.roots, nil
+	if len(broken) == 0 {
+		return l.roots, nil
+	}
+	slices.Sort(broken)
+	reported, err := load(l.config(reportMode, l.cfg.Tests), broken...)
+	if err != nil {
+		return nil, err
+	}
+	out := slices.Clone(l.roots)
+	at := make(map[string]int, len(out))
+	for i, p := range out {
+		at[p.ID] = i
+	}
+	for _, p := range reported {
+		if i, ok := at[p.ID]; ok {
+			out[i] = p
+		} else {
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }
 
 // failed reports whether p, or anything it imports, has an error.
