@@ -143,9 +143,6 @@ func (s *LoadTestSuite) TestMatchesTheExportLoad(t *gotest.T) {
 		got = byID(got)
 		gotest.Equal(t, ids(want), ids(got))
 		for i := range want {
-			if strings.HasSuffix(want[i].ID, ".test") {
-				continue
-			}
 			gotest.Equal(t, want[i].Name, got[i].Name)
 			gotest.Equal(t, want[i].CompiledGoFiles, got[i].CompiledGoFiles)
 			gotest.Empty(t, got[i].Errors)
