@@ -8,36 +8,20 @@ import (
 
 // FuzzEach runs one execution of a fuzz target: t is the engine's, literal
 // renders the input for the failure echo (nil when the input has no literal
-// form), body calls the user's callback under a fresh *T.
+// form), body calls the user's callback under a fresh *T. Generated code
+// names it as gotestruntime.FuzzEach; a hand-written fuzz target passes nil.
 type FuzzEach func(t *testing.T, literal func() string, body func(*T))
 
 // FuzzTarget is the generated binding of one Fuzz<Suite>_<Method> wrapper:
 // Register asserts the callback to the exact type the wrapper was generated
 // for and registers it with the engine under the fanned leaf signature;
 // Explode turns one typed f.Add tuple into those leaves. You never construct
-// one; the generated wrapper hands it to NewF.
+// one; the generated wrapper builds it for [NewF]. Generated code names it as
+// gotestruntime.FuzzTarget; a hand-written fuzz target passes nil.
 type FuzzTarget struct {
 	Signature string
 	Register  func(tf *testing.F, fn any, each FuzzEach) bool
 	Explode   func(seed []any) ([]any, error)
-}
-
-// SeedArity checks one f.Add tuple against the target's declared arity.
-func SeedArity(seed []any, n int) error {
-	if len(seed) != n {
-		return fmt.Errorf("f.Add was given %d value%s, but this fuzz target takes %d", len(seed), plural(len(seed)), n)
-	}
-	return nil
-}
-
-// SeedArg asserts seed[i] to A, naming the 1-based position on mismatch.
-func SeedArg[A any](seed []any, i int) (A, error) {
-	a, ok := seed[i].(A)
-	if !ok {
-		var zero A
-		return zero, fmt.Errorf("value %d: f.Add was given %T, but this fuzz target takes %T", i+1, seed[i], zero)
-	}
-	return a, nil
 }
 
 var gotestTType = reflect.TypeOf((*T)(nil))

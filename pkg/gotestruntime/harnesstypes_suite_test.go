@@ -23,7 +23,7 @@ func (s *HarnessTypesTestSuite) TestEachT(t *gotest.T) {
 		w.It("has no *testing.T behind it", func(it *gotest.T) { gotest.Zero(it, each.T()) })
 		w.It("carries the value's name and context", func(it *gotest.T) {
 			gotest.Equal(it, t.Name(), each.Name())
-			gotest.Equal(it, t.T().Context(), each.Context())
+			gotest.Equal(it, t.T().Context(), each.Context()) //nolint:t-escape // the wrapped value's own context is the expectation
 		})
 	})
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/setupwaits"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // GoTestSuite: gotest.Go starts a goroutine for any T, the TB-backed ones of
@@ -24,7 +25,7 @@ func (s *GoTestSuite) TestTBBackedT(t *gotest.T) {
 	t.When("Go is called with the TB-backed T a benchmark hook receives", func(w *gotest.T) {
 		var waited atomic.Bool
 		testing.Benchmark(func(b *testing.B) {
-			gotest.Go(gotest.NewTFromTB(b), func() { waited.Store(true) })
+			gotest.Go(gotestruntime.EachT(b), func() { waited.Store(true) })
 			for b.Loop() {
 			}
 		})

@@ -14,6 +14,7 @@ import (
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
 	"github.com/mvrahden/go-test/pkg/gotestfuzz"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // The top-level fuzz functions in this file run under plain go test only: the
@@ -115,7 +116,7 @@ func fanReqTarget() *gotest.FuzzTarget {
 			if len(seed) != 1 {
 				return nil, fmt.Errorf("f.Add was given %d values, but this fuzz target takes 1", len(seed))
 			}
-			v, err := gotest.SeedArg[fanReq](seed, 0)
+			v, err := gotestruntime.SeedArg[fanReq](seed, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -170,11 +171,11 @@ func FuzzTargetMixed(f *testing.F) {
 			if len(seed) != 2 {
 				return nil, fmt.Errorf("f.Add was given %d values, but this fuzz target takes 2", len(seed))
 			}
-			v, err := gotest.SeedArg[fanReq](seed, 0)
+			v, err := gotestruntime.SeedArg[fanReq](seed, 0)
 			if err != nil {
 				return nil, err
 			}
-			s, err := gotest.SeedArg[string](seed, 1)
+			s, err := gotestruntime.SeedArg[string](seed, 1)
 			if err != nil {
 				return nil, err
 			}
@@ -372,7 +373,7 @@ func (s *FWrapperTestSuite) TestSeedBuffering(t *gotest.T) {
 	})
 
 	t.It("names the position and both types when a seed value has the wrong type", func(it *gotest.T) {
-		_, err := gotest.SeedArg[fanReq]([]any{"x", "y"}, 1)
+		_, err := gotestruntime.SeedArg[fanReq]([]any{"x", "y"}, 1)
 		gotest.ErrorContains(it, err, "value 2: f.Add was given string, but this fuzz target takes gotest_test.fanReq")
 	})
 }

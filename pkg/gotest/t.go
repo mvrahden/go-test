@@ -17,13 +17,6 @@ func NewT(t *testing.T) *T {
 	return &T{t: t, tb: t}
 }
 
-// NewTFromTB adapts a non-*testing.T testing type (*testing.B, *testing.F)
-// so suite lifecycle hooks written against *gotest.T can run under
-// benchmarks and fuzz targets. T() returns nil and It, When and Each panic
-// on a TB-backed T; the generator rejects a hook that calls T() in a suite with
-// benchmark or fuzz methods.
-func NewTFromTB(tb testing.TB) *T { return &T{tb: tb} }
-
 // T is the test a suite method runs as: assertions report to it, Context
 // carries the suite's deadline and stop, and It, When and Each nest
 // behaviors below it.
@@ -83,7 +76,8 @@ func NewTWithDeadline[TB *testing.T | *T](t TB, timeout time.Duration) *T {
 // or a lifetime that has to differ from the test's own.
 //
 // The caller owns the context; nothing here cancels it. A *testing.B or
-// *testing.F yields a TB-backed T, as [NewTFromTB] does.
+// *testing.F yields a T with no *testing.T behind it: T() returns nil, and
+// It, When and Each panic.
 func NewTWithContext(tb testing.TB, ctx context.Context) *T {
 	t, _ := tb.(*testing.T)
 	return &T{t: t, tb: tb, ctx: ctx}

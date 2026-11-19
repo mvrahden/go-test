@@ -2,6 +2,7 @@ package gotest_test
 
 import (
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // EachTestSuite tests the Each helper for parameterized subtests.
@@ -106,7 +107,7 @@ func (s *EachTestSuite) TestEach(t *gotest.T) {
 func (s *EachTestSuite) TestOnATWithoutATestingT(t *gotest.T) {
 	t.When("Each is given a T built from a testing.TB that is not a *testing.T", func(w *gotest.T) {
 		w.It("panics on the caller, naming Each", func(it *gotest.T) {
-			hookT := gotest.NewTFromTB(it.T()) // as a hook's T under a benchmark: T() is nil
+			hookT := gotestruntime.EachT(it.T()) // as a hook's T under a benchmark: T() is nil
 			got := gotest.Panics(it, func() {
 				for range gotest.Each(hookT, []int{1}) {
 				}
