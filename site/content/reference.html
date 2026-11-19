@@ -675,7 +675,7 @@ percentage = covered / total</div>
         <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
         <tbody>
           <!-- gotest:generated flags/gotest html -->
-          <tr><td><code>--debug</code></td><td>Keep the run&#39;s overlay and work dir for inspection; a later run removes them after 7 days.</td></tr>
+          <tr><td><code>--debug</code></td><td>Keep the run&#39;s work dir, overlay included, and print where it is; a later run removes it after 7 days. The test binaries keep their debug information, and a test run ends with one stderr line of the time each phase took (discover, generate, compile, run, report, total); compile overlaps run, so its span is counted inside run&#39;s.</td></tr>
           <tr><td><code>--ci</code></td><td>CI mode: fail on <code>F_</code> prefixes, snapshot read-only; on by itself where <code>CI</code> is set, opt out with <code>GOTEST_CI=0</code>.</td></tr>
           <tr><td><code>--no-cache</code></td><td>Bypass the test binary cache and link afresh (generation is not cached).</td></tr>
           <tr><td><code>--spec</code></td><td>Render the spec view instead of the default output (default and watch modes).</td></tr>
