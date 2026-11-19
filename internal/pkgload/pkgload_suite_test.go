@@ -142,7 +142,10 @@ func (s *LoadTestSuite) TestMatchesTheExportLoad(t *gotest.T) {
 		gotest.Equal(t, ids(want), ids(got))
 		for i := range want {
 			gotest.Equal(t, want[i].Name, got[i].Name)
+			gotest.Equal(t, want[i].GoFiles, got[i].GoFiles, "files of %s", want[i].ID)
 			gotest.Equal(t, want[i].CompiledGoFiles, got[i].CompiledGoFiles)
+			gotest.Equal(t, want[i].Module, got[i].Module, "module of %s", want[i].ID)
+			gotest.Equal(t, want[i].Errors, got[i].Errors, "errors of %s", want[i].ID)
 			gotest.Empty(t, got[i].Errors)
 			gotest.Equal(t, scopeOf(want[i]), scopeOf(got[i]), "package scope of %s", want[i].ID)
 			gotest.Len(t, got[i].Syntax, len(want[i].Syntax))
