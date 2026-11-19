@@ -479,15 +479,15 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// classification. It must not reach buildSuiteCmd as a raw -test.bench
 	// flag — that would be appended after the generated
 	// -test.bench=^Benchmark<Suite>$ and silently win, defeating per-suite
-	// scoping. Extract and strip it here, then feed it to BuildBenchTargets
-	// as a bench-name filter, matched against Benchmark<Suite>. -run
+	// scoping. Extract and strip it here; the bench run's selection matches
+	// it against Benchmark<Suite> as a bench-name filter. -run
 	// (pf.UserRunFilter) is passed through alongside it as an independent
 	// suite filter — both compose with AND semantics, e.g.
 	// `gotest bench ./pkg/parser -run Parse` filters by suite while -bench
 	// filters by benchmark name.
 	userBenchFilter := ExtractBenchFilter(runFlags)
 	runFlags = StripBenchFilter(runFlags)
-	targets := BuildBenchTargets(prep.compiled, cfg.BenchesByPkg, overlay.DirsByPkg, runFlags, pf.UserRunFilter, userBenchFilter, pf.UserSkipFilter)
+	targets := benchTargets(prep.compiled, plan.benchRun(sel), runFlags, userBenchFilter)
 	withExec(targets, pf.Exec)
 
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
@@ -662,6 +662,9 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	win := planFixtureWindows(plan, overlay.SharedFixtures, sel)
 	win.reportSkipped()
 	scopes := planSuiteScopes(plan, sel)
+	// The targets of each package are built from the same selection the
+	// scopes and the ledger are.
+	selected := byPackage(plan.testRun(sel))
 	// A shared fixture is released once no planned suite left needs it.
 	var planned []*PlannedSuite
 	for i := range scopes {
@@ -830,17 +833,8 @@ loop:
 		cr := outcome.Result
 		traceDispatch(dispatchEvent{Kind: "intake", Package: cr.Package})
 
-		singleCompiled := []CompileResult{cr}
-		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
-		targets := BuildSuiteTargets(singleCompiled, singleSuites, overlay.DirsByPkg, cfg.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, overlay.ExclusiveSuitesByPkg, pf.RunFlags, pf.UserRunFilter, pf.UserSkipFilter)
-		targets = inSelectedGroups(targets, overlay)
+		targets := suiteTargets(cr, selected[cr.Package], pf.RunFlags, pf.UserRunFilter)
 		withExec(targets, pf.Exec)
-		// The planned suites the package produced no target for never run.
-		produced := make(map[string]bool, len(targets))
-		for j := range targets {
-			produced[targets[j].SuiteName] = true
-		}
-		release(ledger.DoneExcept(cr.Package, produced))
 
 		if len(targets) == 0 {
 			collector.RecordNothingToRun(cr.Package)

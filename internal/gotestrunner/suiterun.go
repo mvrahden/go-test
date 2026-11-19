@@ -363,63 +363,29 @@ func StripTrailingStatus(data []byte) []byte {
 	return data
 }
 
-// BuildSuiteTargets constructs SuiteTarget entries from compiled binaries
-// and suite names. suitesByPkg maps import path to a list of suite struct
-// names (e.g., "FooTestSuite"). The generated test function name is
-// "Test" + suite struct name. fuzzFuncsByPkg maps import path to a map of
-// suite struct name to its generated Fuzz<Suite>_<Method> wrapper names
-// (see OverlayResult.FuzzFuncsByPkg); each target's FuzzFuncs is populated
-// from its own pkg+suite entry so its seed corpus replays alongside the
-// suite's Test function in a plain run (see buildSuiteCmd).
-//
-// testlessByPkg (import path → suite struct name → true) marks suites with
-// no Test function: they run for their fuzz seeds alone.
-//
-// A suite is included when userRunFilter (-run) enters one of its top-level
-// functions and userSkipFilter (-skip) does not skip them all, as the
-// testing package decides it.
-//
-// exclusiveByPkg (import path → suite struct name → true) marks suites with
-// SuiteConfig{Exclusive: true}; their targets carry Exclusive and are
-// dispatched strictly alone, after every non-exclusive suite.
-func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {
-	binByPkg := make(map[string]string, len(compiled))
-	for _, cr := range compiled {
-		binByPkg[cr.Package] = cr.BinaryPath
-	}
-
+// suiteTargets builds the target of each planned suite of one compiled
+// package. suites are the package's share of a test run's selection, so no
+// selection is applied here. Each target runs the suite's Test function, its
+// fuzz wrappers' seeds beside it (see buildSuiteCmd), and the part of the
+// user's -run that enters its own top-level functions.
+func suiteTargets(bin CompileResult, suites []*PlannedSuite, runFlags []string, userRunFilter string) []SuiteTarget { //nolint:gocritic // hugeParam: once per package
 	translatedFlags := TranslateToTestBinaryFlags(runFlags)
-
-	var targets []SuiteTarget
-	for pkg, suites := range suitesByPkg {
-		bin, ok := binByPkg[pkg]
-		if !ok {
-			continue
-		}
-
-		pkgDir := dirsByPkg[pkg]
-
-		for _, suiteName := range suites {
-			testFuncName := "Test" + suiteName
-			testless := testlessByPkg[pkg][suiteName]
-			funcs := suiteFuncs(suiteName, testless, fuzzFuncsByPkg[pkg][suiteName])
-			if !selectsSuite(userRunFilter, funcs) || skipsSuite(userSkipFilter, funcs) {
-				continue
-			}
-			target := SuiteTarget{
-				SuiteSpec: SuiteSpec{
-					Package:   pkg,
-					Dir:       pkgDir,
-					SuiteName: testFuncName,
-				},
-				BinaryPath: bin,
-				RunFlags:   translatedFlags,
-				FuzzFuncs:  fuzzFuncsByPkg[pkg][suiteName],
-				Exclusive:  exclusiveByPkg[pkg][suiteName],
-			}
-			target.RunFilter = processRunFilter(userRunFilter, funcs)
-			targets = append(targets, target)
-		}
+	targets := make([]SuiteTarget, 0, len(suites))
+	for _, s := range suites {
+		funcs := suiteFuncs(s.Name, s.Testless, s.FuzzNames())
+		targets = append(targets, SuiteTarget{
+			SuiteSpec: SuiteSpec{
+				Package:   s.Package,
+				Dir:       s.Dir,
+				SuiteName: s.TestFunc(),
+				RunFilter: processRunFilter(userRunFilter, funcs),
+			},
+			BinaryPath: bin.BinaryPath,
+			RunFlags:   translatedFlags,
+			FuzzFuncs:  s.FuzzNames(),
+			Exclusive:  s.Exclusive,
+			Group:      s.Group,
+		})
 	}
 	return targets
 }
@@ -452,60 +418,38 @@ func skipsSuite(userSkipFilter string, funcs []string) bool {
 	return !slices.ContainsFunc(funcs, func(f string) bool { return !skipsFunc(userSkipFilter, f) })
 }
 
-// BuildBenchTargets constructs SuiteTarget entries for benchmark suites from
-// compiled binaries and bench-eligible suite names. benchesByPkg maps import
-// path to a list of suite struct names (e.g., "FooTestSuite") that have at
-// least one effective benchmark. The generated benchmark wrapper function
-// name is "Benchmark" + suite struct name.
-//
-// userRunFilter (from -run) and userBenchFilter (from -bench) are applied
-// independently, each matched against the benchmark wrapper name by its
-// top level, as testing matches it. When both are non-empty, a suite must
-// satisfy both (AND semantics) to be included; either one alone filters on
-// its own, and when both are empty all suites are included. userSkipFilter
-// (from -skip) drops a suite whose wrapper it skips whole; the binary still
-// receives it and skips the sub-benchmarks it names.
+// benchTargets builds the bench target of each planned suite whose package
+// compiled. suites are a bench run's selection (see benchRun): -run, -bench
+// and -skip are matched against Benchmark<Suite> there.
 //
 // A userBenchFilter with sub-benchmark segments additionally scopes what
 // runs inside the wrapper: the per-suite portion of the pattern (extracted
-// with processRunFilter, the same helper -run uses) is
-// carried on the target as BenchFilter and becomes the binary's -test.bench
-// value, where go test's slash matching selects the b.Run sub-benchmarks.
-func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter, userSkipFilter string) []SuiteTarget {
+// with processRunFilter, the same helper -run uses) is carried on the target
+// as BenchFilter and becomes the binary's -test.bench value, where go test's
+// slash matching selects the b.Run sub-benchmarks.
+func benchTargets(compiled []CompileResult, suites []*PlannedSuite, runFlags []string, userBenchFilter string) []SuiteTarget {
 	binByPkg := make(map[string]string, len(compiled))
 	for _, cr := range compiled {
 		binByPkg[cr.Package] = cr.BinaryPath
 	}
-
 	translatedFlags := TranslateToTestBinaryFlags(runFlags)
-
 	var targets []SuiteTarget
-	for pkg, suites := range benchesByPkg {
-		bin, ok := binByPkg[pkg]
+	for _, s := range suites {
+		bin, ok := binByPkg[s.Package]
 		if !ok {
 			continue
 		}
-
-		pkgDir := dirsByPkg[pkg]
-
-		for _, suiteName := range suites {
-			benchFuncName := "Benchmark" + suiteName
-			if !selectsBench(userRunFilter, userBenchFilter, userSkipFilter, benchFuncName) {
-				continue
-			}
-			target := SuiteTarget{
-				SuiteSpec: SuiteSpec{
-					Package:   pkg,
-					Dir:       pkgDir,
-					SuiteName: suiteName,
-				},
-				BinaryPath:  bin,
-				RunFlags:    translatedFlags,
-				Bench:       true,
-				BenchFilter: processRunFilter(userBenchFilter, []string{benchFuncName}),
-			}
-			targets = append(targets, target)
-		}
+		targets = append(targets, SuiteTarget{
+			SuiteSpec: SuiteSpec{
+				Package:   s.Package,
+				Dir:       s.Dir,
+				SuiteName: s.Name,
+			},
+			BinaryPath:  bin,
+			RunFlags:    translatedFlags,
+			Bench:       true,
+			BenchFilter: processRunFilter(userBenchFilter, []string{s.BenchFunc()}),
+		})
 	}
 	return targets
 }
