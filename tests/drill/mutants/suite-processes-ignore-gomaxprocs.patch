@@ -1,5 +1,5 @@
-Clause: when the same suites are run with GOMAXPROCS=1 and no -p → each fails waiting, since one process runs at a time
-Expect: ^FAIL .*conformance/cli CLIProcs .* / each fails waiting, since one process runs at a time \(
+Clause: when the same suites are run with GOMAXPROCS=1 and no -p → they do not all run at once, so at least one fails waiting
+Expect: ^FAIL .*conformance/cli CLIProcs .* / they do not all run at once, so at least one fails waiting \(
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
 @@ -42,7 +42,7 @@
