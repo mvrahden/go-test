@@ -196,3 +196,32 @@ func (s *DeclaredTestSuite) TestATwinsMethodKeepsTheNameGoTestReported(t *gotest
 	gotest.Contains(t, out.String(), `"name":"TestCreate","display":"Create",`)
 	gotest.Contains(t, out.String(), `"reported":"TestCreate#01"`)
 }
+
+func (s *DeclaredTestSuite) TestEveryRunOfARepeatedSuite(t *gotest.T) {
+	run := `{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite"}
+{"Action":"run","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate"}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite/TestCreate","Elapsed":0.01}
+{"Action":"pass","Package":"example.com/unit","Test":"TestUnitTestSuite","Elapsed":0.02}
+`
+	observed := treeOf(t, run+run)
+	excluded := method("X_TestParked")
+	excluded.Excluded = true
+	declared := []*gotestspec.Package{declaredOf("example.com/unit",
+		&gotestspec.Node{Name: "TestUnitTestSuite", Children: []*gotestspec.Node{method("TestCreate"), method("TestUpdate"), excluded}},
+	)}
+
+	tree := gotestspec.Overlay(declared, observed)
+	gotest.Len(t, tree, 1)
+	gotest.Len(t, tree[0].Nodes, 2)
+	for i, suite := range tree[0].Nodes {
+		gotest.Equal(t, i+1, suite.Run)
+		gotest.Equal(t, 2, suite.Runs)
+		gotest.Len(t, suite.Children, 3, "run %d", i+1)
+		gotest.Equal(t, gotestspec.StatusPass, suite.Children[0].Status, "run %d", i+1)
+		gotest.True(t, suite.Children[1].NotRun, "run %d", i+1)
+		gotest.Equal(t, gotestspec.StatusSkip, suite.Children[2].Status, "run %d", i+1)
+	}
+	stats := gotestspec.CollectStats(tree)
+	gotest.Equal(t, 2, stats.NotRun)
+	gotest.Equal(t, 2, stats.Skipped)
+}

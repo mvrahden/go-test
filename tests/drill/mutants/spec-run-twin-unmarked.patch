@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/spec SpecSlashes / SuitesOfBothTestPackages / when a
 Clause: when a suite is declared in both test packages → a run's spec shows two suites, the external one marked
 --- a/internal/gotestspec/tree.go
 +++ b/internal/gotestspec/tree.go
-@@ -408,7 +408,7 @@ func (b *treeBuild) link(e *treeEntry, pl protocol.Placement) {
- 	if pl.Parent == "" {
- 		e.parent = nil
- 		if pl.Instance >= 2 {
--			e.node.Variant, e.node.External = pl.Instance, true
-+			e.node.Variant = pl.Instance
+@@ -553,7 +553,7 @@
  		}
- 		b.pkg.Nodes = append(b.pkg.Nodes, e.node)
- 		return
+ 		runs := (maxInst + t - 1) / t
+ 		for _, n := range group {
+-			n.External = t == 2 && inst(n)%2 == 0
++			n.External = false
+ 			if runs > 1 {
+ 				n.Run, n.Runs = (inst(n)-1)/t+1, runs
+ 			}

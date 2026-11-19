@@ -2,6 +2,7 @@
 package gotestspec_test //nolint:fail-guard
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -209,6 +210,7 @@ func (s *TreeTestSuite) TestBuildTree_DuplicateSuite_PtestPxtest(t *gotest.T, _ 
 	mustEq(t, "suite2 display", suite2.Display, "Unit")
 	mustLen(t, "suite1 children", suite1.Children, 2)
 	mustLen(t, "suite2 children", suite2.Children, 2)
+	mustEq(t, "suite2 run (a twin, not a repeat)", suite2.Run, 0)
 
 	for _, c := range suite2.Children {
 		mustNotContain(t, c.Name, "#", "suite2 child name keeps no dedup suffix")
@@ -721,4 +723,193 @@ func (s *TreeTestSuite) TestAnUnstampedEventOfAStampedPackageFallsBack(t *gotest
 	mustLen(t, "split children", m.Children[0].Children, 1)
 	mustEq(t, "split leaf", m.Children[0].Children[0].Name, "b")
 	mustEq(t, "leaf status", m.Children[0].Children[0].Status, gotestspec.StatusPass)
+}
+
+// A sub-benchmark whose own name ends in a number: a result line that gives
+// the name exactly carries no GOMAXPROCS suffix.
+func (s *TreeTestSuite) TestBuildTree_SubBenchmarkNamedWithANumber(t *gotest.T, _ *treeCtx) {
+	stream := func(reported string) string {
+		return `{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkCopy"}
+{"Action":"run","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024"}
+{"Action":"output","Package":"p","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024","Output":"` + reported + `   \t 100 \t 10.0 ns/op\n"}`
+	}
+	leafOf := func(tree []*gotestspec.Package) *gotestspec.Node {
+		mustLen(t, "root nodes", tree[0].Nodes, 1)
+		mustLen(t, "methods", tree[0].Nodes[0].Children, 1)
+		mustLen(t, "sub-benchmarks", tree[0].Nodes[0].Children[0].Children, 1)
+		return tree[0].Nodes[0].Children[0].Children[0]
+	}
+
+	bare := leafOf(treeOf(t, stream("BenchmarkFooTestSuite/BenchmarkCopy/size-1024")))
+	mustEq(t, "display", bare.Display, "size-1024")
+	mustEq(t, "iterations", bare.Iterations, 100)
+	mustEq(t, "procs without a suffix", bare.Procs, 0)
+
+	suffixed := leafOf(treeOf(t, stream("BenchmarkFooTestSuite/BenchmarkCopy/size-1024-8")))
+	mustEq(t, "procs with a suffix", suffixed.Procs, 8)
+}
+
+// suiteRun is one top-level run of a suite in an unstamped stream: its
+// methods, each passing unless fails names it.
+func suiteRun(suite string, methods []string, fails map[string]string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, `{"Action":"run","Package":"p","Test":%q}`+"\n", suite)
+	status := "pass"
+	for _, m := range methods {
+		fmt.Fprintf(&b, `{"Action":"run","Package":"p","Test":%q}`+"\n", suite+"/"+m)
+		action := "pass"
+		if msg, ok := fails[m]; ok {
+			fmt.Fprintf(&b, `{"Action":"output","Package":"p","Test":%q,"Output":%q}`+"\n", suite+"/"+m, msg)
+			action, status = "fail", "fail"
+		}
+		fmt.Fprintf(&b, `{"Action":%q,"Package":"p","Test":%q,"Elapsed":0}`+"\n", action, suite+"/"+m)
+	}
+	fmt.Fprintf(&b, `{"Action":%q,"Package":"p","Test":%q,"Elapsed":0}`+"\n", status, suite)
+	return b.String()
+}
+
+func runsOf(t *gotest.T, tree []*gotestspec.Package, want int) []*gotestspec.Node {
+	mustLen(t, "packages", tree, 1)
+	mustLen(t, "root nodes", tree[0].Nodes, want)
+	return tree[0].Nodes
+}
+
+func (s *TreeTestSuite) TestThreeRunsOfOneSuite(t *gotest.T, _ *treeCtx) {
+	methods := []string{"TestFailsOnItsSecondRun", "TestAlwaysPasses"}
+	tree := treeOf(t, suiteRun("TestFlakyTestSuite", methods, nil)+
+		suiteRun("TestFlakyTestSuite", methods, map[string]string{"TestFailsOnItsSecondRun": "    flaky_test.go:12: second run\n"})+
+		suiteRun("TestFlakyTestSuite", methods, nil))
+	nodes := runsOf(t, tree, 3)
+	for i, n := range nodes {
+		mustEq(t, fmt.Sprintf("run %d external", i+1), n.External, false)
+		mustEq(t, fmt.Sprintf("run %d run", i+1), n.Run, i+1)
+		mustEq(t, fmt.Sprintf("run %d runs", i+1), n.Runs, 3)
+		mustLen(t, fmt.Sprintf("run %d methods", i+1), n.Children, 2)
+	}
+	second := nodes[1].Children[0]
+	mustEq(t, "the second run's failing method", second.Status, gotestspec.StatusFail)
+	mustContain(t, strings.Join(second.Output, ""), "second run", "the failing method keeps its output")
+	mustEq(t, "the first run's method", nodes[0].Children[0].Status, gotestspec.StatusPass)
+	mustEq(t, "the third run's method", nodes[2].Children[0].Status, gotestspec.StatusPass)
+	stats := gotestspec.CollectStats(tree)
+	mustEq(t, "failed", stats.Failed, 1)
+	mustEq(t, "passed", stats.Passed, 5)
+}
+
+func (s *TreeTestSuite) TestTwinsRunTwice(t *gotest.T, _ *treeCtx) {
+	pair := suiteRun("TestUnitTestSuite", []string{"TestCreate"}, nil) + suiteRun("TestUnitTestSuite", []string{"TestCreate#01"}, nil)
+	nodes := runsOf(t, treeOf(t, pair+pair), 4)
+	for i, want := range []struct {
+		external  bool
+		run, runs int
+	}{{false, 1, 2}, {true, 1, 2}, {false, 2, 2}, {true, 2, 2}} {
+		mustEq(t, fmt.Sprintf("node %d external", i+1), nodes[i].External, want.external)
+		mustEq(t, fmt.Sprintf("node %d run", i+1), nodes[i].Run, want.run)
+		mustEq(t, fmt.Sprintf("node %d runs", i+1), nodes[i].Runs, want.runs)
+	}
+}
+
+func (s *TreeTestSuite) TestTwinsTheSourceNames(t *gotest.T, _ *treeCtx) {
+	guarded := `{"Action":"run","Package":"p","Test":"TestGuardedTestSuite"}
+{"Action":"skip","Package":"p","Test":"TestGuardedTestSuite","Elapsed":0}
+`
+	events, err := gotestspec.ParseEvents(strings.NewReader(guarded + guarded))
+	if err != nil {
+		fatalf(t, "ParseEvents: %v", err)
+	}
+	named := gotestspec.BuildTree(events, gotestspec.WithDeclarations(gotestspec.DeclarationIndex{"p": {gotestspec.DeclKey("TestGuardedTestSuite"): {Twin: true}}}))
+	twins := runsOf(t, named, 2)
+	mustEq(t, "internal twin", twins[0].External, false)
+	mustEq(t, "external twin", twins[1].External, true)
+	mustEq(t, "twin run", twins[0].Run, 0)
+	mustEq(t, "twin run", twins[1].Run, 0)
+
+	unnamed := runsOf(t, gotestspec.BuildTree(events), 2)
+	mustEq(t, "first run external", unnamed[0].External, false)
+	mustEq(t, "second run external", unnamed[1].External, false)
+	mustEq(t, "first run", unnamed[0].Run, 1)
+	mustEq(t, "second run", unnamed[1].Run, 2)
+	mustEq(t, "runs", unnamed[1].Runs, 2)
+}
+
+func (s *TreeTestSuite) TestRepeatedSubtestNamesAreNotATwin(t *gotest.T, _ *treeCtx) {
+	run := suiteRun("TestX", []string{"a", "a#01"}, nil)
+	nodes := runsOf(t, treeOf(t, run+run), 2)
+	mustEq(t, "first external", nodes[0].External, false)
+	mustEq(t, "second external", nodes[1].External, false)
+	mustEq(t, "first run", nodes[0].Run, 1)
+	mustEq(t, "second run", nodes[1].Run, 2)
+}
+
+// A stdlib test both test packages declare has no children for the stream
+// rules to read: only the source says it is a twin pair.
+func (s *TreeTestSuite) TestStdlibTwins(t *gotest.T, _ *treeCtx) {
+	one := `{"Action":"run","Package":"p","Test":"TestFoo"}
+{"Action":"pass","Package":"p","Test":"TestFoo","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestFoo"}
+{"Action":"fail","Package":"p","Test":"TestFoo","Elapsed":0}
+`
+	decls := gotestspec.WithDeclarations(gotestspec.DeclarationIndex{"p": {gotestspec.DeclKey("TestFoo"): {Twin: true}}})
+	build := func(stream string) []*gotestspec.Package {
+		events, err := gotestspec.ParseEvents(strings.NewReader(stream))
+		if err != nil {
+			fatalf(t, "ParseEvents: %v", err)
+		}
+		return gotestspec.BuildTree(events, decls)
+	}
+
+	once := runsOf(t, build(one), 2)
+	mustEq(t, "internal", once[0].External, false)
+	mustEq(t, "external", once[1].External, true)
+	mustEq(t, "runs of a single run", once[1].Runs, 0)
+
+	twice := runsOf(t, build(one+one), 4)
+	for i, want := range []struct {
+		external bool
+		run      int
+	}{{false, 1}, {true, 1}, {false, 2}, {true, 2}} {
+		mustEq(t, fmt.Sprintf("node %d external", i+1), twice[i].External, want.external)
+		mustEq(t, fmt.Sprintf("node %d run", i+1), twice[i].Run, want.run)
+		mustEq(t, fmt.Sprintf("node %d runs", i+1), twice[i].Runs, 2)
+	}
+}
+
+// A skip's message and a line logged before a skip without one read alike;
+// only the source's skip calls, or gotest's harness, tell them apart.
+func (s *TreeTestSuite) TestSkipReasons(t *gotest.T, _ *treeCtx) {
+	stream := `{"Action":"run","Package":"p","Test":"TestLogThenSkip"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkip","Output":"    skip_test.go:6: connecting to the database\n"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkip","Output":"    skip_test.go:7: no database here\n"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkip","Output":"--- SKIP: TestLogThenSkip (0.00s)\n"}
+{"Action":"skip","Package":"p","Test":"TestLogThenSkip","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestLogThenSkipNow"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkipNow","Output":"    skip_test.go:11: checked the flag\n"}
+{"Action":"output","Package":"p","Test":"TestLogThenSkipNow","Output":"--- SKIP: TestLogThenSkipNow (0.00s)\n"}
+{"Action":"skip","Package":"p","Test":"TestLogThenSkipNow","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestGuardedTestSuite"}
+{"Action":"output","Package":"p","Test":"TestGuardedTestSuite","Output":"    gotest_psuite_test.go:25: suite guard: DATABASE_URL not set\n"}
+{"Action":"skip","Package":"p","Test":"TestGuardedTestSuite","Elapsed":0}
+`
+	events, err := gotestspec.ParseEvents(strings.NewReader(stream))
+	if err != nil {
+		fatalf(t, "ParseEvents: %v", err)
+	}
+	reasons := func(opts ...gotestspec.BuildOption) map[string]string {
+		out := map[string]string{}
+		for _, n := range gotestspec.BuildTree(events, opts...)[0].Nodes {
+			out[n.Name] = n.SkipReason
+		}
+		return out
+	}
+	calls := gotestspec.WithSkipCalls(gotestspec.SkipCalls{"p": {"skip_test.go:7": true, "skip_test.go:12": true}})
+
+	withSource := reasons(calls)
+	mustEq(t, "the skip's message, not the line logged before it", withSource["TestLogThenSkip"], "no database here")
+	mustEq(t, "no reason for a skip that gave none", withSource["TestLogThenSkipNow"], "")
+	mustEq(t, "the harness's own skip", withSource["TestGuardedTestSuite"], "suite guard: DATABASE_URL not set")
+
+	without := reasons()
+	mustEq(t, "no reason when the source cannot say", without["TestLogThenSkip"], "")
+	mustEq(t, "the harness's own skip without the source", without["TestGuardedTestSuite"], "suite guard: DATABASE_URL not set")
 }

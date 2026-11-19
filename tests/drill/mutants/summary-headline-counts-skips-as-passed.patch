@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / TheHeadline / when gotest summary runs a package with passed and skipped tests / the headline counts the passed tests and names the skipped ones \(
+Clause: when gotest summary runs a package with passed and skipped tests → the headline counts the passed tests and names the skipped ones
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -81,6 +81,8 @@
+ // passedPhrase is a headline without failures: the tests that passed and,
+ // beside them, those skipped and not run. clean is true when every test passed.
+ func passedPhrase(s Stats) (phrase string, clean bool) { //nolint:gocritic // hugeParam: as renderSummary
++	s.Passed += s.Skipped
++	s.Skipped = 0
+ 	rest := otherCounts(s, false)
+ 	switch {
+ 	case s.Passed > 0:

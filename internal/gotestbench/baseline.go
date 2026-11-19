@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +56,9 @@ type Sample struct {
 	BytesPerOp  int64              `json:"bytesPerOp"`
 	AllocsPerOp int64              `json:"allocsPerOp"`
 	Metrics     map[string]float64 `json:"metrics,omitempty"`
+	// Procs is the processor count the sample ran at, set only when the run
+	// ran at more than one (-cpu=1,8); 1 for a line without a suffix.
+	Procs int `json:"procs,omitempty"`
 }
 
 // FromPackages walks the KindBenchmark leaves of pkgs and produces a
@@ -102,6 +106,8 @@ func FromPackages(pkgs []*gotestspec.Package) Baseline {
 		}
 	}
 	results = slices.DeleteFunc(results, func(r Result) bool { return len(r.Samples) == 0 })
+
+	labelProcs(results)
 
 	sort.Slice(results, func(i, j int) bool {
 		a, b := results[i], results[j]
@@ -169,6 +175,7 @@ func collectBenchLeaves(pkgPath string, top, n *gotestspec.Node, below string, r
 		}
 
 		sample := Sample{
+			Procs:       n.Procs,
 			Iterations:  n.Iterations,
 			NsPerOp:     n.NsPerOp,
 			BytesPerOp:  n.BytesPerOp,
@@ -216,6 +223,10 @@ func harvestBranchSamples(pkgPath string, n *gotestspec.Node, results *[]Result,
 // benchmark result line can arrive split across two consecutive events.
 // Joining them back into one stream and re-splitting on "\n" reconstructs
 // complete lines before matching, regardless of how test2json chunked them.
+//
+// A line is matched by the name it gives against the names the tree's leaves
+// hold: as given, else without a trailing "-N", the processor count. A name
+// ending in a number ("size-1024") thus keeps it whatever counts the run used.
 func harvestPackageOutputSamples(pkgPath string, output []string, results *[]Result, index map[string]int) {
 	lines := strings.Split(strings.Join(output, ""), "\n")
 	for _, line := range lines {
@@ -223,9 +234,7 @@ func harvestPackageOutputSamples(pkgPath string, output []string, results *[]Res
 		if !ok {
 			continue
 		}
-		suite, name := splitBenchFullName(result.Name)
-		key := pkgPath + "\x00" + suite + "\x00" + name
-		idx, ok := index[key]
+		idx, procs, ok := matchBenchName(pkgPath, result.Reported, index)
 		if !ok {
 			continue
 		}
@@ -235,7 +244,50 @@ func harvestPackageOutputSamples(pkgPath string, output []string, results *[]Res
 			BytesPerOp:  result.BytesPerOp,
 			AllocsPerOp: result.AllocsPerOp,
 			Metrics:     result.Metrics,
+			Procs:       procs,
 		})
+	}
+}
+
+// matchBenchName finds the Result a result line's name belongs to and the
+// processor count its suffix gives, 0 for none.
+func matchBenchName(pkgPath, reported string, index map[string]int) (int, int, bool) {
+	key := func(full string) string {
+		suite, name := splitBenchFullName(full)
+		return pkgPath + "\x00" + suite + "\x00" + name
+	}
+	if idx, ok := index[key(reported)]; ok {
+		return idx, 0, true
+	}
+	if i := strings.LastIndexByte(reported, '-'); i > 0 {
+		if procs, err := strconv.Atoi(reported[i+1:]); err == nil && procs > 0 {
+			if idx, ok := index[key(reported[:i])]; ok {
+				return idx, procs, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+// labelProcs keeps each sample's processor count only when the run used
+// more than one; a line without a suffix ran at 1.
+func labelProcs(results []Result) {
+	counts := map[int]bool{}
+	for _, r := range results {
+		for _, s := range r.Samples {
+			counts[s.Procs] = true
+		}
+	}
+	for i := range results {
+		for j := range results[i].Samples {
+			sample := &results[i].Samples[j]
+			switch {
+			case len(counts) < 2:
+				sample.Procs = 0
+			case sample.Procs == 0:
+				sample.Procs = 1
+			}
+		}
 	}
 }
 

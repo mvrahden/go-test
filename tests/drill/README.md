@@ -904,6 +904,32 @@ shards of one run do not add up to every mutant exactly once.
 | `signal-not-announced` | a stop a signal from outside began is neither told to the runner nor ends by the signal | canary: the outside run's stream names no stop from outside and the run passes |
 | `outside-signal-dropped` | under the runner a signal the runner did not send is dropped | canary: the outside run's holding method never sees its context end |
 | `force-before-stop` | the runner's force line with no stop under way is ignored | ring-0 lifecycle: the process the force reached keeps running |
+| `summary-headline-counts-skips-as-passed` | the summary headline counts skipped tests as passed and leaves them unnamed | cli conformance: the headline of a run with passed and skipped tests names the skipped ones |
+| `summary-markdown-drops-stdlib-note` | a live summary passes no note of the stdlib tests it did not run to the Markdown summary | cli conformance: the Markdown summary of a suite package with a stdlib test carries the note |
+| `event-line-capped` | spec and summary refuse a stream with an event line over a mebibyte | spec conformance: a saved stream with a 2 MiB line renders its test with its verdict |
+| `annotation-compiler-path-prefixed` | a build failure is annotated with its package directory put in front of the path the compiler printed | cli conformance: the annotation of a compile error names the file from the working directory |
+| `output-file-colored` | a report --output writes takes its colour from stdout | cli conformance: a report written to a file while stdout is a character device holds no color codes |
+| `bench-numbered-name-read-as-procs` | the repetitions of a benchmark named with a trailing number are keyed without that number | bench conformance: a sub-benchmark named size-1024 under -cpu=1 -count=2 keeps both samples |
+| `bench-suffixed-repetitions-dropped` | a repetition whose line carries a GOMAXPROCS suffix is matched to no benchmark | bench conformance: under -cpu=8,1 -count=2 every benchmark keeps four samples |
+| `spec-skip-reason-dropped` | a skipped row no longer shows the reason its skip gave | spec conformance: the terminal spec shows a skipped row's reason after SKIPPED |
+| `spec-skip-reason-first-logged-line` | a skipped row's reason is read from its first logged line | spec conformance: a row that logs and then skips shows the skip's reason |
+| `spec-skip-reason-from-a-log-line` | a skipped row's last logged line is taken for its reason without a skip call there | spec conformance: a row that logs and then skips without a reason shows none |
+| `spec-live-declared-not-overlaid` | `spec --declared` on a live run renders the run alone, without the declared specification under it | spec conformance: the rows of a table after its failing row show as not run |
+| `spec-declared-over-the-first-run-only` | under -count `--declared` lays the declared specification over the first run only | spec conformance: every run of a repeated suite shows its rows not run and its X_ method skipped |
+| `spec-markdown-skip-reason-dropped` | the Markdown spec leaves a skipped row's reason out | spec conformance: the Markdown spec shows a skipped row's reason after the row |
+| `spec-guard-reason-dropped` | a suite skipped by its guard shows no reason | spec conformance: a guarded suite's line shows the guard's reason |
+| `summary-failure-path-without-run` | the summary's failure path leaves out the run a failure happened in | spec conformance: the summary of three runs names the failing run |
+| `spec-twin-marked-in-the-first-run-only` | under -count only the first run's external twin is marked | spec conformance: twins run twice show the external suite marked in each run |
+| `bench-numbered-name-sets-gomaxprocs` | a benchmark name's trailing number is read as its GOMAXPROCS | bench conformance: a run of size-1024 on one processor records no GOMAXPROCS of 1024 |
+| `annotation-test-path-unprefixed` | a failed test is annotated at its file's base name, without its package directory | cli conformance: a failed test's annotation names the file in its package's directory |
+| `summary-markdown-all-dropped` | the Markdown headline of a run in which every test passed does not say All | cli conformance: the Markdown headline of an all-pass run says All |
+| `summary-headline-no-pass-unsaid` | the headline of a run in which nothing passed does not say so | cli conformance: an all-skipped run's headline says no tests passed |
+| `summary-failed-headline-drops-passes` | the headline of a run with failures leaves out the passed count | cli conformance: a failed run's headline names the failed, passed and skipped counts |
+| `summary-markdown-all-beside-skips` | the Markdown headline says All beside skipped tests | cli conformance: the Markdown headline of a run with skips does not say All |
+| `summary-markdown-all-beside-a-note` | the Markdown headline says All above a note of stdlib tests not run | cli conformance: the Markdown summary with the stdlib note does not say All |
+| `summary-step-summary-not-written` | `summary --github` writes nothing into the GitHub step summary | cli conformance: the step summary carries the headline and the stdlib note |
+| `spec-repeated-run-read-as-twin` | every repeated top-level suite is read as a twin pair, its later runs as external suites | spec conformance: three runs of a suite show as runs 1, 2 and 3 of 3, none external |
+| `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |
 
 ## Adding a mutant
 

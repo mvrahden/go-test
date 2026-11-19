@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli CLISummary / TheStdlibNote / when gotest summary writes Markdown for a package that holds a suite and a stdlib test / the GitHub step summary carries the note \(
+Expect: ^FAIL .*conformance/cli CLISummary / TheHeadline / when gotest summary runs a package with passed and skipped tests / the GitHub step summary carries the Markdown headline \(
+Clause: when gotest summary writes Markdown for a package that holds a suite and a stdlib test → the GitHub step summary carries the note
+Clause: when gotest summary runs a package with passed and skipped tests → the GitHub step summary carries the Markdown headline
+--- a/cmd/gotest/summary.go
++++ b/cmd/gotest/summary.go
+@@ -286,7 +286,6 @@
+ 		if summaryPath := os.Getenv("GITHUB_STEP_SUMMARY"); summaryPath != "" {
+ 			sf, err := os.OpenFile(summaryPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+ 			if err == nil {
+-				gotestspec.RenderMarkdownSummary(sf, tree, mdOpts...)
+ 				sf.Close()
+ 			}
+ 		}

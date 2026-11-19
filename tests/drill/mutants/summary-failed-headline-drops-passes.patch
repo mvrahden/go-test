@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / TheHeadline / when gotest summary runs a package with failed, passed and skipped tests / the headline opens with the failed count, then the passed and the skipped \(
+Clause: when gotest summary runs a package with failed, passed and skipped tests → the headline opens with the failed count, then the passed and the skipped
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -95,7 +95,7 @@
+ // failedPhrase is the headline of a run with failed tests: their count, then
+ // the passed, skipped and not-run counts that are not zero.
+ func failedPhrase(s Stats) string { //nolint:gocritic // hugeParam: as renderSummary
+-	return strings.Join(append([]string{countNoun(s.Failed, "test failed", "tests failed")}, otherCounts(s, true)...), ", ")
++	return strings.Join(append([]string{countNoun(s.Failed, "test failed", "tests failed")}, otherCounts(s, false)...), ", ")
+ }
+ 
+ func otherCounts(s Stats, withPassed bool) []string { //nolint:gocritic // hugeParam: as renderSummary

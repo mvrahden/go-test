@@ -26,6 +26,12 @@ func (s *ColorTestSuite) TestColorRule(t *gotest.T) {
 			gotest.True(it, ExportColorDisabled(false))
 		})
 	})
+	t.When("a report is written to a file --output names", func(w *gotest.T) {
+		w.It("never colors, on a terminal too", func(it *gotest.T) {
+			gotest.True(it, ExportReportColorDisabled(false, "spec.txt"))
+			gotest.False(it, ExportReportColorDisabled(false, ""))
+		})
+	})
 	t.When("stdout is not a terminal", func(w *gotest.T) {
 		w.It("never colors", func(it *gotest.T) {
 			restore := ExportSetStdoutIsTerminal(func() bool { return false })

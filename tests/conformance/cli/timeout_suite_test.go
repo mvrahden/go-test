@@ -1,9 +1,11 @@
 package cli_test
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -18,14 +20,16 @@ func (s *CLITimeoutTestSuite) SuiteConfig() gotest.SuiteConfig {
 
 func (s *CLITimeoutTestSuite) TestAMethodThatReturnsWhenItsContextEnds(t *gotest.T) {
 	t.When("--timeout expires while a method waits for its context to end, and the method then returns", func(w *gotest.T) {
-		// The warm run builds the binary, so the limit times the method alone.
-		warm, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{"CLITIMEOUT_WARM=1"}, "../testdata/clitimeoutctx/")
+		// The warm run builds the binary into the cache the timed runs share,
+		// so the limit times the method alone.
+		cache := protocol.EnvCacheDir + "=" + filepath.Join(w.TempDir(), "cache")
+		warm, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{cache, "CLITIMEOUT_WARM=1"}, "../testdata/clitimeoutctx/")
 		gotest.NoError(w, err)
 		gotest.Equal(w, 0, warm.Exit, "stdout: %s\nstderr: %s", warm.Stdout, warm.Stderr)
 		limit := "--timeout=" + testkit.Scaled(5*time.Second).String()
-		stream, err := testkit.RunPackage(w.Context(), w.TempDir(), "../testdata/clitimeoutctx/", limit)
+		stream, err := testkit.RunPackageWithEnv(w.Context(), w.TempDir(), []string{cache}, "../testdata/clitimeoutctx/", limit)
 		gotest.NoError(w, err)
-		text, err := testkit.RunCLI(w.Context(), ".", limit, "../testdata/clitimeoutctx/")
+		text, err := testkit.RunCLIWithEnv(w.Context(), ".", []string{cache}, limit, "../testdata/clitimeoutctx/")
 		gotest.NoError(w, err)
 		pkgVerdict := ""
 		for _, ev := range stream.Events {

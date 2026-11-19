@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecSkipReason / AGuardedSuite / when a run's suite is kept from running by its guard / the terminal spec shows the guard's reason on the suite's line \(
+Clause: when a run's suite is kept from running by its guard → the terminal spec shows the guard's reason on the suite's line
+--- a/internal/gotestspec/report.go
++++ b/internal/gotestspec/report.go
+@@ -220,7 +220,7 @@
+ 
+ // skipReason is the reason a skipped node's skip gave, as BuildTree read it.
+ func skipReason(n *Node) string {
+-	if n.Status != StatusSkip {
++	if n.Kind == KindSuite || n.Status != StatusSkip {
+ 		return ""
+ 	}
+ 	return n.SkipReason

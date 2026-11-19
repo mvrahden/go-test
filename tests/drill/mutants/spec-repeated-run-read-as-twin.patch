@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecRepeat / AMethodThatFailsInOneRunOfThree / when a suite is run three times and one of its methods fails in the second / the spec shows three suites marked run 1, 2 and 3 of 3, none external \(
+Clause: when a suite is run three times and one of its methods fails in the second → the spec shows three suites marked run 1, 2 and 3 of 3, none external
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -545,7 +545,7 @@
+ 			continue
+ 		}
+ 		first, second := byInst[1], byInst[2]
+-		t := 1
++		t := 2
+ 		switch {
+ 		case twin(name), first == nil, second != nil && repeatMarked(second),
+ 			first != nil && second != nil && len(first.Children) > 0 && len(second.Children) > 0 && !shareChildName(first, second):

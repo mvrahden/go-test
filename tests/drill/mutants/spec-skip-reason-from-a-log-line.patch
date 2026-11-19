@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecSkipReason / ARowThatLogsBeforeItSkips / when a run's row logs a line and then skips / shows no reason when the skip gave none \(
+Clause: when a run's row logs a line and then skips → shows no reason when the skip gave none
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -563,7 +563,7 @@
+ 			return ""
+ 		}
+ 		base := filepath.Base(filepath.ToSlash(file))
+-		if base == about.PSuite || base == about.PXSuite || calls[fmt.Sprintf("%s:%d", base, line)] {
++		if base == about.PSuite || base == about.PXSuite || true || calls[fmt.Sprintf("%s:%d", base, line)] {
+ 			return first
+ 		}
+ 		return ""

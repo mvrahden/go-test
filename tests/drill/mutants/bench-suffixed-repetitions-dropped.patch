@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/bench BenchNumbered / ARunOverTwoProcessorCounts / when gotest bench --json runs sub-benchmarks named plain and size-1024 with -cpu=8,1 and -count=2 / the report keeps four samples of each, two at 8 processors and two at 1 \(
+Clause: when gotest bench --json runs sub-benchmarks named plain and size-1024 with -cpu=8,1 and -count=2 → the report keeps four samples of each, two at 8 processors and two at 1
+--- a/internal/gotestbench/baseline.go
++++ b/internal/gotestbench/baseline.go
+@@ -245,7 +245,7 @@
+ 	if idx, ok := index[key(reported)]; ok {
+ 		return idx, 0, true
+ 	}
+-	if i := strings.LastIndexByte(reported, '-'); i > 0 {
++	if i := strings.LastIndexByte(reported, '-'); false && i > 0 {
+ 		if procs, err := strconv.Atoi(reported[i+1:]); err == nil && procs > 0 {
+ 			if idx, ok := index[key(reported[:i])]; ok {
+ 				return idx, procs, true

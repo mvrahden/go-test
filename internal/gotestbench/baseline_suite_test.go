@@ -2,6 +2,7 @@ package gotestbench_test
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -29,8 +30,92 @@ func buildTree(it *gotest.T, ndjson string) []*gotestspec.Package {
 	return gotestspec.BuildTree(events)
 }
 
+// cpuStream is a bench stream of the sub-benchmarks plain and size-1024 run
+// twice at each processor count in cpus, in go test's order: the first
+// line of each leaf is tagged, the rest are package output.
+func cpuStream(cpus ...int) string {
+	var b strings.Builder
+	b.WriteString(`{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}` + "\n")
+	b.WriteString(`{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy"}` + "\n")
+	for _, leaf := range []string{"plain", "size-1024"} {
+		test := "BenchmarkFooTestSuite/BenchmarkCopy/" + leaf
+		fmt.Fprintf(&b, `{"Action":"run","Package":"example.com/pkg","Test":%q}`+"\n", test)
+		first := true
+		for _, cpu := range cpus {
+			name := test
+			if cpu > 1 {
+				name = fmt.Sprintf("%s-%d", test, cpu)
+			}
+			for range 2 {
+				line := name + "   \t 100 \t 10.0 ns/op\n"
+				if first {
+					fmt.Fprintf(&b, `{"Action":"output","Package":"example.com/pkg","Test":%q,"Output":%q}`+"\n", test, line)
+					first = false
+				} else {
+					fmt.Fprintf(&b, `{"Action":"output","Package":"example.com/pkg","Output":%q}`+"\n", line)
+				}
+			}
+		}
+	}
+	b.WriteString(`{"Action":"pass","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite","Elapsed":0.01}` + "\n")
+	return b.String()
+}
+
+func (s *BaselineTestSuite) TestProcessorCounts(t *gotest.T) {
+	for it, r := range gotest.Each(t, []struct {
+		Desc       string
+		cpus       []int
+		procs      []int // each sample's, in order
+		gomaxprocs int
+	}{
+		{Desc: "-cpu=1", cpus: []int{1}, procs: []int{0, 0}},
+		{Desc: "-cpu=8", cpus: []int{8}, procs: []int{0, 0}, gomaxprocs: 8},
+		{Desc: "-cpu=1,8", cpus: []int{1, 8}, procs: []int{1, 1, 8, 8}},
+		{Desc: "-cpu=8,1", cpus: []int{8, 1}, procs: []int{8, 8, 1, 1}, gomaxprocs: 8},
+	}) {
+		b := gotestbench.FromPackages(buildTree(it, cpuStream(r.cpus...)))
+		gotest.Len(it, b.Results, 2)
+		gotest.Equal(it, r.gomaxprocs, b.GOMAXPROCS)
+		for i, name := range []string{"BenchmarkCopy/plain", "BenchmarkCopy/size-1024"} {
+			gotest.Equal(it, name, b.Results[i].Name)
+			var procs []int
+			for _, sample := range b.Results[i].Samples {
+				procs = append(procs, sample.Procs)
+			}
+			gotest.Equal(it, r.procs, procs, "%s", name)
+		}
+	}
+}
+
 func (s *BaselineTestSuite) TestFromPackages(t *gotest.T) {
 	it0 := t
+	t.When("a sub-benchmark's name ends in a number", func(w *gotest.T) {
+		stream := func(suffix string) string {
+			return `
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy"}
+{"Action":"run","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024"}
+{"Action":"output","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024","Output":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024` + suffix + `   \t 100 \t 10.0 ns/op\n"}
+{"Action":"output","Package":"example.com/pkg","Output":"BenchmarkFooTestSuite/BenchmarkCopy/size-1024` + suffix + `   \t 200 \t 12.0 ns/op\n"}
+{"Action":"pass","Package":"example.com/pkg","Test":"BenchmarkFooTestSuite","Elapsed":0.01}
+`
+		}
+		w.It("keeps the name and every repetition when no line carries a suffix", func(it *gotest.T) {
+			b := gotestbench.FromPackages(buildTree(it, stream("")))
+			gotest.Len(it, b.Results, 1)
+			gotest.Equal(it, "BenchmarkCopy/size-1024", b.Results[0].Name)
+			gotest.Len(it, b.Results[0].Samples, 2)
+			gotest.Zero(it, b.GOMAXPROCS)
+		})
+		w.It("reads the suffix as GOMAXPROCS when the lines carry one", func(it *gotest.T) {
+			b := gotestbench.FromPackages(buildTree(it, stream("-8")))
+			gotest.Len(it, b.Results, 1)
+			gotest.Equal(it, "BenchmarkCopy/size-1024", b.Results[0].Name)
+			gotest.Len(it, b.Results[0].Samples, 2)
+			gotest.Equal(it, 8, b.GOMAXPROCS)
+		})
+	})
+
 	t.When("a benchmark suite wrapper contains a leaf benchmark", func(w *gotest.T) {
 		w.It("derives Package/Suite/Name and one Sample from the leaf's fields", func(it *gotest.T) {
 			pkgs := buildTree(it, `

@@ -156,6 +156,9 @@ func renderMarkdownSuite(doc *mdDoc, n *Node, cfg *renderConfig) {
 	if n.External {
 		heading += " — EXTERNAL"
 	}
+	if mark := runMark(n); mark != "" {
+		heading += " — " + mark
+	}
 	if bare && n.Excluded {
 		// Read from source, a parked suite still lists what it declares;
 		// unmarked, those behaviors read as live ones.
@@ -172,6 +175,9 @@ func renderMarkdownSuite(doc *mdDoc, n *Node, cfg *renderConfig) {
 			// Nothing ran, so nothing was skipped.
 		case n.Status == StatusSkip || n.Excluded:
 			heading += " — SKIPPED"
+			if reason := skipReason(n); reason != "" {
+				heading += ": " + EscapeLabel(reason)
+			}
 		case bare:
 		case n.Status == StatusFail:
 			heading += " — FAILED"
@@ -256,11 +262,22 @@ func markdownItem(list []string, n *Node, depth int, cfg *renderConfig) []string
 	if n.Kind == KindFuzz {
 		line += " (fuzz)"
 	}
+	if n.External {
+		line += " — EXTERNAL"
+	}
+	if mark := runMark(n); mark != "" {
+		line += " — " + mark
+	}
 	if bare && n.Excluded {
 		line += " — EXCLUDED"
 	}
 	if n.Incomplete {
 		line += " — " + incompleteMark
+	}
+	if word != "" && leaf {
+		if reason := skipReason(n); reason != "" {
+			line += " — " + EscapeLabel(reason)
+		}
 	}
 	if word != "" && (leaf || n.Kind == KindFuzz) && !n.NotRun && n.Status != StatusNone {
 		if d := EffectiveDuration(n); d >= time.Second {

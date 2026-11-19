@@ -23,6 +23,12 @@ func colorDisabled(noColorFlag bool) bool {
 	return !stdoutIsTerminal()
 }
 
+// reportColorDisabled is colorDisabled for a report: a file --output names
+// never gets color codes, whatever stdout is.
+func reportColorDisabled(noColorFlag bool, output string) bool {
+	return output != "" || colorDisabled(noColorFlag)
+}
+
 // checkFormat validates a --format value before any work is done.
 func checkFormat(format string) error {
 	switch format {

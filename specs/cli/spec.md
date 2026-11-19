@@ -60,11 +60,17 @@ gotest SHALL suggest the command meant when the first word is almost a subcomman
 - **THEN** suggests the command meant, and runs any other word as a package pattern
 
 ### Requirement: Packages with only stdlib tests
-gotest SHALL note on stderr, in every mode, that a package has only stdlib tests. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`.
+gotest SHALL note on stderr, in every mode, that a package has only stdlib tests. The cases are the table in `tests/conformance/cli/newcomer_suite_test.go`. The Markdown summary and the GitHub step summary SHALL carry the note under their headline, and a summary with the note SHALL not say All.
 
 #### Scenario: A package without suites
 - **WHEN** a package has only stdlib tests
 - **THEN** notes them on stderr in the plain, -json, summary and spec modes
+
+#### Scenario: A suite package that also holds stdlib tests
+- **WHEN** gotest summary writes Markdown for a package that holds a suite and a stdlib test
+- **THEN** the note of the stdlib tests not run follows the headline
+- **AND** the headline does not say All
+- **AND** the GitHub step summary carries the note
 
 ### Requirement: A suite that ran no tests
 In a text run given no -run, -skip, -list or -count=0, nor -test.run, -test.skip, -test.list, -test.bench or -test.count=0 after -args, a suite process whose binary reports that it ran no tests SHALL fail its package and the run with exit 2, naming the suite: the function gotest generated for it was not in the binary. A suite that is guarded, whose methods are all excluded, that focus leaves out or that the user's pattern does not match SHALL NOT fail this way.
@@ -301,11 +307,15 @@ A JSON document gotest is asked for SHALL be one document on stdout, with no col
 - **THEN** prints one JSON document with no color codes or annotations, inside GitHub Actions too
 
 ### Requirement: Color follows the terminal
-gotest SHALL print no color codes to a stdout that is a pipe, whatever --no-color says. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
+gotest SHALL print no color codes to a stdout that is a pipe, whatever --no-color says, nor into a file --output names, whatever stdout is. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
 
 #### Scenario: Output into a pipe
 - **WHEN** stdout is a pipe
 - **THEN** prints no color codes, even with --no-color=false
+
+#### Scenario: A report written to a file
+- **WHEN** spec or summary writes its report to a file --output names while stdout is a character device
+- **THEN** the file holds no color codes
 
 ### Requirement: One output mode
 gotest SHALL refuse with exit 2 two output modes asked for at once, and an unknown --format. The cases are the table in `tests/conformance/cli/streams_suite_test.go`.
@@ -369,6 +379,38 @@ gotest summary SHALL print one line per named ExclusiveGroup that ran, with its 
 - **THEN** prints one line per named group with its suites and wall time
 - **AND** prints the same lines in the Markdown summary and the GitHub step summary
 - **AND** puts a groups entry with each group's suites and wall time in the JSON summary
+
+### Requirement: The summary's headline
+gotest summary's first line SHALL count as passed only the tests that passed and SHALL name beside them the tests that were skipped and those that were not run, in its terminal and Markdown summaries and the GitHub step summary. It SHALL say All only when every test passed, and SHALL claim no pass of a run in which none did. A run with failed tests SHALL open with their count, then the passed, skipped and not-run counts that are not zero.
+
+#### Scenario: A run in which every test passed
+- **WHEN** gotest summary runs a package whose tests all pass
+- **THEN** the Markdown headline says All and the count of tests
+
+#### Scenario: A run with skipped tests
+- **WHEN** gotest summary runs a package with passed and skipped tests
+- **THEN** the headline counts the passed tests and names the skipped ones
+- **AND** the Markdown headline does not say All
+- **AND** the GitHub step summary carries the Markdown headline
+
+#### Scenario: A run in which nothing passed
+- **WHEN** gotest summary runs a package whose tests are all skipped
+- **THEN** the headline says no tests passed, names the skipped ones and exits 0
+
+#### Scenario: A run with failed, passed and skipped tests
+- **WHEN** gotest summary runs a package with failed, passed and skipped tests
+- **THEN** the headline opens with the failed count, then the passed and the skipped
+
+### Requirement: Annotations of a summary
+gotest summary --github SHALL annotate a failed test at its file in its package's directory, and a package that failed to build at the path the compiler printed, which already names the file from the working directory.
+
+#### Scenario: A package that fails to build
+- **WHEN** gotest summary --github runs a package that fails to build
+- **THEN** annotates the compiler's error at the file's path from the working directory
+
+#### Scenario: A failed test
+- **WHEN** gotest summary --github runs a package with a failed test
+- **THEN** annotates the failure at the test file in its package's directory
 
 ### Requirement: Hooks that call t.T() where it is nil
 gotest SHALL refuse with exit 2 a suite whose hook calls t.T() where its wrapper makes it nil: every hook under a benchmark method, BeforeAll and AfterAll under a fuzz method. One error names every such hook in source order, at the first. It reads the hook's own body, closures and aliases of t included, not the helpers it calls, and accepts a call whose result is checked for nil. The cases are the table in `tests/conformance/cli/rejections_suite_test.go`.

@@ -66,3 +66,13 @@ func (s *EventTestSuite) TestParseEvents_BuildEvents(t *gotest.T, _ *eventCtx) {
 	mustEq(t, "events[1].Action", events[1].Action, gotestspec.ActionBuildFail)
 	mustEq(t, "events[2].FailedBuild", events[2].FailedBuild, "m/p [m/p.test]")
 }
+
+func (s *EventTestSuite) TestParseEvents_ALineOfAnyLength(t *gotest.T, _ *eventCtx) {
+	long := `{"Action":"output","Package":"p","Test":"TestLong","Output":"` + strings.Repeat("x", 2<<20) + `"}`
+	events := parseEvents(t, `{"Action":"run","Package":"p","Test":"TestLong"}`+"\n"+long+"\n"+`{"Action":"pass","Package":"p","Test":"TestLong"}`+"\n")
+	mustLen(t, "events", events, 3)
+	mustEq(t, "long output", len(events[1].Output), 2<<20)
+
+	unterminated := parseEvents(t, `{"Action":"run","Package":"p","Test":"TestLong"}`+"\n"+`{"Action":"pass","Package":"p","Test":"TestLong"}`)
+	mustLen(t, "events of a stream whose last line has no newline", unterminated, 2)
+}

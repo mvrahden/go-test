@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / TheStdlibNote / when gotest summary writes Markdown for a package that holds a suite and a stdlib test / the headline does not say All \(
+Clause: when gotest summary writes Markdown for a package that holds a suite and a stdlib test → the headline does not say All
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -232,7 +232,7 @@
+ 	passed, clean := passedPhrase(stats)
+ 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
+ 		all := ""
+-		if clean && len(cfg.notes) == 0 {
++		if clean {
+ 			all = "All "
+ 		}
+ 		fmt.Fprintf(w, "### %s%s (%s)\n",

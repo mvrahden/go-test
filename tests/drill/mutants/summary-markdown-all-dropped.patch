@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLISummary / TheHeadline / when gotest summary runs a package whose tests all pass / the Markdown headline says All and the count of tests \(
+Clause: when gotest summary runs a package whose tests all pass → the Markdown headline says All and the count of tests
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -233,7 +233,7 @@
+ 	if len(failures) == 0 && len(diags) == 0 && stats.FailedPackages == 0 {
+ 		all := ""
+ 		if clean && len(cfg.notes) == 0 {
+-			all = "All "
++			all = ""
+ 		}
+ 		fmt.Fprintf(w, "### %s%s (%s)\n",
+ 			all, passed, formatDuration(effectiveDuration(&cfg, packages)))

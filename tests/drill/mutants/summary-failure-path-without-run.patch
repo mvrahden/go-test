@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecRepeat / AMethodThatFailsInOneRunOfThree / when a suite is run three times and one of its methods fails in the second / the summary names the failure with its run \(
+Clause: when a suite is run three times and one of its methods fails in the second → the summary names the failure with its run
+--- a/internal/gotestspec/summary.go
++++ b/internal/gotestspec/summary.go
+@@ -26,7 +26,7 @@
+ }
+ 
+ func collectFailedLeaves(pkgPath string, n *Node, display []string, out *[]failure) {
+-	cur := append(append([]string(nil), display...), n.pathName())
++	cur := append(append([]string(nil), display...), n.Display)
+ 
+ 	if n.Status == StatusFail && (len(n.Children) == 0 || hasOwnDiagnostic(n) || failedOnItsOwn(n)) {
+ 		d := make([]string, len(cur))

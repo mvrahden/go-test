@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/spec SpecRepeat / AStdlibTestOfBothTestPackages / when a saved stream holds one run of a stdlib test both test packages declare / the spec shows two tests, the external one marked, neither marked as a run \(
+Expect: ^FAIL .*conformance/spec SpecRepeat / AStdlibTestOfBothTestPackages / when a saved stream holds one run of a stdlib test both test packages declare / under -count=2 each run shows the internal test and the external one, marked \(
+Clause: when a saved stream holds one run of a stdlib test both test packages declare → the spec shows two tests, the external one marked, neither marked as a run
+Clause: when a saved stream holds one run of a stdlib test both test packages declare → under -count=2 each run shows the internal test and the external one, marked
+--- a/cmd/gotest/declarations.go
++++ b/cmd/gotest/declarations.go
+@@ -130,7 +130,7 @@
+ // testFuncNames are the top-level Test functions pkg's test files declare.
+ func testFuncNames(pkg *packages.Package) map[string]bool {
+ 	names := map[string]bool{}
+-	for _, f := range pkg.Syntax {
++	for _, f := range pkg.Syntax[:0] {
+ 		if !strings.HasSuffix(pkg.Fset.Position(f.Pos()).Filename, "_test.go") {
+ 			continue
+ 		}

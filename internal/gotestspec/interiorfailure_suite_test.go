@@ -90,7 +90,7 @@ func (s *InteriorFailureTestSuite) TestCollectStats_CountsBareFailInterior(t *go
 
 func (s *InteriorFailureTestSuite) TestRenderSummary_BareFailIsVisible(t *gotest.T, _ *interiorCtx) {
 	out := summaryOf(bareFailPackages())
-	mustContain(t, out, "of 2 tests failed", "the summary must take the red branch")
+	mustContain(t, out, "1 test failed, 1 passed", "the summary must take the red branch")
 	mustContain(t, out, gotestspec.ExportNoDiagnosticNote, "a counted failure with no output renders the fallback note")
 }
 
@@ -103,7 +103,7 @@ func (s *InteriorFailureTestSuite) TestRenderTerminal_BareFailIsMarked(t *gotest
 type statCounts struct{ Failed, Passed, Total int }
 
 func countsOf(stats gotestspec.Stats) statCounts { //nolint:gocritic // hugeParam: stable API
-	return statCounts{Failed: stats.Failed, Passed: stats.Passed, Total: stats.Total()}
+	return statCounts{Failed: stats.Failed, Passed: stats.Passed, Total: stats.Passed + stats.Failed + stats.Skipped + stats.NotRun}
 }
 
 func (s *InteriorFailureTestSuite) TestCollectStats_CountsInteriorNodeFailure(t *gotest.T, _ *interiorCtx) {

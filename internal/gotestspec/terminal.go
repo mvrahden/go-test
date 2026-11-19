@@ -35,6 +35,7 @@ type renderConfig struct {
 	benchEnvWarning string
 	benchGate       *BenchGate
 	groups          []GroupRun
+	notes           []string
 	hidden          map[Status]bool
 	match           string
 	only            *onlyView
@@ -359,8 +360,18 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 		}
 
 		var tail []tailPart
+		if n.External {
+			tail = append(tail, tailPart{" — EXTERNAL", c.dim})
+		}
+		if mark := runMark(n); mark != "" {
+			tail = append(tail, tailPart{" — " + mark, ""})
+		}
 		if n.Excluded || n.Status == StatusSkip {
-			tail = append(tail, tailPart{" — SKIPPED", ""})
+			skipped := " — SKIPPED"
+			if reason := skipReason(n); reason != "" {
+				skipped += ": " + reason
+			}
+			tail = append(tail, tailPart{skipped, ""})
 		}
 		lead, lw := mark(n.Status)
 		writeRow(w, &rowLine{indent: indent, lead: lead, leadWidth: lw, text: n.Display, tail: append(tail, duration()...)}, c, cfg)
@@ -374,6 +385,9 @@ func renderNode(w io.Writer, n *Node, depth int, c *colors, cfg *renderConfig) {
 	row := rowLine{indent: indent, text: n.Display, style: branchStyle(n, c)}
 	if n.External {
 		row.tail = append(row.tail, tailPart{" — EXTERNAL", c.dim})
+	}
+	if mark := runMark(n); mark != "" {
+		row.tail = append(row.tail, tailPart{" — " + mark, c.dim})
 	}
 	if n.Focused {
 		row.tail = append(row.tail, tailPart{" — FOCUSED", c.yellow})

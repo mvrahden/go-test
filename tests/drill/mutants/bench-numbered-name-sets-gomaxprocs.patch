@@ -1,0 +1,15 @@
+Expect: ^FAIL .*conformance/bench BenchNumbered / ASubBenchmarkNamedWithANumber / when gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2 / records no GOMAXPROCS of 1024 \(
+Clause: when gotest bench --json runs a sub-benchmark named size-1024 with -cpu=1 and -count=2 → records no GOMAXPROCS of 1024
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -819,10 +819,6 @@
+ 	node.AllocsPerOp = result.AllocsPerOp
+ 	node.Metrics = result.Metrics
+ 	node.Procs = result.Procs
+-	if result.Reported == node.Name || strings.HasSuffix(result.Reported, "/"+node.Name) {
+-		// The line gives the node's own name: it carries no suffix.
+-		node.Procs = 0
+-	}
+ 	// go test's own -json encoder never emits a "pass" event for a
+ 	// benchmark (see ActionBench doc comment); reaching a parsed ns/op line
+ 	// is the only success signal a real benchmark run ever produces.

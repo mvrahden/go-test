@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
+	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/internal/testkit"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
@@ -20,10 +21,14 @@ import (
 // Sequential: it builds the CLI once and every row drives a live process.
 type CLIEventsFileStopTestSuite struct {
 	cli string
+	// cache holds the test binaries the rows run, built before any row so
+	// that no row compiles inside the window it times.
+	cache string
 }
 
 func (s *CLIEventsFileStopTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 45 * time.Second, SetupTimeout: 45 * time.Second}
+	// The setup builds the CLI and, cold, both test binaries.
+	return gotest.SuiteConfig{Timeout: 45 * time.Second, SetupTimeout: 90 * time.Second}
 }
 
 func (s *CLIEventsFileStopTestSuite) BeforeAll(t *gotest.T) {
@@ -32,22 +37,37 @@ func (s *CLIEventsFileStopTestSuite) BeforeAll(t *gotest.T) {
 	s.cli, err = testkit.BuildCLI(t.Context(), root, t.TempDir())
 	gotest.NoError(t, err)
 	testkit.ScrubActionsEnv()
+	s.cache = testkit.ChildCacheDir(t.TempDir())
+	s.built(t)
 }
 
-// AfterAll has nothing to release: the binary lives in a temp dir.
+// built runs the rows' own command to its end, so the binaries they need are
+// in s.cache. STOPPING_HOLD=1ms lets the holding method pass at once: the
+// warm-up is a real run of both packages.
+func (s *CLIEventsFileStopTestSuite) built(t *gotest.T) {
+	cmd := exec.CommandContext(t.Context(), s.cli, "-json", "--events-file="+filepath.Join(t.TempDir(), "warm.json"), "../testdata/passing/", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
+	cmd.Env = testkit.ChildEnv(t.TempDir(), protocol.EnvCacheDir+"="+s.cache, "STOPPING_HOLD=1ms")
+	out, err := cmd.CombinedOutput()
+	gotest.NoError(t, err, "the warm-up run:\n%s", out)
+}
+
+// AfterAll has nothing to release: the binary and the cache live in temp dirs.
 func (s *CLIEventsFileStopTestSuite) AfterAll(t *gotest.T) {}
 
+// holdWithin is how long a run may take to hold. BeforeAll built the test
+// binaries, so it covers starting them, scaled with the run's budgets.
+const holdWithin = 20 * time.Second
+
 // holding starts a run of the stopping package through cmd and returns once
-// its first method holds. The wait covers building both packages, cold when
-// the runtime changed, so it scales with the run's budgets. A run that never
-// holds is killed before the test fails, so nothing outlives it.
+// its first method holds. A run that never holds is killed before the test
+// fails, so nothing outlives it.
 func holding(t *gotest.T, cmd *exec.Cmd, markerDir string) *proctree.Tree {
 	cmd.Stdout, cmd.Stderr = new(strings.Builder), new(strings.Builder)
 	cmd.WaitDelay = 15 * time.Second
 	tree, err := testkit.StartCLI(cmd)
 	gotest.NoError(t, err)
 	markers := filepath.Join(markerDir, testkit.MarkersFile)
-	for deadline := time.Now().Add(testkit.Scaled(20 * time.Second)); ; time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(testkit.Scaled(holdWithin)); ; time.Sleep(20 * time.Millisecond) {
 		got, _ := testkit.ReadMarkers(markers)
 		if slices.Contains(got, "running") {
 			return tree
@@ -140,7 +160,7 @@ func (s *CLIEventsFileStopTestSuite) stopWhileHolding(t *gotest.T, stop func(cmd
 	markerDir := t.TempDir()
 	path := filepath.Join(t.TempDir(), "events.json")
 	cmd := exec.Command(s.cli, "-json", "--events-file="+path, "../testdata/passing/", "../testdata/stopping/") //nolint:gosec // G204: binary built by this suite
-	cmd.Env = testkit.ChildEnv(markerDir, env...)
+	cmd.Env = testkit.ChildEnv(markerDir, append([]string{protocol.EnvCacheDir + "=" + s.cache}, env...)...)
 	tree := holding(t, cmd, markerDir)
 	var r stoppedRun
 	r.before, r.streamed = streamed(path)

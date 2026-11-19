@@ -2,10 +2,10 @@ Expect: ^FAIL .*conformance/bench .* / prints a schemaVersion 1 report whose bas
 Clause: when a --json bench run selects one of two benchmarks with -benchtime=10x and saves a baseline → prints a schemaVersion 1 report whose baseline holds that benchmark alone, 10 iterations a sample, with no deltas and no gate
 --- a/internal/gotestbench/baseline.go
 +++ b/internal/gotestbench/baseline.go
-@@ -160,7 +160,7 @@
- 		}
+@@ -167,7 +167,7 @@
  
  		sample := Sample{
+ 			Procs:       n.Procs,
 -			Iterations:  n.Iterations,
 +			Iterations:  1,
  			NsPerOp:     n.NsPerOp,

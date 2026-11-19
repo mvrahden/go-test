@@ -2,6 +2,7 @@ package gotestspec
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"time"
@@ -53,20 +54,25 @@ type TestEvent struct {
 	Gotest *protocol.Stamp `json:"Gotest,omitempty"`
 }
 
+// ParseEvents reads one event per line, a line of any length; blank and
+// malformed lines are skipped. Only a read error is returned.
 func ParseEvents(r io.Reader) ([]TestEvent, error) {
 	var events []TestEvent
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+	br := bufio.NewReaderSize(r, 64*1024)
+	for {
+		line, err := br.ReadBytes('\n')
+		if err != nil && err != io.EOF {
+			return events, err
 		}
-		var ev TestEvent
-		if err := json.Unmarshal(line, &ev); err != nil {
-			continue
+		line = bytes.TrimRight(line, "\r\n")
+		if len(line) > 0 {
+			var ev TestEvent
+			if json.Unmarshal(line, &ev) == nil {
+				events = append(events, ev)
+			}
 		}
-		events = append(events, ev)
+		if err == io.EOF {
+			return events, nil
+		}
 	}
-	return events, scanner.Err()
 }

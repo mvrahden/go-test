@@ -76,6 +76,27 @@ A suite name declared in a package's test files and in its external test package
 - **WHEN** the external twin's shared method is rerun alone
 - **THEN** the declared spec under the rerun shows it under its own name, with its verdict
 
+### Requirement: A suite run more than once
+A suite a run holds more than once, as under -count, SHALL read as one suite per run, each marked with its run and the number of runs and each with its own verdicts and output, and never as an external suite; a failure SHALL name the run it happened in. A suite of both test packages run more than once SHALL read as its two suites per run, the external one marked in each.
+
+#### Scenario: A method that fails in one run of three
+- **WHEN** a suite is run three times and one of its methods fails in the second
+- **THEN** the spec shows three suites marked run 1, 2 and 3 of 3, none external
+- **AND** shows the method failed, with its message, in the second run and passed in the others
+- **AND** the summary names the failure with its run
+
+#### Scenario: A suite of both test packages run twice
+- **WHEN** a suite of both test packages is run twice
+- **THEN** each run shows the internal suite and the external one, marked
+
+### Requirement: Stdlib tests of both test packages
+A stdlib test function a package's test files and its external test package both declare SHALL read, in the spec of a saved go test stream, as two tests per run, the external one marked, and not as two runs of one test.
+
+#### Scenario: A stdlib test of both test packages
+- **WHEN** a saved stream holds one run of a stdlib test both test packages declare
+- **THEN** the spec shows two tests, the external one marked, neither marked as a run
+- **AND** under -count=2 each run shows the internal test and the external one, marked
+
 ### Requirement: A group's own failure
 A When or an It that fails while every behavior under it passes SHALL show, on its own row of a run's spec, that it failed and what it wrote.
 
@@ -113,7 +134,7 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **AND** counts one failure and exits 1, or 0 with --render-only
 
 ### Requirement: The declared specification under a run's verdicts
-`spec --input=<file> --declared [packages]` SHALL render the specification the source declares, as --static reads it: a node the stream reported carries its verdict, duration and output, one it did not report neither, or skipped under a node the run skipped; what only the stream holds stays under its declared parent. A behavior with no verdict, unreported or only started, SHALL count as not run, with no duration, sparing the exit code, so the counts add up to the behaviors.
+`spec --declared [packages]` SHALL render the specification the source declares under the run's verdicts, or a saved stream's with --input, as --static reads it: a reported node carries its verdict, duration and output, an unreported one neither, or skipped under a skipped node; what only the stream holds stays under its declared parent. A behavior with no verdict, unreported or only started, SHALL count as not run, with no duration, sparing the exit code, so the counts add up to the behaviors.
 
 #### Scenario: A run of some of a package's methods
 - **WHEN** a stream of some of a package's methods is rendered with --declared
@@ -134,6 +155,13 @@ A node SHALL be failed when a node beneath it failed, and a package SHALL be fai
 - **THEN** counts as not run
 - **AND** shows no duration
 - **AND** the counts add up to the behaviors
+
+#### Scenario: A live run under its declared specification
+- **WHEN** a run of a package is rendered with --declared
+- **THEN** shows the rows of a table after its failing row as not run
+- **AND** reads a method the X_ prefix excludes as skipped
+- **AND** counts what did not run as not run and exits as without --declared
+- **AND** under -count lays the declared specification over every run
 
 ### Requirement: Where the source declares a node
 With --static or --declared each JSON package SHALL carry its dir and each node the source declares its file and line.
@@ -196,7 +224,7 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 - **THEN** every behavior stays on one line
 
 ### Requirement: Hiding rows by status
-`--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared without --input or beside --static, SHALL exit 2.
+`--hide=<status>[,<status>]` SHALL leave out of every format each row whose own status it names (pass, fail, skip, none) and beneath which no row is shown, a package's own failure under fail; `--hide=` SHALL hide nothing. Counts and the exit code SHALL stay the whole stream's. With --hide or --declared every JSON package SHALL carry its stats whatever is hidden, else none SHALL. --hide under --static or with an unknown status, and --declared beside --static, SHALL exit 2.
 
 #### Scenario: Hiding what passed
 - **WHEN** a failing stream is rendered with --hide=pass
@@ -213,7 +241,7 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 - **THEN** leaves the package's failure and its output out of every format, its stats still counting it
 
 #### Scenario: A view that cannot apply
-- **WHEN** --hide is given with --static or with a status it does not know, or --declared without --input or with --static
+- **WHEN** --hide is given with --static or with a status it does not know, or --declared with --static
 - **THEN** refuses with exit 2, naming what it needs or the statuses it accepts
 
 ### Requirement: Searching and picking rows
@@ -232,3 +260,28 @@ The terminal spec SHALL carry the Markdown spec's content laid out for a termina
 #### Scenario: A pick that finds nothing
 - **WHEN** --only names a package or position the stream does not hold, or --match or --only is given with --static
 - **THEN** refuses with exit 2 and says what it did not find
+
+### Requirement: An event line of any length
+spec and summary SHALL read an event line of any length, from a run and from a saved stream.
+
+#### Scenario: A line longer than a mebibyte
+- **WHEN** a saved stream holds an event line longer than a mebibyte
+- **THEN** spec renders the stream, the long line's test with its verdict
+- **AND** summary renders it and exits by its verdict
+
+### Requirement: Why a row was skipped
+A skipped row SHALL show the reason its skip gave, in the terminal and the Markdown spec; a row skipped without one SHALL show none. The stream cannot tell a skip's message from a line logged before a skip without one, so the reason SHALL be the row's last logged line only when the source holds a skip call at that line, or when gotest's own harness wrote it; else no reason SHALL show.
+
+#### Scenario: A row skipped with a reason
+- **WHEN** a run skips a row with a reason
+- **THEN** the terminal spec shows the reason after SKIPPED
+- **AND** the Markdown spec shows the reason after the row
+
+#### Scenario: A suite its guard kept from running, in a run's spec
+- **WHEN** a run's suite is kept from running by its guard
+- **THEN** the terminal spec shows the guard's reason on the suite's line
+
+#### Scenario: A row that logs before it skips
+- **WHEN** a run's row logs a line and then skips
+- **THEN** the spec shows the skip's reason, not the logged line
+- **AND** shows no reason when the skip gave none

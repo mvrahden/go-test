@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,7 +20,9 @@ type Annotation struct {
 	Message string
 }
 
-func CollectAnnotations(packages []*Package, modulePath string) []Annotation {
+// CollectAnnotations locates each failure for a workflow command. workDir is
+// the directory the compiler's paths are relative to; "" is the current one.
+func CollectAnnotations(packages []*Package, modulePath, workDir string) []Annotation {
 	failures := collectFailures(packages)
 	var annotations []Annotation
 
@@ -32,7 +35,7 @@ func CollectAnnotations(packages []*Package, modulePath string) []Annotation {
 			continue
 		}
 
-		file = resolveAnnotationPath(file, dir)
+		file = resolveAnnotationPath(file, dir, workDir)
 
 		annotations = append(annotations, Annotation{
 			File:    file,
@@ -53,7 +56,7 @@ func CollectAnnotations(packages []*Package, modulePath string) []Annotation {
 			continue
 		}
 
-		file = resolveAnnotationPath(file, dir)
+		file = resolveAnnotationPath(file, dir, workDir)
 
 		annotations = append(annotations, Annotation{
 			File:    file,
@@ -66,9 +69,17 @@ func CollectAnnotations(packages []*Package, modulePath string) []Annotation {
 	return annotations
 }
 
-func resolveAnnotationPath(file, pkgDir string) string {
+// resolveAnnotationPath keeps a path the compiler printed: one with a
+// directory part that exists from workDir. Any other file, such as a test's
+// base name, sits in its package's directory.
+func resolveAnnotationPath(file, pkgDir, workDir string) string {
 	if len(file) == 0 {
 		return file
+	}
+	if strings.ContainsAny(file, `/\`) {
+		if _, err := os.Stat(filepath.Join(workDir, file)); err == nil {
+			return path.Clean(filepath.ToSlash(file))
+		}
 	}
 	if pkgDir != "" {
 		return pkgDir + "/" + file

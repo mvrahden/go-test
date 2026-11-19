@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecDeclared / ALiveRunUnderItsDeclaredSpecification / when a run of a package is rendered with --declared / shows the rows of a table after its failing row as not run \(
+Clause: when a run of a package is rendered with --declared → shows the rows of a table after its failing row as not run
+--- a/cmd/gotest/spec.go
++++ b/cmd/gotest/spec.go
+@@ -180,7 +180,7 @@
+ 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
+ 
+ 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)), gotestspec.WithSkipCalls(skipCallsOf(loaded)))
+-	if view.declared {
++	if false && view.declared {
+ 		// The packages the run loaded, read once; the run's verdicts lie over them.
+ 		declared, _ := buildStaticSpec(loaded, nil)
+ 		tree = gotestspec.Overlay(declared, tree)

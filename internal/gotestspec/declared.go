@@ -35,7 +35,7 @@ func Overlay(declared, observed []*Package) []*Package {
 			continue
 		}
 		d.Status, d.Duration, d.Output = o.Status, o.Duration, o.Output
-		d.Nodes = overlayNodes(d.Nodes, o.Nodes, false)
+		d.Nodes = overlayRuns(d.Nodes, o.Nodes)
 		sort.SliceStable(d.Nodes, func(i, j int) bool { return d.Nodes[i].Name < d.Nodes[j].Name })
 		FailBranches(d)
 		out = append(out, d)
@@ -47,6 +47,51 @@ func Overlay(declared, observed []*Package) []*Package {
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
+}
+
+// overlayRuns lays declared over each run of a stream that repeats its
+// top-level nodes (-count): run 1 with the nodes run once, then every later
+// run over a copy of the declared nodes it ran.
+func overlayRuns(declared, observed []*Node) []*Node {
+	runs := 0
+	for _, o := range observed {
+		runs = max(runs, o.Runs)
+	}
+	if runs < 2 {
+		return overlayNodes(declared, observed, false)
+	}
+	byRun := make([][]*Node, runs+1)
+	for _, o := range observed {
+		r := max(o.Run, 1)
+		byRun[r] = append(byRun[r], o)
+	}
+	copies := make([][]*Node, runs+1)
+	for r := 2; r <= runs; r++ {
+		names := map[string]bool{}
+		for _, o := range byRun[r] {
+			names[o.Name] = true
+		}
+		for _, d := range declared {
+			if names[d.Name] {
+				copies[r] = append(copies[r], cloneNode(d))
+			}
+		}
+	}
+	out := overlayNodes(declared, byRun[1], false)
+	for r := 2; r <= runs; r++ {
+		out = append(out, overlayNodes(copies[r], byRun[r], false)...)
+	}
+	return out
+}
+
+// cloneNode copies n and the nodes under it.
+func cloneNode(n *Node) *Node {
+	c := *n
+	c.Children = make([]*Node, len(n.Children))
+	for i, child := range n.Children {
+		c.Children[i] = cloneNode(child)
+	}
+	return &c
 }
 
 // overlayNodes pairs declared with observed siblings and appends the
@@ -89,6 +134,7 @@ func overlayNodes(declared, observed []*Node, skipped bool) []*Node {
 		d.Status, d.Duration, d.Start, d.End, d.Paused = o.Status, o.Duration, o.Start, o.End, o.Paused
 		d.Output = o.Output
 		d.External, d.Variant, d.Reported = d.External || o.External, o.Variant, o.Reported
+		d.Run, d.Runs, d.SkipReason = o.Run, o.Runs, o.SkipReason
 		d.Iterations, d.NsPerOp, d.BytesPerOp, d.AllocsPerOp = o.Iterations, o.NsPerOp, o.BytesPerOp, o.AllocsPerOp
 		d.Metrics, d.Procs = o.Metrics, o.Procs
 		d.Children = overlayNodes(d.Children, o.Children, skipped || d.Excluded || o.Status == StatusSkip)

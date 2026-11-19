@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/spec SpecRepeat / ASuiteOfBothTestPackagesRunTwice / when a suite of both test packages is run twice / each run shows the internal suite and the external one, marked \(
+Clause: when a suite of both test packages is run twice → each run shows the internal suite and the external one, marked
+--- a/internal/gotestspec/tree.go
++++ b/internal/gotestspec/tree.go
+@@ -604,7 +604,7 @@
+ 		}
+ 		runs := (maxInst + t - 1) / t
+ 		for _, n := range group {
+-			n.External = t == 2 && inst(n)%2 == 0
++			n.External = t == 2 && inst(n) == 2
+ 			if runs > 1 {
+ 				n.Run, n.Runs = (inst(n)-1)/t+1, runs
+ 			}

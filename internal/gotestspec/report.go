@@ -99,7 +99,7 @@ func attention(packages []*Package, cfg *renderConfig) []attentionRow {
 
 func attentionOf(n *Node, path []string, rows []attentionRow, cfg *renderConfig) []attentionRow {
 	if n.Kind != KindFixture {
-		path = append(path[:len(path):len(path)], n.Display)
+		path = append(path[:len(path):len(path)], n.pathName())
 	}
 	switch {
 	case n.Kind == KindBenchmark && len(n.Children) == 0:
@@ -216,4 +216,28 @@ func hiddenPhrase(hidden map[Status]bool) string {
 		return "hiding " + words[0] + " rows"
 	}
 	return "hiding " + strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1] + " rows"
+}
+
+// skipReason is the reason a skipped node's skip gave, as BuildTree read it.
+func skipReason(n *Node) string {
+	if n.Status != StatusSkip {
+		return ""
+	}
+	return n.SkipReason
+}
+
+// runMark names a repeated node's run ("RUN 2 OF 3"); "" for a single run.
+func runMark(n *Node) string {
+	if n.Runs == 0 {
+		return ""
+	}
+	return fmt.Sprintf("RUN %d OF %d", n.Run, n.Runs)
+}
+
+// pathName is n's label in a failure's path, its run named when repeated.
+func (n *Node) pathName() string {
+	if n.Runs == 0 {
+		return n.Display
+	}
+	return fmt.Sprintf("%s (run %d of %d)", n.Display, n.Run, n.Runs)
 }
