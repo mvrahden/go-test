@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -37,13 +36,14 @@ func resolveSetupTimeout(d time.Duration) time.Duration {
 // computeDispatchConcurrency decides how many suite processes run at once.
 // The budget (total concurrent test methods, default 2×GOMAXPROCS) is split
 // between processes and each process's -parallel; a user -parallel keeps the
-// budget and divides it, so processes × methods never exceeds the budget;
-// procCap (go test's -p) bounds the process count outright.
-func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap int, sanitized bool) int {
+// budget and divides it, so processes × methods never exceeds the budget.
+// procCap (go test's -p) sets the process count, above gomaxprocs too and
+// without the sanitizer halving: as go test, it runs that many binaries.
+func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap int, sanitized bool, gomaxprocs int) int {
 	userParallel := ExtractParallelValue(*runFlags)
 
-	procs := runtime.GOMAXPROCS(0)
-	if sanitized && budget == 0 {
+	procs := gomaxprocs
+	if sanitized && budget == 0 && procCap == 0 {
 		// Halve both dimensions: the budget (total concurrent test methods)
 		// and the process cap. Halving the budget alone would not reduce the
 		// process count — ComputeConcurrency caps inter at procs first — and
@@ -52,11 +52,11 @@ func computeDispatchConcurrency(runFlags *[]string, budget, totalSuites, procCap
 		procs = max(1, procs/2)
 	}
 	if procCap > 0 {
-		procs = min(procs, procCap)
+		procs = procCap
 	}
 	if userParallel > 0 {
 		if budget <= 0 {
-			budget = 2 * runtime.GOMAXPROCS(0)
+			budget = 2 * procs
 		}
 		return max(1, min(totalSuites, procs, budget/userParallel))
 	}

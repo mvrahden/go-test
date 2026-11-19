@@ -1,0 +1,13 @@
+Clause: when three suites that each wait for the other two are run with -p 3 and GOMAXPROCS=1 → all three pass
+Expect: ^FAIL .*conformance/cli CLIProcs .* / all three pass \(
+--- a/internal/gotestrunner/pipeline.go
++++ b/internal/gotestrunner/pipeline.go
+@@ -52,7 +52,7 @@
+ 		procs = max(1, procs/2)
+ 	}
+ 	if procCap > 0 {
+-		procs = procCap
++		procs = min(procs, procCap)
+ 	}
+ 	if userParallel > 0 {
+ 		if budget <= 0 {
