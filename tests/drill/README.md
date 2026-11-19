@@ -996,6 +996,7 @@ shards of one run do not add up to every mutant exactly once.
 | `summary-step-summary-not-written` | `summary --github` writes nothing into the GitHub step summary | cli conformance: the step summary carries the headline and the stdlib note |
 | `spec-repeated-run-read-as-twin` | every repeated top-level suite is read as a twin pair, its later runs as external suites | spec conformance: three runs of a suite show as runs 1, 2 and 3 of 3, none external |
 | `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |
+| `test-variants-built-for-export-data` | the package loader asks for types in its listing with tests, so go list builds every test variant and test main | pkgload: the load with tests asks for types |
 
 ## Adding a mutant
 

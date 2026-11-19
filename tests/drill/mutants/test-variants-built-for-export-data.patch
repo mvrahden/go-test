@@ -1,0 +1,13 @@
+Expect: ^FAIL .*internal/pkgload Load .* / asks for no types where it asks for tests \(
+Judge: ./internal/pkgload LoadTestSuite/TestNeverBuildsATestVariant
+--- a/internal/pkgload/pkgload.go
++++ b/internal/pkgload/pkgload.go
+@@ -36,7 +36,7 @@
+ 	// graphMode lists without compiling: any of CompiledGoFiles, Syntax,
+ 	// Types, TypesInfo or TypesSizes makes go list run the build actions
+ 	// of every test variant and test main.
+-	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule
++	graphMode = packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedTypes
+ 	// exportMode builds only plain packages, which the test build needs anyway.
+ 	exportMode = packages.NeedName | packages.NeedExportFile | packages.NeedImports | packages.NeedDeps | packages.NeedTypesSizes
+ )
