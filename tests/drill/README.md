@@ -631,6 +631,9 @@ shards of one run do not add up to every mutant exactly once.
 | `overlay-outlives-its-run` | the overlay is written beside the work dir, so the run's cleanup leaves it | runner: the overlay outlives its run |
 | `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
 | `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
+| `debug-run-names-no-phases` | a `--debug` run does not end by naming how long each phase took | cli conformance: the last line of a --debug run's stderr is not the phases line |
+| `debug-phases-run-spans-the-command` | the phases line gives `run` the whole command, not the pipeline's span | cli conformance: the spans add up to more than the total |
+| `plain-run-names-its-phases` | a run without `--debug` also ends by naming its phases | cli conformance: the plain run's stderr names phases |
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
 | `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run places the binary it found under the replaced lock |
 | `untouched-binary-ready-after-a-failed-build` | a placed cached binary go did not replace counts as up to date after go exited non-zero | runner: the row "same file, newer, exit 1" reads confirmed |
