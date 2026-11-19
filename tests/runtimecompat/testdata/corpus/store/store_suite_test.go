@@ -100,3 +100,16 @@ func (s *CodecTestSuite) FuzzNormalize(f *gotest.F) {
 		gotest.Equal(t, once, Normalize(once))
 	})
 }
+
+// entry is a struct-typed fuzz input: its harness carries a fan.
+type entry struct {
+	Key   string
+	Count int
+}
+
+func (s *CodecTestSuite) FuzzEntry(f *gotest.F) {
+	f.Add(entry{Key: " A ", Count: 1})
+	f.Fuzz(func(t *gotest.T, e entry) {
+		gotest.Equal(t, Normalize(e.Key), Normalize(Normalize(e.Key)))
+	})
+}
