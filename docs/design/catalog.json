@@ -12883,6 +12883,52 @@
               "name": "TestATestFileChanges",
               "output": [],
               "status": "none"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the build cache holds no more files than before",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "loadcost_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 72,
+                      "name": "the_build_cache_holds_no_more_files_than_before",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a test file of a linted package is changed and the package is linted again",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "loadcost_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 71,
+                  "name": "a_test_file_of_a_linted_package_is_changed_and_the_package_is_linted_again",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "LintAfterATestFileChanges",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "loadcost_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 69,
+              "name": "TestLintAfterATestFileChanges",
+              "output": [],
+              "status": "none"
             }
           ],
           "display": "DiscoveryLoadCost",
@@ -33361,7 +33407,7 @@
     }
   ],
   "stats": {
-    "behaviors": 962,
+    "behaviors": 963,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,

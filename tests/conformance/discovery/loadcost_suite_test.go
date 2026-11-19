@@ -65,3 +65,12 @@ func (s *DiscoveryLoadCostTestSuite) TestATestFileChanges(t *gotest.T) {
 		})
 	})
 }
+
+func (s *DiscoveryLoadCostTestSuite) TestLintAfterATestFileChanges(t *gotest.T) {
+	before, after := afterATestFileChanges(t, []int{0, 3}, "lint", ".")
+	t.When("a test file of a linted package is changed and the package is linted again", func(w *gotest.T) {
+		w.It("the build cache holds no more files than before", func(it *gotest.T) {
+			gotest.Equal(it, before, after)
+		})
+	})
+}

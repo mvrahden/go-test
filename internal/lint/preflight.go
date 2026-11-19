@@ -18,6 +18,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/genstub"
 	"github.com/mvrahden/go-test/internal/goversion"
+	"github.com/mvrahden/go-test/internal/pkgload"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"golang.org/x/tools/go/packages"
 )
@@ -39,13 +40,13 @@ func PreflightLoad(dir string, patterns []string) error {
 
 // load type-checks the targets from source and reads their dependencies
 // from export data: the analyzer holds no facts, so it never looks at a
-// dependency's syntax. Every target that does not compile is named in the
-// error. overlay replaces the contents of the files it names.
+// dependency's syntax. No test package is built for it. Every target that
+// does not compile is named in the error. overlay replaces the contents of
+// the files it names.
 func load(ctx context.Context, t *Targets, overlay map[string][]byte) ([]*packages.Package, error) {
-	cfg := &packages.Config{
+	cfg := &pkgload.Config{
 		Context: ctx,
 		Dir:     t.Dir,
-		Mode:    packages.LoadSyntax | packages.NeedModule,
 		Tests:   t.Tests,
 		// withOverlay appends to it.
 		BuildFlags: slices.Clone(t.BuildFlags),
@@ -71,7 +72,7 @@ func load(ctx context.Context, t *Targets, overlay map[string][]byte) ([]*packag
 		defer cleanup()
 		replaced = written
 	}
-	pkgs, err := packages.Load(cfg, pkgpattern.Clean(t.Patterns)...)
+	pkgs, err := pkgload.Load(cfg, pkgpattern.Clean(t.Patterns)...)
 	if err != nil {
 		return nil, fmt.Errorf("load packages: %w", err)
 	}
@@ -265,9 +266,10 @@ func absent(p *packages.Package) bool {
 
 // withOverlay makes cfg load overlay's contents in place of the files it
 // names. Config.Overlay would do it too, but go/packages then distrusts all
-// export data and type-checks every dependency from source; the go command's
-// own -overlay builds export data from the overlay, so it stays usable.
-func withOverlay(cfg *packages.Config, tmp string, overlay map[string][]byte) (cleanup func(), written map[string]string, err error) {
+// export data and type-checks every dependency from source when a broken
+// package is loaded for its report; the go command's own -overlay builds
+// export data from the overlay, so it stays usable.
+func withOverlay(cfg *pkgload.Config, tmp string, overlay map[string][]byte) (cleanup func(), written map[string]string, err error) {
 	dir, err := os.MkdirTemp(tmp, "gotest-lint-overlay")
 	if err != nil {
 		return nil, nil, err

@@ -1,6 +1,8 @@
 Clause: when a test file of a discovered package is changed and the package is discovered again → the build cache holds no more files than before
 Expect: ^FAIL .*internal/pkgload Load .* / asks for no types where it asks for tests \(
-Expect: ^FAIL .*conformance/discovery DiscoveryLoadCost .* / the build cache holds no more files than before \(
+Clause: when a test file of a linted package is changed and the package is linted again → the build cache holds no more files than before
+Expect: ^FAIL .*conformance/discovery DiscoveryLoadCost / ATestFileChanges / .* / the build cache holds no more files than before \(
+Expect: ^FAIL .*conformance/discovery DiscoveryLoadCost / LintAfterATestFileChanges / .* / the build cache holds no more files than before \(
 Judge: ./internal/pkgload LoadTestSuite/TestNeverBuildsATestVariant
 --- a/internal/pkgload/pkgload.go
 +++ b/internal/pkgload/pkgload.go

@@ -53,7 +53,7 @@ var load = packages.Load
 // syntax, types and type information from source and Errors holding what failed.
 // It never asks the go command to build a test variant or a test main.
 //
-// A test main is not type-checked: its Types stays nil. A matched package
+// A matched package
 // with an error in any of its variants is loaded once more by packages.Load,
 // alone, so its errors are the go command's own report.
 func Load(cfg *Config, patterns ...string) ([]*packages.Package, error) {
@@ -135,11 +135,6 @@ func (l *loader) graph(mode packages.LoadMode, patterns []string) error {
 			l.source[id] = p
 		}
 	}
-	for id, p := range l.source {
-		if isTestMain(p) {
-			delete(l.source, id)
-		}
-	}
 	l.parse()
 	return nil
 }
@@ -154,10 +149,11 @@ func (l *loader) parse() {
 	var names []string
 	for _, p := range l.source {
 		if !l.compiled {
-			// Without cgo, go list compiles exactly the Go files.
+			// Without cgo, go list compiles exactly the Go files; a test
+			// main's is a build cache file, without an extension.
 			p.CompiledGoFiles = nil
 			for _, f := range p.GoFiles {
-				if filepath.Ext(f) == ".go" {
+				if ext := filepath.Ext(f); ext == ".go" || ext == "" {
 					p.CompiledGoFiles = append(p.CompiledGoFiles, f)
 				}
 			}
