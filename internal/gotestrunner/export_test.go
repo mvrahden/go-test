@@ -462,3 +462,7 @@ func ExportObserveDispatch(fn func(DispatchEvent)) (restore func()) {
 	observeDispatch = fn
 	return func() { observeDispatch = prev }
 }
+
+// plan.go
+var ExportPlanRun = planRun
+var ExportPlanFromMaps = planFromMaps

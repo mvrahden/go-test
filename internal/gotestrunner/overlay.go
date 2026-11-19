@@ -54,6 +54,17 @@ type OverlayResult struct {
 	// Declared are the units the packages declare, which the census holds a
 	// green run to.
 	Declared DeclaredUnits
+	// Plan is every static fact the run reads about the packages' suites.
+	Plan *RunPlan
+}
+
+// plan is the overlay's plan; an overlay built without one (a test's
+// literal) gets it from its maps.
+func (o *OverlayResult) plan() *RunPlan {
+	if o.Plan != nil {
+		return o.Plan
+	}
+	return planFromMaps(o)
 }
 
 func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool, harvestSeeds bool) (*OverlayResult, func(), error) {
@@ -197,6 +208,7 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		FixtureDepSuites:               fixtureDepSuites,
 		SuiteRequiredSharedFixtureKeys: suiteReqKeys,
 		Declared:                       declared,
+		Plan:                           planRun(allResults),
 	}, cleanup, nil
 }
 
