@@ -446,8 +446,6 @@ func watchRunOnce(ctx context.Context, cfg ExecConfig, jsonMode, specMode, bench
 		CompileParallel: cfg.CompileParallel,
 		OutputMode:      mode,
 		Bench:           bench,
-		BenchesByPkg:    overlay.BenchesByPkg,
-		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,

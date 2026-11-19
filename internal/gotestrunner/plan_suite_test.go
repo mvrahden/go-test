@@ -120,9 +120,11 @@ func (s *RunPlanTestSuite) TestThePlanSaysWhatTheMapsSay(t *gotest.T, c *planCtx
 			overlay, cleanup, err := gotestrunner.GenerateOverlay(pkgs.Loaded, pkgs.Broken, false, true, false)
 			gotest.NoError(w, err)
 			c.cleanups = append(c.cleanups, cleanup)
+			results, _, err := gotestgen.GenerateFromLoadedOpts(pkgs.Loaded, false)
+			gotest.NoError(w, err)
 			w.It("plans every suite as the maps do", func(it *gotest.T) {
 				gotest.NotEmpty(it, overlay.Plan.All())
-				gotest.Equal(it, gotestrunner.ExportPlanFromMaps(overlay).Packages, overlay.Plan.Packages)
+				gotest.Equal(it, gotestrunner.ExportPlanFromResults(results).Packages, overlay.Plan.Packages)
 			})
 		})
 	}

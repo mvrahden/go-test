@@ -13,8 +13,8 @@ import (
 // the whole session: started before any target runs and torn down after the
 // last. Each target's processes, fuzz workers included, only hydrate them.
 type FuzzFixtures struct {
-	proc    *SharedFixtureProcess
-	reqKeys map[string]map[string][]string
+	proc *SharedFixtureProcess
+	plan *RunPlan
 }
 
 // StartFuzzFixtures starts the shared fixtures the suites of targets bind and
@@ -45,7 +45,7 @@ func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []Fu
 	// What failed is on stderr already, from the fixture process; the targets
 	// that read it say so in Env.
 	_ = proc.WaitSetup(ctx, setupTimeout)
-	return &FuzzFixtures{proc: proc, reqKeys: overlay.SuiteRequiredSharedFixtureKeys}, nil
+	return &FuzzFixtures{proc: proc, plan: plan}, nil
 }
 
 // Env returns the environment entries t's processes read their shared
@@ -55,7 +55,10 @@ func (f *FuzzFixtures) Env(t FuzzTarget) (env []string, neverRanReason string) {
 	if f == nil {
 		return nil, ""
 	}
-	keys := f.reqKeys[t.Package]["Test"+t.Suite]
+	var keys []string
+	if s := f.plan.Suite(t.Package, t.Suite); s != nil {
+		keys = s.SharedKeys
+	}
 	if len(keys) == 0 {
 		return nil, ""
 	}

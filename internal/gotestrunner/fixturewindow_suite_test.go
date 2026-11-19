@@ -52,32 +52,33 @@ func winKey(id string) string { return winFixturePkg + "." + id }
 //	pkg/a: AlphaSuite  → Alpha        MultiSuite → Alpha, Beta
 //	pkg/b: ChainSuite  → Chain (deliberately non-transitive: closure's job)
 //	       TimingSuite → Beta, Exclusive
-func windowOverlay() *gotestrunner.OverlayResult {
-	return &gotestrunner.OverlayResult{
-		SharedFixtures: []gotestgen.SharedFixtureInfo{
-			winFixture("Alpha"),
-			winFixture("Beta"),
-			winFixture("Chain", winKey("Alpha")),
-			winFixture("Orphan"),
-		},
-		SuitesByPkg: map[string][]string{
-			"pkg/a": {"AlphaSuite", "MultiSuite"},
-			"pkg/b": {"ChainSuite", "TimingSuite"},
-		},
-		ExclusiveSuitesByPkg: map[string]map[string]bool{
-			"pkg/b": {"TimingSuite": true},
-		},
-		SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{
-			"pkg/a": {
-				"TestAlphaSuite": {winKey("Alpha")},
-				"TestMultiSuite": {winKey("Alpha"), winKey("Beta")},
-			},
-			"pkg/b": {
-				"TestChainSuite":  {winKey("Chain")},
-				"TestTimingSuite": {winKey("Beta")},
-			},
-		},
+//
+// Each edit changes the suites, in that order, before the overlay is built.
+func windowOverlay(edits ...func(suites []gotestrunner.PlannedSuite)) *gotestrunner.OverlayResult {
+	suites := []gotestrunner.PlannedSuite{
+		{Package: "pkg/a", Name: "AlphaSuite", Tests: true, SharedKeys: []string{winKey("Alpha")}},
+		{Package: "pkg/a", Name: "MultiSuite", Tests: true, SharedKeys: []string{winKey("Alpha"), winKey("Beta")}},
+		{Package: "pkg/b", Name: "ChainSuite", Tests: true, SharedKeys: []string{winKey("Chain")}},
+		{Package: "pkg/b", Name: "TimingSuite", Tests: true, Exclusive: true, SharedKeys: []string{winKey("Beta")}},
 	}
+	for _, edit := range edits {
+		edit(suites)
+	}
+	return gotestrunner.ExportPlannedOverlay([]gotestgen.SharedFixtureInfo{
+		winFixture("Alpha"),
+		winFixture("Beta"),
+		winFixture("Chain", winKey("Alpha")),
+		winFixture("Orphan"),
+	}, suites...)
+}
+
+// defaultPhases is the bulk and the tail of o's default group under -run.
+func defaultPhases(o *gotestrunner.OverlayResult, run string) (bulk, tail map[string][]string) {
+	scopes := gotestrunner.ExportPlanSuiteScopes(o, run, "")
+	if len(scopes) == 0 || scopes[0].Group != "" {
+		return map[string][]string{}, map[string][]string{}
+	}
+	return scopes[0].Bulk, scopes[0].Tail
 }
 
 func fixtureIdentifiers(fixtures []gotestgen.SharedFixtureInfo) []string {
@@ -138,9 +139,10 @@ func (s *FixtureWindowTestSuite) TestAliveSets(t *gotest.T, _ *windowCtx) {
 	})
 
 	t.When("the skip filter names every fuzz wrapper of a suite without a Test function", func(w *gotest.T) {
-		fuzzOnly := windowOverlay()
-		fuzzOnly.FuzzFuncsByPkg = map[string]map[string][]string{"pkg/b": {"ChainSuite": {"FuzzChainSuite_X"}}}
-		fuzzOnly.TestlessSuitesByPkg = map[string]map[string]bool{"pkg/b": {"ChainSuite": true}}
+		fuzzOnly := windowOverlay(func(suites []gotestrunner.PlannedSuite) {
+			suites[2].Testless = true
+			suites[2].FuzzFuncs = []gotestrunner.PlannedFuzz{{Func: "FuzzChainSuite_X"}}
+		})
 		win := gotestrunner.ExportPlanFixtureWindows(fuzzOnly, "", "^FuzzChainSuite_X$")
 
 		w.It("drops that suite, so its fixture does not start", func(it *gotest.T) {
@@ -169,7 +171,7 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	overlay := windowOverlay()
 
 	t.When("splitting the dispatch plan into phases", func(w *gotest.T) {
-		bulk, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, nil, "", "")
+		bulk, tail := defaultPhases(overlay, "")
 
 		w.It("routes exclusive suites to the tail and the rest to the bulk", func(it *gotest.T) {
 			gotest.ElementsMatch(it, []string{"TestAlphaSuite", "TestMultiSuite"}, bulk["pkg/a"])
@@ -179,10 +181,10 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 	})
 
 	t.When("a phase has no suites", func(w *gotest.T) {
-		_, tail := gotestrunner.ExportPlanSuitePhases(overlay.SuitesByPkg, overlay.ExclusiveSuitesByPkg, nil, nil, "TestAlphaSuite", "")
+		_, tail := defaultPhases(overlay, "TestAlphaSuite")
 
 		w.It("yields an empty alive set", func(it *gotest.T) {
-			gotest.Empty(it, gotestrunner.ExportAliveFixtureKeys(tail, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures))
+			gotest.Empty(it, gotestrunner.ExportAliveFixtureKeys(overlay, tail))
 		})
 	})
 }
@@ -191,12 +193,10 @@ func (s *FixtureWindowTestSuite) TestPhasePlanning(t *gotest.T, _ *windowCtx) {
 // in group load: Alpha is read by the default group and by both others,
 // Beta only by e2e and the default group's exclusive suite.
 func groupOverlay() *gotestrunner.OverlayResult {
-	o := windowOverlay()
-	o.GroupsByPkg = map[string]map[string]string{
-		"pkg/a": {"MultiSuite": "e2e"},
-		"pkg/b": {"ChainSuite": "load"},
-	}
-	return o
+	return windowOverlay(func(suites []gotestrunner.PlannedSuite) {
+		suites[1].Group = "e2e"
+		suites[2].Group = "load"
+	})
 }
 
 func (s *FixtureWindowTestSuite) TestGroupScopes(t *gotest.T, _ *windowCtx) {
@@ -324,12 +324,11 @@ func (s *FixtureWindowTestSuite) TestRealOverlayFiltering(t *gotest.T, ctx *wind
 //
 // Orphan stays required by nobody.
 func benchOverlay() *gotestrunner.OverlayResult {
-	overlay := windowOverlay()
-	overlay.BenchesByPkg = map[string][]string{
-		"pkg/a": {"AlphaSuite", "MultiSuite"},
-		"pkg/b": {"ChainSuite"},
-	}
-	return overlay
+	return windowOverlay(func(suites []gotestrunner.PlannedSuite) {
+		for i := range suites[:3] {
+			suites[i].Bench = true
+		}
+	})
 }
 
 func (s *FixtureWindowTestSuite) TestBenchWindowPlanning(t *gotest.T, _ *windowCtx) {
@@ -392,7 +391,7 @@ func (s *FixtureWindowTestSuite) TestBenchSlotPlan(t *gotest.T, _ *windowCtx) {
 	}
 
 	t.When("computing per-slot windows", func(w *gotest.T) {
-		needs, laterNeeds := gotestrunner.ExportBenchSlotPlan(targets, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+		needs, laterNeeds := gotestrunner.ExportBenchSlotPlan(overlay, targets)
 
 		w.It("resolves each slot's DAG-closed needs", func(it *gotest.T) {
 			gotest.Equal(it, map[string]bool{winKey("Alpha"): true}, needs[0])
@@ -438,28 +437,16 @@ func dependencyOrderViolations(fixtures []gotestgen.SharedFixtureInfo) []string 
 //	       BenchFree (bench, first slot) → nothing
 //	       BenchApp  (bench, later slot) → App
 func depOverlay() *gotestrunner.OverlayResult {
-	return &gotestrunner.OverlayResult{
-		SharedFixtures: []gotestgen.SharedFixtureInfo{
-			winFixture("App", winKey("DB")),
-			winFixture("DB"),
-		},
-		SuitesByPkg: map[string][]string{
-			"pkg/a": {"BulkSuite", "SharedSuite", "TailSuite"},
-		},
-		ExclusiveSuitesByPkg: map[string]map[string]bool{
-			"pkg/a": {"TailSuite": true},
-		},
-		BenchesByPkg: map[string][]string{
-			"pkg/a": {"BenchApp", "ABenchFree"},
-		},
-		SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{
-			"pkg/a": {
-				"TestSharedSuite": {winKey("DB")},
-				"TestTailSuite":   {winKey("App"), winKey("DB")},
-				"TestBenchApp":    {winKey("App"), winKey("DB")},
-			},
-		},
-	}
+	return gotestrunner.ExportPlannedOverlay([]gotestgen.SharedFixtureInfo{
+		winFixture("App", winKey("DB")),
+		winFixture("DB"),
+	},
+		gotestrunner.PlannedSuite{Package: "pkg/a", Name: "BulkSuite", Tests: true},
+		gotestrunner.PlannedSuite{Package: "pkg/a", Name: "SharedSuite", Tests: true, SharedKeys: []string{winKey("DB")}},
+		gotestrunner.PlannedSuite{Package: "pkg/a", Name: "TailSuite", Tests: true, Exclusive: true, SharedKeys: []string{winKey("App"), winKey("DB")}},
+		gotestrunner.PlannedSuite{Package: "pkg/a", Name: "BenchApp", Bench: true, SharedKeys: []string{winKey("App"), winKey("DB")}},
+		gotestrunner.PlannedSuite{Package: "pkg/a", Name: "ABenchFree", Bench: true},
+	)
 }
 
 func (s *FixtureWindowTestSuite) TestDependencyOrder(t *gotest.T, ctx *windowCtx) {

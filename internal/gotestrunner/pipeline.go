@@ -74,8 +74,6 @@ type PipelineConfig struct {
 	CompileParallel int
 	OutputMode      RunMode
 	Bench           bool
-	BenchesByPkg    map[string][]string
-	FuzzFuncsByPkg  map[string]map[string][]string
 	// GlobalTimeout names the deadline in the failure of a run that outlives
 	// it; the deadline itself arrives on ctx.
 	GlobalTimeout time.Duration
@@ -115,8 +113,9 @@ func bookNoSuites(c *OutputCollector, overlay *OverlayResult, noSuite, order []s
 	}
 	noSuite = slices.Clone(noSuite)
 	slices.SortStableFunc(noSuite, func(a, b string) int { return rank[a] - rank[b] })
+	skipped := overlay.plan().SkippedSuites()
 	for _, pkg := range noSuite {
-		c.RecordNoSuite(pkg, len(overlay.SkippedSuitesByPkg[pkg]) > 0)
+		c.RecordNoSuite(pkg, len(skipped[pkg]) > 0)
 	}
 }
 
@@ -309,7 +308,7 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 	// Only when seed corpora actually replay in this run: a stale entry is
 	// what would fail, and the engine's own error names the wrapper, not the
 	// field that moved.
-	if len(cfg.FuzzFuncsByPkg) > 0 {
+	if !cfg.Bench && overlay.plan().HasFuzz() {
 		ReportStaleFuzzCorpora(os.Stderr, overlay)
 	}
 
@@ -434,7 +433,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	win := planBenchFixtureWindows(plan, overlay.SharedFixtures, sel)
 	win.reportSkipped()
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
-	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	collector.StdlibTestsByPkg = plan.StdlibTests()
 	collector.bench = true
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	prep := prepareBenchRun(ctx, overlay, win.Fixtures, pf.BuildFlags, resolvedSetupTimeout, cfg.CompileParallel)
@@ -491,7 +490,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	noSuite := slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
 	order := flushOrder(cfg, overlay, noSuite)
 	collector.SetFlushOrder(order)
-	collector.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
+	collector.EmitSkippedSuites(plan.SkippedSuites())
 	bookBuildFailures(collector, overlay.BrokenPackages, prep.compileFailures)
 	bookNoSuites(collector, overlay, noSuite, order)
 	// A package that built but runs no benchmark passes, as under go test

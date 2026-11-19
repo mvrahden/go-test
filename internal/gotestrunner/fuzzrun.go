@@ -1,7 +1,7 @@
 package gotestrunner
 
 // Package note on fuzzing: this file deliberately does NOT reuse the
-// compiled suite binaries produced by BuildSuiteTargets/CompilePackagesStream.
+// compiled suite binaries produced by CompilePackagesStream.
 // Native Go fuzz instrumentation (the counters `go test -fuzz` relies on to
 // drive the mutation engine) is woven in by cmd/go at `go test` invocation
 // time, only when the `-fuzz` flag is present on that invocation. A binary

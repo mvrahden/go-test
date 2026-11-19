@@ -81,22 +81,26 @@ func CheckFuzzCorpus(dir, funcName string, want []string) ([]CorpusMismatch, err
 // warning, not a verdict: the run still happens, and the engine's own error
 // still ends it — this only says which entry it will be and why.
 func ReportStaleFuzzCorpora(w io.Writer, overlay *OverlayResult) {
-	pkgs := make([]string, 0, len(overlay.FuzzParamsByFunc))
-	for pkg := range overlay.FuzzParamsByFunc {
-		pkgs = append(pkgs, pkg)
+	type shaped struct {
+		pkg, dir string
+		fuzz     *PlannedFuzz
 	}
-	sort.Strings(pkgs)
-
-	for _, pkg := range pkgs {
-		byFunc := overlay.FuzzParamsByFunc[pkg]
-		funcs := make([]string, 0, len(byFunc))
-		for fn := range byFunc {
-			funcs = append(funcs, fn)
+	var all []shaped
+	for _, s := range overlay.plan().All() {
+		for i := range s.FuzzFuncs {
+			if len(s.FuzzFuncs[i].Params) > 0 {
+				all = append(all, shaped{s.Package, s.Dir, &s.FuzzFuncs[i]})
+			}
 		}
-		sort.Strings(funcs)
-		for _, fn := range funcs {
-			reportStaleCorpus(w, overlay.DirsByPkg[pkg], fn, byFunc[fn])
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].pkg != all[j].pkg {
+			return all[i].pkg < all[j].pkg
 		}
+		return all[i].fuzz.Func < all[j].fuzz.Func
+	})
+	for _, f := range all {
+		reportStaleCorpus(w, f.dir, f.fuzz.Func, f.fuzz.Params)
 	}
 }
 
@@ -105,8 +109,13 @@ func ReportStaleFuzzCorpora(w io.Writer, overlay *OverlayResult) {
 // entry belonging to some other target is not reported as if it were about to
 // cost this run its budget.
 func ReportStaleFuzzCorporaFor(w io.Writer, overlay *OverlayResult, targets []FuzzTarget) {
+	plan := overlay.plan()
 	for i := range targets {
-		reportStaleCorpus(w, targets[i].Dir, targets[i].Func, overlay.FuzzParamsByFunc[targets[i].Package][targets[i].Func])
+		var params []string
+		if f := plan.Fuzz(targets[i].Package, targets[i].Func); f != nil {
+			params = f.Params
+		}
+		reportStaleCorpus(w, targets[i].Dir, targets[i].Func, params)
 	}
 }
 

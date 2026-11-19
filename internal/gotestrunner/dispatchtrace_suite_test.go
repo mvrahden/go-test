@@ -65,7 +65,7 @@ func (c *traceCtx) run(t *gotest.T, pkg string, goTestArgs ...string) (string, i
 	c.cleanup = cleanup
 	result, err := gotestrunner.RunPipeline(t.Context(), gotestrunner.PipelineConfig{
 		GoTestArgs: goTestArgs, OutputMode: gotestrunner.RunCaptureJSON, Parallel: 8,
-		PackageOrder: pkgs.Order, FuzzFuncsByPkg: overlay.FuzzFuncsByPkg,
+		PackageOrder: pkgs.Order,
 	}, overlay)
 	gotest.NoError(t, err)
 	c.mu.Lock()

@@ -115,77 +115,6 @@ func (p *RunPlan) index() {
 	}
 }
 
-// planFromMaps rebuilds a plan from the per-package maps.
-func planFromMaps(o *OverlayResult) *RunPlan {
-	harness := map[string]bool{}
-	for _, pkg := range o.SuitePackages {
-		harness[pkg] = true
-	}
-	paths := slices.Concat(o.SuitePackages, o.NoSuitePackages)
-	if len(paths) == 0 {
-		set := map[string]bool{}
-		addKeys(set, o.SuitesByPkg)
-		addKeys(set, o.BenchesByPkg)
-		addKeys(set, o.DirsByPkg)
-		addKeys(set, o.StdlibTestsByPkg)
-		addKeys(set, o.SkippedSuitesByPkg)
-		addKeys(set, o.FuzzFuncsByPkg)
-		addKeys(set, o.GroupsByPkg)
-		addKeys(set, o.ExclusiveSuitesByPkg)
-		addKeys(set, o.TestlessSuitesByPkg)
-		addKeys(set, o.SuiteRequiredSharedFixtureKeys)
-		paths = slices.Sorted(maps.Keys(set))
-	}
-	p := &RunPlan{Packages: make([]PlannedPackage, 0, len(paths))}
-	for _, path := range paths {
-		pkg := PlannedPackage{
-			Path:        path,
-			Dir:         o.DirsByPkg[path],
-			Harness:     harness[path],
-			StdlibTests: o.StdlibTestsByPkg[path],
-			Skipped:     o.SkippedSuitesByPkg[path],
-		}
-		benches := o.BenchesByPkg[path]
-		suite := func(name string, tests bool) PlannedSuite {
-			s := PlannedSuite{
-				Package:    path,
-				Dir:        o.DirsByPkg[path],
-				Name:       name,
-				Tests:      tests,
-				Bench:      slices.Contains(benches, name),
-				SharedKeys: sortedCopy(o.SuiteRequiredSharedFixtureKeys[path]["Test"+name]),
-			}
-			if tests {
-				s.Testless = o.TestlessSuitesByPkg[path][name]
-				s.Exclusive = o.ExclusiveSuitesByPkg[path][name]
-				s.Group = o.GroupsByPkg[path][name]
-			}
-			for _, fn := range o.FuzzFuncsByPkg[path][name] {
-				s.FuzzFuncs = append(s.FuzzFuncs, PlannedFuzz{Func: fn, Params: o.FuzzParamsByFunc[path][fn], Decoded: o.FuzzDecodedByFunc[path][fn]})
-			}
-			return s
-		}
-		suites := o.SuitesByPkg[path]
-		for _, name := range suites {
-			pkg.Suites = append(pkg.Suites, suite(name, true))
-		}
-		for _, name := range benches {
-			if !slices.Contains(suites, name) {
-				pkg.Suites = append(pkg.Suites, suite(name, false))
-			}
-		}
-		p.Packages = append(p.Packages, pkg)
-	}
-	p.index()
-	return p
-}
-
-func addKeys[V any](set map[string]bool, m map[string]V) {
-	for k := range m {
-		set[k] = true
-	}
-}
-
 // Package returns the planned package at path; nil when the plan holds none.
 func (p *RunPlan) Package(path string) *PlannedPackage {
 	if p == nil {
@@ -253,9 +182,29 @@ func (p *RunPlan) StdlibTests() map[string]int {
 	return out
 }
 
+// SkippedSuites lists, per package that has any, the suites focus or X_
+// left out.
+func (p *RunPlan) SkippedSuites() map[string][]string {
+	out := map[string][]string{}
+	if p == nil {
+		return out
+	}
+	for i := range p.Packages {
+		if len(p.Packages[i].Skipped) > 0 {
+			out[p.Packages[i].Path] = p.Packages[i].Skipped
+		}
+	}
+	return out
+}
+
 // HasBenchmarks reports whether any suite has an effective benchmark.
 func (p *RunPlan) HasBenchmarks() bool {
 	return slices.ContainsFunc(p.All(), func(s *PlannedSuite) bool { return s.Bench })
+}
+
+// HasFuzz reports whether any suite has a generated fuzz wrapper.
+func (p *RunPlan) HasFuzz() bool {
+	return slices.ContainsFunc(p.All(), func(s *PlannedSuite) bool { return len(s.FuzzFuncs) > 0 })
 }
 
 // selection is what a run's flags leave of the plan.

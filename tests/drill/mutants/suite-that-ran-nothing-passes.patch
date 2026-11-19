@@ -5,7 +5,7 @@ Clause: when a suite's binary runs none of its tests in a text run without a pat
 @@ -218,7 +218,6 @@
  	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
  	r.collector = c
- 	c.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+ 	c.StdlibTestsByPkg = r.plan.StdlibTests()
 -	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags)
  	// The flush order holds every package the collector will report on.
  	r.noSuite = slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
