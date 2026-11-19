@@ -24,7 +24,8 @@ func (s *DependencyAllowlistTestSuite) SuiteConfig() gotest.SuiteConfig {
 // three packages a harness or a suite imports.
 var linked = []string{
 	module + "/internal/callsite", module + "/internal/carry", module + "/internal/control",
-	module + "/internal/protocol", module + "/internal/runstate", module + "/internal/schedinfo",
+	module + "/internal/protocol", module + "/internal/protocol/sharedwire", module + "/internal/runstate",
+	module + "/internal/schedinfo",
 	module + "/internal/setupwaits", module + "/internal/unidiff",
 	module + "/pkg/gotest", module + "/pkg/gotest/internal/assert", module + "/pkg/gotest/internal/snapfile",
 	module + "/pkg/gotestfuzz", module + "/pkg/gotestruntime",
