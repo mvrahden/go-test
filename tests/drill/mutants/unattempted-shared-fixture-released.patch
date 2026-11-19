@@ -1,14 +1,14 @@
 Expect: cancelbeforesetup: markers \[.*later\.AfterAll.*\], want \[hold\.BeforeAll hold\.AfterAll\]
 Judge: ./tests/canary CanaryTestSuite/TestASetupCancelledBeforeBeforeAllReleasesNothing
 Clause: when a run is interrupted while a shared fixture's dependency sets up, before the fixture's own BeforeAll runs → runs no AfterAll for the fixture, and the dependency's AfterAll
---- a/internal/gotestgen/static/sharedfixture.go.tpl
-+++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -326,7 +326,7 @@ func main() {
+--- a/pkg/gotestruntime/sharedprogram.go
++++ b/pkg/gotestruntime/sharedprogram.go
+@@ -495,7 +495,7 @@
  			}
- {{- end }}
- 			ƒstateMu.Lock()
--			ƒskip := ƒtorn[{{ $f.Index }}] || !ƒattempted[{{ $f.Index }}]
-+			ƒskip := ƒtorn[{{ $f.Index }}]
- 			ƒtorn[{{ $f.Index }}] = true
- 			ƒstateMu.Unlock()
- 			defer ƒlife.Released({{ $f.Index }})
+ 		}
+ 		r.stateMu.Lock()
+-		skip := r.torn[i] || !r.attempted[i]
++		skip := r.torn[i]
+ 		r.torn[i] = true
+ 		r.stateMu.Unlock()
+ 		defer r.env.life.Released(i)

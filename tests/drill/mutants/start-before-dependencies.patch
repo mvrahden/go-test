@@ -1,14 +1,14 @@
 Expect: dagrelease: a fixture started before its dependency was up
 Judge: ./tests/canary CanaryDagTestSuite/TestSharedFixturesStartAndReleaseInDependencyOrder
 Clause: when a shared fixture started for the exclusive tail depends on a shared fixture only the tail needs → both come up, the dependency first, and the suite reading them passes
---- a/internal/gotestgen/static/sharedfixture.go.tpl
-+++ b/internal/gotestgen/static/sharedfixture.go.tpl
-@@ -224,7 +224,7 @@ func main() {
- 		ƒcfg_{{ $f.VarName }} = gotestruntime.WithFixtureDefaults(ƒcfg)
- {{- end }}
- {{- range $dep := $f.DependsOnVars }}
--		<-ƒdone_{{ $dep }}
-+		_ = ƒdone_{{ $dep }}
- {{- end }}
- {{- range $idx := $f.DependsOnIndices }}
- 		if ƒerrs[{{ $idx }}] != nil {
+--- a/pkg/gotestruntime/sharedprogram.go
++++ b/pkg/gotestruntime/sharedprogram.go
+@@ -413,7 +413,7 @@
+ 		r.cfg[i] = WithFixtureDefaults(cfg)
+ 	}
+ 	for _, d := range r.dependencies[i] {
+-		<-r.done[d]
++		_ = r.done[d]
+ 	}
+ 	for _, d := range r.dependencies[i] {
+ 		if r.errs[d] != nil {
