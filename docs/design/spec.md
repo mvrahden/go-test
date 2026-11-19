@@ -133,7 +133,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | Flag | Effect |
 |---|---|
 | `--debug` | Keep the run's overlay and work dir for inspection; a later run removes them after 7 days |
-| `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only |
+| `--ci` | CI mode: fail on `F_` prefixes, snapshot read-only; on by itself where `CI` is set, opt out with `GOTEST_CI=0` |
 | `--no-cache` | Bypass the test binary cache and link afresh (generation is not cached) |
 | `--spec` | Render the spec view instead of the default output (default and watch modes) |
 | `--update-snapshots` | Regenerate snapshot files |
@@ -149,7 +149,7 @@ gotest [subcommand] [packages...] [go-test-flags...] [--gotest-flags...]
 | `--group=<name>` | Run only the suites of this `ExclusiveGroup` (repeatable; default runs, `spec`, `summary`); a name no suite declares exits 2 before any build |
 | `--skip-group=<name>` | Leave the suites of this `ExclusiveGroup` out (repeatable) |
 | `--input=<path>` | Replay a saved `go test -json` stream in `spec`/`summary` (`-` reads stdin); exit 2 when it holds no test events, a package or failed build has no verdict, or a package failed to build |
-| `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back, and a text run refuses it (exit 2) |
+| `--events-file=<path>` | With `-json`, or in `summary`, also write the run's `go test -json` event stream to the file as `-json` prints it (a suite's events when its process ends), making its directories and replacing a file there; `summary --input` reads it back; a text run refuses it, and an unwritable path exits 2 before anything is built |
 | `--control=stdin` | Read `stop` and `force` lines on standard input, a first and a second interrupt, counted with the signals, the input's end a stop when none is under way; taken by every command that stops on an interrupt, and without it standard input is never read |
 | `--github` | Emit GitHub annotations and step summary (auto-enabled in GitHub Actions) |
 | `--coverage=<path>` | Coverage profile path for the `summary` subcommand |

@@ -345,7 +345,7 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 | `ExclusiveGroup` | `string` | ExclusiveGroup names the group the suite runs in: the suites of a group run in parallel with each other and never beside a suite outside it. |
 <!-- gotest:end -->
 
-An `Exclusive` suite is dispatched after every non-exclusive suite of its group; go test's `-p N` separately caps how many suite processes run at once.
+`Exclusive` is for suites whose verdicts measure wall-clock behavior or contend for resources: such a suite is dispatched after every non-exclusive suite of its group; go test's `-p N` separately caps how many suite processes run at once.
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 `ExclusiveGroup: "e2e"` is for suites that must not share the machine with the rest of the run but may share it with each other, such as E2E suites against one stack.

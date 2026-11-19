@@ -660,12 +660,20 @@ Functional API with compile-time type safety: an assertion with a type parameter
 | `gotest.Consistently(t, waitFor, tick time.Duration, fn func(poll *gotest.R))` | Asserts that fn passes on every poll for the entire waitFor duration. |
 <!-- gotest:end -->
 
+`Nil` and `NotNil` are for non-comparable nilables (slices, maps, funcs) and fail a type guard on any other type; `Zero` and `NotZero` cover comparable ones, a nil pointer or interface included.
+`JSONEq` accepts a string, `[]byte`, `json.RawMessage`, `io.Reader` or any marshalable value.
 Every assertion but `Eventually`, `Consistently` and `MatchSnapshot` also takes trailing message arguments:
 
 ```go
 gotest.Fail(t, "unreachable")                // immediate unconditional failure
-gotest.ErrorAs[*MyError](t, err)             // returns the matched error
+gotest.ErrorAs[*MyError](t, err, "loading %s", path) // returns the matched error
+```
+
+The polls take a callback instead, and `gotest.Go` is no assertion:
+
+```go
 gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) { ... })
+gotest.Consistently(t, 500*time.Millisecond, 50*time.Millisecond, func(poll *gotest.R) { ... })
 
 // Panic-safe goroutines
 wait := gotest.Go(t, func() { ... })         // captures a goroutine panic and re-raises it on the test's goroutine
