@@ -21,22 +21,18 @@ type fixtureLedger struct {
 	done   map[[2]string]bool
 }
 
-// newFixtureLedger counts the needs of the planned suites, package → test
-// function names, as planSuitePhases returns them.
-func newFixtureLedger(planned []map[string][]string, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) *fixtureLedger {
+// newFixtureLedger counts the needs of the planned suites. Done and
+// DoneExcept name a suite by its test function name.
+func newFixtureLedger(planned []*PlannedSuite, fixtures []gotestgen.SharedFixtureInfo) *fixtureLedger {
 	l := &fixtureLedger{needs: map[string]map[string][]string{}, counts: map[string]int{}, done: map[[2]string]bool{}}
-	for _, phase := range planned {
-		for pkg, suites := range phase {
-			for _, suite := range suites {
-				keys := sortedKeys(aliveFixtureKeys(map[string][]string{pkg: {suite}}, reqKeys, fixtures))
-				if l.needs[pkg] == nil {
-					l.needs[pkg] = map[string][]string{}
-				}
-				l.needs[pkg][suite] = keys
-				for _, key := range keys {
-					l.counts[key]++
-				}
-			}
+	for _, s := range planned {
+		keys := sortedKeys(aliveFixtureKeys([]*PlannedSuite{s}, fixtures))
+		if l.needs[s.Package] == nil {
+			l.needs[s.Package] = map[string][]string{}
+		}
+		l.needs[s.Package][s.TestFunc()] = keys
+		for _, key := range keys {
+			l.counts[key]++
 		}
 	}
 	return l

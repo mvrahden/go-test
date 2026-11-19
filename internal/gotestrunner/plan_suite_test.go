@@ -67,6 +67,31 @@ func (s *RunPlanTestSuite) TestEveryFactHasOnePlace(t *gotest.T, _ *planCtx) {
 	gotest.True(t, plan.Fuzz("example.com/a", "FuzzSeedsTestSuite_FuzzX").Decoded)
 }
 
+func (s *RunPlanTestSuite) TestOnePredicateSelectsATestRun(t *gotest.T, _ *planCtx) {
+	plan := gotestrunner.ExportPlanRun(gotestgen.GenerateResults{{
+		PkgPath: "example.com/a", PTest: []byte("x"),
+		SuiteNames: []string{"AlphaTestSuite", "BetaTestSuite", "SeedsTestSuite"}, TestlessSuiteNames: []string{"SeedsTestSuite"},
+		BenchSuiteNames: []string{"OnlyBenchTestSuite"}, GroupBySuite: map[string]string{"BetaTestSuite": "e2e"},
+		FuzzFuncsBySuite: map[string][]string{"SeedsTestSuite": {"FuzzSeedsTestSuite_FuzzX"}},
+	}})
+	for sub, row := range gotest.Each(t, []struct {
+		Desc             string
+		run, skip        string
+		only, skipGroups []string
+		want             []string
+	}{
+		{Desc: "no filter: every suite with a test run, never a bench-only one", want: []string{"AlphaTestSuite", "BetaTestSuite", "SeedsTestSuite"}},
+		{Desc: "-run enters one suite", run: "TestAlpha", want: []string{"AlphaTestSuite"}},
+		{Desc: "-run naming a fuzz wrapper selects its testless suite", run: "FuzzSeedsTestSuite_FuzzX", want: []string{"SeedsTestSuite"}},
+		{Desc: "-run naming the Test function a testless suite lacks selects nothing", run: "^TestSeedsTestSuite$", want: nil},
+		{Desc: "-skip drops a suite whole", skip: "TestBetaTestSuite", want: []string{"AlphaTestSuite", "SeedsTestSuite"}},
+		{Desc: "--group keeps its group", only: []string{"e2e"}, want: []string{"BetaTestSuite"}},
+		{Desc: "--skip-group leaves the rest", skipGroups: []string{"e2e"}, want: []string{"AlphaTestSuite", "SeedsTestSuite"}},
+	}) {
+		gotest.Equal(sub, row.want, gotestrunner.ExportTestRun(plan, row.run, row.skip, row.only, row.skipGroups))
+	}
+}
+
 func (s *RunPlanTestSuite) TestThePlanSaysWhatTheMapsSay(t *gotest.T, c *planCtx) {
 	for _, dir := range []string{"groups", "groupfixtures", "fuzzing", "benching", "fixataildep"} {
 		t.When("the package is "+dir, func(w *gotest.T) {

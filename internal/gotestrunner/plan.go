@@ -3,6 +3,7 @@ package gotestrunner
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 )
@@ -255,4 +256,73 @@ func (p *RunPlan) StdlibTests() map[string]int {
 // HasBenchmarks reports whether any suite has an effective benchmark.
 func (p *RunPlan) HasBenchmarks() bool {
 	return slices.ContainsFunc(p.All(), func(s *PlannedSuite) bool { return s.Bench })
+}
+
+// selection is what a run's flags leave of the plan.
+type selection struct {
+	Run, Skip string // -run and -skip
+	Bench     string // -bench, for a bench run
+	Groups    groupSelection
+}
+
+// testRun lists the suites a test run dispatches: those with a test run,
+// in a selected group, that -run enters and -skip does not drop whole.
+func (p *RunPlan) testRun(sel selection) []*PlannedSuite { //nolint:gocritic // hugeParam: once per run
+	var out []*PlannedSuite
+	for _, s := range p.All() {
+		if !s.Tests || !sel.Groups.selects(s.Group) {
+			continue
+		}
+		funcs := suiteFuncs(s.Name, s.Testless, s.FuzzNames())
+		if selectsSuite(sel.Run, funcs) && !skipsSuite(sel.Skip, funcs) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// benchRun lists the suites a bench run dispatches, by (Package, Name).
+func (p *RunPlan) benchRun(sel selection) []*PlannedSuite { //nolint:gocritic // hugeParam: once per run
+	var out []*PlannedSuite
+	for _, s := range p.All() {
+		if s.Bench && selectsBench(sel.Run, sel.Bench, sel.Skip, s.BenchFunc()) {
+			out = append(out, s)
+		}
+	}
+	slices.SortFunc(out, func(a, b *PlannedSuite) int {
+		if a.Package != b.Package {
+			return strings.Compare(a.Package, b.Package)
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	return out
+}
+
+// Groups lists the named groups the plan's suites declare, sorted.
+func (p *RunPlan) Groups() []string {
+	set := map[string]bool{}
+	for _, s := range p.All() {
+		if s.Tests && s.Group != "" {
+			set[s.Group] = true
+		}
+	}
+	return slices.Sorted(maps.Keys(set))
+}
+
+// byPackage groups suites by package, each package's in the given order.
+func byPackage(suites []*PlannedSuite) map[string][]*PlannedSuite {
+	out := map[string][]*PlannedSuite{}
+	for _, s := range suites {
+		out[s.Package] = append(out[s.Package], s)
+	}
+	return out
+}
+
+// flatten lists the suites of a package-keyed phase, packages sorted.
+func flatten(phase map[string][]*PlannedSuite) []*PlannedSuite {
+	var out []*PlannedSuite
+	for _, pkg := range slices.Sorted(maps.Keys(phase)) {
+		out = append(out, phase[pkg]...)
+	}
+	return out
 }
