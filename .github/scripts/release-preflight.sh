@@ -9,7 +9,8 @@
 #                                                    tag exists and points at sha
 #
 # Both modes require: vX.Y.Z above every other release tag, not below the
-# runtime and extension floors of the commit, a version the module proxy has
+# runtime and extension floors of the commit, the minor version the commit's
+# skill describes, a version the module proxy has
 # not recorded at another commit, a commit on origin/main, and green gate runs
 # for it.
 set -euo pipefail
@@ -48,7 +49,7 @@ gate_path() {
 		;;
 	contract.yml)
 		case $f in
-		cmd/* | internal/* | pkg/* | go.mod | go.sum | vscode-gotest/* | .github/workflows/contract.yml | \
+		cmd/* | internal/* | pkg/* | go.mod | go.sum | vscode-gotest/* | examples/* | skills/* | .github/workflows/contract.yml | \
 		.github/actions/setup-go/* | .github/actions/save-go-cache/* | .github/gate.env) return 0 ;;
 		*) return 1 ;;
 		esac
@@ -106,7 +107,29 @@ below "$version" "$cli_floor" &&
 	fail "$version is below MIN_CLI_VERSION $cli_floor at ${sha:0:12}: the extension would ask for a CLI no release provides; release $cli_floor or later"
 ok "$version is not below MIN_CLI_VERSION $cli_floor"
 
-# 5. The proxy. Before tagging it must not list the version, and only @v/list
+# 5. The skill ships with the release, so it describes the release's minor
+# version.
+skill=skills/writing-gotest-tests/SKILL.md
+minor=${version%.*}
+described=$(git show "$sha:$skill" 2>/dev/null | sed -n 's/.*describes \**\(v[0-9][0-9]*\.[0-9][0-9]*\)\**.*/\1/p' | head -n 1) || true
+[ -n "$described" ] ||
+	fail "cannot read the version $skill describes at ${sha:0:12}: it needs a line such as \"This skill describes **$minor**.\""
+[ "$described" = "$minor" ] ||
+	fail "$version is not the version $skill describes ($described) at ${sha:0:12}: update its \"This skill describes\" line to $minor"
+ok "$skill describes $minor"
+
+# The golangci plugin, where the commit has it, is tagged with this release
+# and must build against it.
+plugin=pkg/lint/golangci/go.mod
+if git cat-file -e "$sha:$plugin" 2>/dev/null; then
+	required=$(git show "$sha:$plugin" | awk -v m="$module" '$1 == m { print $2; exit } $1 == "require" && $2 == m { print $3; exit }')
+	[ -n "$required" ] || fail "$plugin at ${sha:0:12} does not require $module; require $module $version"
+	[ "$required" = "$version" ] ||
+		fail "$plugin requires $module $required, not $version: the plugin is tagged with this release and must build against it; set its require to $version"
+	ok "$plugin requires $module $version"
+fi
+
+# 6. The proxy. Before tagging it must not list the version, and only @v/list
 # is asked: asking for the version itself can make the proxy fetch it or
 # remember it as missing. Once the tag exists the proxy may record it any
 # moment, so a listed version must be recorded at sha.
@@ -124,11 +147,11 @@ else
 	fail "proxy.golang.org already lists $version; its checksum is fixed, so pick the next version"
 fi
 
-# 6. The commit is on main.
+# 7. The commit is on main.
 git merge-base --is-ancestor "$sha" origin/main || fail "$sha is not on origin/main"
 ok "$sha is on origin/main"
 
-# 7. Each required workflow ran green on main for sha, or, where its path
+# 8. Each required workflow ran green on main for sha, or, where its path
 # filter skipped sha, on the nearest ancestor with no gate change since.
 run_of() { # workflow commit -> "status conclusion url" of its latest push run, or nothing
 	gh api "repos/$repo/actions/workflows/$1/runs?head_sha=$2&event=push&branch=main&per_page=1" \

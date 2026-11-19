@@ -479,9 +479,10 @@ type raceCounts struct {
 	firstErr                                            error
 }
 
-// raceClaimsAndSweeps runs claimers and sweepers of one build for two
-// seconds. Each claimer is a fresh process that builds when nothing is
-// published, keeps its copy a moment, and exits.
+// raceClaimsAndSweeps runs claimers and sweepers of one build for at least
+// two seconds, until a sweep has taken the build. Each claimer is a fresh
+// process that builds when nothing is published, keeps its copy a moment,
+// and exits.
 func raceClaimsAndSweeps(t *gotest.T) raceCounts {
 	tmp := t.TempDir()
 	// Fake pids, far above any real one, live while their goroutine says so.
@@ -554,7 +555,13 @@ func raceClaimsAndSweeps(t *gotest.T) raceCounts {
 			}
 		})
 	}
+	// Race until a sweep took the build between two claims; a fixed window
+	// holds a single build on a machine whose sleeps are coarse.
 	time.Sleep(2 * time.Second)
+	deadline := time.Now().Add(testkit.Scaled(18 * time.Second))
+	for time.Now().Before(deadline) && (n.builds.Load() < 2 || n.claims.Load() <= n.builds.Load()) {
+		time.Sleep(50 * time.Millisecond)
+	}
 	stop.Store(true)
 	wg.Wait()
 	r := raceCounts{n.claims.Load(), n.builds.Load(), n.overlaps.Load(), n.failed.Load(), n.partial.Load(), n.vanished.Load(), nil}

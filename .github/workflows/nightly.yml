@@ -1,0 +1,318 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/nightly.yml
+      - .github/scripts/mixed-verdicts.sh
+      - .github/scripts/nightly-report.sh
+      - .github/scripts/coverage-total.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-key: test
+      - name: Test (suites)
+        id: test
+        uses: ./
+        with:
+          packages: "./... ./examples/..."
+          race: true
+          min-coverage: ${{ env.GATE_MIN_COVERAGE }}
+          flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          events-file: ${{ runner.temp }}/test-events.json
+      - name: Upload the test event stream
+        if: ${{ always() && steps.test.outputs.events-file != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nightly-events-${{ matrix.run }}
+          path: ${{ steps.test.outputs.events-file }}
+          retention-days: 14
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-key: test
+      - name: Prepare the CLI's coverage directory
+        run: mkdir -p "$RUNNER_TEMP/cli-cover"
+      - name: Test (suites, with the CLI instrumented)
+        uses: ./
+        env:
+          GOCOVERDIR: ${{ runner.temp }}/cli-cover
+        with:
+          packages: "./... ./examples/..."
+          race: true
+          flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          coverage: true
+          go-test-flags: -coverprofile=${{ runner.temp }}/suites.out
+      - name: Coverage with the CLI's subprocess runs
+        run: |
+          bash .github/scripts/coverage-total.sh "$RUNNER_TEMP/suites.out" "$RUNNER_TEMP/cli-cover" "$GATE_MIN_TOTAL_COVERAGE" \
+            github.com/mvrahden/go-test/cmd/... github.com/mvrahden/go-test/internal/... github.com/mvrahden/go-test/pkg/...
+
+  gate-min:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+        with:
+          go: min
+          cache-key: test
+      - name: Test (suites)
+        id: test
+        uses: ./
+        with:
+          packages: "./... ./examples/..."
+          race: true
+          min-coverage: ${{ env.GATE_MIN_COVERAGE }}
+          flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+
+  platform:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+        shard: [cli, core]
+        include:
+          - os: windows-latest
+            timeout-scale: 2
+          - os: macos-latest
+            parallel: 6
+            timeout-scale: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-key: platform-test-${{ matrix.shard }}
+      - name: Select the shard's packages
+        id: shard
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          cli='^github\.com/mvrahden/go-test/(cmd|tests)(/|$)'
+          if [ "$SHARD" = cli ]; then sel=(grep -E); else sel=(grep -vE); fi
+          pkgs=$(go list ./... ./examples/... | "${sel[@]}" "$cli" | tr '\n' ' ')
+          echo "packages=$pkgs" >> "$GITHUB_OUTPUT"
+      - name: Test (suites)
+        id: test
+        uses: ./
+        env:
+          GOTEST_TIMEOUT_SCALE: ${{ matrix.timeout-scale }}
+        with:
+          packages: ${{ steps.shard.outputs.packages }}
+          race: true
+          flags: "--parallel=${{ matrix.parallel || env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          events-file: ${{ runner.temp }}/test-events.json
+      - name: Upload the test event stream
+        if: ${{ always() && steps.test.outputs.events-file != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nightly-events-${{ runner.os }}-${{ matrix.shard }}
+          path: ${{ steps.test.outputs.events-file }}
+          retention-days: 14
+
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-key: quality
+      - name: Checks and lint
+        run: make checks lint
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+      - name: OpenSpec validate
+        run: make spec-validate
+      - name: Spec sync
+        run: make catalog && git diff --exit-code docs/design/catalog.json
+      - name: Consumer fixture (skill evals)
+        working-directory: tests/skillevals/writing-gotest-tests/consumer-fixture
+        run: |
+          go build ./... && go vet ./...
+          go tool gotest ./...
+
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+      - name: Drill
+        env:
+          DRILL_SHARD: ${{ matrix.shard }}/4
+          DRILL_LOGS: ${{ runner.temp }}/drill-logs
+          DRILL_TIMINGS: tests/drill/timings.json
+        run: make drill
+      - name: Keep drill logs and phase timings
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: drill-${{ matrix.shard }}
+          path: ${{ runner.temp }}/drill-logs
+          if-no-files-found: ignore
+
+  drill-shards:
+    needs: drill
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: drill-*
+          path: ${{ runner.temp }}/drill-logs
+      - uses: ./.github/actions/setup-go
+      - name: Shards agree on one assignment
+        run: bash tests/drill/drill.sh --check-shards "${{ runner.temp }}/drill-logs"
+
+  mixed-verdicts:
+    needs: gate
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: nightly-events-[0-9]
+          path: ${{ runner.temp }}/events
+      - name: Tests whose verdict changed between runs
+        run: |
+          d="$RUNNER_TEMP/events"
+          bash .github/scripts/mixed-verdicts.sh "$d/nightly-events-1/test-events.json" "$d/nightly-events-2/test-events.json" "$d/nightly-events-3/test-events.json"
+
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+      - name: Fuzz the repository's own targets
+        run: go run ./cmd/gotest fuzz --for=15m ./cmd/... ./internal/... ./pkg/... ./tests/...
+      - name: List the corpus files the session added
+        id: crashers
+        if: ${{ always() }}
+        run: |
+          git ls-files --others --exclude-standard -- '*/testdata/fuzz/*' > "$RUNNER_TEMP/crashers.txt"
+          if [ -s "$RUNNER_TEMP/crashers.txt" ]; then
+            mkdir -p "$RUNNER_TEMP/crashers"
+            xargs -r -d '\n' cp --parents -t "$RUNNER_TEMP/crashers" < "$RUNNER_TEMP/crashers.txt"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Keep the corpus files
+        if: ${{ always() && steps.crashers.outputs.found == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nightly-crashers
+          path: ${{ runner.temp }}/crashers
+          retention-days: 30
+
+  go-tip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      outcome: ${{ steps.outcome.outputs.outcome }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-go
+      - name: Install Go tip
+        id: install
+        continue-on-error: true
+        run: |
+          go install golang.org/dl/gotip@latest
+          "$(go env GOPATH)/bin/gotip" download
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Build
+        id: build
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: local
+        run: go build ./... ./examples/...
+      - name: Vet
+        id: vet
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: local
+        run: go vet ./... ./examples/...
+      - name: Test (suites)
+        id: test
+        continue-on-error: true
+        uses: ./
+        env:
+          GOTOOLCHAIN: local
+        with:
+          packages: "./... ./examples/..."
+          flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+      - name: Report Go tip
+        id: outcome
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: local
+          INSTALL: ${{ steps.install.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          VET: ${{ steps.vet.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          outcome=success
+          for o in "$INSTALL" "$BUILD" "$VET" "$TEST"; do
+            if [ "$o" != success ]; then outcome=failure; fi
+          done
+          echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+          echo "Go tip ($(go version 2>/dev/null || echo unavailable)): $outcome" >> "$GITHUB_STEP_SUMMARY"
+
+  report:
+    needs: [gate, coverage, gate-min, platform, checks, drill, drill-shards, mixed-verdicts, fuzz, go-tip]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Report a red night
+        if: ${{ github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          printf '%s' "$NEEDS" > "$RUNNER_TEMP/needs.json"
+          bash .github/scripts/nightly-report.sh "$RUNNER_TEMP/needs.json" "$RUN_URL"

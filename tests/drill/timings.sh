@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Rewrites tests/drill/timings.json from the drill shards' timings-i-of-n.json
 # artifacts: per mutant the longest observation across the given runs,
-# rounded to 0.1s. No run ids reads the last three successful quality.yml
-# runs on main. Mutants without a patch here are dropped.
+# rounded to 0.1s. No run ids reads the last three successful nightly.yml
+# runs on main, which judge every mutant. Mutants without a patch here are
+# dropped.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 runs=("$@")
 if [ ${#runs[@]} -eq 0 ]; then
-  mapfile -t runs < <(gh run list --workflow quality.yml --branch main --status success \
+  mapfile -t runs < <(gh run list --workflow nightly.yml --branch main --status success \
     --limit 3 --json databaseId --jq '.[].databaseId')
 fi
 [ ${#runs[@]} -gt 0 ] || { echo "no runs to read" >&2; exit 1; }

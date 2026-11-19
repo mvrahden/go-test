@@ -1,8 +1,9 @@
-.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check
+.PHONY: ci test lint build vet vuln fmt-check golangci-lint golangci-version checks drill catalog extension-test extension-contract extension-package spec-validate runtime-compat runtime-api runtime-floor release-check workflow-lint drill-check coverage-total lint-plugin
 
 # Must ship x/tools >= v0.46.0, the first that reads Go 1.27 export data.
 # Move it with the Go version the workflows test.
 GOLANGCI_VERSION := v2.14.0
+ACTIONLINT_VERSION := v1.7.12
 
 SPECS_DIR ?= specs
 
@@ -22,6 +23,24 @@ lint: vet
 
 drill:
 	bash tests/drill/drill.sh
+
+drill-check:
+	bash tests/drill/drill.sh --check-patches
+
+# The golangci plugin is a module of its own, built against this one
+# without the workspace.
+PLUGIN_DIR := pkg/lint/golangci
+
+lint-plugin:
+	@if [ ! -f "$(PLUGIN_DIR)/go.mod" ]; then echo "lint-plugin: no module at $(PLUGIN_DIR), nothing to check"; else \
+		cd "$(PLUGIN_DIR)" && GOWORK=off go vet ./... && GOWORK=off go test ./...; fi
+
+COVER_DIR ?= $(or $(TMPDIR),/tmp)/gotest-coverage-total
+
+coverage-total:
+	rm -rf "$(COVER_DIR)" && mkdir -p "$(COVER_DIR)/data"
+	GOCOVERDIR="$(COVER_DIR)/data" go run ./cmd/gotest spec --parallel=$(GATE_PARALLEL) --timeout=$(GATE_TIMEOUT) ./... ./examples/... -race -coverprofile="$(COVER_DIR)/suites.out"
+	bash .github/scripts/coverage-total.sh "$(COVER_DIR)/suites.out" "$(COVER_DIR)/data" $(GATE_MIN_TOTAL_COVERAGE) github.com/mvrahden/go-test/cmd/... github.com/mvrahden/go-test/internal/... github.com/mvrahden/go-test/pkg/...
 
 catalog:
 	go run ./internal/speccatalog/render
@@ -57,6 +76,11 @@ fmt-check:
 	@unformatted=$$(find . \( -name testdata -o -name .worktrees -o -name node_modules \) -prune -o -name '*.go' -print | xargs -r gofmt -l); \
 	test -z "$$unformatted" || (echo "gofmt needed on:" && echo "$$unformatted" && exit 1)
 
+workflow-lint:
+	@command -v shellcheck >/dev/null || { echo "shellcheck not found: install it (apt-get install shellcheck, brew install shellcheck)"; exit 2; }
+	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION) -no-color
+	shellcheck --severity=warning $$(git ls-files '*.sh' ':!:*/testdata/*')
+
 golangci-lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run --allow-parallel-runners ./... ./examples/...
 
@@ -79,4 +103,4 @@ release-check:
 	@test -n "$(VERSION)" || { echo "usage: make release-check VERSION=vX.Y.Z [SHA=<commit>]"; exit 2; }
 	bash .github/scripts/release-preflight.sh $(VERSION) $(SHA)
 
-checks: fmt-check vuln golangci-lint runtime-compat
+checks: fmt-check workflow-lint vuln golangci-lint runtime-compat lint-plugin

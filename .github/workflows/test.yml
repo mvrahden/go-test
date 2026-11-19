@@ -41,7 +41,7 @@ jobs:
             timeout-scale: 2
           - os: macos-latest
             parallel: 6
-            timeout-scale: 1
+            timeout-scale: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-go
@@ -103,6 +103,75 @@ jobs:
           fuzz: "true"
           fuzz-for: "10s"
 
+  action-consumer:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        tool: [declared, undeclared]
+        include:
+          - os: windows-latest
+            tool: declared
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: gotest
+      - name: Stage a consumer module at the workspace root
+        id: stage
+        shell: bash
+        run: |
+          cp -R gotest/tests/skillevals/writing-gotest-tests/consumer-fixture/. .
+          rm -f go.work go.work.sum
+          go_line=$(sed -n 's/^go //p' go.mod)
+          echo "go-version=$go_line" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ steps.stage.outputs.go-version }}
+          cache: false
+      - name: Point the consumer at this checkout
+        shell: bash
+        env:
+          TOOL: ${{ matrix.tool }}
+        run: |
+          go mod edit -replace github.com/mvrahden/go-test=./gotest
+          if [ "$TOOL" = undeclared ]; then
+            go mod edit -droptool github.com/mvrahden/go-test/cmd/gotest
+            go mod tidy
+          fi
+          cp go.sum "$RUNNER_TEMP/go.sum.before"
+      - name: Test (the consumer, through the action)
+        id: green
+        uses: ./gotest
+        with:
+          coverage: true
+          go-test-flags: -short
+      - name: The run was green and left go.sum alone
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.green.outputs.exit-code }}
+          COVERAGE: ${{ steps.green.outputs.coverage }}
+        run: |
+          test "$EXIT_CODE" = 0
+          test -n "$COVERAGE"
+          cmp go.sum "$RUNNER_TEMP/go.sum.before"
+      - name: Break one package
+        shell: bash
+        run: printf 'package pricing\n\nvar _ = undefined\n' > pricing/zz_broken.go
+      - name: Test (a package that does not build)
+        id: red
+        continue-on-error: true
+        uses: ./gotest
+      - name: A build failure is exit code 2
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.red.outputs.exit-code }}
+          OUTCOME: ${{ steps.red.outcome }}
+        run: |
+          test "$OUTCOME" = failure
+          test "$EXIT_CODE" = 2
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -116,6 +185,8 @@ jobs:
         go: [min, pinned]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-go
         with:
           go: ${{ matrix.go }}
@@ -123,6 +194,7 @@ jobs:
       # the canary and the drill (quality.yml) replace the stdlib step; see
       # ARCHITECTURE.md, "Testing gotest".
       - name: Test (suites)
+        id: test
         uses: ./
         with:
           packages: "./... ./examples/..."
@@ -132,5 +204,13 @@ jobs:
           # it for the same number.
           badge: ${{ matrix.go == 'pinned' }}
           flags: "--parallel=${{ env.GATE_PARALLEL }} --timeout=${{ env.GATE_TIMEOUT }}"
+          events-file: ${{ runner.temp }}/test-events.json
+      - name: Upload the test event stream
+        if: ${{ always() && steps.test.outputs.events-file != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: test-events-${{ runner.os }}-go-${{ matrix.go }}
+          path: ${{ steps.test.outputs.events-file }}
+          retention-days: 14
       - if: ${{ !cancelled() }}
         uses: ./.github/actions/save-go-cache

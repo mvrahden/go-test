@@ -12,6 +12,7 @@ import (
 //
 //	[--root <repository>] [--binary-dir <dir>] <mutant>...   run the drill
 //	--check-shards <dir>                     check the shards' selection files
+//	--root <repository> --check-patches      name every patch that no longer applies
 //	--worker <job.json>                      judge one mutant (internal)
 //	--supervise <seconds> <status> <cmd...>  bound a command (internal)
 //
@@ -58,6 +59,8 @@ func dispatch(root string, args []string) (int, error) {
 		}
 		fmt.Printf("drill  %d shards agree on one assignment\n", len(found))
 		return 0, nil
+	case len(args) == 1 && args[0] == "--check-patches":
+		return checkPatches(root)
 	case len(args) >= 4 && args[0] == "--supervise":
 		seconds, err := strconv.ParseFloat(args[1], 64)
 		if err != nil {

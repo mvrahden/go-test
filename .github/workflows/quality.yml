@@ -26,6 +26,10 @@ jobs:
       - uses: ./.github/actions/setup-go
       - name: Format check
         run: make fmt-check
+      - name: Workflow and shell lint
+        run: make workflow-lint
+      - name: Drill patches apply
+        run: make drill-check
       - name: Vuln check
         run: make vuln
       - name: Resolve the golangci-lint pin
@@ -57,6 +61,8 @@ jobs:
         run: make lint
       - name: Runtime compatibility
         run: make runtime-compat
+      - name: Golangci plugin module
+        run: make lint-plugin
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
@@ -83,7 +89,18 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-go
+      - name: List the changed files
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if git diff --name-only --no-renames "$BASE"...HEAD > "$RUNNER_TEMP/drill-changed.txt" 2>/dev/null; then
+            echo "DRILL_CHANGED=$RUNNER_TEMP/drill-changed.txt" >> "$GITHUB_ENV"
+          else
+            echo "::notice title=drill::no base commit to compare with; every mutant is judged"
+          fi
       - name: Drill
         env:
           DRILL_SHARD: ${{ matrix.shard }}/4

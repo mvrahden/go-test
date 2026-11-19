@@ -64,6 +64,7 @@ func runDrill(root string, names []string) (int, error) {
 		return 0, err
 	}
 	mutants := filepath.Join(root, "tests", "drill", "mutants")
+	named := len(names) > 0
 	if len(names) == 0 {
 		patches, _ := filepath.Glob(filepath.Join(mutants, "*.patch"))
 		for _, p := range patches {
@@ -83,6 +84,10 @@ func runDrill(root string, names []string) (int, error) {
 		if !mutantName.MatchString(name) || err != nil || !info.Mode().IsRegular() {
 			return 0, errors.New("no mutant named " + name)
 		}
+	}
+	changed, narrowed, err := ChangedFiles(environ, named)
+	if err != nil {
+		return 0, err
 	}
 	weights := map[string]float64{}
 	if path := environ["DRILL_TIMINGS"]; path != "" {
@@ -138,6 +143,7 @@ func runDrill(root string, names []string) (int, error) {
 	}
 	d := &drillRun{
 		root: root, scratchRoot: scratchRoot, scratch: scratch.Dir, logs: logs, logRoot: logRoot, names: names, weights: weights,
+		changed: changed, narrowed: narrowed,
 		shardI: shardI, shardN: shardN, cpus: cpus, jobs: jobs, self: self,
 		supervision: NewSupervision([]string{self}, float64(seconds), logs),
 		results:     map[string]Verdict{},
@@ -184,6 +190,8 @@ type drillRun struct {
 	root, scratchRoot, scratch string
 	logs, logRoot, self        string
 	names                      []string
+	changed                    []string // DRILL_CHANGED's paths, when narrowed
+	narrowed                   bool
 	weights                    map[string]float64
 	shardI, shardN, cpus, jobs int
 	supervision                *Supervision
@@ -280,6 +288,23 @@ func (d *drillRun) judge() (err error) {
 	modes, runs, err := ReadPlan(string(text), d.names)
 	if err != nil {
 		return err
+	}
+	if d.narrowed {
+		facts := map[string]MutantFacts{}
+		for _, n := range d.names {
+			patch, err := os.ReadFile(patchOf(n))
+			if err != nil {
+				return err
+			}
+			facts[n] = ReadFacts(string(patch), runs[n])
+		}
+		spec := func(path string) string {
+			data, _ := os.ReadFile(filepath.Join(snapshot, filepath.FromSlash(path)))
+			return string(data)
+		}
+		var note string
+		d.names, note = Narrow(d.names, d.changed, facts, spec)
+		fmt.Println(note)
 	}
 	assignment, _, err := Plan(d.names, modes, d.weights, d.shardN, Environ(), d.cpus)
 	if err != nil {

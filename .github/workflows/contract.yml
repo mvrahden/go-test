@@ -18,6 +18,8 @@ on:
       - go.mod
       - go.sum
       - vscode-gotest/**
+      - examples/**
+      - skills/**
       - .github/workflows/contract.yml
       - .github/actions/setup-go/**
       - .github/actions/save-go-cache/**
@@ -31,6 +33,8 @@ on:
       - go.mod
       - go.sum
       - vscode-gotest/**
+      - examples/**
+      - skills/**
       - .github/workflows/contract.yml
       - .github/actions/setup-go/**
       - .github/actions/save-go-cache/**
@@ -71,6 +75,8 @@ jobs:
         run: npm run contract:verify
       - name: Cross the process boundary for real
         run: npm run test:integration
+      - name: Bundle the skill as packaging does
+        run: node scripts/bundle-skill.mjs && test -f skills/writing-gotest-tests/SKILL.md
       - if: ${{ !cancelled() }}
         uses: ./.github/actions/save-go-cache
 

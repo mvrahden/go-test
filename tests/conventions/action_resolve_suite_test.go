@@ -58,13 +58,14 @@ func (s *ActionResolveTestSuite) BeforeAll(t *gotest.T) {
 // AfterAll has nothing to release: every run lives in a temp dir.
 func (s *ActionResolveTestSuite) AfterAll(t *gotest.T) {}
 
-// goStandIn prints the faked listing for a bare go tool and hands every
-// other call to the real toolchain.
+// goStandIn prints the faked listing for a bare go tool, logs a build
+// without running it, and hands every other call to the real toolchain.
 const goStandIn = `#!/usr/bin/env bash
 if [ "$1" = tool ] && [ $# -eq 1 ]; then
   printf '%s\n' "$FAKE_TOOL_LISTING"
   exit 0
 fi
+if [ "$1" = build ]; then echo "$*" >> "$GO_LOG"; exit 0; fi
 exec "$REAL_GO" "$@"
 `
 
@@ -85,16 +86,30 @@ const (
 	workAB       = "go 1.26.0\n\nuse (\n\t./a\n\t./b\n)\n"
 )
 
-const (
-	wantTool      = "GOTEST_CMD=go tool " + gotestPkg + "\n"
-	wantRun       = "GOTEST_CMD=go run " + gotestPkg + "\n"
-	wantRunMod    = "GOTEST_CMD=go run -mod=mod " + gotestPkg + "\n"
-	resolveNotice = "::notice title=gotest::go.mod does not declare the gotest tool"
-)
+const resolveNotice = "::notice title=gotest::go.mod does not declare the gotest tool"
+
+// The build each decision leads to, under the run's RUNNER_TEMP. A declared
+// tool and a workspace build alike; neither resolves in a copy of go.mod.
+func wantTool(temp string) string { return wantRun(temp) }
+
+func wantRun(temp string) string {
+	return "build -o " + filepath.Join(temp, "gotest-bin", "gotest") + " " + gotestPkg + "\n"
+}
+
+func wantRunMod(temp string) string {
+	bin := filepath.Join(temp, "gotest-bin")
+	return "build -mod=mod -modfile=" + filepath.Join(bin, "go.mod") + " -o " + filepath.Join(bin, "gotest") + " " + gotestPkg + "\n"
+}
 
 type resolveRun struct {
 	exit        int
 	stdout, env string // env is what the step appended to GITHUB_ENV
+	build, temp string // the go build lines it ran, and its RUNNER_TEMP
+}
+
+// wantBin is the env line every decision writes.
+func (r resolveRun) wantBin() string {
+	return "GOTEST_BIN=" + filepath.Join(r.temp, "gotest-bin", "gotest") + "\n"
 }
 
 // resolve writes files (path relative to a fresh directory -> content), runs
@@ -116,64 +131,74 @@ func (s *ActionResolveTestSuite) resolve(t *gotest.T, files map[string]string, c
 	cmd.Env = append(os.Environ(), "PWD="+dir,
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GITHUB_ENV="+env, "REAL_GO="+s.realGo, "FAKE_TOOL_LISTING="+listing,
+		"RUNNER_TEMP="+bin, "RUNNER_OS=Linux", "GO_LOG="+filepath.Join(bin, "go.log"),
 		"GOWORK=", "GOFLAGS=", "GOTOOLCHAIN=local", "GOPROXY=off")
 	out, _ := cmd.Output()
 	written, _ := os.ReadFile(env)
-	return resolveRun{exit: cmd.ProcessState.ExitCode(), stdout: string(out), env: string(written)}
+	build, _ := os.ReadFile(filepath.Join(bin, "go.log"))
+	return resolveRun{exit: cmd.ProcessState.ExitCode(), stdout: string(out), env: string(written), build: string(build), temp: bin}
 }
 
 func (s *ActionResolveTestSuite) TestADeclaredToolIsFoundUnderGo126(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.mod": modTool}, ".", listingGo126)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantTool, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantTool(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.NotContains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestADeclaredToolIsFoundUnderGo127(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.mod": modTool}, ".", listingGo127)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantTool, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantTool(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.NotContains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestAToolInABlockIsFound(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.mod": modToolBlock}, ".", listingGo126)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantTool, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantTool(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.NotContains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestAToolOfAnyWorkspaceModuleIsFound(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.work": workAB, "a/go.mod": modPlain, "b/go.mod": modTool}, ".", listingGo126)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantTool, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantTool(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.NotContains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestARequiredModuleIsNotATool(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.mod": modRequire}, ".", listingNone)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantRunMod, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantRunMod(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.Contains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestTheListingAloneDeclaresNothing(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.mod": modRequire}, ".", listingGo127)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantRunMod, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantRunMod(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.Contains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestAWorkspaceWithoutTheToolRunsFromSource(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.work": workAB, "a/go.mod": modPlain, "b/go.mod": modRequire}, ".", listingNone)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantRun, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantRun(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.Contains(t, run.stdout, resolveNotice)
 }
 
 func (s *ActionResolveTestSuite) TestTheGotestWorkspaceIsNotToldToDeclareIt(t *gotest.T) {
 	run := s.resolve(t, map[string]string{"go.work": workAB, "a/go.mod": modGotest, "b/go.mod": modPlain}, ".", listingNone)
 	gotest.Equal(t, 0, run.exit, "stdout: %s", run.stdout)
-	gotest.Equal(t, wantRun, run.env, "stdout: %s", run.stdout)
+	gotest.Equal(t, wantRun(run.temp), run.build, "stdout: %s", run.stdout)
+	gotest.Equal(t, run.wantBin(), run.env)
 	gotest.NotContains(t, run.stdout, resolveNotice)
 }
