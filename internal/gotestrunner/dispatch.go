@@ -247,6 +247,11 @@ func (r *streamRun) intake(compiled <-chan CompileOutcome) map[string]*scopeQueu
 			}
 			r.take(outcome, held)
 		case <-r.ctx.Done():
+			// The stage still ends: what it reports now is dropped.
+			go func() {
+				for range compiled {
+				}
+			}()
 			r.wg.Wait()
 			return held
 		}

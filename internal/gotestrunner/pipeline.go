@@ -124,6 +124,9 @@ type PipelineResult struct {
 	CapturedJSON []byte
 	// Groups is what each named group that ran took, by name.
 	Groups []GroupRun
+	// CompileSpan runs from the compile stage's start to its last outcome;
+	// zero when nothing was compiled.
+	CompileSpan time.Duration
 }
 
 // sharedFixturesPkg names the synthetic package a shared fixture failure is
@@ -350,6 +353,7 @@ type benchPrep struct {
 	proc            *SharedFixtureProcess
 	setupErr        error
 	setupTimedOut   bool
+	compileSpan     time.Duration
 }
 
 // prepareBenchRun compiles the suite packages and starts the given shared
@@ -363,7 +367,9 @@ func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []got
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		p.compiled, p.compileFailures = CompilePackages(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel)
+		ch, span := spanOf(CompilePackagesStream(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel), time.Now)
+		p.compiled, p.compileFailures = collectOutcomes(ch)
+		p.compileSpan = span()
 	}()
 
 	if len(fixtures) > 0 {
@@ -456,6 +462,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 		applySetupFailure(collector, &result, setupErr)
 		applyTeardownFailure(collector, &result, teardownErr)
 		result.CapturedJSON = collector.CapturedJSON()
+		result.CompileSpan = prep.compileSpan
 		return result
 	}
 
@@ -647,9 +654,12 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	r := newStreamRun(ctx, cfg, overlay, pf)
 	defer r.cancel()
 	defer r.releaseCancel()
-	held := r.intake(CompilePackagesStream(r.ctx, overlay.SuitePackages, overlay.OverlayFlag, r.pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, r.pf.BuildFlags), cfg.CompileParallel))
+	compiled, span := spanOf(CompilePackagesStream(r.ctx, overlay.SuitePackages, overlay.OverlayFlag, r.pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, r.pf.BuildFlags), cfg.CompileParallel), time.Now)
+	held := r.intake(compiled)
 	r.runScopes(held)
-	return r.finish(), nil
+	result := r.finish()
+	result.CompileSpan = span()
+	return result, nil
 }
 
 // deferredTarget is a suite held back past the stream, with its slot in
