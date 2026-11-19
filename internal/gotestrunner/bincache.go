@@ -87,6 +87,24 @@ func stillAt(f *os.File, path string) bool {
 // replace it to act while a run waits on a lock.
 var lockOpened = func(path string) {}
 
+// hardLink makes a hard link; tests replace it.
+var hardLink = os.Link
+
+// linkOrCopy makes dst name src's bytes as an executable, replacing dst:
+// a hard link, or a copy on Windows, where a linked binary in use can be
+// neither replaced nor evicted, and wherever the link is refused (another
+// filesystem, protected hard links, a link count at its limit).
+func linkOrCopy(src, dst string) (linked bool, err error) {
+	if runtime.GOOS == "windows" {
+		return false, copyFile(src, dst)
+	}
+	_ = os.Remove(dst)
+	if hardLink(src, dst) == nil {
+		return true, nil
+	}
+	return false, copyFile(src, dst)
+}
+
 // copyFile writes src's bytes to dst as an executable, replacing dst. No
 // process is forked while dst is open: a child forked then would hold the
 // write handle until it execs, and the kernel refuses to execute a file
