@@ -64,6 +64,6 @@ func (s *FixtureSessionTestSuite) TestMissing(t *gotest.T) {
 	})
 	t.It("names nothing for a suite that reads nothing", func(it *gotest.T) {
 		f := gotestrunner.ExportNewFixtureSession(nil, nil, false)
-		gotest.Equal(it, "", gotestrunner.ExportSessionMissing(f, nil))
+		gotest.Empty(it, gotestrunner.ExportSessionMissing(f, nil))
 	})
 }
