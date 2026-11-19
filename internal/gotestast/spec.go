@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/protocol"
-	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -76,7 +76,7 @@ func (ts TestSuiteSpecSet) ReduceToEffectiveSet() (TestSuiteSpecSet, SkippedTest
 // Focuses reports whether ts holds a focused item: an F_ suite, or an F_
 // method of a suite that is not excluded.
 func (ts TestSuiteSpecSet) Focuses() bool {
-	return slices.Any(ts, func(v *TestSuiteSpec, _ int) bool { return v.IsFocused() || v.focusesMethod() })
+	return slices.ContainsFunc(ts, func(v *TestSuiteSpec) bool { return v.IsFocused() || v.focusesMethod() })
 }
 
 // focusesMethod reports whether a suite that is not excluded has an F_ method.
@@ -84,8 +84,21 @@ func (ts *TestSuiteSpec) focusesMethod() bool {
 	if ts.IsExcluded() {
 		return false
 	}
-	focused := func(m *TestSuiteMethod, _ int) bool { return m.IsFocused() }
-	return slices.Any(ts.th.TestCases, focused) || slices.Any(ts.th.Benchmarks, focused) || slices.Any(ts.th.Fuzzers, focused)
+	focused := func(m *TestSuiteMethod) bool { return m.IsFocused() }
+	return slices.ContainsFunc(ts.th.TestCases, focused) || slices.ContainsFunc(ts.th.Benchmarks, focused) || slices.ContainsFunc(ts.th.Fuzzers, focused)
+}
+
+// splitBy puts the elements pred holds for into yes and the others into no;
+// a side with no element is nil.
+func splitBy[T any](in []T, pred func(T) bool) (yes, no []T) {
+	for _, v := range in {
+		if pred(v) {
+			yes = append(yes, v)
+			continue
+		}
+		no = append(no, v)
+	}
+	return yes, no
 }
 
 // ReduceInRun splits ts into the suites that run, the suites skipped and the
@@ -97,14 +110,14 @@ func (ts TestSuiteSpecSet) ReduceInRun(focusRun bool) (TestSuiteSpecSet, Skipped
 	var skippedTestSuites SkippedTestSuites
 	skippedTestCases := SkippedTestCases{}
 	if focusRun { // split focused from unfocused
-		focused, unfocused := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
+		focused, unfocused := splitBy(effectiveSet, func(v *TestSuiteSpec) bool {
 			return v.IsFocused() || v.focusesMethod()
 		})
 		effectiveSet, skippedTestSuites = focused, append(skippedTestSuites, unfocused...)
 	}
 
 	{ // split excluded from included
-		excluded, included := slices.SplitBy(effectiveSet, func(v *TestSuiteSpec, _ int) bool {
+		excluded, included := splitBy(effectiveSet, func(v *TestSuiteSpec) bool {
 			return v.IsExcluded()
 		})
 		effectiveSet = included
@@ -113,14 +126,14 @@ func (ts TestSuiteSpecSet) ReduceInRun(focusRun bool) (TestSuiteSpecSet, Skipped
 		}
 	}
 
-	slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+	for _, v := range effectiveSet {
 		skippedTestCases[v] = nil
-	})
+	}
 
 	{ // reduce SEQUENTIAL test cases
-		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+		for _, v := range effectiveSet {
 			// split focused from unfocused
-			focused, unfocused := slices.SplitBy(v.th.TestCases, func(v *TestSuiteMethod, _ int) bool {
+			focused, unfocused := splitBy(v.th.TestCases, func(v *TestSuiteMethod) bool {
 				return v.IsFocused()
 			})
 			v.th.TestCases = unfocused
@@ -131,20 +144,20 @@ func (ts TestSuiteSpecSet) ReduceInRun(focusRun bool) (TestSuiteSpecSet, Skipped
 			}
 
 			// split excluded from included
-			excluded, included := slices.SplitBy(v.th.TestCases, func(v *TestSuiteMethod, _ int) bool {
+			excluded, included := splitBy(v.th.TestCases, func(v *TestSuiteMethod) bool {
 				return v.IsExcluded()
 			})
 			v.th.TestCases = included
 			if len(excluded) > 0 {
 				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
 			}
-		})
+		}
 	}
 
 	{ // reduce BENCHMARK methods
-		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+		for _, v := range effectiveSet {
 			// split focused from unfocused
-			focused, unfocused := slices.SplitBy(v.th.Benchmarks, func(v *TestSuiteMethod, _ int) bool {
+			focused, unfocused := splitBy(v.th.Benchmarks, func(v *TestSuiteMethod) bool {
 				return v.IsFocused()
 			})
 			v.th.Benchmarks = unfocused
@@ -155,20 +168,20 @@ func (ts TestSuiteSpecSet) ReduceInRun(focusRun bool) (TestSuiteSpecSet, Skipped
 			}
 
 			// split excluded from included
-			excluded, included := slices.SplitBy(v.th.Benchmarks, func(v *TestSuiteMethod, _ int) bool {
+			excluded, included := splitBy(v.th.Benchmarks, func(v *TestSuiteMethod) bool {
 				return v.IsExcluded()
 			})
 			v.th.Benchmarks = included
 			if len(excluded) > 0 {
 				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
 			}
-		})
+		}
 	}
 
 	{ // reduce FUZZ methods
-		slices.Range(effectiveSet, func(v *TestSuiteSpec, _ int) {
+		for _, v := range effectiveSet {
 			// split focused from unfocused
-			focused, unfocused := slices.SplitBy(v.th.Fuzzers, func(v *TestSuiteMethod, _ int) bool {
+			focused, unfocused := splitBy(v.th.Fuzzers, func(v *TestSuiteMethod) bool {
 				return v.IsFocused()
 			})
 			v.th.Fuzzers = unfocused
@@ -179,14 +192,14 @@ func (ts TestSuiteSpecSet) ReduceInRun(focusRun bool) (TestSuiteSpecSet, Skipped
 			}
 
 			// split excluded from included
-			excluded, included := slices.SplitBy(v.th.Fuzzers, func(v *TestSuiteMethod, _ int) bool {
+			excluded, included := splitBy(v.th.Fuzzers, func(v *TestSuiteMethod) bool {
 				return v.IsExcluded()
 			})
 			v.th.Fuzzers = included
 			if len(excluded) > 0 {
 				skippedTestCases[v] = append(skippedTestCases[v], excluded...)
 			}
-		})
+		}
 	}
 
 	return effectiveSet, skippedTestSuites, skippedTestCases

@@ -18,7 +18,6 @@ import (
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/goversion"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
-	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -288,9 +287,13 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 		}
 	}
 
-	loadedTestPkgs = slices.Filter(loadedTestPkgs, func(item *packages.Package, index int) bool {
-		return strings.HasSuffix(item.ID, ".test]")
-	})
+	var testVariants []*packages.Package
+	for _, item := range loadedTestPkgs {
+		if strings.HasSuffix(item.ID, ".test]") {
+			testVariants = append(testVariants, item)
+		}
+	}
+	loadedTestPkgs = testVariants
 	pkgOrder := map[string]int{}
 	for i, p := range totalFoundPkgs {
 		path := strings.TrimSuffix(p.PkgPath, "_test")
@@ -323,9 +326,13 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	// A package broken in one variant must not run its intact variants: the
 	// test build for that package fails as a whole, so the verdict is the
 	// broken entry, not a partial run.
-	res = slices.Filter(res, func(lr *LoadResult, _ int) bool {
-		return brokenByPath[lr.PkgPath] == nil
-	})
+	var intact []*LoadResult
+	for _, lr := range res {
+		if brokenByPath[lr.PkgPath] == nil {
+			intact = append(intact, lr)
+		}
+	}
+	res = intact
 	sort.SliceStable(res, func(i, j int) bool {
 		return pkgOrder[res[i].PkgPath] < pkgOrder[res[j].PkgPath]
 	})
@@ -496,7 +503,12 @@ func reportOrder(matched, listed []string) []string {
 			delete(rest, p)
 		}
 	}
-	tail := slices.Filter(matched, func(p string, _ int) bool { return rest[p] })
+	var tail []string
+	for _, p := range matched {
+		if rest[p] {
+			tail = append(tail, p)
+		}
+	}
 	// "/" sorts first, as a segment ending before its sibling does.
 	segments := func(p string) string { return strings.ReplaceAll(p, "/", "\x00") }
 	sort.SliceStable(tail, func(i, j int) bool { return segments(tail[i]) < segments(tail[j]) })
@@ -541,7 +553,7 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()
 	}
 
-	results, err := slices.MapErr(loadResults, func(lr *LoadResult, i int) (*GenerateResult, error) {
+	generateOne := func(lr *LoadResult, i int) (*GenerateResult, error) {
 		c := collector{sources: lr.sources}
 		ptestCollected, pxtestCollected := all[i].ptest, all[i].pxtest
 
@@ -721,9 +733,13 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			FuzzCases:                      fuzzCases,
 			BenchCases:                     benchCases,
 		}, nil
-	})
-	if err != nil {
-		return nil, nil, err
+	}
+	results := make([]*GenerateResult, len(loadResults))
+	for i, lr := range loadResults {
+		var err error
+		if results[i], err = generateOne(lr, i); err != nil {
+			return nil, nil, err
+		}
 	}
 	sort.Slice(allSharedFixtures, func(i, j int) bool {
 		if allSharedFixtures[i].PkgPath != allSharedFixtures[j].PkgPath {
