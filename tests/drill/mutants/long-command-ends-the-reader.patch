@@ -1,0 +1,14 @@
+Judge: ./pkg/gotestruntime SharedProgramTestSuite/TestALongCommand
+Expect: the protocol stream ended
+--- a/pkg/gotestruntime/sharedprogram.go
++++ b/pkg/gotestruntime/sharedprogram.go
+@@ -318,6 +318,9 @@
+ 			if err != nil && len(line) == 0 {
+ 				return
+ 			}
++			if len(line) > 64<<10 {
++				return
++			}
+ 			c, ok := sharedwire.ParseCommand(line)
+ 			if !ok {
+ 				continue

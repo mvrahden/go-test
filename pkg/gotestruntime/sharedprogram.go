@@ -303,16 +303,22 @@ loop:
 // Stdin ending means the runner is gone, the one sign of it where no death
 // signal is sent: it ends setup as SIGTERM does. The reader keeps reading past
 // a shutdown, so a force line and the end of stdin are seen during teardown as
-// well.
+// well. A line is read whole however long it is: a start names every key it
+// brings up, and a line cut short would end the reader as if the runner were
+// gone.
 func (r *sharedRun) readCommands(end, force context.CancelFunc) (cmds <-chan sharedwire.Command, eof <-chan struct{}) {
 	commands := make(chan sharedwire.Command)
 	ended := make(chan struct{})
 	go func() {
 		defer end()
 		defer close(ended)
-		sc := bufio.NewScanner(r.env.stdin)
-		for sc.Scan() {
-			c, ok := sharedwire.ParseCommand(sc.Bytes())
+		in := bufio.NewReader(r.env.stdin)
+		for {
+			line, err := in.ReadBytes('\n')
+			if err != nil && len(line) == 0 {
+				return
+			}
+			c, ok := sharedwire.ParseCommand(line)
 			if !ok {
 				continue
 			}
