@@ -44,7 +44,7 @@ func (s *RunPlanTestSuite) TestEveryFactHasOnePlace(t *gotest.T, _ *planCtx) {
 		FuzzParamsByFunc:               map[string][]string{"FuzzSeedsTestSuite_FuzzX": {"string", "int"}},
 		FuzzDecodedFuncs:               map[string]bool{"FuzzSeedsTestSuite_FuzzX": true},
 		SkippedSuiteNames:              []string{"X_GoneTestSuite"},
-		SuiteRequiredSharedFixtureKeys: map[string][]string{"TestOneTestSuite": {"example.com/f.B", "example.com/f.A"}},
+		SuiteRequiredSharedFixtureKeys: map[string][]string{"OneTestSuite": {"example.com/f.B", "example.com/f.A"}},
 	}, {PkgPath: "example.com/empty", AbsPath: "/src/empty"}})
 
 	gotest.Len(t, plan.Packages, 2)

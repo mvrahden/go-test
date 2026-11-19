@@ -26,7 +26,7 @@ func runSuitePlan() *gotestrunner.RunPlan {
 	return gotestrunner.ExportPlanRun(gotestgen.GenerateResults{{
 		PkgPath: runSuitePkg, PTest: []byte("x"),
 		SuiteNames:                     []string{"XTestSuite", "YTestSuite"},
-		SuiteRequiredSharedFixtureKeys: map[string][]string{"TestXTestSuite": {"p.A"}},
+		SuiteRequiredSharedFixtureKeys: map[string][]string{"XTestSuite": {"p.A"}},
 	}})
 }
 
