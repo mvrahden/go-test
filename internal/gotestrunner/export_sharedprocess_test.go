@@ -3,12 +3,21 @@ package gotestrunner
 import (
 	"context"
 	"os/exec"
+	"time"
+
+	"github.com/mvrahden/go-test/internal/gotestgen"
 )
 
 // ExportLaunchSharedProcess starts name with args as a shared fixture process
 // that serves no fixtures, so a test can speak the protocol itself.
 func ExportLaunchSharedProcess(ctx context.Context, dir, name string, args ...string) (*SharedFixtureProcess, error) {
-	return launchSharedFixtures(exec.CommandContext(ctx, name, args...), dir, nil, 0)
+	return launchSharedFixtures(exec.CommandContext(ctx, name, args...), dir, nil, 0, nil)
+}
+
+// ExportStartTapped is StartSharedFixtures with every line of the wire shown
+// to tap: '>' for a line written to the process, '<' for one read from it.
+func ExportStartTapped(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration, tap func(dir byte, line []byte), buildFlags ...string) (*SharedFixtureProcess, error) {
+	return startSharedFixtures(ctx, tmpDir, fixtures, setupTimeout, tap, buildFlags...)
 }
 
 // ExportProtocolErr is the protocol error the process made after its setup.

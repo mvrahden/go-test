@@ -2,6 +2,7 @@ package gotestrunner
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -113,6 +114,11 @@ type SharedFixtureProcess struct {
 	// failures keeps what the process reported on stderr about fixtures
 	// that failed.
 	failures *failureLog
+
+	// tap, when set, sees each line written to stdin ('>') and read from the
+	// protocol stream ('<'), without its newline, before it is written or
+	// acted on. Nil outside tests.
+	tap func(dir byte, line []byte)
 }
 
 // StateFile returns the path to the shared fixture state JSON file.
@@ -336,6 +342,9 @@ func (p *SharedFixtureProcess) send(line string) error {
 	}
 	p.cmdMu.Lock()
 	defer p.cmdMu.Unlock()
+	if p.tap != nil {
+		p.tap('>', []byte(strings.TrimSuffix(line, "\n")))
+	}
 	_, err := io.WriteString(p.stdin, line)
 	return err
 }
@@ -628,6 +637,9 @@ func (p *SharedFixtureProcess) command(ctx context.Context, verb string, keys []
 		p.mu.Unlock()
 	}
 	p.cmdMu.Lock()
+	if p.tap != nil {
+		p.tap('>', line)
+	}
 	_, err = p.stdin.Write(append(line, '\n'))
 	p.cmdMu.Unlock()
 	if err != nil {
@@ -779,6 +791,12 @@ func exitVerdict(setupErr, tornErr, waitErr error, diedEarly bool) error {
 // force-kill window until the process reports its own (see teardownBudget).
 // buildFlags are the run's build flags: the program is built as the suites are.
 func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration, buildFlags ...string) (*SharedFixtureProcess, error) {
+	return startSharedFixtures(ctx, tmpDir, fixtures, setupTimeout, nil, buildFlags...)
+}
+
+// startSharedFixtures is [StartSharedFixtures] with every line of the wire
+// shown to tap, when set.
+func startSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestgen.SharedFixtureInfo, setupTimeout time.Duration, tap func(dir byte, line []byte), buildFlags ...string) (*SharedFixtureProcess, error) {
 	src, err := gotestgen.GenerateSharedSetup(fixtures)
 	if err != nil {
 		return nil, fmt.Errorf("generate shared setup: %w", err)
@@ -817,7 +835,7 @@ func StartSharedFixtures(ctx context.Context, tmpDir string, fixtures []gotestge
 			held[keys[i]] = true
 		}
 	}
-	proc, err := launchSharedFixtures(exec.CommandContext(ctx, setupBin), sharedDir, keys, setupTimeout)
+	proc, err := launchSharedFixtures(exec.CommandContext(ctx, setupBin), sharedDir, keys, setupTimeout, tap)
 	if err != nil {
 		return nil, err
 	}
@@ -834,8 +852,8 @@ func setupBuildArgs(buildFlags []string, bin, src string) []string {
 }
 
 // launchSharedFixtures starts cmd as the shared fixture process serving the
-// fixtures with the given state keys.
-func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupTimeout time.Duration) (*SharedFixtureProcess, error) {
+// fixtures with the given state keys; tap, when set, sees the wire.
+func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupTimeout time.Duration, tap func(dir byte, line []byte)) (*SharedFixtureProcess, error) {
 	// The teardown budget the process reports is the only kill timer: exec's
 	// WaitDelay stays unset, since any bound set here would have to be chosen
 	// before the budget is known, and one below it becomes the budget — a
@@ -923,6 +941,7 @@ func launchSharedFixtures(cmd *exec.Cmd, sharedDir string, keys []string, setupT
 		budgetSeen:      make(chan struct{}, 1),
 		teardownSeen:    make(chan struct{}, 1),
 		failures:        newFailureLog(os.Stderr),
+		tap:             tap,
 	}
 
 	track(tree, liveTree{root: cmd.Process.Pid, again: proc.force, done: waitDone})
@@ -965,6 +984,9 @@ func (p *SharedFixtureProcess) readProtocol(stream io.Reader) {
 		if err != nil && len(line) == 0 {
 			readErr = err
 			break
+		}
+		if p.tap != nil {
+			p.tap('<', bytes.TrimSuffix(line, []byte("\n")))
 		}
 		var entry fixtureStateEntry
 		if json.Unmarshal(line, &entry) != nil {
