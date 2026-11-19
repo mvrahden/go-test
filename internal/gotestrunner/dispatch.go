@@ -53,6 +53,7 @@ type streamRun struct {
 	pf        ParsedFlags
 	overlay   *OverlayResult
 	plan      *RunPlan
+	sel       selection
 	scopes    []suiteScope
 	collector *OutputCollector
 	baseEnv   []string
@@ -173,6 +174,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	r.plan = overlay.plan()
 	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+	r.sel = sel
 	r.win = planFixtureWindows(r.plan, overlay.SharedFixtures, sel)
 	r.win.reportSkipped()
 	r.scopes = planSuiteScopes(r.plan, sel)
@@ -232,6 +234,20 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 // scopeQueue is what the stream held back for one group.
 type scopeQueue struct{ bulk, tail []deferredTarget }
+
+// bookUnbuilt books each suite package the run dispatches no suite of as
+// having nothing to run, and returns the packages to build.
+func (r *streamRun) bookUnbuilt() []string {
+	dispatched := dispatchedPackages(r.plan.testRun(r.sel))
+	for _, pkg := range r.overlay.SuitePackages {
+		if !dispatched[pkg] {
+			r.collector.RecordNothingToRun(pkg)
+			r.nothingToRun = true
+			r.free(r.ledger.DoneExcept(pkg, nil))
+		}
+	}
+	return buildSet(r.overlay.SuitePackages, dispatched)
+}
 
 // intake reads the compile stream: it books build failures, builds each
 // package's targets, starts the first scope's bulk and queues every other

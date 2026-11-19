@@ -633,6 +633,8 @@ shards of one run do not add up to every mutant exactly once.
 | `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
 | `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run links into the evicted cache entry |
+| `filtered-run-builds-every-package` | a run builds every suite package, including those its filter dispatches no suite of | cli conformance: a filtered run reports the vet finding of a package it does not run |
+| `dispatched-package-left-unbuilt` | a run builds no suite package, so even the packages it dispatches report no tests to run | cli conformance: an unfiltered run misses the vet finding |
 | `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
 | `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
 | `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |

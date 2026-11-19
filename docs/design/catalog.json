@@ -4410,6 +4410,98 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "exits 0 and reports the other package as having no tests to run",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "buildset_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 26,
+                      "name": "exits_0_and_reports_the_other_package_as_having_no_tests_to_run",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -run names a suite of one package and another package's suite fails vet",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "buildset_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 25,
+                  "name": "-run_names_a_suite_of_one_package_and_another_package's_suite_fails_vet",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "exits 2 and reports the vet finding under its package",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "buildset_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 33,
+                      "name": "exits_2_and_reports_the_vet_finding_under_its_package",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the two packages are run without -run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "buildset_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 32,
+                  "name": "the_two_packages_are_run_without_-run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhatAFilteredRunBuilds",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "buildset_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 19,
+              "name": "TestWhatAFilteredRunBuilds",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIBuildSet",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "buildset_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLIBuildSetTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -32457,13 +32549,13 @@
     }
   ],
   "stats": {
-    "behaviors": 944,
+    "behaviors": 946,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 135,
+    "suites": 136,
     "tests": 0
   }
 }
