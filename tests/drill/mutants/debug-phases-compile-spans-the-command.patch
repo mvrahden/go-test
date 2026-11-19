@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli CLIPhases .* / compile is no longer than run, and the others add up to no more than the total \(
+Clause: when a passing package is run with --debug → compile is no longer than run, and the others add up to no more than the total
+--- a/cmd/gotest/phases.go
++++ b/cmd/gotest/phases.go
+@@ -37,7 +37,7 @@
+ 	return phases{
+ 		Discover: span(c.start, c.discovered),
+ 		Generate: span(c.discovered, c.generated),
+-		Compile:  c.compile,
++		Compile:  span(c.start, end),
+ 		Run:      span(c.piped, c.ran),
+ 		Report:   span(c.ran, end),
+ 		Total:    span(c.start, end),

@@ -308,3 +308,6 @@ func ExportDeclarationIndexOf(patterns []string) (gotestspec.DeclarationIndex, e
 	}
 	return buildDeclarationIndex(pkgs.Loaded), nil
 }
+
+// phases.go
+type ExportPhases = phases

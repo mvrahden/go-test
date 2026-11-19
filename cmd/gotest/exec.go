@@ -6,15 +6,22 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 )
 
 func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
+	clock := phaseClock{start: time.Now()}
+	if cfg.Debug {
+		// Deferred first, so it prints last: after the cleanup and the stop.
+		defer func() { fmt.Fprintln(os.Stderr, clock.phases(time.Now())) }()
+	}
 	classified := gotestrunner.ClassifyGoTestArgs(cfg.GoTestArgs)
 	loadFlags := gotestrunner.StripNonLoadFlags(classified.BuildFlags)
 	pkgs, err := loadRunPackages(cfg.PackagePatterns, loadFlags)
+	clock.discovered = time.Now()
 	loaded, broken, noTestFiles := pkgs.Loaded, pkgs.Broken, pkgs.NoTestFiles
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
@@ -29,6 +36,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	}
 
 	overlay, cleanup, err := gotestrunner.GenerateOverlay(loaded, broken, cfg.Debug, cfg.NoCache, cfg.HarvestSeeds)
+	clock.generated = time.Now()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
@@ -44,6 +52,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		defer cancel()
 	}
 
+	clock.piped = time.Now()
 	result, err := gotestrunner.RunPipeline(ctx, gotestrunner.PipelineConfig{
 		GoTestArgs:      cfg.GoTestArgs,
 		SetupTimeout:    cfg.SetupTimeout,
@@ -59,6 +68,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		Groups:          cfg.Groups,
 		SkipGroups:      cfg.SkipGroups,
 	}, overlay)
+	clock.ran, clock.compile = time.Now(), result.CompileSpan
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FAIL: %s\n", err)
 		return 2
