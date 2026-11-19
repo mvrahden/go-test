@@ -8,17 +8,19 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 )
 
 // A run links its test binaries into a cache keyed by what decides the
 // link's output: the working directory (two checkouts of one module share
-// import paths), the build flags, the platform and the Go version. Each
-// entry is then stable across runs. A run places its cached binaries into
-// its own stage dir, by link or copy, under each binary's lock, and builds
-// there: go touches a binary that is up to date and replaces one that is
-// not. Nothing writes a cache entry in place: a rebuilt binary replaces its
-// entry by a rename, so a run executing the old file keeps it.
+// import paths), the build flags, those in GOFLAGS among them, the platform
+// and the Go version. Each entry is then stable across runs. A run places
+// its cached binaries into its own stage dir, by link or copy, under each
+// binary's lock, and builds there: go leaves a binary that is up to date
+// and replaces one that is not. Nothing writes a cache entry in place: a
+// rebuilt binary replaces its entry by a rename, so a run executing the old
+// file keeps it.
 
 func binaryCacheKey(cwd string, buildFlags []string) string {
 	flags := slices.Clone(buildFlags)
@@ -31,6 +33,32 @@ func binaryCacheKey(cwd string, buildFlags []string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
+// keyedEnv are the variables that change a test binary beside its build
+// flags: GOFLAGS carries build flags too.
+var keyedEnv = []string{"GOFLAGS", "GOEXPERIMENT", "CGO_ENABLED"}
+
+// traceFlags change what go prints, not the binary it links.
+var traceFlags = []string{"x", "v", "n", "work", "json", "p"}
+
+// envKeyFlags is what keyedEnv holds, as parts of a cache key; GOFLAGS
+// without its traceFlags.
+func envKeyFlags(getenv func(string) string) []string {
+	var out []string
+	for _, name := range keyedEnv {
+		v := getenv(name)
+		if name == "GOFLAGS" {
+			v = strings.Join(slices.DeleteFunc(strings.Fields(v), func(f string) bool {
+				flag, _, _ := strings.Cut(strings.TrimLeft(f, `-'"`), "=")
+				return slices.Contains(traceFlags, flag)
+			}), " ")
+		}
+		if v != "" {
+			out = append(out, "$"+name+"="+v)
+		}
+	}
+	return out
+}
+
 // binaryCacheDir returns the directory this run's binaries link into, or ""
 // when the cache is off (an empty root) or cannot be used.
 func binaryCacheDir(root string, buildFlags []string) string {
@@ -41,7 +69,7 @@ func binaryCacheDir(root string, buildFlags []string) string {
 	if err != nil {
 		return ""
 	}
-	dir := filepath.Join(root, "bin", binaryCacheKey(cwd, buildFlags))
+	dir := filepath.Join(root, "bin", binaryCacheKey(cwd, append(slices.Clone(buildFlags), envKeyFlags(os.Getenv)...)))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return ""
 	}

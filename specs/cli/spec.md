@@ -560,6 +560,10 @@ A run SHALL execute a test binary built from the sources, build tags and link fl
 - **WHEN** three runs of one package start at once on an empty cache
 - **THEN** all pass and leave no temporary file in the cache
 
+#### Scenario: Runs at once with build tags in GOFLAGS
+- **WHEN** two runs of one package start together over one cache, one with a build tag in GOFLAGS
+- **THEN** each executes the binary built for its own tags
+
 #### Scenario: A filtered run before a full one
 - **WHEN** a run that -run narrows to one package is followed by an unfiltered run
 - **THEN** the second run builds and runs the other package
