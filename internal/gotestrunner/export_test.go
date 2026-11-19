@@ -814,6 +814,15 @@ func (l *buildLog) ExportFailed(pkg string) bool        { return l.failed(pkg) }
 func (l *buildLog) ExportDiagnostics(pkg string) []byte { return l.diagnostics(pkg) }
 func (l *buildLog) ExportShared() []byte                { return l.shared() }
 
+var ExportLinkOrCopy = linkOrCopy
+
+// ExportSetHardLink replaces the hard link a placement makes until restore.
+func ExportSetHardLink(fn func(oldname, newname string) error) (restore func()) {
+	prev := hardLink
+	hardLink = fn
+	return func() { hardLink = prev }
+}
+
 // ExportDispatchedPackages is the packages a test run of o dispatches
 // under -run, -skip and --skip-group.
 func ExportDispatchedPackages(o *OverlayResult, run, skip string, skipGroups []string) map[string]bool {
