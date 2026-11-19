@@ -706,6 +706,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			// after every suite has stopped. The pipeline ctx stays attached
 			// as the safety net so an abnormal runner death still releases
 			// the process group.
+			traceDispatch(dispatchEvent{Kind: "up-front", Keys: sortedKeys(win.Bulk)})
 			setupProc, err = StartSharedFixtures(ctx, overlay.WorkDir, win.Fixtures, resolvedSetupTimeout, pf.BuildFlags...)
 			if err != nil {
 				fixtureStartErr = err
@@ -751,6 +752,12 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		}
 		return setupProc
 	})
+	release := func(keys []string) {
+		if len(keys) > 0 {
+			traceDispatch(dispatchEvent{Kind: "free", Keys: sortedCopy(keys)})
+		}
+		releaser.Release(keys)
+	}
 
 	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, pf.BuildFlags), cfg.CompileParallel)
 
@@ -769,7 +776,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	// A package that will never run holds no fixture.
 	for i := range overlay.BrokenPackages {
-		releaser.Release(ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
+		release(ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
 	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
@@ -803,12 +810,14 @@ loop:
 			if streamCtx.Err() != nil {
 				continue // cancellation noise, not a compile verdict
 			}
+			traceDispatch(dispatchEvent{Kind: "intake", Package: outcome.Package, For: "failed"})
 			buildFailed = true
 			bookBuildFailures(collector, nil, []BuildFailure{{Package: outcome.Package, Err: outcome.Err}})
-			releaser.Release(ledger.DoneExcept(outcome.Package, nil))
+			release(ledger.DoneExcept(outcome.Package, nil))
 			continue
 		}
 		cr := outcome.Result
+		traceDispatch(dispatchEvent{Kind: "intake", Package: cr.Package})
 
 		singleCompiled := []CompileResult{cr}
 		singleSuites := map[string][]string{cr.Package: overlay.SuitesByPkg[cr.Package]}
@@ -820,7 +829,7 @@ loop:
 		for j := range targets {
 			produced[targets[j].SuiteName] = true
 		}
-		releaser.Release(ledger.DoneExcept(cr.Package, produced))
+		release(ledger.DoneExcept(cr.Package, produced))
 
 		if len(targets) == 0 {
 			collector.RecordNothingToRun(cr.Package)
@@ -860,7 +869,8 @@ loop:
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
 				// Last of all, once the suite's process is gone.
-				defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)) }()
+				defer func() { release(ledger.Done(t.Package, t.SuiteName)) }()
+				requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 				recorded := false
 				// missing names the shared fixture the suite is given up for.
 				missing := ""
@@ -868,15 +878,16 @@ loop:
 					switch {
 					case recorded:
 					case missing != "":
+						traceSuite("given-up", &t, requiredKeys)
 						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
 					case streamCtx.Err() != nil:
+						traceSuite("stopped", &t, requiredKeys)
 						collector.RecordStopped(t.Package, idx, t.SuiteName)
 					default:
 						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
 					}
 				}()
 
-				requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 				var env []string
 				if len(requiredKeys) > 0 {
 					select {
@@ -928,7 +939,11 @@ loop:
 				}
 				defer func() { <-sem }()
 
-				clock.run(t.Group, func() { runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON()) })
+				clock.run(t.Group, func() {
+					traceSuite("suite-start", &t, requiredKeys)
+					runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
+					traceSuite("suite-end", &t, requiredKeys)
+				})
 				recorded = true
 			}(target, i)
 		}
@@ -981,6 +996,7 @@ loop:
 		for _, key := range start {
 			started[key] = true
 		}
+		traceDispatch(dispatchEvent{Kind: "start", Keys: start, For: what})
 		if err := setupProc.StartKeys(streamCtx, start, resolvedSetupTimeout); err != nil {
 			slotErr = errors.Join(slotErr, fmt.Errorf("shared fixture start for %s: %w", what, err))
 		}
@@ -989,10 +1005,12 @@ loop:
 	runDeferred := func(t SuiteTarget, idx int) { //nolint:gocritic // hugeParam: a copy per suite is nothing beside the process it starts
 		requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
 		if streamCtx.Err() != nil {
+			traceSuite("stopped", &t, requiredKeys)
 			collector.RecordStopped(t.Package, idx, t.SuiteName)
 			return
 		}
 		if missing := missingFixture(setupProc, requiredKeys); missing != "" {
+			traceSuite("given-up", &t, requiredKeys)
 			collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
 			return
 		}
@@ -1008,7 +1026,11 @@ loop:
 			copy(env, baseEnv)
 			env = append(env, protocol.EnvSharedStateFile+"="+stateFile)
 		}
-		clock.run(t.Group, func() { runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON()) })
+		clock.run(t.Group, func() {
+			traceSuite("suite-start", &t, requiredKeys)
+			runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
+			traceSuite("suite-end", &t, requiredKeys)
+		})
 	}
 
 	// Scopes never overlap: a later group starts once the one before it has
@@ -1026,10 +1048,11 @@ loop:
 				go func(t SuiteTarget, idx int) {
 					defer scopeWg.Done()
 					// Last of all, once the suite's process is gone.
-					defer func() { releaser.Release(ledger.Done(t.Package, t.SuiteName)) }()
+					defer func() { release(ledger.Done(t.Package, t.SuiteName)) }()
 					select {
 					case sem <- struct{}{}:
 					case <-streamCtx.Done():
+						traceSuite("stopped", &t, overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName])
 						collector.RecordStopped(t.Package, idx, t.SuiteName)
 						return
 					}
@@ -1052,7 +1075,7 @@ loop:
 			}
 			// The slot's process is gone. Its release runs beside the next
 			// slot, which needs none of what it frees.
-			releaser.Release(ledger.Done(d.t.Package, d.t.SuiteName))
+			release(ledger.Done(d.t.Package, d.t.SuiteName))
 		}
 	}
 	allIn()
@@ -1069,6 +1092,7 @@ loop:
 	releaseErr := releaser.Err()
 	var teardownErr error
 	if setupProc != nil {
+		traceDispatch(dispatchEvent{Kind: "teardown"})
 		teardownErr = errors.Join(slotErr, releaseErr, setupProc.Teardown())
 		reports := setupProc.TakeFailures()
 		setupErr = withReports(setupErr, reports, false)

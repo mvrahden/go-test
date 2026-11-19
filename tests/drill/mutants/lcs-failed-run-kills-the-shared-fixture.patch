@@ -10,5 +10,5 @@ Clause: when the first method of a FailFast suite bound to a shared fixture fail
 +		_ = setupProc.tree.Kill()
 +	}
  	if setupProc != nil {
+ 		traceDispatch(dispatchEvent{Kind: "teardown"})
  		teardownErr = errors.Join(slotErr, releaseErr, setupProc.Teardown())
- 		reports := setupProc.TakeFailures()

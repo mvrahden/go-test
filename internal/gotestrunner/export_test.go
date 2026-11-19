@@ -451,3 +451,14 @@ func (p *SharedFixtureProcess) State(keys []string) map[string]json.RawMessage {
 }
 
 func (p *ManagedProcess) Done() <-chan struct{} { return p.done }
+
+// DispatchEvent is one step of a run's dispatch.
+type DispatchEvent = dispatchEvent
+
+// ExportObserveDispatch hands every dispatch step to fn until the returned
+// call restores the default.
+func ExportObserveDispatch(fn func(DispatchEvent)) (restore func()) {
+	prev := observeDispatch
+	observeDispatch = fn
+	return func() { observeDispatch = prev }
+}
