@@ -788,3 +788,10 @@ func addKeys[V any](set map[string]bool, m map[string]V) {
 		set[k] = true
 	}
 }
+
+// ExportBooked counts the suite results c has booked for pkg.
+func ExportBooked(c *OutputCollector, pkg string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.pkgs[pkg].completed
+}

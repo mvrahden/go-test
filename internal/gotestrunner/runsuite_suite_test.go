@@ -31,9 +31,9 @@ func runSuitePlan() *gotestrunner.RunPlan {
 }
 
 // runOne runs suite in mode on session f and returns the captured stream
-// followed by the collector's stderr, the package's exit code and how many
-// suite processes were started.
-func runOne(t *gotest.T, f gotestrunner.ExportSession, suite string, mode gotestrunner.ExportSuiteMode, stop bool) (stream string, exit, starts int) {
+// followed by the collector's stderr, the package's exit code, how many
+// suite processes were started and how many verdicts were booked.
+func runOne(t *gotest.T, f gotestrunner.ExportSession, suite string, mode gotestrunner.ExportSuiteMode, stop bool) (stream string, exit, starts, booked int) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	if stop {
@@ -46,7 +46,7 @@ func runOne(t *gotest.T, f gotestrunner.ExportSession, suite string, mode gotest
 	gotestrunner.ExportRunSuite(gotestrunner.ExportNewStreamRun(ctx, runSuitePlan(), c, f, 1), suite, mode)
 	restore()
 	c.Finalize()
-	return string(c.CapturedJSON()) + stderr.String(), c.WorstExitCode(), starts
+	return string(c.CapturedJSON()) + stderr.String(), c.WorstExitCode(), starts, gotestrunner.ExportBooked(c, runSuitePkg)
 }
 
 func (s *RunSuiteTestSuite) TestEveryPathBooksOneVerdict(t *gotest.T) {
@@ -61,8 +61,9 @@ func (s *RunSuiteTestSuite) TestEveryPathBooksOneVerdict(t *gotest.T) {
 	for _, m := range modes {
 		t.When(m.name+", the run already stopped", func(w *gotest.T) {
 			// A missing fixture as well: a stopped run says stopped.
-			stream, _, starts := runOne(w, gotestrunner.ExportNewFixtureSession(nil, errors.New("setup failed"), false), "TestXTestSuite", m.mode, true)
+			stream, _, starts, booked := runOne(w, gotestrunner.ExportNewFixtureSession(nil, errors.New("setup failed"), false), "TestXTestSuite", m.mode, true)
 			w.It("books the suite skipped as run stopping and starts nothing", func(it *gotest.T) {
+				gotest.Equal(it, 1, booked)
 				gotest.Contains(it, stream, `"Action":"skip"`)
 				gotest.Contains(it, stream, "run stopping")
 				gotest.NotContains(it, stream, "never ran")
@@ -71,8 +72,9 @@ func (s *RunSuiteTestSuite) TestEveryPathBooksOneVerdict(t *gotest.T) {
 			})
 		})
 		t.When(m.name+", its fixture never came up", func(w *gotest.T) {
-			stream, exit, starts := runOne(w, gotestrunner.ExportNewFixtureSession(nil, errors.New("setup failed"), false), "TestXTestSuite", m.mode, false)
+			stream, exit, starts, booked := runOne(w, gotestrunner.ExportNewFixtureSession(nil, errors.New("setup failed"), false), "TestXTestSuite", m.mode, false)
 			w.It("books it failed, naming the fixture, and starts nothing", func(it *gotest.T) {
+				gotest.Equal(it, 1, booked)
 				gotest.Contains(it, stream, "TestXTestSuite never ran: shared fixture A did not come up")
 				gotest.Contains(it, stream, `"Action":"fail"`)
 				gotest.Equal(it, 1, exit)
@@ -81,8 +83,9 @@ func (s *RunSuiteTestSuite) TestEveryPathBooksOneVerdict(t *gotest.T) {
 		})
 		t.When(m.name+", the state file cannot be written", func(w *gotest.T) {
 			proc := gotestrunner.ExportNewUpProcess(filepath.Join(notAFile, "shared"), up)
-			stream, exit, starts := runOne(w, gotestrunner.ExportNewFixtureSession(proc, nil, false), "TestXTestSuite", m.mode, false)
+			stream, exit, starts, booked := runOne(w, gotestrunner.ExportNewFixtureSession(proc, nil, false), "TestXTestSuite", m.mode, false)
 			w.It("fails the package and starts nothing", func(it *gotest.T) {
+				gotest.Equal(it, 1, booked)
 				gotest.Equal(it, 1, exit)
 				gotest.NotContains(it, stream, "never ran")
 				gotest.Zero(it, starts)
@@ -93,8 +96,9 @@ func (s *RunSuiteTestSuite) TestEveryPathBooksOneVerdict(t *gotest.T) {
 
 func (s *RunSuiteTestSuite) TestASuiteWithNothingInItsWayStarts(t *gotest.T) {
 	for _, mode := range []gotestrunner.ExportSuiteMode{gotestrunner.ExportStreamed, gotestrunner.ExportDeferred, gotestrunner.ExportAlone} {
-		stream, exit, starts := runOne(t, gotestrunner.ExportNewFixtureSession(nil, nil, false), "TestYTestSuite", mode, false)
+		stream, exit, starts, booked := runOne(t, gotestrunner.ExportNewFixtureSession(nil, nil, false), "TestYTestSuite", mode, false)
 		gotest.Equal(t, 1, starts)
+		gotest.Equal(t, 1, booked)
 		gotest.NotEqual(t, 0, exit)
 		gotest.Contains(t, stream, "did not start: must not start")
 	}
