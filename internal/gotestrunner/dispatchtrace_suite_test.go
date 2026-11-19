@@ -153,9 +153,8 @@ func (s *DispatchTraceTestSuite) TestARunWithNothingToRunEndsClean(t *gotest.T, 
 
 // traceScope is one scope of a canonical trace.
 type traceScope struct {
-	starts []string          // start lines for the group, in event order
-	bulk   map[string]string // suite → its bulk line
-	tail   []string          // exclusive suites and their starts, in event order
+	bulk map[string]string // suite → its bulk line
+	tail []string          // exclusive suites and their starts, in event order
 }
 
 // traceSpan is where a suite's events sit in the trace.
