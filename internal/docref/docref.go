@@ -3,6 +3,7 @@ package docref
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"maps"
 	"regexp"
 	"slices"
@@ -114,6 +115,23 @@ func textCell(text string) string {
 		parts[i] = codeCell(parts[i])
 	}
 	return strings.Join(parts, "`")
+}
+
+// htmlText escapes prose for HTML and writes its `code` spans as <code>.
+func htmlText(text string) string {
+	parts := strings.Split(text, "`")
+	var b strings.Builder
+	for i, p := range parts {
+		switch {
+		case i%2 == 0:
+			b.WriteString(html.EscapeString(p))
+		case i == len(parts)-1: // an unclosed span is text
+			b.WriteString("`" + html.EscapeString(p))
+		default:
+			b.WriteString("<code>" + html.EscapeString(p) + "</code>")
+		}
+	}
+	return b.String()
 }
 
 // sentence starts text with a capital letter.
