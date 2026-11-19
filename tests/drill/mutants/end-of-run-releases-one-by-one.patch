@@ -82,5 +82,5 @@ Clause: when a shared fixture's release still runs as the run ends and another f
  	// later.
 +	releaser.Drain()
  	releaseCancel()
- 	releaseErr := releaser.Err()
- 	var teardownErr error
+ 	setupErr, teardownErr := fixtures.close(releaser.Err())
+ 	streamCancel()

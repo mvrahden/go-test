@@ -125,6 +125,25 @@ func (s *DispatchTraceTestSuite) TestGroupsWithFixturesOfTheirOwn(t *gotest.T, c
 	gotest.MatchSnapshot(t, trace)
 }
 
+// TestALateFixtureStartedOnce pins, without a snapshot, that a fixture two
+// exclusive suites read is started for the first and kept for the second.
+func (s *DispatchTraceTestSuite) TestALateFixtureStartedOnce(t *gotest.T, c *traceCtx) {
+	trace, exit := c.run(t, "../../tests/conformance/testdata/tracelatetwice/")
+	gotest.Equal(t, 0, exit)
+	p, key := tracePkgs+"/tracelatetwice", "["+tracePkgs+"/tracelatetwice.LateSharedFixture]"
+	gotest.Equal(t, strings.Join([]string{
+		"intake " + p,
+		"up-front []",
+		`scope ""`,
+		"  start " + key + " for exclusive tail",
+		"  tail " + p + ".TestAFirstTestSuite " + key + " ran",
+		"  tail " + p + ".TestBSecondTestSuite " + key + " ran",
+		"free " + key,
+		"teardown",
+		"",
+	}, "\n"), trace)
+}
+
 // traceScope is one scope of a canonical trace.
 type traceScope struct {
 	starts []string          // start lines for the group, in event order

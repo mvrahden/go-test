@@ -8,6 +8,6 @@ Clause: when the only suite reading a shared fixture finishes while an unrelated
  				// Last of all, once the suite's process is gone.
 -				defer func() { release(ledger.Done(t.Package, t.SuiteName)) }()
 +				defer func() { _ = ledger.Done(t.Package, t.SuiteName) }()
- 				requiredKeys := overlay.SuiteRequiredSharedFixtureKeys[t.Package][t.SuiteName]
+ 				requiredKeys := plannedKeys(plan, &t)
  				recorded := false
  				// missing names the shared fixture the suite is given up for.

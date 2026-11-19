@@ -8,6 +8,6 @@ Clause: when a passing run is interrupted while its shared fixture's AfterAll ru
  
 -	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), dispatchErr)
 +	exitCode := exitCodeAfterDispatch(collector.WorstExitCode(), ctx.Err())
- 	if sharedSetupFailed.Load() && exitCode == 0 {
+ 	if fixtures.failedSetup() && exitCode == 0 {
  		exitCode = 1
  	}
