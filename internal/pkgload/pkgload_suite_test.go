@@ -1,6 +1,7 @@
 package pkgload_test
 
 import (
+	"fmt"
 	"go/types"
 	"os/exec"
 	"path/filepath"
@@ -172,6 +173,55 @@ func (s *LoadTestSuite) TestNeverBuildsATestVariant(t *gotest.T) {
 	t.It("asks for no tests where it asks for export data", func(it *gotest.T) {
 		gotest.False(it, calls[1].Tests)
 		gotest.NotZero(it, calls[1].Mode&packages.NeedExportFile)
+	})
+}
+
+// errorsOf maps each package to the kind and message of its errors, in order.
+func errorsOf(pkgs []*packages.Package) map[string][]string {
+	out := map[string][]string{}
+	for _, p := range pkgs {
+		for _, e := range p.Errors {
+			out[p.ID] = append(out[p.ID], fmt.Sprintf("%d %s", e.Kind, e.Msg))
+		}
+	}
+	return out
+}
+
+func (s *LoadTestSuite) TestABrokenPackage(t *gotest.T) {
+	for t, row := range gotest.Each(t, []corpusRow{
+		{Desc: "a type error in a test file", Pattern: testdata + "broken/typeerr"},
+		{Desc: "an import that does not resolve", Pattern: testdata + "broken/importerr"},
+	}) {
+		want := s.loadWithExport(t, row)
+		got, err := pkgload.Load(s.config(row), row.Pattern)
+		gotest.NoError(t, err)
+		gotest.NotEmpty(t, errorsOf(want))
+		gotest.Equal(t, errorsOf(want), errorsOf(got))
+	}
+}
+
+func (s *LoadTestSuite) TestABrokenPackageBesideAnIntactOne(t *gotest.T) {
+	var calls [][]string
+	restore := pkgload.ExportSetLoad(func(cfg *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		calls = append(calls, patterns)
+		return packages.Load(cfg, patterns...)
+	})
+	pkgs, err := pkgload.Load(&pkgload.Config{Dir: s.root, Tests: true}, testdata+"broken/typeerr", testdata+"inpkg")
+	restore()
+	gotest.NoError(t, err)
+	t.It("loads the broken package alone once more", func(it *gotest.T) {
+		gotest.Len(it, calls, 3)
+		gotest.Equal(it, []string{repoPath + "broken/typeerr"}, calls[2])
+	})
+	t.It("leaves the intact package without errors", func(it *gotest.T) {
+		var intact int
+		for _, p := range pkgs {
+			if strings.HasPrefix(p.ID, repoPath+"inpkg") {
+				intact++
+				gotest.Empty(it, p.Errors, "errors of %s", p.ID)
+			}
+		}
+		gotest.Equal(it, 3, intact) // the package, its test variant and its test main
 	})
 }
 
