@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -255,6 +256,60 @@ func dispatchedPackages(suites []*PlannedSuite) map[string]bool {
 		out[s.Package] = true
 	}
 	return out
+}
+
+// testBinaryName is the file go test -c -o <dir>/ writes for importPath: its
+// last element, or the one before a major-version element such as v2, then
+// .test and the platform's executable suffix.
+func testBinaryName(importPath, goos string) string {
+	name := importPath
+	if i := strings.LastIndex(importPath, "/"); i >= 0 {
+		name = importPath[i+1:]
+		if isVersionElement(name) {
+			rest := importPath[:i]
+			name = rest[strings.LastIndex(rest, "/")+1:]
+		}
+	}
+	name += ".test"
+	if goos == "windows" {
+		name += ".exe"
+	}
+	return name
+}
+
+// isVersionElement reports whether elem is v followed by a number of at
+// least 2 without a leading zero.
+func isVersionElement(elem string) bool {
+	if len(elem) < 2 || elem[0] != 'v' || elem[1] == '0' || elem == "v1" {
+		return false
+	}
+	for _, c := range elem[1:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// compileGroups deals pkgs, in order, into the first group that does not
+// hold their binary's name yet: go test -c refuses two packages with one
+// name in one call. Names are compared case-folded, for case-insensitive
+// filesystems.
+func compileGroups(pkgs []string, goos string) [][]string {
+	var groups [][]string
+	var names []map[string]bool
+	for _, pkg := range pkgs {
+		name := strings.ToLower(testBinaryName(pkg, goos))
+		i := slices.IndexFunc(names, func(held map[string]bool) bool { return !held[name] })
+		if i < 0 {
+			i = len(groups)
+			groups = append(groups, nil)
+			names = append(names, map[string]bool{})
+		}
+		groups[i] = append(groups[i], pkg)
+		names[i][name] = true
+	}
+	return groups
 }
 
 // spanOf passes ch's outcomes on and measures the compile stage: span is
