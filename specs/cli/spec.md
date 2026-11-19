@@ -467,7 +467,7 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 - **THEN** leaves no coverage profile in the temp directory
 
 ### Requirement: Where a run's time went
-A --debug run SHALL end its stderr with one line naming how long it spent discovering, generating, compiling, running and reporting, and in total. Compiling overlaps running, so the line gives each span, not a sum. A run without --debug SHALL print no such line.
+A --debug run SHALL follow its own output on stderr with one line naming how long it spent discovering, generating, compiling, running and reporting, and in total; only the coverage verdict of a run given --min may come after it, and is not counted in it. Compiling overlaps running, so the line gives each span, not a sum. A run without --debug SHALL print no such line.
 
 #### Scenario: A --debug run
 - **WHEN** a passing package is run with --debug
