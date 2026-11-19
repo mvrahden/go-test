@@ -17,17 +17,21 @@ var fuzzRuntimeImport = about.Repo + "/pkg/gotestfuzz"
 // gotestImport is the import path of the assertion package.
 var gotestImport = about.Repo + "/pkg/gotest"
 
+// runtimeImport is the import path of the harness runtime.
+var runtimeImport = about.Repo + "/pkg/gotestruntime"
+
 // arrayFanLimit bounds element-wise fanning of a fixed-size array: an array
 // whose elements would add more leaves than this rides as one hybrid []byte
 // leaf instead, so a [256]int field cannot dilute the mutator's attention
 // across 256 positions.
 const arrayFanLimit = 16
 
-// FuzzTargetRef is one generated gotest.FuzzTarget, as the NewF call in the
-// fuzz wrapper needs to reference it: a complete composite-literal expression.
+// FuzzTargetRef is one generated gotestruntime.FuzzTarget, as the FuzzF call
+// in the fuzz wrapper needs to reference it: a complete composite-literal
+// expression.
 type FuzzTargetRef struct {
 	FuncName string // the wrapper it binds, e.g. FuzzRichFuzzTestSuite_FuzzRich
-	Expr     string // e.g. &gotest.FuzzTarget{Signature: "func(*gotest.T, Rich)", Register: ƒ_fuzzreg_v1_FuzzRichFuzzTestSuite_FuzzRich, Explode: ƒ_fuzzexp_v1_FuzzRichFuzzTestSuite_FuzzRich}
+	Expr     string // e.g. &gotestruntime.FuzzTarget{Signature: "func(*gotest.T, Rich)", Register: ƒ_fuzzreg_v1_FuzzRichFuzzTestSuite_FuzzRich, Explode: ƒ_fuzzexp_v1_FuzzRichFuzzTestSuite_FuzzRich}
 }
 
 // FuzzTargetSet is everything the renderer needs to emit fuzz support for
@@ -164,7 +168,7 @@ func (e *fuzzEmitter) emitCall(body *strings.Builder, c gotestast.FuzzCall) (str
 
 // emitTarget emits the register and explode functions of one target (and
 // the literal function of its tuple, memoised per tuple) and returns the
-// gotest.FuzzTarget expression the wrapper hands to NewF, plus the corpus
+// gotestruntime.FuzzTarget expression the wrapper hands to FuzzF, plus the corpus
 // type of every leaf the engine sees.
 func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []types.Type) (string, []string, error) {
 	infos := make([]*fanInfo, len(typs))
@@ -183,6 +187,7 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	}
 	sig := "func(*gotest.T" + strings.Join(append([]string{""}, refs...), ", ") + ")"
 	gt := e.pkgRef(gotestImport)
+	rt := e.pkgRef(runtimeImport)
 	codeSig := "func(*" + gt + ".T" + strings.Join(append([]string{""}, codeRefs...), ", ") + ")"
 	if len(params) == 0 {
 		return "", nil, fmt.Errorf("f.Fuzz over %s has no fuzzable leaves — nothing for the engine to mutate; fuzz the operation's real input", sig)
@@ -261,14 +266,14 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	}
 	tg := e.pkgRef("testing")
 	fmt.Fprintf(body, "\nfunc %s(ƒf *%s.F, ƒfn any, ƒeach %s.FuzzEach) bool {\n\tƒrun, ok := ƒfn.(%s)\n\tif !ok {\n\t\treturn false\n\t}\n\tƒf.Fuzz(func(ƒt *%s.T, %s) {\n%s\t\tƒeach(ƒt, %s, func(ƒtt *%s.T) { ƒrun(ƒtt, %s) })\n\t})\n\treturn true\n}\n",
-		regName, tg, gt, codeSig, tg, strings.Join(leafParams, ", "), fanIn.String(), literalArg, gt, strings.Join(argNames, ", "))
+		regName, tg, rt, codeSig, tg, strings.Join(leafParams, ", "), fanIn.String(), literalArg, gt, strings.Join(argNames, ", "))
 
 	// Explode: one typed f.Add tuple to the same leaves, with the arity and
 	// each position's type checked against the declared signature.
 	var exp strings.Builder
-	fmt.Fprintf(&exp, "\nfunc %s(ƒseed []any) ([]any, error) {\n\tif err := %s.SeedArity(ƒseed, %d); err != nil {\n\t\treturn nil, err\n\t}\n", expName, gt, len(typs))
+	fmt.Fprintf(&exp, "\nfunc %s(ƒseed []any) ([]any, error) {\n\tif err := %s.SeedArity(ƒseed, %d); err != nil {\n\t\treturn nil, err\n\t}\n", expName, rt, len(typs))
 	for i, t := range typs {
-		fmt.Fprintf(&exp, "\t%s, err := %s.SeedArg[%s](ƒseed, %d)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", argNames[i], gt, codeRefs[i], i)
+		fmt.Fprintf(&exp, "\t%s, err := %s.SeedArg[%s](ƒseed, %d)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", argNames[i], rt, codeRefs[i], i)
 		_ = t
 	}
 	fmt.Fprintf(&exp, "\tƒo := make([]any, 0, %d)\n", len(params))
@@ -278,7 +283,7 @@ func (e *fuzzEmitter) emitTarget(body *strings.Builder, funcName string, typs []
 	exp.WriteString("\treturn ƒo, nil\n}\n")
 	body.WriteString(exp.String())
 
-	expr := fmt.Sprintf("&%s.FuzzTarget{Signature: %q, Register: %s, Explode: %s}", gt, sig, regName, expName)
+	expr := fmt.Sprintf("&%s.FuzzTarget{Signature: %q, Register: %s, Explode: %s}", rt, sig, regName, expName)
 	return expr, params, nil
 }
 

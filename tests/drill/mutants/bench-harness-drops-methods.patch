@@ -14,7 +14,7 @@ Judge: ./tests/canary CanaryTestSuite/TestEveryBenchmarkReportsAResult
      ƒgotestruntime.SkipIfStopped(b)
 @@ -18,7 +18,7 @@
      b.ResetTimer()
-     ƒgotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}ƒgotest.NewB(b){{ end }}) })
+     ƒgotestruntime.RunBody(b, func() { s.{{ $bm.Identifier }}({{ if $bm.UsesStdlibT }}b{{ else }}ƒgotestruntime.BenchB(b){{ end }}) })
    })
 -{{ end }}
 +{{ end }}{{ end }}
