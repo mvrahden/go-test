@@ -172,6 +172,41 @@ func (s *CLIStaleBinaryTestSuite) TestRunsAtOnce(t *gotest.T, c *staleCtx) {
 	})
 }
 
+func (s *CLIStaleBinaryTestSuite) TestRunsAtOnceWithGOFLAGSTags(t *gotest.T, c *staleCtx) {
+	gotest.Equal(t, "stale-probe: dep=1 test=1 tag=off linked=", c.run(t, nil))
+	// Every run's go touches the cached binary its slot links when it finds
+	// it up to date; touch it all along, as a third run would, so the two
+	// runs below see such a touch whenever they look.
+	stop := make(chan struct{})
+	waitTouch := gotest.Go(t, func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+			bins, _ := filepath.Glob(filepath.Join(c.cache, "bin", "*", "*.test"))
+			now := time.Now()
+			for _, b := range bins {
+				_ = os.Chtimes(b, now, now)
+			}
+		}
+	})
+	var tagged, plain string
+	waitTagged := gotest.Go(t, func() { tagged = c.run(t, []string{"GOFLAGS=-tags=probetag"}) })
+	waitPlain := gotest.Go(t, func() { plain = c.run(t, nil) })
+	waitTagged()
+	waitPlain()
+	close(stop)
+	waitTouch()
+	t.When("two runs of one package start together over one cache, one with a build tag in GOFLAGS", func(w *gotest.T) {
+		w.It("each executes the binary built for its own tags", func(it *gotest.T) {
+			gotest.Equal(it, "stale-probe: dep=1 test=1 tag=on linked=", tagged)
+			gotest.Equal(it, "stale-probe: dep=1 test=1 tag=off linked=", plain)
+		})
+	})
+}
+
 func (s *CLIStaleBinaryTestSuite) TestAFilteredRunBeforeAFullOne(t *gotest.T, c *staleCtx) {
 	env := []string{protocol.EnvCacheDir + "=" + c.cache}
 	filtered, err := testkit.RunCLIWithEnv(t.Context(), ".", env, "../testdata/buildset/...", "-run", "^TestSelTestSuite$")

@@ -26,6 +26,17 @@ func (s *BinaryCacheKeyTestSuite) TestKey(t *gotest.T) {
 	t.It("changes with the build flags", func(it *gotest.T) {
 		gotest.NotEqual(it, gotestrunner.ExportBinaryCacheKey("/w", nil), gotestrunner.ExportBinaryCacheKey("/w", []string{"-race"}))
 	})
+	t.It("changes with the build flags GOFLAGS carries", func(it *gotest.T) {
+		env := func(vars map[string]string) func(string) string {
+			return func(name string) string { return vars[name] }
+		}
+		plain := gotestrunner.ExportEnvKeyFlags(env(nil))
+		tagged := gotestrunner.ExportEnvKeyFlags(env(map[string]string{"GOFLAGS": "-tags=probetag"}))
+		gotest.Empty(it, plain)
+		gotest.NotEqual(it, gotestrunner.ExportBinaryCacheKey("/w", plain), gotestrunner.ExportBinaryCacheKey("/w", tagged))
+		gotest.NotEqual(it, tagged, gotestrunner.ExportEnvKeyFlags(env(map[string]string{"GOEXPERIMENT": "-tags=probetag"})))
+		gotest.Equal(it, tagged, gotestrunner.ExportEnvKeyFlags(env(map[string]string{"GOFLAGS": "-x -tags=probetag -p=4"})), "trace flags change no binary")
+	})
 }
 
 func (s *BinaryCacheKeyTestSuite) TestDir(t *gotest.T) {
@@ -38,6 +49,13 @@ func (s *BinaryCacheKeyTestSuite) TestDir(t *gotest.T) {
 		gotest.Regexp(it, `^bin[\\/][0-9a-f]{16}$`, dir)
 		_, err := os.Stat(filepath.Join(root, dir))
 		gotest.NoError(it, err)
+	})
+	t.It("is another for build tags in GOFLAGS", func(it *gotest.T) {
+		root := it.TempDir()
+		it.Setenv("GOFLAGS", "")
+		plain := gotestrunner.ExportBinaryCacheDir(root, nil)
+		it.Setenv("GOFLAGS", "-tags=probetag")
+		gotest.NotEqual(it, plain, gotestrunner.ExportBinaryCacheDir(root, nil))
 	})
 }
 

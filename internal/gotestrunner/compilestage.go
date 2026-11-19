@@ -213,19 +213,21 @@ type readiness int
 
 const (
 	notReady  readiness = iota
-	confirmed           // the placed file, touched by go: up to date
+	confirmed           // the placed file, left by go: up to date
 	rebuilt             // a file go wrote
 )
 
-// binaryReady judges one slot. exited is go's exit: -1 while it runs. A
-// placed file go has not touched is ready only once go exited 0; a new
-// file only once go exited, unless go renames it into place.
+// binaryReady judges one slot. exited is go's exit: -1 while it runs. The
+// placed file is confirmed only once go exited 0 and left it there: its
+// mtime is no sign, since every run's slot links the same cache entry and
+// another run's go touches it. A new file is ready once go exited, or as
+// soon as it is there where go renames it into place.
 func binaryReady(placed, now os.FileInfo, renameSafe bool, exited int) readiness {
 	switch {
 	case now == nil:
 		return notReady
 	case placed != nil && os.SameFile(placed, now):
-		if now.ModTime().After(placed.ModTime()) || exited == 0 {
+		if exited == 0 {
 			return confirmed
 		}
 		return notReady
