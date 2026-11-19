@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/gotestrunner"
@@ -27,10 +26,6 @@ type traceCtx struct {
 	events  []gotestrunner.DispatchEvent
 	restore func()
 	cleanup func()
-}
-
-func (s *DispatchTraceTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Timeout: 90 * time.Second}
 }
 
 func (s *DispatchTraceTestSuite) BeforeAll(t *gotest.T) { testkit.IsolateTempDir(t) }
