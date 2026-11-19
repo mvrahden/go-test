@@ -1,0 +1,13 @@
+Clause: when two packages named util are run together → both run and pass
+Expect: ^FAIL .*conformance/cli CLIBatch .* / both run and pass \(
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -181,7 +181,7 @@
+ 		}
+ 		for n, group := range compileGroups(packages, runtime.GOOS) {
+ 			wg.Add(1)
+-			go build(group, filepath.Join(binDir, strconv.Itoa(n)))
++			go build(group, filepath.Join(binDir, strconv.Itoa(n-n)))
+ 		}
+ 		wg.Wait()
+ 	}()
