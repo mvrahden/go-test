@@ -12,6 +12,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // SnapshotGroupingTestSuite tests grouped snapshot file creation with per-subtest sections.
@@ -407,7 +408,7 @@ func (s *SnapshotTBBackedTestSuite) TestMatchSnapshotWithTBBacked(t *gotest.T) {
 					recovered = fmt.Sprintf("%v", r)
 				}
 			}()
-			tb := gotest.NewTFromTB(b)
+			tb := gotestruntime.EachT(b)
 			gotest.MatchSnapshot(tb, "snapshot-value", "tb_backed")
 			for b.Loop() {
 			}

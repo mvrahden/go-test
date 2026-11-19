@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // Sequential: Setenv.
@@ -13,7 +14,7 @@ type BWrapperTestSuite struct{}
 func (s *BWrapperTestSuite) TestNewB(t *gotest.T) {
 	t.It("exposes the underlying *testing.B and satisfies assertions", func(it *gotest.T) {
 		res := testing.Benchmark(func(b *testing.B) {
-			gb := gotest.NewB(b)
+			gb := gotestruntime.BenchB(b)
 			gotest.NotZero(it, gb.B())
 			gotest.Equal(it, b, gb.B())
 			for gb.Loop() {
@@ -30,7 +31,7 @@ func (s *BWrapperTestSuite) TestSetenvAndTempDir(t *gotest.T) {
 		var during, dir string
 		var dirErr error
 		testing.Benchmark(func(b *testing.B) {
-			gb := gotest.NewB(b)
+			gb := gotestruntime.BenchB(b)
 			gb.Setenv(key, "set")
 			during = os.Getenv(key)
 			dir = gb.TempDir()

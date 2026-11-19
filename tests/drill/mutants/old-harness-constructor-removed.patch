@@ -1,0 +1,29 @@
+Expect: undefined: ƒgotest\.NewB
+Judge: ./pkg/gotest DeprecatedNamesTestSuite/TestOldHarness
+--- a/pkg/gotest/deprecated.go
++++ b/pkg/gotest/deprecated.go
+@@ -14,13 +14,6 @@
+ // harnesses written by gotest before v1.39.
+ func NewTFromTB(tb testing.TB) *T { return &T{tb: tb} }
+
+-// NewB wraps b for a suite's benchmark method.
+-//
+-// Deprecated: generated code calls gotestruntime.BenchB. The name stays for
+-// harnesses written by gotest before v1.39. An assertion takes a *testing.B
+-// as it is.
+-func NewB(b *testing.B) *B { return &B{b: b} }
+-
+ // Deprecated: generated code calls gotestruntime.SeedArity. The name stays
+ // for harnesses written by gotest before v1.39.
+ func SeedArity(seed []any, n int) error {
+--- a/pkg/gotestruntime/harnesstypes.go
++++ b/pkg/gotestruntime/harnesstypes.go
+@@ -18,7 +18,7 @@
+
+ // BenchB is the *gotest.B a suite's benchmark method gets.
+ func BenchB(b *testing.B) *gotest.B {
+-	return gotest.NewB(b) //nolint:staticcheck // SA1019: the body lives beside the type it builds
++	return nil
+ }
+
+ // FuzzTarget is the generated binding of one fuzz wrapper.

@@ -36,10 +36,11 @@ type F struct {
 	echoAll    bool
 }
 
-// NewF wraps f, pairing it with optional beforeEach/afterEach lifecycle
-// hooks (either may be nil) and the generated target of its wrapper. A nil
-// target is the plain-library case: Fuzz then binds by reflection and only
-// engine-native argument types work.
+// NewF wraps f for a fuzz target written as a top-level func
+// FuzzXxx(*testing.F): gotest.NewF(f, nil, nil, nil). Its Fuzz then binds the
+// callback by reflection, with the engine's native argument types only. The
+// three further parameters are a suite's hooks and the wrapper's generated
+// target; generated code passes them through gotestruntime.FuzzF.
 func NewF(f *testing.F, beforeEach, afterEach func(*T), target *FuzzTarget) *F {
 	return &F{
 		f: f, beforeEach: beforeEach, afterEach: afterEach, target: target,

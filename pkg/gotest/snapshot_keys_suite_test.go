@@ -8,6 +8,7 @@ import (
 
 	"github.com/mvrahden/go-test/internal/protocol"
 	"github.com/mvrahden/go-test/pkg/gotest"
+	"github.com/mvrahden/go-test/pkg/gotestruntime"
 )
 
 // SnapshotKeysTestSuite: a snapshot's section is the exact subtest name, and
@@ -102,7 +103,7 @@ func (s *SnapshotKeysTestSuite) TestBenchAndFuzzNames(t *gotest.T) {
 			var got, want string
 			var named bool
 			testing.Benchmark(func(b *testing.B) {
-				n, ok := any(gotest.NewB(b)).(interface{ Name() string })
+				n, ok := any(gotestruntime.BenchB(b)).(interface{ Name() string })
 				named = ok
 				if ok {
 					got, want = n.Name(), b.Name()

@@ -12,10 +12,14 @@ import (
 
 // EachT is the *gotest.T a benchmark's BeforeEach and AfterEach get: tb's
 // own, with no *testing.T behind it.
-func EachT(tb testing.TB) *gotest.T { return gotest.NewTFromTB(tb) }
+func EachT(tb testing.TB) *gotest.T {
+	return gotest.NewTFromTB(tb) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+}
 
 // BenchB is the *gotest.B a suite's benchmark method gets.
-func BenchB(b *testing.B) *gotest.B { return gotest.NewB(b) }
+func BenchB(b *testing.B) *gotest.B {
+	return gotest.NewB(b) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+}
 
 // FuzzTarget is the generated binding of one fuzz wrapper.
 type FuzzTarget = gotest.FuzzTarget
@@ -30,7 +34,11 @@ func FuzzF(f *testing.F, beforeEach, afterEach func(*gotest.T), target *FuzzTarg
 }
 
 // SeedArity checks one f.Add tuple against the target's arity.
-func SeedArity(seed []any, n int) error { return gotest.SeedArity(seed, n) }
+func SeedArity(seed []any, n int) error {
+	return gotest.SeedArity(seed, n) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+}
 
 // SeedArg asserts seed[i] to A, naming the 1-based position on mismatch.
-func SeedArg[A any](seed []any, i int) (A, error) { return gotest.SeedArg[A](seed, i) }
+func SeedArg[A any](seed []any, i int) (A, error) {
+	return gotest.SeedArg[A](seed, i) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+}
