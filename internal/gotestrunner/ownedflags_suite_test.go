@@ -48,7 +48,7 @@ func (s *OwnedGoTestFlagsTestSuite) TestProcessCapAndExecPrefix(t *gotest.T) {
 		})
 		w.It("caps the dispatched processes", func(it *gotest.T) {
 			runFlags := []string{"-v"}
-			gotest.Equal(it, 1, gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, 1, false))
+			gotest.Equal(it, 1, gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, 1, false, runtime.GOMAXPROCS(0)))
 		})
 	})
 	t.When("-exec is among the build flags", func(w *gotest.T) {
@@ -72,12 +72,12 @@ func (s *OwnedGoTestFlagsTestSuite) TestUserParallelKeepsTheBudget(t *gotest.T) 
 	t.When("-parallel is pinned by the user", func(w *gotest.T) {
 		w.It("divides the default budget by it instead of doubling the processes", func(it *gotest.T) {
 			runFlags := []string{"-parallel=4"}
-			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, 0, false)
+			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 0, 64, 0, false, runtime.GOMAXPROCS(0))
 			gotest.Equal(it, min(64, procs, max(1, 2*procs/4)), got)
 		})
 		w.It("divides an explicit budget by it", func(it *gotest.T) {
 			runFlags := []string{"-parallel=4"}
-			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 12, 64, 0, false)
+			got := gotestrunner.ExportComputeDispatchConcurrency(&runFlags, 12, 64, 0, false, runtime.GOMAXPROCS(0))
 			gotest.Equal(it, min(64, procs, 3), got)
 		})
 	})

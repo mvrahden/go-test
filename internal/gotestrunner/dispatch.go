@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -209,7 +210,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 			totalSuites++
 		}
 	}
-	maxParallel := computeDispatchConcurrency(&r.pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags))
+	maxParallel := computeDispatchConcurrency(&r.pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags), runtime.GOMAXPROCS(0))
 	r.sem = make(chan struct{}, maxParallel)
 	r.buildFailed = len(overlay.BrokenPackages) > 0
 

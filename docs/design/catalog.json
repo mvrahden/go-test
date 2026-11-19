@@ -8419,6 +8419,98 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "all three pass",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "procs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 28,
+                      "name": "all_three_pass",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when three suites that each wait for the other two are run with -p 3 and GOMAXPROCS=1",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "procs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 27,
+                  "name": "three_suites_that_each_wait_for_the_other_two_are_run_with_-p_3_and_GOMAXPROCS=1",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "each fails waiting, since one process runs at a time",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "procs_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 34,
+                      "name": "each_fails_waiting,_since_one_process_runs_at_a_time",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the same suites are run with GOMAXPROCS=1 and no -p",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "procs_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 33,
+                  "name": "the_same_suites_are_run_with_GOMAXPROCS=1_and_no_-p",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "SuiteProcessesAtOnce",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "procs_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 20,
+              "name": "TestSuiteProcessesAtOnce",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIProcs",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "procs_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestCLIProcsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -32549,13 +32641,13 @@
     }
   ],
   "stats": {
-    "behaviors": 946,
+    "behaviors": 948,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 136,
+    "suites": 137,
     "tests": 0
   }
 }

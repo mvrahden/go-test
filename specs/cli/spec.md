@@ -496,6 +496,17 @@ A run SHALL build a suite package only when it dispatches one of its suites. A p
 - **WHEN** the two packages are run without -run
 - **THEN** exits 2 and reports the vet finding under its package
 
+### Requirement: Suite processes at once
+A run SHALL start at most GOMAXPROCS suite processes at once, half of that under -race, -msan or -asan, and exactly the number -p gives when -p is given, whatever GOMAXPROCS is. The default --parallel budget SHALL be twice that number.
+
+#### Scenario: -p above GOMAXPROCS
+- **WHEN** three suites that each wait for the other two are run with -p 3 and GOMAXPROCS=1
+- **THEN** all three pass
+
+#### Scenario: No -p
+- **WHEN** the same suites are run with GOMAXPROCS=1 and no -p
+- **THEN** each fails waiting, since one process runs at a time
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 
