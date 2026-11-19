@@ -13,4 +13,16 @@ const (
 	testVariantExportLoads = 1
 	// execsPerSuite: test-binary starts per dispatched suite, text mode.
 	execsPerSuite = 1
+
+	// rerunCompiles, rerunLinks, rerunVets: build actions of a warm run
+	// after nothing changed.
+	rerunCompiles = 0
+	rerunLinks    = 0
+	rerunVets     = 0
+	// editCompiles: after one test-file edit, the package with its tests and
+	// the test main; the staged packages have no external tests.
+	editCompiles = 2
+	// editLinks, editVets: the edited package's binary and its vet.
+	editLinks = 1
+	editVets  = 1
 )
