@@ -10458,6 +10458,98 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "takes both, and the run passes with exit 0",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "testflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 19,
+                      "name": "takes_both,_and_the_run_passes_with_exit_0",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -artifacts and -mutexprofilefraction=5 are given to a run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "testflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 18,
+                  "name": "-artifacts_and_-mutexprofilefraction=5_are_given_to_a_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "refuses it with exit 2 as an unknown flag, before anything is built",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "testflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 27,
+                      "name": "refuses_it_with_exit_2_as_an_unknown_flag,_before_anything_is_built",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when -mutexprofilerate=5 is given to a run",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "testflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 26,
+                  "name": "-mutexprofilerate=5_is_given_to_a_run",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "FlagsOfTheTestingPackage",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "testflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 17,
+              "name": "TestFlagsOfTheTestingPackage",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLITestFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "testflags_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 11,
+          "name": "TestCLITestFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "runs the gotest suite, notes the testify runner as a stdlib test go test runs, and exits 0",
                       "duration": 0,
                       "excluded": false,
@@ -32365,13 +32457,13 @@
     }
   ],
   "stats": {
-    "behaviors": 942,
+    "behaviors": 944,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 134,
+    "suites": 135,
     "tests": 0
   }
 }

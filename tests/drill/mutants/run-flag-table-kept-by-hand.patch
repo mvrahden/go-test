@@ -1,0 +1,14 @@
+Expect: ^FAIL .*conformance/cli .* / takes both, and the run passes with exit 0 \(
+Clause: when -artifacts and -mutexprofilefraction=5 are given to a run → takes both, and the run passes with exit 0
+--- a/internal/gotestrunner/testflags.go
++++ b/internal/gotestrunner/testflags.go
+@@ -39,6 +39,9 @@
+ var runFlags = sync.OnceValue(func() map[string]bool {
+ 	flags := map[string]bool{}
+ 	testFlagSet().VisitAll(func(f *flag.Flag) {
++		if f.Name == "artifacts" {
++			return
++		}
+ 		if !testBinaryOnly[f.Name] {
+ 			flags["-"+f.Name] = !isBoolFlag(f)
+ 		}

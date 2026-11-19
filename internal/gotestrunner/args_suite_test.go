@@ -40,6 +40,9 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 		{"unknown", "-zzz", false, false},
 		{"double dash unknown", "--debug", false, false},
 		{"vet is a build value flag", "-vet", true, true},
+		{"artifacts is a run bool", "-artifacts", false, true},
+		{"mutexprofilefraction is a run value", "-mutexprofilefraction", true, true},
+		{"mutexprofilerate is no go test flag", "-mutexprofilerate", false, false},
 	}) {
 		isValue, known := gotestrunner.IsGoTestFlag(tc.flag)
 		gotest.Equal(sub, tc.isValue, isValue)
@@ -72,6 +75,7 @@ func (s *ArgsTestSuite) TestEveryGoTestFlagIsClassified(t *gotest.T) {
 		{Desc: "-outputdir", value: true}, {Desc: "-list", value: true}, {Desc: "-fuzz", value: true}, {Desc: "-fuzztime", value: true},
 		{Desc: "-fuzzminimizetime", value: true}, {Desc: "-cpu", value: true}, {Desc: "-blockprofilerate", value: true},
 		{Desc: "-memprofilerate", value: true},
+		{Desc: "-artifacts"}, {Desc: "-mutexprofilefraction", value: true},
 	}) {
 		isValue, known := gotestrunner.IsGoTestFlag(row.Desc)
 		gotest.True(sub, known)
