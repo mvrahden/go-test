@@ -7059,6 +7059,129 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "its test binary carries no debug information",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "linkflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 54,
+                      "name": "its_test_binary_carries_no_debug_information",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a package is run with no link or profile flag",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "linkflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 53,
+                  "name": "a_package_is_run_with_no_link_or_profile_flag",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "its test binary carries debug information",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "linkflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 59,
+                      "name": "its_test_binary_carries_debug_information",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the package is run with -cpuprofile",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "linkflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 58,
+                  "name": "the_package_is_run_with_-cpuprofile",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the test prints the value and the binary carries debug information",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "linkflags_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 67,
+                      "name": "the_test_prints_the_value_and_the_binary_carries_debug_information",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when GOFLAGS sets -ldflags=-X for a variable the test prints",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "linkflags_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 66,
+                  "name": "GOFLAGS_sets_-ldflags=-X_for_a_variable_the_test_prints",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "HowTestBinariesAreLinked",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "linkflags_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 35,
+              "name": "TestHowTestBinariesAreLinked",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLILinkFlags",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "linkflags_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 17,
+          "name": "TestCLILinkFlagsTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -32733,13 +32856,13 @@
     }
   ],
   "stats": {
-    "behaviors": 950,
+    "behaviors": 953,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 138,
+    "suites": 139,
     "tests": 0
   }
 }

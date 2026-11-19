@@ -518,6 +518,21 @@ A run SHALL build its packages together and report each build failure under the 
 - **WHEN** two packages named util are run together
 - **THEN** both run and pass
 
+### Requirement: How test binaries are linked
+A run SHALL link its test binaries without the symbol table and debug information, as go test does, unless -ldflags is given as an argument or in GOFLAGS, a -cpuprofile, -memprofile, -blockprofile or -mutexprofile flag is given, or --debug keeps the binaries.
+
+#### Scenario: A plain run
+- **WHEN** a package is run with no link or profile flag
+- **THEN** its test binary carries no debug information
+
+#### Scenario: A run that writes a CPU profile
+- **WHEN** the package is run with -cpuprofile
+- **THEN** its test binary carries debug information
+
+#### Scenario: Link flags in GOFLAGS
+- **WHEN** GOFLAGS sets -ldflags=-X for a variable the test prints
+- **THEN** the test prints the value and the binary carries debug information
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 

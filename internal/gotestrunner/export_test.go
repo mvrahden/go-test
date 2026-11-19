@@ -853,6 +853,8 @@ func ExportSetGoCacheDir(dir string) (restore func()) {
 	return func() { goCacheDir = prev }
 }
 
+var ExportLinkFlags = linkFlags
+
 // ExportSetHardLink replaces the hard link a placement makes until restore.
 func ExportSetHardLink(fn func(oldname, newname string) error) (restore func()) {
 	prev := hardLink

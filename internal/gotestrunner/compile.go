@@ -264,6 +264,59 @@ func compileGroups(pkgs []string, goos string) [][]string {
 	return groups
 }
 
+// stripLinkFlag links a test binary without the symbol table and DWARF, as
+// go test links the binaries it runs.
+const stripLinkFlag = "-ldflags=-s -w"
+
+// linkFlags is buildFlags with stripLinkFlag appended, unless something needs
+// what it drops: link flags of the user's (an argument or GOFLAGS, which a
+// later -ldflags would override), a profile flag (go test's own list), or
+// binaries kept for inspection.
+func linkFlags(buildFlags, runFlags []string, goflags string, kept bool) []string {
+	if kept || hasLinkFlags(buildFlags) || hasLinkFlags(strings.Fields(goflags)) || hasProfileFlag(runFlags) {
+		return buildFlags
+	}
+	return append(slices.Clone(buildFlags), stripLinkFlag)
+}
+
+func hasLinkFlags(flags []string) bool {
+	for _, f := range flags {
+		f = strings.TrimLeft(f, `'"`)
+		for _, name := range []string{"-ldflags", "--ldflags"} {
+			if f == name || strings.HasPrefix(f, name+"=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasProfileFlag reports whether runFlags ask for a profile go test needs
+// the binary's symbols for.
+func hasProfileFlag(runFlags []string) bool {
+	for _, f := range runFlags {
+		name, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(f, "-"), "-"), "=")
+		switch strings.TrimPrefix(name, "test.") {
+		case "cpuprofile", "memprofile", "blockprofile", "mutexprofile":
+			return true
+		}
+	}
+	return false
+}
+
+// stageFlags are the build flags the compile stage links a run's binaries
+// with, and keys their cache entries by: stripped and unstripped binaries
+// never share an entry.
+func stageFlags(buildFlags, runFlags []string, workDir string) []string {
+	return linkFlags(buildFlags, runFlags, os.Getenv("GOFLAGS"), keptForInspection(workDir))
+}
+
+// keptForInspection reports whether --debug keeps workDir.
+func keptForInspection(workDir string) bool {
+	_, err := os.Stat(filepath.Join(workDir, keepFile))
+	return err == nil
+}
+
 // spanOf passes ch's outcomes on and measures the compile stage: span is
 // the time from this call to ch's close, zero until then.
 func spanOf(ch <-chan CompileOutcome, now func() time.Time) (<-chan CompileOutcome, func() time.Duration) {
