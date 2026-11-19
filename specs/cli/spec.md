@@ -207,7 +207,7 @@ A go test flag gotest implements itself SHALL keep the meaning go test gives it,
 - **AND** starts no suite and no shared fixture
 
 ### Requirement: Test binary flags follow the testing package
-gotest SHALL take as a go test flag every flag the testing package it was built with gives a test binary for its user to set, with the value the testing package gives it, and SHALL refuse a single-dash flag ahead of -- and -args that is neither such a flag nor a build flag of go test, with exit 2 before anything is built. A gotest built with a newer Go than the one that builds the test binary can take a flag that binary does not declare.
+gotest SHALL take as a go test flag every flag the testing package it was built with gives a test binary for its user to set, with the value the testing package gives it, and SHALL refuse a single-dash flag ahead of -- and -args that is neither such a flag nor a build flag of go test, nor a flag gotest implements itself, with exit 2 before anything is built. A gotest built with a newer Go than the one that builds the test binary can take a flag that binary does not declare.
 
 #### Scenario: A flag the testing package declares
 - **WHEN** -artifacts and -mutexprofilefraction=5 are given to a run
