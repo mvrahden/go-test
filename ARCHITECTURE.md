@@ -8,7 +8,7 @@
                   ▼
  ┌─────────────────────────────────────────────────────────────┐
  │  1. DISCOVERY                                               │
- │     packages.Load(./...) → AST Inspector → Suites/Fixtures  │
+ │     pkgload.Load(./...) → AST Inspector → Suites/Fixtures   │
  └──────────────────────────┬──────────────────────────────────┘
                             │  []*LoadResult (Ptest + Pxtest per pkg)
                             ▼
@@ -25,8 +25,8 @@
  │  ┌─────────────────────┐    ┌────────────────────────────┐  │
  │  │ CompilePackages-    │    │ startSharedFixtures        │  │
  │  │ Stream              │    │   go build → start → read  │  │
- │  │   go test -c per    │    │   JSON state, own stream   │  │
- │  │   pkg (NumCPU par)  │    │   → write state.json       │  │
+ │  │   go test -c -json  │    │   JSON state, own stream   │  │
+ │  │   per group (NumCPU)│    │   → write state.json       │  │
  │  └────────┬────────────┘    └────────────┬───────────────┘  │
  │           │ <-chan CompileResult         │ *SharedFixtureProcess
  └───────────┼──────────────────────────────┼──────────────────┘
@@ -52,7 +52,7 @@
 
 ## 1. Discovery
 
-Discovery is fully static: packages are loaded with syntax and types (`packageLoadMode`), suites are found in the AST and bound through `go/types`. Nothing is discovered by reflection at run time. Type-checking is where discovery spends its time.
+Discovery is fully static: packages are loaded with syntax and types, suites are found in the AST and bound through `go/types`. Nothing is discovered by reflection at run time. Type-checking is where discovery spends its time.
 
 ### Package Loading
 
@@ -60,14 +60,27 @@ Discovery is fully static: packages are loaded with syntax and types (`packageLo
 cli.go:runTest() / discover.go:runDiscover()
   │
   └─ LoadPackages(patterns, buildFlags)
-       mode: NeedModule | NeedSyntax | NeedName | NeedTypes
-              | NeedTypesInfo | NeedImports | NeedFiles
-       (matched packages from source, dependencies from export data;
-        a dependency that declares a fixture with Hydrate is loaded
+       └─ pkgload.Load(cfg, patterns...)
+            1. go list the graph, with tests, compiling nothing
+               (names, files, imports, deps, module)
+            2. go list export data, without tests, for the plain
+               packages the roots import (and the type sizes)
+            3. parse and type-check in process, concurrently: the roots,
+               their test variants and test mains, and the dependencies
+               a test variant rebuilds; every other import from export data
+            4. a root with an error anywhere in what it reaches is loaded
+               once more by packages.Load, for the compiler's own report
+       (a dependency that declares a fixture with Hydrate is loaded
         again as a root, so its fields classify from source)
 ```
 
-`packages.Load()` with `Tests: true` returns both internal-test (`pkg_test.go`
+Discovery makes two `go list` calls, and neither builds a test variant: the
+graph with tests, and export data without them. A test file change therefore
+compiles nothing until the run builds its binary. A package that imports
+`"C"` is listed once more with its compiled files, which cgo generates.
+`gotest lint` loads through the same `internal/pkgload`.
+
+`pkgload.Load` with `Tests: true` returns both internal-test (`pkg_test.go`
 in the same package) and external-test (`pkg_test.go` in `pkg_test` package)
 packages. These are grouped into `LoadResult` structs:
 
@@ -578,16 +591,16 @@ The system has **four levels of parallelism**, each with distinct mechanisms:
 │ Level 1: Package COMPILATION            semaphore: runtime.NumCPU()│
 │                                                                     │
 │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                                  │
-│  │ go  │ │ go  │ │ go  │ │ go  │  ← goroutines, each runs         │
-│  │test │ │test │ │test │ │test │    `go test -c -overlay=...`      │
-│  │ -c  │ │ -c  │ │ -c  │ │ -c  │                                  │
-│  │pkg1 │ │pkg2 │ │pkg3 │ │pkg4 │                                  │
+│  │ go  │ │ go  │ │ go  │ │ go  │  ← goroutines, each runs one     │
+│  │test │ │test │ │test │ │test │    `go test -c -json -overlay=…` │
+│  │ -c  │ │ -c  │ │ -c  │ │ -c  │    for a group of packages       │
+│  │grp1 │ │grp2 │ │grp3 │ │grp4 │                                  │
 │  └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘                                  │
 │     │       │       │       │                                       │
 │     └───────┴───────┴───────┘                                       │
 │               │                                                     │
 │               ▼  CompileResult streamed to channel                  │
-│                  (execution starts as each package finishes)        │
+│                  (execution starts as each binary is ready)         │
 ├─────────────────────────────────────────────────────────────────────┤
 │ Level 2: Shared fixture SETUP           concurrent with compilation│
 │                                                                     │
@@ -646,8 +659,9 @@ Level 3 is sized from a budget of concurrent test methods, `--parallel`,
 and each gets the budget divided by the process count as its
 `-test.parallel` (`ComputeConcurrency`). A user `-parallel=N` pins that
 in-process value instead; the process count is then
-`min(suites, GOMAXPROCS, budget/N)` (`computeDispatchConcurrency`), and
-`go test`'s `-p` caps it outright. These defaults and Level 1's
+`min(suites, GOMAXPROCS, budget/N)` (`computeDispatchConcurrency`).
+`go test`'s `-p` sets the process count in place of GOMAXPROCS, above it
+too and without the sanitizer halving, and caps Level 1. These defaults and Level 1's
 (`NumCPU`) apply to uninstrumented builds; under `-race`/`-msan`/`-asan`
 they halve, since instrumentation at least doubles the CPU cost per
 instruction stream. An explicit `--compile-parallel`/`--parallel` always wins. Two aids keep
@@ -748,6 +762,47 @@ the target queued first. A group's go confirms cached binaries only as it
 exits, beside the ones it relinked last, and reports the relinked ones
 first. No "compile all, then run all" barrier.
 ```
+
+### The Compile Stage
+
+`CompilePackagesStream` (`compile.go`, `compilestage.go`) builds only the
+packages the run dispatches a suite of (`buildSet`); `bookUnbuilt` books
+every other suite package as having no tests to run before anything is
+compiled. The rest is built in groups:
+
+1. **Groups.** `compileGroups` deals the packages, in order, into the first
+   group that does not yet hold their binary's name, compared case-folded:
+   `go test -c -o <dir>/` refuses two packages that would write one file.
+   Each group gets one `go test -c -json -o <work dir>/bin/<n>/` call
+   (`compileGroup`), under the Level 1 semaphore.
+2. **Staging.** Before go runs, `stageGroup` places each package's cached
+   binary in the group's stage dir under go's name: a hard link from the
+   cache, or a copy on Windows and wherever the link is refused, taken
+   under the entry's lock and only when the entry still matches its
+   checksum record. go then leaves an up-to-date binary alone and links a
+   stale one anew.
+3. **Readiness.** The stage dir is polled while go runs (`binaryReady`). A
+   newly linked binary is ready as soon as go has renamed it into place,
+   where go renames (`renameSafe`), else when go exits. A placed binary is
+   confirmed only when this run's go exits 0 and left it there: every run's
+   slot links the same entry, so another run's go touching it says nothing.
+   Each package is emitted once, its binary or its failure.
+4. **Failures.** Build failures are read from go's `-json` build events,
+   attributed by package (`buildevents.go`). A package go left without a
+   verdict of its own, because a dependency failed, is built again alone
+   in a stage dir of its own, where whatever go says is its own.
+5. **Publish.** A rebuilt binary becomes the cache entry by a link or copy
+   to a temporary name and a rename, with its record written beside it
+   (`publish`). Nothing writes an entry in place, so a run executing the
+   old entry keeps it.
+
+The stage links its binaries stripped (`-ldflags=-s -w`, `stageFlags`), as
+`go test` links the binaries it runs, unless the user's `-ldflags` (an
+argument or in `GOFLAGS`), a profile flag or `--debug` needs the symbols.
+The flags key the cache entry, so stripped and unstripped binaries never
+share one; `GOFLAGS`, `GOEXPERIMENT` and `CGO_ENABLED` are keyed too. The
+VS Code debugger and `gotest fuzz` build outside the compile stage and are
+never stripped.
 
 ### Per-Suite Fixture Readiness
 
@@ -1315,6 +1370,19 @@ way a user runs it. Every other claim it once made is a scenario in `specs/`.
 `tests/sharedfixture` holds no tests of its own: its packages are shared
 fixtures and the suites binding them, which the runner's, the generator's and
 the CLI's own tests run.
+`tests/perf` holds a run to its cost. It stages a synthetic module twice, with
+twelve and with six packages of two suites of three methods, each beside a
+stdlib twin of the same tests, and runs the CLI built from the tree through a
+`go` shim that logs every go command and an `-exec` counter of binary starts.
+`budgets_test.go` holds the counts: one `go test -c` per group of binary
+names, no go command more for twelve packages than for six, no `go list`
+with both `-test` and `-export`, one binary start per dispatched suite, no
+compile, link or vet on a rerun with nothing changed, and two compiles, one
+link and one vet after one test file changes. On Unix it also holds gotest's
+CPU time to at most 1.5 times that of `go test -count=1` on the twin. It reads
+no wall-clock time: counts and a ratio of the same machine's CPU, so a slow
+or busy machine divides out. Its suites are `Exclusive`, so the CPU suite
+measures with nothing of the run beside it.
 
 Case accounting for any restructuring is by `gotest -json` capture
 (`Package`+`Test` pairs) before and after, never by grepping sources: grep
@@ -1349,11 +1417,12 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 |---|---|---|
 | `cmd/gotest` | The CLI: arguments, subcommands, signals, watch | `internal/{about,config,filewrite,gotestast,gotestbench,gotestgen,gotestrunner,gotestspec,lint,migrate,pkgpattern,protocol,refactor,scaffold,unidiff}`, `skills`; third-party: `fsnotify`, `x/tools` |
 | `internal/gotestast` | Suite and fixture model read from syntax and types | `internal/{about,protocol,typeclass}`; third-party: `x/tools` |
-| `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgpattern,protocol}`; third-party: `x/mod`, `x/tools` |
+| `internal/gotestgen` | Loading, collection, binding, rendering of the harness | `internal/{about,genstub,gotestast,goversion,pkgload,pkgpattern,protocol}`; third-party: `x/mod`, `x/tools` |
 | `internal/gotestrunner` | Overlay, compile, shared fixtures, one process per suite | `internal/{about,control,gotestgen,proctree,protocol,protocol/sharedwire,schedinfo}` |
 | `internal/gotestspec` | Event stream → tree → terminal, Markdown and JSON renderers; the census | `internal/{about,protocol}` |
 | `internal/gotestbench` | Benchmark baselines, deltas and the gate | `internal/gotestspec` |
-| `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |
+| `internal/lint` | The analyzer and its fix driver | `internal/{about,filewrite,genstub,gotestast,gotestgen,goversion,pkgload,pkgpattern,protocol,refactor,typeclass}`; third-party: `x/tools` |
+| `internal/pkgload` | Loads packages with their tests, type-checked in process, without building a test variant | third-party: `x/tools` |
 | `internal/migrate` | testify/suite conversion | `internal/{about,filewrite,gotestast,protocol,refactor,unidiff}`; third-party: `x/tools` |
 | `internal/refactor` | Source edits: focus toggles, seed splices | `internal/{gotestast,protocol}`; third-party: `x/tools` |
 | `internal/scaffold` | Suite skeletons from a type | `internal/{gotestgen,goversion}`; third-party: `x/tools` |
@@ -1409,10 +1478,11 @@ It is why the project's rule is "never call `t.T().Helper()` with gotest asserti
    work dir (`<work dir>/overlay/`), so runs never share or remove each other's;
    Go's build cache keys overlaid files by content under their original path,
    so an overlay at a new path each run costs no rebuild. The test binaries do
-   get reuse: each links into
+   get reuse: each is cached in
    `~/.cache/gotest/bin/<key>/`, keyed by working directory, build flags,
-   platform and Go version, so go skips the link for an unchanged package, and
-   the run copies the binary into its own work dir before executing it. Each
+   platform and Go version, and a run hard-links it into its own work dir
+   before go builds there, so go skips the link for an unchanged package; a
+   rebuilt binary is published back by a rename (The Compile Stage). Each
    key records its checkout in `.cwd`, and every run's start evicts the
    binaries of a checkout that no longer exists, those unused for 7 days (go
    touches a binary it finds up to date, so its modification time is its
@@ -1423,7 +1493,7 @@ It is why the project's rule is "never call `t.T().Helper()` with gotest asserti
    cache. Use `--no-cache` to bypass it.
 
 4. **Streaming compilation**: `CompilePackagesStream` sends results to a
-   channel as each package finishes. Test execution begins before all packages
+   channel as each package's binary is ready. Test execution begins before all packages
    are compiled, reducing total wall-clock time.
 
 5. **Process trees via ManagedProcess**: Every subprocess runs as the root of
