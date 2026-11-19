@@ -13,12 +13,12 @@ import (
 
 // A run links its test binaries into a cache keyed by what decides the
 // link's output: the working directory (two checkouts of one module share
-// import paths), the build flags, the platform and the Go version. The -o
-// path is then stable across runs, and go skips the link when the binary's
-// build ID still matches. Each run copies the binary into its own work dir:
-// a concurrent run relinking the same key never replaces a file another run
-// is executing. The link runs under a per-binary lock so two runs cannot
-// write one output at once.
+// import paths), the build flags, the platform and the Go version. Each
+// entry is then stable across runs. A run places its cached binaries into
+// its own stage dir, by link or copy, under each binary's lock, and builds
+// there: go touches a binary that is up to date and replaces one that is
+// not. Nothing writes a cache entry in place: a rebuilt binary replaces its
+// entry by a rename, so a run executing the old file keeps it.
 
 func binaryCacheKey(cwd string, buildFlags []string) string {
 	flags := slices.Clone(buildFlags)
