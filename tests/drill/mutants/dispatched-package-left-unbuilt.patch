@@ -1,5 +1,7 @@
 Clause: when the two packages are run without -run → exits 2 and reports the vet finding under its package
 Expect: ^FAIL .*conformance/cli CLIBuildSet .* / exits 2 and reports the vet finding under its package \(
+Clause: when a run that -run narrows to one package is followed by an unfiltered run → the second run builds and runs the other package
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / the second run builds and runs the other package \(
 --- a/internal/gotestrunner/compile.go
 +++ b/internal/gotestrunner/compile.go
 @@ -251,7 +251,7 @@

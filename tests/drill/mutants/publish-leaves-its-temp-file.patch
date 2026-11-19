@@ -1,0 +1,13 @@
+Clause: when three runs of one package start at once on an empty cache → all pass and leave no temporary file in the cache
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* / all pass and leave no temporary file in the cache \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -270,7 +270,7 @@
+ 			_ = os.Remove(tmp)
+ 			return
+ 		}
+-		if err := os.Rename(tmp, b.Cached); err != nil {
++		if err := copyFile(tmp, b.Cached); err != nil {
+ 			_ = os.Remove(tmp)
+ 			return
+ 		}

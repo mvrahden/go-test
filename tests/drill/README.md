@@ -644,6 +644,10 @@ shards of one run do not add up to every mutant exactly once.
 | `strip-overrides-goflags-ldflags` | the strip flag is added though GOFLAGS carries `-ldflags`, which it then overrides | cli conformance: a GOFLAGS `-X` value is not printed and the binary has no DWARF |
 | `test-binaries-never-stripped` | test binaries keep their symbol table and DWARF on a plain run | cli conformance: a plain run's binary carries debug information |
 | `profiled-binary-stripped` | a run with a profile flag strips its binary all the same | cli conformance: a `-cpuprofile` run's binary has no DWARF |
+| `placed-binary-run-before-go-confirms-it` | a cached binary placed for go to confirm is handed out while go still runs, before go touched or replaced it | cli conformance: a run after a source change prints the old value |
+| `goflags-dropped-from-the-build` | the go command that builds a run's binaries is started with `GOFLAGS` emptied | cli conformance: build tags and link flags given in GOFLAGS do not reach the binary |
+| `stage-builds-without-vet` | the compile stage passes `-vet=off` to every build | cli conformance: a run without `-vet=off` misses a vet finding |
+| `publish-leaves-its-temp-file` | a rebuilt binary is copied onto its cache entry and its temporary file is left beside it | cli conformance: runs at once leave a temporary file in the cache |
 | `live-checkout-evicted` | the sweep evicts every key that records a checkout, not only one whose checkout is gone | runner: a key whose checkout exists loses its binaries |
 | `cap-evicts-newest-first` | over its cap, the binary cache evicts the binaries used most recently first | runner: the newest binaries go and the oldest stay |
 | `eviction-ignores-a-held-lock` | the binary cache sweep evicts a binary whose lock a run holds | runner: the locked binary goes and the next one stays |
