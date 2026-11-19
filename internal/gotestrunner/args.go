@@ -7,50 +7,56 @@ import (
 	"strings"
 )
 
-// buildOnlyFlags are flags consumed exclusively by `go test -c` (compilation).
-// Boolean flags have empty string value; value flags list their name only.
-var buildOnlyFlags = map[string]bool{
-	"-race":       true,
-	"-msan":       true,
-	"-asan":       true,
-	"-cover":      true,
-	"-a":          true,
-	"-c":          true,
-	"-n":          true,
-	"-x":          true,
-	"-trimpath":   true,
-	"-work":       true,
-	"-linkshared": true,
-	"-modcacherw": true,
-	// -buildvcs takes an optional value (-buildvcs, -buildvcs=false), so a
-	// bare one must not swallow the next word.
-	"-buildvcs": true,
+// buildFlags are the go build flags a run hands to its compile; the
+// value reports whether the flag takes one. A conventions suite holds the
+// list to `go help build` of the toolchain in use. -buildvcs takes its
+// value only as -buildvcs=false, so a bare one must not swallow the next
+// word.
+var buildFlags = map[string]bool{
+	"-a": false, "-asan": false, "-asmflags": true, "-buildmode": true, "-buildvcs": false,
+	"-compiler": true, "-cover": false, "-covermode": true, "-coverpkg": true, "-gccgoflags": true,
+	"-gcflags": true, "-installsuffix": true, "-ldflags": true, "-linkshared": false, "-mod": true,
+	"-modcacherw": false, "-modfile": true, "-msan": false, "-n": false, "-overlay": true, "-p": true,
+	"-pgo": true, "-pkgdir": true, "-race": false, "-tags": true, "-toolexec": true, "-trimpath": false,
+	"-work": false, "-x": false,
 }
 
-var buildSpecialValueFlags = map[string]bool{
-	"-o":    true,
-	"-exec": true,
+// goTestBuildFlags are go test's own flags that act before the test
+// binary runs; go build does not have them.
+var goTestBuildFlags = map[string]bool{"-c": false, "-exec": true, "-o": true, "-vet": true}
+
+// buildFlagsNotTaken are the go build flags a run does not take, and why.
+// The conventions suite reads it from this file.
+var buildFlagsNotTaken = map[string]string{ //nolint:unused // read as source by tests/conventions
+	"-C":    "it must come first on the go command line and changes its directory: run gotest from that directory",
+	"-json": "under go test -json is the test event stream, which gotest writes itself",
+	"-v":    "under go test -v belongs to the test binary",
 }
 
-var buildValueFlags = map[string]bool{
-	"-covermode":     true,
-	"-coverpkg":      true,
-	"-vet":           true,
-	"-tags":          true,
-	"-ldflags":       true,
-	"-gcflags":       true,
-	"-gccgoflags":    true,
-	"-asmflags":      true,
-	"-mod":           true,
-	"-modfile":       true,
-	"-p":             true,
-	"-toolexec":      true,
-	"-pkgdir":        true,
-	"-pgo":           true,
-	"-overlay":       true,
-	"-buildmode":     true,
-	"-compiler":      true,
-	"-installsuffix": true,
+type goFlagSide int
+
+const (
+	notGoFlag goFlagSide = iota
+	buildSide            // read by the compile
+	runSide              // read by the test binary
+)
+
+// classifyGoFlag reports which side of a run reads the go test flag name
+// and whether it takes a value.
+func classifyGoFlag(name string) (side goFlagSide, takesValue bool) {
+	if v, ok := buildFlags[name]; ok {
+		return buildSide, v
+	}
+	if v, ok := goTestBuildFlags[name]; ok {
+		return buildSide, v
+	}
+	if runOnlyFlags[name] {
+		return runSide, false
+	}
+	if runValueFlags[name] {
+		return runSide, true
+	}
+	return notGoFlag, false
 }
 
 // runOnlyFlags are flags consumed exclusively by the test binary at runtime.
@@ -129,59 +135,31 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 			continue
 		}
 
-		if buildOnlyFlags[name] || buildOnlyFlags[arg] {
-			result.BuildFlags = append(result.BuildFlags, arg)
+		side, takesValue := classifyGoFlag(name)
+		if side == notGoFlag {
+			// A flag nobody here declares is the test binary's. As go test
+			// assumes, a non-flag after it is taken as its value.
+			binaryFlags = append(binaryFlags, arg)
 			i++
-			continue
-		}
-
-		if buildValueFlags[name] || buildSpecialValueFlags[name] {
-			switch {
-			case hasEquals:
-				result.BuildFlags = append(result.BuildFlags, arg)
-				i++
-			case i+1 < len(args):
-				result.BuildFlags = append(result.BuildFlags, arg, args[i+1])
-				i += 2
-			default:
-				result.BuildFlags = append(result.BuildFlags, arg)
+			if !hasEquals && i < len(args) && !strings.HasPrefix(args[i], "-") {
+				binaryFlags = append(binaryFlags, args[i])
 				i++
 			}
 			continue
 		}
 
-		if runOnlyFlags[name] || runOnlyFlags[arg] {
-			result.RunFlags = append(result.RunFlags, arg)
-			i++
+		dst := &result.BuildFlags
+		if side == runSide {
+			dst = &result.RunFlags
+			needsCoverBuild = needsCoverBuild || name == "-coverprofile"
+		}
+		if takesValue && !hasEquals && i+1 < len(args) {
+			*dst = append(*dst, arg, args[i+1])
+			i += 2
 			continue
 		}
-
-		if runValueFlags[name] {
-			if name == "-coverprofile" {
-				needsCoverBuild = true
-			}
-			switch {
-			case hasEquals:
-				result.RunFlags = append(result.RunFlags, arg)
-				i++
-			case i+1 < len(args):
-				result.RunFlags = append(result.RunFlags, arg, args[i+1])
-				i += 2
-			default:
-				result.RunFlags = append(result.RunFlags, arg)
-				i++
-			}
-			continue
-		}
-
-		// A flag nobody here declares is the test binary's. As go test
-		// assumes, a non-flag after it is taken as its value.
-		binaryFlags = append(binaryFlags, arg)
+		*dst = append(*dst, arg)
 		i++
-		if !hasEquals && i < len(args) && !strings.HasPrefix(args[i], "-") {
-			binaryFlags = append(binaryFlags, args[i])
-			i++
-		}
 	}
 
 	if len(binaryFlags) > 0 || explicitArgs != nil {
@@ -190,17 +168,8 @@ func ClassifyGoTestArgs(args []string) ClassifiedArgs {
 		result.RunFlags = append(result.RunFlags, explicitArgs...)
 	}
 
-	if needsCoverBuild {
-		hasCover := false
-		for _, f := range result.BuildFlags {
-			if f == "-cover" {
-				hasCover = true
-				break
-			}
-		}
-		if !hasCover {
-			result.BuildFlags = append(result.BuildFlags, "-cover")
-		}
+	if needsCoverBuild && !slices.Contains(result.BuildFlags, "-cover") {
+		result.BuildFlags = append(result.BuildFlags, "-cover")
 	}
 
 	return result
@@ -326,17 +295,8 @@ func stripCompileOnlyFlags(flags []string) []string {
 // is a recognized go test flag. It returns whether the flag takes a value
 // argument and whether it is known at all.
 func IsGoTestFlag(name string) (isValue bool, known bool) {
-	if buildOnlyFlags[name] {
-		return false, true
-	}
-	if buildValueFlags[name] || buildSpecialValueFlags[name] {
-		return true, true
-	}
-	if runOnlyFlags[name] {
-		return false, true
-	}
-	if runValueFlags[name] {
-		return true, true
+	if side, takesValue := classifyGoFlag(name); side != notGoFlag {
+		return takesValue, true
 	}
 	if name == "-json" || name == "-args" {
 		return false, true
