@@ -148,6 +148,35 @@ type sharedRun struct {
 }
 
 func runSharedProgram(p SharedProgram, env sharedEnv) (failed bool) { //nolint:gocritic // hugeParam: as RunSharedFixtures
+	r := newSharedRun(p, env)
+
+	// The context every AfterAll runs under: only a force line ends it, so a
+	// release that honours its context returns at once. A stop, by line or
+	// by signal, leaves it alone.
+	releaseCtx, force := context.WithCancel(context.Background())
+	defer force()
+	r.releaseCtx = releaseCtx
+	ctx, end := context.WithCancel(env.signals)
+	defer end()
+	r.ctx = ctx
+
+	cmds, eof := r.readCommands(end, force)
+	r.exitWhenRunnerGone(eof)
+
+	anyFailed := r.setupUpFront()
+	r.serveUntilStop(cmds, eof)
+	r.releaseAll()
+
+	r.failMu.Lock()
+	defer r.failMu.Unlock()
+	// A failure of either kind; a start's failure was reported on its _cmd
+	// line and is the runner's to book, not this status's.
+	return anyFailed || r.teardownFailed
+}
+
+// newSharedRun lays out the program's state: one slot per fixture and the
+// dependency graph between them, by key.
+func newSharedRun(p SharedProgram, env sharedEnv) *sharedRun { //nolint:gocritic // hugeParam: as RunSharedFixtures
 	n := len(p.Fixtures)
 	r := &sharedRun{
 		fx:         p.Fixtures,
@@ -186,39 +215,34 @@ func runSharedProgram(p SharedProgram, env sharedEnv) (failed bool) { //nolint:g
 			r.shares[i] = SupervisorBudget(r.cfg[i].Timeout)
 		}
 	}
+	return r
+}
 
-	// The context every AfterAll runs under: only a force line ends it, so a
-	// release that honours its context returns at once. A stop, by line or
-	// by signal, leaves it alone.
-	releaseCtx, force := context.WithCancel(context.Background())
-	defer force()
-	r.releaseCtx = releaseCtx
-	ctx, end := context.WithCancel(env.signals)
-	defer end()
-	r.ctx = ctx
-
-	cmds, eof := r.readCommands(end, force)
-
-	// The runner is gone once stdin ends, or once a signal finds the parent
-	// changed. From then on, in setup or in teardown, the process exits by
-	// itself once it has had its budgets: with no runner left to kill it, a
-	// BeforeAll or an AfterAll that hangs would otherwise keep it alive for
-	// good.
+// exitWhenRunnerGone ends the process once the runner is gone: once stdin
+// ends, or once a signal finds the parent changed. From then on, in setup or
+// in teardown, the process exits by itself once it has had its budgets: with
+// no runner left to kill it, a BeforeAll or an AfterAll that hangs would
+// otherwise keep it alive for good.
+func (r *sharedRun) exitWhenRunnerGone(eof <-chan struct{}) {
 	gone := make(chan struct{})
 	go func() {
 		defer close(gone)
 		select {
 		case <-eof:
-		case <-ctx.Done():
-			if !env.orphaned() {
+		case <-r.ctx.Done():
+			if !r.env.orphaned() {
 				<-eof
 			}
 		}
 	}()
-	go env.life.ExitWhenOrphaned(gone)
+	go r.env.life.ExitWhenOrphaned(gone)
+}
 
-	// Up-front phase: every non-deferred fixture, concurrently, gated by the
-	// dependency channels. Deferred fixtures wait for their start command.
+// setupUpFront brings up every non-deferred fixture, concurrently, gated by
+// the dependency channels, and reports the outcome on the _done line.
+// Deferred fixtures wait for their start command. It reports whether any
+// setup failed.
+func (r *sharedRun) setupUpFront() (anyFailed bool) {
 	var wg sync.WaitGroup
 	for i := range r.fx {
 		if r.fx[i].Deferred {
@@ -228,7 +252,7 @@ func runSharedProgram(p SharedProgram, env sharedEnv) (failed bool) { //nolint:g
 	}
 	wg.Wait()
 
-	anyFailed := slices.ContainsFunc(r.errs, func(err error) bool { return err != nil })
+	anyFailed = slices.ContainsFunc(r.errs, func(err error) bool { return err != nil })
 	// Reported on both _done forms: a failed setup still has succeeded
 	// siblings to release under this budget.
 	setupErr := ""
@@ -236,21 +260,24 @@ func runSharedProgram(p SharedProgram, env sharedEnv) (failed bool) { //nolint:g
 		setupErr = sharedwire.SetupFailed
 	}
 	r.write(sharedwire.DoneLine(setupErr, r.teardownBudget()))
+	return anyFailed
+}
 
-	// Window commands until shutdown. The runner owns shutdown timing, only
-	// it knows when every suite has stopped using the fixtures, so even a
-	// failed setup reports and then serves commands until the stop instead of
-	// tearing down on its own; this process owns shutdown execution. Commands
-	// run concurrently, so a release that hangs holds up no later start. A
-	// stop that already arrived, by line or by SIGTERM (cancelling setup
-	// above), has ctx closed and falls straight through, as does the end of
-	// stdin. Starts still in flight when the loop ends are waited for, so no
-	// AfterAll runs beside its own BeforeAll.
+// serveUntilStop serves window commands until shutdown. The runner owns
+// shutdown timing, only it knows when every suite has stopped using the
+// fixtures, so even a failed setup reports and then serves commands until the
+// stop instead of tearing down on its own; this process owns shutdown
+// execution. Commands run concurrently, so a release that hangs holds up no
+// later start. A stop that already arrived, by line or by SIGTERM (cancelling
+// setup), has ctx closed and falls straight through, as does the end of
+// stdin. Starts still in flight when the loop ends are waited for, so no
+// AfterAll runs beside its own BeforeAll.
+func (r *sharedRun) serveUntilStop(cmds <-chan sharedwire.Command, eof <-chan struct{}) {
 	var startsInFlight sync.WaitGroup
 loop:
 	for {
 		select {
-		case <-ctx.Done():
+		case <-r.ctx.Done():
 			break loop
 		case <-eof:
 			break loop
@@ -267,10 +294,13 @@ loop:
 		}
 	}
 	startsInFlight.Wait()
+}
 
-	// Terminal teardown: everything still resident, concurrently, each after
-	// its dependents. Keys a release command already released return its
-	// outcome without running again: one owner per fixture teardown.
+// releaseAll is the terminal teardown: everything still resident,
+// concurrently, each after its dependents. Keys a release command already
+// released return its outcome without running again: one owner per fixture
+// teardown.
+func (r *sharedRun) releaseAll() {
 	var releasing sync.WaitGroup
 	for i := len(r.fx) - 1; i >= 0; i-- {
 		releasing.Go(func() { r.teardown(i) })
@@ -289,11 +319,6 @@ loop:
 	if len(tornErrs) > 0 {
 		r.write(sharedwire.TeardownLine(strings.Join(tornErrs, "; ")))
 	}
-	r.failMu.Lock()
-	defer r.failMu.Unlock()
-	// A failure of either kind; a start's failure was reported on its _cmd
-	// line and is the runner's to book, not this status's.
-	return anyFailed || r.teardownFailed
 }
 
 // readCommands reads the runner's commands from stdin, from the start. A stop
