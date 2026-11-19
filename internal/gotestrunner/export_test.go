@@ -563,6 +563,50 @@ func ExportSessionEnv(f *fixtureSession, base []string, pkg, suite string, keys 
 // ExportSessionMissing names the first of keys f has not up.
 func ExportSessionMissing(f *fixtureSession, keys []string) string { return f.missing(keys) }
 
+// dispatch.go
+
+// ExportSession is a run's fixture session.
+type ExportSession = *fixtureSession
+
+// ExportSuiteMode is how a suite gets to run.
+type ExportSuiteMode = suiteMode
+
+const (
+	ExportStreamed = streamed
+	ExportDeferred = deferred
+	ExportAlone    = alone
+)
+
+// ExportNewStreamRun is a streaming run of plan booking into c, its fixtures
+// in f, with slots dispatch slots. It ends with ctx.
+func ExportNewStreamRun(ctx context.Context, plan *RunPlan, c *OutputCollector, f *fixtureSession, slots int) *streamRun {
+	ctx, cancel := context.WithCancel(ctx)
+	return &streamRun{
+		ctx: ctx, cancel: cancel, plan: plan, collector: c, fixtures: f,
+		sem:      make(chan struct{}, slots),
+		ledger:   newFixtureLedger(nil, nil),
+		releaser: startFixtureReleaser(ctx, func() *SharedFixtureProcess { return nil }),
+	}
+}
+
+// ExportRunSuite runs the suite of r's first package named by its test
+// function, in mode, at index 0.
+func ExportRunSuite(r *streamRun, suite string, mode suiteMode) {
+	r.runSuite(SuiteTarget{SuiteSpec: SuiteSpec{Package: r.plan.Packages[0].Path, SuiteName: suite}}, 0, mode)
+}
+
+// ExportNewUpProcess is a process without a subprocess behind it whose every
+// state key came up.
+func ExportNewUpProcess(sharedDir string, state map[string]json.RawMessage) *SharedFixtureProcess {
+	p := &SharedFixtureProcess{sharedDir: sharedDir, state: state, ready: map[string]chan struct{}{}}
+	for key := range state {
+		ch := make(chan struct{})
+		close(ch)
+		p.ready[key] = ch
+	}
+	return p
+}
+
 // BuildSuiteTargets builds the targets of the suites the maps declare that
 // -run selects and -skip does not drop whole, for each compiled package.
 func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {

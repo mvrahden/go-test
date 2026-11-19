@@ -670,13 +670,12 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	// The first scope's bulk streams with the compile. Every other suite is
 	// collected during the stream and runs after it, scope by scope: a
 	// group's bulk, then its exclusive suites one at a time.
-	streamed := ""
+	streamedGroup := ""
 	if len(scopes) > 0 {
-		streamed = scopes[0].Group
+		streamedGroup = scopes[0].Group
 	}
 	deferredBulk := map[string][]deferredTarget{}
 	deferredTail := map[string][]deferredTarget{}
-	var clock groupClock
 
 	streamCtx, streamCancel := context.WithCancel(ctx)
 	defer streamCancel()
@@ -687,12 +686,6 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	releaseCtx, releaseCancel := context.WithCancel(streamCtx)
 	defer releaseCancel()
 	releaser := startFixtureReleaser(releaseCtx, func() *SharedFixtureProcess { return fixtures.releasable(releaseCtx) })
-	release := func(keys []string) {
-		if len(keys) > 0 {
-			traceDispatch(dispatchEvent{Kind: "free", Keys: sortedCopy(keys)})
-		}
-		releaser.Release(keys)
-	}
 
 	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, pf.BuildFlags), cfg.CompileParallel)
 
@@ -704,6 +697,10 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	}
 	maxParallel := computeDispatchConcurrency(&pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags))
 	sem := make(chan struct{}, maxParallel)
+	r := &streamRun{
+		ctx: streamCtx, cancel: streamCancel, cfg: cfg, pf: pf, overlay: overlay, plan: plan, scopes: scopes,
+		baseEnv: baseEnv, sem: sem, fixtures: fixtures, ledger: ledger, releaser: releaser,
+	}
 	var wg sync.WaitGroup
 	anyTargets := false
 	// nothingToRun: a package built but none of its suites run.
@@ -713,10 +710,11 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	// A package that will never run holds no fixture.
 	for i := range overlay.BrokenPackages {
-		release(ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
+		r.free(ledger.DoneExcept(overlay.BrokenPackages[i].PkgPath, nil))
 	}
 
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
+	r.collector = collector
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
 	collector.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, pf.RunFlags)
 	// The flush order holds every package the collector will report on.
@@ -750,7 +748,7 @@ loop:
 			traceDispatch(dispatchEvent{Kind: "intake", Package: outcome.Package, For: "failed"})
 			buildFailed = true
 			bookBuildFailures(collector, nil, []BuildFailure{{Package: outcome.Package, Err: outcome.Err}})
-			release(ledger.DoneExcept(outcome.Package, nil))
+			r.free(ledger.DoneExcept(outcome.Package, nil))
 			continue
 		}
 		cr := outcome.Result
@@ -775,11 +773,11 @@ loop:
 		}
 
 		collector.Register(cr.Package, len(targets))
-		clock.count(targets)
+		r.clock.count(targets)
 
 		for i := range targets { //nolint:gocritic // hugeParam: stable API
 			target := targets[i]
-			if target.Exclusive || target.Group != streamed {
+			if target.Exclusive || target.Group != streamedGroup {
 				// Deferred past the stream: exclusive suites run strictly
 				// alone, after every concurrent suite of their group has
 				// drained, and a later group after the one before it. Their
@@ -797,48 +795,8 @@ loop:
 			go func(t SuiteTarget, idx int) {
 				defer wg.Done()
 				// Last of all, once the suite's process is gone.
-				defer func() { release(ledger.Done(t.Package, t.SuiteName)) }()
-				requiredKeys := plannedKeys(plan, &t)
-				recorded := false
-				// missing names the shared fixture the suite is given up for.
-				missing := ""
-				defer func() {
-					switch {
-					case recorded:
-					case missing != "":
-						traceSuite("given-up", &t, requiredKeys)
-						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
-					case streamCtx.Err() != nil:
-						traceSuite("stopped", &t, requiredKeys)
-						collector.RecordStopped(t.Package, idx, t.SuiteName)
-					default:
-						collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
-					}
-				}()
-
-				var up bool
-				if missing, up = fixtures.await(streamCtx, requiredKeys); !up || missing != "" {
-					return
-				}
-				env, err := fixtures.env(baseEnv, t.Package, t.SuiteName, requiredKeys)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
-					return
-				}
-
-				select {
-				case sem <- struct{}{}:
-				case <-streamCtx.Done():
-					return
-				}
-				defer func() { <-sem }()
-
-				clock.run(t.Group, func() {
-					traceSuite("suite-start", &t, requiredKeys)
-					runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
-					traceSuite("suite-end", &t, requiredKeys)
-				})
-				recorded = true
+				defer r.done(&t)
+				r.runSuite(t, idx, streamed)
 			}(target, i)
 		}
 	}
@@ -880,31 +838,6 @@ loop:
 		fixtures.startFor(streamCtx, suites, win.Fixtures, what)
 	}
 
-	runDeferred := func(t SuiteTarget, idx int) { //nolint:gocritic // hugeParam: a copy per suite is nothing beside the process it starts
-		requiredKeys := plannedKeys(plan, &t)
-		if streamCtx.Err() != nil {
-			traceSuite("stopped", &t, requiredKeys)
-			collector.RecordStopped(t.Package, idx, t.SuiteName)
-			return
-		}
-		if missing := fixtures.missing(requiredKeys); missing != "" {
-			traceSuite("given-up", &t, requiredKeys)
-			collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
-			return
-		}
-		env, err := fixtures.env(baseEnv, t.Package, t.SuiteName, requiredKeys)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "FAIL: %s %s: shared fixture state: %s\n", t.Package, t.SuiteName, err)
-			collector.RecordResult(t.Package, idx, SuiteResult{ExitCode: 1})
-			return
-		}
-		clock.run(t.Group, func() {
-			traceSuite("suite-start", &t, requiredKeys)
-			runRecorded(streamCtx, collector, t.Package, idx, t, env, collector.UsesTest2JSON())
-			traceSuite("suite-end", &t, requiredKeys)
-		})
-	}
-
 	// Scopes never overlap: a later group starts once the one before it has
 	// drained. Exclusive suites own the machine: after their group's bulk,
 	// one at a time, in deterministic order. Shared fixture processes stay
@@ -920,16 +853,8 @@ loop:
 				go func(t SuiteTarget, idx int) {
 					defer scopeWg.Done()
 					// Last of all, once the suite's process is gone.
-					defer func() { release(ledger.Done(t.Package, t.SuiteName)) }()
-					select {
-					case sem <- struct{}{}:
-					case <-streamCtx.Done():
-						traceSuite("stopped", &t, plannedKeys(plan, &t))
-						collector.RecordStopped(t.Package, idx, t.SuiteName)
-						return
-					}
-					defer func() { <-sem }()
-					runDeferred(t, idx)
+					defer r.done(&t)
+					r.runSuite(t, idx, deferred)
 				}(d.t, d.idx)
 			}
 			scopeWg.Wait()
@@ -941,13 +866,13 @@ loop:
 		for i := range tail {
 			d := &tail[i]
 			startFor(tail[i:i+1], "exclusive tail")
-			runDeferred(d.t, d.idx)
+			r.runSuite(d.t, d.idx, alone)
 			if left--; left == 0 {
 				allIn()
 			}
 			// The slot's process is gone. Its release runs beside the next
 			// slot, which needs none of what it frees.
-			release(ledger.Done(d.t.Package, d.t.SuiteName))
+			r.done(&d.t)
 		}
 	}
 	allIn()
@@ -977,7 +902,7 @@ loop:
 		if cfg.OutputMode == RunBatchText && dispatchErr == nil && !fixtures.failedSetup() {
 			fmt.Fprintln(os.Stderr, "no test suites to run")
 		}
-		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr), Groups: clock.runs()}
+		result := PipelineResult{ExitCode: exitCodeAfterDispatch(0, dispatchErr), Groups: r.clock.runs()}
 		if fixtures.failedSetup() && result.ExitCode == 0 {
 			result.ExitCode = 1
 		}
@@ -998,7 +923,7 @@ loop:
 	}
 	exitCode = collector.takeCensus(cfg, overlay.Declared, exitCode, dispatchErr)
 	running := collector.bookDeadline(dispatchErr)
-	result := PipelineResult{ExitCode: exitCode, Groups: clock.runs()}
+	result := PipelineResult{ExitCode: exitCode, Groups: r.clock.runs()}
 	applyDeadlineFailure(collector, &result, cfg, dispatchErr, running)
 	applyInterrupt(collector, &result, dispatchErr)
 	applySetupFailure(collector, &result, setupErr)

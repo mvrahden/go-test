@@ -6,8 +6,8 @@ Clause: when suites of the default group, of a group e2e and of a later group ru
  
  		for i := range targets { //nolint:gocritic // hugeParam: stable API
  			target := targets[i]
--			if target.Exclusive || target.Group != streamed {
-+			if target.Exclusive || target.Group != streamed && false {
+-			if target.Exclusive || target.Group != streamedGroup {
++			if target.Exclusive || target.Group != streamedGroup && false {
  				// Deferred past the stream: exclusive suites run strictly
  				// alone, after every concurrent suite of their group has
  				// drained, and a later group after the one before it. Their

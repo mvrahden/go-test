@@ -6,8 +6,8 @@ Judge: ./tests/canary CanaryTestSuite/TestAnExclusiveSuiteRunsAfterTheBulk
  
  		for i := range targets { //nolint:gocritic // hugeParam: stable API
  			target := targets[i]
--			if target.Exclusive || target.Group != streamed {
-+			if target.Group != streamed {
+-			if target.Exclusive || target.Group != streamedGroup {
++			if target.Group != streamedGroup {
  				// Deferred past the stream: exclusive suites run strictly
  				// alone, after every concurrent suite of their group has
  				// drained, and a later group after the one before it. Their
