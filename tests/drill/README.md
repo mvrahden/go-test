@@ -1002,6 +1002,7 @@ shards of one run do not add up to every mutant exactly once.
 | `spec-repeated-run-read-as-twin` | every repeated top-level suite is read as a twin pair, its later runs as external suites | spec conformance: three runs of a suite show as runs 1, 2 and 3 of 3, none external |
 | `spec-stdlib-twin-read-as-runs` | a stdlib test both test packages declare is not marked a twin, so its two halves read as two runs | spec conformance: a replayed stdlib twin shows its external half marked, once and under -count=2 |
 | `test-variants-built-for-export-data` | the package loader asks for types in its listing with tests, so go list builds every test variant and test main | pkgload: the load with tests asks for types |
+| `reference-drops-an-assertion` | the reference reader skips every assertion with a type parameter | conventions: the generated sections match the committed documents |
 
 ## Adding a mutant
 
