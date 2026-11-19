@@ -679,3 +679,20 @@ Rules and sections tagged **v1.38+** need v1.38.0 or newer. What v1.38 changes:
    `Fuzz<Suite>_<Method>` wrapper to replay them. `-c`, `-n`,
    `-overlay`, `-fuzz` and a profile flag over several suite processes
    are refused with exit 2.
+
+## v1.39
+
+What v1.39 changes:
+
+1. **Generated code needs the v1.39 runtime** — the harness calls
+   `gotestruntime.EachT`, `BenchB`, `FuzzF`, `FuzzTarget`, `SeedArity` and
+   `SeedArg`, and the shared fixture setup program is one call of
+   `gotestruntime.RunSharedFixtures`; none of them exists before v1.39, so
+   the module must resolve gotest v1.39.0 or newer. A `go get -tool` pin
+   resolves both from one version.
+
+2. **Four constructors are deprecated** — `gotest.NewTFromTB`,
+   `gotest.NewB`, `gotest.SeedArg` and `gotest.SeedArity` are for generated
+   code, which now calls the runtime's names instead. They stay,
+   so a harness an older gotest left on disk still compiles. Nothing a user
+   wrote changes; `gotest.NewF` stays the call for a stdlib `FuzzXxx`.
