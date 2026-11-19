@@ -82,7 +82,7 @@ func planRun(results gotestgen.GenerateResults) *RunPlan {
 				Name:       name,
 				Tests:      tests,
 				Bench:      slices.Contains(r.BenchSuiteNames, name),
-				SharedKeys: sortedCopy(r.SuiteRequiredSharedFixtureKeys["Test"+name]),
+				SharedKeys: sortedCopy(r.SuiteRequiredSharedFixtureKeys[name]),
 			}
 			if tests {
 				s.Testless = slices.Contains(r.TestlessSuiteNames, name)

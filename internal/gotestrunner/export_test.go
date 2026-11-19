@@ -708,7 +708,11 @@ func mapsOf(results gotestgen.GenerateResults) planMaps {
 		m.ExclusiveSuitesByPkg[r.PkgPath] = set(r.ExclusiveSuiteNames)
 		m.TestlessSuitesByPkg[r.PkgPath] = set(r.TestlessSuiteNames)
 		m.GroupsByPkg[r.PkgPath] = r.GroupBySuite
-		m.SuiteRequiredSharedFixtureKeys[r.PkgPath] = r.SuiteRequiredSharedFixtureKeys
+		byFunc := map[string][]string{}
+		for id, keys := range r.SuiteRequiredSharedFixtureKeys {
+			byFunc["Test"+id] = keys
+		}
+		m.SuiteRequiredSharedFixtureKeys[r.PkgPath] = byFunc
 	}
 	return m
 }
