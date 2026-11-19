@@ -31,10 +31,17 @@ func (s *CLIProcsTestSuite) TestSuiteProcessesAtOnce(t *gotest.T) {
 		})
 	})
 	t.When("the same suites are run with GOMAXPROCS=1 and no -p", func(w *gotest.T) {
-		w.It("each fails waiting, since one process runs at a time", func(it *gotest.T) {
+		w.It("they do not all run at once, so at least one fails waiting", func(it *gotest.T) {
 			r := run()
 			gotest.Equal(it, 1, r.Exit)
-			gotest.Equal(it, "fail", r.Verdict("TestMeetATestSuite/TestMeets"))
+			// The suite dispatched last sees every mark and may pass.
+			failed := 0
+			for _, suite := range []string{"A", "B", "C"} {
+				if r.Verdict("TestMeet"+suite+"TestSuite/TestMeets") == "fail" {
+					failed++
+				}
+			}
+			gotest.GreaterOrEqual(it, failed, 1)
 		})
 	})
 }

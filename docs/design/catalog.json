@@ -8666,7 +8666,7 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "each fails waiting, since one process runs at a time",
+                      "display": "they do not all run at once, so at least one fails waiting",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
@@ -8674,7 +8674,7 @@
                       "focused": false,
                       "kind": "block",
                       "line": 34,
-                      "name": "each_fails_waiting,_since_one_process_runs_at_a_time",
+                      "name": "they_do_not_all_run_at_once,_so_at_least_one_fails_waiting",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
