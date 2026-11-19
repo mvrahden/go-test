@@ -303,7 +303,7 @@ func (s *MyTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 ```
 
-Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite of its group, for suites whose verdicts measure wall-clock behavior or contend for resources; go test's `-p N` separately caps how many suite processes run at once), `ExclusiveGroup` (a named group run apart from every other suite).
+Fields: `Timeout` (per-test deadline), `SetupTimeout`, `FailFast` (stop on first failure), `Parallel`, `Exclusive` (dispatched strictly alone, after every non-exclusive suite of its group, for suites whose verdicts measure wall-clock behavior or contend for resources; go test's `-p N` separately sets how many suite processes run at once), `ExclusiveGroup` (a named group run apart from every other suite).
 Presets: `DefaultSuiteConfig()` (30s/30s), `IntegrationSuiteConfig()` (2m/5m).
 
 `ExclusiveGroup: "e2e"` is for suites that must not share the machine with the rest of the run but may share it with each other, such as E2E suites against one stack.
