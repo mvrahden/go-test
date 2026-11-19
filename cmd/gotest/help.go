@@ -92,8 +92,8 @@ Run "gotest help <subcommand>" for subcommand-specific help.
 
 Flags (gotest — use --double-dash):
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep the overlay and work dir for inspection;
-                          a later run removes them after 7 days
+  --debug                 Keep the work dir and print it; end with the time
+                          each phase took; a later run removes it after 7 days
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the test binary cache
@@ -137,6 +137,13 @@ Environment:
   GOTEST_SLOW_BUILD_THRESHOLD=<duration>
                           Report a build still running after this long
                           (default: 15s)
+  GOTEST_UPDATE_SNAPSHOTS=1
+                          Regenerate snapshot baselines (what --update-snapshots
+                          sets; the only way under plain go test)
+  GOTEST_TIMEOUT_SCALE=<n>
+                          Multiply every suite and fixture budget, declared or
+                          default (2 doubles them); processes the tests start
+                          do not inherit it
 
 Configuration:
   Place a .gotest.yml in your project root. Run "gotest help config" for details.
@@ -164,8 +171,8 @@ that did not change is not linked again.
 
 Flags:
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep the overlay and work dir for inspection;
-                          a later run removes them after 7 days
+  --debug                 Keep the work dir and print it; end with the time
+                          each phase took; a later run removes it after 7 days
   --spec                  Render spec view instead of default output
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the test binary cache
@@ -186,9 +193,9 @@ Flags:
                           Ctrl-C, force a second; the input's end is a stop
 
 All standard go test flags (-single-dash) are forwarded automatically; -run also
-takes a Fuzz<Suite>_<Method> wrapper name, -p caps the suite processes, -exec wraps
-every suite binary, and -o and -overlay are refused (gotest builds the binaries
-itself, through an overlay of its own).
+takes a Fuzz<Suite>_<Method> wrapper name, -p sets how many suite processes run
+at once, -exec wraps every suite binary, and -o and -overlay are refused (gotest
+builds the binaries itself, through an overlay of its own).
 Use a bare "--" to pass unrecognized flags without validation.
 
 CI auto-detection: when the standard CI env var is set and GOTEST_CI is
@@ -288,8 +295,8 @@ Flags:
                           Not with --static
   --no-color              Disable ANSI color codes
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep the overlay and work dir; a later run
-                          removes them after 7 days
+  --debug                 Keep the work dir and print it; a later run
+                          removes it after 7 days
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the test binary cache
   --min=<pct>             Fail if coverage < pct% (0-100)
@@ -363,8 +370,8 @@ Flags:
   --coverage=<file>       Include coverage from profile in summary output
   --badge=<file>          Write a coverage badge SVG (enables -coverprofile)
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep the overlay and work dir; a later run
-                          removes them after 7 days
+  --debug                 Keep the work dir and print it; a later run
+                          removes it after 7 days
   --update-snapshots      Regenerate snapshot files
   --no-cache              Disable the test binary cache
   --min=<pct>             Fail if coverage < pct% (0-100)
@@ -409,8 +416,8 @@ keeps watching: the first package written there runs.
 Flags:
   --debounce=<dur>        Re-run delay after change (default: 200ms)
   --ci                    CI mode: fail on F_ prefixes, snapshot read-only
-  --debug                 Keep the overlay and work dir; a later run
-                          removes them after 7 days
+  --debug                 Keep the work dir and print it; a later run
+                          removes it after 7 days
   --spec                  Render spec view after each run
   --bench                 Benchmark mode: re-run benchmarks on change, with the
                           ns/op delta against the previous run
@@ -453,8 +460,8 @@ benchmark line reports allocations (B/op, allocs/op) alongside ns/op.
 Flags:
   --spec                  Render spec view instead of raw benchmark output
   --no-color              Disable ANSI color codes (with --spec)
-  --debug                 Keep the overlay and work dir for inspection;
-                          a later run removes them after 7 days
+  --debug                 Keep the work dir and print it; a later run
+                          removes it after 7 days
   --no-cache              Disable the test binary cache
   --setup-timeout=<dur>   Total budget for shared fixture setup (default: the fixtures' declared
                           budgets, 30s until the first reports; 0 to disable)
@@ -576,8 +583,8 @@ Flags:
                           (-run, -skip and -bench are refused in its favour)
   --no-harvest            Do not mine table-test literals into seeds for this run
   --no-cache              Disable the test binary cache
-  --debug                 Keep the overlay and work dir for inspection;
-                          a later run removes them after 7 days
+  --debug                 Keep the work dir and print it; a later run
+                          removes it after 7 days
   --control=stdin         Read stop and force lines on stdin: stop is a first
                           Ctrl-C, force a second; the input's end is a stop
 
