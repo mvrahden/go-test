@@ -445,15 +445,6 @@ func (p *ManagedProcess) awaitOutput(timeout time.Duration) {
 // its tree, so the rest of the tree is stopped once the root has exited.
 func (p *ManagedProcess) Stopped() { p.stopped.Store(true) }
 
-func (p *ManagedProcess) Done() <-chan struct{} { return p.done }
-func (p *ManagedProcess) Cmd() *exec.Cmd        { return p.cmd }
-func (p *ManagedProcess) SetGraceDuration(d time.Duration) {
-	if d <= 0 {
-		return
-	}
-	p.config.GraceDuration = d
-}
-
 func (p *ManagedProcess) WaitWithGrace(ctx context.Context) error {
 	select {
 	case <-p.done:
@@ -474,25 +465,6 @@ func (p *ManagedProcess) WaitWithGrace(ctx context.Context) error {
 		return &exec.ExitError{ProcessState: p.cmd.ProcessState}
 	}
 	return nil
-}
-
-func (p *ManagedProcess) Terminate() {
-	if p.cmd.Process == nil {
-		return
-	}
-	select {
-	case <-p.done:
-		return
-	default:
-	}
-	_ = p.tree.Interrupt()
-	grace := p.graceTimeout()
-	select {
-	case <-p.done:
-	case <-time.After(grace):
-		p.forceKill()
-		<-p.done
-	}
 }
 
 func (p *ManagedProcess) forceKill() {

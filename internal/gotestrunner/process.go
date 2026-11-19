@@ -1,7 +1,6 @@
 package gotestrunner
 
 import (
-	"os/exec"
 	"time"
 
 	"github.com/mvrahden/go-test/internal/proctree"
@@ -9,24 +8,9 @@ import (
 
 // GracefulShutdownDelay is the grace a process gets to exit after it is asked
 // to shut down when it reported no teardown budget: the fallback for a suite
-// process that sent none on its channel, and the grace of the helper trees
-// below. A reported budget can be any length; nothing else bounds a managed
-// process.
+// process that sent none on its channel. A reported budget can be any length;
+// nothing else bounds a managed process.
 const GracefulShutdownDelay = 5*time.Minute + 30*time.Second
-
-// runTree runs cmd as the root of its own process tree. A canceled context
-// asks the tree to shut down, and GracefulShutdownDelay later kills the root.
-func runTree(cmd *exec.Cmd) error {
-	tree := proctree.New(cmd)
-	cmd.WaitDelay = GracefulShutdownDelay
-	defer tree.Release()
-	if err := tree.Start(); err != nil {
-		return err
-	}
-	track(tree, liveTree{root: cmd.Process.Pid})
-	defer untrack(tree)
-	return cmd.Wait()
-}
 
 // ExitStatusVerdict reads a child's exit status as a verdict. A status the
 // child cannot have chosen — a signal on Unix, where os/exec reports -1, or a

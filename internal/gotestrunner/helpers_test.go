@@ -1,14 +1,11 @@
 package gotestrunner_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/gotestrunner"
 	"github.com/mvrahden/go-test/pkg/gotest"
@@ -62,19 +59,6 @@ func buildTest2JSONArgs(target gotestrunner.SuiteTarget) (path string, args []st
 		testArgs = append(testArgs, "-test.coverprofile="+target.CoverProfile)
 	}
 	return target.BinaryPath, testArgs
-}
-
-func capturePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) string {
-	r, wr, _ := os.Pipe()
-	old := os.Stdout
-	os.Stdout = wr
-	gotestrunner.WritePackageSummary(pkg, failed, d, verbose)
-	wr.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	r.Close()
-	return buf.String()
 }
 
 var jsonTimestampRe = regexp.MustCompile(`\d+\.\d+s`)

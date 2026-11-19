@@ -72,13 +72,6 @@ type pkgState struct {
 
 type OutputOption func(*OutputCollector)
 
-func WithWriters(stdout, stderr io.Writer) OutputOption {
-	return func(c *OutputCollector) {
-		c.stdout = stdout
-		c.stderr = stderr
-	}
-}
-
 // WithEvents tees the JSON stream into w as it is written; nil for none.
 func WithEvents(w io.Writer) OutputOption {
 	return func(c *OutputCollector) { c.events = w }

@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,9 +56,7 @@ func (s *SpecInputTestSuite) TestRunSpec_InputStdin(t *gotest.T, ctx *specInputC
 		gotest.NoError(it, err, "WriteOverlay: %v", err)
 		ctx.overlayDir = tmpDir
 
-		jsonData, _, err := gotestrunner.StdlibRunTestsJSONIn(context.Background(), absExamples,
-			[]string{"-overlay=" + filepath.Join(tmpDir, "overlay.json"), "./cart"})
-		gotest.NoError(it, err, "go test: %v", err)
+		jsonData := goTestJSON(it, absExamples, "-overlay="+filepath.Join(tmpDir, "overlay.json"), "./cart")
 
 		events, err := gotestspec.ParseEvents(bytes.NewReader(jsonData))
 		gotest.NoError(it, err, "ParseEvents: %v", err)

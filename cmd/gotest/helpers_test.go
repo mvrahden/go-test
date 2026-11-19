@@ -133,3 +133,14 @@ func stageFixtureModule(t *gotest.T, repoRoot, dir, filename string, src []byte)
 	gotest.NoError(t, os.WriteFile(filepath.Join(dir, filename), src, 0o600))
 	return dir
 }
+
+// goTestJSON runs go test -json with args from dir ("" the current
+// directory) and returns its standard output, whatever the tests' verdict.
+func goTestJSON(t *gotest.T, dir string, args ...string) []byte {
+	cmd := exec.CommandContext(t.Context(), "go", append([]string{"test", "-json"}, args...)...) //nolint:gosec // G204: go tool with controlled arguments
+	cmd.Dir = dir
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	gotest.NotZero(t, cmd.ProcessState, "go test did not start: %v", err)
+	return out
+}

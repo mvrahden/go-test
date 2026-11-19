@@ -429,3 +429,25 @@ func ExportBookDeadlineCut(stream string, cutShort bool) (running []CensusCase, 
 }
 
 var ExportMayRunNothing = mayRunNothing
+
+func WithWriters(stdout, stderr io.Writer) OutputOption {
+	return func(c *OutputCollector) {
+		c.stdout = stdout
+		c.stderr = stderr
+	}
+}
+
+// State returns a snapshot of the accumulated state for the given keys.
+func (p *SharedFixtureProcess) State(keys []string) map[string]json.RawMessage {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	result := make(map[string]json.RawMessage, len(keys))
+	for _, k := range keys {
+		if v, ok := p.state[k]; ok {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+func (p *ManagedProcess) Done() <-chan struct{} { return p.done }
