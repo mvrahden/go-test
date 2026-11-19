@@ -943,6 +943,7 @@ shards of one run do not add up to every mutant exactly once.
 | `summary-failure-path-without-run` | the summary's failure path leaves out the run a failure happened in | spec conformance: the summary of three runs names the failing run |
 | `spec-twin-marked-in-the-first-run-only` | under -count only the first run's external twin is marked | spec conformance: twins run twice show the external suite marked in each run |
 | `bench-numbered-name-sets-gomaxprocs` | a benchmark name's trailing number is read as its GOMAXPROCS | bench conformance: a run of size-1024 on one processor records no GOMAXPROCS of 1024 |
+| `bench-zero-sample-dropped` | a result line without ns/op, a sample that measured no time, is dropped | bench conformance: samples that measured no time are kept at 0 ns/op |
 | `annotation-test-path-unprefixed` | a failed test is annotated at its file's base name, without its package directory | cli conformance: a failed test's annotation names the file in its package's directory |
 | `summary-markdown-all-dropped` | the Markdown headline of a run in which every test passed does not say All | cli conformance: the Markdown headline of an all-pass run says All |
 | `summary-headline-no-pass-unsaid` | the headline of a run in which nothing passed does not say so | cli conformance: an all-skipped run's headline says no tests passed |

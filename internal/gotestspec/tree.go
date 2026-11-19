@@ -730,10 +730,11 @@ type BenchLine struct {
 var benchNameRe = regexp.MustCompile(`^(Benchmark\S*?)(?:-(\d+))?$`)
 
 // ParseBenchLine reads a benchmark result line. A line is one only when it
-// starts with a benchmark name, carries an iteration count and reports ns/op.
+// starts with a benchmark name and carries an iteration count. go test leaves
+// out ns/op when a sample measured no time, as a coarse clock can.
 func ParseBenchLine(line string) (BenchLine, bool) {
 	fields := strings.Fields(line)
-	if len(fields) < 4 || len(fields)%2 != 0 {
+	if len(fields) < 2 || len(fields)%2 != 0 {
 		return BenchLine{}, false
 	}
 	m := benchNameRe.FindStringSubmatch(fields[0])
@@ -748,7 +749,6 @@ func ParseBenchLine(line string) (BenchLine, bool) {
 	if m[2] != "" {
 		out.Procs, _ = strconv.Atoi(m[2])
 	}
-	sawNs := false
 	for k := 2; k < len(fields); k += 2 {
 		value, err := strconv.ParseFloat(fields[k], 64)
 		if err != nil {
@@ -756,7 +756,7 @@ func ParseBenchLine(line string) (BenchLine, bool) {
 		}
 		switch unit := fields[k+1]; unit {
 		case "ns/op":
-			out.NsPerOp, sawNs = value, true
+			out.NsPerOp = value
 		case "B/op":
 			out.BytesPerOp = int64(value)
 		case "allocs/op":
@@ -767,9 +767,6 @@ func ParseBenchLine(line string) (BenchLine, bool) {
 			}
 			out.Metrics[unit] = value
 		}
-	}
-	if !sawNs {
-		return BenchLine{}, false
 	}
 	return out, true
 }

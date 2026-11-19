@@ -3996,6 +3996,67 @@
           "name": "TestBenchNumberedTestSuite",
           "output": [],
           "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "the report keeps both samples at 0 ns/op",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "zero_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 23,
+                      "name": "the_report_keeps_both_samples_at_0_ns/op",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when gotest bench --json runs a benchmark whose samples measured no time with -count=2",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "zero_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 22,
+                  "name": "gotest_bench_--json_runs_a_benchmark_whose_samples_measured_no_time_with_-count=2",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "ASampleThatMeasuredNoTime",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "zero_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 18,
+              "name": "TestASampleThatMeasuredNoTime",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "BenchZero",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "zero_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 12,
+          "name": "TestBenchZeroTestSuite",
+          "output": [],
+          "status": "none"
         }
       ],
       "output": [],
@@ -31544,13 +31605,13 @@
     }
   ],
   "stats": {
-    "behaviors": 918,
+    "behaviors": 919,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 125,
+    "suites": 126,
     "tests": 0
   }
 }
