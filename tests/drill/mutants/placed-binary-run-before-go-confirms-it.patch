@@ -1,0 +1,15 @@
+Clause: when a dependency's source is changed, run, and restored → each run prints the value its sources hold
+Clause: when a test file is changed, run, and restored → each run prints the value its sources hold
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* ADependencyChanges / .* / each run prints the value its sources hold \(
+Expect: ^FAIL .*conformance/cli CLIStaleBinary .* ATestFileChanges / .* / each run prints the value its sources hold \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -225,7 +225,7 @@
+ 	case now == nil:
+ 		return notReady
+ 	case placed != nil && os.SameFile(placed, now):
+-		if now.ModTime().After(placed.ModTime()) || exited == 0 {
++		if now.ModTime().After(placed.ModTime()) || exited <= 0 {
+ 			return confirmed
+ 		}
+ 		return notReady
