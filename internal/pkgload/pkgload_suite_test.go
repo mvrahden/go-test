@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/genstub"
@@ -29,9 +28,8 @@ type LoadTestSuite struct {
 }
 
 func (s *LoadTestSuite) SuiteConfig() gotest.SuiteConfig {
-	cfg := gotest.DefaultSuiteConfig()
-	cfg.Timeout = 2 * time.Minute // the export load compiles every test variant of the corpus
-	return cfg
+	// From an empty build cache the slowest method takes about 6s.
+	return gotest.DefaultSuiteConfig()
 }
 
 const (
