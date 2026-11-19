@@ -1,0 +1,13 @@
+Clause: when -run names a suite of one package and another package's suite fails vet → exits 0 and reports the other package as having no tests to run
+Expect: ^FAIL .*conformance/cli CLIBuildSet .* / exits 0 and reports the other package as having no tests to run \(
+--- a/internal/gotestrunner/compile.go
++++ b/internal/gotestrunner/compile.go
+@@ -240,7 +240,7 @@
+ func buildSet(suitePackages []string, dispatched map[string]bool) []string {
+ 	var out []string
+ 	for _, pkg := range suitePackages {
+-		if dispatched[pkg] {
++		if dispatched[pkg] || pkg != "" {
+ 			out = append(out, pkg)
+ 		}
+ 	}

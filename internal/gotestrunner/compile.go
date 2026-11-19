@@ -235,6 +235,27 @@ func CompilePackagesStream(ctx context.Context, packages []string, overlayFlag s
 	return ch
 }
 
+// buildSet is the members of suitePackages, in order, that dispatched holds:
+// a package none of whose suites runs is not built.
+func buildSet(suitePackages []string, dispatched map[string]bool) []string {
+	var out []string
+	for _, pkg := range suitePackages {
+		if dispatched[pkg] {
+			out = append(out, pkg)
+		}
+	}
+	return out
+}
+
+// dispatchedPackages is the set of packages the given suites belong to.
+func dispatchedPackages(suites []*PlannedSuite) map[string]bool {
+	out := make(map[string]bool, len(suites))
+	for _, s := range suites {
+		out[s.Package] = true
+	}
+	return out
+}
+
 // spanOf passes ch's outcomes on and measures the compile stage: span is
 // the time from this call to ch's close, zero until then.
 func spanOf(ch <-chan CompileOutcome, now func() time.Time) (<-chan CompileOutcome, func() time.Duration) {

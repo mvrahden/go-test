@@ -485,6 +485,17 @@ A run's start SHALL evict from the test binary cache the binaries of a checkout 
 - **WHEN** a cached test binary has no record beside it
 - **THEN** the next run links it again without a word and records it
 
+### Requirement: Packages a run builds
+A run SHALL build a suite package only when it dispatches one of its suites. A package whose suites -run, -skip, a group flag or focus all leave out SHALL be reported as go test reports a package that ran no tests, without being built, so a build or vet failure in it is not that run's.
+
+#### Scenario: A package the filter leaves out
+- **WHEN** -run names a suite of one package and another package's suite fails vet
+- **THEN** exits 0 and reports the other package as having no tests to run
+
+#### Scenario: The same packages without the filter
+- **WHEN** the two packages are run without -run
+- **THEN** exits 2 and reports the vet finding under its package
+
 ### Requirement: Clearing the test binary cache
 gotest clean --cache SHALL remove every cached binary no run is linking or copying, with its lock and record, and say how many.
 

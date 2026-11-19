@@ -356,18 +356,18 @@ type benchPrep struct {
 	compileSpan     time.Duration
 }
 
-// prepareBenchRun compiles the suite packages and starts the given shared
-// fixtures concurrently, and waits for both: a bench run dispatches nothing
-// while a build or a setup could compete with a measurement. fixtures is the
-// run's residency plan (see planBenchFixtureWindows), not the full overlay
-// set: a fixture no scheduled target requires never starts.
-func prepareBenchRun(ctx context.Context, overlay *OverlayResult, fixtures []gotestgen.SharedFixtureInfo, buildFlags []string, setupTimeout time.Duration, compileParallel int) benchPrep {
+// prepareBenchRun compiles packages and starts the given shared fixtures
+// concurrently, and waits for both: a bench run dispatches nothing while a
+// build or a setup could compete with a measurement. fixtures is the run's
+// residency plan (see planBenchFixtureWindows), not the full overlay set: a
+// fixture no scheduled target requires never starts.
+func prepareBenchRun(ctx context.Context, overlay *OverlayResult, packages []string, fixtures []gotestgen.SharedFixtureInfo, buildFlags []string, setupTimeout time.Duration, compileParallel int) benchPrep {
 	var p benchPrep
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ch, span := spanOf(CompilePackagesStream(ctx, overlay.SuitePackages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel), time.Now)
+		ch, span := spanOf(CompilePackagesStream(ctx, packages, overlay.OverlayFlag, buildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, buildFlags), compileParallel), time.Now)
 		p.compiled, p.compileFailures = collectOutcomes(ch)
 		p.compileSpan = span()
 	}()
@@ -442,7 +442,9 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	collector.StdlibTestsByPkg = plan.StdlibTests()
 	collector.bench = true
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
-	prep := prepareBenchRun(ctx, overlay, win.Fixtures, pf.BuildFlags, resolvedSetupTimeout, cfg.CompileParallel)
+	// A package no selected benchmark belongs to is not built.
+	benchBuild := buildSet(overlay.SuitePackages, dispatchedPackages(plan.benchRun(sel)))
+	prep := prepareBenchRun(ctx, overlay, benchBuild, win.Fixtures, pf.BuildFlags, resolvedSetupTimeout, cfg.CompileParallel)
 	setupProc, setupErr := prep.proc, prep.setupErr
 
 	// finish tears the fixture process down — the one owner of its
@@ -500,19 +502,7 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	collector.EmitSkippedSuites(plan.SkippedSuites())
 	bookBuildFailures(collector, overlay.BrokenPackages, prep.compileFailures)
 	bookNoSuites(collector, overlay, noSuite, order)
-	// A package that built but runs no benchmark passes, as under go test
-	// -bench.
-	benched := map[string]bool{}
-	for i := range targets {
-		benched[targets[i].Package] = true
-	}
-	nothingToRun := false
-	for i := range prep.compiled {
-		if pkg := prep.compiled[i].Package; !benched[pkg] {
-			collector.RecordNothingToRun(pkg)
-			nothingToRun = true
-		}
-	}
+	nothingToRun := bookUnbenched(collector, overlay.SuitePackages, benchBuild, prep.compiled, targets)
 
 	// "Nothing to run" is a clean outcome only when every matched package
 	// became runnable and none of them reports a verdict of its own. A
@@ -620,6 +610,30 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	return finish(result, errors.Join(closeErrs...)), nil
 }
 
+// bookUnbenched books each suite package that runs no benchmark as passing,
+// as under go test -bench: one left unbuilt, or built with no target. It
+// reports whether there was any.
+func bookUnbenched(c *OutputCollector, suitePackages, built []string, compiled []CompileResult, targets []SuiteTarget) bool {
+	benched := map[string]bool{}
+	for i := range targets {
+		benched[targets[i].Package] = true
+	}
+	found := false
+	for i := range compiled {
+		if pkg := compiled[i].Package; !benched[pkg] {
+			c.RecordNothingToRun(pkg)
+			found = true
+		}
+	}
+	for _, pkg := range suitePackages {
+		if !slices.Contains(built, pkg) {
+			c.RecordNothingToRun(pkg)
+			found = true
+		}
+	}
+	return found
+}
+
 // neverRan is what a suite reports that was given up before it started,
 // naming the fixture by its type: key is its state key, import path and all.
 func neverRan(suite, key string) string {
@@ -654,7 +668,7 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	r := newStreamRun(ctx, cfg, overlay, pf)
 	defer r.cancel()
 	defer r.releaseCancel()
-	compiled, span := spanOf(CompilePackagesStream(r.ctx, overlay.SuitePackages, overlay.OverlayFlag, r.pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, r.pf.BuildFlags), cfg.CompileParallel), time.Now)
+	compiled, span := spanOf(CompilePackagesStream(r.ctx, r.bookUnbuilt(), overlay.OverlayFlag, r.pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, r.pf.BuildFlags), cfg.CompileParallel), time.Now)
 	held := r.intake(compiled)
 	r.runScopes(held)
 	result := r.finish()
