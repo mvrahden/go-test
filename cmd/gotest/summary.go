@@ -129,7 +129,6 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		CompileParallel: cfg.CompileParallel,
 		OutputMode:      gotestrunner.RunCaptureJSON,
 		Events:          eventsWriter(eventsFile),
-		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,
@@ -147,7 +146,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
-	noteStdlibTests(overlay.StdlibTestsByPkg)
+	noteStdlibTests(overlay.Plan.StdlibTests())
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)))
@@ -158,7 +157,7 @@ func runSummary(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 
 	elapsed := time.Since(pipelineStart)
 	var notes []string
-	if note := stdlibNote(overlay.StdlibTestsByPkg); note != "" {
+	if note := stdlibNote(overlay.Plan.StdlibTests()); note != "" {
 		notes = []string{note}
 	}
 	if err := writeSummaryOutput(tree, format, output, coverageProfile, noColor, github, elapsed, badgePath, groupRuns(result.Groups), notes); err != nil {

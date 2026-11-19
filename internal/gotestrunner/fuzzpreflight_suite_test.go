@@ -122,13 +122,13 @@ func (s *FuzzPreflightTestSuite) TestReportStaleFuzzCorpora(t *gotest.T, c *fuzz
 		w.It("writes one warning per stale entry", func(it *gotest.T) {
 			writeCorpus(it, c.dir, "FuzzT_A", "bbb", `string("hi")`)
 			writeCorpus(it, c.dir, "FuzzT_B", "ccc", `string("hi")`)
-			overlay := &gotestrunner.OverlayResult{
-				DirsByPkg: map[string]string{"example.com/p": c.dir},
-				FuzzParamsByFunc: map[string]map[string][]string{"example.com/p": {
-					"FuzzT_A": {"string", "[]byte"},
-					"FuzzT_B": {"string"},
-				}},
-			}
+			overlay := gotestrunner.ExportPlannedOverlay(nil, gotestrunner.PlannedSuite{
+				Package: "example.com/p", Dir: c.dir, Name: "T", Tests: true,
+				FuzzFuncs: []gotestrunner.PlannedFuzz{
+					{Func: "FuzzT_A", Params: []string{"string", "[]byte"}},
+					{Func: "FuzzT_B", Params: []string{"string"}},
+				},
+			})
 
 			var buf bytes.Buffer
 			gotestrunner.ReportStaleFuzzCorpora(&buf, overlay)
@@ -142,13 +142,13 @@ func (s *FuzzPreflightTestSuite) TestReportStaleFuzzCorpora(t *gotest.T, c *fuzz
 		w.It("checks only those, so --target never reports another target's drift", func(it *gotest.T) {
 			writeCorpus(it, c.dir, "FuzzT_A", "bbb", `string("hi")`)
 			writeCorpus(it, c.dir, "FuzzT_B", "ccc", `string("hi")`)
-			overlay := &gotestrunner.OverlayResult{
-				DirsByPkg: map[string]string{"example.com/p": c.dir},
-				FuzzParamsByFunc: map[string]map[string][]string{"example.com/p": {
-					"FuzzT_A": {"string", "[]byte"},
-					"FuzzT_B": {"bool"},
-				}},
-			}
+			overlay := gotestrunner.ExportPlannedOverlay(nil, gotestrunner.PlannedSuite{
+				Package: "example.com/p", Dir: c.dir, Name: "T", Tests: true,
+				FuzzFuncs: []gotestrunner.PlannedFuzz{
+					{Func: "FuzzT_A", Params: []string{"string", "[]byte"}},
+					{Func: "FuzzT_B", Params: []string{"bool"}},
+				},
+			})
 
 			var buf bytes.Buffer
 			gotestrunner.ReportStaleFuzzCorporaFor(&buf, overlay, []gotestrunner.FuzzTarget{

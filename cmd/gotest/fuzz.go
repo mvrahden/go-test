@@ -208,23 +208,13 @@ func recordFuzzSession(targets []gotestrunner.FuzzTarget, res gotestrunner.FuzzR
 	return gotestrunner.RecordFuzzSession(path, targets, res)
 }
 
-// collectFuzzTargets flattens overlay.FuzzFuncsByPkg (import path -> suite
-// struct name -> generated Fuzz<Suite>_<Method> func names) into a
-// deterministically ordered slice of FuzzTarget, pairing each with its
-// package's source directory from overlay.DirsByPkg.
+// collectFuzzTargets lists every generated Fuzz<Suite>_<Method> wrapper of
+// the plan as a FuzzTarget, ordered by package, then wrapper.
 func collectFuzzTargets(overlay *gotestrunner.OverlayResult) []gotestrunner.FuzzTarget {
 	var targets []gotestrunner.FuzzTarget
-	for pkg, bySuite := range overlay.FuzzFuncsByPkg {
-		dir := overlay.DirsByPkg[pkg]
-		for suite, funcs := range bySuite {
-			for _, fn := range funcs {
-				targets = append(targets, gotestrunner.FuzzTarget{
-					Package: pkg,
-					Dir:     dir,
-					Func:    fn,
-					Suite:   suite,
-				})
-			}
+	for _, s := range overlay.Plan.All() {
+		for _, f := range s.FuzzFuncs {
+			targets = append(targets, gotestrunner.FuzzTarget{Package: s.Package, Dir: s.Dir, Func: f.Func, Suite: s.Name})
 		}
 	}
 	sort.Slice(targets, func(i, j int) bool {

@@ -218,13 +218,13 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 
 	c := NewOutputCollector(cfg.OutputMode, pf.Verbose, WithEvents(cfg.Events))
 	r.collector = c
-	c.StdlibTestsByPkg = overlay.StdlibTestsByPkg
+	c.StdlibTestsByPkg = r.plan.StdlibTests()
 	c.holdToTests = cfg.OutputMode == RunBatchText && !mayRunNothing(cfg.GoTestArgs, r.pf.RunFlags)
 	// The flush order holds every package the collector will report on.
 	r.noSuite = slices.Concat(overlay.NoSuitePackages, cfg.NoTestFiles)
 	order := flushOrder(cfg, overlay, r.noSuite)
 	c.SetFlushOrder(order)
-	c.EmitSkippedSuites(overlay.SkippedSuitesByPkg)
+	c.EmitSkippedSuites(r.plan.SkippedSuites())
 	bookBuildFailures(c, overlay.BrokenPackages, nil)
 	bookNoSuites(c, overlay, r.noSuite, order)
 	return r

@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -455,7 +457,12 @@ func ExportObserveDispatch(fn func(DispatchEvent)) (restore func()) {
 
 // plan.go
 var ExportPlanRun = planRun
-var ExportPlanFromMaps = planFromMaps
+
+// ExportPlanFromResults projects results onto the per-package maps a run
+// once read, and plans from those.
+func ExportPlanFromResults(results gotestgen.GenerateResults) *RunPlan {
+	return mapsOf(results).plan()
+}
 
 // ExportTestRun names the suites a test run of plan dispatches, in plan
 // order; nil for none.
@@ -484,13 +491,13 @@ func exportPhase(phase map[string][]*PlannedSuite) map[string][]string {
 	return out
 }
 
-// phaseSuites turns package → test function names back into planned suites
-// reading the keys reqKeys gives them.
-func phaseSuites(phase map[string][]string, reqKeys map[string]map[string][]string) []*PlannedSuite {
+// phaseSuites turns package → test function names back into o's planned
+// suites; a name o does not plan reads no keys.
+func phaseSuites(o *OverlayResult, phase map[string][]string) []*PlannedSuite {
 	var out []*PlannedSuite
 	for pkg, names := range phase {
 		for _, name := range names {
-			out = append(out, &PlannedSuite{Package: pkg, Name: strings.TrimPrefix(name, "Test"), SharedKeys: reqKeys[pkg][name]})
+			out = append(out, o.plan().Suite(pkg, strings.TrimPrefix(name, "Test")))
 		}
 	}
 	return out
@@ -512,7 +519,7 @@ func ExportPlanSuiteScopes(o *OverlayResult, run, skip string) []ExportScope {
 // ExportPlanSuitePhases splits the suites of the given maps, all of the
 // default group, into the bulk and the tail.
 func ExportPlanSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, run, skip string) (bulk, tail map[string][]string) {
-	o := &OverlayResult{SuitesByPkg: suitesByPkg, ExclusiveSuitesByPkg: exclusiveByPkg, FuzzFuncsByPkg: fuzzFuncsByPkg, TestlessSuitesByPkg: testlessByPkg}
+	o := &OverlayResult{Plan: planMaps{SuitesByPkg: suitesByPkg, ExclusiveSuitesByPkg: exclusiveByPkg, FuzzFuncsByPkg: fuzzFuncsByPkg, TestlessSuitesByPkg: testlessByPkg}.plan()}
 	scopes := ExportPlanSuiteScopes(o, run, skip)
 	if len(scopes) == 0 {
 		return map[string][]string{}, map[string][]string{}
@@ -520,9 +527,10 @@ func ExportPlanSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[s
 	return scopes[0].Bulk, scopes[0].Tail
 }
 
-// ExportAliveFixtureKeys closes the keys reqKeys gives the suites of phase.
-func ExportAliveFixtureKeys(phase map[string][]string, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) map[string]bool {
-	return aliveFixtureKeys(phaseSuites(phase, reqKeys), fixtures)
+// ExportAliveFixtureKeys closes, over o's fixtures, the keys o's suites in
+// phase read.
+func ExportAliveFixtureKeys(o *OverlayResult, phase map[string][]string) map[string]bool {
+	return aliveFixtureKeys(phaseSuites(o, phase), o.SharedFixtures)
 }
 
 // ExportPlanFixtureWindows plans o's fixture windows under -run and -skip.
@@ -539,13 +547,13 @@ func ExportPlanBenchFixtureWindows(o *OverlayResult, run, bench, skip string) fi
 }
 
 // ExportBenchSlotPlan plans the windows of bench targets in dispatch order,
-// each reading the keys reqKeys gives its test function.
-func ExportBenchSlotPlan(targets []SuiteTarget, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) (needs, laterNeeds []map[string]bool) {
+// each target naming one of o's suites by its identifier.
+func ExportBenchSlotPlan(o *OverlayResult, targets []SuiteTarget) (needs, laterNeeds []map[string]bool) {
 	slots := make([]*PlannedSuite, len(targets))
 	for i := range targets {
-		slots[i] = &PlannedSuite{Package: targets[i].Package, Name: targets[i].SuiteName, SharedKeys: reqKeys[targets[i].Package]["Test"+targets[i].SuiteName]}
+		slots[i] = o.plan().Suite(targets[i].Package, targets[i].SuiteName)
 	}
-	return benchSlotPlan(slots, fixtures)
+	return benchSlotPlan(slots, o.SharedFixtures)
 }
 
 var ExportSuiteTargets = suiteTargets
@@ -610,7 +618,7 @@ func ExportNewUpProcess(sharedDir string, state map[string]json.RawMessage) *Sha
 // BuildSuiteTargets builds the targets of the suites the maps declare that
 // -run selects and -skip does not drop whole, for each compiled package.
 func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string, dirsByPkg map[string]string, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, exclusiveByPkg map[string]map[string]bool, runFlags []string, userRunFilter, userSkipFilter string) []SuiteTarget {
-	plan := planFromMaps(&OverlayResult{SuitesByPkg: suitesByPkg, DirsByPkg: dirsByPkg, FuzzFuncsByPkg: fuzzFuncsByPkg, TestlessSuitesByPkg: testlessByPkg, ExclusiveSuitesByPkg: exclusiveByPkg})
+	plan := planMaps{SuitesByPkg: suitesByPkg, DirsByPkg: dirsByPkg, FuzzFuncsByPkg: fuzzFuncsByPkg, TestlessSuitesByPkg: testlessByPkg, ExclusiveSuitesByPkg: exclusiveByPkg}.plan()
 	selected := byPackage(plan.testRun(selection{Run: userRunFilter, Skip: userSkipFilter}))
 	var targets []SuiteTarget
 	for _, cr := range compiled {
@@ -622,6 +630,157 @@ func BuildSuiteTargets(compiled []CompileResult, suitesByPkg map[string][]string
 // BuildBenchTargets builds the bench targets of the suites benchesByPkg
 // declares that -run, -bench and -skip select, for each compiled package.
 func BuildBenchTargets(compiled []CompileResult, benchesByPkg map[string][]string, dirsByPkg map[string]string, runFlags []string, userRunFilter, userBenchFilter, userSkipFilter string) []SuiteTarget {
-	plan := planFromMaps(&OverlayResult{BenchesByPkg: benchesByPkg, DirsByPkg: dirsByPkg})
+	plan := planMaps{BenchesByPkg: benchesByPkg, DirsByPkg: dirsByPkg}.plan()
 	return benchTargets(compiled, plan.benchRun(selection{Run: userRunFilter, Bench: userBenchFilter, Skip: userSkipFilter}), runFlags, userBenchFilter)
+}
+
+// ExportPlannedOverlay is an overlay holding fixtures and a plan of suites,
+// each suite's package created on first mention with a generated harness.
+func ExportPlannedOverlay(fixtures []gotestgen.SharedFixtureInfo, suites ...PlannedSuite) *OverlayResult { //nolint:gocritic // hugeParam: test literals
+	p := &RunPlan{}
+	at := map[string]int{}
+	for _, s := range suites {
+		i, ok := at[s.Package]
+		if !ok {
+			i = len(p.Packages)
+			at[s.Package] = i
+			p.Packages = append(p.Packages, PlannedPackage{Path: s.Package, Dir: s.Dir, Harness: true})
+		}
+		p.Packages[i].Suites = append(p.Packages[i].Suites, s)
+	}
+	p.index()
+	return &OverlayResult{SharedFixtures: fixtures, Plan: p}
+}
+
+// planMaps are the per-package maps a run once read its suites from. Tests
+// that state suites as maps plan through them.
+type planMaps struct {
+	SuitePackages, NoSuitePackages []string
+	StdlibTestsByPkg               map[string]int
+	SuitesByPkg                    map[string][]string
+	ExclusiveSuitesByPkg           map[string]map[string]bool
+	GroupsByPkg                    map[string]map[string]string
+	TestlessSuitesByPkg            map[string]map[string]bool
+	BenchesByPkg                   map[string][]string
+	FuzzFuncsByPkg                 map[string]map[string][]string
+	FuzzParamsByFunc               map[string]map[string][]string
+	FuzzDecodedByFunc              map[string]map[string]bool
+	DirsByPkg                      map[string]string
+	SkippedSuitesByPkg             map[string][]string
+	SuiteRequiredSharedFixtureKeys map[string]map[string][]string // package → test function → keys
+}
+
+// mapsOf projects results onto the maps, as runs once did.
+func mapsOf(results gotestgen.GenerateResults) planMaps {
+	m := planMaps{
+		StdlibTestsByPkg: map[string]int{}, SuitesByPkg: map[string][]string{}, ExclusiveSuitesByPkg: map[string]map[string]bool{},
+		GroupsByPkg: map[string]map[string]string{}, TestlessSuitesByPkg: map[string]map[string]bool{}, BenchesByPkg: map[string][]string{},
+		FuzzFuncsByPkg: map[string]map[string][]string{}, FuzzParamsByFunc: map[string]map[string][]string{}, FuzzDecodedByFunc: map[string]map[string]bool{},
+		DirsByPkg: map[string]string{}, SkippedSuitesByPkg: map[string][]string{}, SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{},
+	}
+	set := func(names []string) map[string]bool {
+		out := map[string]bool{}
+		for _, n := range names {
+			out[n] = true
+		}
+		return out
+	}
+	for _, r := range results {
+		if len(r.PTest) > 0 || len(r.PXTest) > 0 {
+			m.SuitePackages = append(m.SuitePackages, r.PkgPath)
+		} else {
+			m.NoSuitePackages = append(m.NoSuitePackages, r.PkgPath)
+		}
+		if r.StdlibTestCount > 0 {
+			m.StdlibTestsByPkg[r.PkgPath] = r.StdlibTestCount
+		}
+		if r.AbsPath != "" {
+			m.DirsByPkg[r.PkgPath] = r.AbsPath
+		}
+		if len(r.SkippedSuiteNames) > 0 {
+			m.SkippedSuitesByPkg[r.PkgPath] = r.SkippedSuiteNames
+		}
+		m.SuitesByPkg[r.PkgPath] = r.SuiteNames
+		m.BenchesByPkg[r.PkgPath] = r.BenchSuiteNames
+		m.FuzzFuncsByPkg[r.PkgPath] = r.FuzzFuncsBySuite
+		m.FuzzParamsByFunc[r.PkgPath] = r.FuzzParamsByFunc
+		m.FuzzDecodedByFunc[r.PkgPath] = r.FuzzDecodedFuncs
+		m.ExclusiveSuitesByPkg[r.PkgPath] = set(r.ExclusiveSuiteNames)
+		m.TestlessSuitesByPkg[r.PkgPath] = set(r.TestlessSuiteNames)
+		m.GroupsByPkg[r.PkgPath] = r.GroupBySuite
+		m.SuiteRequiredSharedFixtureKeys[r.PkgPath] = r.SuiteRequiredSharedFixtureKeys
+	}
+	return m
+}
+
+// plan rebuilds a plan from the maps. Packages are SuitePackages then
+// NoSuitePackages, or the sorted union of the maps' keys when neither is set.
+func (m planMaps) plan() *RunPlan { //nolint:gocritic // hugeParam: test helper
+	harness := map[string]bool{}
+	for _, pkg := range m.SuitePackages {
+		harness[pkg] = true
+	}
+	paths := slices.Concat(m.SuitePackages, m.NoSuitePackages)
+	if len(paths) == 0 {
+		set := map[string]bool{}
+		addKeys(set, m.SuitesByPkg)
+		addKeys(set, m.BenchesByPkg)
+		addKeys(set, m.DirsByPkg)
+		addKeys(set, m.StdlibTestsByPkg)
+		addKeys(set, m.SkippedSuitesByPkg)
+		addKeys(set, m.FuzzFuncsByPkg)
+		addKeys(set, m.GroupsByPkg)
+		addKeys(set, m.ExclusiveSuitesByPkg)
+		addKeys(set, m.TestlessSuitesByPkg)
+		addKeys(set, m.SuiteRequiredSharedFixtureKeys)
+		paths = slices.Sorted(maps.Keys(set))
+	}
+	p := &RunPlan{Packages: make([]PlannedPackage, 0, len(paths))}
+	for _, path := range paths {
+		pkg := PlannedPackage{
+			Path:        path,
+			Dir:         m.DirsByPkg[path],
+			Harness:     harness[path],
+			StdlibTests: m.StdlibTestsByPkg[path],
+			Skipped:     m.SkippedSuitesByPkg[path],
+		}
+		benches := m.BenchesByPkg[path]
+		suite := func(name string, tests bool) PlannedSuite {
+			s := PlannedSuite{
+				Package:    path,
+				Dir:        m.DirsByPkg[path],
+				Name:       name,
+				Tests:      tests,
+				Bench:      slices.Contains(benches, name),
+				SharedKeys: sortedCopy(m.SuiteRequiredSharedFixtureKeys[path]["Test"+name]),
+			}
+			if tests {
+				s.Testless = m.TestlessSuitesByPkg[path][name]
+				s.Exclusive = m.ExclusiveSuitesByPkg[path][name]
+				s.Group = m.GroupsByPkg[path][name]
+			}
+			for _, fn := range m.FuzzFuncsByPkg[path][name] {
+				s.FuzzFuncs = append(s.FuzzFuncs, PlannedFuzz{Func: fn, Params: m.FuzzParamsByFunc[path][fn], Decoded: m.FuzzDecodedByFunc[path][fn]})
+			}
+			return s
+		}
+		suites := m.SuitesByPkg[path]
+		for _, name := range suites {
+			pkg.Suites = append(pkg.Suites, suite(name, true))
+		}
+		for _, name := range benches {
+			if !slices.Contains(suites, name) {
+				pkg.Suites = append(pkg.Suites, suite(name, false))
+			}
+		}
+		p.Packages = append(p.Packages, pkg)
+	}
+	p.index()
+	return p
+}
+
+func addKeys[V any](set map[string]bool, m map[string]V) {
+	for k := range m {
+		set[k] = true
+	}
 }

@@ -13,13 +13,13 @@ type FuzzFixturesTestSuite struct{}
 func (s *FuzzFixturesTestSuite) TestNoTargetBindsAFixture(t *gotest.T) {
 	t.When("the package declares a shared fixture no target's suite binds", func(w *gotest.T) {
 		w.It("starts nothing and hands every target an empty environment", func(it *gotest.T) {
-			overlay := &gotestrunner.OverlayResult{
-				WorkDir:        it.TempDir(),
-				SharedFixtures: []gotestgen.SharedFixtureInfo{{PkgPath: "example.com/p", Identifier: "DBSharedFixture"}},
-				SuiteRequiredSharedFixtureKeys: map[string]map[string][]string{
-					"example.com/p": {"TestOtherTestSuite": {"example.com/p.DBSharedFixture"}},
-				},
-			}
+			overlay := gotestrunner.ExportPlannedOverlay(
+				[]gotestgen.SharedFixtureInfo{{PkgPath: "example.com/p", Identifier: "DBSharedFixture"}},
+				gotestrunner.PlannedSuite{Package: "example.com/p", Name: "OtherTestSuite", Tests: true, SharedKeys: []string{"example.com/p.DBSharedFixture"}},
+				gotestrunner.PlannedSuite{Package: "example.com/p", Name: "ParseTestSuite", Tests: true,
+					FuzzFuncs: []gotestrunner.PlannedFuzz{{Func: "FuzzParseTestSuite_FuzzOne"}}},
+			)
+			overlay.WorkDir = it.TempDir()
 			target := gotestrunner.FuzzTarget{Package: "example.com/p", Func: "FuzzParseTestSuite_FuzzOne", Suite: "ParseTestSuite"}
 			fixtures, err := gotestrunner.StartFuzzFixtures(it.Context(), overlay, []gotestrunner.FuzzTarget{target}, 0)
 			gotest.NoError(it, err)

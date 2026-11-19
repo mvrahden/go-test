@@ -5,7 +5,7 @@ Clause: when gotest summary writes Markdown for a package that holds a suite and
 @@ -161,7 +161,7 @@
  	elapsed := time.Since(pipelineStart)
  	var notes []string
- 	if note := stdlibNote(overlay.StdlibTestsByPkg); note != "" {
+ 	if note := stdlibNote(overlay.Plan.StdlibTests()); note != "" {
 -		notes = []string{note}
 +		_ = note
  	}
