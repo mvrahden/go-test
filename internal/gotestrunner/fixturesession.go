@@ -126,7 +126,7 @@ func (f *fixtureSession) await(ctx context.Context, keys []string) (missing stri
 	case <-ctx.Done():
 		return "", false
 	}
-	if f.startErr != nil {
+	if f.startErr != nil || f.proc == nil {
 		return keys[0], true
 	}
 	for _, key := range keys {

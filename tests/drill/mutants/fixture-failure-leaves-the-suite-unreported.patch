@@ -1,12 +1,12 @@
 Expect: ^FAIL .*conformance/fixtures .* / the fixture is started for it and its failure fails the run and the suite, whose guard never runs \(
 Clause: when a guard-skipped suite binds a shared fixture whose setup fails → the fixture is started for it and its failure fails the run and the suite, whose guard never runs
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -870,7 +870,6 @@
- 					case recorded:
- 					case missing != "":
- 						traceSuite("given-up", &t, requiredKeys)
--						collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
- 					case streamCtx.Err() != nil:
- 						traceSuite("stopped", &t, requiredKeys)
- 						collector.RecordStopped(t.Package, idx, t.SuiteName)
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -93,7 +93,6 @@
+ 	}
+ 	if missing != "" {
+ 		traceSuite("given-up", &t, keys)
+-		r.collector.RecordGivenUp(t.Package, idx, t.SuiteName, neverRan(t.SuiteName, missing))
+ 		return
+ 	}
+ 	env, err := r.fixtures.env(r.baseEnv, t.Package, t.SuiteName, keys)
