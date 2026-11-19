@@ -47,6 +47,57 @@ func (s *ArgsTestSuite) TestIsGoTestFlag(t *gotest.T) {
 	}
 }
 
+func (s *ArgsTestSuite) TestEveryGoTestFlagIsClassified(t *gotest.T) {
+	for sub, row := range gotest.Each(t, []struct {
+		Desc  string // the flag
+		value bool   // takes a value
+		build bool   // goes to the compile; otherwise to the test binary
+	}{
+		{Desc: "-race", build: true}, {Desc: "-msan", build: true}, {Desc: "-asan", build: true}, {Desc: "-cover", build: true},
+		{Desc: "-a", build: true}, {Desc: "-c", build: true}, {Desc: "-n", build: true}, {Desc: "-x", build: true},
+		{Desc: "-trimpath", build: true}, {Desc: "-work", build: true}, {Desc: "-linkshared", build: true},
+		{Desc: "-modcacherw", build: true}, {Desc: "-buildvcs", build: true},
+		{Desc: "-o", value: true, build: true}, {Desc: "-exec", value: true, build: true},
+		{Desc: "-covermode", value: true, build: true}, {Desc: "-coverpkg", value: true, build: true}, {Desc: "-vet", value: true, build: true},
+		{Desc: "-tags", value: true, build: true}, {Desc: "-ldflags", value: true, build: true}, {Desc: "-gcflags", value: true, build: true},
+		{Desc: "-gccgoflags", value: true, build: true}, {Desc: "-asmflags", value: true, build: true}, {Desc: "-mod", value: true, build: true},
+		{Desc: "-modfile", value: true, build: true}, {Desc: "-p", value: true, build: true}, {Desc: "-toolexec", value: true, build: true},
+		{Desc: "-pkgdir", value: true, build: true}, {Desc: "-pgo", value: true, build: true}, {Desc: "-overlay", value: true, build: true},
+		{Desc: "-buildmode", value: true, build: true}, {Desc: "-compiler", value: true, build: true}, {Desc: "-installsuffix", value: true, build: true},
+		{Desc: "-v"}, {Desc: "-failfast"}, {Desc: "-short"}, {Desc: "-benchmem"}, {Desc: "-fullpath"},
+		{Desc: "-count", value: true}, {Desc: "-timeout", value: true}, {Desc: "-run", value: true}, {Desc: "-skip", value: true},
+		{Desc: "-parallel", value: true}, {Desc: "-shuffle", value: true}, {Desc: "-bench", value: true}, {Desc: "-benchtime", value: true},
+		{Desc: "-coverprofile", value: true}, {Desc: "-cpuprofile", value: true}, {Desc: "-memprofile", value: true},
+		{Desc: "-blockprofile", value: true}, {Desc: "-mutexprofile", value: true}, {Desc: "-trace", value: true},
+		{Desc: "-outputdir", value: true}, {Desc: "-list", value: true}, {Desc: "-fuzz", value: true}, {Desc: "-fuzztime", value: true},
+		{Desc: "-fuzzminimizetime", value: true}, {Desc: "-cpu", value: true}, {Desc: "-blockprofilerate", value: true},
+		{Desc: "-memprofilerate", value: true},
+	}) {
+		isValue, known := gotestrunner.IsGoTestFlag(row.Desc)
+		gotest.True(sub, known)
+		gotest.Equal(sub, row.value, isValue)
+
+		args := []string{row.Desc, "./pkg"}
+		if row.value {
+			args = []string{row.Desc, "val", "./pkg"}
+		}
+		got := gotestrunner.ClassifyGoTestArgs(args)
+		gotest.Equal(sub, []string{"./pkg"}, got.PkgPatterns)
+		flags := args[:len(args)-1]
+		switch {
+		case row.build:
+			gotest.Equal(sub, flags, got.BuildFlags)
+			gotest.Empty(sub, got.RunFlags)
+		case row.Desc == "-coverprofile":
+			gotest.Equal(sub, flags, got.RunFlags)
+			gotest.Equal(sub, []string{"-cover"}, got.BuildFlags) // a profile needs an instrumented build
+		default:
+			gotest.Equal(sub, flags, got.RunFlags)
+			gotest.Empty(sub, got.BuildFlags)
+		}
+	}
+}
+
 // Every positional argument that is not a flag's value is a package
 // pattern, as go test reads it, whatever its shape.
 func (s *ArgsTestSuite) TestValidateTestFlags(t *gotest.T) {
