@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mvrahden/go-test/internal/protocol"
+	"github.com/mvrahden/go-test/internal/protocol/sharedwire"
 )
 
 func setupDAG(ctx context.Context, fixtures []*FixtureNode, sharedState map[string]json.RawMessage, tracker *nodeTracker) error {
@@ -386,11 +387,7 @@ func loadSharedState(path string) (map[string]json.RawMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read shared state file: %w", err)
 	}
-	var state map[string]json.RawMessage
-	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, fmt.Errorf("unmarshal shared state: %w", err)
-	}
-	return state, nil
+	return sharedwire.DecodeState(data)
 }
 
 // RunnerRequiredError refuses a suite that binds a shared fixture outside the
