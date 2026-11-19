@@ -22,11 +22,12 @@ type FuzzFixtures struct {
 // returns nil when no target binds one. A fixture that fails to come up gives
 // up the targets that read it, not the session: see Env.
 func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []FuzzTarget, setupTimeout time.Duration, buildFlags ...string) (*FuzzFixtures, error) {
-	suites := map[string][]string{}
+	plan := overlay.plan()
+	suites := make([]*PlannedSuite, 0, len(targets))
 	for i := range targets {
-		suites[targets[i].Package] = append(suites[targets[i].Package], "Test"+targets[i].Suite)
+		suites = append(suites, plan.Suite(targets[i].Package, targets[i].Suite))
 	}
-	alive := aliveFixtureKeys(suites, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+	alive := aliveFixtureKeys(suites, overlay.SharedFixtures)
 	if len(alive) == 0 {
 		return nil, nil
 	}

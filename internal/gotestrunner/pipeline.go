@@ -324,7 +324,8 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult
 		return runBench(ctx, cfg, overlay, pf)
 	}
 	if name := sharedProfileFlag(pf.RunFlags); name != "" {
-		if n := plannedSuiteCount(planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)); n > 1 {
+		sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+		if n := plannedSuiteCount(planSuiteScopes(overlay.plan(), sel)); n > 1 {
 			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
 		}
 	}
@@ -430,7 +431,9 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// Bench runs dispatch bench targets, not test suites, and match -run and
 	// -bench against Benchmark<Suite>: their residency plan must come from
 	// the same selection, or fixtures would follow the wrong schedule.
-	win := planBenchFixtureWindows(overlay, pf.UserRunFilter, ExtractBenchFilter(pf.RunFlags), pf.UserSkipFilter)
+	plan := overlay.plan()
+	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Bench: ExtractBenchFilter(pf.RunFlags), Groups: overlay.groups}
+	win := planBenchFixtureWindows(plan, overlay.SharedFixtures, sel)
 	win.reportSkipped()
 	collector := NewOutputCollector(cfg.OutputMode, pf.Verbose)
 	collector.StdlibTestsByPkg = overlay.StdlibTestsByPkg
@@ -534,7 +537,11 @@ func runBench(ctx context.Context, cfg PipelineConfig, overlay *OverlayResult, p
 	// with the up-front phase and would answer no command: its windows are
 	// left closed, and every target that needed one is given up.
 	SortTargetsSerial(targets)
-	needs, laterNeeds := benchSlotPlan(targets, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+	slots := make([]*PlannedSuite, len(targets))
+	for i := range targets {
+		slots[i] = plan.Suite(targets[i].Package, targets[i].SuiteName)
+	}
+	needs, laterNeeds := benchSlotPlan(slots, win.Fixtures)
 	alive := make(map[string]bool, len(win.Bulk))
 	for k := range win.Bulk {
 		alive[k] = true
@@ -650,15 +657,17 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	resolvedSetupTimeout := resolveSetupTimeout(cfg.SetupTimeout)
 	baseEnv := buildBaseEnv(cfg)
 
-	win := planFixtureWindows(overlay, pf.UserRunFilter, pf.UserSkipFilter)
+	plan := overlay.plan()
+	sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+	win := planFixtureWindows(plan, overlay.SharedFixtures, sel)
 	win.reportSkipped()
-	scopes := planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)
+	scopes := planSuiteScopes(plan, sel)
 	// A shared fixture is released once no planned suite left needs it.
-	planned := make([]map[string][]string, 0, 2*len(scopes))
-	for _, sc := range scopes {
-		planned = append(planned, sc.Bulk, sc.Tail)
+	var planned []*PlannedSuite
+	for i := range scopes {
+		planned = append(planned, scopes[i].suites()...)
 	}
-	ledger := newFixtureLedger(planned, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+	ledger := newFixtureLedger(planned, win.Fixtures)
 
 	// The first scope's bulk streams with the compile. Every other suite is
 	// collected during the stream and runs after it, scope by scope: a
@@ -762,8 +771,10 @@ func runStreaming(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 	compileCh := CompilePackagesStream(streamCtx, overlay.SuitePackages, overlay.OverlayFlag, pf.BuildFlags, overlay.WorkDir, binaryCacheDir(overlay.BinaryCacheRoot, pf.BuildFlags), cfg.CompileParallel)
 
 	totalSuites := 0
-	for _, suites := range overlay.SuitesByPkg {
-		totalSuites += len(suites)
+	for _, s := range plan.All() {
+		if s.Tests {
+			totalSuites++
+		}
 	}
 	maxParallel := computeDispatchConcurrency(&pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags))
 	sem := make(chan struct{}, maxParallel)
@@ -984,11 +995,11 @@ loop:
 		if setupProc == nil || setupTimedOut || streamCtx.Err() != nil {
 			return
 		}
-		phase := map[string][]string{}
+		phase := make([]*PlannedSuite, 0, len(ds))
 		for i := range ds {
-			phase[ds[i].t.Package] = append(phase[ds[i].t.Package], ds[i].t.SuiteName)
+			phase = append(phase, plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))
 		}
-		need := aliveFixtureKeys(phase, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
+		need := aliveFixtureKeys(phase, win.Fixtures)
 		start := diffKeys(need, started)
 		if len(start) == 0 {
 			return

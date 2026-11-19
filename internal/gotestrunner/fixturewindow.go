@@ -35,34 +35,33 @@ type fixtureWindows struct {
 	Skipped int
 }
 
-// planFixtureWindows computes the residency plan for a run. The suite
-// selection mirrors BuildSuiteTargets minus compile results, which do not
-// exist yet: fixtures must not wait for the compiler.
-func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter string) fixtureWindows {
-	scopes := planSuiteScopes(overlay, userRunFilter, userSkipFilter)
-	var first map[string][]string
-	later := map[string][]string{}
+// planFixtureWindows computes the residency plan for a run from the same
+// selection the targets are built from, before anything compiles: fixtures
+// must not wait for the compiler.
+func planFixtureWindows(plan *RunPlan, fixtures []gotestgen.SharedFixtureInfo, sel selection) fixtureWindows { //nolint:gocritic // hugeParam: once per run
+	scopes := planSuiteScopes(plan, sel)
+	var first, later []*PlannedSuite
 	for i, sc := range scopes {
 		if i == 0 {
-			first = sc.Bulk
+			first = flatten(sc.Bulk)
 		} else {
-			mergePhase(later, sc.Bulk)
+			later = append(later, flatten(sc.Bulk)...)
 		}
-		mergePhase(later, sc.Tail)
+		later = append(later, flatten(sc.Tail)...)
 	}
 	w := fixtureWindows{
-		Bulk: aliveFixtureKeys(first, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
-		Tail: aliveFixtureKeys(later, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures),
+		Bulk: aliveFixtureKeys(first, fixtures),
+		Tail: aliveFixtureKeys(later, fixtures),
 	}
-	for i := range overlay.SharedFixtures {
-		key := sharedFixtureKey(&overlay.SharedFixtures[i])
+	for i := range fixtures {
+		key := sharedFixtureKey(&fixtures[i])
 		switch {
 		case w.Bulk[key]:
-			w.Fixtures = append(w.Fixtures, overlay.SharedFixtures[i])
+			w.Fixtures = append(w.Fixtures, fixtures[i])
 		case w.Tail[key]:
 			// Late fixtures ride along deferred: compiled into the setup
 			// program, started by StartKeys just before their phase.
-			sf := overlay.SharedFixtures[i]
+			sf := fixtures[i]
 			sf.Deferred = true
 			w.Fixtures = append(w.Fixtures, sf)
 		default:
@@ -71,12 +70,6 @@ func planFixtureWindows(overlay *OverlayResult, userRunFilter, userSkipFilter st
 	}
 	w.Fixtures = dependenciesFirst(w.Fixtures)
 	return w
-}
-
-func mergePhase(into, phase map[string][]string) {
-	for pkg, suites := range phase {
-		into[pkg] = append(into[pkg], suites...)
-	}
 }
 
 // dependenciesFirst orders fixtures so each comes after its dependencies,
@@ -131,61 +124,39 @@ func (w *fixtureWindows) reportSkipped() {
 }
 
 // suiteScope is one group's share of a run: its parallel bulk, then its
-// exclusive tail, as planSuitePhases splits them. Scopes never overlap.
+// exclusive tail, each by package. Scopes never overlap.
 type suiteScope struct {
 	Group      string // "" for the default group
-	Bulk, Tail map[string][]string
+	Bulk, Tail map[string][]*PlannedSuite
+}
+
+// suites lists the scope's bulk, then its tail, packages sorted.
+func (sc *suiteScope) suites() []*PlannedSuite {
+	return append(flatten(sc.Bulk), flatten(sc.Tail)...)
 }
 
 // planSuiteScopes splits the suites the run will dispatch into scopes: the
 // default group first, then each named group by name. A group the
 // selection leaves no suite in has no scope.
-func planSuiteScopes(overlay *OverlayResult, userRunFilter, userSkipFilter string) []suiteScope {
-	byGroup := map[string]map[string][]string{}
-	for pkg, suites := range overlay.SuitesByPkg {
-		for _, suiteName := range suites {
-			group := overlay.GroupsByPkg[pkg][suiteName]
-			if !overlay.groups.selects(group) {
-				continue
-			}
-			if byGroup[group] == nil {
-				byGroup[group] = map[string][]string{}
-			}
-			byGroup[group][pkg] = append(byGroup[group][pkg], suiteName)
+func planSuiteScopes(plan *RunPlan, sel selection) []suiteScope { //nolint:gocritic // hugeParam: once per run
+	byGroup := map[string]*suiteScope{}
+	for _, s := range plan.testRun(sel) {
+		sc := byGroup[s.Group]
+		if sc == nil {
+			sc = &suiteScope{Group: s.Group, Bulk: map[string][]*PlannedSuite{}, Tail: map[string][]*PlannedSuite{}}
+			byGroup[s.Group] = sc
 		}
+		phase := sc.Bulk
+		if s.Exclusive {
+			phase = sc.Tail
+		}
+		phase[s.Package] = append(phase[s.Package], s)
 	}
 	scopes := make([]suiteScope, 0, len(byGroup))
 	for _, group := range slices.Sorted(maps.Keys(byGroup)) {
-		bulk, tail := planSuitePhases(byGroup[group], overlay.ExclusiveSuitesByPkg, overlay.FuzzFuncsByPkg, overlay.TestlessSuitesByPkg, userRunFilter, userSkipFilter)
-		if len(bulk) == 0 && len(tail) == 0 {
-			continue
-		}
-		scopes = append(scopes, suiteScope{Group: group, Bulk: bulk, Tail: tail})
+		scopes = append(scopes, *byGroup[group])
 	}
 	return scopes
-}
-
-// planSuitePhases splits the suites the run will dispatch into the two phases:
-// those -run selects and -skip does not drop whole.
-// Values are test function names ("Test" + suite name) — the keying
-// SuiteRequiredSharedFixtureKeys uses.
-func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, userRunFilter, userSkipFilter string) (bulk, tail map[string][]string) {
-	bulk, tail = map[string][]string{}, map[string][]string{}
-	for pkg, suites := range suitesByPkg {
-		for _, suiteName := range suites {
-			testFuncName := "Test" + suiteName
-			funcs := suiteFuncs(suiteName, testlessByPkg[pkg][suiteName], fuzzFuncsByPkg[pkg][suiteName])
-			if !selectsSuite(userRunFilter, funcs) || skipsSuite(userSkipFilter, funcs) {
-				continue
-			}
-			phase := bulk
-			if exclusiveByPkg[pkg][suiteName] {
-				phase = tail
-			}
-			phase[pkg] = append(phase[pkg], testFuncName)
-		}
-	}
-	return bulk, tail
 }
 
 // aliveFixtureKeys computes Alive(phase): the DAG-closure of the union of the
@@ -193,7 +164,7 @@ func planSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]
 // transitive; closing over fixture dependencies here keeps the invariant
 // local — an alive fixture's dependencies are alive, whatever produced the
 // per-suite sets.
-func aliveFixtureKeys(phaseSuites map[string][]string, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) map[string]bool {
+func aliveFixtureKeys(suites []*PlannedSuite, fixtures []gotestgen.SharedFixtureInfo) map[string]bool {
 	deps := make(map[string][]string, len(fixtures))
 	for i := range fixtures {
 		deps[sharedFixtureKey(&fixtures[i])] = fixtures[i].Dependencies
@@ -209,11 +180,12 @@ func aliveFixtureKeys(phaseSuites map[string][]string, reqKeys map[string]map[st
 			claim(dep)
 		}
 	}
-	for pkg, suites := range phaseSuites {
-		for _, suite := range suites {
-			for _, key := range reqKeys[pkg][suite] {
-				claim(key)
-			}
+	for _, s := range suites {
+		if s == nil {
+			continue
+		}
+		for _, key := range s.SharedKeys {
+			claim(key)
 		}
 	}
 	return alive
@@ -230,55 +202,30 @@ func sharedFixtureKey(sf *gotestgen.SharedFixtureInfo) string {
 // last — opened by StartKeys just before the first, released by TeardownKeys
 // right after the last, never restarted in between.
 
-// planBenchFixtureWindows computes the residency plan for a bench run. The
-// selection mirrors BuildBenchTargets minus compile results: -run, -bench and
-// -skip are matched against Benchmark<Suite>, not the test function names the
-// default plan uses. Bulk is the first planned slot's needs — started
-// up-front, concurrent with compile; every other fixture rides deferred and
-// opens with its slot.
-func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFilter, userSkipFilter string) fixtureWindows {
-	type slot struct {
-		pkg   string
-		suite string
-	}
-	var slots []slot
-	for pkg, suites := range overlay.BenchesByPkg {
-		for _, suiteName := range suites {
-			if !selectsBench(userRunFilter, userBenchFilter, userSkipFilter, "Benchmark"+suiteName) {
-				continue
-			}
-			slots = append(slots, slot{pkg: pkg, suite: suiteName})
-		}
-	}
-	// Dispatch order: the same deterministic (Package, SuiteName) order the
-	// serial dispatcher applies.
-	sort.Slice(slots, func(a, b int) bool {
-		if slots[a].pkg != slots[b].pkg {
-			return slots[a].pkg < slots[b].pkg
-		}
-		return slots[a].suite < slots[b].suite
-	})
-
-	all := map[string][]string{}
-	for _, sl := range slots {
-		all[sl.pkg] = append(all[sl.pkg], "Test"+sl.suite)
-	}
+// planBenchFixtureWindows computes the residency plan for a bench run from
+// the bench run's selection: -run, -bench and -skip are matched against
+// Benchmark<Suite>, not the test function names the default plan uses. Bulk
+// is the first planned slot's needs — started up-front, concurrent with
+// compile; every other fixture rides deferred and opens with its slot.
+func planBenchFixtureWindows(plan *RunPlan, fixtures []gotestgen.SharedFixtureInfo, sel selection) fixtureWindows { //nolint:gocritic // hugeParam: once per run
+	// Dispatch order: the deterministic (Package, Name) order the serial
+	// dispatcher applies.
+	slots := plan.benchRun(sel)
 	w := fixtureWindows{
 		Bulk: map[string]bool{},
 		Tail: map[string]bool{},
 	}
 	if len(slots) > 0 {
-		first := map[string][]string{slots[0].pkg: {"Test" + slots[0].suite}}
-		w.Bulk = aliveFixtureKeys(first, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+		w.Bulk = aliveFixtureKeys(slots[:1], fixtures)
 	}
-	alive := aliveFixtureKeys(all, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
-	for i := range overlay.SharedFixtures {
-		key := sharedFixtureKey(&overlay.SharedFixtures[i])
+	alive := aliveFixtureKeys(slots, fixtures)
+	for i := range fixtures {
+		key := sharedFixtureKey(&fixtures[i])
 		switch {
 		case w.Bulk[key]:
-			w.Fixtures = append(w.Fixtures, overlay.SharedFixtures[i])
+			w.Fixtures = append(w.Fixtures, fixtures[i])
 		case alive[key]:
-			sf := overlay.SharedFixtures[i]
+			sf := fixtures[i]
 			sf.Deferred = true
 			w.Fixtures = append(w.Fixtures, sf)
 		default:
@@ -290,20 +237,17 @@ func planBenchFixtureWindows(overlay *OverlayResult, userRunFilter, userBenchFil
 }
 
 // benchSlotPlan computes each slot's needed keys and the union of every later
-// slot's needs, for bench targets already in dispatch order. laterNeeds has
-// len(targets)+1 entries; the final one is empty — after the last slot,
+// slot's needs, for slots already in dispatch order. laterNeeds has
+// len(slots)+1 entries; the final one is empty — after the last slot,
 // nothing is needed.
-func benchSlotPlan(targets []SuiteTarget, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) (needs, laterNeeds []map[string]bool) {
-	needs = make([]map[string]bool, len(targets))
-	for i := range targets {
-		// Bench targets carry the bare suite identifier; required keys are
-		// keyed by test function name.
-		phase := map[string][]string{targets[i].Package: {"Test" + targets[i].SuiteName}}
-		needs[i] = aliveFixtureKeys(phase, reqKeys, fixtures)
+func benchSlotPlan(slots []*PlannedSuite, fixtures []gotestgen.SharedFixtureInfo) (needs, laterNeeds []map[string]bool) {
+	needs = make([]map[string]bool, len(slots))
+	for i := range slots {
+		needs[i] = aliveFixtureKeys(slots[i:i+1], fixtures)
 	}
-	laterNeeds = make([]map[string]bool, len(targets)+1)
-	laterNeeds[len(targets)] = map[string]bool{}
-	for i := len(targets) - 1; i >= 0; i-- {
+	laterNeeds = make([]map[string]bool, len(slots)+1)
+	laterNeeds[len(slots)] = map[string]bool{}
+	for i := len(slots) - 1; i >= 0; i-- {
 		later := make(map[string]bool, len(laterNeeds[i+1])+len(needs[i]))
 		for k := range laterNeeds[i+1] {
 			later[k] = true

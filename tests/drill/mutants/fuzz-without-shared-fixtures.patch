@@ -4,10 +4,10 @@ Clause: when gotest fuzz runs a target whose suite binds a shared fixture → st
 Clause: when gotest fuzz triage re-runs a crasher of a target whose suite binds a shared fixture → reports the crasher's own failure, seen with the fixture's state, and tears the fixture down
 --- a/internal/gotestrunner/fuzzfixtures.go
 +++ b/internal/gotestrunner/fuzzfixtures.go
-@@ -27,7 +27,7 @@
- 		suites[targets[i].Package] = append(suites[targets[i].Package], "Test"+targets[i].Suite)
+@@ -28,7 +28,7 @@
+ 		suites = append(suites, plan.Suite(targets[i].Package, targets[i].Suite))
  	}
- 	alive := aliveFixtureKeys(suites, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+ 	alive := aliveFixtureKeys(suites, overlay.SharedFixtures)
 -	if len(alive) == 0 {
 +	if len(alive) >= 0 {
  		return nil, nil

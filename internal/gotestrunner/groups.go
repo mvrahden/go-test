@@ -22,21 +22,10 @@ func (g groupSelection) selects(group string) bool {
 	return !g.skip[group]
 }
 
-// knownGroups lists the named groups the overlay's suites declare, sorted.
-func (o *OverlayResult) knownGroups() []string {
-	set := map[string]bool{}
-	for _, suites := range o.GroupsByPkg {
-		for _, group := range suites {
-			set[group] = true
-		}
-	}
-	return slices.Sorted(maps.Keys(set))
-}
-
 // selectGroups narrows the run to the groups only names, less those skip
 // names. A name no suite declares is an error naming the known groups.
 func (o *OverlayResult) selectGroups(only, skip []string) error {
-	known := o.knownGroups()
+	known := o.plan().Groups()
 	for _, flag := range []struct {
 		name  string
 		names []string
@@ -52,6 +41,12 @@ func (o *OverlayResult) selectGroups(only, skip []string) error {
 			return fmt.Errorf("%s=%s: no suite declares the group %q; known groups: %s", flag.name, name, name, list)
 		}
 	}
+	o.groups = newGroupSelection(only, skip)
+	return nil
+}
+
+// newGroupSelection is the selection of only less skip.
+func newGroupSelection(only, skip []string) groupSelection {
 	sel := groupSelection{}
 	if len(only) > 0 {
 		sel.only = map[string]bool{}
@@ -65,17 +60,19 @@ func (o *OverlayResult) selectGroups(only, skip []string) error {
 			sel.skip[name] = true
 		}
 	}
-	o.groups = sel
-	return nil
+	return sel
 }
 
 // inSelectedGroups gives each target its group and drops those of a group
 // the selection leaves out.
 func inSelectedGroups(targets []SuiteTarget, o *OverlayResult) []SuiteTarget {
+	plan := o.plan()
 	kept := targets[:0]
 	for i := range targets {
 		t := targets[i]
-		t.Group = o.GroupsByPkg[t.Package][strings.TrimPrefix(t.SuiteName, "Test")]
+		if s := plan.Suite(t.Package, strings.TrimPrefix(t.SuiteName, "Test")); s != nil {
+			t.Group = s.Group
+		}
 		if o.groups.selects(t.Group) {
 			kept = append(kept, t)
 		}

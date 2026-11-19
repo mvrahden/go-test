@@ -7,10 +7,12 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/mvrahden/go-test/internal/gotestgen"
 	"github.com/mvrahden/go-test/internal/proctree"
 	"github.com/mvrahden/go-test/internal/protocol"
 )
@@ -108,22 +110,10 @@ func ExportNewSharedFixtureProcess(sharedDir string, state map[string]json.RawMe
 
 type ExportFixtureWindows = fixtureWindows
 
-var ExportPlanFixtureWindows = planFixtureWindows
-var ExportPlanBenchFixtureWindows = planBenchFixtureWindows
-var ExportBenchSlotPlan = benchSlotPlan
-var ExportPlanSuitePhases = planSuitePhases
-
-// ExportScope is one planned scope: its group and its two phases.
-type ExportScope = suiteScope
-
-var ExportPlanSuiteScopes = planSuiteScopes
-
 // ExportSelectGroups narrows o to --group and --skip-group.
 func ExportSelectGroups(o *OverlayResult, only, skip []string) error {
 	return o.selectGroups(only, skip)
 }
-
-var ExportAliveFixtureKeys = aliveFixtureKeys
 
 // ExportSortDeferred orders targets as a scope dispatches its held-back suites.
 func ExportSortDeferred(targets []SuiteTarget) []SuiteTarget {
@@ -466,3 +456,94 @@ func ExportObserveDispatch(fn func(DispatchEvent)) (restore func()) {
 // plan.go
 var ExportPlanRun = planRun
 var ExportPlanFromMaps = planFromMaps
+
+// ExportTestRun names the suites a test run of plan dispatches, in plan
+// order; nil for none.
+func ExportTestRun(plan *RunPlan, run, skip string, only, skipGroups []string) []string {
+	var names []string
+	for _, s := range plan.testRun(selection{Run: run, Skip: skip, Groups: newGroupSelection(only, skipGroups)}) {
+		names = append(names, s.Name)
+	}
+	return names
+}
+
+// ExportScope is one planned scope: its group and its two phases, package →
+// test function names.
+type ExportScope struct {
+	Group      string
+	Bulk, Tail map[string][]string
+}
+
+func exportPhase(phase map[string][]*PlannedSuite) map[string][]string {
+	out := map[string][]string{}
+	for pkg, suites := range phase {
+		for _, s := range suites {
+			out[pkg] = append(out[pkg], s.TestFunc())
+		}
+	}
+	return out
+}
+
+// phaseSuites turns package → test function names back into planned suites
+// reading the keys reqKeys gives them.
+func phaseSuites(phase map[string][]string, reqKeys map[string]map[string][]string) []*PlannedSuite {
+	var out []*PlannedSuite
+	for pkg, names := range phase {
+		for _, name := range names {
+			out = append(out, &PlannedSuite{Package: pkg, Name: strings.TrimPrefix(name, "Test"), SharedKeys: reqKeys[pkg][name]})
+		}
+	}
+	return out
+}
+
+func overlaySelection(o *OverlayResult, run, skip string) selection {
+	return selection{Run: run, Skip: skip, Groups: o.groups}
+}
+
+// ExportPlanSuiteScopes plans o's scopes under -run and -skip.
+func ExportPlanSuiteScopes(o *OverlayResult, run, skip string) []ExportScope {
+	var out []ExportScope
+	for _, sc := range planSuiteScopes(o.plan(), overlaySelection(o, run, skip)) {
+		out = append(out, ExportScope{Group: sc.Group, Bulk: exportPhase(sc.Bulk), Tail: exportPhase(sc.Tail)})
+	}
+	return out
+}
+
+// ExportPlanSuitePhases splits the suites of the given maps, all of the
+// default group, into the bulk and the tail.
+func ExportPlanSuitePhases(suitesByPkg map[string][]string, exclusiveByPkg map[string]map[string]bool, fuzzFuncsByPkg map[string]map[string][]string, testlessByPkg map[string]map[string]bool, run, skip string) (bulk, tail map[string][]string) {
+	o := &OverlayResult{SuitesByPkg: suitesByPkg, ExclusiveSuitesByPkg: exclusiveByPkg, FuzzFuncsByPkg: fuzzFuncsByPkg, TestlessSuitesByPkg: testlessByPkg}
+	scopes := ExportPlanSuiteScopes(o, run, skip)
+	if len(scopes) == 0 {
+		return map[string][]string{}, map[string][]string{}
+	}
+	return scopes[0].Bulk, scopes[0].Tail
+}
+
+// ExportAliveFixtureKeys closes the keys reqKeys gives the suites of phase.
+func ExportAliveFixtureKeys(phase map[string][]string, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) map[string]bool {
+	return aliveFixtureKeys(phaseSuites(phase, reqKeys), fixtures)
+}
+
+// ExportPlanFixtureWindows plans o's fixture windows under -run and -skip.
+func ExportPlanFixtureWindows(o *OverlayResult, run, skip string) fixtureWindows {
+	return planFixtureWindows(o.plan(), o.SharedFixtures, overlaySelection(o, run, skip))
+}
+
+// ExportPlanBenchFixtureWindows plans o's bench windows under -run, -bench
+// and -skip.
+func ExportPlanBenchFixtureWindows(o *OverlayResult, run, bench, skip string) fixtureWindows {
+	sel := overlaySelection(o, run, skip)
+	sel.Bench = bench
+	return planBenchFixtureWindows(o.plan(), o.SharedFixtures, sel)
+}
+
+// ExportBenchSlotPlan plans the windows of bench targets in dispatch order,
+// each reading the keys reqKeys gives its test function.
+func ExportBenchSlotPlan(targets []SuiteTarget, reqKeys map[string]map[string][]string, fixtures []gotestgen.SharedFixtureInfo) (needs, laterNeeds []map[string]bool) {
+	slots := make([]*PlannedSuite, len(targets))
+	for i := range targets {
+		slots[i] = &PlannedSuite{Package: targets[i].Package, Name: targets[i].SuiteName, SharedKeys: reqKeys[targets[i].Package]["Test"+targets[i].SuiteName]}
+	}
+	return benchSlotPlan(slots, fixtures)
+}

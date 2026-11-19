@@ -10,7 +10,7 @@ Clause: when a run is stopped while a suite of the e2e group runs → starts non
 +		if setupProc == nil || setupTimedOut {
  			return
  		}
- 		phase := map[string][]string{}
+ 		phase := make([]*PlannedSuite, 0, len(ds))
 @@ -982,7 +982,7 @@
  			started[key] = true
  		}

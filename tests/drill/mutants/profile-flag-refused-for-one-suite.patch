@@ -2,12 +2,12 @@ Expect: ^FAIL .*conformance/cli .* / a run of one suite writes the profile \(
 Clause: when -cpuprofile, -memprofile, -blockprofile, -mutexprofile or -trace is given to a run that starts two suite processes → a run of one suite writes the profile
 --- a/internal/gotestrunner/pipeline.go
 +++ b/internal/gotestrunner/pipeline.go
-@@ -316,7 +316,7 @@
- 		return runBench(ctx, cfg, overlay, pf)
+@@ -325,7 +325,7 @@
  	}
  	if name := sharedProfileFlag(pf.RunFlags); name != "" {
--		if n := plannedSuiteCount(planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)); n > 1 {
-+		if n := plannedSuiteCount(planSuiteScopes(overlay, pf.UserRunFilter, pf.UserSkipFilter)); n > 0 {
+ 		sel := selection{Run: pf.UserRunFilter, Skip: pf.UserSkipFilter, Groups: overlay.groups}
+-		if n := plannedSuiteCount(planSuiteScopes(overlay.plan(), sel)); n > 1 {
++		if n := plannedSuiteCount(planSuiteScopes(overlay.plan(), sel)); n > 0 {
  			return PipelineResult{}, fmt.Errorf("%s writes one file, and this run starts %d suite processes that would each write it: select one suite of one package with -run '^Test<Suite>$'", name, n)
  		}
  	}
