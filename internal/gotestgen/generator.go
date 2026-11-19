@@ -17,6 +17,7 @@ import (
 	"github.com/mvrahden/go-test/internal/genstub"
 	"github.com/mvrahden/go-test/internal/gotestast"
 	"github.com/mvrahden/go-test/internal/goversion"
+	"github.com/mvrahden/go-test/internal/pkgload"
 	"github.com/mvrahden/go-test/internal/pkgpattern"
 	"golang.org/x/tools/go/packages"
 )
@@ -92,9 +93,9 @@ func countStdlibTests(pkgs ...*packages.Package) int {
 	return n
 }
 
-// packageLoadMode type-checks the matched packages from source and reads
-// their dependencies from export data. A dependency's source is loaded only
-// where binding needs it, see sourceLoader.
+// packageLoadMode type-checks single packages from source and reads their
+// dependencies from export data, for loads without tests. A dependency's
+// source is loaded only where binding needs it, see sourceLoader.
 const packageLoadMode = packages.NeedModule | packages.NeedSyntax | packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports | packages.NeedFiles
 
 func CollectFromLoaded(loadResults []*LoadResult) (gotestast.TestSuiteSpecSet, error) {
@@ -164,13 +165,13 @@ func (lr *LoadResult) InMainModule() bool {
 // are named in noTestFiles, for the same reason. matched names every package
 // the patterns matched, in load order.
 func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResult, broken []BrokenPackage, noTestFiles, matched []string, err error) {
-	cfg := &packages.Config{
-		Mode:  packageLoadMode,
-		Tests: true,
-		Fset:  token.NewFileSet(),
+	cfg := &pkgload.Config{
+		Tests:     true,
+		Fset:      token.NewFileSet(),
+		ParseFile: about.ParseStubbingGenerated,
 	}
-	cfg.ParseFile = about.ParseStubbingGenerated
-	// go list -export compiles from disk, so the go command takes the stubs too.
+	// A broken package is built for its report, from disk, so the go
+	// command takes the stubs too.
 	loadFlags, unstub, err := genstub.LoadFlags("", targetPkgs, buildFlags)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -179,7 +180,7 @@ func loadPackages(targetPkgs []string, buildFlags []string) (loaded []*LoadResul
 	if len(loadFlags) > 0 {
 		cfg.BuildFlags = loadFlags
 	}
-	totalFoundPkgs, err := packages.Load(cfg, targetPkgs...)
+	totalFoundPkgs, err := pkgload.Load(cfg, targetPkgs...)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

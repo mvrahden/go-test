@@ -178,6 +178,17 @@ A generated file left on disk by an earlier generate SHALL neither break nor be 
 - **WHEN** a suite file carries a build constraint
 - **THEN** --tags= selects the files built with that tag
 
+### Requirement: Discovery builds no test package
+Reading the suites of a package SHALL NOT make the go command build its test variants or its test main: after a change to a test file, discover, lint and the discovery step of a run add nothing for that package to the build cache. The one exception is a package whose type-checked files import "C": cgo's generated files come only from a compiled listing, which adds a small record to the build cache for each test variant and test main, though it still compiles none of them.
+
+#### Scenario: A test file changes
+- **WHEN** a test file of a discovered package is changed and the package is discovered again
+- **THEN** the build cache holds no more files than before
+
+#### Scenario: Lint after a test file changes
+- **WHEN** a test file of a linted package is changed and the package is linted again
+- **THEN** the build cache holds no more files than before
+
 ### Requirement: Cases no run reaches
 A method named as a case taking *gotest.T, *gotest.B or *gotest.F, declared in a _test.go file on a type that is no suite, SHALL be refused with exit 2 unless a test file of the package calls it or converts a value of the type to an interface holding it: one error per type, at its first such method, naming the suite suffix. A generic suite in a _test.go file, X_ aside, SHALL be refused at its declaration unless a suite alias instantiates it. A type in a non-test file SHALL be left alone.
 

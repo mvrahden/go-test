@@ -1,0 +1,13 @@
+Clause: when gotest generate runs again after the suites changed → a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes
+Expect: ^FAIL .*conformance/discovery GeneratedFiles .* / a renamed suite leaves no reference to its old name, a variant without suites loses its file, and the run passes \(
+--- a/cmd/gotest/generate.go
++++ b/cmd/gotest/generate.go
+@@ -88,7 +88,7 @@
+ // removed when src is empty, so a variant without suites leaves no stale file.
+ func syncGenerated(dst string, src []byte) error {
+ 	if len(src) == 0 {
+-		if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
++		if err := os.Remove(dst + "~"); err != nil && !errors.Is(err, fs.ErrNotExist) {
+ 			return err
+ 		}
+ 		return nil
