@@ -11,6 +11,8 @@ invocation runs tests — there is NO `test` subcommand:
   that starts more than one suite process. `-run '^Test<Suite>$'` reaches
   only that suite's process and replays none of its fuzz seeds (v1.38+):
   name the `Fuzz<Suite>_<Method>` wrapper too, or drop the anchors.
+  gotest has no result cache. Every run executes every suite it selects;
+  it never prints `(cached)`.
   Outside CI mode a focused run notes on stderr that `F_` narrows it
   (v1.38+), and a text run fails with exit 2 when a suite's binary ran no
   tests (v1.38+).
