@@ -27,33 +27,23 @@ type OverlayResult struct {
 	// BrokenPackages are pattern-matched packages that failed to load. The
 	// pipeline books each one as a failed package so the run cannot report
 	// success while some of its packages never became runnable.
-	BrokenPackages       []gotestgen.BrokenPackage
-	NoSuitePackages      []string
-	StdlibTestsByPkg     map[string]int // stdlib func TestX counts per package — gotest reports but does not run them
-	SuitesByPkg          map[string][]string
-	ExclusiveSuitesByPkg map[string]map[string]bool
-	// GroupsByPkg is, per package, the named group of each suite declaring
-	// one (SuiteConfig.ExclusiveGroup); a suite absent is in the default group.
-	GroupsByPkg map[string]map[string]string
+	BrokenPackages  []gotestgen.BrokenPackage
+	NoSuitePackages []string
 	// groups is the run's --group and --skip-group selection.
 	groups groupSelection
-	// TestlessSuitesByPkg marks the suites with no Test function: they run
-	// for their fuzz seeds alone.
-	TestlessSuitesByPkg map[string]map[string]bool
-	BenchesByPkg        map[string][]string
-	FuzzFuncsByPkg      map[string]map[string][]string
-	// FuzzParamsByFunc is, per package, the corpus shape of every generated
-	// fuzz target: the type of each value the engine feeds it. The
-	// stale-corpus pre-flight compares recorded corpus entries against it.
-	FuzzParamsByFunc               map[string]map[string][]string
-	FuzzDecodedByFunc              map[string]map[string]bool // per package, the fuzz targets whose input is decoded from the engine's leaves
-	DirsByPkg                      map[string]string
-	SkippedSuitesByPkg             map[string][]string
-	FixtureDepSuites               map[string]map[string]bool
-	SuiteRequiredSharedFixtureKeys map[string]map[string][]string
 	// Declared are the units the packages declare, which the census holds a
 	// green run to.
 	Declared DeclaredUnits
+	// Plan is every static fact the run reads about the packages' suites.
+	Plan *RunPlan
+}
+
+// plan is the overlay's plan; an overlay built without one has an empty plan.
+func (o *OverlayResult) plan() *RunPlan {
+	if o.Plan != nil {
+		return o.Plan
+	}
+	return &RunPlan{}
 }
 
 func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPackage, debug bool, noCache bool, harvestSeeds bool) (*OverlayResult, func(), error) {
@@ -98,19 +88,6 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 
 	var suitePkgs []string
 	var noSuitePkgs []string
-	stdlibByPkg := map[string]int{}
-	suitesByPkg := map[string][]string{}
-	benchesByPkg := map[string][]string{}
-	fuzzFuncsByPkg := map[string]map[string][]string{}
-	fuzzParamsByPkg := map[string]map[string][]string{}
-	fuzzDecodedByPkg := map[string]map[string]bool{}
-	dirsByPkg := map[string]string{}
-	skippedSuitesByPkg := map[string][]string{}
-	exclusiveSuitesByPkg := map[string]map[string]bool{}
-	groupsByPkg := map[string]map[string]string{}
-	testlessSuitesByPkg := map[string]map[string]bool{}
-	fixtureDepSuites := map[string]map[string]bool{}
-	suiteReqKeys := map[string]map[string][]string{}
 	var declared DeclaredUnits
 	for _, r := range allResults {
 		declared.Tests = appendCases(declared.Tests, r.PkgPath, r.TestCases)
@@ -121,82 +98,19 @@ func GenerateOverlay(loaded []*gotestgen.LoadResult, broken []gotestgen.BrokenPa
 		} else {
 			noSuitePkgs = append(noSuitePkgs, r.PkgPath)
 		}
-		if r.StdlibTestCount > 0 {
-			stdlibByPkg[r.PkgPath] = r.StdlibTestCount
-		}
-		if len(r.SuiteNames) > 0 {
-			suitesByPkg[r.PkgPath] = r.SuiteNames
-		}
-		if len(r.BenchSuiteNames) > 0 {
-			benchesByPkg[r.PkgPath] = r.BenchSuiteNames
-		}
-		if len(r.FuzzFuncsBySuite) > 0 {
-			fuzzFuncsByPkg[r.PkgPath] = r.FuzzFuncsBySuite
-		}
-		if len(r.FuzzParamsByFunc) > 0 {
-			fuzzParamsByPkg[r.PkgPath] = r.FuzzParamsByFunc
-		}
-		if len(r.FuzzDecodedFuncs) > 0 {
-			fuzzDecodedByPkg[r.PkgPath] = r.FuzzDecodedFuncs
-		}
-		if r.AbsPath != "" {
-			dirsByPkg[r.PkgPath] = r.AbsPath
-		}
-		if len(r.SkippedSuiteNames) > 0 {
-			skippedSuitesByPkg[r.PkgPath] = r.SkippedSuiteNames
-		}
-		if len(r.ExclusiveSuiteNames) > 0 {
-			ex := make(map[string]bool, len(r.ExclusiveSuiteNames))
-			for _, name := range r.ExclusiveSuiteNames {
-				ex[name] = true
-			}
-			exclusiveSuitesByPkg[r.PkgPath] = ex
-		}
-		if len(r.GroupBySuite) > 0 {
-			groupsByPkg[r.PkgPath] = r.GroupBySuite
-		}
-		if len(r.TestlessSuiteNames) > 0 {
-			tl := make(map[string]bool, len(r.TestlessSuiteNames))
-			for _, name := range r.TestlessSuiteNames {
-				tl[name] = true
-			}
-			testlessSuitesByPkg[r.PkgPath] = tl
-		}
-		if len(r.FixtureDepSuites) > 0 {
-			s := make(map[string]bool, len(r.FixtureDepSuites))
-			for _, fn := range r.FixtureDepSuites {
-				s[fn] = true
-			}
-			fixtureDepSuites[r.PkgPath] = s
-		}
-		if len(r.SuiteRequiredSharedFixtureKeys) > 0 {
-			suiteReqKeys[r.PkgPath] = r.SuiteRequiredSharedFixtureKeys
-		}
 	}
 
 	return &OverlayResult{
-		OverlayDir:                     overlayDir,
-		BinaryCacheRoot:                binaryCacheRoot,
-		WorkDir:                        workDir,
-		OverlayFlag:                    "-overlay=" + filepath.Join(overlayDir, "overlay.json"),
-		SharedFixtures:                 allSharedFixtures,
-		SuitePackages:                  suitePkgs,
-		BrokenPackages:                 broken,
-		NoSuitePackages:                noSuitePkgs,
-		StdlibTestsByPkg:               stdlibByPkg,
-		SuitesByPkg:                    suitesByPkg,
-		ExclusiveSuitesByPkg:           exclusiveSuitesByPkg,
-		GroupsByPkg:                    groupsByPkg,
-		TestlessSuitesByPkg:            testlessSuitesByPkg,
-		BenchesByPkg:                   benchesByPkg,
-		FuzzFuncsByPkg:                 fuzzFuncsByPkg,
-		FuzzParamsByFunc:               fuzzParamsByPkg,
-		FuzzDecodedByFunc:              fuzzDecodedByPkg,
-		DirsByPkg:                      dirsByPkg,
-		SkippedSuitesByPkg:             skippedSuitesByPkg,
-		FixtureDepSuites:               fixtureDepSuites,
-		SuiteRequiredSharedFixtureKeys: suiteReqKeys,
-		Declared:                       declared,
+		OverlayDir:      overlayDir,
+		BinaryCacheRoot: binaryCacheRoot,
+		WorkDir:         workDir,
+		OverlayFlag:     "-overlay=" + filepath.Join(overlayDir, "overlay.json"),
+		SharedFixtures:  allSharedFixtures,
+		SuitePackages:   suitePkgs,
+		BrokenPackages:  broken,
+		NoSuitePackages: noSuitePkgs,
+		Declared:        declared,
+		Plan:            planRun(allResults),
 	}, cleanup, nil
 }
 

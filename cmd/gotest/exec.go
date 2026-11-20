@@ -53,7 +53,6 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 		CompileParallel: cfg.CompileParallel,
 		OutputMode:      modeFromJSON(cfg.JSON),
 		Events:          cfg.Events,
-		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,
@@ -66,7 +65,7 @@ func Run(cfg ExecConfig) int { //nolint:gocritic // hugeParam: stable API
 	}
 	// stderr is free in every output mode, so the notes about what did not
 	// run reach the reader whether stdout carries text or JSON.
-	noteStdlibTests(overlay.StdlibTestsByPkg)
+	noteStdlibTests(overlay.Plan.StdlibTests())
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, cfg.GoTestArgs, len(overlay.Declared.Benchmarks))
 	return result.ExitCode
 }

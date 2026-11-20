@@ -9,5 +9,5 @@ Clause: when --skip-group=e2e is given → runs every suite outside the e2e grou
 -	return !g.skip[group]
 +	return true
  }
- 
- // knownGroups lists the named groups the overlay's suites declare, sorted.
+
+ // selectGroups narrows the run to the groups only names, less those skip

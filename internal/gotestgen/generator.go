@@ -36,8 +36,7 @@ type GenerateResult struct {
 	SkippedSuiteNames              []string            // identifiers of suites excluded by focus/X_ rules
 	ExclusiveSuiteNames            []string            // identifiers of suites with SuiteConfig{Exclusive: true} — dispatched alone, after the parallel bulk
 	GroupBySuite                   map[string]string   // suite identifier → SuiteConfig.ExclusiveGroup, for suites in a named group
-	FixtureDepSuites               []string            // test function names that depend on shared fixtures (e.g. "TestFooSuite")
-	SuiteRequiredSharedFixtureKeys map[string][]string // test func name → required state keys
+	SuiteRequiredSharedFixtureKeys map[string][]string // suite identifier → required state keys
 	StdlibTestCount                int                 // stdlib func TestX(*testing.T) declarations — reported, never run by gotest
 	TestCases                      []string            // "Test<Suite>/<Method>" of every effective test method, in source order
 	FuzzCases                      []string            // generated Fuzz<Suite>_<Method> wrapper names, in source order
@@ -568,11 +567,11 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 
 		fuzzParams := map[string][]string{}
 		fuzzDecoded := map[string]bool{}
-		ptestBuf, ptestFixtureDeps, ptestReqKeys, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, fuzzDecoded)
+		ptestBuf, ptestReqKeys, err := generateForPkg(lr.Ptest, lr.sources, ptestSpec, ptestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, fuzzDecoded)
 		if err != nil {
 			return nil, locate(lr.Ptest, err)
 		}
-		pxtestBuf, pxtestFixtureDeps, pxtestReqKeys, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, fuzzDecoded)
+		pxtestBuf, pxtestReqKeys, err := generateForPkg(lr.Pxtest, lr.sources, pxtestSpec, pxtestCollected, sharedSeen, &allSharedFixtures, harvestSeeds, fuzzParams, fuzzDecoded)
 		if err != nil {
 			return nil, locate(lr.Pxtest, err)
 		}
@@ -726,7 +725,6 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 			SkippedSuiteNames:              skippedNames,
 			ExclusiveSuiteNames:            exclusiveNames,
 			GroupBySuite:                   groupBySuite,
-			FixtureDepSuites:               append(ptestFixtureDeps, pxtestFixtureDeps...),
 			SuiteRequiredSharedFixtureKeys: mergedReqKeys,
 			StdlibTestCount:                countStdlibTests(lr.Ptest, lr.Pxtest),
 			TestCases:                      testCases,
@@ -754,14 +752,14 @@ func generateFromLoaded(loadResults []*LoadResult, harvestSeeds bool) (GenerateR
 // filled in place with the corpus shape of every fuzz target the variant
 // declares and the targets that decode their input, so the internal and
 // external variants of the same package accumulate into one map.
-func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string, fuzzDecoded map[string]bool) ([]byte, []string, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
+func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutcome, collected CollectorResult, sharedSeen map[string]bool, allShared *[]SharedFixtureInfo, harvestSeeds bool, fuzzParams map[string][]string, fuzzDecoded map[string]bool) ([]byte, map[string][]string, error) { //nolint:gocritic // hugeParam: stable API
 	if pkg == nil || len(spec.EffectiveTestSuites) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, nil
 	}
 
 	resolved, err := bind(pkg, sources, spec.EffectiveTestSuites, collected.Fixtures)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	for i := range resolved.RequiredSharedFixtures {
@@ -772,32 +770,9 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 		}
 	}
 
-	var fixtureDeps []string
-	for id, refs := range resolved.SuiteSharedFixtures {
-		if len(refs) > 0 {
-			fixtureDeps = append(fixtureDeps, "Test"+id)
-		}
-	}
-	if fixtureTreeHasSharedFixtures(resolved.RootFixtures) {
-		seen := make(map[string]bool, len(fixtureDeps))
-		for _, d := range fixtureDeps {
-			seen[d] = true
-		}
-		for _, ts := range resolved.FixtureBound {
-			name := "Test" + ts.Identifier()
-			if !seen[name] {
-				fixtureDeps = append(fixtureDeps, name)
-			}
-		}
-	}
-
-	// Convert suite-identifier-keyed required keys to test-func-name-keyed.
 	var suiteReqKeys map[string][]string
 	if len(resolved.SuiteRequiredSharedFixtureKeys) > 0 {
-		suiteReqKeys = make(map[string][]string, len(resolved.SuiteRequiredSharedFixtureKeys))
-		for suiteID, keys := range resolved.SuiteRequiredSharedFixtureKeys {
-			suiteReqKeys["Test"+suiteID] = keys
-		}
+		suiteReqKeys = resolved.SuiteRequiredSharedFixtureKeys
 	}
 
 	r := renderer{}
@@ -809,28 +784,7 @@ func generateForPkg(pkg *packages.Package, sources *sourceLoader, spec SpecOutco
 		maps.Copy(fuzzParams, fans.ParamsByFunc)
 		maps.Copy(fuzzDecoded, fans.DecodedFuncs)
 	}
-	return buf, fixtureDeps, suiteReqKeys, err
-}
-
-func fixtureTreeHasSharedFixtures(roots []*BoundFixture) bool {
-	for _, rf := range roots {
-		if fixtureHasSharedFixtures(rf) {
-			return true
-		}
-	}
-	return false
-}
-
-func fixtureHasSharedFixtures(rf *BoundFixture) bool {
-	if len(rf.SharedFixtures) > 0 {
-		return true
-	}
-	for _, child := range rf.Children {
-		if fixtureHasSharedFixtures(child) {
-			return true
-		}
-	}
-	return false
+	return buf, suiteReqKeys, err
 }
 
 // missingGotestHint names the fix when a package fails because its module

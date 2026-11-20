@@ -9,24 +9,24 @@ Clause: when the suite binding a shared fixture directly finishes while a suite 
 +	"slices"
  	"sort"
  	"sync"
- 
-@@ -29,6 +30,19 @@ func newFixtureLedger(planned []map[string][]string, reqKeys map[string]map[stri
- 		for pkg, suites := range phase {
- 			for _, suite := range suites {
- 				keys := sortedKeys(aliveFixtureKeys(map[string][]string{pkg: {suite}}, reqKeys, fixtures))
-+				var direct []string
-+				for _, k := range keys {
-+					dependedOn := false
-+					for i := range fixtures {
-+						if slices.Contains(fixtures[i].Dependencies, k) && slices.Contains(keys, sharedFixtureKey(&fixtures[i])) {
-+							dependedOn = true
-+						}
-+					}
-+					if !dependedOn {
-+						direct = append(direct, k)
-+					}
+
+@@ -27,6 +28,19 @@ func newFixtureLedger(planned []*PlannedSuite, fixtures []gotestgen.SharedFixtur
+ 	l := &fixtureLedger{needs: map[string]map[string][]string{}, counts: map[string]int{}, done: map[[2]string]bool{}}
+ 	for _, s := range planned {
+ 		keys := sortedKeys(aliveFixtureKeys([]*PlannedSuite{s}, fixtures))
++		var direct []string
++		for _, k := range keys {
++			dependedOn := false
++			for i := range fixtures {
++				if slices.Contains(fixtures[i].Dependencies, k) && slices.Contains(keys, sharedFixtureKey(&fixtures[i])) {
++					dependedOn = true
 +				}
-+				keys = direct
- 				if l.needs[pkg] == nil {
- 					l.needs[pkg] = map[string][]string{}
- 				}
++			}
++			if !dependedOn {
++				direct = append(direct, k)
++			}
++		}
++		keys = direct
+ 		if l.needs[s.Package] == nil {
+ 			l.needs[s.Package] = map[string][]string{}
+ 		}

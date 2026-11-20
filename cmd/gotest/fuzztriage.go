@@ -511,19 +511,23 @@ func displayPath(p string) string {
 }
 
 // lookupSuiteMethod reverse-looks-up the generated Fuzz<Suite>_<Method>
-// wrapper name funcName within pkg's entry in overlay.FuzzFuncsByPkg,
-// returning the originating suite type name and fuzz method name.
+// wrapper name funcName among the suites the plan holds for pkg, returning
+// the originating suite type name and fuzz method name.
 func lookupSuiteMethod(overlay *gotestrunner.OverlayResult, pkg, funcName string) (suite, method string, ok bool) {
-	for s, funcs := range overlay.FuzzFuncsByPkg[pkg] {
-		for _, fn := range funcs {
-			if fn != funcName {
+	p := overlay.Plan.Package(pkg)
+	if p == nil {
+		return "", "", false
+	}
+	for _, s := range p.Suites {
+		for _, f := range s.FuzzFuncs {
+			if f.Func != funcName {
 				continue
 			}
-			prefix := "Fuzz" + s + "_"
+			prefix := "Fuzz" + s.Name + "_"
 			if !strings.HasPrefix(funcName, prefix) {
 				return "", "", false
 			}
-			return s, strings.TrimPrefix(funcName, prefix), true
+			return s.Name, strings.TrimPrefix(funcName, prefix), true
 		}
 	}
 	return "", "", false
@@ -617,7 +621,7 @@ func runFuzzPromote(args []string) (code int) {
 	// fixtures its suite binds.
 	var rerun []gotestrunner.FuzzTarget
 	for _, p := range queue {
-		if overlay.FuzzDecodedByFunc[p.target.Package][p.target.Func] {
+		if f := overlay.Plan.Fuzz(p.target.Package, p.target.Func); f != nil && f.Decoded {
 			rerun = append(rerun, p.target)
 		}
 	}
@@ -724,11 +728,11 @@ func promoteCrasher(overlay *gotestrunner.OverlayResult, target gotestrunner.Fuz
 	}
 
 	var spliceArgs []string
-	if overlay.FuzzDecodedByFunc[target.Package][target.Func] {
+	if f := overlay.Plan.Fuzz(target.Package, target.Func); f != nil && f.Decoded {
 		out, _, _ := rerunCrasher(overlay, target, hashBase, env)
 		lit := extractDecodedInput(out)
 		if lit == "" {
-			leaves := len(overlay.FuzzParamsByFunc[target.Package][target.Func])
+			leaves := len(f.Params)
 			return fmt.Sprintf("promote: %s/%s: skipped: %s decodes its input from %d lea%s, and the re-run echoed no decoded value; raw leaves are not its input",
 				target.Func, hashBase, target.Func, leaves, leafSuffix(leaves)), false
 		}

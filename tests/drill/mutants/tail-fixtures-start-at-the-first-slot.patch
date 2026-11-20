@@ -1,13 +1,15 @@
 Expect: ^FAIL .*conformance/fixtures .* / starts the fixture after the first suite ran, and releases it after the second \(
 Clause: when only the second of two exclusive suites reads a shared fixture → starts the fixture after the first suite ran, and releases it after the second
---- a/internal/gotestrunner/pipeline.go
-+++ b/internal/gotestrunner/pipeline.go
-@@ -974,7 +974,7 @@
- 		for i := range ds {
- 			phase[ds[i].t.Package] = append(phase[ds[i].t.Package], ds[i].t.SuiteName)
- 		}
--		need := aliveFixtureKeys(phase, overlay.SuiteRequiredSharedFixtureKeys, win.Fixtures)
-+		need := win.Tail
- 		start := diffKeys(need, started)
- 		if len(start) == 0 {
- 			return
+--- a/internal/gotestrunner/dispatch.go
++++ b/internal/gotestrunner/dispatch.go
+@@ -339,6 +339,10 @@
+ 	for i := range ds {
+ 		suites = append(suites, r.plan.Suite(ds[i].t.Package, strings.TrimPrefix(ds[i].t.SuiteName, "Test")))
+ 	}
++	suites = nil
++	for i := range r.scopes {
++		suites = append(suites, r.scopes[i].suites()...)
++	}
+ 	r.fixtures.startFor(r.ctx, suites, r.win.Fixtures, what)
+ }
+

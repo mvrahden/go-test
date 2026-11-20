@@ -7,7 +7,7 @@ Clause: when a package has only stdlib tests → notes them on stderr in the pla
  		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
  		return 2
  	}
--	noteStdlibTests(overlay.StdlibTestsByPkg)
+-	noteStdlibTests(overlay.Plan.StdlibTests())
  	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
  
  	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)), gotestspec.WithSkipCalls(skipCallsOf(loaded)))

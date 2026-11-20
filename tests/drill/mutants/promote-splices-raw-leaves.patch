@@ -6,7 +6,7 @@ Clause: when a decoding target's crasher re-run echoes no decoded value → prom
  		out, _, _ := rerunCrasher(overlay, target, hashBase, env)
  		lit := extractDecodedInput(out)
  		if lit == "" {
--			leaves := len(overlay.FuzzParamsByFunc[target.Package][target.Func])
+-			leaves := len(f.Params)
 -			return fmt.Sprintf("promote: %s/%s: skipped: %s decodes its input from %d lea%s, and the re-run echoed no decoded value; raw leaves are not its input",
 -				target.Func, hashBase, target.Func, leaves, leafSuffix(leaves)), false
 +			for _, a := range corpusArgs {

@@ -13,8 +13,8 @@ import (
 // the whole session: started before any target runs and torn down after the
 // last. Each target's processes, fuzz workers included, only hydrate them.
 type FuzzFixtures struct {
-	proc    *SharedFixtureProcess
-	reqKeys map[string]map[string][]string
+	proc *SharedFixtureProcess
+	plan *RunPlan
 }
 
 // StartFuzzFixtures starts the shared fixtures the suites of targets bind and
@@ -22,11 +22,12 @@ type FuzzFixtures struct {
 // returns nil when no target binds one. A fixture that fails to come up gives
 // up the targets that read it, not the session: see Env.
 func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []FuzzTarget, setupTimeout time.Duration, buildFlags ...string) (*FuzzFixtures, error) {
-	suites := map[string][]string{}
+	plan := overlay.plan()
+	suites := make([]*PlannedSuite, 0, len(targets))
 	for i := range targets {
-		suites[targets[i].Package] = append(suites[targets[i].Package], "Test"+targets[i].Suite)
+		suites = append(suites, plan.Suite(targets[i].Package, targets[i].Suite))
 	}
-	alive := aliveFixtureKeys(suites, overlay.SuiteRequiredSharedFixtureKeys, overlay.SharedFixtures)
+	alive := aliveFixtureKeys(suites, overlay.SharedFixtures)
 	if len(alive) == 0 {
 		return nil, nil
 	}
@@ -44,7 +45,7 @@ func StartFuzzFixtures(ctx context.Context, overlay *OverlayResult, targets []Fu
 	// What failed is on stderr already, from the fixture process; the targets
 	// that read it say so in Env.
 	_ = proc.WaitSetup(ctx, setupTimeout)
-	return &FuzzFixtures{proc: proc, reqKeys: overlay.SuiteRequiredSharedFixtureKeys}, nil
+	return &FuzzFixtures{proc: proc, plan: plan}, nil
 }
 
 // Env returns the environment entries t's processes read their shared
@@ -54,7 +55,10 @@ func (f *FuzzFixtures) Env(t FuzzTarget) (env []string, neverRanReason string) {
 	if f == nil {
 		return nil, ""
 	}
-	keys := f.reqKeys[t.Package]["Test"+t.Suite]
+	var keys []string
+	if s := f.plan.Suite(t.Package, t.Suite); s != nil {
+		keys = s.SharedKeys
+	}
 	if len(keys) == 0 {
 		return nil, ""
 	}

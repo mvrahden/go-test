@@ -134,7 +134,7 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 	}
 	defer cleanup()
 
-	if len(overlay.BenchesByPkg) == 0 {
+	if !overlay.Plan.HasBenchmarks() {
 		if jsonRequested {
 			// Machine consumers get a valid empty document, not prose.
 			return emitBenchReport(gotestbench.FromPackages(nil), nil, nil, nil, nil, nil, nil)
@@ -167,7 +167,6 @@ func runBench(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		CompileParallel: cfg.CompileParallel,
 		OutputMode:      mode,
 		Bench:           true,
-		BenchesByPkg:    overlay.BenchesByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,

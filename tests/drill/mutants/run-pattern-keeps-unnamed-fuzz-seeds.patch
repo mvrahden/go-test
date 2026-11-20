@@ -2,13 +2,13 @@ Expect: ^FAIL .*conformance/cli .* / runs the test methods and replays no fuzz s
 Clause: when -run names only the Test function of a suite that also has a fuzz method → runs the test methods and replays no fuzz seed, as go test does
 --- a/internal/gotestrunner/suiterun.go
 +++ b/internal/gotestrunner/suiterun.go
-@@ -423,6 +423,9 @@
- 				Exclusive:  exclusiveByPkg[pkg][suiteName],
- 			}
- 			target.RunFilter = processRunFilter(userRunFilter, funcs)
-+			if !strings.Contains(userRunFilter, "/") {
-+				target.RunFilter = ""
-+			}
- 			targets = append(targets, target)
- 		}
- 	}
+@@ -375,6 +375,9 @@
+ 	targets := make([]SuiteTarget, 0, len(suites))
+ 	for _, s := range suites {
+ 		funcs := suiteFuncs(s.Name, s.Testless, s.FuzzNames())
++		if !strings.Contains(userRunFilter, "/") {
++			userRunFilter = ""
++		}
+ 		targets = append(targets, SuiteTarget{
+ 			SuiteSpec: SuiteSpec{
+ 				Package:   s.Package,

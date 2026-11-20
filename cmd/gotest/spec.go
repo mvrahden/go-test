@@ -156,7 +156,6 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		Parallel:        cfg.Parallel,
 		CompileParallel: cfg.CompileParallel,
 		OutputMode:      gotestrunner.RunCaptureJSON,
-		FuzzFuncsByPkg:  overlay.FuzzFuncsByPkg,
 		GlobalTimeout:   cfg.GlobalTimeout,
 		NoTestFiles:     noTestFiles,
 		PackageOrder:    pkgs.Order,
@@ -174,7 +173,7 @@ func runSpec(inv Invocation) int { //nolint:gocritic // hugeParam: stable API
 		fmt.Fprintf(os.Stderr, "FAIL: parsing test events: %s\n", err)
 		return 2
 	}
-	noteStdlibTests(overlay.StdlibTestsByPkg)
+	noteStdlibTests(overlay.Plan.StdlibTests())
 	gotestrunner.NoteBenchmarksNotRun(os.Stderr, goTestArgs, len(overlay.Declared.Benchmarks))
 
 	tree := gotestspec.BuildTree(events, gotestspec.WithDeclarations(buildDeclarationIndex(loaded)), gotestspec.WithSkipCalls(skipCallsOf(loaded)))
