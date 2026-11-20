@@ -691,8 +691,10 @@ What v1.39 changes:
    the module must resolve gotest v1.39.0 or newer. A `go get -tool` pin
    resolves both from one version.
 
-2. **Four constructors are deprecated** — `gotest.NewTFromTB`,
-   `gotest.NewB`, `gotest.SeedArg` and `gotest.SeedArity` are for generated
-   code, which now calls the runtime's names instead. They stay,
-   so a harness an older gotest left on disk still compiles. Nothing a user
-   wrote changes; `gotest.NewF` stays the call for a stdlib `FuzzXxx`.
+2. **Four constructors are gone** — `gotest.NewTFromTB`, `gotest.NewB`,
+   `gotest.SeedArg` and `gotest.SeedArity` were for generated code, which
+   now calls the runtime's names. A harness an older gotest left on disk no
+   longer compiles: remove it with `gotest clean ./...`, and run gotest as
+   `go tool gotest`, so the CLI and the runtime come from one version. A
+   benchmark of your own hands its `*testing.B` to assertions as it is;
+   `gotest.NewF` stays the call for a stdlib `FuzzXxx`.
