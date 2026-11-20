@@ -248,10 +248,6 @@ the floor: v1.34.0 is one, so the floor skipped to v1.35.0.
 changes a symbol of the last release, and a corpus under
 `tests/runtimecompat` runs this tree's generated code against the floor
 release, reaching every runtime symbol the templates and the fuzz fan call.
-`make runtime-api` holds `pkg/gotest` against the last release too, since an
-older harness and the user's own tests call it: an incompatible change fails
-unless `tests/runtimecompat/accepted-breaks.txt` lists its `apidiff` line,
-and each listed line needs a release note that tells users what to change.
 
 For **suites with fixtures**, every generated top-level function — the
 `TestX` function, each `FuzzX_M` seed-replay wrapper, the `BenchmarkX`
