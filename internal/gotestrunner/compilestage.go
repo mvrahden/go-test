@@ -205,6 +205,9 @@ func place(b *stagedBinary) {
 		return
 	}
 	if info, err := os.Stat(b.Path); err == nil {
+		// On Windows a stat reads the file's id at the first SameFile, from
+		// the path: by then that names the file go wrote. Read it now.
+		os.SameFile(info, info)
 		b.placed, b.linked = info, linked
 	}
 }
