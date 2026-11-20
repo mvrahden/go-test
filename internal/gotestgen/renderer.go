@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"go/format"
 	gotypes "go/types"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
 
 	"github.com/mvrahden/go-test/internal/about"
 	"github.com/mvrahden/go-test/internal/gotestast"
-	"github.com/mvrahden/go-test/internal/x/slices"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -300,7 +300,7 @@ func harvestedSeedsForTemplate(pkg *packages.Package, spec SpecOutcome, harvestS
 	if !harvestSeeds {
 		return nil, nil
 	}
-	hasFuzzers := slices.Any(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec, idx int) bool {
+	hasFuzzers := slices.ContainsFunc(spec.EffectiveTestSuites, func(v *gotestast.TestSuiteSpec) bool {
 		return len(v.Fuzzers()) > 0
 	})
 	if !hasFuzzers {

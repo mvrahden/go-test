@@ -50,21 +50,15 @@ type FuzzTargetSet struct {
 	DecodedFuncs map[string]bool
 }
 
-// BuildFuzzTargets resolves the f.Fuzz call of every fuzz method in pkg and
+// buildFuzzTargets resolves the f.Fuzz call of every fuzz method in pkg and
 // emits one target per method. Returns (nil, nil) when the package fuzzes
-// nothing at all.
+// nothing at all. imps are the generated file's own imports.
 //
 // Rejections are errors, not silent skips. Nothing in the toolchain catches
 // an unfuzzable type for us: go vet only checks direct (*testing.F).Fuzz
 // calls, and f.Fuzz takes any, so an unsupported type would compile cleanly
 // and panic at run time. Refusing at generation time is the only place a
 // useful message can be produced.
-func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (*FuzzTargetSet, error) {
-	return buildFuzzTargets(pkg, suites, newImportSet(pkg.PkgPath))
-}
-
-// buildFuzzTargets is BuildFuzzTargets naming packages through imps, the
-// generated file's own imports.
 func buildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet, imps *importSet) (*FuzzTargetSet, error) {
 	calls, err := gotestast.CollectFuzzCalls(pkg, suites)
 	if err != nil {

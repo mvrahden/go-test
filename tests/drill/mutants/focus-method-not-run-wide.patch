@@ -3,13 +3,16 @@ Clause: when a run holds a focused method → a focused method in one package sk
 Judge: ./tests/canary CanaryDiscoveryTestSuite/TestFocusIsRunWide
 --- a/internal/gotestgen/generator.go
 +++ b/internal/gotestgen/generator.go
-@@ -538,7 +538,8 @@
+@@ -550,7 +550,11 @@
  		if err := orphanError(lr); err != nil {
  			return nil, nil, err
  		}
 -		focusRun = focusRun || all[i].ptest.Suites.Focuses() || all[i].pxtest.Suites.Focuses()
-+		suiteFocused := func(v *gotestast.TestSuiteSpec, _ int) bool { return v.IsFocused() }
-+		focusRun = focusRun || slices.Any(all[i].ptest.Suites, suiteFocused) || slices.Any(all[i].pxtest.Suites, suiteFocused)
++		for _, set := range []gotestast.TestSuiteSpecSet{all[i].ptest.Suites, all[i].pxtest.Suites} {
++			for _, v := range set {
++				focusRun = focusRun || v.IsFocused()
++			}
++		}
  	}
- 
- 	results, err := slices.MapErr(loadResults, func(lr *LoadResult, i int) (*GenerateResult, error) {
+
+ 	generateOne := func(lr *LoadResult, i int) (*GenerateResult, error) {

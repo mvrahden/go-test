@@ -93,19 +93,6 @@ func compareResult(key string, old, new Result) Delta {
 	return d
 }
 
-// WorstRegression returns the largest significant positive PercentChange
-// across deltas, or 0 if none of the significant deltas are regressions
-// (positive change, i.e. slower).
-func WorstRegression(deltas []Delta) float64 {
-	worst := 0.0
-	for _, d := range deltas {
-		if d.Significant && d.PercentChange > worst {
-			worst = d.PercentChange
-		}
-	}
-	return worst
-}
-
 func nsSamples(samples []Sample) []float64 {
 	ns := make([]float64, len(samples))
 	for i, s := range samples {

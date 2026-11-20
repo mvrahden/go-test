@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -148,9 +147,7 @@ func (s *StaticSpecTestSuite) observedPaths(t *gotest.T, ctx *staticCtx) map[str
 	gotest.NoError(t, err)
 	ctx.overlayDir = overlayDir
 
-	stdout, _, err := gotestrunner.StdlibRunTestsJSON(context.Background(),
-		[]string{"-overlay=" + filepath.Join(overlayDir, "overlay.json"), s.corpus})
-	gotest.NoError(t, err)
+	stdout := goTestJSON(t, "", "-overlay="+filepath.Join(overlayDir, "overlay.json"), s.corpus)
 
 	events, err := gotestspec.ParseEvents(bytes.NewReader(stdout))
 	gotest.NoError(t, err)

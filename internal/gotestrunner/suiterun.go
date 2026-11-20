@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -362,17 +361,6 @@ func StripTrailingStatus(data []byte) []byte {
 		}
 	}
 	return data
-}
-
-func WritePackageSummary(pkg string, failed bool, d time.Duration, verbose bool) {
-	switch {
-	case failed:
-		fmt.Fprintf(os.Stdout, "FAIL\nFAIL\t%s\t%.3fs\n", pkg, d.Seconds())
-	case verbose:
-		fmt.Fprintf(os.Stdout, "PASS\nok  \t%s\t%.3fs\n", pkg, d.Seconds())
-	default:
-		fmt.Fprintf(os.Stdout, "ok  \t%s\t%.3fs\n", pkg, d.Seconds())
-	}
 }
 
 // BuildSuiteTargets constructs SuiteTarget entries from compiled binaries

@@ -99,26 +99,3 @@ func (s *CompareTestSuite) TestCompare(t *gotest.T) {
 		})
 	})
 }
-
-func (s *CompareTestSuite) TestWorstRegression(t *gotest.T) {
-	t.When("multiple deltas include significant and insignificant regressions", func(w *gotest.T) {
-		w.It("returns the max significant positive PercentChange", func(it *gotest.T) {
-			deltas := []gotestbench.Delta{
-				{Key: "a", PercentChange: 5, Significant: false},
-				{Key: "b", PercentChange: 40, Significant: true},
-				{Key: "c", PercentChange: 15, Significant: true},
-				{Key: "d", PercentChange: -50, Significant: true},
-			}
-			gotest.InDelta(it, 40.0, gotestbench.WorstRegression(deltas), 0.001)
-		})
-	})
-
-	t.When("no deltas are significant", func(w *gotest.T) {
-		w.It("returns 0", func(it *gotest.T) {
-			deltas := []gotestbench.Delta{
-				{Key: "a", PercentChange: 90, Significant: false},
-			}
-			gotest.Equal(it, 0.0, gotestbench.WorstRegression(deltas))
-		})
-	})
-}

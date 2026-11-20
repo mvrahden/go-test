@@ -203,3 +203,13 @@ var (
 )
 
 var ExportCountStdlibTests = countStdlibTests
+
+// Bind is bind without a source loader.
+func Bind(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*Binding, error) {
+	return bind(targetPkg, nil, suites, localFixtures)
+}
+
+// BuildFuzzTargets is buildFuzzTargets with the imports of a fresh file.
+func BuildFuzzTargets(pkg *packages.Package, suites gotestast.TestSuiteSpecSet) (*FuzzTargetSet, error) {
+	return buildFuzzTargets(pkg, suites, newImportSet(pkg.PkgPath))
+}

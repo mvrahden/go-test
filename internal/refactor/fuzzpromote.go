@@ -67,7 +67,12 @@ func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string, types
 	return "", 0, fmt.Errorf("fuzz method %s.%s not found in %s", suiteName, methodName, dir)
 }
 
-// InsertFuzzAdd parses src (a single Go source file's bytes) looking for the
+// TypeNames reports whether qual.name (name alone when qual is empty) names
+// a type where the seed is spliced. Only a conversion to a type is a
+// literal; a nil TypeNames admits the predeclared types alone.
+type TypeNames func(qual, name string) bool
+
+// insertFuzzAdd parses src (a single Go source file's bytes) looking for the
 // fuzz method suiteName.methodName. If found, it splices
 // `<param>.Add(argExprs...)` into the method body directly after the last
 // existing top-level `<param>.Add(...)` call and its trailing comment (or as
@@ -83,17 +88,8 @@ func PromoteFuzzSeed(dir, suiteName, methodName string, argExprs []string, types
 // differs from the f.Fuzz callback's arguments, so callers can tell "try
 // another file" apart from "found it, but something is wrong" and abort
 // instead of silently skipping a genuine problem.
-func InsertFuzzAdd(src []byte, suiteName, methodName string, argExprs []string, types TypeNames) (edited []byte, found bool, err error) {
-	return insertFuzzAdd("", src, suiteName, methodName, argExprs, types)
-}
-
-// TypeNames reports whether qual.name (name alone when qual is empty) names
-// a type where the seed is spliced. Only a conversion to a type is a
-// literal; a nil TypeNames admits the predeclared types alone.
-type TypeNames func(qual, name string) bool
-
-// insertFuzzAdd is InsertFuzzAdd with the file's path, which decides where
-// imports are resolved from.
+//
+// The file's path, filename, decides where imports are resolved from.
 func insertFuzzAdd(filename string, src []byte, suiteName, methodName string, argExprs []string, types TypeNames) (edited []byte, found bool, err error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.ParseComments)
@@ -313,7 +309,7 @@ func isParamAddCall(stmt ast.Stmt, paramName string) bool {
 
 // lastAddLine re-parses edited (post-format) source and returns the 1-based
 // line of the last `<param>.Add(...)` call in suiteName.methodName's body —
-// i.e. the statement InsertFuzzAdd just spliced in.
+// i.e. the statement insertFuzzAdd just spliced in.
 func lastAddLine(edited []byte, suiteName, methodName string) (int, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", edited, 0)

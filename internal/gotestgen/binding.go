@@ -127,13 +127,9 @@ func (r *binder) prefix(p *types.Package) string {
 	return pre
 }
 
-// Bind performs demand-driven fixture resolution starting from targeted test
+// bind performs demand-driven fixture resolution starting from targeted test
 // suites. It walks the type graph recursively to discover all required fixtures
 // (both package and shared), validates constraints, and builds the fixture tree.
-func Bind(targetPkg *packages.Package, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*Binding, error) {
-	return bind(targetPkg, nil, suites, localFixtures)
-}
-
 func bind(targetPkg *packages.Package, sources *sourceLoader, suites []*gotestast.TestSuiteSpec, localFixtures []*gotestast.FixtureSpec) (*Binding, error) {
 	result := &Binding{}
 	r := &binder{

@@ -15,8 +15,11 @@ import (
 // OutputCollectorTestSuite covers the output collector: per-package flushing in registration
 // order, package-level event filtering, skipped-suite notes, formatting, the
 // golden output.
-// Sequential: TestOutputFormatting swaps os.Stdout to capture WritePackageSummary.
 type OutputCollectorTestSuite struct{}
+
+func (s *OutputCollectorTestSuite) SuiteConfig() gotest.SuiteConfig {
+	return gotest.SuiteConfig{Parallel: true}
+}
 
 func (s *OutputCollectorTestSuite) TestOutputCollector(t *gotest.T) {
 	pass := func(d time.Duration) gotestrunner.SuiteResult {
@@ -669,65 +672,6 @@ func (s *OutputCollectorTestSuite) TestOutputFormatting(t *gotest.T) {
 			}
 		}
 	})
-
-	t.When("writing package summary", func(w *gotest.T) {
-		w.When("verbose mode", func(w2 *gotest.T) {
-			for sub, tc := range gotest.Each(w2, []struct {
-				Name     string
-				pkg      string
-				failed   bool
-				duration time.Duration
-				expect   string
-			}{
-				{
-					Name:     "passing package includes PASS prefix",
-					pkg:      "example.com/pkg",
-					failed:   false,
-					duration: 1234 * time.Millisecond,
-					expect:   "PASS\nok  \texample.com/pkg\t1.234s\n",
-				},
-				{
-					Name:     "failing package includes FAIL prefix",
-					pkg:      "example.com/pkg",
-					failed:   true,
-					duration: 567 * time.Millisecond,
-					expect:   "FAIL\nFAIL\texample.com/pkg\t0.567s\n",
-				},
-			}) {
-				got := capturePackageSummary(tc.pkg, tc.failed, tc.duration, true)
-				gotest.Equal(sub, tc.expect, got)
-			}
-		})
-
-		w.When("non-verbose mode", func(w2 *gotest.T) {
-			for sub, tc := range gotest.Each(w2, []struct {
-				Name     string
-				pkg      string
-				failed   bool
-				duration time.Duration
-				expect   string
-			}{
-				{
-					Name:     "passing package omits PASS prefix",
-					pkg:      "example.com/pkg",
-					failed:   false,
-					duration: 1234 * time.Millisecond,
-					expect:   "ok  \texample.com/pkg\t1.234s\n",
-				},
-				{
-					Name:     "failing package still includes FAIL prefix",
-					pkg:      "example.com/pkg",
-					failed:   true,
-					duration: 567 * time.Millisecond,
-					expect:   "FAIL\nFAIL\texample.com/pkg\t0.567s\n",
-				},
-			}) {
-				got := capturePackageSummary(tc.pkg, tc.failed, tc.duration, false)
-				gotest.Equal(sub, tc.expect, got)
-			}
-		})
-	})
-
 }
 
 func (s *OutputCollectorTestSuite) TestOutputGolden(t *gotest.T) {

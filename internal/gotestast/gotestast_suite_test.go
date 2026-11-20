@@ -1187,6 +1187,13 @@ func (s *SpecTestSuite) TestDetermineTestSuite(t *gotest.T) {
 		})
 		w.It("rejects underscore-only prefix", func(it *gotest.T) {
 			gotest.False(it, gotestast.IS_TEST_SUITE.MatchString("_PrivateTestSuite"))
+			gotest.False(it, gotestast.IS_TEST_SUITE.MatchString("_X_MyTestSuite"))
+			gotest.True(it, gotestast.IS_TEST_SUITE.MatchString("X__MyTestSuite"))
+			gotest.True(it, gotestast.IS_TEST_SUITE.MatchString("Myƒƒ_GOTEST_TestSuite"))
+			gotest.False(it, gotestast.IS_TEST_SUITE.MatchString("TestSuite"))
+			gotest.False(it, gotestast.IS_TEST_SUITE.MatchString("MyTestSuiteX"))
+			gotest.True(it, gotestast.IS_TEST_CASE.MatchString("Test_x"))
+			gotest.False(it, gotestast.IS_TEST_CASE.MatchString("Testify"))
 		})
 	})
 }

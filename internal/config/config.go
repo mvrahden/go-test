@@ -88,11 +88,6 @@ func (d Duration) Duration() time.Duration {
 	return time.Duration(d)
 }
 
-func Dur(d time.Duration) *Duration {
-	v := Duration(d)
-	return &v
-}
-
 func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	var s string
 	if err := value.Decode(&s); err != nil {

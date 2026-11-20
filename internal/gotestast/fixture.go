@@ -76,16 +76,9 @@ func (f *FixtureSpec) ExportedFieldNames() []string {
 	return names
 }
 
-// DetermineFixture inspects an AST node for a struct type whose name ends in
-// "SharedFixture" (→ SharedFixture kind) or "Fixture" (→ PackageFixture kind).
-// Returns nil if the type name doesn't match either suffix, or an error if
-// the matching type is not a struct.
-func DetermineFixture(n ast.Node, pkg *packages.Package) (*FixtureSpec, error) {
-	return DetermineFixtureOf(n, pkg, nil)
-}
-
-// DetermineFixtureOf is DetermineFixture for the fixture types wanted
-// reports true for; any other is passed over. A nil wanted takes every one.
+// DetermineFixtureOf inspects an AST node for a struct type whose name ends
+// in SharedFixture or Fixture, among the types wanted reports true for; a nil
+// wanted takes every one.
 func DetermineFixtureOf(n ast.Node, pkg *packages.Package, wanted func(name string) bool) (*FixtureSpec, error) {
 	decl, ok := n.(*ast.GenDecl)
 	if !ok || decl.Tok != token.TYPE {
@@ -290,16 +283,6 @@ func NewFixtureSpecForTest(name string, kind FixtureKind) *FixtureSpec {
 	return &FixtureSpec{
 		Kind: kind,
 		pkg:  &packages.Package{},
-		ts:   &ast.TypeSpec{Name: ast.NewIdent(name)},
-	}
-}
-
-// NewFixtureSpecForTestWithPkg creates a minimal FixtureSpec for use in unit tests,
-// including a package path so that PackagePath() works.
-func NewFixtureSpecForTestWithPkg(name string, kind FixtureKind, pkgPath string) *FixtureSpec {
-	return &FixtureSpec{
-		Kind: kind,
-		pkg:  &packages.Package{PkgPath: pkgPath},
 		ts:   &ast.TypeSpec{Name: ast.NewIdent(name)},
 	}
 }

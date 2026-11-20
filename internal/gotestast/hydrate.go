@@ -7,20 +7,12 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// ClassifyLocalFields analyzes a Hydrate method's AST to determine which
+// ClassifyLocalFieldsRaw analyzes a Hydrate method's AST to determine which
 // exported fixture fields are assigned (directly or via one-level-deep receiver
 // method calls). Fields assigned in Hydrate are "local" — they are excluded
-// from JSON serialization and reconstructed in the test process.
-func ClassifyLocalFields(f *FixtureSpec) map[string]bool {
-	if f.HydrateDecl == nil || f.HydrateDecl.Body == nil {
-		return nil
-	}
-	return ClassifyLocalFieldsRaw(f.HydrateDecl, f.Identifier(), f.PackageSyntax(), f.PackageTypesInfo())
-}
-
-// ClassifyLocalFieldsRaw performs the same analysis as ClassifyLocalFields but
-// accepts raw inputs instead of a FixtureSpec. This supports cross-package
-// fixture resolution where no FixtureSpec exists.
+// from JSON serialization and reconstructed in the test process. It takes raw
+// inputs instead of a FixtureSpec, for cross-package fixture resolution where
+// no FixtureSpec exists.
 func ClassifyLocalFieldsRaw(hydrateDecl *ast.FuncDecl, fixtureName string, syntax []*ast.File, info *types.Info) map[string]bool {
 	if hydrateDecl == nil || hydrateDecl.Body == nil {
 		return nil

@@ -157,19 +157,6 @@ func (p *SharedFixtureProcess) Came(key string) bool {
 	}
 }
 
-// State returns a snapshot of the accumulated state for the given keys.
-func (p *SharedFixtureProcess) State(keys []string) map[string]json.RawMessage {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	result := make(map[string]json.RawMessage, len(keys))
-	for _, k := range keys {
-		if v, ok := p.state[k]; ok {
-			result[k] = v
-		}
-	}
-	return result
-}
-
 // WaitSetup waits for the process to report its setup done, for at most
 // flat when positive. Zero flat makes the wait the fixtures' own: every
 // fixture reports the budget its setup is held to as it starts, and the
@@ -687,25 +674,6 @@ func ackErr(verb, ack string) error {
 		return nil
 	}
 	return fmt.Errorf("shared fixture %s: %s", verb, ack)
-}
-
-// RefreshStateFile rewrites the global state file (the one WaitAllReady wrote
-// and every batch suite's env points at) from the current accumulated state —
-// after StartKeys added late fixtures, the file must contain them.
-func (p *SharedFixtureProcess) RefreshStateFile() error {
-	if p.stateFile == "" {
-		return nil
-	}
-	p.mu.Lock()
-	data, err := json.Marshal(p.state)
-	p.mu.Unlock()
-	if err != nil {
-		return fmt.Errorf("re-marshal shared fixture state: %w", err)
-	}
-	if err := os.WriteFile(p.stateFile, data, 0600); err != nil {
-		return fmt.Errorf("refresh shared fixture state file: %w", err)
-	}
-	return nil
 }
 
 // Teardown asks the shared fixture subprocess to shut down and waits for it
