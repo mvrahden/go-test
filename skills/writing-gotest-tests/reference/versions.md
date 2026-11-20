@@ -691,10 +691,13 @@ What v1.39 changes:
    the module must resolve gotest v1.39.0 or newer. A `go get -tool` pin
    resolves both from one version.
 
-2. **Four constructors are gone** — `gotest.NewTFromTB`, `gotest.NewB`,
-   `gotest.SeedArg` and `gotest.SeedArity` were for generated code, which
-   now calls the runtime's names. A harness an older gotest left on disk no
-   longer compiles: remove it with `gotest clean ./...`, and run gotest as
-   `go tool gotest`, so the CLI and the runtime come from one version. A
-   benchmark of your own hands its `*testing.B` to assertions as it is;
-   `gotest.NewF` stays the call for a stdlib `FuzzXxx`.
+2. **What only generated code used is gone from the user API** —
+   `gotest.NewTFromTB`, `gotest.NewB`, `gotest.SeedArg`, `gotest.SeedArity`,
+   `gotest.FuzzTarget`, `gotest.FuzzEach` and the package
+   `pkg/gotestfuzz`; generated code calls the runtime's names instead. A
+   harness an older gotest left on disk no longer compiles: remove it with
+   `gotest clean ./...`, and run gotest as `go tool gotest`, so the CLI and
+   the runtime come from one version. A stdlib `FuzzXxx` wraps its
+   `*testing.F` with `gotest.NewF(f)`, without the three `nil`s; a benchmark
+   of your own hands its `*testing.B` to assertions as it is. A vendored
+   module drops its blank import of `pkg/gotestfuzz`.
