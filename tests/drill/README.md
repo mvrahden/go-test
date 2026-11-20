@@ -380,6 +380,8 @@ shards of one run do not add up to every mutant exactly once.
 | `foreign-flag-accepted` | a command takes a gotest flag another command owns | cli conformance: `clean --debug` is not refused with exit 2 |
 | `flags-after-dashdash-dropped` | the flags after a bare `--` never reach the test binary | cli conformance: the binary's own check fails after `--` |
 | `exec-command-left-in-build-flags` | `-exec <cmd>` lifts the command but leaves it among the build flags | cli conformance: a run under `-exec env` fails |
+| `run-flag-table-kept-by-hand` | a flag the testing package declares is left out of the run flags | cli conformance: the run given -artifacts exits 2 as an unknown flag |
+| `run-flag-unknown-to-testing-taken` | a flag the testing package does not declare is kept among the run flags | cli conformance: the run given -mutexprofilerate reaches the test binary and exits 1 |
 | `spaced-coverprofile-missed` | `-coverprofile <file>` is not read as the run's profile | cli conformance: summary prints no coverage for the spaced spelling |
 | `spec-skips-stdlib-note` | spec runs without noting the stdlib tests it left to go test | cli conformance: spec's stderr lacks the stdlib note |
 | `color-codes-into-pipe` | color follows only `--no-color` and `NO_COLOR`, never the terminal | cli conformance: summary into a pipe prints color codes |

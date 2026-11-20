@@ -1,0 +1,13 @@
+Expect: ^FAIL .*conformance/cli .* / refuses it with exit 2 as an unknown flag, before anything is built \(
+Clause: when -mutexprofilerate=5 is given to a run → refuses it with exit 2 as an unknown flag, before anything is built
+--- a/internal/gotestrunner/testflags.go
++++ b/internal/gotestrunner/testflags.go
+@@ -37,7 +37,7 @@
+ // dash: every flag the testing package declares, less testBinaryOnly. The
+ // value reports whether the flag takes one.
+ var runFlags = sync.OnceValue(func() map[string]bool {
+-	flags := map[string]bool{}
++	flags := map[string]bool{"-mutexprofilerate": true}
+ 	testFlagSet().VisitAll(func(f *flag.Flag) {
+ 		if !testBinaryOnly[f.Name] {
+ 			flags["-"+f.Name] = !isBoolFlag(f)
