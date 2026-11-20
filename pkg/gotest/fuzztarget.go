@@ -6,24 +6,6 @@ import (
 	"testing"
 )
 
-// FuzzEach runs one execution of a fuzz target: t is the engine's, literal
-// renders the input for the failure echo (nil when the input has no literal
-// form), body calls the user's callback under a fresh *T. Generated code
-// names it as gotestruntime.FuzzEach; a hand-written fuzz target passes nil.
-type FuzzEach func(t *testing.T, literal func() string, body func(*T))
-
-// FuzzTarget is the generated binding of one Fuzz<Suite>_<Method> wrapper:
-// Register asserts the callback to the exact type the wrapper was generated
-// for and registers it with the engine under the fanned leaf signature;
-// Explode turns one typed f.Add tuple into those leaves. You never construct
-// one; the generated wrapper builds it as gotestruntime.FuzzTarget and hands
-// it to gotestruntime.FuzzF. A hand-written fuzz target passes nil to [NewF].
-type FuzzTarget struct {
-	Signature string
-	Register  func(tf *testing.F, fn any, each FuzzEach) bool
-	Explode   func(seed []any) ([]any, error)
-}
-
 var gotestTType = reflect.TypeOf((*T)(nil))
 
 // fuzzWithoutTarget binds fn by reflection — the path for a top-level

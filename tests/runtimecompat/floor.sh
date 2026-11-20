@@ -64,7 +64,7 @@ fi
 # The fuzz fan writes its runtime calls from Go (internal/gotestgen/fuzzfan.go).
 {
   grep -rhoE 'gotestruntime\.[A-Za-z_0-9]+' "$root/internal/gotestgen/static"
-  printf 'gotestruntime.%s\n' FuzzEach FuzzTarget SeedArg SeedArity
+  printf 'gotestruntime.%s\n' FuzzEach FuzzTarget SeedArg SeedArity FuzzLeaf FuzzLeafBytes FuzzBytes NewFuzzReader NewFuzzWriter FuzzReader FuzzWriter
 } | sort -u >"$work/want"
 missing=$(comm -23 "$work/want" "$work/got")
 if [ -n "$missing" ]; then

@@ -720,7 +720,7 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_StructTarget")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+			gotest.Regexp(it, `ƒgotestruntime\.(FuzzLeaf\[|FuzzBytes\(|NewFuzzReader\()`, out)
 			gotest.Contains(it, out, "func ƒ_fuzzin_v1_Request(ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) Request {")
 			gotest.Contains(it, out, `ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{Signature: "func(*gotest.T, Request)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzCreate, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzCreate})`)
 			gotest.Contains(it, out, `ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{Signature: "func(*gotest.T, string)", Register: ƒ_fuzzreg_v1_FuzzStructFuzzTestSuite_FuzzNative, Explode: ƒ_fuzzexp_v1_FuzzStructFuzzTestSuite_FuzzNative})`)
@@ -738,11 +738,10 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("a fuzz target's struct pulls in a type from another package", func(w *gotest.T) {
-		w.It("imports that package in the generated header, alongside gotestfuzz", func(it *gotest.T) {
+		w.It("imports that package in the generated header", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestFuzzCodec_CrossPackage")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
-			gotest.Contains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
 			gotest.Contains(it, out, `"testpkg/TestFuzzCodec_CrossDep"`,
 				"without this import the generated file references crossdep.Setting and does not compile")
 			gotest.Contains(it, out, "crossdep.Setting")
@@ -750,14 +749,14 @@ func (s *RendererTestSuite) TestRenderer_FuzzWrapper(t *gotest.T) {
 	})
 
 	t.When("no fuzz target needs a fan", func(w *gotest.T) {
-		w.It("still binds the callback by type but imports no fuzz runtime", func(it *gotest.T) {
+		w.It("still binds the callback by type but calls no fuzz codec", func(it *gotest.T) {
 			pkg := gotestgen.ExportMustTestPkg(it.T(), "TestCollector_FuzzMethod")
 			out, _ := renderTestPkg(it.T(), pkg, true)
 
 			gotest.Contains(it, out, `ƒf := ƒgotestruntime.FuzzF(f, s.BeforeEach, s.AfterEach, &ƒgotestruntime.FuzzTarget{Signature: "func(*gotest.T, string)"`)
 			gotest.Contains(it, out, "s.FuzzParse(ƒf)")
 			gotest.NotContains(it, out, "ƒ_fuzzin_")
-			gotest.NotContains(it, out, `"github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+			gotest.Empty(it, regexp.MustCompile(`ƒgotestruntime\.(FuzzLeaf|FuzzBytes|NewFuzzReader|NewFuzzWriter)\b`).FindAllString(out, -1))
 		})
 	})
 }

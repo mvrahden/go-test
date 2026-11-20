@@ -1,7 +1,10 @@
 # One line per accepted incompatible change of pkg/gotest, exactly as `apidiff -incompatible` prints it.
 # Each line needs a release note that tells users what to change.
 # Remove the lines once the release that carries them is tagged.
+- FuzzEach: removed
+- FuzzTarget: removed
 - NewB: removed
+- NewF: changed from func(*testing.F, func(*T), func(*T), *FuzzTarget) *F to func(*testing.F) *F
 - NewTFromTB: removed
 - SeedArg: removed
 - SeedArity: removed

@@ -1,4 +1,4 @@
-package gotestfuzz
+package fuzzcodec
 
 import (
 	"encoding/binary"

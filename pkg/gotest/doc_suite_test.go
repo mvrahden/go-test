@@ -46,7 +46,6 @@ func (s *DocTestSuite) TestPackageComments(t *gotest.T) {
 	for sub, row := range gotest.Each(t, []struct{ Desc, dir, opens string }{
 		{"gotest", ".", "Package gotest is what a gotest suite is written against"},
 		{"gotestruntime", "../gotestruntime", "Package gotestruntime is what the harness gotest generates calls"},
-		{"gotestfuzz", "../gotestfuzz", "Package gotestfuzz holds the byte codecs"},
 	}) {
 		gotest.Regexp(sub, "^"+regexp.QuoteMeta(row.opens), docOf(sub, row.dir).Doc)
 	}

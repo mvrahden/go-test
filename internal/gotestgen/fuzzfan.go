@@ -11,9 +11,6 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// fuzzRuntimeImport is the import path every emitted fan needs.
-var fuzzRuntimeImport = about.Repo + "/pkg/gotestfuzz"
-
 // gotestImport is the import path of the assertion package.
 var gotestImport = about.Repo + "/pkg/gotest"
 
@@ -41,7 +38,7 @@ type FuzzTargetSet struct {
 	Targets []FuzzTargetRef // one per fuzz method, in (suite, method) order
 	Source  string          // source of every register, explode, fan-in/out, hybrid codec, and literal function
 	// Imports are the import specs Source and the target expressions need,
-	// each under its generated alias, e.g. `ƒgotestfuzz "…/pkg/gotestfuzz"`.
+	// each under its generated alias, e.g. `ƒgotestruntime "…/pkg/gotestruntime"`.
 	Imports []string
 
 	// ParamsByFunc maps every generated Fuzz<Suite>_<Method> wrapper name to
@@ -353,8 +350,7 @@ func (e *fuzzEmitter) fan(t types.Type) (*fanInfo, error) {
 			fmt.Fprintf(&in, "\treturn %s(ƒ0)\n", ref)
 			fmt.Fprintf(&out, "\treturn []any{%s(ƒv)}\n", p)
 		default:
-			m, ok := fuzzBasicMethod[u.Kind()]
-			if !ok {
+			if _, ok := fuzzBasicMethod[u.Kind()]; !ok {
 				return nil, e.reject(t, fuzzRejectReason(u))
 			}
 			// A number, named or not: one fixed-width []byte leaf. Bytes
@@ -362,11 +358,11 @@ func (e *fuzzEmitter) fan(t types.Type) (*fanInfo, error) {
 			// get its poorest.
 			params = []string{"[]byte"}
 			if isNamed {
-				fmt.Fprintf(&in, "\treturn %s(%s.Leaf%s(ƒ0))\n", ref, e.fuzzPkg(), m)
+				fmt.Fprintf(&in, "\treturn %s(%s.FuzzLeaf[%s](ƒ0))\n", ref, e.fuzzPkg(), u.Name())
 			} else {
-				fmt.Fprintf(&in, "\treturn %s.Leaf%s(ƒ0)\n", e.fuzzPkg(), m)
+				fmt.Fprintf(&in, "\treturn %s.FuzzLeaf[%s](ƒ0)\n", e.fuzzPkg(), u.Name())
 			}
-			fmt.Fprintf(&out, "\treturn []any{%s.LeafBytes%s(%s(ƒv))}\n", e.fuzzPkg(), m, u.Name())
+			fmt.Fprintf(&out, "\treturn []any{%s.FuzzLeafBytes(%s(ƒv))}\n", e.fuzzPkg(), u.Name())
 		}
 
 	case *types.Slice:
@@ -374,7 +370,7 @@ func (e *fuzzEmitter) fan(t types.Type) (*fanInfo, error) {
 			// A named byte slice: one native []byte leaf plus the conversion,
 			// empty collapsed to nil like every []byte the fan constructs.
 			params = []string{"[]byte"}
-			fmt.Fprintf(&in, "\treturn %s(%s.LeafBytes(ƒ0))\n", ref, e.fuzzPkg())
+			fmt.Fprintf(&in, "\treturn %s(%s.FuzzBytes(ƒ0))\n", ref, e.fuzzPkg())
 			out.WriteString("\treturn []any{[]byte(ƒv)}\n")
 			break
 		}
@@ -503,8 +499,8 @@ func (e *fuzzEmitter) hybrid(in, out *strings.Builder, t types.Type, ref, ident 
 		if err != nil {
 			return err
 		}
-		e.hybrids[ident] = fmt.Sprintf("\nfunc %s(ƒb []byte) %s {\n\tƒr := %s.NewReader(ƒb)\n\treturn %s\n}\n", decName, ref, e.fuzzPkg(), readExpr) +
-			fmt.Sprintf("\nfunc %s(ƒv %s) []byte {\n\tƒw := %s.NewWriter()\n\t%s\n\treturn ƒw.Out()\n}\n", encName, ref, e.fuzzPkg(), writeStmt)
+		e.hybrids[ident] = fmt.Sprintf("\nfunc %s(ƒb []byte) %s {\n\tƒr := %s.NewFuzzReader(ƒb)\n\treturn %s\n}\n", decName, ref, e.fuzzPkg(), readExpr) +
+			fmt.Sprintf("\nfunc %s(ƒv %s) []byte {\n\tƒw := %s.NewFuzzWriter()\n\t%s\n\treturn ƒw.Out()\n}\n", encName, ref, e.fuzzPkg(), writeStmt)
 		e.hybridOrder = append(e.hybridOrder, ident)
 	}
 	fmt.Fprintf(in, "\treturn %s(ƒ0)\n", decName)
@@ -514,12 +510,12 @@ func (e *fuzzEmitter) hybrid(in, out *strings.Builder, t types.Type, ref, ident 
 
 // inExpr returns the Go expression that fans the leaf variables args back
 // into a value of type t. A pass-through []byte nested inside a fanned
-// value collapses empty to nil (see gotestfuzz.LeafBytes); a top-level
+// value collapses empty to nil (see gotestruntime.FuzzBytes); a top-level
 // pass-through position is passed exactly as the engine handed it over.
 func (e *fuzzEmitter) inExpr(t types.Type, fi *fanInfo, args []string, nested bool) string {
 	if fi.passthrough {
 		if nested && fi.params[0] == "[]byte" {
-			return e.fuzzPkg() + ".LeafBytes(" + args[0] + ")"
+			return e.fuzzPkg() + ".FuzzBytes(" + args[0] + ")"
 		}
 		return args[0]
 	}

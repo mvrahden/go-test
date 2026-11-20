@@ -109,7 +109,6 @@ The examples below write `gotest` for brevity; with the tool directive, read `go
 // gotestdeps_test.go, in any package of the module
 
 import (
-    _ "github.com/mvrahden/go-test/pkg/gotestfuzz"    // fuzz targets that take a struct
     _ "github.com/mvrahden/go-test/pkg/gotestruntime" // every suite
 )
 ```

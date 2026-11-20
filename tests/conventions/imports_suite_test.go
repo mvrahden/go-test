@@ -25,7 +25,7 @@ func (s *ImportsTestSuite) SuiteConfig() gotest.SuiteConfig {
 const module = "github.com/mvrahden/go-test"
 
 // runtimePackages are the packages a suite and its harness import.
-var runtimePackages = []string{"./pkg/gotest/...", "./pkg/gotestruntime/...", "./pkg/gotestfuzz/..."}
+var runtimePackages = []string{"./pkg/gotest/...", "./pkg/gotestruntime/..."}
 
 // listDeps lists the non-standard packages patterns depend on, for one platform.
 func listDeps(t *gotest.T, goos, goarch string, patterns ...string) []string {

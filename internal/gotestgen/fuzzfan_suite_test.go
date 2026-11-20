@@ -109,10 +109,10 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 		// Home *Address → bool nil-flag + Street string + Zip []byte.
 		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_Request(ƒ0 string, ƒ1 []byte, ƒ2 []byte, ƒ3 []byte, ƒ4 bool, ƒ5 string, ƒ6 []byte) Request {")
 		gotest.Contains(it, set.Source, "return Request{Email: ƒ0, Age: ƒ_fuzzin_v1_int(ƒ1), Prio: ƒ_fuzzin_v1_Priority(ƒ2), Tags: ƒ_fuzzin_v1_slice_string(ƒ3), Home: ƒ_fuzzin_v1_ptr_Address(ƒ4, ƒ5, ƒ6)}")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_int(ƒ0 []byte) int {\n\treturn ƒgotestfuzz.LeafInt(ƒ0)\n}")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_Priority(ƒ0 []byte) Priority {\n\treturn Priority(ƒgotestfuzz.LeafInt(ƒ0))\n}")
-		gotest.Contains(it, set.Source, "return []any{ƒgotestfuzz.LeafBytesInt(int(ƒv))}")
-		gotest.Contains(it, set.Imports, `ƒgotestfuzz "github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_int(ƒ0 []byte) int {\n\treturn ƒgotestruntime.FuzzLeaf[int](ƒ0)\n}")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzin_v1_Priority(ƒ0 []byte) Priority {\n\treturn Priority(ƒgotestruntime.FuzzLeaf[int](ƒ0))\n}")
+		gotest.Contains(it, set.Source, "return []any{ƒgotestruntime.FuzzLeafBytes(int(ƒv))}")
+		gotest.Contains(it, set.Imports, `ƒgotestruntime "github.com/mvrahden/go-test/pkg/gotestruntime"`)
 	})
 
 	t.It("binds the callback by its exact type and registers through a direct (*testing.F).Fuzz call", func(it *gotest.T) {
@@ -137,9 +137,9 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 
 	t.It("rides a slice of strings as one hybrid leaf through the total mini-codec", func(it *gotest.T) {
 		set := s.build(it, "TestFuzzCodec_StructTarget")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzdec_v1_slice_string(ƒb []byte) []string {\n\tƒr := ƒgotestfuzz.NewReader(ƒb)\n\treturn ƒ_fuzzread_v1_slice_string(ƒr)\n}")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzdec_v1_slice_string(ƒb []byte) []string {\n\tƒr := ƒgotestruntime.NewFuzzReader(ƒb)\n\treturn ƒ_fuzzread_v1_slice_string(ƒr)\n}")
 		gotest.Contains(it, set.Source, "func ƒ_fuzzenc_v1_slice_string(ƒv []string) []byte {")
-		gotest.Contains(it, set.Source, "func ƒ_fuzzread_v1_slice_string(ƒr *ƒgotestfuzz.Reader) []string {")
+		gotest.Contains(it, set.Source, "func ƒ_fuzzread_v1_slice_string(ƒr *ƒgotestruntime.FuzzReader) []string {")
 	})
 
 	t.It("collapses an empty pass-through []byte field to nil on fan-in", func(it *gotest.T) {
@@ -163,12 +163,13 @@ func (s *FuzzFanTestSuite) TestStructTarget(t *gotest.T) {
 		}
 	})
 
-	t.It("binds a pass-through-only package without the leaf runtime", func(it *gotest.T) {
+	t.It("binds a pass-through-only package without the leaf codecs", func(it *gotest.T) {
 		set := s.build(it, "TestCollector_FuzzMethod")
 		gotest.NotZero(it, set)
 		gotest.NotEmpty(it, set.Targets)
 		gotest.Contains(it, set.Source, "ƒfn.(func(*ƒgotest.T, string))")
-		gotest.NotContains(it, set.Imports, `ƒgotestfuzz "github.com/mvrahden/go-test/pkg/gotestfuzz"`)
+		gotest.NotContains(it, set.Source, "FuzzLeaf")
+		gotest.NotContains(it, set.Source, "FuzzReader")
 		gotest.NotEmpty(it, set.ParamsByFunc)
 	})
 

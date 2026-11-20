@@ -54,9 +54,38 @@ func (s *HarnessTypesTestSuite) TestSeeds(t *gotest.T) {
 	})
 }
 
-// The types generated code names are the user package's own.
-var (
-	_ func(*testing.F, func(*gotest.T), func(*gotest.T), *gotestruntime.FuzzTarget) *gotest.F = gotestruntime.FuzzF
-	_ *gotest.FuzzTarget                                                                      = (*gotestruntime.FuzzTarget)(nil)
-	_ gotest.FuzzEach                                                                         = gotestruntime.FuzzEach(nil)
-)
+// FuzzF takes the hooks and target generated code hands it.
+var _ func(*testing.F, func(*gotest.T), func(*gotest.T), *gotestruntime.FuzzTarget) *gotest.F = gotestruntime.FuzzF
+
+func (s *HarnessTypesTestSuite) TestFuzzCodecs(t *gotest.T) {
+	t.When("a number travels as a leaf", func(w *gotest.T) {
+		w.It("decodes to the value it was encoded from", func(it *gotest.T) {
+			gotest.Equal(it, int16(-7), gotestruntime.FuzzLeaf[int16](gotestruntime.FuzzLeafBytes(int16(-7))))
+			gotest.Equal(it, uint64(1<<40), gotestruntime.FuzzLeaf[uint64](gotestruntime.FuzzLeafBytes(uint64(1<<40))))
+			gotest.Equal(it, 2.5, gotestruntime.FuzzLeaf[float64](gotestruntime.FuzzLeafBytes(2.5)))
+			gotest.Equal(it, float32(-1.25), gotestruntime.FuzzLeaf[float32](gotestruntime.FuzzLeafBytes(float32(-1.25))))
+			gotest.Equal(it, byte(200), gotestruntime.FuzzLeaf[byte](gotestruntime.FuzzLeafBytes(byte(200))))
+		})
+		w.It("is as wide as its type", func(it *gotest.T) {
+			gotest.Len(it, gotestruntime.FuzzLeafBytes(int8(1)), 1)
+			gotest.Len(it, gotestruntime.FuzzLeafBytes(uint32(1)), 4)
+			gotest.Len(it, gotestruntime.FuzzLeafBytes(1), 8)
+		})
+	})
+	t.When("a []byte leaf is empty", func(w *gotest.T) {
+		w.It("becomes nil", func(it *gotest.T) {
+			gotest.Nil(it, gotestruntime.FuzzBytes([]byte{}))
+			gotest.Equal(it, []byte("x"), gotestruntime.FuzzBytes([]byte("x")))
+		})
+	})
+	t.When("a value is written and read back", func(w *gotest.T) {
+		w.It("reads what was written", func(it *gotest.T) {
+			fw := gotestruntime.NewFuzzWriter()
+			fw.String("hi")
+			fw.Int32(-3)
+			fr := gotestruntime.NewFuzzReader(fw.Out())
+			gotest.Equal(it, "hi", fr.String())
+			gotest.Equal(it, int32(-3), fr.Int32())
+		})
+	})
+}

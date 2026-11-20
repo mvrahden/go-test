@@ -4,33 +4,37 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mvrahden/go-test/internal/harnessctor"
+	"github.com/mvrahden/go-test/internal/harness"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
 // The values generated benchmark and fuzz wrappers hand to a suite.
 
+// pkg/gotest sets them at its init, which runs before this package's.
+var ctors = harness.Registered.(harness.Constructors[*gotest.T, *gotest.B, *gotest.F]) //nolint:forcetypeassert // pkg/gotest registers exactly this type
+
 // EachT is the *gotest.T a benchmark's BeforeEach and AfterEach get: tb's
 // own, with no *testing.T behind it.
-func EachT(tb testing.TB) *gotest.T {
-	return harnessctor.EachT(tb).(*gotest.T) //nolint:forcetypeassert // pkg/gotest builds exactly this type
-}
+func EachT(tb testing.TB) *gotest.T { return ctors.EachT(tb) }
 
 // BenchB is the *gotest.B a suite's benchmark method gets.
-func BenchB(b *testing.B) *gotest.B {
-	return harnessctor.BenchB(b).(*gotest.B) //nolint:forcetypeassert // pkg/gotest builds exactly this type
-}
+func BenchB(b *testing.B) *gotest.B { return ctors.BenchB(b) }
 
-// FuzzTarget is the generated binding of one fuzz wrapper.
-type FuzzTarget = gotest.FuzzTarget
+// FuzzTarget is the generated binding of one Fuzz<Suite>_<Method> wrapper:
+// Register asserts the callback to the exact type the wrapper was generated
+// for and registers it with the engine under the fanned leaf signature;
+// Explode turns one typed f.Add tuple into those leaves.
+type FuzzTarget = harness.FuzzTarget[*gotest.T]
 
-// FuzzEach runs one execution of a [FuzzTarget].
-type FuzzEach = gotest.FuzzEach
+// FuzzEach runs one execution of a [FuzzTarget]: t is the engine's, literal
+// renders the input for the failure echo (nil when the input has no literal
+// form), body calls the user's callback under a fresh *gotest.T.
+type FuzzEach = harness.FuzzEach[*gotest.T]
 
 // FuzzF is the *gotest.F a suite's fuzz method gets: f with the suite's
 // per-execution hooks and the wrapper's target, nil for a native signature.
 func FuzzF(f *testing.F, beforeEach, afterEach func(*gotest.T), target *FuzzTarget) *gotest.F {
-	return gotest.NewF(f, beforeEach, afterEach, target)
+	return ctors.FuzzF(f, beforeEach, afterEach, target)
 }
 
 // SeedArity checks one f.Add tuple against the target's arity.

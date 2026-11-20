@@ -1772,8 +1772,8 @@ Resolution is demand-driven: it starts from targeted suites and walks the Go typ
 ### Key Invariant
 
 The pipeline is always: **static analysis → code generation → `go test -c` → one process per suite**.
-The runtime components are the `gotest.T` wrapper with its assertion engine, `pkg/gotestruntime`, which every generated suite calls, and for fanned fuzz arguments the `pkg/gotestfuzz` leaf codecs.
-If a feature can't be implemented as (a) generated code, (b) a method on `gotest.T`, (c) runtime support in `pkg/gotestruntime` or `pkg/gotestfuzz`, or (d) post-processing of `go test -json`, it doesn't belong in this project.
+The runtime components are the `gotest.T` wrapper with its assertion engine, and `pkg/gotestruntime`, which every generated suite calls, its leaf codecs for fanned fuzz arguments included.
+If a feature can't be implemented as (a) generated code, (b) a method on `gotest.T`, (c) runtime support in `pkg/gotestruntime`, or (d) post-processing of `go test -json`, it doesn't belong in this project.
 
 ---
 

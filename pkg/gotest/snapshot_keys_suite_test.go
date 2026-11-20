@@ -113,7 +113,7 @@ func (s *SnapshotKeysTestSuite) TestBenchAndFuzzNames(t *gotest.T) {
 			})
 			gotest.True(it, named, "B has no Name")
 			gotest.Equal(it, want, got)
-			_, ok := any(gotest.NewF(nil, nil, nil, nil)).(interface{ Name() string })
+			_, ok := any(gotest.NewF(nil)).(interface{ Name() string })
 			gotest.True(it, ok, "F has no Name")
 		})
 	})

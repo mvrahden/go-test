@@ -21,14 +21,14 @@ func (s *DependencyAllowlistTestSuite) SuiteConfig() gotest.SuiteConfig {
 }
 
 // linked are the packages of this module a suite binary links through the
-// three packages a harness or a suite imports.
+// two packages a harness or a suite imports.
 var linked = []string{
-	module + "/internal/callsite", module + "/internal/carry", module + "/internal/control", module + "/internal/harnessctor",
+	module + "/internal/callsite", module + "/internal/carry", module + "/internal/control", module + "/internal/fuzzcodec", module + "/internal/harness",
 	module + "/internal/protocol", module + "/internal/protocol/sharedwire", module + "/internal/runstate",
 	module + "/internal/schedinfo",
 	module + "/internal/setupwaits", module + "/internal/unidiff",
 	module + "/pkg/gotest", module + "/pkg/gotest/internal/assert", module + "/pkg/gotest/internal/snapfile",
-	module + "/pkg/gotestfuzz", module + "/pkg/gotestruntime",
+	module + "/pkg/gotestruntime",
 }
 
 // TestWhatATestBinaryLinks compares every system before failing, so one
@@ -36,7 +36,7 @@ var linked = []string{
 func (s *DependencyAllowlistTestSuite) TestWhatATestBinaryLinks(t *gotest.T) {
 	var changed []string
 	for _, goos := range []string{"linux", "darwin", "windows", "freebsd"} {
-		deps := listDeps(t, goos, "amd64", "./pkg/gotest", "./pkg/gotestruntime", "./pkg/gotestfuzz")
+		deps := listDeps(t, goos, "amd64", "./pkg/gotest", "./pkg/gotestruntime")
 		for _, dep := range deps {
 			if !slices.Contains(linked, dep) {
 				changed = append(changed, goos+": joined "+dep)
