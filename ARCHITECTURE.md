@@ -1359,14 +1359,14 @@ Arrows read "imports". Third-party modules are named where a package needs one.
 
 Rules that hold, and what holds them:
 
-1. `cmd/gotest` imports no `pkg/*` package. The CLI and the code it generates for meet only through the generated source, so a CLI and a runtime of different releases can be told apart (the runtime floor).
+1. `cmd/gotest` imports no `pkg/*` package. The CLI and the code it generates for meet only through the generated source, so a CLI and a runtime of different releases can be told apart (the runtime floor). `vendordeps.go` names `pkg/gotestruntime` behind a build tag no build sets: `go mod vendor` reads it, the CLI never links it.
 2. `pkg/gotest` and `pkg/gotestruntime` import the standard library and this module, nothing else: they are linked into every user's test binary. A conventions suite fails on any other import.
 3. `pkg/gotestruntime` imports `pkg/gotest`, never the reverse. What both need lives in a leaf under `internal/` (`carry`, `runstate`, `setupwaits`, `callsite`, `harness`).
 4. The generator chain is one way: `gotestast` ← `gotestgen` ← `gotestrunner` ← `cmd/gotest`. Lint, migrate, refactor and scaffold read `gotestast` and `gotestgen` and never the runner.
 5. `internal/gotestspec` reads the event stream and imports neither the generator nor the runner, so a saved stream renders without either.
 6. No production package imports `internal/testkit`, `internal/speccatalog` or `internal/drill`.
 
-What the overlay design asks of a consumer: the suites run only under `gotest`; nothing on disk imports `pkg/gotestruntime`, so `go mod vendor` leaves it out unless a file of the module imports it; and a `go get -tool` declaration brings the CLI's dependencies into the consumer's `go.mod` as indirect requirements.
+What the overlay design asks of a consumer: the suites run only under `gotest`; nothing on disk imports `pkg/gotestruntime`, so `go mod vendor` copies it only through the CLI's tool declaration; and a `go get -tool` declaration brings the CLI's dependencies into the consumer's `go.mod` as indirect requirements.
 
 ## Failure Locations Without t.Helper()
 

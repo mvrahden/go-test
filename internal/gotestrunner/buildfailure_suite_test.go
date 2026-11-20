@@ -282,7 +282,7 @@ func (s *BuildFailureVerdictsTestSuite) TestAnInterruptBooksTheStop(t *gotest.T,
 }
 
 func (s *BuildFailureVerdictsTestSuite) TestAVendoredModule(t *gotest.T, _ *buildFailureCtx) {
-	const advice = `gotest: vendor/ lacks github.com/mvrahden/go-test/pkg/gotestruntime, which the generated harness imports and no file of this module does. Add a blank import of it to a test file (import _ "github.com/mvrahden/go-test/pkg/gotestruntime") and run go mod vendor, or run with -mod=mod.`
+	const advice = `gotest: vendor/ lacks github.com/mvrahden/go-test/pkg/gotestruntime, which the generated harness imports. Declare the CLI as a tool (go get -tool github.com/mvrahden/go-test/cmd/gotest@<the version go.mod requires>) and run go mod vendor, or run with -mod=mod.`
 	runtimeMissing := []byte("ok/gotest_psuite_test.go:7:2: cannot find module providing package github.com/mvrahden/go-test/pkg/gotestruntime: import lookup disabled by -mod=vendor\n")
 	otherMissing := []byte("ok/x_test.go:3:2: cannot find module providing package example.com/dep: import lookup disabled by -mod=vendor\n")
 	t.It("adds the advice to a build that lacks the runtime under -mod=vendor", func(it *gotest.T) {

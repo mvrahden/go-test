@@ -60,11 +60,13 @@ go tool gotest version
 ## Vendored modules
 
 In a vendored module (`vendor/modules.txt`) any go.mod edit breaks every
-build until `go mod vendor` reruns. gotest runs vendored only when a file
-of the module imports `github.com/mvrahden/go-test/pkg/gotestruntime`,
-because only generated code imports it; where that file is missing, report it and do not add it
-unasked. From v1.38 the build failure of each suite package says so
-itself: it names the blank import to add to a test file, and `-mod=mod`.
+build until `go mod vendor` reruns. Only generated code imports
+`github.com/mvrahden/go-test/pkg/gotestruntime`; from v1.39 `go mod vendor`
+copies it through the tool directive, so a module that declares the CLI
+needs nothing more. Below v1.39, or without the directive, gotest runs
+vendored only when a file of the module imports the runtime blank; where
+it is missing, report it and do not add it unasked. The build failure of
+each suite package names the fix itself (v1.38+), and `-mod=mod`.
 
 ## Running the CLI
 

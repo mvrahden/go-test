@@ -10748,15 +10748,15 @@
                   "children": [
                     {
                       "children": [],
-                      "display": "fails to build with exit 2, naming the blank import to add and -mod=mod",
+                      "display": "fails to build with exit 2, naming the tool declaration to add and -mod=mod",
                       "duration": 0,
                       "excluded": false,
                       "external": false,
                       "file": "vendored_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 42,
-                      "name": "fails_to_build_with_exit_2,_naming_the_blank_import_to_add_and_-mod=mod",
+                      "line": 43,
+                      "name": "fails_to_build_with_exit_2,_naming_the_tool_declaration_to_add_and_-mod=mod",
                       "output": [],
                       "status": "none",
                       "vocab": "it"
@@ -10769,7 +10769,7 @@
                   "file": "vendored_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 41,
+                  "line": 42,
                   "name": "a_suite_runs_in_a_module_whose_vendor_directory_lacks_pkg/gotestruntime",
                   "output": [],
                   "status": "none",
@@ -10783,7 +10783,7 @@
               "file": "vendored_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 21,
+              "line": 22,
               "name": "TestAModuleVendoredWithoutTheRuntime",
               "output": [],
               "status": "none"
@@ -10796,7 +10796,7 @@
           "file": "vendored_suite_test.go",
           "focused": false,
           "kind": "suite",
-          "line": 15,
+          "line": 16,
           "name": "TestCLIVendoredTestSuite",
           "output": [],
           "status": "none"
