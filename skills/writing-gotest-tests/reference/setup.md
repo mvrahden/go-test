@@ -66,7 +66,7 @@ copies it through the tool directive, so a module that declares the CLI
 needs nothing more. Below v1.39, or without the directive, gotest runs
 vendored only when a file of the module imports the runtime blank; where
 it is missing, report it and do not add it unasked. The build failure of
-each suite package names the fix itself (v1.38+), and `-mod=mod`.
+each suite package names the fix itself, and `-mod=mod`.
 
 ## Running the CLI
 
