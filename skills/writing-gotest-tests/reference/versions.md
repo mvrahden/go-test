@@ -699,5 +699,10 @@ What v1.39 changes:
    `gotest clean ./...`, and run gotest as `go tool gotest`, so the CLI and
    the runtime come from one version. A stdlib `FuzzXxx` wraps its
    `*testing.F` with `gotest.NewF(f)`, without the three `nil`s; a benchmark
-   of your own hands its `*testing.B` to assertions as it is. A vendored
-   module drops its blank import of `pkg/gotestfuzz`.
+   of your own hands its `*testing.B` to assertions as it is.
+
+3. **A vendored module imports nothing extra** — with the CLI declared by
+   `go get -tool`, `go mod vendor` copies `pkg/gotestruntime` itself:
+   delete the blank imports of `pkg/gotestruntime` and `pkg/gotestfuzz`
+   and vendor again. Without the tool directive the build failure of each
+   suite package names the `go get -tool` command, and `-mod=mod`.
