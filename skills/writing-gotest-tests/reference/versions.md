@@ -692,9 +692,9 @@ What v1.39 changes:
    resolves both from one version.
 
 2. **What only generated code used is gone from the user API** —
-   `gotest.NewTFromTB`, `gotest.NewB`, `gotest.SeedArg`, `gotest.SeedArity`,
-   `gotest.FuzzTarget`, `gotest.FuzzEach` and the package
-   `pkg/gotestfuzz`; generated code calls the runtime's names instead. A
+   `pkg/gotest` drops `NewTFromTB`, `NewB`, `SeedArg`, `SeedArity`,
+   `FuzzTarget` and `FuzzEach`, and the package `pkg/gotestfuzz` is gone;
+   generated code calls the runtime's names instead. A
    harness an older gotest left on disk no longer compiles: remove it with
    `gotest clean ./...`, and run gotest as `go tool gotest`, so the CLI and
    the runtime come from one version. A stdlib `FuzzXxx` wraps its
