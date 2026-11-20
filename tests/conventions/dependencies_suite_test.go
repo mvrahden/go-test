@@ -23,7 +23,7 @@ func (s *DependencyAllowlistTestSuite) SuiteConfig() gotest.SuiteConfig {
 // linked are the packages of this module a suite binary links through the
 // three packages a harness or a suite imports.
 var linked = []string{
-	module + "/internal/callsite", module + "/internal/carry", module + "/internal/control",
+	module + "/internal/callsite", module + "/internal/carry", module + "/internal/control", module + "/internal/harnessctor",
 	module + "/internal/protocol", module + "/internal/protocol/sharedwire", module + "/internal/runstate",
 	module + "/internal/schedinfo",
 	module + "/internal/setupwaits", module + "/internal/unidiff",

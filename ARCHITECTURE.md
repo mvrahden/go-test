@@ -328,7 +328,7 @@ func BenchmarkFooTestSuite(b *testing.B) {
         s.BeforeEach(eachT)                // outside timing
         b.StartTimer()
         b.ResetTimer()
-        s.BenchmarkParse(gotest.NewB(b))   // user's b.Loop() bounds measurement
+        s.BenchmarkParse(gotestruntime.BenchB(b))  // user's b.Loop() bounds measurement
     })
 }
 ```

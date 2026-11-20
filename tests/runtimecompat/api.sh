@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # A harness an older gotest generated must keep compiling against this
-# runtime and this user package. pkg/gotestruntime keeps every exported
-# symbol and signature of the last release (a dropped call stays as a shim in
-# deprecated.go). pkg/gotest prints every change; an incompatible one fails
-# unless accepted-breaks.txt lists its apidiff line.
+# runtime: pkg/gotestruntime keeps every exported symbol and signature of the
+# last release (a dropped call stays as a shim in deprecated.go). pkg/gotest
+# is the user API and prints every change; an incompatible one fails unless
+# accepted-breaks.txt lists its apidiff line.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 work="${TMPDIR:-/tmp}/gotest-runtimecompat-$(printf %s "$root" | cksum | cut -d' ' -f1)/api"

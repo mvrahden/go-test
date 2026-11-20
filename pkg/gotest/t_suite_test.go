@@ -171,7 +171,7 @@ func (s *TTestSuite) TestNestedBehaviorContext(t *gotest.T) {
 	})
 }
 
-func (s *TTestSuite) TestNewTFromTB(t *gotest.T) {
+func (s *TTestSuite) TestBenchmarkHookT(t *gotest.T) {
 	t.It("routes helpers through the TB and nils T()", func(it *gotest.T) {
 		res := testing.Benchmark(func(b *testing.B) {
 			tb := gotestruntime.EachT(b)

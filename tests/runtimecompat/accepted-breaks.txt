@@ -1,3 +1,7 @@
 # One line per accepted incompatible change of pkg/gotest, exactly as `apidiff -incompatible` prints it.
 # Each line needs a release note that tells users what to change.
 # Remove the lines once the release that carries them is tagged.
+- NewB: removed
+- NewTFromTB: removed
+- SeedArg: removed
+- SeedArity: removed

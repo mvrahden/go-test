@@ -1,24 +1,24 @@
 package gotestruntime
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/mvrahden/go-test/internal/harnessctor"
 	"github.com/mvrahden/go-test/pkg/gotest"
 )
 
-// The values generated benchmark and fuzz wrappers hand to a suite. Each
-// function is one call of the pkg/gotest constructor that builds it: the
-// fields it sets are unexported there.
+// The values generated benchmark and fuzz wrappers hand to a suite.
 
 // EachT is the *gotest.T a benchmark's BeforeEach and AfterEach get: tb's
 // own, with no *testing.T behind it.
 func EachT(tb testing.TB) *gotest.T {
-	return gotest.NewTFromTB(tb) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+	return harnessctor.EachT(tb).(*gotest.T) //nolint:forcetypeassert // pkg/gotest builds exactly this type
 }
 
 // BenchB is the *gotest.B a suite's benchmark method gets.
 func BenchB(b *testing.B) *gotest.B {
-	return gotest.NewB(b) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+	return harnessctor.BenchB(b).(*gotest.B) //nolint:forcetypeassert // pkg/gotest builds exactly this type
 }
 
 // FuzzTarget is the generated binding of one fuzz wrapper.
@@ -35,10 +35,22 @@ func FuzzF(f *testing.F, beforeEach, afterEach func(*gotest.T), target *FuzzTarg
 
 // SeedArity checks one f.Add tuple against the target's arity.
 func SeedArity(seed []any, n int) error {
-	return gotest.SeedArity(seed, n) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+	if len(seed) != n {
+		s := "s"
+		if len(seed) == 1 {
+			s = ""
+		}
+		return fmt.Errorf("f.Add was given %d value%s, but this fuzz target takes %d", len(seed), s, n)
+	}
+	return nil
 }
 
 // SeedArg asserts seed[i] to A, naming the 1-based position on mismatch.
 func SeedArg[A any](seed []any, i int) (A, error) {
-	return gotest.SeedArg[A](seed, i) //nolint:staticcheck // SA1019: the body lives beside the type it builds
+	a, ok := seed[i].(A)
+	if !ok {
+		var zero A
+		return zero, fmt.Errorf("value %d: f.Add was given %T, but this fuzz target takes %T", i+1, seed[i], zero)
+	}
+	return a, nil
 }

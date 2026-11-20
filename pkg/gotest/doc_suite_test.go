@@ -69,7 +69,7 @@ func (s *DocTestSuite) TestTheNamesATestIsWrittenAgainst(t *gotest.T) {
 	}
 	for _, name := range []string{
 		"T", "NewT", "T.Context", "T.Errorf", "T.FailNow", "T.Skipf", "T.It", "T.When", "MatchSnapshot",
-		"B", "NewB", "B.B", "B.Name", "B.Loop", "B.ReportAllocs", "B.SetBytes", "B.ReportMetric", "B.Context", "B.Errorf", "B.FailNow", "B.Skipf",
+		"B", "B.B", "B.Name", "B.Loop", "B.ReportAllocs", "B.SetBytes", "B.ReportMetric", "B.Context", "B.Errorf", "B.FailNow", "B.Skipf",
 	} {
 		gotest.NotEmpty(t, strings.TrimSpace(documented[name]), "%s has no doc comment", name)
 	}

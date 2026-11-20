@@ -309,7 +309,6 @@ shards of one run do not add up to every mutant exactly once.
 | `harness-drops-methods` | the shared suite-methods template omits the first method of each suite | census: declared methods have no verdict, exercised by the canary's passing fixture |
 | `bench-harness-drops-methods` | the bench template omits the first benchmark of each suite | bench census, exercised by the canary's benchmark fixture |
 | `fuzz-harness-drops-target` | the fuzz template omits the first fuzz target of each suite | canary: the fuzzing fixture's golden list (the fixture is red, so the census stands down) |
-| `old-harness-constructor-removed` | `gotest.NewB` is removed, so a harness an earlier gotest wrote no longer compiles | the deprecated-names suite: the recorded old harness fails to build with `undefined: ƒgotest.NewB` |
 | `exit-code-zero` | `WorstExitCode` always returns 0 | canary: exit codes differ from the golden list |
 | `hex-row-start-named` | a hunk in a hex rendering names the start of its row, not the byte that differs | ring-0 equal suite |
 | `hooks-calling-t-alias-unfollowed` | a hook's `t.T()` through a local alias of `t` (`tt := t`) is not seen | cli conformance: the alias row of the suites reaching `t.T()` other than by a plain call is accepted |
