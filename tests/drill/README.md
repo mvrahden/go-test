@@ -631,6 +631,10 @@ shards of one run do not add up to every mutant exactly once.
 | `overlay-outlives-its-run` | the overlay is written beside the work dir, so the run's cleanup leaves it | runner: the overlay outlives its run |
 | `overlay-also-written-to-the-cache` | a run also writes its overlay under the cache's `overlays` dir | runner: a run wrote under the cache's overlays dir |
 | `debug-run-drops-its-overlay` | a `--debug` run removes its work dir and overlay at its end like any run | cli conformance: the overlay a --debug run named is gone |
+| `debug-run-names-no-phases` | a `--debug` run does not end by naming how long each phase took | cli conformance: the last line of a --debug run's stderr is not the phases line |
+| `debug-phases-run-spans-the-command` | the phases line gives `run` the whole command, not the pipeline's span | cli conformance: the spans add up to more than the total |
+| `debug-phases-compile-spans-the-command` | the phases line gives `compile` the whole command, not the compile stage's span | cli conformance: compile is longer than run |
+| `plain-run-names-its-phases` | a run without `--debug` also ends by naming its phases | cli conformance: the plain run's stderr names phases |
 | `old-overlay-entries-never-drain` | the sweep no longer evicts the `overlays` entries older CLIs left in the cache | runner: an aged overlay entry outlives the sweep |
 | `lock-taken-on-a-replaced-file` | a run that waited on a binary's lock uses the cache though an eviction replaced the lock file meanwhile | runner: the run places the binary it found under the replaced lock |
 | `untouched-binary-ready-after-a-failed-build` | a placed cached binary go did not replace counts as up to date after go exited non-zero | runner: the row "same file, newer, exit 1" reads confirmed |
@@ -640,6 +644,7 @@ shards of one run do not add up to every mutant exactly once.
 | `suite-processes-ignore-gomaxprocs` | without `-p` a run starts a process per suite, whatever GOMAXPROCS is | cli conformance: the suites that wait for each other pass under GOMAXPROCS=1 |
 | `refused-link-fails-the-build` | a hard link the filesystem refuses fails the placement instead of falling back to a copy | runner: a refused link returns its error |
 | `build-failure-booked-under-every-package` | a failed package of a batched build is given the reports of other packages of its group | cli conformance: one vet finding is reported under the other package too |
+| `go-command-per-package` | every package gets a compile group of its own, so a run starts one `go test -c` per package | perf: twelve staged packages start twelve `go test -c` instead of one |
 | `same-named-packages-share-a-stage-dir` | every compile group builds into one stage dir, so a later group's binary replaces an earlier one's of the same name | cli conformance: one of two `util` packages does not run its suite |
 | `confirmed-binaries-reported-with-rebuilt` | the binaries go confirmed are reported in staged order beside those it rebuilt | runner: confirmed and rebuilt binaries ready together are reported in staged order |
 | `suites-race-for-slots` | each suite queues for a process slot from its own goroutine, in no set order | cli conformance: after an edit to the last of four packages, it does not run first |

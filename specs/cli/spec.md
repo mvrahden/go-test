@@ -466,6 +466,18 @@ The files a run generates for its packages SHALL be the run's own: runs that sha
 - **WHEN** a run given --min and no -coverprofile ends
 - **THEN** leaves no coverage profile in the temp directory
 
+### Requirement: Where a run's time went
+A --debug run SHALL follow its own output on stderr with one line naming how long it spent discovering, generating, compiling, running and reporting, and in total; only the coverage verdict of a run given --min may come after it, and is not counted in it. Compiling overlaps running, so the line gives each span, not a sum. A run without --debug SHALL print no such line.
+
+#### Scenario: A --debug run
+- **WHEN** a passing package is run with --debug
+- **THEN** the last line of stderr names the six spans as durations
+- **AND** compile is no longer than run, and the others add up to no more than the total
+
+#### Scenario: A run without --debug
+- **WHEN** the package is run without --debug
+- **THEN** stderr names no phases
+
 ### Requirement: The test binary cache
 A run's start SHALL evict from the test binary cache the binaries of a checkout that no longer exists, those unused for 7 days, then the least recently used until the cache is at most 5 GiB, and an eviction SHALL never fail a run or take a binary a run is linking or copying. A run SHALL reuse a cached binary only when it still has the size and checksum recorded when it was last linked; one that does not, or has no record, SHALL be linked again.
 

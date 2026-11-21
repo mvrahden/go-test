@@ -8635,6 +8635,113 @@
                   "children": [
                     {
                       "children": [],
+                      "display": "the last line of stderr names the six spans as durations",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "phases_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 30,
+                      "name": "the_last_line_of_stderr_names_the_six_spans_as_durations",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    },
+                    {
+                      "children": [],
+                      "display": "compile is no longer than run, and the others add up to no more than the total",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "phases_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 38,
+                      "name": "compile_is_no_longer_than_run,_and_the_others_add_up_to_no_more_than_the_total",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when a passing package is run with --debug",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "phases_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 29,
+                  "name": "a_passing_package_is_run_with_--debug",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "display": "stderr names no phases",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "phases_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 47,
+                      "name": "stderr_names_no_phases",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when the package is run without --debug",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "phases_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 46,
+                  "name": "the_package_is_run_without_--debug",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "WhereARunsTimeWent",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "phases_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 21,
+              "name": "TestWhereARunsTimeWent",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIPhases",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "phases_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 13,
+          "name": "TestCLIPhasesTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
                       "display": "all three pass",
                       "duration": 0,
                       "excluded": false,
@@ -33407,13 +33514,13 @@
     }
   ],
   "stats": {
-    "behaviors": 964,
+    "behaviors": 967,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 142,
+    "suites": 143,
     "tests": 0
   }
 }
