@@ -39,6 +39,8 @@ gotest.False(t, value bool)
 ```go
 gotest.Zero[V comparable](t, value V)               // value == zero value for type
 gotest.NotZero[V comparable](t, value V)             // value != zero value for type
+gotest.Nil(t, object any)                            // nil; non-comparable nilables only (type-guarded)
+gotest.NotNil(t, object any)                         // not nil; non-comparable nilables only
 ```
 
 `comparable` includes: pointers, interfaces, channels, numerics, strings, bools, structs of comparables, arrays of comparables.
@@ -146,6 +148,11 @@ Assertions take the types they are given at face value and say what they cannot 
 ## Eventually & Consistently
 
 Package-level functions for async polling. Both use `*gotest.R` — an assertion recorder that captures failures without propagating them.
+
+```go
+gotest.Eventually(t, waitFor, tick time.Duration, fn func(poll *gotest.R))    // fn passes once within waitFor, polled every tick
+gotest.Consistently(t, waitFor, tick time.Duration, fn func(poll *gotest.R))  // fn passes on every poll for all of waitFor
+```
 
 ```go
 gotest.Eventually(t, 5*time.Second, 100*time.Millisecond, func(poll *gotest.R) {

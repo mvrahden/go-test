@@ -11,6 +11,9 @@ invocation runs tests — there is NO `test` subcommand:
   that starts more than one suite process. `-run '^Test<Suite>$'` reaches
   only that suite's process and replays none of its fuzz seeds (v1.38+):
   name the `Fuzz<Suite>_<Method>` wrapper too, or drop the anchors.
+  A filtered run builds only the packages it runs, so a build or vet
+  failure in a package the filter leaves out goes unreported by that run
+  (`go test` builds every matched package).
   gotest has no result cache. Every run executes every suite it selects;
   it never prints `(cached)`.
   Outside CI mode a focused run notes on stderr that `F_` narrows it

@@ -662,6 +662,9 @@ gotest.TimeIsNow(t, ts, tolerance)           // timestamp ≈ now
 // Panics
 gotest.Panics(t, func() { ... })             // returns recovered value
 
+// Snapshots
+gotest.MatchSnapshot(t, value)               // compares with testdata/__snapshots__/<TestName>.snap
+
 // Failure
 gotest.Fail(t, "unreachable")                // immediate unconditional failure
 
@@ -1120,6 +1123,7 @@ gotest help                    # show help
 
 The `go test` flags keep their meaning: `-race`, `-cover`, `-count`, `-run`, `-skip`, `-list`, `-json`, `-short`, `-timeout`, `-v`, `-p`, `-exec` and the build flags. A few would break what gotest does and are refused with the reason, exit 2 ([Go test flags gotest implements](specs/cli/spec.md#requirement-go-test-flags-gotest-implements)): `-o`, `-c` and `-n`, since gotest builds the binaries itself; `-overlay`, since gotest builds through an overlay of its own; `-fuzz`, which `gotest fuzz` replaces; and `-cpuprofile`, `-memprofile`, `-blockprofile`, `-mutexprofile` and `-trace` on a run that starts more than one suite process, which would each write the one file. Every word after `-args` goes to the test binary as written.
 `-run` reaches each suite process as a pattern for that suite alone ([A -run pattern in each suite process](specs/cli/spec.md#requirement-a--run-pattern-in-each-suite-process)). `-run '^TestMySuite$'` names the suite's test function only, so its fuzz seeds do not replay; name the fuzz wrapper as well, or drop the anchors, to replay them.
+A filtered run builds only the packages it runs, so a build or vet failure in a package the filter leaves out is not reported by that run; `go test` builds every matched package.
 
 A run exits `0` when everything passed, `1` on a failed test (one that panics or calls `os.Exit` included — `os.Exit(0)` too, as under `go test`), a shared fixture that failed to set up or tear down, or an expired `--timeout` (a suite it stopped fails its package even when its methods passed: [A suite cut short by --timeout](specs/cli/spec.md#requirement-a-suite-cut-short-by---timeout)), `2` on a usage, generation or build error, on a text run in which a suite reports that it ran no tests ([A suite that ran no tests](specs/cli/spec.md#requirement-a-suite-that-ran-no-tests)), on a green run that writes an event stream (`-json`, `spec`, `summary`) in which a declared test never ran (a plain text run takes no census, and `-run`, `-skip` and `-list` stand it down), and when the patterns match no package, and `130` when it was interrupted. `lint` and `fuzz` state their own codes in `gotest help lint` and `gotest help fuzz`.
 
