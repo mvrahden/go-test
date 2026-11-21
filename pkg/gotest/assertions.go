@@ -164,21 +164,21 @@ func sleepUntil(at time.Time) {
 	}
 }
 
-// Contains asserts that s contains the given element (substring for strings, element for slices/arrays, key for maps).
-func Contains(t testingT, s, contains any, msgAndArgs ...any) {
-	found, guard := assert.IncludesElement(s, contains)
+// Contains asserts that haystack contains needle (substring for strings, element for slices/arrays, key for maps).
+func Contains(t testingT, haystack, needle any, msgAndArgs ...any) {
+	found, guard := assert.IncludesElement(haystack, needle)
 	if guard != "" {
 		fail(t, "Contains failed:\n  "+guard, msgAndArgs)
 		return
 	}
 	if !found {
-		fail(t, fmt.Sprintf("Contains failed:\n  %#v does not contain %#v", s, contains), msgAndArgs)
+		fail(t, fmt.Sprintf("Contains failed:\n  %#v does not contain %#v", haystack, needle), msgAndArgs)
 	}
 }
 
-// ElementsMatch asserts that listA and listB contain the same elements regardless of order.
-func ElementsMatch[V comparable](t testingT, listA, listB []V, msgAndArgs ...any) {
-	if msg := assert.CheckElementsMatch(listA, listB); msg != "" {
+// ElementsMatch asserts that a and b contain the same elements regardless of order.
+func ElementsMatch[V comparable](t testingT, a, b []V, msgAndArgs ...any) {
+	if msg := assert.CheckElementsMatch(a, b); msg != "" {
 		fail(t, msg, msgAndArgs)
 	}
 }
@@ -226,9 +226,9 @@ func ErrorAs[E error](t testingT, err error, msgAndArgs ...any) E {
 }
 
 // ErrorContains asserts that err is not nil and its message contains the given substring.
-// Fails with a type guard error when contains is empty; for non-nil error checks use Error.
-func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
-	if contains == "" {
+// Fails with a type guard error when substr is empty; for non-nil error checks use Error.
+func ErrorContains(t testingT, err error, substr string, msgAndArgs ...any) {
+	if substr == "" {
 		fail(t, "ErrorContains: contains is empty; for non-nil error checks, use Error", msgAndArgs)
 		return
 	}
@@ -236,8 +236,8 @@ func ErrorContains(t testingT, err error, contains string, msgAndArgs ...any) {
 		fail(t, "ErrorContains failed:\n  expected an error but got nil", msgAndArgs)
 		return
 	}
-	if text := assert.ErrorText(err); !strings.Contains(text, contains) {
-		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", text, contains), msgAndArgs)
+	if text := assert.ErrorText(err); !strings.Contains(text, substr) {
+		fail(t, fmt.Sprintf("ErrorContains failed:\n  error: %q\n  does not contain: %q", text, substr), msgAndArgs)
 	}
 }
 
@@ -372,15 +372,15 @@ func NoError(t testingT, err error, msgAndArgs ...any) {
 	}
 }
 
-// NotContains asserts that s does NOT contain the given element.
-func NotContains(t testingT, s, contains any, msgAndArgs ...any) {
-	found, guard := assert.IncludesElement(s, contains)
+// NotContains asserts that haystack does NOT contain needle.
+func NotContains(t testingT, haystack, needle any, msgAndArgs ...any) {
+	found, guard := assert.IncludesElement(haystack, needle)
 	if guard != "" {
 		fail(t, "NotContains failed:\n  "+guard, msgAndArgs)
 		return
 	}
 	if found {
-		fail(t, fmt.Sprintf("NotContains failed:\n  %#v should not contain %#v", s, contains), msgAndArgs)
+		fail(t, fmt.Sprintf("NotContains failed:\n  %#v should not contain %#v", haystack, needle), msgAndArgs)
 	}
 }
 
