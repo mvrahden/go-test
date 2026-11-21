@@ -20,7 +20,8 @@ type TestifyModuleSharedFixture struct {
 	GoSum string
 }
 
-// SharedFixtureConfig: a cold module cache downloads testify.
+// SharedFixtureConfig: a cold module cache downloads testify, a cold build
+// cache compiles it.
 func (f *TestifyModuleSharedFixture) SharedFixtureConfig() gotest.FixtureConfig {
 	cfg := gotest.DefaultFixtureConfig()
 	cfg.Timeout = 5 * time.Minute
@@ -74,6 +75,23 @@ func (f *TestifyModuleSharedFixture) BeforeAll(ctx context.Context) error {
 		return err
 	}
 	f.GoMod, f.GoSum = string(mod), string(sum)
+	return warmTestBuild(ctx, dir)
+}
+
+// warmTestBuild compiles and vets testify and gotest for a test build, with
+// the environment the suites reading the module run go in, so their first
+// parallel methods don't each compile them cold at once. The binary is not
+// kept: run here, the runtime's init would take this process's channel.
+func warmTestBuild(ctx context.Context, dir string) error {
+	if err := os.WriteFile(filepath.Join(dir, "stub_test.go"), []byte("package m\n\nimport \"testing\"\n\nfunc TestStub(t *testing.T) {}\n"), 0o600); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, "go", "test", "-c", "-o", os.DevNull, ".") //nolint:gosec // G204: the go tool with fixed arguments
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("go test: %w\n%s", err, out)
+	}
 	return nil
 }
 
