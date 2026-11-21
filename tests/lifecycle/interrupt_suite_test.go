@@ -28,7 +28,7 @@ type InterruptTestSuite struct {
 }
 
 func (s *InterruptTestSuite) SuiteConfig() gotest.SuiteConfig {
-	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: time.Minute}
+	return gotest.SuiteConfig{Parallel: true, Timeout: 30 * time.Second, SetupTimeout: 3 * time.Minute}
 }
 
 func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
@@ -52,6 +52,12 @@ func (s *InterruptTestSuite) BeforeAll(t *gotest.T) {
 	build := exec.Command("go", "test", "-c", "-o", s.binary, "./testdata/interrupt/") //nolint:gosec // G204: fixed args
 	build.Dir = s.root
 	out, err = build.CombinedOutput()
+	gotest.NoError(t, err, string(out))
+	// gotest fuzz builds the package instrumented, the standard library
+	// included: built here once, a method does not compile it cold.
+	fuzzBuild := exec.Command("go", "test", "-c", "-fuzz=^FuzzFuzzingTestSuite_FuzzSpins$", "-o", os.DevNull, "./testdata/interrupt/") //nolint:gosec // G204: fixed args
+	fuzzBuild.Dir = s.root
+	out, err = fuzzBuild.CombinedOutput()
 	gotest.NoError(t, err, string(out))
 }
 
