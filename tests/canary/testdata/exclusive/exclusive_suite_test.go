@@ -10,9 +10,11 @@ import (
 )
 
 // Three suites, three processes. The two bulk suites hold their window open
-// long enough to overlap each other; the Exclusive one must open only after
-// both bulk windows closed. Every suite stamps its window into a file the
-// canary reads back.
+// long enough to overlap each other, and close it apart: with two process
+// slots, an Exclusive suite dispatched with the bulk takes the first one freed
+// while the other window is still open. It must open only after both bulk
+// windows closed. Every suite stamps its window into a file the canary reads
+// back.
 
 func stamp(event, suite string) {
 	path := filepath.Join(os.Getenv("GOTEST_CANARY_DIR"), "windows")
@@ -36,7 +38,7 @@ func (s *BulkOneTestSuite) TestWindow(t *gotest.T) { window("BulkOneTestSuite", 
 
 type BulkTwoTestSuite struct{}
 
-func (s *BulkTwoTestSuite) TestWindow(t *gotest.T) { window("BulkTwoTestSuite", 300*time.Millisecond) }
+func (s *BulkTwoTestSuite) TestWindow(t *gotest.T) { window("BulkTwoTestSuite", time.Second) }
 
 type ExclusiveTestSuite struct{}
 
