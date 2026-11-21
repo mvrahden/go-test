@@ -33575,13 +33575,13 @@
     }
   ],
   "stats": {
-    "behaviors": 967,
+    "behaviors": 968,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 143,
+    "suites": 144,
     "tests": 0
   }
 }
