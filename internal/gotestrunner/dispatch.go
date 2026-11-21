@@ -58,7 +58,7 @@ type streamRun struct {
 	scopes    []suiteScope
 	collector *OutputCollector
 	baseEnv   []string
-	sem       chan struct{}
+	slots     *slots
 	fixtures  *fixtureSession
 	ledger    *fixtureLedger
 	releaser  *fixtureReleaser
@@ -91,7 +91,12 @@ const (
 
 // runSuite runs one suite and books exactly one verdict for it: its
 // result, stopped, or given up for a fixture that did not come up.
-func (r *streamRun) runSuite(t SuiteTarget, idx int, mode suiteMode) { //nolint:gocritic // hugeParam: a copy per suite is nothing beside the process it starts
+// held is the slot the suite queued for before it was handed here, nil for
+// none: it then queues once its fixtures are up.
+func (r *streamRun) runSuite(t SuiteTarget, idx int, mode suiteMode, held chan struct{}) { //nolint:gocritic // hugeParam: a copy per suite is nothing beside the process it starts
+	if held != nil {
+		defer r.slots.leave(held)
+	}
 	keys := plannedKeys(r.plan, &t)
 	stopped := func() {
 		traceSuite("stopped", &t, keys)
@@ -123,29 +128,22 @@ func (r *streamRun) runSuite(t SuiteTarget, idx int, mode suiteMode) { //nolint:
 		return
 	}
 	if mode != alone {
-		release, ok := r.slot()
-		if !ok {
+		if held == nil {
+			held = r.slots.queue()
+			defer r.slots.leave(held)
+		}
+		select {
+		case <-held:
+		case <-r.ctx.Done():
 			stopped()
 			return
 		}
-		defer release()
 	}
 	r.clock.run(t.Group, func() {
 		traceSuite("suite-start", &t, keys)
 		runRecorded(r.ctx, r.collector, t.Package, idx, t, env, r.collector.UsesTest2JSON())
 		traceSuite("suite-end", &t, keys)
 	})
-}
-
-// slot takes a dispatch slot for a suite, or reports that the run ended
-// first; release gives it back.
-func (r *streamRun) slot() (release func(), ok bool) {
-	select {
-	case r.sem <- struct{}{}:
-		return func() { <-r.sem }, true
-	case <-r.ctx.Done():
-		return nil, false
-	}
 }
 
 // done tells the ledger the suite's process is gone and queues what that frees.
@@ -211,7 +209,7 @@ func newStreamRun(ctx context.Context, cfg PipelineConfig, overlay *OverlayResul
 		}
 	}
 	maxParallel := computeDispatchConcurrency(&r.pf.RunFlags, cfg.Parallel, totalSuites, pf.ProcessCap, SanitizerActive(pf.BuildFlags), runtime.GOMAXPROCS(0))
-	r.sem = make(chan struct{}, maxParallel)
+	r.slots = newSlots(maxParallel)
 	r.buildFailed = len(overlay.BrokenPackages) > 0
 
 	// A package that will never run holds no fixture.
@@ -335,12 +333,18 @@ func (r *streamRun) take(outcome CompileOutcome, held map[string]*scopeQueue) { 
 			}
 			continue
 		}
+		// A suite with no shared fixture to wait for queues now, in the
+		// order the compile reported its package.
+		var held chan struct{}
+		if len(plannedKeys(r.plan, &target)) == 0 {
+			held = r.slots.queue()
+		}
 		r.wg.Add(1)
 		go func(t SuiteTarget, idx int) {
 			defer r.wg.Done()
 			// Last of all, once the suite's process is gone.
 			defer r.done(&t)
-			r.runSuite(t, idx, streamed)
+			r.runSuite(t, idx, streamed, held)
 		}(target, i)
 	}
 }
@@ -399,7 +403,7 @@ func (r *streamRun) runScopes(held map[string]*scopeQueue) {
 					defer scopeWg.Done()
 					// Last of all, once the suite's process is gone.
 					defer r.done(&t)
-					r.runSuite(t, idx, deferred)
+					r.runSuite(t, idx, deferred, nil)
 				}(d.t, d.idx)
 			}
 			scopeWg.Wait()
@@ -411,7 +415,7 @@ func (r *streamRun) runScopes(held map[string]*scopeQueue) {
 		for i := range tail {
 			d := &tail[i]
 			r.startFor(tail[i:i+1], "exclusive tail")
-			r.runSuite(d.t, d.idx, alone)
+			r.runSuite(d.t, d.idx, alone, nil)
 			if left--; left == 0 {
 				r.allIn()
 			}

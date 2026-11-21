@@ -586,11 +586,11 @@ const (
 
 // ExportNewStreamRun is a streaming run of plan booking into c, its fixtures
 // in f, with slots dispatch slots. It ends with ctx.
-func ExportNewStreamRun(ctx context.Context, plan *RunPlan, c *OutputCollector, f *fixtureSession, slots int) *streamRun {
+func ExportNewStreamRun(ctx context.Context, plan *RunPlan, c *OutputCollector, f *fixtureSession, n int) *streamRun {
 	ctx, cancel := context.WithCancel(ctx)
 	return &streamRun{
 		ctx: ctx, cancel: cancel, plan: plan, collector: c, fixtures: f,
-		sem:      make(chan struct{}, slots),
+		slots:    newSlots(n),
 		ledger:   newFixtureLedger(nil, nil),
 		releaser: startFixtureReleaser(ctx, func() *SharedFixtureProcess { return nil }),
 	}
@@ -599,7 +599,7 @@ func ExportNewStreamRun(ctx context.Context, plan *RunPlan, c *OutputCollector, 
 // ExportRunSuite runs the suite of r's first package named by its test
 // function, in mode, at index 0.
 func ExportRunSuite(r *streamRun, suite string, mode suiteMode) {
-	r.runSuite(SuiteTarget{SuiteSpec: SuiteSpec{Package: r.plan.Packages[0].Path, SuiteName: suite}}, 0, mode)
+	r.runSuite(SuiteTarget{SuiteSpec: SuiteSpec{Package: r.plan.Packages[0].Path, SuiteName: suite}}, 0, mode, nil)
 }
 
 // ExportNewUpProcess is a process without a subprocess behind it whose every
@@ -832,6 +832,7 @@ var (
 	ExportBinaryReady = binaryReady
 	ExportRenameSafe  = renameSafe
 	ExportPublish     = publish
+	ExportReportOrder = reportOrder
 )
 
 // ExportPlaced reports whether a cached binary was placed in b's slot.
@@ -869,3 +870,8 @@ func ExportSetHardLink(fn func(oldname, newname string) error) (restore func()) 
 func ExportDispatchedPackages(o *OverlayResult, run, skip string, skipGroups []string) map[string]bool {
 	return dispatchedPackages(o.plan().testRun(selection{Run: run, Skip: skip, Groups: newGroupSelection(nil, skipGroups)}))
 }
+
+// ExportNewSlots, ExportQueue and ExportLeave drive the run's suite slots.
+func ExportNewSlots(n int) *slots              { return newSlots(n) }
+func ExportQueue(s *slots) chan struct{}       { return s.queue() }
+func ExportLeave(s *slots, held chan struct{}) { s.leave(held) }

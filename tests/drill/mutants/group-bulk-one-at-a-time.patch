@@ -2,9 +2,9 @@ Expect: ^FAIL .*conformance/lifecycle .* / runs the suites of e2e beside each ot
 Clause: when suites of the default group, of a group e2e and of a later group run → runs the suites of e2e beside each other, two 1s suites within 1.8s
 --- a/internal/gotestrunner/dispatch.go
 +++ b/internal/gotestrunner/dispatch.go
-@@ -379,6 +379,7 @@
+@@ -405,6 +405,7 @@
  					defer r.done(&t)
- 					r.runSuite(t, idx, deferred)
+ 					r.runSuite(t, idx, deferred, nil)
  				}(d.t, d.idx)
 +				scopeWg.Wait()
  			}

@@ -2,7 +2,7 @@ Expect: ^FAIL .*conformance/fixtures .* / starts that fixture and runs the suite
 Clause: when a shared fixture's release takes its time while an exclusive suite needs a fixture of its own → starts that fixture and runs the suite while the release still runs
 --- a/internal/gotestrunner/dispatch.go
 +++ b/internal/gotestrunner/dispatch.go
-@@ -317,7 +317,11 @@
+@@ -343,7 +343,11 @@
  		go func(t SuiteTarget, idx int) {
  			defer r.wg.Done()
  			// Last of all, once the suite's process is gone.
@@ -12,6 +12,6 @@ Clause: when a shared fixture's release takes its time while an exclusive suite 
 +					_ = r.fixtures.proc.TeardownKeys(r.ctx, keys, r.fixtures.proc.teardownBudget())
 +				}
 +			}()
- 			r.runSuite(t, idx, streamed)
+ 			r.runSuite(t, idx, streamed, held)
  		}(target, i)
  	}

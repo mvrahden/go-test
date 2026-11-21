@@ -518,6 +518,13 @@ A run SHALL build its packages together and report each build failure under the 
 - **WHEN** two packages named util are run together
 - **THEN** both run and pass
 
+### Requirement: Packages go rebuilt run first
+Of the packages whose binaries are ready at once, the suites of those go rebuilt SHALL start before the suites of those whose cached binary go confirmed up to date, so after an edit the package changed reports first.
+
+#### Scenario: One package edited after a run
+- **WHEN** four packages ran once, the last of them is edited, and they run again with -p 1
+- **THEN** the edited package's suite runs first
+
 ### Requirement: How test binaries are linked
 A run SHALL link its test binaries without the symbol table and debug information, as go test does, unless -ldflags is given as an argument or in GOFLAGS, a -cpuprofile, -memprofile, -blockprofile or -mutexprofile flag is given, or --debug keeps the binaries.
 

@@ -8726,6 +8726,67 @@
                 {
                   "children": [
                     {
+                      "children": [],
+                      "display": "the edited package's suite runs first",
+                      "duration": 0,
+                      "excluded": false,
+                      "external": false,
+                      "file": "rebuiltfirst_suite_test.go",
+                      "focused": false,
+                      "kind": "block",
+                      "line": 46,
+                      "name": "the_edited_package's_suite_runs_first",
+                      "output": [],
+                      "status": "none",
+                      "vocab": "it"
+                    }
+                  ],
+                  "display": "when four packages ran once, the last of them is edited, and they run again with -p 1",
+                  "duration": 0,
+                  "excluded": false,
+                  "external": false,
+                  "file": "rebuiltfirst_suite_test.go",
+                  "focused": false,
+                  "kind": "block",
+                  "line": 45,
+                  "name": "four_packages_ran_once,_the_last_of_them_is_edited,_and_they_run_again_with_-p_1",
+                  "output": [],
+                  "status": "none",
+                  "vocab": "when"
+                }
+              ],
+              "display": "PackagesGoRebuilt",
+              "duration": 0,
+              "excluded": false,
+              "external": false,
+              "file": "rebuiltfirst_suite_test.go",
+              "focused": false,
+              "kind": "method",
+              "line": 35,
+              "name": "TestPackagesGoRebuilt",
+              "output": [],
+              "status": "none"
+            }
+          ],
+          "display": "CLIRebuiltFirst",
+          "duration": 0,
+          "excluded": false,
+          "external": true,
+          "file": "rebuiltfirst_suite_test.go",
+          "focused": false,
+          "kind": "suite",
+          "line": 15,
+          "name": "TestCLIRebuiltFirstTestSuite",
+          "output": [],
+          "status": "none"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
                       "children": [
                         {
                           "children": [],
@@ -26279,7 +26340,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 64,
+                      "line": 79,
                       "name": "lint_-fix_renames_every_receiver_and_use,_and_the_package_still_compiles",
                       "output": [],
                       "status": "none",
@@ -26293,7 +26354,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 62,
+                  "line": 77,
                   "name": "lint_-fix_removes_the_focus_of_a_suite_whose_methods_and_uses_are_spread_over_several_files",
                   "output": [],
                   "status": "none",
@@ -26307,7 +26368,7 @@
               "file": "focus_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 61,
+              "line": 76,
               "name": "TestSpread",
               "output": [],
               "status": "none"
@@ -26325,7 +26386,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 82,
+                      "line": 97,
                       "name": "lint_-fix_renames_every_generic_receiver_and_alias,_and_the_package_still_compiles",
                       "output": [],
                       "status": "none",
@@ -26339,7 +26400,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 80,
+                  "line": 95,
                   "name": "lint_-fix_removes_the_focus_of_a_generic_suite_that_aliases_instantiate",
                   "output": [],
                   "status": "none",
@@ -26353,7 +26414,7 @@
               "file": "focus_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 79,
+              "line": 94,
               "name": "TestGeneric",
               "output": [],
               "status": "none"
@@ -26371,7 +26432,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 100,
+                      "line": 115,
                       "name": "lint_-fix_renames_the_external_test_package's_references_too",
                       "output": [],
                       "status": "none",
@@ -26385,7 +26446,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 98,
+                  "line": 113,
                   "name": "lint_-fix_removes_the_focus_of_a_suite_the_external_test_package_refers_to",
                   "output": [],
                   "status": "none",
@@ -26399,7 +26460,7 @@
               "file": "focus_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 97,
+              "line": 112,
               "name": "TestExternal",
               "output": [],
               "status": "none"
@@ -26417,7 +26478,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 115,
+                      "line": 130,
                       "name": "lint_-fix_renames_the_focused_benchmark_and_fuzz_methods,_and_the_package_still_compiles",
                       "output": [],
                       "status": "none",
@@ -26431,7 +26492,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 113,
+                  "line": 128,
                   "name": "lint_-fix_removes_the_focus_of_a_benchmark_or_fuzz_method",
                   "output": [],
                   "status": "none",
@@ -26445,7 +26506,7 @@
               "file": "focus_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 112,
+              "line": 127,
               "name": "TestMethodKinds",
               "output": [],
               "status": "none"
@@ -26463,7 +26524,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 129,
+                      "line": 144,
                       "name": "lint_-fix_renames_the_selectors_and_literal_keys_that_name_the_embedded_field,_and_the_package_still_compiles",
                       "output": [],
                       "status": "none",
@@ -26477,7 +26538,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 127,
+                  "line": 142,
                   "name": "lint_-fix_removes_the_focus_of_a_suite_another_type_embeds",
                   "output": [],
                   "status": "none",
@@ -26491,7 +26552,7 @@
               "file": "focus_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 126,
+              "line": 141,
               "name": "TestEmbedded",
               "output": [],
               "status": "none"
@@ -26509,7 +26570,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 155,
+                      "line": 170,
                       "name": "lint_-fix_renames_their_references_too,_and_the_package_still_compiles_with_the_tag",
                       "output": [],
                       "status": "none",
@@ -26523,7 +26584,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 153,
+                  "line": 168,
                   "name": "lint_-fix_removes_the_focus_of_a_suite_that_files_behind_a_build_constraint_refer_to",
                   "output": [],
                   "status": "none",
@@ -26540,7 +26601,7 @@
                       "file": "focus_suite_test.go",
                       "focused": false,
                       "kind": "block",
-                      "line": 168,
+                      "line": 183,
                       "name": "lint_-fix_leaves_the_focus_and_names_the_file's_position",
                       "output": [],
                       "status": "none",
@@ -26554,7 +26615,7 @@
                   "file": "focus_suite_test.go",
                   "focused": false,
                   "kind": "block",
-                  "line": 166,
+                  "line": 181,
                   "name": "a_file_behind_a_build_constraint_spells_the_focused_name_and_no_build_type-checks_it",
                   "output": [],
                   "status": "none",
@@ -26568,7 +26629,7 @@
               "file": "focus_suite_test.go",
               "focused": false,
               "kind": "method",
-              "line": 152,
+              "line": 167,
               "name": "TestConstrainedFiles",
               "output": [],
               "status": "none"
@@ -33239,13 +33300,13 @@
     }
   ],
   "stats": {
-    "behaviors": 961,
+    "behaviors": 962,
     "benchmarks": 0,
     "failed": 0,
     "fuzzers": 0,
     "passed": 0,
     "skipped": 0,
-    "suites": 140,
+    "suites": 141,
     "tests": 0
   }
 }

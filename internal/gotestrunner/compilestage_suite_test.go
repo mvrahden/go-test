@@ -74,6 +74,20 @@ func (s *CompileStageTestSuite) TestReadiness(t *gotest.T, ctx *stageCtx) {
 	}
 }
 
+func (s *CompileStageTestSuite) TestReportOrder(t *gotest.T, ctx *stageCtx) {
+	ready := []gotestrunner.ExportReadiness{gotestrunner.ExportConfirmed, gotestrunner.ExportRebuilt, gotestrunner.ExportConfirmed, gotestrunner.ExportRebuilt}
+	t.When("go exits with confirmed and rebuilt binaries ready together", func(w *gotest.T) {
+		w.It("reports the rebuilt ones first, each kind in staged order", func(it *gotest.T) {
+			gotest.Equal(it, []int{1, 3, 0, 2}, gotestrunner.ExportReportOrder([]int{0, 1, 2, 3}, ready))
+		})
+	})
+	t.When("only some slots are ready", func(w *gotest.T) {
+		w.It("reports those alone", func(it *gotest.T) {
+			gotest.Equal(it, []int{3, 0}, gotestrunner.ExportReportOrder([]int{0, 3}, ready))
+		})
+	})
+}
+
 func (s *CompileStageTestSuite) TestRenameSafe(t *gotest.T, ctx *stageCtx) {
 	dir := gotest.Must(os.Stat(t.TempDir()))
 	t.It("holds where go renames its output into place", func(it *gotest.T) {

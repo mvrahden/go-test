@@ -1,0 +1,24 @@
+Judge: ./internal/gotestrunner CompileStageTestSuite/TestReportOrder
+Expect: ^FAIL .*internal/gotestrunner CompileStage .* / reports the rebuilt ones first, each kind in staged order \(
+--- a/internal/gotestrunner/compilestage.go
++++ b/internal/gotestrunner/compilestage.go
+@@ -147,18 +147,7 @@
+ // a cached binary only at its exit, beside what it rebuilt last; reported
+ // first, the package just edited runs first.
+ func reportOrder(found []int, ready []readiness) []int {
+-	order := make([]int, 0, len(found))
+-	for _, i := range found {
+-		if ready[i] == rebuilt {
+-			order = append(order, i)
+-		}
+-	}
+-	for _, i := range found {
+-		if ready[i] != rebuilt {
+-			order = append(order, i)
+-		}
+-	}
+-	return order
++	return found
+ }
+ 
+ // exitCode is go's exit code: 0 for nil, the process's code, else 1.

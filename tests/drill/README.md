@@ -641,6 +641,8 @@ shards of one run do not add up to every mutant exactly once.
 | `refused-link-fails-the-build` | a hard link the filesystem refuses fails the placement instead of falling back to a copy | runner: a refused link returns its error |
 | `build-failure-booked-under-every-package` | a failed package of a batched build is given the reports of other packages of its group | cli conformance: one vet finding is reported under the other package too |
 | `same-named-packages-share-a-stage-dir` | every compile group builds into one stage dir, so a later group's binary replaces an earlier one's of the same name | cli conformance: one of two `util` packages does not run its suite |
+| `confirmed-binaries-reported-with-rebuilt` | the binaries go confirmed are reported in staged order beside those it rebuilt | runner: confirmed and rebuilt binaries ready together are reported in staged order |
+| `suites-race-for-slots` | each suite queues for a process slot from its own goroutine, in no set order | cli conformance: after an edit to the last of four packages, it does not run first |
 | `strip-overrides-goflags-ldflags` | the strip flag is added though GOFLAGS carries `-ldflags`, which it then overrides | cli conformance: a GOFLAGS `-X` value is not printed and the binary has no DWARF |
 | `test-binaries-never-stripped` | test binaries keep their symbol table and DWARF on a plain run | cli conformance: a plain run's binary carries debug information |
 | `profiled-binary-stripped` | a run with a profile flag strips its binary all the same | cli conformance: a `-cpuprofile` run's binary has no DWARF |

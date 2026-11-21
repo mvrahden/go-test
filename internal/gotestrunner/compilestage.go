@@ -61,6 +61,7 @@ func compileGroup(ctx context.Context, group []string, overlayFlag string, build
 	ready := make([]readiness, len(staged))
 	reported := make([]bool, len(staged))
 	pass := func(exited int) {
+		var found []int
 		for i := range staged {
 			b := &staged[i]
 			if reported[i] || ctx.Err() != nil {
@@ -74,8 +75,11 @@ func compileGroup(ctx context.Context, group []string, overlayFlag string, build
 			now, _ := os.Stat(b.Path)
 			if r := binaryReady(b.placed, now, safe, exited); r != notReady {
 				reported[i], ready[i] = true, r
-				emit(CompileOutcome{Package: b.Package, Result: CompileResult{Package: b.Package, BinaryPath: b.Path}})
+				found = append(found, i)
 			}
+		}
+		for _, i := range reportOrder(found, ready) {
+			emit(CompileOutcome{Package: staged[i].Package, Result: CompileResult{Package: staged[i].Package, BinaryPath: staged[i].Path}})
 		}
 	}
 	tick := time.NewTicker(pollInterval)
@@ -136,6 +140,25 @@ func forwardBuildOutput(staged []stagedBinary, reported []bool, log *buildLog, s
 	if len(out) > 0 {
 		_, _ = os.Stderr.Write(out)
 	}
+}
+
+// reportOrder is the order the slots found ready together are reported in:
+// what go rebuilt, then what it confirmed, each in staged order. Go confirms
+// a cached binary only at its exit, beside what it rebuilt last; reported
+// first, the package just edited runs first.
+func reportOrder(found []int, ready []readiness) []int {
+	order := make([]int, 0, len(found))
+	for _, i := range found {
+		if ready[i] == rebuilt {
+			order = append(order, i)
+		}
+	}
+	for _, i := range found {
+		if ready[i] != rebuilt {
+			order = append(order, i)
+		}
+	}
+	return order
 }
 
 // exitCode is go's exit code: 0 for nil, the process's code, else 1.
