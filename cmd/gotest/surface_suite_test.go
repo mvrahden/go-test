@@ -3,6 +3,8 @@ package main_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	. "github.com/mvrahden/go-test/cmd/gotest"
 
@@ -53,6 +55,23 @@ func (s *SurfaceContractTestSuite) TestCLISurfaceMatchesSpec(t *gotest.T) {
 			for flag := range documented {
 				_, known := ExportGotestFlags[flag]
 				gotest.True(it, known, "spec.md documents unknown flag %q", flag)
+			}
+		})
+	})
+
+	t.When("comparing the website reference's Flags table", func(w *gotest.T) {
+		site, err := os.ReadFile(filepath.Join("..", "..", "site", "content", "reference.html"))
+		gotest.NoError(w, err)
+		documented := siteFlagRows(w, string(site))
+		w.It("lists every registered --flag", func(it *gotest.T) {
+			for flag := range ExportGotestFlags {
+				gotest.True(it, documented[flag], "flag %q missing from the website reference", flag)
+			}
+		})
+		w.It("lists no phantom flags", func(it *gotest.T) {
+			for flag := range documented {
+				_, known := ExportGotestFlags[flag]
+				gotest.True(it, known, "the website reference lists unknown flag %q", flag)
 			}
 		})
 	})
@@ -120,3 +139,20 @@ func (s *SurfaceContractTestSuite) TestActionSurfaceMatchesSpec(t *gotest.T) {
 		})
 	})
 }
+
+// siteFlagRows are the flags the rows of the website reference's Flags table
+// name in their first cell, "--name" whatever value follows.
+func siteFlagRows(t *gotest.T, html string) map[string]bool {
+	start := strings.Index(html, "<h3>Flags</h3>")
+	gotest.GreaterOrEqual(t, start, 0, "the website reference has no Flags heading")
+	body := html[start:]
+	end := strings.Index(body, "</tbody>")
+	gotest.GreaterOrEqual(t, end, 0, "the website reference's Flags table has no end")
+	rows := map[string]bool{}
+	for _, m := range siteFlagCell.FindAllStringSubmatch(body[:end], -1) {
+		rows[m[1]] = true
+	}
+	return rows
+}
+
+var siteFlagCell = regexp.MustCompile(`<tr><td><code>(--[a-z][a-z-]*)`)
